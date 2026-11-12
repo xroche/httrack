@@ -1,0 +1,18 @@
+#!/bin/bash
+#
+# hts_findnext() lists every entry, a dangling symlink included
+# ('httrack -#test=findall <dir>').
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+dir=$(mktemp -d)
+cleanup_push rm -rf "$dir"
+
+# Windows creates no links, so it lists the 10 dirs alone.
+want="findall: listed 13 entries"
+target_is_windows && want="findall: listed 10 entries"
+out=$(httrack -#test=findall "$dir")
+echo "$out"
+test "$out" == "$want" || fail "unexpected report (want '$want')"

@@ -126,7 +126,7 @@ data-for="droid">Tap <b>Next</b></span> to create a project, or open one you alr
 
 <figure>
 	<img data-for="win" src="img/guide-win-start.png" alt="WinHTTrack welcome pane" width="1040" height="744">
-	<img data-for="web" src="img/guide-web-start.png" alt="WebHTTrack welcome page" width="1024" height="387">
+	<img data-for="web" src="img/guide-web-start.png" alt="WebHTTrack welcome page" width="1024" height="410">
 	<img data-for="droid" src="img/guide-droid-start.png" alt="HTTrack for Android welcome screen" width="600" height="1300">
 	<figcaption>The welcome screen.</figcaption>
 </figure>
@@ -147,7 +147,7 @@ together in the list.</p>
 
 <figure>
 	<img data-for="win" src="img/guide-win-project-name.png" alt="WinHTTrack project name, category and base path" width="1040" height="744">
-	<img data-for="web" src="img/guide-web-project-name.png" alt="WebHTTrack project name, category and base path" width="1024" height="329">
+	<img data-for="web" src="img/guide-web-project-name.png" alt="WebHTTrack project name, category and base path" width="1024" height="313">
 	<img data-for="droid" src="img/guide-droid-project-name.png" alt="Android project name, category and base path" width="600" height="1300">
 	<figcaption>Project name, category, and where the files go.</figcaption>
 </figure>
@@ -217,14 +217,34 @@ keep their links to each other.</p>
 <p data-for="win web">The <b>Add a URL</b> button takes one address at a time. It can attach
 a login and password to that one address, for a page behind basic authentication.</p>
 
+<p data-for="win">To copy a site behind a login, click <b>Add URL...</b>, then
+<b>Log in with a browser...</b>. Log in to the site in the window that opens, click
+<b>Done</b>, then click <b>OK</b>. The mirror now uses that login. See
+<a href="login.html#win-login">Sites behind a login</a>.</p>
+
+<p data-for="web">To copy a site behind a login, click <b>Log in with a browser...</b>
+and paste the request that you copied from your browser with "Copy as cURL". The mirror
+now uses that login. See
+<a href="login.html#webhttrack">Sites behind a login</a>.</p>
+
+<p data-for="droid">To copy a site behind a login, tap <b>Log in with a browser</b>,
+under the address field. Log in, then tap <b>Use this login</b>. The mirror now uses that
+login. See
+<a href="login.html#android">Sites behind a login</a>.</p>
+
 <p data-for="win">It can also capture an address out of your browser, for a page
 you can only reach by submitting a form or following a script: HTTrack listens on a local
 port, you point your browser at it as a proxy and click the link or the submit button as
 usual, and the address the browser asks for is added to the project.</p>
 
 <figure data-for="web">
-	<img data-for="web" src="img/guide-web-add-url.png" alt="WebHTTrack add-a-URL dialog" width="1024" height="565">
+	<img data-for="web" src="img/guide-web-add-url.png" alt="WebHTTrack add-a-URL dialog" width="1024" height="525">
 	<figcaption>Adding a single address, with an optional login.</figcaption>
+</figure>
+
+<figure data-for="win">
+	<img data-for="win" src="img/guide-win-add-url.png" alt="WinHTTrack Insert URL dialog" width="415" height="270">
+	<figcaption>Adding a single address, with the "Log in with a browser..." button.</figcaption>
 </figure>
 
 <p>Everything else lives behind <b>Set options</b>, described in
@@ -363,7 +383,7 @@ them in.</p>
 </div>
 
 <div class="opt" data-for="win web">
-	<div class="opt-head"><span class="opt-name">Rule list from a file</span><span class="cli">-%S, --urllist &lt;file&gt;</span></div>
+	<div class="opt-head"><span class="opt-name">Rule list from a file</span><span class="cli">-%S, --filterlist &lt;file&gt;</span></div>
 	<p>Reads rules from a text file, one per line, instead of the box.</p>
 </div>
 
@@ -455,7 +475,7 @@ bottom are the ones that keep you welcome.</p>
 
 <figure>
 	<img data-for="win" src="img/guide-win-opt-flow-control.png" alt="WinHTTrack Flow Control tab" width="524" height="448">
-	<img data-for="web" src="img/guide-web-opt-flow-control.png" alt="WebHTTrack Flow Control tab" width="1024" height="827">
+	<img data-for="web" src="img/guide-web-opt-flow-control.png" alt="WebHTTrack Flow Control tab" width="1024" height="864">
 	<img data-for="droid" src="img/guide-droid-opt-flow-control.png" alt="Android Flow Control tab" width="600" height="1300">
 </figure>
 
@@ -602,7 +622,7 @@ bottom are the ones that keep you welcome.</p>
 
 <figure>
 	<img data-for="win" src="img/guide-win-opt-browser-id.png" alt="WinHTTrack Browser ID tab" width="524" height="448">
-	<img data-for="web" src="img/guide-web-opt-browser-id.png" alt="WebHTTrack Browser ID tab" width="1024" height="619">
+	<img data-for="web" src="img/guide-web-opt-browser-id.png" alt="WebHTTrack Browser ID tab" width="1024" height="1168">
 	<img data-for="droid" src="img/guide-droid-opt-browser-id.png" alt="Android Browser ID tab" width="600" height="1300">
 </figure>
 
@@ -641,6 +661,9 @@ bottom are the ones that keep you welcome.</p>
 	<p data-for="win">The rows open in their own window, from the Accept headers button.</p>
 	<figure data-for="win">
 		<img data-for="win" src="img/guide-win-opt-accept-headers.png" alt="WinHTTrack Accept headers window" width="586" height="445">
+	</figure>
+	<figure data-for="droid">
+		<img data-for="droid" src="img/guide-droid-opt-accept-headers.png" alt="Android Accept headers tab" width="600" height="1300">
 	</figure>
 </div>
 

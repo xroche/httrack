@@ -1,0 +1,41 @@
+#!/bin/bash
+#
+# -%I2 writes sindex.html: a letter bar, one row per word with its pages, a
+# common word marked ignored, and a closing table, with no stale bytes after it.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+require_httrack
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_kwhtml.XXXXXX")
+cleanup_push rm -rf "$tmp"
+
+# 1000 distinct words keep "alpha" under the "too common" threshold and make
+# "the" (30 hits) exceed it.
+mkdir "$tmp/a"
+{
+    printf '<html><body>alpha beta alpha <a href="p2.html">x</a>'
+    for i in $(seq 1 1000); do printf ' w%dx' "$i"; done
+    for _ in $(seq 1 30); do printf ' the'; done
+    printf '</body></html>'
+} >"$tmp/a/index.html"
+echo '<html><body>alpha gamma</body></html>' >"$tmp/a/p2.html"
+
+bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$tmp/a")" \
+    --file-matches ../sindex.html '^ <a href="#a">a</a>' \
+    --file-matches ../sindex.html '^<th>g</th>' \
+    --file-matches ../sindex.html '^<a name="b"></a>' \
+    --file-matches ../sindex.html '^<tr>' \
+    --file-matches ../sindex.html '^<td>alpha</td>' \
+    --file-matches ../sindex.html '^<a href="[^"]*index.html">[^<]*</a> \[[0-9]+ hits\]<br>' \
+    --file-matches ../sindex.html '^<a href="[^"]*p2.html">[^<]*</a> \[[0-9]+ hits\]<br>' \
+    --file-matches ../sindex.html '^\(ignored\) \[[0-9]+ hits\]<br>' \
+    --file-matches ../sindex.html '^</table>' \
+    --file-matches ../sindex.html '^<td>the</td>' \
+    --not-found ../index.txt \
+    httrack BASEURL/index.html -q -%I2

@@ -43,7 +43,9 @@ Please visit our Website: http://www.httrack.com
 #include <unistd.h>
 #endif
 
-FILE *hts_fopen_private(const char *name, const char *mode) {
+/* excl: fail if name exists. */
+static FILE *fopen_private(const char *name, const char *mode,
+                           hts_boolean excl) {
   char catbuff[CATBUFF_SIZE];
 
   /* O_TRUNC below would silently turn an append into a rewrite */
@@ -52,13 +54,16 @@ FILE *hts_fopen_private(const char *name, const char *mode) {
     return NULL;
   }
 #ifdef _WIN32
+  (void) excl;
   return FOPEN(fconv(catbuff, sizeof(catbuff), name), mode);
 #else
   {
-    const int fd = open(fconv(catbuff, sizeof(catbuff), name),
-                        O_WRONLY | O_CREAT | O_TRUNC, HTS_PROTECT_FILE);
-    FILE *fp = fd != -1 ? fdopen(fd, mode) : NULL;
+    const int flags = O_WRONLY | O_CREAT | (excl ? O_EXCL : O_TRUNC);
+    int fd;
+    FILE *fp;
 
+    fd = open(fconv(catbuff, sizeof(catbuff), name), flags, HTS_PROTECT_FILE);
+    fp = fd != -1 ? fdopen(fd, mode) : NULL;
     if (fd != -1 && fp == NULL)
       close(fd);    /* fdopen failed: don't leak the descriptor */
     if (fp != NULL) /* O_CREAT's mode skips pre-existing files: tighten those */
@@ -66,6 +71,14 @@ FILE *hts_fopen_private(const char *name, const char *mode) {
     return fp;
   }
 #endif
+}
+
+FILE *hts_fopen_private(const char *name, const char *mode) {
+  return fopen_private(name, mode, HTS_FALSE);
+}
+
+FILE *hts_fopen_private_new(const char *name, const char *mode) {
+  return fopen_private(name, mode, HTS_TRUE);
 }
 
 /* hts_readline_raw() keeps every byte. */

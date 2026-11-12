@@ -166,3 +166,39 @@ grep -qaF 'is not a contained relative name' "$dir/log" ||
     fail "the safeCache escape was not refused: $(cat "$dir/log")"
 grep -qaF -- "$inside" "$dir/sticky/out.arc" ||
     fail "the refusal cost the contained entry its body: $(cat "$dir/log")"
+
+# The host guess on the first absolute name sets fixedPath, which then reduces
+# a second name whose host the guess cannot find.
+mkdir -p "$dir/fixed/example.com" "$dir/fixed/other.org"
+cp "$dir/ok/example.com/p.html" "$dir/fixed/example.com/p.html"
+printf 'REDUCED-BY-FIXEDPATH-%s\n' "$$" >"$dir/fixed/other.org/q.html"
+reduced=$(cat "$dir/fixed/other.org/q.html")
+# Entries are read in hash order, so try both and expect one to be served.
+first="/zz/example.com/p.html=$(nativepath "$dir/fixed/example.com/p.html")"
+second="/zz/other.org/q.html=$(nativepath "$dir/fixed/other.org/q.html")"
+served=0
+for swap in no yes; do
+    if test "$swap" = yes; then
+        make_store "$dir/fixed" "$second" "$first"
+    else
+        make_store "$dir/fixed" "$first" "$second"
+    fi
+    convert "$dir/fixed"
+    if grep -qaF -- "$reduced" "$dir/fixed/out.arc"; then served=$((served + 1)); fi
+done
+test "$served" -eq 1 ||
+    fail "fixedPath did not carry over to the next record: $(cat "$dir/log")"
+
+# A pre-3.40 store saved names with the root already in front, and the reader
+# must not join the root a second time.
+mkdir -p "$dir/old/a/b/example.com"
+cp "$dir/ok/example.com/p.html" "$dir/old/a/b/example.com/p.html"
+make_store "$dir/old/a/b" \
+    "a/b/example.com/p.html=$(nativepath "$dir/old/a/b/example.com/p.html")"
+(
+    cd "$dir/old" || exit 1
+    "$bin" --convert out.arc a/b/hostile.ndx
+) >"$dir/log" 2>&1
+subshell_ok $?
+grep -qaF -- "$inside" "$dir/old/out.arc" ||
+    fail "a root-prefixed save name lost its body: $(cat "$dir/log")"

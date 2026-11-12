@@ -93,7 +93,6 @@ static int st_wizardfilter(httrackp *opt, int argc, char **argv) {
   char pattern[HTS_FILTER_SLOT_SIZE];
   htsbuff f = htsbuff_array(pattern);
 
-  (void) opt;
   if (argc >= 3) {
     hts_wizard_answer_filter(
         &f, argc >= 5 ? atoi(argv[4]) : 0, atoi(argv[0]), argv[1], argv[2],
@@ -244,7 +243,6 @@ static int st_wizardscope(httrackp *opt, int argc, char **argv) {
   char scope[HTS_URLMAXSIZE];
   int k;
 
-  (void) opt;
   if (argc >= 1) {
     for (k = 0; hts_wizard_host_scope(argv[0], k, scope, sizeof(scope)); k++)
       printf("%d %s\n", k, scope);
@@ -324,9 +322,6 @@ static int st_wizardscope(httrackp *opt, int argc, char **argv) {
 
 /* #1117: which host-scope range an answer falls in. */
 static int st_wizardscopeanswer(httrackp *opt, int argc, char **argv) {
-  (void) opt;
-  (void) argc;
-  (void) argv;
 #define ANSWER(n, expect) assertf(hts_wizard_scope_answer(n) == (expect))
   /* the plain answers, and the boundary just below the first range */
   ANSWER(-999, HTS_DEFAULT);
@@ -468,13 +463,25 @@ static int st_wizardverdict(httrackp *opt, int argc, char **argv) {
 
 #undef PRIO_UNSET
 
+/* Prints the answer code of the reply <text>; with no argument, asserts the
+   empty and NULL replies. */
+static int st_wizardreply(httrackp *opt, int argc, char **argv) {
+  if (argc >= 1) {
+    printf("%d\n", hts_wizard_parse_reply(argv[0]));
+    return 0;
+  }
+  assertf(hts_wizard_parse_reply(NULL) == 0);
+  assertf(hts_wizard_parse_reply("") == 0);
+  printf("wizardreply self-test OK\n");
+  return 0;
+}
+
 /* Prints the prompt the wizard asks about <adr> <fil>; with no argument,
    asserts it. */
 static int st_wizardprompt(httrackp *opt, int argc, char **argv) {
   char prompt[HTS_URLMAXSIZE * 2];
   char adr[HTS_URLMAXSIZE], fil[HTS_URLMAXSIZE * 2];
 
-  (void) opt;
   if (argc >= 2) {
     hts_wizard_prompt_url(prompt, sizeof(prompt), argv[0], argv[1]);
     printf("%s\n", prompt);
@@ -694,6 +701,46 @@ done:
   return 0;
 }
 
+/* hts_acceptlink()'s verdict on a link found by the primary page, under -p
+   `getmode` and -n `near`: 1 forbidden, 0 allowed, -1 no opinion. */
+static int st_wizardnonhtml(httrackp *opt, int argc, char **argv) {
+  const hts_wizard savedwizard = opt->wizard;
+  const int savedgetmode = opt->getmode;
+  const hts_tristate savednear = opt->nearlink;
+  const hts_robots savedrobots = opt->robots;
+  const int savedtravel = opt->travel;
+  lien_url **savedliens = opt->liens;
+  char adr[] = "www.example.com", fil[] = "/", sav[] = "index.html";
+  lien_url primary, *liens[1];
+  int prio = 0;
+
+  if (argc != 4) {
+    fprintf(stderr, "wizardnonhtml: <getmode> <near> <adr> <fil>\n");
+    return 1;
+  }
+  memset(&primary, 0, sizeof(primary));
+  primary.adr = adr;
+  primary.fil = fil;
+  primary.sav = sav;
+  primary.depth = 5;
+  liens[0] = &primary;
+  opt->liens = liens;
+  opt->wizard = HTS_WIZARD_NONE;
+  opt->getmode = atoi(argv[0]);
+  opt->nearlink = atoi(argv[1]) ? HTS_TRUE : HTS_FALSE;
+  opt->robots = HTS_ROBOTS_NEVER;
+  opt->travel = HTS_TRAVEL_SAME_ADDRESS;
+  printf("verdict=%d\n", hts_acceptlink(opt, 0, argv[2], argv[3], NULL, NULL,
+                                        HTS_FALSE, &prio, NULL));
+  opt->liens = savedliens;
+  opt->wizard = savedwizard;
+  opt->getmode = savedgetmode;
+  opt->nearlink = savednear;
+  opt->robots = savedrobots;
+  opt->travel = savedtravel;
+  return 0;
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: this module's tests, in the order -#test lists them. */
 /* ------------------------------------------------------------ */
@@ -709,7 +756,11 @@ const struct selftest_entry selftests_wizard[] = {
      st_wizardverdict},
     {"wizardprompt", "[<adr> <fil>]", "URL the wizard prompt asks about",
      st_wizardprompt},
+    {"wizardreply", "[<text>]", "answer code of a wizard reply",
+     st_wizardreply},
     {"wizardinsert", "[<adr> <fil> [answer...] [@ filter...]]",
      "where a wizard answer lands in the filter array", st_wizardinsert},
+    {"wizardnonhtml", "<getmode> <near> <adr> <fil>",
+     "-p and -n verdict on a link from the primary page", st_wizardnonhtml},
     {NULL, NULL, NULL, NULL},
 };

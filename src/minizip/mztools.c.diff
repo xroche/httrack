@@ -1,5 +1,5 @@
---- mztools.c.orig	2024-01-27 14:07:18.636193212 +0100
-+++ mztools.c	2024-01-27 14:09:55.356620093 +0100
+--- mztools.c.orig	2026-11-08 00:52:55.753801407 +0100
++++ mztools.c	2026-11-08 00:52:55.753801407 +0100
 @@ -10,10 +10,11 @@
  #include <string.h>
  #include "zlib.h"
@@ -125,7 +125,7 @@
  
      /* Final merge (file + central directory) */
 -    fclose(fpOutCD);
-+    /* A buffered write can fail only at close. */
++    /* A buffered write may fail only at close. */
 +    if (fclose(fpOutCD) != 0) {
 +      err = Z_ERRNO;
 +    }

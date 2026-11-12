@@ -411,9 +411,6 @@ static int st_quotediff(httrackp *opt, int argc, char **argv) {
   size_t i;
   int r;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   for (i = 0; hand[i] != NULL; i++)
     quotediff_one(&st, hand[i]);
   /* Longer than HTS_CDLMAXSIZE: every site runs it except the argv unquote. */
@@ -447,9 +444,6 @@ static int st_quoteprop(httrackp *opt, int argc, char **argv) {
   uint32_t seed = 5480;
   int r;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   for (r = 0; r < 20000; r++) {
     const int n = (int) (quote_rand(&seed) % 6);
     String args[6];
@@ -549,7 +543,6 @@ static int st_splitargs(httrackp *opt, int argc, char **argv) {
   char **v;
   int flags = 0, nv = 0, i;
 
-  (void) opt;
   if (argc != 2) {
     fprintf(stderr, "usage: -#test=splitargs <flags> <line>\n");
     return 1;
@@ -578,7 +571,6 @@ static int st_quotearg(httrackp *opt, int argc, char **argv) {
   String line = STRING_EMPTY, out = STRING_EMPTY;
   int i;
 
-  (void) opt;
   for (i = 0; i < argc; i++) {
     if (i != 0)
       StringAddchar(line, ' ');
@@ -596,7 +588,6 @@ static int st_quotearg(httrackp *opt, int argc, char **argv) {
 static int st_unquotearg(httrackp *opt, int argc, char **argv) {
   char *arg;
 
-  (void) opt;
   if (argc != 1) {
     fprintf(stderr, "usage: -#test=unquotearg <arg>\n");
     return 1;
@@ -612,7 +603,6 @@ static int st_unquotearg(httrackp *opt, int argc, char **argv) {
 }
 
 static int st_ruleopt(httrackp *opt, int argc, char **argv) {
-  (void) opt;
   if (argc != 1) {
     fprintf(stderr, "usage: -#test=ruleopt <arg>\n");
     return 1;

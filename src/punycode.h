@@ -40,23 +40,14 @@ typedef unsigned long punycode_uint;
 /* the input.  The output_length is an in/out argument: the       */
 /* caller passes in the maximum number of code points that it     */
 /* can receive, and on successful return it will contain the      */
-/* number of code points actually output.  The case_flags array   */
-/* holds input_length boolean values, where nonzero suggests that */
-/* the corresponding Unicode character be forced to uppercase     */
-/* after being decoded (if possible), and zero suggests that      */
-/* it be forced to lowercase (if possible).  ASCII code points    */
-/* are encoded literally, except that ASCII letters are forced    */
-/* to uppercase or lowercase according to the corresponding       */
-/* uppercase flags.  If case_flags is a null pointer then ASCII   */
-/* letters are left as they are, and other code points are        */
-/* treated as if their uppercase flags were zero.  The return     */
-/* value can be any of the punycode_status values defined above   */
-/* except punycode_bad_input; if not punycode_success, then       */
-/* output_size and output might contain garbage.                  */
+/* number of code points actually output.  ASCII code points are  */
+/* encoded literally.  The return value can be any of the        */
+/* punycode_status values defined above except punycode_bad_input;*/
+/* if not punycode_success, then output_size and output might     */
+/* contain garbage.                                               */
 enum punycode_status punycode_encode(punycode_uint input_length,
                                      const punycode_uint input[],
-                                     const unsigned char case_flags[],
-                                     punycode_uint * output_length,
+                                     punycode_uint *output_length,
                                      char output[]);
 
 /* punycode_decode() converts Punycode to Unicode.  The input is  */
@@ -66,23 +57,15 @@ enum punycode_status punycode_encode(punycode_uint input_length,
 /* output_length is an in/out argument: the caller passes in      */
 /* the maximum number of code points that it can receive, and     */
 /* on successful return it will contain the actual number of      */
-/* code points output.  The case_flags array needs room for at    */
-/* least output_length values, or it can be a null pointer if the */
-/* case information is not needed.  A nonzero flag suggests that  */
-/* the corresponding Unicode character be forced to uppercase     */
-/* by the caller (if possible), while zero suggests that it be    */
-/* forced to lowercase (if possible).  ASCII code points are      */
-/* output already in the proper case, but their flags will be set */
-/* appropriately so that applying the flags would be harmless.    */
-/* The return value can be any of the punycode_status values      */
-/* defined above; if not punycode_success, then output_length,    */
-/* output, and case_flags might contain garbage.  On success, the */
-/* decoder will never need to write an output_length greater than */
-/* input_length, because of how the encoding is defined.          */
+/* code points output.  The return value can be any of the        */
+/* punycode_status values defined above; if not punycode_success, */
+/* then output_length and output might contain garbage.  On       */
+/* success, the decoder will never need to write an output_length */
+/* greater than input_length, because of how the encoding is      */
+/* defined.                                                       */
 enum punycode_status punycode_decode(punycode_uint input_length,
                                      const char input[],
-                                     punycode_uint * output_length,
-                                     punycode_uint output[],
-                                     unsigned char case_flags[]);
+                                     punycode_uint *output_length,
+                                     punycode_uint output[]);
 
 #endif

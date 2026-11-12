@@ -38,16 +38,7 @@ Please visit our Website: http://www.httrack.com
 #include "punycode.h"
 #include "htssafe.h"
 
-#ifdef _WIN32
-#include <stddef.h>
-typedef unsigned __int32 uint32_t;
-typedef unsigned __int64 uint64_t;
-#elif (defined(SOLARIS) || defined(sun) || defined(HAVE_INTTYPES_H) \
-  || defined(BSD) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) || defined(__FreeBSD_kernel__))
-#include <inttypes.h>
-#else
 #include <stdint.h>
-#endif
 #include <stdarg.h>
 
 int hts_isStringAscii(const char *s, size_t size) {
@@ -272,7 +263,7 @@ LPWSTR hts_convertStringToUCS2(const char *s, int size, UINT cp, int *pwsize) {
 
   if (wsize > 0) {
     LPSTR uoutput = NULL;
-    LPWSTR woutput = malloc((wsize + 1) * sizeof(WCHAR));
+    LPWSTR woutput = malloct((wsize + 1) * sizeof(WCHAR));
 
     if (woutput != NULL
         && MultiByteToWideChar(cp, 0, (LPCSTR) s, size, woutput,
@@ -286,8 +277,7 @@ LPWSTR hts_convertStringToUCS2(const char *s, int size, UINT cp, int *pwsize) {
         return woutput;
       }
     }
-    if (woutput != NULL)
-      free(woutput);
+    freet(woutput);
   }
   return NULL;
 }
@@ -326,7 +316,7 @@ static char *hts_convertUCS2StringToCPEx(LPWSTR woutput, int wsize, UINT cp,
     *plossy = HTS_FALSE;
   }
   if (usize > 0) {
-    char *const uoutput = malloc((usize + 1) * sizeof(char));
+    char *uoutput = malloct((usize + 1) * sizeof(char));
 
     if (uoutput != NULL) {
       BOOL usedDefault = FALSE;
@@ -344,7 +334,7 @@ static char *hts_convertUCS2StringToCPEx(LPWSTR woutput, int wsize, UINT cp,
         }
         return uoutput;
       } else {
-        free(uoutput);
+        freet(uoutput);
       }
     }
   }
@@ -377,7 +367,7 @@ char *hts_convertStringCPToUTF8(const char *s, size_t size, UINT cp) {
     if (woutput != NULL) {
       char *const uoutput = hts_convertUCS2StringToUTF8(woutput, wsize);
 
-      free(woutput);
+      freet(woutput);
       return uoutput;
     }
   }
@@ -409,7 +399,7 @@ static char *hts_convertStringCPFromUTF8Ex(const char *s, size_t size, UINT cp,
       char *const uoutput =
           hts_convertUCS2StringToCPEx(woutput, wsize, cp, plossy);
 
-      free(woutput);
+      freet(woutput);
       return uoutput;
     }
   }
@@ -438,11 +428,11 @@ char *hts_convertStringFromUTF8(const char *s, size_t size, const char *charset)
 char *hts_convertStringFromUTF8Strict(const char *s, size_t size,
                                       const char *charset) {
   hts_boolean lossy = HTS_FALSE;
-  char *const out =
+  char *out =
       hts_convertStringCPFromUTF8Ex(s, size, hts_getCodepage(charset), &lossy);
 
   if (lossy) {
-    free(out);
+    freet(out);
     return NULL;
   }
   return out;
@@ -592,7 +582,7 @@ static char *hts_convertStringCharset(const char *s, size_t size,
                                       const char *to, const char *from) {
   /* Empty string ? */
   if (size == 0) {
-    return strdup("");
+    return strdupt("");
   }
   /* Already on correct charset ? */
   if (hts_equalsAlphanum(from, to)) {
@@ -613,7 +603,7 @@ static char *hts_convertStringCharset(const char *s, size_t size,
 
       /* Initial size to around the string size */
       for(outbufCapa = 16; outbufCapa < size + 1; outbufCapa *= 2) ;
-      outbuf = malloc(outbufCapa);
+      outbuf = malloct(outbufCapa);
       outbytesleft = outbufCapa;
 
       /* Convert */
@@ -638,7 +628,7 @@ static char *hts_convertStringCharset(const char *s, size_t size,
             outbuf = grown;
             outbytesleft = outbufCapa - used;
           } else {
-            free(outbuf);
+            freet(outbuf);
             outbuf = NULL;
             break;
           }
@@ -683,7 +673,7 @@ HTSEXT_API char *hts_convertStringToUTF8(const char *s, size_t size,
                                          const char *charset) {
   /* Empty string ? */
   if (size == 0) {
-    return strdup("");
+    return strdupt("");
   }
   /* Already UTF-8 ? */
   if (hts_isCharsetUTF8(charset) || hts_isStringAscii(s, size)) {
@@ -698,7 +688,7 @@ HTSEXT_API char *hts_convertStringToUTF8(const char *s, size_t size,
 char *hts_convertStringFromUTF8(const char *s, size_t size, const char *charset) {
   /* Empty string ? */
   if (size == 0) {
-    return strdup("");
+    return strdupt("");
   }
   /* Already UTF-8 ? */
   if (hts_isCharsetUTF8(charset) || hts_isStringAscii(s, size)) {
@@ -724,9 +714,9 @@ char *hts_convertStringFromUTF8Strict(const char *s, size_t size,
 #define strncasecmp(a,b,n) strnicmp(a,b,n)
 #endif
 
-/* Whitespace for the <meta> charset prescan: SPACE, TAB, CR, LF. */
+/* WHATWG prescan whitespace: SPACE, TAB, CR, LF, FF, but not VT. */
 static int is_html_space(char c) {
-  return c == ' ' || c == '\t' || c == '\r' || c == '\n';
+  return c == ' ' || c == '\t' || c == '\r' || c == '\n' || c == '\f';
 }
 
 static int is_html_space_or_equal(char c) {
@@ -887,144 +877,70 @@ char *hts_getCharsetFromMeta(const char *html, size_t size) {
 
 /* UTF-8 helpers */
 
-/* Number of leading zeros. Returns a value between 0 and 8. */
-static unsigned int nlz8(unsigned char x) {
-  unsigned int b = 0;
-
-  if (x & 0xf0) {
-    x >>= 4;
-  } else {
-    b += 4;
-  }
-
-  if (x & 0x0c) {
-    x >>= 2;
-  } else {
-    b += 2;
-  }
-
-  if (! (x & 0x02) ) {
-    b++;
-  }
-
-  return b;
+/* Length of the strict RFC 3629 sequence that lead starts, or 0. */
+static size_t utf8_lead_length(unsigned char lead) {
+  if (lead < 0x80)
+    return 1;
+  if (lead >= 0xc2 && lead <= 0xdf)
+    return 2;
+  if (lead >= 0xe0 && lead <= 0xef)
+    return 3;
+  if (lead >= 0xf0 && lead <= 0xf4)
+    return 4;
+  return 0;
 }
 
-/*
-  Emit the Unicode character 'UC' (internal)
-  See <http://en.wikipedia.org/wiki/UTF-8>
-  7	  U+0000		U+007F		1	0xxxxxxx
-  11	U+0080		U+07FF		2	110xxxxx
-  16	U+0800		U+FFFF		3	1110xxxx
-  21	U+10000		U+1FFFFF	4	11110xxx
-  26	U+200000	U+3FFFFFF	5	111110xx
-  31	U+4000000	U+7FFFFFFF	6	1111110x
-*/
-#define ADD_FIRST_SEQ(UC, LEN, EMITTER) do {                            \
-  /* first octet */                                                     \
-  const unsigned char lead =                                            \
-    /* leading bits: LEN "1" bits */                                    \
-    ~ ( ( 1 << (unsigned) ( 8 - LEN ) ) - 1 )                           \
-    /* encoded bits */                                                  \
-    | ( (UC) >> (unsigned) ( ( LEN - 1 ) * 6 ) );                       \
-  EMITTER(lead);                                                        \
-  } while(0)
+/* The one UTF-8 decoder: overlongs, surrogates, > U+10FFFF and truncated
+   sequences give 0, else the sequence length. */
+static size_t utf8_decode(const unsigned char *s, size_t size, hts_UCS4 *puc) {
+  static const hts_UCS4 min[5] = {0, 0, 0x80, 0x800, 0x10000};
+  const size_t len = size != 0 ? utf8_lead_length(s[0]) : 0;
+  hts_UCS4 uc;
+  size_t k;
 
-#define ADD_NEXT_SEQ(UC, SHIFT, EMITTER) do {                           \
-  /* further bytes are encoding 6 bits */                               \
-  const unsigned char next =                                            \
-    0x80 | ( ( (UC) >> SHIFT ) & 0x3f );                                \
-  EMITTER(next);                                                        \
-  } while(0)
+  if (len == 0 || size < len)
+    return 0;
+  if (len == 1) {
+    *puc = s[0];
+    return 1;
+  }
+  uc = s[0] & (0x7f >> len);
+  for (k = 1; k < len; k++) {
+    if ((s[k] & 0xc0) != 0x80)
+      return 0;
+    uc = (uc << 6) | (s[k] & 0x3f);
+  }
+  if (uc < min[len] || uc > 0x10FFFF || (uc >= 0xD800 && uc <= 0xDFFF))
+    return 0;
+  *puc = uc;
+  return len;
+}
 
-/* UC is a constant. EMITTER is a macro function taking an unsigned int. */
-#define EMIT_UNICODE(UC, EMITTER) do {          \
-    if ((UC) < 0x80) {                          \
-      EMITTER(((unsigned char) (UC)));          \
-    } else if ((UC) < 0x0800) {                 \
-      ADD_FIRST_SEQ(UC, 2, EMITTER);            \
-      ADD_NEXT_SEQ(UC, 0, EMITTER);             \
-    } else if ((UC) < 0x10000) {                \
-      ADD_FIRST_SEQ(UC, 3, EMITTER);            \
-      ADD_NEXT_SEQ(UC, 6, EMITTER);             \
-      ADD_NEXT_SEQ(UC, 0, EMITTER);             \
-    } else if ((UC) < 0x200000) {               \
-      ADD_FIRST_SEQ(UC, 4, EMITTER);            \
-      ADD_NEXT_SEQ(UC, 12, EMITTER);            \
-      ADD_NEXT_SEQ(UC, 6, EMITTER);             \
-      ADD_NEXT_SEQ(UC, 0, EMITTER);             \
-    } else if ((UC) < 0x4000000) {              \
-      ADD_FIRST_SEQ(UC, 5, EMITTER);            \
-      ADD_NEXT_SEQ(UC, 18, EMITTER);            \
-      ADD_NEXT_SEQ(UC, 12, EMITTER);            \
-      ADD_NEXT_SEQ(UC, 6, EMITTER);             \
-      ADD_NEXT_SEQ(UC, 0, EMITTER);             \
-    } else {                                    \
-      ADD_FIRST_SEQ(UC, 6, EMITTER);            \
-      ADD_NEXT_SEQ(UC, 24, EMITTER);            \
-      ADD_NEXT_SEQ(UC, 18, EMITTER);            \
-      ADD_NEXT_SEQ(UC, 12, EMITTER);            \
-      ADD_NEXT_SEQ(UC, 6, EMITTER);             \
-      ADD_NEXT_SEQ(UC, 0, EMITTER);             \
-    }                                           \
-  } while(0)
-
-#undef READ_LOOP
-#define READ_LOOP(C, READER, EMITTER, CLEARED)  \
-  do {                                          \
-    unsigned int uc_ =                          \
-      (C) & ( (1 << (CLEARED - 1)) - 1 );       \
-    int i_;                                     \
-    /* loop should be unrolled by compiler */   \
-    for(i_ = 0 ; i_ < 7 - CLEARED ; i_++) {     \
-      const int c_ = (READER);                  \
-      /* continuation byte 10xxxxxx */          \
-      if (c_ != -1 && ( c_ >> 6 ) == 0x2) {     \
-        uc_ <<= 6;                              \
-        uc_ |= (c_ & 0x3f);                     \
-      } else {                                  \
-        uc_ = (unsigned int) -1;                \
-        break;                                  \
-      }                                         \
-    }                                           \
-    EMITTER(((int) uc_));                       \
-  } while(0)
-
-/* READER is a macro returning an int (-1 for error).
-   EMITTER is a macro function taking an int (-1 for error). */
-#define READ_UNICODE(READER, EMITTER) do {      \
-    const unsigned int f_ =                     \
-      (unsigned int) (READER);                  \
-    /* 1..8 */                                  \
-    const unsigned int c_ =                     \
-      nlz8((unsigned char)~f_);                 \
-    /* ascii */                                 \
-    switch(c_) {                                \
-    case 0:                                     \
-      EMITTER(((int)f_));                       \
-      break;                                    \
-      /* 110xxxxx 10xxxxxx */                   \
-    case 2:                                     \
-      READ_LOOP(f_, READER, EMITTER, 6);        \
-      break;                                    \
-    case 3:                                     \
-      READ_LOOP(f_, READER, EMITTER, 5);        \
-      break;                                    \
-    case 4:                                     \
-      READ_LOOP(f_, READER, EMITTER, 4);        \
-      break;                                    \
-    case 5:                                     \
-      READ_LOOP(f_, READER, EMITTER, 3);        \
-      break;                                    \
-    case 6:                                     \
-      READ_LOOP(f_, READER, EMITTER, 2);        \
-      break;                                    \
-      /* unexpected continuation/bogus */       \
-    default:                                    \
-      EMITTER(-1);                              \
-      break;                                    \
-    }                                           \
-  } while(0)
+/* Encode uc into out[4]; a surrogate or a value above U+10FFFF gives 0. */
+static size_t utf8_encode(hts_UCS4 uc, unsigned char *out) {
+  if (uc < 0x80) {
+    out[0] = (unsigned char) uc;
+    return 1;
+  } else if (uc < 0x800) {
+    out[0] = (unsigned char) (0xc0 | (uc >> 6));
+    out[1] = (unsigned char) (0x80 | (uc & 0x3f));
+    return 2;
+  } else if (uc < 0x10000) {
+    if (uc >= 0xD800 && uc <= 0xDFFF)
+      return 0;
+    out[0] = (unsigned char) (0xe0 | (uc >> 12));
+    out[1] = (unsigned char) (0x80 | ((uc >> 6) & 0x3f));
+    out[2] = (unsigned char) (0x80 | (uc & 0x3f));
+    return 3;
+  } else if (uc <= 0x10FFFF) {
+    out[0] = (unsigned char) (0xf0 | (uc >> 18));
+    out[1] = (unsigned char) (0x80 | ((uc >> 12) & 0x3f));
+    out[2] = (unsigned char) (0x80 | ((uc >> 6) & 0x3f));
+    out[3] = (unsigned char) (0x80 | (uc & 0x3f));
+    return 4;
+  }
+  return 0;
+}
 
 /* IDNA helpers. */
 #undef ADD_BYTE
@@ -1041,12 +957,7 @@ static unsigned int nlz8(unsigned char x) {
   } \
   dest[destSize++] = (C); \
 } while(0)
-#define FREE_BUFFER() do { \
-  if (dest != NULL) { \
-    free(dest); \
-    dest = NULL; \
-  } \
-} while(0)
+#define FREE_BUFFER() freet(dest)
 
 char *hts_convertStringUTF8ToIDNA(const char *s, size_t size) {
   char *dest = NULL;
@@ -1077,72 +988,34 @@ char *hts_convertStringUTF8ToIDNA(const char *s, size_t size) {
           ADD_BYTE('-');
           
           /* copy utf-8 to integers. note: buffer is sufficient! */
-          segInt = (punycode_uint*) malloc(segSize*sizeof(punycode_uint));
+          segInt = (punycode_uint *) malloct(segSize * sizeof(punycode_uint));
           if (segInt == NULL) {
             FREE_BUFFER();
             return NULL;
           }
-          for(j = 0, segOutputSize = 0, utfSeq = (size_t) -1
-            ; j <= segSize ; j++) {
-            const unsigned char c = j < segSize ? segData[j] : 0;
+          for (j = 0, segOutputSize = 0; j < segSize; j += utfSeq) {
+            hts_UCS4 uc;
 
-            /* character start (ascii, or utf-8 leading sequence) */
-            if (HTS_IS_LEADING_UTF8(c)) {
-              /* commit sequence ? */
-              if (utfSeq != (size_t) -1) {
-
-                /* Reader: can read bytes up to j */
-#define RD ( utfSeq < j ? segData[utfSeq++] : -1 )
-
-                /* Writer: a malformed sequence abandons the encode (NULL) */
-#define WR(C)                                                                  \
-  do {                                                                         \
-    if ((C) != -1) {                                                           \
-      /* copy character */                                                     \
-      assertf(segOutputSize < segSize);                                        \
-      segInt[segOutputSize++] = (C);                                           \
-    } else {                                                                   \
-      freet(segInt);                                                           \
-      FREE_BUFFER();                                                           \
-      return NULL;                                                             \
-    }                                                                          \
-  } while (0)
-
-                /* Read/Write Unicode character. */
-                READ_UNICODE(RD, WR);
-#undef RD
-#undef WR
-
-                /* not anymore in sequence */
-                utfSeq = (size_t) -1;
-              }
-
-              /* ascii ? */
-              if (c < 0x80) {
-                assertf(segOutputSize < segSize);
-                segInt[segOutputSize] = c;
-                if (c != 0) {
-                  segOutputSize++;
-                }
-              }
-              /* new UTF8 sequence */
-              else {
-                utfSeq = j;
-              }
+            utfSeq = utf8_decode(&segData[j], segSize - j, &uc);
+            if (utfSeq == 0) {
+              freet(segInt);
+              FREE_BUFFER();
+              return NULL;
             }
+            segInt[segOutputSize++] = uc;
           }
 
           /* encode */
           output_length = (punycode_uint) ( capa - destSize );
-          while((status = punycode_encode((punycode_uint) segOutputSize,
-            segInt, NULL, &output_length, &dest[destSize]))
-            == punycode_big_output) {
-              INCREASE_CAPA();
-              output_length = (punycode_uint) ( capa - destSize );
+          while ((status = punycode_encode(
+                      (punycode_uint) segOutputSize, segInt, &output_length,
+                      &dest[destSize])) == punycode_big_output) {
+            INCREASE_CAPA();
+            output_length = (punycode_uint) (capa - destSize);
           }
 
           /* cleanup */
-          free(segInt);
+          freet(segInt);
 
           /* success ? */
           if (status == punycode_success) {
@@ -1176,6 +1049,30 @@ char *hts_convertStringUTF8ToIDNA(const char *s, size_t size) {
   }
 
   return dest;
+}
+
+hts_boolean hts_host_to_ascii(char *dst, size_t size, const char *host,
+                              size_t len) {
+  char *idna = NULL;
+  const char *src = host;
+  size_t n = len;
+  hts_boolean fits;
+
+  if (!hts_isStringAscii(host, len)) {
+    idna = hts_convertStringUTF8ToIDNA(host, len);
+    if (idna == NULL)
+      return HTS_FALSE;
+    src = idna;
+    n = strlen(idna);
+  }
+  fits = n < size;
+  if (fits) {
+    // dst may be host itself
+    memmove(dst, src, n);
+    dst[n] = '\0';
+  }
+  freet(idna);
+  return fits;
 }
 
 int hts_isStringIDNA(const char *s, size_t size) {
@@ -1216,16 +1113,15 @@ char *hts_convertStringIDNAToUTF8(const char *s, size_t size) {
         for(output_capa = 16 ; output_capa < segSize 
           ; output_capa <<= 1) ;
         output_dest =
-          (punycode_uint*) malloc(output_capa*sizeof(punycode_uint));
+            (punycode_uint *) malloct(output_capa * sizeof(punycode_uint));
         if (output_dest == NULL) {
           FREE_BUFFER();
           return NULL;
         }
-        for(output_length = output_capa 
-          ; (status = punycode_decode((punycode_uint) segSize - 4,
-            &s[startSeg + 4], &output_length, output_dest, NULL))
-            == punycode_big_output 
-          ; ) {
+        for (output_length = output_capa;
+             (status = punycode_decode((punycode_uint) segSize - 4,
+                                       &s[startSeg + 4], &output_length,
+                                       output_dest)) == punycode_big_output;) {
           output_capa <<= 1;
           output_dest = (punycode_uint *) realloct(
               output_dest, output_capa * sizeof(punycode_uint));
@@ -1236,21 +1132,23 @@ char *hts_convertStringIDNAToUTF8(const char *s, size_t size) {
         /* success ? */
         if (status == punycode_success) {
           punycode_uint j;
-          for(j = 0 ; j < output_length ; j++) {
-            const punycode_uint uc = output_dest[j];
-            if (uc < 0x80) {
-              ADD_BYTE((char) uc);
-            } else {
-              /* EMIT_UNICODE only ever emits a byte, never an error */
-#define EM(C) ADD_BYTE(C)
-              EMIT_UNICODE(uc, EM);
-#undef EM
+          for (j = 0; j < output_length; j++) {
+            unsigned char seq[4];
+            const size_t n = utf8_encode(output_dest[j], seq);
+            size_t k;
+
+            if (n == 0) {
+              status = punycode_bad_input;
+              break;
+            }
+            for (k = 0; k < n; k++) {
+              ADD_BYTE((char) seq[k]);
             }
           }
         }
 
         /* cleanup */
-        free(output_dest);
+        freet(output_dest);
 
         /* error ? */
         if (status != punycode_success) {
@@ -1283,19 +1181,17 @@ hts_UCS4* hts_convertUTF8StringToUCS4(const char *s, size_t size, size_t *nChars
   if (nChars != NULL) {
     *nChars = 0;
   }
-  for(i = 0 ; i < size ; ) {
+  for (i = 0; i < size;) {
     hts_UCS4 uc;
+    const size_t n = utf8_decode(&data[i], size - i, &uc);
 
-    /* Reader: can read bytes up to j */
-#define RD ( i < size ? data[i++] : -1 )
-
-    /* Writer: upon error, return FFFD (replacement character) */
-#define WR(C) uc = (C) != -1 ? (hts_UCS4) (C) : (hts_UCS4) 0xfffd
-
-    /* Read Unicode character. */
-    READ_UNICODE(RD, WR);
-#undef RD
-#undef WR
+    /* each byte of a malformed sequence becomes one U+FFFD */
+    if (n != 0) {
+      i += n;
+    } else {
+      uc = 0xfffd;
+      i++;
+    }
 
     /* Emit char */
     ADD_BYTE(uc);
@@ -1310,47 +1206,14 @@ hts_UCS4* hts_convertUTF8StringToUCS4(const char *s, size_t size, size_t *nChars
 
 int hts_isStringUTF8(const char *s, size_t size) {
   const unsigned char *const data = (const unsigned char*) s;
-  size_t i;
+  size_t i, n;
+  hts_UCS4 uc;
 
-  /* Strict RFC 3629: reject overlongs, surrogates, > U+10FFFF, 5/6-byte. */
-  for(i = 0 ; i < size ; ) {
-    const unsigned char c = data[i];
-    size_t len, k;
-    hts_UCS4 uc, min;
-
-    if (c < 0x80) {
-      i++;
-      continue;
-    } else if (c >= 0xc2 && c <= 0xdf) {
-      len = 2;
-      min = 0x80;
-      uc = c & 0x1f;
-    } else if (c >= 0xe0 && c <= 0xef) {
-      len = 3;
-      min = 0x800;
-      uc = c & 0x0f;
-    } else if (c >= 0xf0 && c <= 0xf4) {
-      len = 4;
-      min = 0x10000;
-      uc = c & 0x07;
-    } else { /* continuation byte, overlong C0/C1, or F5..FF lead */
+  for (i = 0; i < size; i += n) {
+    n = utf8_decode(&data[i], size - i, &uc);
+    if (n == 0) {
       return 0;
     }
-    if (size - i < len) {
-      return 0;
-    }
-    for (k = 1; k < len; k++) {
-      const unsigned char cc = data[i + k];
-
-      if ((cc & 0xc0) != 0x80) {
-        return 0;
-      }
-      uc = (uc << 6) | (cc & 0x3f);
-    }
-    if (uc < min || uc > 0x10FFFF || (uc >= 0xD800 && uc <= 0xDFFF)) {
-      return 0;
-    }
-    i += len;
   }
 
   return 1;
@@ -1361,11 +1224,15 @@ char *hts_convertUCS4StringToUTF8(const hts_UCS4 *s, size_t nChars) {
   char *dest = NULL;
   size_t capa = 0, destSize = 0;
   for(i = 0 ; i < nChars ; i++) {
-    const hts_UCS4 uc = s[i];
-    /* EMIT_UNICODE only ever emits a byte, never an error */
-#define EM(C) ADD_BYTE(C)
-    EMIT_UNICODE(uc, EM);
-#undef EM
+    unsigned char seq[4];
+    size_t n = utf8_encode(s[i], seq), k;
+
+    if (n == 0) {
+      n = utf8_encode(0xfffd, seq);
+    }
+    for (k = 0; k < n; k++) {
+      ADD_BYTE((char) seq[k]);
+    }
   }
   ADD_BYTE('\0');
 
@@ -1373,67 +1240,66 @@ char *hts_convertUCS4StringToUTF8(const hts_UCS4 *s, size_t nChars) {
 }
 
 size_t hts_writeUTF8(hts_UCS4 uc, char *dest, size_t size) {
-  size_t offs = 0;
-#define EM(C) do {       \
-  if (offs + 1 < size) { \
-    dest[offs++] = C;    \
-  } else {               \
-    return 0;            \
-  }                      \
-} while(0)
-  EMIT_UNICODE(uc, EM);
-#undef EM
-  return offs; 
+  unsigned char seq[4];
+  const size_t n = utf8_encode(uc, seq);
+
+  /* keep room for a NUL the caller may add */
+  if (n == 0 || n >= size) {
+    return 0;
+  }
+  memcpy(dest, seq, n);
+  return n;
 }
 
 size_t hts_readUTF8(const char *src, size_t size, hts_UCS4 *puc) {
-  const unsigned char *const data = (const unsigned char*) src;
-  size_t i = 0;
-  int uc = -1;
+  hts_UCS4 uc;
+  const size_t n = utf8_decode((const unsigned char *) src, size, &uc);
 
-  /* Reader: can read bytes up to j */
-#define RD ( i < size ? data[i++] : -1 )
-
-  /* Writer: upon error, return FFFD (replacement character) */
-#define WR(C) uc = (C)
-
-  /* Read Unicode character. */
-  READ_UNICODE(RD, WR);
-#undef RD
-#undef WR
-
-  /* Return */
-  if (uc != -1) {
-    if (puc != NULL) {
-      *puc = (hts_UCS4) uc;
-    }
-    return i;
+  if (n != 0 && puc != NULL) {
+    *puc = uc;
   }
-
-  return 0;
+  return n;
 }
 
 size_t hts_getUTF8SequenceLength(const char lead) {
-  const unsigned char f = (unsigned char) lead;
-  const unsigned int c = nlz8(~f);
-  switch(c) {
-  case 0:
-    /* ASCII */
-    return 1;
-    break;
-  case 2:
-  case 3:
-  case 4:
-  case 5:
-  case 6:
-    /* UTF-8 */
-    return c;
-    break;
-  default:
-    /* ERROR */
-    return 0;
-    break;
+  return utf8_lead_length((unsigned char) lead);
+}
+
+void hts_json_string(String *out, const char *s) {
+  const unsigned char *p = (const unsigned char *) s;
+
+  StringAddchar(*out, '"');
+  while (*p != '\0') {
+    const unsigned char c = *p;
+
+    if (c == '"' || c == '\\') {
+      StringAddchar(*out, '\\');
+      StringAddchar(*out, (char) c);
+      p++;
+    } else if (c < 0x20 || c == 0x7f) {
+      char esc[8];
+
+      snprintf(esc, sizeof(esc), "\\u%04x", (unsigned) c);
+      StringCat(*out, esc);
+      p++;
+    } else if (c < 0x80) {
+      StringAddchar(*out, (char) c);
+      p++;
+    } else {
+      /* Emit a sequence verbatim only if it is well-formed UTF-8. */
+      hts_UCS4 uc;
+      const size_t len = utf8_decode(p, strnlen((const char *) p, 4), &uc);
+
+      if (len != 0) {
+        StringMemcat(*out, (const char *) p, len);
+        p += len;
+      } else {
+        StringCat(*out, "\\ufffd");
+        p++;
+      }
+    }
   }
+  StringAddchar(*out, '"');
 }
 
 #undef ADD_BYTE

@@ -36,10 +36,6 @@ Please visit our Website: http://www.httrack.com
    fixed set of scenarios (IPv4/IPv6/dual-stack, errors, family filter,
    cache reuse) with no live DNS. */
 
-#define HTS_INTERNAL_BYTECODE
-
-#include "htsdns_selftest.h"
-
 #include "htsselftest_int.h"
 
 #include <setjmp.h>
@@ -298,14 +294,7 @@ static void dns_cut_runner(void (*fun)(void *arg), void *arg) {
 
 static int failures = 0;
 
-#define CHECK(cond)                                                            \
-  do {                                                                         \
-    if (!(cond)) {                                                             \
-      failures++;                                                              \
-      fprintf(stderr, "dns-selftest: FAIL at %s:%d: %s\n", __FILE__, __LINE__, \
-              #cond);                                                          \
-    }                                                                          \
-  } while (0)
+#define CHECK(cond) ST_CHECK(failures, cond)
 
 /* Resolve via the uncached entry point; return the address family, or
    AF_UNSPEC if the host did not resolve. */
@@ -318,7 +307,11 @@ static int resolve_family_nocache(const char *host) {
   return SOCaddr_sinfamily(addr);
 }
 
-int dns_selftests(httrackp *opt) {
+/* Drive the DNS resolver and cache through a scripted (mock) getaddrinfo,
+   asserting address family, single-address selection, negative caching, the
+   IPv4/IPv6 family filter, and that a cached host is resolved only once.
+   Returns the number of failed checks (0 == success). */
+static int dns_selftests(httrackp *opt) {
   failures = 0;
   hts_dns_set_resolver_backend(&mock_backend);
 
@@ -522,7 +515,7 @@ int dns_selftests(httrackp *opt) {
     T_SOC s;
 
     hts_init_htsblk(&r);
-    s = newhttp_addr(opt, "dual.test", &r, 80, 0, 0, &count);
+    s = newhttp_addr(opt, "dual.test", &r, 80, 0, &count);
     CHECK(count == 2);
     CHECK(SOCaddr_sinfamily(r.address) == AF_INET6); /* index 0 = v6 */
     if (s != INVALID_SOCKET)
@@ -530,7 +523,7 @@ int dns_selftests(httrackp *opt) {
 
     hts_init_htsblk(&r);
     count = -1;
-    s = newhttp_addr(opt, "dual.test", &r, 80, 0, 1, &count);
+    s = newhttp_addr(opt, "dual.test", &r, 80, 1, &count);
     CHECK(count == 2);
     CHECK(SOCaddr_sinfamily(r.address) == AF_INET); /* index 1 = v4 */
     if (s != INVALID_SOCKET)
@@ -538,7 +531,7 @@ int dns_selftests(httrackp *opt) {
 
     /* out-of-range index: no address selected (address stays unset) */
     hts_init_htsblk(&r);
-    s = newhttp_addr(opt, "dual.test", &r, 80, 0, 2, NULL);
+    s = newhttp_addr(opt, "dual.test", &r, 80, 2, NULL);
     CHECK(s == INVALID_SOCKET);
     if (s != INVALID_SOCKET)
       deletesoc(s);
@@ -567,7 +560,7 @@ int dns_selftests(httrackp *opt) {
       T_SOC s;
 
       hts_init_htsblk(&r);
-      s = newhttp_addr(opt, good[k], &r, -1, 0, 0, &count);
+      s = newhttp_addr(opt, good[k], &r, -1, 0, &count);
       CHECK(count == 2); /* accepted: reached the resolve */
       if (s != INVALID_SOCKET)
         deletesoc(s);
@@ -579,7 +572,7 @@ int dns_selftests(httrackp *opt) {
       T_SOC s;
 
       hts_init_htsblk(&r);
-      s = newhttp_addr(opt, bad[k], &r, -1, 0, 0, &count);
+      s = newhttp_addr(opt, bad[k], &r, -1, 0, &count);
       CHECK(s == INVALID_SOCKET);
       CHECK(count == 0); /* refused before resolving, not a failed connect */
       CHECK(strstr(r.msg, "Invalid port") != NULL);
@@ -633,7 +626,11 @@ static void lock_probe_thread(void *arg) {
   hts_mutexrelease(&p->lock);
 }
 
-int dns_timeout_selftests(httrackp *opt) {
+/* Drive a deliberately slow (mock) resolver, asserting that a resolve is
+   bounded by opt->timeout, does not hold opt->state.lock while it runs, and
+   does not cache a timeout as an answer (#606). Takes a few seconds.
+   Returns the number of failed checks (0 == success). */
+static int dns_timeout_selftests(httrackp *opt) {
   SOCaddr addrs[HTS_MAXADDRNUM];
   const char *err = NULL;
   lock_probe probe;
@@ -777,34 +774,24 @@ int dns_timeout_selftests(httrackp *opt) {
 
 #else
 
-int dns_selftests(httrackp *opt) {
-  (void) opt;
+static int dns_selftests(httrackp *opt) {
   return 0; /* resolver seam only exists in the IPv6 build */
 }
 
-int dns_timeout_selftests(httrackp *opt) {
-  (void) opt;
-  return 0;
-}
+static int dns_timeout_selftests(httrackp *opt) { return 0; }
 
 #endif
 
 static int st_dns(httrackp *opt, int argc, char **argv) {
   const int err = dns_selftests(opt);
 
-  (void) argc;
-  (void) argv;
-  printf("dns-selftest: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("dns-selftest", err);
 }
 
 static int st_dnstimeout(httrackp *opt, int argc, char **argv) {
   const int err = dns_timeout_selftests(opt);
 
-  (void) argc;
-  (void) argv;
-  printf("dns-timeout-selftest: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("dns-timeout-selftest", err);
 }
 
 /* ------------------------------------------------------------ */

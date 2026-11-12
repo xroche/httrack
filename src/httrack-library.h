@@ -152,12 +152,13 @@ typedef void (*htsErrorCallback)(const char *msg, const char *file, int line);
 
 /* Initialization */
 /** Initialize the engine, once per process, before hts_create_opt() or
-    hts_main(). Later calls do nothing, and it is not thread-safe, so call it
-    from one thread. Reads $HTS_LOG for the debug level. Always returns 1. */
+    hts_main(). Later calls do nothing until hts_uninit(), and it is not
+    thread-safe, so call it from one thread. Reads $HTS_LOG for the debug
+    level. Always returns 1. */
 HTSEXT_API int hts_init(void);
 
-/** Does nothing, kept for ABI compatibility. What hts_init() set up is never
-    released. Always returns 1. */
+/** Release what hts_init() set up. Call it only when no other thread uses
+    the engine. A later hts_init() sets it up again. Always returns 1. */
 HTSEXT_API int hts_uninit(void);
 
 /** Block until every worker spawned by hts_newthread() has finished. */
@@ -660,8 +661,9 @@ HTSEXT_API char *jump_normalized(char *);
 
 HTSEXT_API const char *jump_normalized_const(const char *);
 
-/** Return a pointer (into the input) to the ":port" part of a URL host, or NULL
-    if there is no explicit port. Handles bracketed IPv6 literals. */
+/** Return a pointer (into the input) to the ":port" part of a URL's authority,
+    or NULL if there is no explicit port. A ':' in the path, query or fragment
+    is never returned. Handles bracketed IPv6 literals. */
 HTSEXT_API char *jump_toport(char *);
 
 HTSEXT_API const char *jump_toport_const(const char *);
@@ -923,7 +925,8 @@ struct topindex_chain {
 HTSEXT_API find_handle hts_findfirst(char *path);
 
 /** Advance to the next directory entry. Returns 1 if an entry is available, 0
-   at end of directory. */
+   at end of directory. An entry that cannot be stat()ed is still returned, as
+   neither file nor directory, with size -1. */
 HTSEXT_API hts_boolean hts_findnext(find_handle find);
 
 /** Close the iteration and free @p find. Always returns 0; NULL is accepted. */
@@ -933,7 +936,8 @@ HTSEXT_API int hts_findclose(find_handle find);
     only until the next hts_findnext()/hts_findclose(). */
 HTSEXT_API char *hts_findgetname(find_handle find);
 
-/** Size in bytes of the current entry, or -1 when there is none. */
+/** Size in bytes of the current entry, or -1 when there is none or it cannot
+    be stat()ed. */
 HTSEXT_API LLint hts_findgetsize64(find_handle find);
 
 /** @deprecated Use hts_findgetsize64(). An int cannot carry a size past 2 GB,
@@ -1084,8 +1088,9 @@ HTSEXT_API void hts_bundle_names_free(char **names);
 #define HTS_PASTE_ERROR_SIZE 256
 
 /** What hts_bundle_from_paste found. The caller sets size to
-    sizeof(hts_paste_result), so later fields can be added. After a failure,
-    every field but size and error is empty or zero. */
+    sizeof(hts_paste_result), so later fields can be added; a field past size
+    is not written. After a failure, every field but size and error is empty or
+    zero. */
 typedef struct hts_paste_result {
   /** sizeof(hts_paste_result), set by the caller */
   size_t size;
@@ -1102,6 +1107,9 @@ typedef struct hts_paste_result {
   char error[HTS_PASTE_ERROR_SIZE];
   /** the cookies inside the bundle's scope */
   int cookies;
+  /** the cookies of hosts that hts_bundle_from_paste_hosts left out, because
+      the jar was full or a cookie was too long */
+  int dropped;
 } hts_paste_result;
 
 /** Turn paste, a DevTools "Copy as cURL (bash)" text or a cookies.txt export,
@@ -1109,8 +1117,8 @@ typedef struct hts_paste_result {
     one. agent and url are fallbacks, used when the paste carries none; either
     may be NULL. dry_run writes nothing, and folder may then be NULL.
     HTS_FALSE when refused, with the reason in result->error, or with result
-    untouched when result->size is smaller than this struct. Call it after
-    hts_init(). */
+    untouched when result->size is smaller than
+    offsetof(hts_paste_result, dropped). Call it after hts_init(). */
 HTSEXT_API hts_boolean hts_bundle_from_paste(const char *paste,
                                              const char *folder,
                                              const char *agent, const char *url,
@@ -1130,6 +1138,19 @@ HTSEXT_API hts_boolean hts_bundle_from_paste(const char *paste,
 HTSEXT_API hts_boolean hts_bundle_from_paste_flags(
     const char *paste, const char *folder, const char *agent, const char *url,
     unsigned int flags, hts_paste_result *result);
+
+/** Do what hts_bundle_from_paste_flags does, and keep the cookies.txt
+    records of hosts, a comma-separated list such as the hosts a browser login
+    went through, or NULL. Each host gets a scope line for its registrable
+    domain, and never becomes a start URL. A host that cannot have a scope
+    line, such as a public suffix, is skipped, and so is every host past 256
+    scope domains. The whole list is ignored when the address's own host cannot
+    have a scope line, such as "intranet". The address's own records come
+    first, and result->dropped counts the records of hosts left out. A cURL
+    paste ignores hosts. */
+HTSEXT_API hts_boolean hts_bundle_from_paste_hosts(
+    const char *paste, const char *folder, const char *agent, const char *url,
+    const char *hosts, unsigned int flags, hts_paste_result *result);
 
 /* UTF-8 aware FILE API */
 /* On non-Windows these macros resolve directly to the POSIX calls. On Windows

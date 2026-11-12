@@ -30,9 +30,6 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
-/* Internal engine bytecode */
-#define HTS_INTERNAL_BYTECODE
-
 // Fichier intercepteur d'URL .c
 
 /* specific definitions */
@@ -199,13 +196,6 @@ catch_url_status catch_url_capture(T_SOC soc, char *url, char *method,
 
     while((soc2 = (T_SOC) accept(soc, NULL, NULL)) == INVALID_SOCKET) ;
     socket_set_nosigpipe(soc2);
-    /*
-       #ifdef _WIN32
-       closesocket(soc);
-       #else
-       close(soc);
-       #endif
-     */
     soc = soc2;
     /* INFOS */
     {

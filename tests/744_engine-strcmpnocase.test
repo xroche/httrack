@@ -1,0 +1,9 @@
+#!/bin/bash
+#
+# strcmpnocase is 0 only when both strings end together.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+assert_selftest "strcmpnocase: OK" strcmpnocase

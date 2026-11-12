@@ -10,7 +10,7 @@ set -eu
 
 # Bare -#test lists known tests (printed to stderr).
 list=$(httrack -#test 2>&1)
-assert_match 'filter +<pattern> <string>' "$list" 'the registry listing'
+assert_match 'filter +<pattern> \[string\]' "$list" 'the registry listing'
 assert_match 'cache-writefail +<dir>' "$list" 'the registry listing'
 
 # Unknown name: non-zero exit + diagnostic, and no test result line.

@@ -23,8 +23,6 @@ HEADER = """\
    Public License, v. 2.0. If a copy of the MPL was not distributed with this
    file, you can obtain one at https://mozilla.org/MPL/2.0/. */
 
-#define HTS_INTERNAL_BYTECODE
-
 #include "htspsl.h"
 
 const char hts_psl_builtin_version[] = "{version}";

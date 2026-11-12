@@ -30,9 +30,6 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
-/* Internal engine bytecode */
-#define HTS_INTERNAL_BYTECODE
-
 #include "htsbase.h"
 #include "htscore.h"
 #include "htscodec.h"
@@ -56,6 +53,8 @@ Please visit our Website: http://www.httrack.com
    Deflate cannot pass 1032x, so it only meets this at the 2 GiB ceiling. */
 #define HTS_CODEC_MAX_RATIO 4096
 #define HTS_CODEC_MIN_MAXOUT (1024 * 1024)
+/* Per-body decoded size without -m: past it a bomb is "File too big". */
+#define HTS_CODEC_DEFAULT_CAP ((LLint) 256 * 1024 * 1024)
 
 LLint hts_codec_maxout(LLint in_size) {
   LLint maxout;
@@ -67,6 +66,20 @@ LLint hts_codec_maxout(LLint in_size) {
   if (maxout < HTS_CODEC_MIN_MAXOUT)
     maxout = HTS_CODEC_MIN_MAXOUT;
   return maxout;
+}
+
+LLint hts_codec_budget(LLint in_size, LLint cap) {
+  const LLint maxout = hts_codec_maxout(in_size);
+
+  return (cap > 0 && cap < maxout) ? cap : maxout;
+}
+
+LLint hts_codec_decode_cap(LLint user_cap) {
+  return user_cap > 0 ? user_cap : HTS_CODEC_DEFAULT_CAP;
+}
+
+hts_boolean hts_codec_cap_binds(LLint in_size, LLint cap) {
+  return (cap > 0 && cap < hts_codec_maxout(in_size)) ? HTS_TRUE : HTS_FALSE;
 }
 
 hts_codec hts_codec_parse(const char *encoding) {
@@ -188,7 +201,9 @@ static int codec_unpack_brotli(FILE *in, FILE *out, LLint maxout,
       ok = HTS_FALSE;
   }
   BrotliDecoderDestroyInstance(state);
-  return (ok && done && !ferror(in)) ? (int) total : -1;
+  if (ok && done && !ferror(in))
+    return (int) total;
+  return total > maxout ? HTS_CODEC_TOOBIG : -1;
 }
 
 static size_t codec_head_brotli(const void *in, size_t in_len, void *out,
@@ -256,7 +271,9 @@ static int codec_unpack_zstd(FILE *in, FILE *out, LLint maxout, int *io_errno) {
   }
   ZSTD_freeDStream(zds);
   /* zret != 0 at EOF: the last frame never completed */
-  return (ok && zret == 0 && !ferror(in)) ? (int) total : -1;
+  if (ok && zret == 0 && !ferror(in))
+    return (int) total;
+  return total > maxout ? HTS_CODEC_TOOBIG : -1;
 }
 
 static size_t codec_head_zstd(const void *in, size_t in_len, void *out,
@@ -298,12 +315,17 @@ LLint hts_codec_coded_size(FILE *in) {
 
 int hts_codec_unpack(hts_codec codec, const char *filename,
                      const char *newfile) {
+  return hts_codec_unpack_max(codec, filename, newfile, 0);
+}
+
+int hts_codec_unpack_max(hts_codec codec, const char *filename,
+                         const char *newfile, LLint cap) {
   errno = 0; /* nothing local failed: see the contract in htscodec.h */
   if (filename == NULL || newfile == NULL || !filename[0] || !newfile[0])
     return -1;
   switch (codec) {
   case HTS_CODEC_DEFLATE:
-    return hts_zunpack(filename, newfile);
+    return hts_zunpack_max(filename, newfile, cap);
   case HTS_CODEC_BROTLI:
   case HTS_CODEC_ZSTD:
     break;
@@ -314,12 +336,13 @@ int hts_codec_unpack(hts_codec codec, const char *filename,
   {
     char catbuff[CATBUFF_SIZE];
     FILE *out, *in = FOPEN(fconv(catbuff, sizeof(catbuff), filename), "rb");
-    LLint maxout;
+    LLint maxout, coded;
     int ret = -1, io_errno = 0;
 
     if (in == NULL)
       return -1;
-    maxout = hts_codec_maxout(hts_codec_coded_size(in));
+    coded = hts_codec_coded_size(in);
+    maxout = hts_codec_budget(coded, cap);
     out = FOPEN(fconv(catbuff, sizeof(catbuff), newfile), "wb");
     if (out == NULL) {
       io_errno = errno;
@@ -335,6 +358,10 @@ int hts_codec_unpack(hts_codec codec, const char *filename,
     if (codec == HTS_CODEC_ZSTD)
       ret = codec_unpack_zstd(in, out, maxout, &io_errno);
 #endif
+    /* only a cap the caller set is a verdict; the built-in limit stays a bomb
+     */
+    if (ret == HTS_CODEC_TOOBIG && !hts_codec_cap_binds(coded, cap))
+      ret = -1;
     /* stdio may still hold the tail, so the close is a write of its own */
     if (fclose(out) != 0) {
       io_errno = errno;

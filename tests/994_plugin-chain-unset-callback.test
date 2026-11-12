@@ -1,0 +1,8 @@
+#!/bin/bash
+#
+# A plug-in that calls prev on a callback no front end sets must not crash (C85).
+
+set -euo pipefail
+
+out=$(httrack -O /dev/null -#test=chainprev)
+grep -q "chainprev: OK" <<<"$out"

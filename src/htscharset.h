@@ -36,6 +36,7 @@ Please visit our Website: http://www.httrack.com
 /** Standard includes. **/
 #include "htsglobal.h"
 #include "httrack-library.h"
+#include "htsstrings.h"
 #include <stdlib.h>
 #include <string.h>
 #include "htswin32.h"
@@ -66,6 +67,13 @@ extern char *hts_convertStringFromUTF8Strict(const char *s, size_t size,
  * Convert an UTF-8 string to an IDNA (RFC 3492) string.
  **/
 extern char *hts_convertStringUTF8ToIDNA(const char *s, size_t size);
+
+/**
+ * Write the ASCII (IDNA) form of the len-byte host into dst, of size bytes;
+ * dst may be host. HTS_FALSE, dst untouched, if it has none or does not fit.
+ **/
+extern hts_boolean hts_host_to_ascii(char *dst, size_t size, const char *host,
+                                     size_t len);
 
 /**
  * Convert an IDNA (RFC 3492) string to an UTF-8 string.
@@ -122,6 +130,7 @@ extern size_t hts_appendStringUTF8(char *dest, const char *src,
 
 /**
  * Convert an UTF-8 string into an Unicode string (0-terminated).
+ * Each byte that hts_isStringUTF8() would refuse becomes one U+FFFD.
  **/
 extern hts_UCS4* hts_convertUTF8StringToUCS4(const char *s, size_t size, 
                                              size_t *nChars);
@@ -133,7 +142,8 @@ extern char *hts_convertUCS4StringToUTF8(const hts_UCS4 *s, size_t nChars);
 
 /**
  * Write the Unicode character 'uc' in 'dest' of maximum size 'size'.
- * Return the number of bytes written, or 0 upon error.
+ * Return the number of bytes written, or 0 upon error, a surrogate or a
+ * code point above U+10FFFF.
  * Note: does not \0-terminate the destination buffer.
  **/
 extern size_t hts_writeUTF8(hts_UCS4 uc, char *dest, size_t size);
@@ -142,16 +152,20 @@ extern size_t hts_writeUTF8(hts_UCS4 uc, char *dest, size_t size);
  * Read the next Unicode character within 'src' of size 'size' and, upon
  * successful reading, return the number of bytes read and place the
  * character is 'puc'.
- * Return 0 upon error.
+ * Return 0 for a sequence hts_isStringUTF8() refuses.
  **/
 extern size_t hts_readUTF8(const char *src, size_t size, hts_UCS4 *puc);
 
 /**
  * Given the first UTF-8 sequence character, get the total number of
- * characters in the sequence (1 for ASCII). 
- * Return 0 upon error (not a leading character).
+ * characters in the sequence (1 for ASCII).
+ * Return 0 when it cannot start a valid sequence (C0, C1, F5..FF included).
  **/
 extern size_t hts_getUTF8SequenceLength(const char lead);
+
+/* Append s to out as a quoted JSON string. Byte sequences that are not valid
+   UTF-8 become U+FFFD, so a legacy-charset URL still gives parseable JSON. */
+extern void hts_json_string(String *out, const char *s);
 
 /** WIN32 specific functions. **/
 #ifdef _WIN32

@@ -394,17 +394,6 @@ struct t_hts_htmlcheck_callbacks {
 
 #include <stddef.h>
 
-/** A callback slot's name beside its offset in the table. Declared here, and
-    used by nothing. */
-#ifndef HTS_DEF_FWSTRUCT_t_hts_callback_ref
-#define HTS_DEF_FWSTRUCT_t_hts_callback_ref
-typedef struct t_hts_callback_ref t_hts_callback_ref;
-#endif
-struct t_hts_callback_ref {
-  const char *name;
-  size_t offset; /**< byte offset in t_hts_htmlcheck_callbacks */
-};
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -428,11 +417,8 @@ extern const t_hts_htmlcheck_callbacks default_callbacks;
 /** Closes an HT_REQUEST_START block, and expands to nothing. */
 #define HT_REQUEST_END
 
-/* HTT_ and HTS_ spell the same two macros again. Nothing uses the HTS_ pair. */
 #define HTT_REQUEST_START opt->state.HTbuff[0] = '\0';
 #define HTT_REQUEST_END
-#define HTS_REQUEST_START opt->state.HTbuff[0] = '\0';
-#define HTS_REQUEST_END
 /** Record S as the engine's error message, which hts_errmsg() returns. Needs
     opt in scope, and aborts when S does not fit. */
 #define HTS_PANIC_PRINTF(S) strcpybuff(opt->state._hts_errmsg, S);

@@ -78,6 +78,10 @@ selftest_queue none fetchdest - url /a.png/b
 
 selftest_queue same-origin fetchsite https://a.example.com https://a.example.com:443
 selftest_queue same-origin fetchsite https://EXAMPLE.com https://example.com/x
+# An out-of-range port keeps the scheme default instead of wrapping to another.
+selftest_queue same-origin fetchsite https://example.com https://example.com:4294967376
+selftest_queue same-origin fetchsite https://example.com https://example.com:8443x
+selftest_queue same-origin fetchsite https://example.com https://example.com:0
 # A browser keeps the trailing dot, so these are two hosts.
 selftest_queue cross-site fetchsite https://example.com. https://example.com/x
 selftest_queue cross-site fetchsite https://a.example.com. https://b.example.com

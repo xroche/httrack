@@ -269,8 +269,8 @@ cases = {
     # a byte linput() drops sitting INSIDE the scheme, not in front of the line
     b"schemecr": archive(b"schemecr", b"htt\rp://schemecr/victim.html 0.0.0.0 "
                          + date + b" text/html %d\n"),
-    # and a NUL, which this reader's own linput() drops like a TAB, so a record
-    # line carrying one is indexed and served all the same
+    # and a NUL, which this reader's own linput() drops like a TAB, so the scan
+    # still sees a record line carrying one
     b"schemenul": archive(b"schemenul", b"htt\x00p://schemenul/victim.html 0.0.0.0 "
                           + date + b" text/html %d\n"),
     # a record line near the longest linput() will return, which a scan reading
@@ -364,6 +364,9 @@ open(d + "/overlong.arc", "wb").write(pair(
     nxt + b"x" * 4096))
 # and a record whose data ends inside its own status line
 open(d + "/shorthdr.arc", "wb").write(pair(b"shorthdr", b"HTTP/", nxt))
+# and two honest records whose host carries a NUL
+open(d + "/urlnul.arc", "wb").write(pair(
+    b"url\x00nul", b"HTTP/1.1 200 OK\r\n\r\nA", head(b"NULKEPT") + b"NULKEPT"))
 EOF
 
 # Walks the record chain to return the body archive $1 stores for URL $2, rather
@@ -444,6 +447,10 @@ for class in space digit newline cr eof padline urlend urlmid later dns \
             fail_dump "reading the $class archive back failed" "$dir/$class.err"
     fi
 done
+# The reader drops a NUL in a record line, so that record is still served.
+convert "$dir/urlnul.arc" "$dir/urlnul-out.arc"
+stored "$dir/urlnul-out.arc" http://urlnul/b.html "$dir/urlnul.b"
+is_body "$dir/urlnul.b" NULKEPT "a NUL in a record line lost that record"
 
 # The tail record, which exists to say that refusing the greedy record did not
 # also drop everything stored after the page it swallowed.

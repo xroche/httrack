@@ -30,9 +30,6 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
-/* Internal engine bytecode */
-#define HTS_INTERNAL_BYTECODE
-
 // Gestion protocole ftp
 // Version .05 (01/2000)
 
@@ -42,6 +39,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsio.h"
 #include "htsthread.h"
 #include "htscrashtest.h"
+#include "htsencoding.h"
 
 #include <limits.h>
 #include <stdint.h>
@@ -65,8 +63,6 @@ Please visit our Website: http://www.httrack.com
 #endif
 
 #define FTP_DEBUG 0
-
-#if USE_BEGINTHREAD
 
 /* Live FTP workers. Each writes through its backlog slot and reads opt for its
    whole run, so neither may be freed while the list is not empty (#1051).
@@ -171,9 +167,6 @@ void back_launch_ftp(void *pP) {
   printf("[Launching main ftp routine]\n");
 #endif
   run_launch_ftp(pStruct);
-
-  /* Uninitialize */
-  hts_uninit();
 
   pStruct->body_returned = HTS_TRUE;
 }
@@ -445,26 +438,18 @@ void launch_ftp(FTPDownloadStruct * params) {
   }
 }
 
-#else
-#error No more supported
-#endif
-
-// pour l'arrêt du ftp
+// closes and invalidates, for run_launch_ftp's single cleanup
 #ifdef _WIN32
 #define _T_SOC_close(soc)  do { closesocket(soc); soc=INVALID_SOCKET; } while(0)
 #else
 #define _T_SOC_close(soc)  do { close(soc); soc=INVALID_SOCKET; } while(0)
 #endif
-#define _HALT_FTP { \
-  if ( soc_ctl     != INVALID_SOCKET ) _T_SOC_close(soc_ctl); \
-  if ( soc_servdat != INVALID_SOCKET ) _T_SOC_close(soc_servdat); \
-  if ( soc_dat     != INVALID_SOCKET ) _T_SOC_close(soc_dat); \
-}
-#define _CHECK_HALT_FTP \
-  if (stop_ftp(back)) { \
-  _HALT_FTP \
-  return 0; \
-  }
+/* htsblk_failf() for a permanent failure. */
+#define ftp_fail(R, ...)                                                       \
+  do {                                                                         \
+    htsblk_failf((R), __VA_ARGS__);                                            \
+    (R)->statuscode = STATUSCODE_INVALID;                                      \
+  } while (0)
 
 /* Start of the authority in a URL address (see htsftp.h). */
 char *ftp_jump_authority(char *url_adr) {
@@ -501,10 +486,34 @@ hts_boolean ftp_split_hostport(const char *adr, char *host, size_t host_size,
   return HTS_TRUE;
 }
 
+/* Percent-decode src[0..len) into dst; HTS_FALSE if it does not fit or
+   decodes to a control byte, which would inject an FTP command. */
+static hts_boolean ftp_decode_userinfo(const char *src, size_t len, char *dst,
+                                       size_t dst_size) {
+  size_t i, j = 0;
+
+  for (i = 0; i < len; i++) {
+    int h = -1;
+
+    if (j >= dst_size - 1)
+      return HTS_FALSE;               /* a clipped name is another account's */
+    if (src[i] == '%' && i + 2 < len) /* both hex digits in this field */
+      h = hts_ehex(&src[i + 1]);
+    if (h >= 0) {
+      dst[j++] = (char) h;
+      i += 2;
+    } else {
+      dst[j++] = src[i];
+    }
+  }
+  dst[j] = '\0';
+  return hts_is_control_free_sized(dst, j);
+}
+
 /* Split a hostile-URL "user[:pass]@" prefix (see htsftp.h). */
 hts_boolean ftp_split_userpass(const char *src, const char *end, char *user,
                                size_t user_size, char *pass, size_t pass_size) {
-  size_t len = 0, user_len, pass_len;
+  size_t len = 0, user_len;
   const char *colon;
 
   assertf(user_size > 0 && pass_size > 0); /* the size-1 math underflows on 0 */
@@ -513,17 +522,14 @@ hts_boolean ftp_split_userpass(const char *src, const char *end, char *user,
   user[0] = pass[0] = '\0'; // fail safe for a caller that ignores the result
   while (len < (size_t) (end - src) - 1 && src[len] != '\0')
     len++;
-  colon = memchr(src, ':', len);
+  colon = memchr(src, ':', len); /* the raw colon, so %3A stays in the name */
   user_len = colon != NULL ? (size_t) (colon - src) : len;
-  pass_len = colon != NULL ? len - user_len - 1 : 0;
-  /* a clipped name is another account's, so refuse rather than log in as it */
-  if (user_len >= user_size || pass_len >= pass_size)
+  if (!ftp_decode_userinfo(src, user_len, user, user_size) ||
+      (colon != NULL &&
+       !ftp_decode_userinfo(colon + 1, len - user_len - 1, pass, pass_size))) {
+    user[0] = pass[0] = '\0';
     return HTS_FALSE;
-  memcpy(user, src, user_len);
-  user[user_len] = '\0';
-  if (pass_len != 0)
-    memcpy(pass, colon + 1, pass_len);
-  pass[pass_len] = '\0';
+  }
   return HTS_TRUE;
 }
 
@@ -686,16 +692,18 @@ static hts_boolean ftp_connect(lien_back *back, T_SOC soc, SOCaddr *server,
     if (errno != EINPROGRESS && errno != EINTR)
 #endif
       return HTS_FALSE;
+    int ready;
+
     /* state.stop counts here, unlike in the waits below: a mirror the user
        stopped has nothing to finish on a connection never established. */
-    while (check_socket_connect(soc) == 0) {
+    while ((ready = check_socket_connect(soc)) == 0) {
       if (hts_load_acquire_int(&back->stop_ftp) ||
           (opt != NULL && hts_load_acquire_int(&opt->state.stop)) ||
           (int) (time_local() - started) >= timeout)
         return HTS_FALSE;
       Sleep(100);
     }
-    if (connect_socket_error(soc) != 0)
+    if (ready < 0 || connect_socket_error(soc) != 0)
       return HTS_FALSE;
   }
   /* the rest of the session reads and writes this socket blocking */
@@ -764,7 +772,6 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
 #if FTP_PASV
   int port_pasv = 0;
 #endif
-  char BIGSTK adr_ip[1024];
   char *adr, *real_adr;
   char BIGSTK ftp_path[CATBUFF_SIZE]; // the decoded URL path, screened once
   /* opt->timeout == 0 means unlimited; use INT_MAX so 0 doesn't make the read
@@ -781,7 +788,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
   SOCaddr server_data;
 
   //
-  line_retr[0] = adr_ip[0] = ftp_path[0] = '\0';
+  line_retr[0] = ftp_path[0] = '\0';
 
   // effacer
   strcpybuff(back->r.msg, "");
@@ -792,9 +799,8 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
   real_adr = ftp_jump_authority(back->url_adr);
   if ((adr = jump_identification(real_adr)) != real_adr) {      // user
     if (!ftp_split_userpass_buf(real_adr, adr, user, pass)) {
-      strcpybuff(back->r.msg, "FTP user name or password too long");
-      back->r.statuscode = STATUSCODE_INVALID;
-      _HALT_FTP return 0;
+      ftp_fail(&back->r, "FTP user name or password too long or invalid");
+      goto done;
     }
   }
   // Calculer RETR <nom>
@@ -816,17 +822,15 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
           fits = ftp_command_line(line_retr, "RETR", ftp_path);
         }
         if (!fits) {
-          strcpybuff(back->r.msg, "FTP path too long");
-          back->r.statuscode = STATUSCODE_INVALID;
-          _HALT_FTP return 0;
+          ftp_fail(&back->r, "FTP path too long");
+          goto done;
         }
       } else {
         transfer_list = 1;
         snprintf(line_retr, sizeof(line_retr), "LIST -A");
       }
     } else {
-      strcpybuff(back->r.msg, "Unexpected PORT error");
-      back->r.statuscode = STATUSCODE_INVALID;
+      ftp_fail(&back->r, "Unexpected PORT error");
     }
   }
 
@@ -834,9 +838,8 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
   // Every command below is a literal verb plus one of these three.
   if (!hts_is_control_free(user) || !hts_is_control_free(pass) ||
       !hts_is_control_free(ftp_path)) {
-    strcpybuff(back->r.msg, "Invalid control character in FTP URL");
-    back->r.statuscode = STATUSCODE_INVALID;
-    _HALT_FTP return 0;
+    ftp_fail(&back->r, "Invalid control character in FTP URL");
+    goto done;
   }
 
 #if FTP_DEBUG
@@ -853,9 +856,8 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
     memset(&server, 0, sizeof(server));
 
     if (!ftp_split_hostport(adr, _adr, sizeof(_adr), &port, err, sizeof(err))) {
-      htsblk_failf(&back->r, "%s", err);
-      back->r.statuscode = STATUSCODE_INVALID; // permanent, unlike a DNS miss
-      _HALT_FTP return 0;
+      ftp_fail(&back->r, "%s", err); // permanent, unlike a DNS miss
+      goto done;
     }
 
     // récupérer adresse résolue
@@ -863,9 +865,10 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
     if (ftp_dns_resolve(opt, back, _adr, &server, timeout, &error) == NULL) {
       htsblk_failf(&back->r, "Unable to get server's address: %s", error);
       back->r.statuscode = STATUSCODE_NON_FATAL;
-      _HALT_FTP return 0;
+      goto done;
     }
-    _CHECK_HALT_FTP;
+    if (stop_ftp(back))
+      goto done;
 
     // copie adresse pour cnx data
     SOCaddr_copy_SOCaddr(server_data, server);
@@ -873,9 +876,8 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
     // créer ("attachement") une socket (point d'accès) internet,en flot
     soc_ctl = hts_socket_client(SOCaddr_sinfamily(server), opt, HTS_FALSE);
     if (soc_ctl == INVALID_SOCKET) {
-      strcpybuff(back->r.msg, "Unable to create a socket");
-      back->r.statuscode = STATUSCODE_INVALID;
-      _HALT_FTP return 0;
+      ftp_fail(&back->r, "Unable to create a socket");
+      goto done;
     }
 
     SOCaddr_initport(server, port);
@@ -885,11 +887,11 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                   adr_nologin(opt, _adr), port);
 
     if (!ftp_connect(back, soc_ctl, &server, timeout, opt)) {
-      strcpybuff(back->r.msg, "Unable to connect to the server");
-      back->r.statuscode = STATUSCODE_INVALID;
-      _HALT_FTP return 0;
+      ftp_fail(&back->r, "Unable to connect to the server");
+      goto done;
     }
-    _CHECK_HALT_FTP;
+    if (stop_ftp(back))
+      goto done;
 
     {
       char BIGSTK line[FTP_LINE_SIZE];
@@ -901,14 +903,16 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
 
       // --USER--
       get_ftp_line(back, soc_ctl, line, sizeof(line), timeout, opt); // en tête
-      _CHECK_HALT_FTP;
+      if (stop_ftp(back))
+        goto done;
 
       if (line[0] == '2') {     // ok, connecté
         strcpybuff(back->info, "login: user");
         snprintf(line, sizeof(line), "USER %s", user);
         send_line(soc_ctl, line);
         get_ftp_line(back, soc_ctl, line, sizeof(line), timeout, opt);
-        _CHECK_HALT_FTP;
+        if (stop_ftp(back))
+          goto done;
         if ((line[0] == '3') || (line[0] == '2')) {
           // --PASS--
           if (line[0] == '3') {
@@ -916,30 +920,28 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
             snprintf(line, sizeof(line), "PASS %s", pass);
             send_line(soc_ctl, line);
             get_ftp_line(back, soc_ctl, line, sizeof(line), timeout, opt);
-            _CHECK_HALT_FTP;
+            if (stop_ftp(back))
+              goto done;
           }
           if (line[0] == '2') { // ok
             send_line(soc_ctl, "TYPE I");
             get_ftp_line(back, soc_ctl, line, sizeof(line), timeout, opt);
-            _CHECK_HALT_FTP;
+            if (stop_ftp(back))
+              goto done;
             if (line[0] == '2') {
               // ok
             } else {
-              strcpybuff(back->r.msg, "TYPE I error");
-              back->r.statuscode = STATUSCODE_INVALID;
+              ftp_fail(&back->r, "TYPE I error");
             }
 
           } else {
-            htsblk_failf(&back->r, "Bad password: %s", linejmp(line));
-            back->r.statuscode = STATUSCODE_INVALID;
+            ftp_fail(&back->r, "Bad password: %s", linejmp(line));
           }
         } else {
-          htsblk_failf(&back->r, "Bad user name: %s", linejmp(line));
-          back->r.statuscode = STATUSCODE_INVALID;
+          ftp_fail(&back->r, "Bad user name: %s", linejmp(line));
         }
       } else {
-        htsblk_failf(&back->r, "Connection refused: %s", linejmp(line));
-        back->r.statuscode = STATUSCODE_INVALID;
+        ftp_fail(&back->r, "Connection refused: %s", linejmp(line));
       }
 
       // ok, si on est prêts on écoute sur un port et on demande la sauce
@@ -957,12 +959,15 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
         } else {                /* ipv6 */
           line[0] = '\0';
         }
-        _CHECK_HALT_FTP;
+        if (stop_ftp(back))
+          goto done;
         if (line[0] == '2') {
           // e.g. 227 Entering Passive Mode (123,45,67,89,177,27)
-          if (!ftp_parse_pasv(line, adr_ip, sizeof(adr_ip), &port_pasv)) {
-            htsblk_failf(&back->r, "PASV incorrect: %s", linejmp(line));
-            back->r.statuscode = STATUSCODE_INVALID;
+          char ignored_ip[64]; // data goes to the control peer
+
+          if (!ftp_parse_pasv(line, ignored_ip, sizeof(ignored_ip),
+                              &port_pasv)) {
+            ftp_fail(&back->r, "PASV incorrect: %s", linejmp(line));
           }
         } else {
           /*
@@ -972,17 +977,16 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
           snprintf(line, sizeof(line), "EPSV");
           send_line(soc_ctl, line);
           get_ftp_line(back, soc_ctl, line, sizeof(line), timeout, opt);
-          _CHECK_HALT_FTP;
+          if (stop_ftp(back))
+            goto done;
           if (line[0] == '2') { /* got it */
             // e.g. 229 Entering Extended Passive Mode (|||6446|)
             if (!ftp_parse_epsv(line, &port_pasv)) {
-              htsblk_failf(&back->r, "EPSV incorrect: %s", linejmp(line));
-              back->r.statuscode = STATUSCODE_INVALID;
+              ftp_fail(&back->r, "EPSV incorrect: %s", linejmp(line));
             }
           } else {
-            htsblk_failf(&back->r, "PASV/EPSV error: %s", linejmp(line));
-            back->r.statuscode = STATUSCODE_INVALID;
-          }                     // sinon on est prêts
+            ftp_fail(&back->r, "PASV/EPSV error: %s", linejmp(line));
+          }
         }
 #else
         // rien à faire avant
@@ -999,7 +1003,8 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
               strcpybuff(back->info, "size");
               send_line(soc_ctl, line);
               get_ftp_line(back, soc_ctl, line, sizeof(line), timeout, opt);
-              _CHECK_HALT_FTP;
+              if (stop_ftp(back))
+                goto done;
               if (line[0] == '2') {     // SIZE compris, ALORS tester REST (sinon pas tester: cf probleme des txt.gz decompresses a la volee)
                 LLint size;
                 time_t remote_mtime = (time_t) -1;
@@ -1014,7 +1019,8 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                   strcpybuff(back->info, "mdtm");
                   send_line(soc_ctl, line);
                   get_ftp_line(back, soc_ctl, line, sizeof(line), timeout, opt);
-                  _CHECK_HALT_FTP;
+                  if (stop_ftp(back))
+                    goto done;
                   if (ftp_parse_mdtm(line, &remote_tm)) {
                     char date[256];
 
@@ -1022,10 +1028,8 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                     /* Stamp the mirror as the HTTP path does, so a later pass
                        compares server-clock times instead of crossing clocks.
                      */
-                    back->r.lastmodified[0] = '\0';
-                    strlncatbuff(back->r.lastmodified, date,
-                                 sizeof(back->r.lastmodified),
-                                 sizeof(back->r.lastmodified) - 1);
+                    strclipbuff(back->r.lastmodified,
+                                sizeof(back->r.lastmodified), date);
                     // a clipped date cannot prove the copy matches
                     if (!hts_time_exact(hts_utc_seconds(&remote_tm),
                                         &remote_mtime))
@@ -1043,7 +1047,8 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                            (LLint) back->range_req_size);
                   send_line(soc_ctl, line);
                   get_ftp_line(back, soc_ctl, line, sizeof(line), timeout, opt);
-                  _CHECK_HALT_FTP;
+                  if (stop_ftp(back))
+                    goto done;
                   if ((line[0] == '3') || (line[0] == '2')) {   // ok
                     rest_understood = 1;
                   } // else never mind
@@ -1062,8 +1067,6 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
         // Ok, se connecter
         if (port_pasv) {
           SOCaddr server;
-          hts_boolean resolved;
-          const char *error = "unknown error";
 
           // effacer structure
           memset(&server, 0, sizeof(server));
@@ -1071,104 +1074,81 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
           // infos
           strcpybuff(back->info, "resolv");
 
-          // résoudre
-          if (adr_ip[0]) {
-            resolved = ftp_dns_resolve(opt, back, adr_ip, &server, timeout,
-                                       &error) != NULL;
-          } else {
-            SOCaddr_copy_SOCaddr(server, server_data);
-            resolved = HTS_TRUE;
-          }
+          SOCaddr_copy_SOCaddr(server, server_data);
 
           // infos
           strcpybuff(back->info, "cnxdata");
-#if FTP_DEBUG
-          printf("Data: Connecting to %s:%d...\n", adr_ip, port_pasv);
-#endif
-          if (resolved) {
-            // socket
-            soc_dat =
-                hts_socket_client(SOCaddr_sinfamily(server), opt, HTS_FALSE);
-            if (soc_dat != INVALID_SOCKET) {
-              // structure: connexion au domaine internet, port 80 (ou autre)
-              SOCaddr_initport(server, port_pasv);
-              if (ftp_connect(back, soc_dat, &server, timeout, opt)) {
-                strcpybuff(back->info, "retr");
-                // clip, never abort: this line is built from a crawled URL
-                line[0] = '\0';
-                strlncatbuff(line, line_retr, sizeof(line), sizeof(line) - 1);
-                send_line(soc_ctl, line);
-                get_ftp_line(back, soc_ctl, line, sizeof(line), timeout, opt);
-                _CHECK_HALT_FTP;
-                if (line[0] == '1') {
-                  // OK
-                } else {
-                  deletesoc(soc_dat);
-                  soc_dat = INVALID_SOCKET;
-                  //
-                  htsblk_failf(&back->r, "RETR command error: %s",
-                               linejmp(line));
-                  back->r.statuscode = STATUSCODE_INVALID;
-                }               // sinon on est prêts
+          // socket
+          soc_dat =
+              hts_socket_client(SOCaddr_sinfamily(server), opt, HTS_FALSE);
+          if (soc_dat != INVALID_SOCKET) {
+            // structure: connexion au domaine internet, port 80 (ou autre)
+            SOCaddr_initport(server, port_pasv);
+            if (ftp_connect(back, soc_dat, &server, timeout, opt)) {
+              strcpybuff(back->info, "retr");
+              // clip, never abort: this line is built from a crawled URL
+              strclipbuff(line, sizeof(line), line_retr);
+              send_line(soc_ctl, line);
+              get_ftp_line(back, soc_ctl, line, sizeof(line), timeout, opt);
+              if (stop_ftp(back))
+                goto done;
+              if (line[0] == '1') {
+                // OK
               } else {
-#if FTP_DEBUG
-                printf("Data: unable to connect\n");
-#endif
                 deletesoc(soc_dat);
                 soc_dat = INVALID_SOCKET;
                 //
-                strcpybuff(back->r.msg, "Unable to connect");
-                back->r.statuscode = STATUSCODE_INVALID;
-              } // sinon on est prêts
+                ftp_fail(&back->r, "RETR command error: %s", linejmp(line));
+              }
             } else {
-              strcpybuff(back->r.msg, "Unable to create a socket");
-              back->r.statuscode = STATUSCODE_INVALID;
-            }                   // sinon on est prêts
+#if FTP_DEBUG
+              printf("Data: unable to connect\n");
+#endif
+              deletesoc(soc_dat);
+              soc_dat = INVALID_SOCKET;
+              //
+              ftp_fail(&back->r, "Unable to connect");
+            }
           } else {
-            htsblk_failf(&back->r, "Unable to resolve IP %s: %s", adr_ip,
-                         error);
-            back->r.statuscode = STATUSCODE_INVALID;
-          } // sinon on est prêts
+            ftp_fail(&back->r, "Unable to create a socket");
+          }
         } else {
-          htsblk_failf(&back->r, "PASV incorrect: %s", linejmp(line));
-          back->r.statuscode = STATUSCODE_INVALID;
-        }                       // sinon on est prêts
+          ftp_fail(&back->r, "PASV incorrect: %s", linejmp(line));
+        }
 #else
         //T_SOC soc_servdat;
         strcpybuff(back->info, "listening");
         if ((soc_servdat = get_datasocket(line, sizeof(line))) != INVALID_SOCKET) {
-          _CHECK_HALT_FTP;
+          if (stop_ftp(back))
+            goto done;
           send_line(soc_ctl, line);     // envoi du RETR
           get_ftp_line(back, soc_ctl, line, sizeof(line), timeout, opt);
-          _CHECK_HALT_FTP;
+          if (stop_ftp(back))
+            goto done;
           if (line[0] == '2') { // ok
             strcpybuff(back->info, "retr");
             // clip, never abort: this line is built from a crawled URL
-            line[0] = '\0';
-            strlncatbuff(line, line_retr, sizeof(line), sizeof(line) - 1);
+            strclipbuff(line, sizeof(line), line_retr);
             send_line(soc_ctl, line);
             get_ftp_line(back, soc_ctl, line, sizeof(line), timeout, opt);
-            _CHECK_HALT_FTP;
+            if (stop_ftp(back))
+              goto done;
             if (line[0] == '1') {
               if ((soc_dat = ftp_accept(back, soc_servdat, timeout, opt)) ==
                   INVALID_SOCKET) {
-                strcpybuff(back->r.msg, "Unable to accept connection");
-                back->r.statuscode = STATUSCODE_INVALID;
+                ftp_fail(&back->r, "Unable to accept connection");
               }
             } else {
-              htsblk_failf(&back->r, "RETR command error: %s", linejmp(line));
-              back->r.statuscode = STATUSCODE_INVALID;
+              ftp_fail(&back->r, "RETR command error: %s", linejmp(line));
             }
           } else {
-            htsblk_failf(&back->r, "PORT command error: %s", linejmp(line));
-            back->r.statuscode = STATUSCODE_INVALID;
+            ftp_fail(&back->r, "PORT command error: %s", linejmp(line));
           }
-          /* invalidate, or the _CHECK_HALT_FTP below re-closes a stale fd */
+          /* invalidate, or the cleanup at done: re-closes a stale fd */
           deletesoc(soc_servdat);
           soc_servdat = INVALID_SOCKET;
         } else {
-          strcpybuff(back->r.msg, "Unable to listen to a port");
-          back->r.statuscode = STATUSCODE_INVALID;
+          ftp_fail(&back->r, "Unable to listen to a port");
         }
 #endif
 
@@ -1202,8 +1182,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
               len = 1;          // pas d'erreur pour le moment
               switch (wait_socket_receive(back, soc_dat, timeout, opt)) {
               case -1:
-                strcpybuff(back->r.msg, "FTP read error");
-                back->r.statuscode = STATUSCODE_INVALID;
+                ftp_fail(&back->r, "FTP read error");
                 len = 0;        // fin
                 break;
               case 0:
@@ -1231,20 +1210,17 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                          opt->state.exit_xh=-1;
                          }
                        */
-                      strcpybuff(back->r.msg, "Write error");
-                      back->r.statuscode = STATUSCODE_INVALID;
+                      ftp_fail(&back->r, "Write error");
                       len = 0;  // error
                     }
                   } else {
-                    strcpybuff(back->r.msg, "Unexpected write error");
-                    back->r.statuscode = STATUSCODE_INVALID;
+                    ftp_fail(&back->r, "Unexpected write error");
                   }
                 } else { // Erreur ou terminé
                   back->r.statuscode = 0;
                   if (back->r.totalsize > 0
                       && back->r.size != back->r.totalsize) {
-                    back->r.statuscode = STATUSCODE_INVALID;
-                    strcpybuff(back->r.msg, "FTP file incomplete");
+                    ftp_fail(&back->r, "FTP file incomplete");
                   }
                 }
                 read_len = 1024;
@@ -1259,10 +1235,9 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
             if (strnotempty(back->r.lastmodified))
               set_filetime_rfc822(back->url_sav, back->r.lastmodified);
           } else {
-            strcpybuff(back->r.msg, "Unable to write file");
-            back->r.statuscode = STATUSCODE_INVALID;
+            ftp_fail(&back->r, "Unable to write file");
           }
-          /* invalidate, or the _CHECK_HALT_FTP below re-closes a stale fd */
+          /* invalidate, or the cleanup at done: re-closes a stale fd */
           deletesoc(soc_dat);
           soc_dat = INVALID_SOCKET;
 
@@ -1275,12 +1250,10 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                 strcpybuff(back->r.msg, "OK");
                 back->r.statuscode = HTTP_OK;
               } else {
-                htsblk_failf(&back->r, "RETR incorrect: %s", linejmp(line));
-                back->r.statuscode = STATUSCODE_INVALID;
+                ftp_fail(&back->r, "RETR incorrect: %s", linejmp(line));
               }
             } else {
-              strcpybuff(back->r.msg, "FTP read error");
-              back->r.statuscode = STATUSCODE_INVALID;
+              ftp_fail(&back->r, "FTP read error");
             }
           }
 
@@ -1290,24 +1263,27 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
 
     }
 
-    _CHECK_HALT_FTP;
+    if (stop_ftp(back))
+      goto done;
     strcpybuff(back->info, "quit");
     send_line(soc_ctl, "QUIT"); // bye bye
     /* A stopped mirror skips the second --timeout window this courtesy reply
        costs on a silent server; its text is discarded anyway (#1096). */
     if (!hts_load_acquire_int(&opt->state.stop))
       get_ftp_line(back, soc_ctl, NULL, 0, timeout, opt);
-#ifdef _WIN32
-    closesocket(soc_ctl);
-#else
-    close(soc_ctl);
-#endif
   }
 
   if (back->r.statuscode != -1) {
     back->r.statuscode = HTTP_OK;
     strcpybuff(back->r.msg, "OK");
   }
+done:
+  if (soc_ctl != INVALID_SOCKET)
+    _T_SOC_close(soc_ctl);
+  if (soc_servdat != INVALID_SOCKET)
+    _T_SOC_close(soc_servdat);
+  if (soc_dat != INVALID_SOCKET)
+    _T_SOC_close(soc_dat);
   return 0;
 }
 
@@ -1547,6 +1523,8 @@ int check_socket(T_SOC soc) {
   fd_set fds, fds_e;            // poll structures
   struct timeval tv;            // structure for select
 
+  if (!hts_soc_selectable(soc))
+    return -1;
   FD_ZERO(&fds);
   FD_ZERO(&fds_e);
   // socket read 
@@ -1570,6 +1548,8 @@ int check_socket_connect(T_SOC soc) {
   fd_set fds, fds_e;            // poll structures
   struct timeval tv;            // structure for select
 
+  if (!hts_soc_selectable(soc))
+    return -1;
   FD_ZERO(&fds);
   FD_ZERO(&fds_e);
   // socket write 

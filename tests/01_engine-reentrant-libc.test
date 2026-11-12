@@ -23,9 +23,9 @@ expect_ok "strerror self-test" httrack -O "${tmpdir}/o1" -#test=strerror
 # lock must still be held at h_addr_list, or the copy reads a hostent another
 # worker has already replaced.
 body=$(awk '/^static int hts_dns_resolve_nocache_list_\(/,/^}/' \
-    "$top_srcdir/src/htslib.c")
+    "$top_srcdir/src/htsdns.c")
 if [ -z "$body" ]; then
-    echo "FAIL: hts_dns_resolve_nocache_list_() not found in src/htslib.c"
+    echo "FAIL: hts_dns_resolve_nocache_list_() not found in src/htsdns.c"
     exit 1
 fi
 # grep -E, because BSD sed has no \| alternation and would match nothing.
