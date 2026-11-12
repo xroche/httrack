@@ -1,0 +1,12 @@
+#!/bin/bash
+#
+# The socket waits must each watch their own direction.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+out=$(httrack -O /dev/null '-#test=socwait' 2>&1) || fail "-#test=socwait failed: $out"
+assert_eq "socwait self-test OK" "$out" "the self-test's own verdict"
+ok "read and write waits each watch their own direction"

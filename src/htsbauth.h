@@ -50,8 +50,8 @@ Please visit our Website: http://www.httrack.com
 typedef struct bauth_chain bauth_chain;
 #endif
 struct bauth_chain {
-  char prefix[1024]; /**< host and path, cut after the last '/', for example
-                          www.foo.com/secure/ */
+  char prefix[1024]; /**< scheme, host and path, cut after the last '/', for
+                          example http://www.foo.com/secure/ */
   char auth[1024];   /**< base-64 "user:pass", the value sent after
                           "Authorization: Basic " */
   struct bauth_chain *next; /**< next entry, NULL at the end */
@@ -118,9 +118,24 @@ typedef struct cookie_attr {
 int cookie_set(t_cookie *cookie, const char *cook_name, const char *cook_value,
                const char *domain, const char *path, const cookie_attr *attr);
 
+/** This is cookie_set for a cookie a server sent. When the jar has no room,
+    it evicts the oldest records of the largest host holding over 50 records
+    or 8 KB (the setter's host counts the new one), until it fits, and refuses
+    if no host is over. Oldest is the first record of the shortest path (the
+    jar keeps no age). A cookies file loads with cookie_set, uncapped. */
+int cookie_set_capped(t_cookie *cookie, const char *cook_name,
+                      const char *cook_value, const char *domain,
+                      const char *path, const cookie_attr *attr);
+
 /** This is cookie_set with attr NULL. */
 int cookie_add(t_cookie *cookie, const char *cook_name, const char *cook_value,
                const char *domain, const char *path);
+
+/** Does the jar hold a Secure record of cook_name that a cookie for this
+    domain and path would shadow (RFC 6265bis 5.6)? Either domain may be the
+    parent, and the record's path must cover path on a "/" boundary. */
+hts_boolean cookie_is_secure_record(t_cookie *cookie, const char *cook_name,
+                                    const char *domain, const char *path);
 
 /** Erase the record of cook_name with exactly this domain and path, with
     domain normalised by cookie_host as cookie_set does. Always 0: a domain
@@ -222,14 +237,15 @@ char *cookie_nextfield(char *a);
 /* basic auth */
 
 /** Register credentials (auth = base-64 user:pass) for the prefix derived from
-    adr (host) and fil (path). No-op returning 0 if cookie is NULL, allocation
-    fails, a matching prefix is already stored, bauth_prefix builds no key, or
-    either string is too long for bauth_chain; returns 1 on insertion. */
+    adr (scheme, host) and fil (path). No-op returning 0 if cookie is NULL,
+   allocation fails, a matching prefix is already stored, bauth_prefix builds no
+   key, or either string is too long for bauth_chain; returns 1 on insertion. */
 int bauth_add(t_cookie *cookie, const char *adr, const char *fil,
               const char *auth);
 
 /** Return the base-64 credentials of the first stored prefix that starts
-    adr+fil, or NULL when none does or cookie is NULL. The result points into
+    adr+fil, or NULL when none does or cookie is NULL. An https request also
+    matches entries learned over http, never the reverse. The result points into
     the jar, so never free it, and bauth_free() invalidates it. */
 char *bauth_check(t_cookie *cookie, const char *adr, const char *fil);
 
@@ -237,10 +253,11 @@ char *bauth_check(t_cookie *cookie, const char *adr, const char *fil);
     a NULL jar and on a jar already freed; the jar itself is not released. */
 void bauth_free(t_cookie *cookie);
 
-/** Build the auth lookup key (host + path, query string stripped, truncated at
-    the last '/') from adr and fil into prefix; returns prefix, or NULL when
-    adr+fil does not fit, since a clipped key would match URLs nobody
-    authenticated. Caller must supply a buffer of HTS_URLMAXSIZE * 2 bytes. */
+/** Build the auth lookup key (scheme if https, host + path, query string
+   stripped, truncated at the last '/') from adr and fil into prefix; returns
+   prefix, or NULL when adr+fil does not fit, since a clipped key would match
+   URLs nobody authenticated. Caller must supply a buffer of HTS_URLMAXSIZE * 2
+   bytes. */
 char *bauth_prefix(char *buffer, const char *adr, const char *fil);
 
 #endif

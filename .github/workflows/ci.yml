@@ -135,7 +135,7 @@ jobs:
 
       - name: Print the test log on failure
         if: failure()
-        run: cat tests/test-suite.log 2>/dev/null || true
+        run: sh tools/ci-test-log.sh
 
   # Reproduce the Debian buildds: they build in a minimal chroot with no
   # python3, so the local-server tests must SKIP (exit 77), not fail. GitHub
@@ -185,7 +185,7 @@ jobs:
 
       - name: Print the test log on failure
         if: failure()
-        run: cat tests/test-suite.log 2>/dev/null || true
+        run: sh tools/ci-test-log.sh
 
   # Portability: build and test on macOS (Darwin/clang) on a native runner --
   # no VM. The tree has no __APPLE__ branches, so Darwin exercises the
@@ -237,7 +237,7 @@ jobs:
 
       - name: Print the test log on failure
         if: failure()
-        run: cat tests/test-suite.log 2>/dev/null || true
+        run: sh tools/ci-test-log.sh
 
   # Runtime smoke of the WebHTTrack launcher on macOS: it carries a Darwin-only
   # browser path (open -W) and nothing else exercises htsserver. Install into a
@@ -339,7 +339,7 @@ jobs:
 
       - name: Print the test log on failure
         if: failure()
-        run: cat tests/test-suite.log 2>/dev/null || true
+        run: sh tools/ci-test-log.sh
 
   # Memory safety: build and run the suite under AddressSanitizer +
   # UndefinedBehaviorSanitizer. The offline engine self-tests drive the parsers
@@ -559,7 +559,7 @@ jobs:
 
       - name: Print the test log on failure
         if: failure()
-        run: cat tests/test-suite.log 2>/dev/null || true
+        run: sh tools/ci-test-log.sh
 
   # OpenSSL 4.0 removes the API 3.x deprecated. Building with that set hidden
   # keeps the engine ready for it: a deprecated call fails here rather than the
@@ -675,6 +675,33 @@ jobs:
           git config --global --add safe.directory "*"
           export DEB_BUILD_OPTIONS="noautodbgsym parallel=$CHECK_JOBS"
           bash tools/mkdeb.sh --unsigned --no-release-artifacts
+
+  # Ubuntu syncs the Debian package and builds it on a development release no
+  # runner tracks, so build it here the way Launchpad does: Build-Depends only.
+  deb-ubuntu:
+    name: deb package (Ubuntu devel)
+    runs-on: ubuntu-24.04
+    container: ubuntu:devel
+    steps:
+      # Before checkout: the container has no git, so submodules would be lost.
+      - name: Install git
+        run: |
+          set -euo pipefail
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates git
+
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install Build-Depends
+        run: apt-get build-dep -y --no-install-recommends ./
+
+      - name: Build the packages and run the test suite
+        run: |
+          set -euo pipefail
+          export DEB_BUILD_OPTIONS="noautodbgsym parallel=$CHECK_JOBS"
+          dpkg-buildpackage -b -us -uc
 
   # Release-tarball integrity: `make distcheck` rolls the dist tarball, then
   # configures, builds and tests it out-of-tree from a read-only source tree and
@@ -1010,6 +1037,7 @@ jobs:
       - openssl-no-deprecated
       - no-selftests
       - deb
+      - deb-ubuntu
       - distcheck
       - dco
       - lint

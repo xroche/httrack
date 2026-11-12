@@ -33,7 +33,8 @@ fuzz_filters_SOURCES = fuzz-filters.c fuzz.h
 fuzz_url_SOURCES = fuzz-url.c fuzz.h
 fuzz_header_SOURCES = fuzz-header.c fuzz.h
 # The .ndx reader it drives is proxytrack's, so its store compiles in here too.
-fuzz_cachendx_SOURCES = fuzz-cachendx.c fuzz.h $(top_srcdir)/src/proxy/store.c
+fuzz_cachendx_SOURCES = fuzz-cachendx.c fuzz.h $(top_srcdir)/src/proxy/store.c \
+	$(top_srcdir)/src/htsshared.c
 fuzz_cachendx_CPPFLAGS = $(AM_CPPFLAGS) -DZLIB_CONST
 fuzz_htsparse_SOURCES = fuzz-htsparse.c fuzz.h
 fuzz_singlefile_SOURCES = fuzz-singlefile.c fuzz.h
@@ -41,7 +42,8 @@ fuzz_sitemap_SOURCES = fuzz-sitemap.c fuzz.h
 
 # proxytrack does not link libhttrack, so its store compiles into the harness;
 # coucal, minizip and md5 still come from the static libhttrack above.
-fuzz_arc_SOURCES = fuzz-arc.c fuzz.h $(top_srcdir)/src/proxy/store.c
+fuzz_arc_SOURCES = fuzz-arc.c fuzz.h $(top_srcdir)/src/proxy/store.c \
+	$(top_srcdir)/src/htsshared.c
 fuzz_arc_CPPFLAGS = $(AM_CPPFLAGS) -DZLIB_CONST
 
 # The save-name builder: hostile URLs in, on-disk paths out.

@@ -48,14 +48,18 @@ poke() {
 
 # The parser keeps the last X-Save seen, so the forged line replaces the Etag;
 # the colon-free pad after it is skipped, restoring the block's length.
+forge_line() { # forge_line FILE ETAGLINE VALUE
+    local line pad
+    line="X-Save: $3"$'\r\n'
+    test "${#line}" -le "${#2}" ||
+        fail "forge_line: '$3' does not fit the line it replaces"
+    pad=$(printf "%$((${#2} - ${#line}))s" '' | tr ' ' 'E')
+    poke "$1" "$2" "$line$pad"
+}
+
 forge_save() {
-    local out=$1 value=$2 line pad
-    cp "$dir/good.zip" "$out"
-    line="X-Save: $value"$'\r\n'
-    test "${#line}" -le "${#etagline}" ||
-        fail "forge_save: '$value' does not fit the line it replaces"
-    pad=$(printf "%$((${#etagline} - ${#line}))s" '' | tr ' ' 'E')
-    poke "$out" "$etagline" "$line$pad"
+    cp "$dir/good.zip" "$1"
+    forge_line "$1" "$etagline" "$2"
 }
 
 read_back() {
@@ -91,5 +95,47 @@ read_back "$dir/dots.zip"
 if grep -q "$refused" "$dir/out.arc"; then
     fail "'a..b/p.html' was refused, so the guard rejects ordinary names"
 fi
+
+# The reader keeps safeCache and fixedPath across records, so build a two-record
+# store and let the first name set the state the second one needs.
+etag2=$(printf '%0.sF' $(seq 1 60))
+etagline2="Etag: \"$etag2\""
+sed "s/$etag/$etag2/" "$dir/hdr" >"$dir/hdr2"
+{
+    arc_filedesc
+    arc_record http://example.com/p.html text/html 200 "$dir/hdr" "$dir/body"
+    printf '\n' # the separator opening each record after the first
+    arc_record http://example.com/q.html text/html 200 "$dir/hdr2" "$dir/body"
+} >"$dir/two.arc"
+proxytrack --convert "$dir/two.zip" "$dir/two.arc" >/dev/null 2>&1 ||
+    fail "proxytrack died writing the two-record cache"
+forge_two() { # forge_two OUT FIRST SECOND
+    cp "$dir/two.zip" "$1"
+    forge_line "$1" "$etagline" "$2"
+    forge_line "$1" "$etagline2" "$3"
+}
+
+# Records are read in hash order, not archive order, so each case forges both
+# assignments and expects the verdict from the one that runs the setter first.
+refusals() { # refusals FIRST SECOND: how many of the two orders were refused
+    local n=0
+    forge_two "$dir/st.zip" "$1" "$2"
+    read_back "$dir/st.zip"
+    if grep -q "$refused" "$dir/out.arc"; then n=$((n + 1)); fi
+    forge_two "$dir/st.zip" "$2" "$1"
+    read_back "$dir/st.zip"
+    if grep -q "$refused" "$dir/out.arc"; then n=$((n + 1)); fi
+    echo "$n"
+}
+
+# A relative name sets safeCache, which sends a later absolute one to the
+# contained-join check instead of the host-guess fallback that would accept it.
+test "$(refusals 'example.com/p.html' '/abs/example.com/q.html')" -eq 1 ||
+    fail "safeCache did not carry over to the next record"
+
+# The host guess on one name sets fixedPath, which reduces a later name whose
+# host the guess could not find.
+test "$(refusals '/abs/example.com/p.html' '/abs/other.org/q.html')" -eq 1 ||
+    fail "fixedPath did not carry over to the next record"
 
 echo "ProxyTrack refuses a cached name that leaves the store, and keeps the rest"

@@ -30,8 +30,6 @@ Please visit our Website: http://www.httrack.com
 /*       Fetch Metadata request headers (Sec-Fetch-*)           */
 /* ------------------------------------------------------------ */
 
-#define HTS_INTERNAL_BYTECODE
-
 #include "htsfetch.h"
 
 #include "htscore.h"
@@ -365,8 +363,14 @@ static void origin_of(const char *adr, fetch_origin *o) {
   }
   o->host_len = (size_t) (p - o->host);
   o->port = o->https ? 443 : 80;
-  if (p < end && *p == ':' && p + 1 < end)
-    o->port = atoi(p + 1);
+  if (p < end && *p == ':' && p + 1 < end) {
+    const char *stop;
+    LLint port;
+
+    /* a port out of range keeps the scheme default */
+    if (hts_parse_llint(p + 1, &stop, 1, 65535, &port) && stop == end)
+      o->port = (int) port;
+  }
 }
 
 /* The registrable domain of the first n bytes of the host, extended to its end,

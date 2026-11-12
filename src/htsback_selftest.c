@@ -34,6 +34,7 @@ Please visit our Website: http://www.httrack.com
 #include <limits.h> /* INT_MAX, the backing count back_new() must refuse */
 
 #include "htsselftest_int.h"
+#include "htsstats.h"
 
 /* hts_mirror_completed() answers HTS_DEFAULT until a mirror has run, so a GUI
    whose hts_main2() bailed out early does not read that as an abort. The
@@ -43,33 +44,24 @@ static int st_mirrorcompleted(httrackp *opt, int argc, char **argv) {
   httrackp *to = hts_create_opt();
   int err = 0;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
-
-  if (hts_mirror_completed(from) != HTS_DEFAULT)
-    err = 1;
-  if (hts_mirror_completed(to) != HTS_DEFAULT)
-    err = 1;
+  ST_FAIL_IF(err, hts_mirror_completed(from) != HTS_DEFAULT);
+  ST_FAIL_IF(err, hts_mirror_completed(to) != HTS_DEFAULT);
 
   /* A verdict never travels onto an opt that has none. */
   from->mirror_completed = HTS_TRUE;
   to->mirror_completed = HTS_DEFAULT;
   copy_htsopt(from, to);
-  if (hts_mirror_completed(to) != HTS_DEFAULT)
-    err = 1;
+  ST_FAIL_IF(err, hts_mirror_completed(to) != HTS_DEFAULT);
   /* A verdict never overwrites one the target earned itself, which is what a
      copy_htsopt change would silently break. */
   from->mirror_completed = HTS_FALSE;
   to->mirror_completed = HTS_TRUE;
   copy_htsopt(from, to);
-  if (hts_mirror_completed(to) != HTS_TRUE)
-    err = 1;
+  ST_FAIL_IF(err, hts_mirror_completed(to) != HTS_TRUE);
 
   hts_free_opt(from);
   hts_free_opt(to);
-  printf("mirror-completed: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("mirror-completed", err);
 }
 
 /* stat_errors reads the same for a 404 as for a timeout. A front end deciding
@@ -81,51 +73,38 @@ static int st_transportfailures(httrackp *opt, int argc, char **argv) {
   const hts_stat_struct *stats;
   int err = 0;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
-
-  if (from->transport_failures != 0 || to->transport_failures != 0)
-    err = 1;
+  ST_FAIL_IF(err, from->transport_failures != 0 || to->transport_failures != 0);
 
   /* Published beside stat_errors, which is where a front end reads it. */
   to->transport_failures = 7;
   stats = hts_get_stats(to);
-  if (stats == NULL || stats->stat_transport_failures != 7)
-    err = 1;
+  ST_FAIL_IF(err, stats == NULL || stats->stat_transport_failures != 7);
 
   /* A count never travels onto another opt. */
   from->transport_failures = 3;
   to->transport_failures = 0;
   copy_htsopt(from, to);
-  if (to->transport_failures != 0)
-    err = 1;
+  ST_FAIL_IF(err, to->transport_failures != 0);
 
   hts_free_opt(from);
   hts_free_opt(to);
-  printf("transport-failures: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("transport-failures", err);
 }
 
 static int st_pause(httrackp *opt, int argc, char **argv) {
   int err = 0, i, seen_low = 0, seen_high = 0;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   /* Consecutive-ms seeds (production shape: launch timestamps a few ms apart)
      must stay in range and spread, not collapse to a bound -- worst case for a
      weak low-bit mixer. */
   for (i = 0; i < 10000; i++) {
     int t = hts_pause_target_ms((TStamp) (1719500000000LL + i), 5000, 10000);
 
-    if (t < 5000 || t > 10000)
-      err = 1;
+    ST_FAIL_IF(err, t < 5000 || t > 10000);
     seen_low |= (t < 6000);
     seen_high |= (t > 9000);
   }
-  if (!seen_low || !seen_high)
-    err = 1;
+  ST_FAIL_IF(err, !seen_low || !seen_high);
   if (hts_pause_target_ms(12345, 8000, 8000) != 8000) /* equal bounds = fixed */
     err = 1;
   /* deterministic: a seed yields the same target even after an intervening call
@@ -134,11 +113,9 @@ static int st_pause(httrackp *opt, int argc, char **argv) {
     int a = hts_pause_target_ms(99, 5000, 10000);
 
     (void) hts_pause_target_ms(54321, 5000, 10000);
-    if (hts_pause_target_ms(99, 5000, 10000) != a)
-      err = 1;
+    ST_FAIL_IF(err, hts_pause_target_ms(99, 5000, 10000) != a);
   }
-  printf("pause: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("pause", err);
 }
 
 /* #747: a thread is outstanding from the moment hts_newthread() returns, not
@@ -195,10 +172,174 @@ static void threadwait_gated_thread(void *arg) {
   hts_mutexrelease(&threadwait_lock);
 }
 
+static void st_statsrows_slot(lien_back *b, int status, LLint size,
+                              LLint totalsize, const char *fil) {
+  b->status = status;
+  b->r.size = size;
+  b->r.totalsize = totalsize;
+  b->r.statuscode = HTTP_OK;
+  strcpybuff(b->url_adr, "http://example.com");
+  strcpybuff(b->url_fil, fil);
+}
+
+/* stats_collect_rows() survives an empty table and maps each slot to its row.
+ */
+static int st_statsrows(httrackp *opt, int argc, char **argv) {
+  struct_back *sback = back_new(opt, 4);
+  t_StatsBuffer rows[NStatsBuffer];
+  lien_back *b;
+  int i, err = 0;
+
+  if (sback == NULL) {
+    printf("statsrows: SKIP (no slot table)\n");
+    return 77;
+  }
+  b = sback->lnk;
+  for (i = 0; i < NStatsBuffer; i++)
+    strcpybuff(rows[i].state, "stale");
+
+  /* no backing table: no row, and no division by zero */
+  ST_FAIL_IF(err,
+             stats_collect_rows(opt, b, 0, 0, rows, NStatsBuffer, 40) != 0);
+  ST_FAIL_IF(err, rows[0].state[0] != '\0');
+  ST_FAIL_IF(err, stats_collect_rows(opt, b, 4, 0, rows, 0, 40) != 0);
+
+  st_statsrows_slot(&b[0], STATUS_WAIT_HEADERS, 0, -1, "/a/b.html");
+  st_statsrows_slot(&b[1], 50, 0, 0, "/empty");
+  st_statsrows_slot(&b[2], STATUS_READY, 3, 3, "/done");
+  st_statsrows_slot(&b[3], 50, 10000, -1, "/unknown");
+  ST_FAIL_IF(err,
+             stats_collect_rows(opt, b, 4, 0, rows, NStatsBuffer, 40) != 4);
+  /* the current slot first, then transfers, then finished slots */
+  ST_FAIL_IF(err, strcmp(rows[0].state, "request") != 0 || rows[0].back != 0);
+  ST_FAIL_IF(err, strcmp(rows[0].name, "http://example.com/a") != 0);
+  ST_FAIL_IF(err, strcmp(rows[0].file, "/b.html") != 0);
+  ST_FAIL_IF(err, strcmp(rows[1].state, "receive") != 0 || rows[1].back != 1);
+  /* a known size of 0 is shown as 0, not as an 8 KB placeholder */
+  ST_FAIL_IF(err, rows[1].sizetot != 0 || rows[1].size != 0);
+  ST_FAIL_IF(err, rows[2].back != 3 || rows[2].sizetot != 8192);
+  ST_FAIL_IF(err, rows[2].size != 10000 % 8192);
+  ST_FAIL_IF(err, strcmp(rows[3].state, "ready") != 0 || rows[3].back != 2);
+  ST_FAIL_IF(err, rows[4].state[0] != '\0');
+
+  /* a URL as wide as both fields is clipped and shortened, never aborted */
+  memset(b[0].url_adr, 'h', sizeof(b[0].url_adr) - 1);
+  b[0].url_adr[sizeof(b[0].url_adr) - 1] = '\0';
+  memset(b[0].url_fil, 'f', sizeof(b[0].url_fil) - 1);
+  b[0].url_fil[sizeof(b[0].url_fil) - 1] = '\0';
+  ST_FAIL_IF(err, stats_collect_rows(opt, b, 4, 0, rows, 1, 40) != 1);
+  ST_FAIL_IF(err, strlen(rows[0].name) >= 40);
+
+  /* every label, from a rotated start, with the login and a secret hidden */
+  for (i = 0; i < sback->count; i++)
+    b[i].status = STATUS_FREE;
+  back_free(&sback);
+  sback = back_new(opt, 8);
+  if (sback == NULL)
+    return 1;
+  b = sback->lnk;
+  hts_secret_add(opt, "SECRETTOKEN1", 12, HTS_SECRET_HEADER);
+  st_statsrows_slot(&b[0], STATUS_WAIT_DNS, 0, -1, "/dns");
+  st_statsrows_slot(&b[1], STATUS_CONNECTING, 0, -1, "/conn");
+  st_statsrows_slot(&b[2], STATUS_FTP_TRANSFER, 0, -1, "/pub/f");
+  strcpybuff(b[2].url_adr, "FTP://up.example");
+  strcpybuff(b[2].info, "RETR f");
+  st_statsrows_slot(&b[3], STATUS_READY, 0, 0, "/missing");
+  b[3].r.statuscode = 404;
+  st_statsrows_slot(&b[4], STATUS_READY, 0, 0, "/odd");
+  b[4].r.statuscode = 700;
+  st_statsrows_slot(&b[5], STATUS_READY, 5, -1, "/short");
+  st_statsrows_slot(&b[6], 50, 0, -1, "/in");
+  strcpybuff(b[6].url_adr, "http://user:pw@example.com");
+  st_statsrows_slot(&b[7], 98, 0, -1, "/q?t=SECRETTOKEN1");
+  ST_FAIL_IF(err,
+             stats_collect_rows(opt, b, 8, 2, rows, NStatsBuffer, 40) != 8);
+  ST_FAIL_IF(err,
+             strcmp(rows[0].state, "FTP: RETR f") != 0 || rows[0].back != 2);
+  ST_FAIL_IF(err, strcmp(rows[1].state, "receive") != 0 || rows[1].back != 6);
+  ST_FAIL_IF(err, strcmp(rows[1].name, "http://example.com") != 0);
+  ST_FAIL_IF(err, strcmp(rows[2].state, "receive") != 0 || rows[2].back != 7);
+  ST_FAIL_IF(err, strstr(rows[2].file, "SECRETTOKEN1") != NULL);
+  ST_FAIL_IF(err, strcmp(rows[3].state, "search") != 0 || rows[3].back != 0);
+  ST_FAIL_IF(err, strcmp(rows[4].state, "connect") != 0 || rows[4].back != 1);
+  {
+    char notfound[256];
+
+    notfound[0] = '\0';
+    infostatuscode(notfound, 404);
+    ST_FAIL_IF(err, strcmp(rows[5].state, notfound) != 0 || rows[5].back != 3);
+  }
+  ST_FAIL_IF(err, strcmp(rows[6].state, "error") != 0 || rows[6].back != 4);
+  ST_FAIL_IF(err, strcmp(rows[7].state, "ready") != 0 || rows[7].back != 5);
+  /* a finished slot of unknown size shows what it got */
+  ST_FAIL_IF(err, rows[7].sizetot != 5 || rows[7].size != 5);
+
+  for (i = 0; i < sback->count; i++)
+    b[i].status = STATUS_FREE;
+  back_free(&sback);
+  if (!err)
+    printf("statsrows: OK\n");
+  return err;
+}
+
+/* back_slot_fail() clips a reason too long for r.msg, where a copy aborted;
+   back_slot_fail_nonfatal() closes and keeps a reason already set. */
+static int st_slotfail(httrackp *opt, int argc, char **argv) {
+  struct_back *sback = back_new(opt, 1);
+  htsblk *r;
+  char longmsg[sizeof(r->msg) + 1];
+  int err = 0;
+
+  if (sback == NULL) {
+    printf("slotfail: SKIP (no slot table)\n");
+    return 77;
+  }
+  r = &sback->lnk[0].r;
+  r->soc = INVALID_SOCKET;
+  /* poisoned, so a stray NUL past msg shows */
+  memset(r->contenttype, '#', sizeof(r->contenttype));
+
+  /* one byte past capacity: the copy keeps all but the last 'x' */
+  memset(longmsg, 'x', sizeof(longmsg) - 1);
+  longmsg[sizeof(longmsg) - 1] = '\0';
+  sback->lnk[0].status = STATUS_CONNECTING;
+  back_slot_fail(opt, sback, 0, STATUSCODE_TIMEOUT, longmsg);
+  ST_FAIL_IF(err, r->statuscode != STATUSCODE_TIMEOUT);
+  ST_FAIL_IF(err, sback->lnk[0].status != STATUS_READY);
+  ST_FAIL_IF(err, strlen(r->msg) != sizeof(r->msg) - 1);
+  ST_FAIL_IF(err, strncmp(r->msg, longmsg, sizeof(r->msg) - 1) != 0);
+  ST_FAIL_IF(err, r->contenttype[0] != '#');
+
+  /* NULL keeps the reason already set */
+  strcpybuff(r->msg, "kept");
+  sback->lnk[0].status = STATUS_CONNECTING;
+  back_slot_fail(opt, sback, 0, STATUSCODE_NON_FATAL, NULL);
+  ST_FAIL_IF(err, r->statuscode != STATUSCODE_NON_FATAL);
+  ST_FAIL_IF(err, sback->lnk[0].status != STATUS_READY);
+  ST_FAIL_IF(err, strcmp(r->msg, "kept") != 0);
+
+  /* the nonfatal close keeps a set reason, else takes the fallback */
+  r->soc = LOCAL_SOCKET_ID;
+  sback->lnk[0].status = STATUS_CONNECTING;
+  back_slot_fail_nonfatal(opt, sback, 0, "fallback");
+  ST_FAIL_IF(err, r->soc != INVALID_SOCKET);
+  ST_FAIL_IF(err, r->statuscode != STATUSCODE_NON_FATAL);
+  ST_FAIL_IF(err, sback->lnk[0].status != STATUS_READY);
+  ST_FAIL_IF(err, strcmp(r->msg, "kept") != 0);
+  r->msg[0] = '\0';
+  r->soc = LOCAL_SOCKET_ID;
+  sback->lnk[0].status = STATUS_CONNECTING;
+  back_slot_fail_nonfatal(opt, sback, 0, "fallback");
+  ST_FAIL_IF(err, r->soc != INVALID_SOCKET);
+  ST_FAIL_IF(err, strcmp(r->msg, "fallback") != 0);
+
+  back_free(&sback);
+  if (!err)
+    printf("slotfail: OK\n");
+  return err;
+}
+
 static int st_backswap(httrackp *opt, int argc, char **argv) {
-  (void) opt;
-  (void) argc;
-  (void) argv;
   return back_selftest_slot_swap();
 }
 
@@ -208,7 +349,6 @@ typedef enum { ST_CAP_FAIL, ST_CAP_OK, ST_CAP_SKIPPED } st_cap_result;
 static st_cap_result st_spool_capped_write(httrackp *opt,
                                            const lien_back *back) {
 #ifdef _WIN32
-  (void) opt;
   (void) back;
   return ST_CAP_SKIPPED;
 #else
@@ -260,10 +400,6 @@ static int st_spoolwrite(httrackp *opt, int argc, char **argv) {
   lien_back back;
   int err = 0;
 
-  if (argc < 1) {
-    fprintf(stderr, "spoolwrite: needs a writable base dir\n");
-    return 1;
-  }
   snprintf(base, sizeof(base), "%s/", argv[0]);
   StringCopy(opt->path_html_utf8, base);
   memset(&back, 0, sizeof(back));
@@ -298,8 +434,7 @@ static int st_spoolwrite(httrackp *opt, int argc, char **argv) {
   (void) UNLINK(name);
   back_tmpdir_drop(name);
   freet(back.r.adr);
-  printf("spoolwrite: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("spoolwrite", err);
 }
 
 static hts_boolean st_spool_plant(const char *path) {
@@ -352,10 +487,6 @@ static int st_spoolsweep(httrackp *opt, int argc, char **argv) {
   size_t i;
   int err = 0;
 
-  if (argc < 1) {
-    fprintf(stderr, "spoolsweep: needs a writable base dir\n");
-    return 1;
-  }
   snprintf(base, sizeof(base), "%s/", argv[0]);
   StringCopy(opt->path_html_utf8, base);
   /* a file of our own pid predates this run, so it is stale */
@@ -421,8 +552,7 @@ static int st_spoolsweep(httrackp *opt, int argc, char **argv) {
     fprintf(stderr, "spoolsweep: emptied ~hts-tmp was kept\n");
     err++;
   }
-  printf("spoolsweep: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("spoolsweep", err);
 }
 
 /* TEST-NET-1: routed nowhere, so a connect to it stays pending. */
@@ -434,7 +564,7 @@ static T_SOC st_backstop_pending(httrackp *opt, htsblk *r) {
   T_SOC soc;
 
   hts_init_htsblk(r);
-  soc = newhttp_addr(opt, ST_BACKSTOP_DEADHOST, r, 80, 0, 0, NULL);
+  soc = newhttp_addr(opt, ST_BACKSTOP_DEADHOST, r, 80, 0, NULL);
   if (soc == INVALID_SOCKET)
     return INVALID_SOCKET;
   r->soc = soc;
@@ -486,15 +616,12 @@ static void st_backstop_slot(struct_back *sback, int p, int status,
 /* Refill every slot: a fresh pending connect for each state that owns a socket,
    plus the poison the assertions read back. False if the blackhole answered. */
 static hts_boolean st_backstop_arm(httrackp *opt, struct_back *sback,
-                                   const int *status, htsblk *r, int slots,
-                                   int dnsslot) {
+                                   const int *status, htsblk *r, int slots) {
   int i;
 
   for (i = 0; i < slots; i++) {
     deletehttp(&sback->lnk[i].r); /* whatever the previous round left */
-    if (i == dnsslot) {
-      hts_init_htsblk(&r[i]);
-    } else if (st_backstop_pending(opt, &r[i]) == INVALID_SOCKET) {
+    if (st_backstop_pending(opt, &r[i]) == INVALID_SOCKET) {
       printf("backstop: SKIP (no stalled connect to " ST_BACKSTOP_DEADHOST
              ": %s)\n",
              r[i].msg);
@@ -506,7 +633,7 @@ static hts_boolean st_backstop_arm(httrackp *opt, struct_back *sback,
      ends slots the caller asserts are intact (the powerpc buildds). */
   Sleep(ST_BACKSTOP_SETTLE_MS);
   for (i = 0; i < slots; i++) {
-    if (i != dnsslot && check_socket_connect(sback->lnk[i].r.soc) != 0) {
+    if (check_socket_connect(sback->lnk[i].r.soc) != 0) {
       printf("backstop: SKIP (the network answered for " ST_BACKSTOP_DEADHOST
              " within %d ms)\n",
              ST_BACKSTOP_SETTLE_MS);
@@ -583,8 +710,7 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
   /* the states a stop sweeps, pre-connect then receive, and last the FTP one
      whose socket another thread owns */
   enum {
-    SLOT_DNS = 0,
-    SLOT_CONNECT,
+    SLOT_CONNECT = 0,
     SLOT_SSL,
     SLOT_HEADERS,
     SLOT_XFER,
@@ -594,9 +720,8 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
   };
 
   static const int status[SLOTS] = {
-      STATUS_WAIT_DNS,     STATUS_CONNECTING, STATUS_SSL_WAIT_HANDSHAKE,
-      STATUS_WAIT_HEADERS, STATUS_TRANSFER,   STATUS_CHUNK_WAIT,
-      STATUS_FTP_TRANSFER};
+      STATUS_CONNECTING, STATUS_SSL_WAIT_HANDSHAKE, STATUS_WAIT_HEADERS,
+      STATUS_TRANSFER,   STATUS_CHUNK_WAIT,         STATUS_FTP_TRANSFER};
   T_SOC swept[SLOTS];
   htsblk r[SLOTS];
   struct_back *sback = NULL;
@@ -607,9 +732,6 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
   int round;
   int i;
 
-  (void) argc;
-  (void) argv;
-
   /* no quota may fire instead of the stop, and no slot may time out */
   opt->maxtime = 0;
   opt->maxsite = 0;
@@ -618,13 +740,7 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
 
   memset(&cache, 0, sizeof(cache));
 
-#define CHECK(cond)                                                            \
-  do {                                                                         \
-    if (!(cond)) {                                                             \
-      printf("  FAIL line %d: %s\n", __LINE__, #cond);                         \
-      err = 1;                                                                 \
-    }                                                                          \
-  } while (0)
+#define CHECK(cond) ST_CHECK(err, cond)
 
   /* before the cleanup label has anything to free */
   sback = back_new(opt, SLOTS);
@@ -632,7 +748,7 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
     return 77;
   cache.hashtable = coucal_new(0);
   back = sback->lnk;
-  if (!st_backstop_arm(opt, sback, status, r, SLOTS, SLOT_DNS)) {
+  if (!st_backstop_arm(opt, sback, status, r, SLOTS)) {
     skipped = 1;
     goto cleanup;
   }
@@ -658,7 +774,7 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
      flag goes up after the slots are in place. */
   for (round = 0; round < 2 && !err; round++) {
     opt->state.stop = 0;
-    if (!st_backstop_arm(opt, sback, status, r, SLOTS, SLOT_DNS)) {
+    if (!st_backstop_arm(opt, sback, status, r, SLOTS)) {
       skipped = 1;
       goto cleanup;
     }
@@ -670,7 +786,7 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
 
     /* every slot but the FTP one is gone, its socket closed rather than merely
        forgotten, and reported as fatal so the link is not queued again */
-    for (i = SLOT_DNS; i < SLOT_FTP; i++) {
+    for (i = SLOT_CONNECT; i < SLOT_FTP; i++) {
       CHECK(back[i].status == STATUS_READY);
       CHECK(back[i].r.soc == INVALID_SOCKET);
       CHECK(back[i].r.statuscode == STATUSCODE_INVALID);
@@ -695,7 +811,7 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
     const LLint recv_was = hts_stat_recv_get();
 
     opt->state.stop = 0;
-    if (!st_backstop_arm(opt, sback, status, r, SLOTS, SLOT_DNS)) {
+    if (!st_backstop_arm(opt, sback, status, r, SLOTS)) {
       skipped = 1;
       goto cleanup;
     }
@@ -712,7 +828,7 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
 
     /* nothing it swept was writing, so there is no partial to describe */
     CHECK(!opt->abort_left_partial);
-    for (i = SLOT_DNS; i < SLOT_HEADERS; i++) {
+    for (i = SLOT_CONNECT; i < SLOT_HEADERS; i++) {
       CHECK(back[i].status == STATUS_READY);
       CHECK(back[i].r.statuscode == STATUSCODE_INVALID);
     }
@@ -746,7 +862,7 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
 
     for (c = 0; c < (int) (sizeof(partial) / sizeof(partial[0])) && !err; c++) {
       opt->state.stop = 0;
-      if (!st_backstop_arm(opt, sback, status, r, SLOTS, SLOT_DNS)) {
+      if (!st_backstop_arm(opt, sback, status, r, SLOTS)) {
         skipped = 1;
         goto cleanup;
       }
@@ -774,7 +890,7 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
     const LLint recv_was = hts_stat_recv_get();
 
     opt->state.stop = 0;
-    if (!st_backstop_arm(opt, sback, status, r, SLOTS, SLOT_DNS)) {
+    if (!st_backstop_arm(opt, sback, status, r, SLOTS)) {
       skipped = 1;
       goto cleanup;
     }
@@ -821,8 +937,7 @@ cleanup:
   if (skipped)
     return 77;
 
-  printf("backstop self-test: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("backstop self-test", err);
 }
 
 /* back_new() sizes its slot table from -cN, so a user can ask for one that
@@ -833,9 +948,6 @@ static int st_backnew(httrackp *opt, int argc, char **argv) {
   enum { slots = 4096 };
 
   struct_back *sback;
-
-  (void) argc;
-  (void) argv;
 
   /* Control: with memory available the same call hands back a whole table, so
      a NULL below cannot be back_new refusing every size. */
@@ -921,8 +1033,6 @@ static int st_recordoom(httrackp *opt, int argc, char **argv) {
   int before;
   int recorded = 0, recorded_cod = 0, after = -1, after_cod = -1;
 
-  (void) argc;
-  (void) argv;
   memset(&cache, 0, sizeof(cache));
   st_mirror_wiring(opt, &sback, &hash, HTS_FALSE);
   if (!hts_record_link(opt, "www.example.com", "/a.html", "/p/a.html", "", "",
@@ -1010,10 +1120,6 @@ static int st_relaxedcounter(httrackp *opt, int argc, char **argv) {
   long spins;
   int err = 0;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
-
   hts_store_relaxed_llint(&relaxed_counter, 0);
   if (hts_newthread(relaxed_writer, NULL) != 0) {
     fprintf(stderr, "relaxedcounter: cannot spawn\n");
@@ -1045,17 +1151,12 @@ static int st_relaxedcounter(httrackp *opt, int argc, char **argv) {
             hts_load_relaxed_llint(&relaxed_counter));
     err = 1;
   }
-  printf("relaxedcounter self-test: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("relaxedcounter self-test", err);
 }
 
 static int st_threadwait(httrackp *opt, int argc, char **argv) {
   int err = 0;
   int i, round;
-
-  (void) opt;
-  (void) argc;
-  (void) argv;
 
   /* htsthread_wait() joins a thread spawned just before it */
   for (round = 0; round < THREADWAIT_ROUNDS && !err; round++) {
@@ -1101,8 +1202,7 @@ static int st_threadwait(httrackp *opt, int argc, char **argv) {
     err = 1;
   }
 
-  printf("threadwait self-test: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("threadwait self-test", err);
 }
 
 /* Confirms the runner encloses the body exactly once, on the worker. */
@@ -1219,9 +1319,6 @@ static int st_threadrunner(httrackp *opt, int argc, char **argv) {
   const threadrunner_id caller = threadrunner_self();
   hts_boolean spawned;
   int err = 0;
-
-  (void) argc;
-  (void) argv;
 
   /* Unlocked, because htsthread_wait() published the worker's writes. */
   threadrunner_reset();
@@ -1416,27 +1513,19 @@ static int st_threadrunner(httrackp *opt, int argc, char **argv) {
     err = 1;
   }
 
-  printf("threadrunner self-test: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("threadrunner self-test", err);
 }
 
 static int st_ftpworker(httrackp *opt, int argc, char **argv) {
   const int err = ftp_worker_selftests();
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
-  printf("ftp-worker-selftest: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("ftp-worker-selftest", err);
 }
 
 static int st_ftphandoff(httrackp *opt, int argc, char **argv) {
   const int err = ftp_handoff_selftests(opt);
 
-  (void) argc;
-  (void) argv;
-  printf("ftp-handoff-selftest: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("ftp-handoff-selftest", err);
 }
 
 /* #1697: hts_strerror() must own its output. strerror() answers with a buffer
@@ -1476,10 +1565,6 @@ static int st_strerror(httrackp *opt, int argc, char **argv) {
   char first[HTS_STRERROR_SIZE], second[HTS_STRERROR_SIZE];
   const char *kept;
   int err = 0, i;
-
-  (void) opt;
-  (void) argc;
-  (void) argv;
 
   for (i = 0; i < STRERROR_THREADS; i++) {
     const char *const msg = hts_strerror(
@@ -1559,8 +1644,7 @@ static int st_strerror(httrackp *opt, int argc, char **argv) {
     err = 1;
   }
 
-  printf("strerror self-test: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("strerror self-test", err);
 }
 
 /* hts_mutexlock() builds a lock on first use, so threads meet an empty slot. */
@@ -1595,10 +1679,6 @@ static int st_mutexlazyinit(httrackp *opt, int argc, char **argv) {
   int err = 0;
   int i;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
-
   for (i = 0; i < MUTEXLAZY_THREADS; i++) {
     if (hts_newthread(mutexlazy_thread, NULL) != 0) {
       fprintf(stderr, "mutexlazyinit: cannot spawn\n");
@@ -1624,8 +1704,7 @@ static int st_mutexlazyinit(httrackp *opt, int argc, char **argv) {
     mutexlazy_count[i] = 0;
   }
 
-  printf("mutexlazyinit self-test: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("mutexlazyinit self-test", err);
 }
 
 /* ------------------------------------------------------------ */
@@ -1663,8 +1742,6 @@ static int st_hostban(httrackp *opt, int argc, char **argv) {
   int filptr = 0;
   int err = 0;
 
-  (void) argc;
-  (void) argv;
   opt->maxfilter = 128;
   if (filters_init(&filters, opt->maxfilter, 0) == 0) {
     fprintf(stderr, "hostban: cannot allocate filters\n");
@@ -1725,8 +1802,7 @@ static int st_hostban(httrackp *opt, int argc, char **argv) {
   back_free(&sback);
   freet(filters[0]);
   freet(filters);
-  printf("hostban self-test: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("hostban self-test", err);
 }
 
 /* The clock starts just before a wall-clock second ends, so a whole-second
@@ -1737,8 +1813,6 @@ static int st_maxtime(httrackp *opt, int argc, char **argv) {
   int tries;
   TStamp t0 = 0, elapsed = 0;
 
-  (void) argc;
-  (void) argv;
   opt->log = NULL; /* the stop logs, and this test's own output is exact */
   opt->maxtime = 1;
   /* A starved host can oversleep past the cap, so retry. The window is timed
@@ -1770,8 +1844,7 @@ static int st_maxtime(httrackp *opt, int argc, char **argv) {
   opt->state.stop = 0;
   opt->maxtime = 0;
   opt->log = saved_log;
-  printf("maxtime self-test: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("maxtime self-test", err);
 }
 
 const struct selftest_entry selftests_back[] = {
@@ -1809,6 +1882,11 @@ const struct selftest_entry selftests_back[] = {
      st_mutexlazyinit},
     {"backswap", "", "which backlog slots may be swapped to the ready table",
      st_backswap},
+    {"slotfail", "", "a failed slot clips a reason too long for its message",
+     st_slotfail},
+    {"statsrows", "",
+     "the progress rows survive an empty table and show a known size of 0",
+     st_statsrows},
     {"spoolwrite", "<dir>", "a failed spool write leaves no partial file",
      st_spoolwrite},
     {"spoolsweep", "<dir>", "startup removes the spool of a dead process only",

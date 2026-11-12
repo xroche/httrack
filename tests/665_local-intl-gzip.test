@@ -11,3 +11,21 @@ bash "$top_srcdir/tests/local-crawl.sh" --outdir-intl 'café' --errors 0 --files
     --file-matches 'warcgz/page.html' 'verbatim gzip page' \
     --file-matches 'warcgz/data.bin' 'verbatim gzip octet-stream' \
     httrack 'BASEURL/warcgz/index.html'
+
+# A gzip body that decodes past -m is refused like an uncoded one, and not saved.
+bash "$top_srcdir/tests/local-crawl.sh" --errors 1 \
+    --not-found 'warcgz/big.bin' \
+    --log-found '"File too big".*warcgz/big\.bin' \
+    httrack 'BASEURL/warcgz/big.bin' -m100000
+
+# Without -m, a body decoding past 256 MiB is refused the same way.
+bash "$top_srcdir/tests/local-crawl.sh" --errors 1 \
+    --not-found 'warcgz/huge.bin' \
+    --log-found '"File too big".*warcgz/huge\.bin' \
+    httrack 'BASEURL/warcgz/huge.bin' -A100000000
+
+# -mN limits non-HTML only, so HTML keeps the 256 MiB default.
+bash "$top_srcdir/tests/local-crawl.sh" --errors 1 \
+    --not-found 'warcgz/huge.html' \
+    --log-found '"File too big".*warcgz/huge\.html' \
+    httrack 'BASEURL/warcgz/huge.html' -m5000000 -A100000000

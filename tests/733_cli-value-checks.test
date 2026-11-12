@@ -1,0 +1,76 @@
+#!/bin/bash
+#
+# A bad --warc-max-size stops the run. A bad -%c rate only warns.
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_clival.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "${tmp}"
+
+echo '<html><body>hello</body></html>' >"${tmp}/page.html"
+out=${tmp}/out
+
+crawl() {
+    rm -rf "${out}"
+    mkdir -p "${out}"
+    RC=0
+    httrack "file://${tmp}/page.html" -O "${out}" --quiet -n "$@" \
+        >"${tmp}/log" 2>&1 || RC=$?
+}
+
+refused() { # refused MESSAGE ARG...
+    local msg=$1
+    shift
+    crawl "$@"
+    { test "${RC}" -ne 0 && test "${RC}" -ne 134 && test "${RC}" -ne 139 && test "${RC}" -ne 136; } ||
+        fail_dump "$* not refused (exit ${RC})" "${tmp}/log"
+    grep -q "${msg}" "${tmp}/log" ||
+        fail_dump "$* refused without ${msg}" "${tmp}/log"
+    test -z "$(find "${out}" -name 'page.html' 2>/dev/null)" ||
+        fail_dump "$* still mirrored" "${tmp}/log"
+}
+
+accepted() {
+    crawl "$@"
+    assert_eq 0 "${RC}" "$* exited"
+    test -n "$(find "${out}" -name 'page.html' 2>/dev/null)" ||
+        fail_dump "$* mirrored nothing" "${tmp}/log"
+}
+
+accepted --warc-max-size 1048576
+accepted --warc-max-size " 10 "
+accepted -%c0
+accepted -%c0.000001
+accepted -%c0.5
+accepted --connection-per-second=0.5
+
+W='warc-max-size needs a non-negative number'
+# a dash value reaches the number check rather than being read as an option
+for v in -5 abc 10X +5 "" 99999999999999999999; do
+    refused "${W}" "--warc-max-size=${v}"
+    refused "${W}" --warc-max-size "${v}"
+done
+
+warned() { # warned MESSAGE ARG...
+    local msg=$1
+    shift
+    accepted "$@"
+    grep -qF "${msg}" "${tmp}/log" || fail_dump "$* did not warn ${msg}" "${tmp}/log"
+    # a bad rate must not become 0, which the security cap logs as a raise to 5
+    ! grep -qF 'connections per second limited' "${out}/hts-log.txt" ||
+        fail_dump "$* set the rate to 0" "${out}/hts-log.txt"
+}
+
+for v in 0.0000001 1e-7; do
+    warned "rate \"${v}\" raised to 0.000001" "-%c${v}"
+done
+for v in abc -1 "" nan inf O 1e99 1e400 5,5 1.2.3; do
+    warned "rate \"${v}\" ignored" "-%c${v}"
+done
+# the rest of a bad value is not read as more options: I0 would drop the top index
+warned 'rate "I0" ignored' -%cI0
+test -f "${out}/index.html" || fail_dump "-%cI0 lost the top index" "${tmp}/log"

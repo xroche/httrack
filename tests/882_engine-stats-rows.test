@@ -1,0 +1,10 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# The progress rows of httrack and htsserver come from one shared walk.
+selftest_queue "statsrows: OK" statsrows
+selftest_run_queued

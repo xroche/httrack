@@ -31,9 +31,6 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
-/* Internal engine bytecode */
-#define HTS_INTERNAL_BYTECODE
-
 /* specific definitions */
 #include "htsnet.h"
 #include "htsbundle.h"
@@ -63,10 +60,6 @@ Please visit our Website: http://www.httrack.com
 // DOS
 #include <process.h>            /* _beginthread, _endthread */
 #endif
-#include <io.h> /* _chsize_s */
-#define HTS_FTRUNCATE(fp, sz) _chsize_s(_fileno(fp), (sz))
-#else
-#define HTS_FTRUNCATE(fp, sz) ftruncate(fileno(fp), (sz))
 #endif
 
 /* Subdirectory for temporaries, beside a mirrored file or at the mirror root.
@@ -208,6 +201,12 @@ static hts_mirror_limit back_mirror_limit(httrackp *opt);
 static hts_boolean back_mirror_capped(const httrackp *opt);
 static hts_boolean back_is_live(const int status);
 
+static int back_search(httrackp *opt, struct_back *sback);
+static void back_move(lien_back *src, lien_back *dst);
+static void back_connxfr(htsblk *src, htsblk *dst);
+static int back_searchlive(httrackp *opt, struct_back *sback,
+                           const char *search_addr);
+
 /* Slots for maxsoc connections, clamped to what back_new() can size: it builds
    two tables of back_max + 1, so INT_MAX itself is one too many. Total on
    purpose, so a self-test can check it without allocating anything: -cN is
@@ -284,22 +283,6 @@ void back_free(struct_back ** sback) {
    above a normal handshake. The last candidate still gets the full timeout. */
 #define HTS_CONNECT_FALLBACK_TIMEOUT 10
 
-void back_read_ftp_result(FILE *fp, htsblk *r) {
-  size_t j = 0;
-
-  if (fscanf(fp, "%d ", &r->statuscode) != 1)
-    r->statuscode = STATUSCODE_INVALID;
-  // an external helper writes this file: stop at capacity, not at EOF
-  while (j + 1 < sizeof(r->msg)) {
-    const int c = fgetc(fp);
-
-    if (c == EOF)
-      break;
-    r->msg[j++] = (char) c;
-  }
-  r->msg[j] = '\0';
-}
-
 int back_connect_fallback_due(int addr_index, int addr_count, int elapsed,
                               int timeout) {
   int deadline;
@@ -312,6 +295,12 @@ int back_connect_fallback_due(int addr_index, int addr_count, int elapsed,
                  ? timeout
                  : HTS_CONNECT_FALLBACK_TIMEOUT;
   return elapsed >= deadline;
+}
+
+/* Log the outcome of a stored link. */
+static void back_log_link(httrackp *opt, const lien_back *b, const char *what) {
+  hts_log_print(opt, LOG_INFO, "engine: transfer-status: link %s: %s%s -> %s",
+                what, adr_nologin(opt, b->url_adr), b->url_fil, b->url_sav);
 }
 
 /* Retry a stuck/failed connecting slot against its next resolved address.
@@ -329,9 +318,8 @@ static int back_connect_next(httrackp *opt, struct_back *sback, int i) {
 
   if (back[i].r.soc != INVALID_SOCKET) {
     deletehttp(&back[i].r);
-    back[i].r.soc = INVALID_SOCKET;
   }
-  soc = newhttp_addr(opt, back[i].url_adr, &back[i].r, -1, 0, next, NULL);
+  soc = newhttp_addr(opt, back[i].url_adr, &back[i].r, -1, next, NULL);
   if (soc == INVALID_SOCKET)
     return 0;
 
@@ -373,20 +361,13 @@ void back_delete_all(httrackp * opt, cache_back * cache, struct_back * sback) {
       struct_coucal_enum e = coucal_enum_new(sback->ready);
       coucal_item *item;
 
-      while((item = coucal_enum_next(&e))) {
-#ifndef HTS_NO_BACK_ON_DISK
+      while ((item = coucal_enum_next(&e))) {
         const char *filename = (char *) item->value.ptr;
 
         if (filename != NULL) {
           (void) UNLINK(filename);
           back_tmpdir_drop(filename);
         }
-#else
-        /* clear entry content (but not yet the entry) */
-        lien_back *back = (lien_back *) item->value.ptr;
-
-        back_clear_entry(back);
-#endif
       }
       /* delete hashtable & content */
       coucal_delete(&sback->ready);
@@ -456,7 +437,6 @@ static int back_index_ready(httrackp * opt, struct_back * sback, const char *adr
     } else if (ptr != NULL) {
       lien_back *itemback = NULL;
 
-#ifndef HTS_NO_BACK_ON_DISK
       FILE *fp;
       const char *fileback = (char *) ptr;
       char catbuff[CATBUFF_SIZE];
@@ -481,9 +461,6 @@ static int back_index_ready(httrackp * opt, struct_back * sback, const char *adr
       }
       (void) UNLINK(fileback);
       back_tmpdir_drop(fileback);
-#else
-      itemback = (lien_back *) ptr;
-#endif
       if (itemback != NULL) {
         // move from hashtable to fast repository
         int q = back_search(opt, sback);
@@ -748,8 +725,8 @@ int back_selftest_slot_swap(void) {
 }
 
 /* Put all backing entries that are ready in the storage hashtable to spare space and CPU */
-int back_cleanup_background(httrackp * opt, cache_back * cache,
-                            struct_back * sback) {
+static int back_cleanup_background(httrackp *opt, cache_back *cache,
+                                   struct_back *sback) {
   lien_back *const back = sback->lnk;
   const int back_max = sback->count;
   int nclean = 0;
@@ -758,9 +735,6 @@ int back_cleanup_background(httrackp * opt, cache_back * cache,
   for(i = 0; i < back_max; i++) {
     // ready, not locked and suitable
     if (slot_can_be_cached_on_disk(&back[i])) {
-#ifdef HTS_NO_BACK_ON_DISK
-      lien_back *itemback;
-#endif
       /* Security check */
       int checkIndex =
         back_index_ready(opt, sback, back[i].url_adr, back[i].url_fil,
@@ -784,7 +758,6 @@ int back_cleanup_background(httrackp * opt, cache_back * cache,
         }
 #endif
       }
-#ifndef HTS_NO_BACK_ON_DISK
       /* temporarily serialize the entry on disk */
       {
         /* filecreate() aborts on a longer name */
@@ -816,12 +789,6 @@ int back_cleanup_background(httrackp * opt, cache_back * cache,
                         named ? "memory full" : "temporary filename too long");
         }
       }
-#else
-      itemback = calloct(1, sizeof(lien_back));
-      back_move(&back[i], itemback);
-      coucal_add_pvoid(sback->ready, itemback->url_sav, itemback);
-      nclean++;
-#endif
     }
   }
   return nclean;
@@ -853,20 +820,6 @@ LLint back_incache(const struct_back * sback) {
         sum += max(hts_load_relaxed_llint(&back[i].r.size),
                    hts_load_relaxed_llint(&back[i].r.totalsize));
   // stored (ready) slots
-#ifdef HTS_NO_BACK_ON_DISK
-  if (sback->ready != NULL) {
-    struct_coucal_enum e = coucal_enum_new(sback->ready);
-    coucal_item *item;
-
-    while((item = coucal_enum_next(&e))) {
-      lien_back *ritem = (lien_back *) item->value.ptr;
-
-      if (back_status(ritem) != -1)
-        if (ritem->r.adr)       // ne comptabilier que les blocs en mémoire
-          sum += max(ritem->r.size, ritem->r.totalsize);
-    }
-  }
-#endif
   return sum;
 }
 
@@ -882,19 +835,7 @@ int back_done_incache(const struct_back * sback) {
       n++;
   // stored (ready) slots
   if (sback->ready != NULL) {
-#ifndef HTS_NO_BACK_ON_DISK
     n += (int) coucal_nitems(sback->ready);
-#else
-    struct_coucal_enum e = coucal_enum_new(sback->ready);
-    coucal_item *item;
-
-    while((item = coucal_enum_next(&e))) {
-      lien_back *ritem = (lien_back *) item->value.ptr;
-
-      if (back_status(ritem) == STATUS_READY)
-        n++;
-    }
-#endif
   }
   return n;
 }
@@ -918,7 +859,8 @@ int back_nsoc(const struct_back * sback) {
 
   return n;
 }
-int back_nsoc_overall(const struct_back * sback) {
+
+static int back_nsoc_overall(const struct_back *sback) {
   const lien_back *const back = sback->lnk;
   const int back_max = sback->count;
   int n = 0;
@@ -1233,8 +1175,14 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                   back[p].r.statuscode = STATUSCODE_INVALID;
                 }
               } else {
-                snprintf(back[p].r.msg, sizeof(back[p].r.msg),
-                         "Open error when decompressing (can not generate a temporary file)");
+                /* never let the coded bytes be committed as the page */
+                htsblk_failf(&back[p].r, "Open error when decompressing (can "
+                                         "not generate a temporary file)");
+                back[p].r.statuscode = STATUSCODE_INVALID;
+                deleteaddr(&back[p].r);
+                /* keep the previous copy out of the --update purge */
+                if (fexist_utf8(back[p].url_sav))
+                  filenote(&opt->state.strc, back[p].url_sav, NULL);
               }
             }
             // fermer fichier sortie
@@ -1262,8 +1210,13 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                      bytes be committed as the page */
                   if (!back[p].r.is_write)
                     deleteaddr(&back[p].r);
-                } else if ((size = hts_codec_unpack(codec, back[p].tmpfile,
-                                                    unpacked)) >= 0) {
+                } else if ((size = hts_codec_unpack_max(
+                                codec, back[p].tmpfile, unpacked,
+                                hts_codec_decode_cap(
+                                    is_hypertext_mime(opt,
+                                                      back[p].r.contenttype, "")
+                                        ? back[p].maxfile_html
+                                        : back[p].maxfile_nonhtml))) >= 0) {
                   const hts_boolean sized =
                       back_set_decoded_size(&back[p].r, size);
 
@@ -1307,6 +1260,13 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                         "could not replace %s; decoded copy kept as %s",
                         back[p].url_sav, unpacked);
                   }
+                } else if (size == HTS_CODEC_TOOBIG) {
+                  /* over -m or the default cap once decoded: a verdict */
+                  back[p].r.statuscode = STATUSCODE_TOO_BIG;
+                  strcpybuff(back[p].r.msg, "File too big");
+                  if (!back[p].r.is_write)
+                    deleteaddr(&back[p].r);
+                  UNLINK(unpacked);
                 } else {
                   back[p].r.statuscode = STATUSCODE_INVALID;
                   /* Our own disk, not the coded body: hts_codec_unpack() leaves
@@ -1433,34 +1393,19 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
           }
           strftime(s, 250, "%H:%M:%S", &tmv);
 
-          flags[0] = '\0';
-          /* input flags */
-          if (back[p].is_update)
-            strcatbuff(flags, "U");     // update request
-          else
-            strcatbuff(flags, "-");
-          if (back[p].range_req_size)
-            strcatbuff(flags, "R");     // range request
-          else
-            strcatbuff(flags, "-");
-          /* state flags */
-          if (back[p].r.is_file)        // direct to disk
-            strcatbuff(flags, "F");
-          else
-            strcatbuff(flags, "-");
-          /* output flags */
-          if (!back[p].r.notmodified)
-            strcatbuff(flags, "M");     // modified
-          else
-            strcatbuff(flags, "-");
-          if (back[p].r.is_chunk)       // chunked
-            strcatbuff(flags, "C");
-          else
-            strcatbuff(flags, "-");
-          if (back[p].r.compressed)
-            strcatbuff(flags, "Z"); // content coding
-          else
-            strcatbuff(flags, "-");
+          {
+            /* update, range, direct to disk, modified, chunked, coded */
+            const int on[] = {
+                back[p].is_update != 0,  back[p].range_req_size != 0,
+                back[p].r.is_file != 0,  !back[p].r.notmodified,
+                back[p].r.is_chunk != 0, back[p].r.compressed != 0};
+            const char *const letters = "URFMCZ";
+            size_t k;
+
+            for (k = 0; k < sizeof(on) / sizeof(on[0]); k++)
+              flags[k] = on[k] ? letters[k] : '-';
+            flags[k] = '\0';
+          }
           /* Err I had to split these.. */
           fprintf(cache->txt, "%s\t", s);
           fprintf(cache->txt, LLintP "/", (LLint) back[p].r.size);
@@ -1480,18 +1425,8 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
             }
             if ((!back[p].r.notmodified) && (opt->is_update)) {
               HTS_STAT.stat_updated_files++;    // page modifiée
-              if (back[p].is_update) {
-                hts_log_print(
-                    opt, LOG_INFO,
-                    "engine: transfer-status: link updated: %s%s -> %s",
-                    adr_nologin(opt, back[p].url_adr), back[p].url_fil,
-                    back[p].url_sav);
-              } else {
-                hts_log_print(opt, LOG_INFO,
-                              "engine: transfer-status: link added: %s%s -> %s",
-                              adr_nologin(opt, back[p].url_adr),
-                              back[p].url_fil, back[p].url_sav);
-              }
+              back_log_link(opt, &back[p],
+                            back[p].is_update ? "updated" : "added");
               if (cache->txt) {
                 if (back[p].is_update) {
                   state = "updated";
@@ -1500,11 +1435,7 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                 }
               }
             } else {
-              hts_log_print(
-                  opt, LOG_INFO,
-                  "engine: transfer-status: link recorded: %s%s -> %s",
-                  adr_nologin(opt, back[p].url_adr), back[p].url_fil,
-                  back[p].url_sav);
+              back_log_link(opt, &back[p], "recorded");
               if (cache->txt) {
                 if (opt->is_update)
                   state = "untouched";
@@ -1616,8 +1547,8 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
 }
 
 /* try to keep the connection alive */
-int back_letlive(httrackp * opt, cache_back * cache, struct_back * sback,
-                 const int p) {
+static int back_letlive(httrackp *opt, cache_back *cache, struct_back *sback,
+                        const int p) {
   lien_back *const back = sback->lnk;
   const int back_max = sback->count;
   int checkerror;
@@ -1642,7 +1573,7 @@ int back_letlive(httrackp * opt, cache_back * cache, struct_back * sback,
   return 0;
 }
 
-void back_connxfr(htsblk * src, htsblk * dst) {
+static void back_connxfr(htsblk *src, htsblk *dst) {
   dst->soc = src->soc;
   src->soc = INVALID_SOCKET;
 #if HTS_USEOPENSSL
@@ -1669,7 +1600,7 @@ static void back_free_response(htsblk *r) {
   warc_free_request(r);
 }
 
-void back_move(lien_back * src, lien_back * dst) {
+static void back_move(lien_back *src, lien_back *dst) {
   memcpy(dst, src, sizeof(lien_back));
   memset(src, 0, sizeof(lien_back));
   src->r.soc = INVALID_SOCKET;
@@ -2175,8 +2106,8 @@ int back_maydelete(httrackp * opt, cache_back * cache, struct_back * sback,
 }
 
 // clear, or leave for keep-alive
-void back_maydeletehttp(httrackp * opt, cache_back * cache, struct_back * sback,
-                        const int p) {
+static void back_maydeletehttp(httrackp *opt, cache_back *cache,
+                               struct_back *sback, const int p) {
   lien_back *const back = sback->lnk;
   const int back_max = sback->count;
   TStamp lt = 0;
@@ -2222,14 +2153,13 @@ void back_maydeletehttp(httrackp * opt, cache_back * cache, struct_back * sback,
                     back[q].r.debugid, adr_nologin(opt, back[q].url_adr));
     } else {
       deletehttp(&back[p].r);
-      back[p].r.soc = INVALID_SOCKET;
     }
   }
 }
 
 /* attempt to attach a live connection to this slot */
-int back_trylive(httrackp * opt, cache_back * cache, struct_back * sback,
-                 const int p) {
+static int back_trylive(httrackp *opt, cache_back *cache, struct_back *sback,
+                        const int p) {
   lien_back *const back = sback->lnk;
   const int back_max = sback->count;
 
@@ -2250,7 +2180,8 @@ int back_trylive(httrackp * opt, cache_back * cache, struct_back * sback,
 }
 
 /* search for a live position, or, if not possible, try to return a new one */
-int back_searchlive(httrackp * opt, struct_back * sback, const char *search_addr) {
+static int back_searchlive(httrackp *opt, struct_back *sback,
+                           const char *search_addr) {
   lien_back *const back = sback->lnk;
   const int back_max = sback->count;
   int i;
@@ -2259,6 +2190,12 @@ int back_searchlive(httrackp * opt, struct_back * sback, const char *search_addr
   for(i = 0; i < back_max; i++) {
     if (back_status(&back[i]) == STATUS_ALIVE) {
       if (strfield2(back[i].url_adr, search_addr)) {    /* same location (xxc: check also virtual hosts?) */
+#if HTS_USEOPENSSL
+        // opened before --check-cert was turned on, so never verified
+        if (opt->check_cert == HTS_TRUE && back[i].r.ssl_con != NULL &&
+            (SSL_get_verify_mode(back[i].r.ssl_con) & SSL_VERIFY_PEER) == 0)
+          continue;
+#endif
         if (time_local() < back[i].ka_time_start + back[i].r.keep_alive_t) {
           return i;
         }
@@ -2284,7 +2221,7 @@ int back_search_quick(struct_back * sback) {
   return -1;
 }
 
-int back_search(httrackp * opt, struct_back * sback) {
+static int back_search(httrackp *opt, struct_back *sback) {
   lien_back *const back = sback->lnk;
   const int back_max = sback->count;
   int i;
@@ -2332,48 +2269,58 @@ void back_set_finished(httrackp *opt, struct_back *sback, const int p) {
   }
 }
 
+void back_slot_fail(httrackp *opt, struct_back *sback, const int p,
+                    const int statuscode, const char *msg) {
+  htsblk *const r = &sback->lnk[p].r;
+
+  r->statuscode = statuscode;
+  if (msg != NULL)
+    htsblk_failf(r, "%s", msg);
+  back_set_finished(opt, sback, p);
+}
+
+/* back_slot_fail() after deletehttp(), which frees ssl_con even on a closed
+   socket, so sites that test soc first keep their own close. */
+void back_slot_close_fail(httrackp *opt, struct_back *sback, const int p,
+                          const int statuscode, const char *msg) {
+  deletehttp(&sback->lnk[p].r);
+  back_slot_fail(opt, sback, p, statuscode, msg);
+}
+
+void back_slot_fail_nonfatal(httrackp *opt, struct_back *sback, const int p,
+                             const char *fallback) {
+  back_slot_close_fail(opt, sback, p, STATUSCODE_NON_FATAL,
+                       strnotempty(sback->lnk[p].r.msg) ? NULL : fallback);
+}
+
 /* Refuse a transfer for its size: TOO_BIG is a verdict, not a failure, so
    back_transfer_failed() keeps it out of the retry queue. Close the socket
    before returning, or the chunk end path relabels the verdict "Invalid
    chunk". */
 static void back_set_too_big(httrackp *opt, struct_back *sback, const int p) {
-  lien_back *const back = sback->lnk;
-
-  back_set_finished(opt, sback, p);
-  back[p].r.statuscode = STATUSCODE_TOO_BIG;
-  deletehttp(&back[p].r);
-  back[p].r.soc = INVALID_SOCKET;
-  strcpybuff(back[p].r.msg,
-             back[p].testmode ? "Test: File too big" : "File too big");
+  back_slot_close_fail(opt, sback, p, STATUSCODE_TOO_BIG,
+                       sback->lnk[p].testmode ? "Test: File too big"
+                                              : "File too big");
 }
 
-void back_set_locked(struct_back * sback, const int p) {
-  lien_back *const back = sback->lnk;
-  const int back_max = sback->count;
+/* Set the lock state of slot p: 0, 1 (locked) or BACK_PINNED. */
+static void back_set_lock(struct_back *sback, const int p, const int state) {
+  assertf(p >= 0 && p < sback->count);
+  if (p >= 0 && p < sback->count)
+    sback->lnk[p].locked = state;
+}
 
-  assertf(p >= 0 && p < back_max);
-  if (p >= 0 && p < sback->count) {
-    /* status: locked (in process, do not swap on disk) */
-    back[p].locked = 1;         /* locked */
-  }
+void back_set_locked(struct_back *sback, const int p) {
+  back_set_lock(sback, p, 1);
 }
 
 /* See htsback.h. back_set_unlocked() releases it. */
 void back_set_pinned(struct_back *sback, const int p) {
-  assertf(p >= 0 && p < sback->count);
-  if (p >= 0 && p < sback->count)
-    sback->lnk[p].locked = BACK_PINNED;
+  back_set_lock(sback, p, BACK_PINNED);
 }
 
-void back_set_unlocked(struct_back * sback, const int p) {
-  lien_back *const back = sback->lnk;
-  const int back_max = sback->count;
-
-  assertf(p >= 0 && p < back_max);
-  if (p >= 0 && p < sback->count) {
-    /* status: unlocked (can be swapped on disk) */
-    back[p].locked = 0;         /* unlocked */
-  }
+void back_set_unlocked(struct_back *sback, const int p) {
+  back_set_lock(sback, p, 0);
 }
 
 int back_flush_output(httrackp * opt, cache_back * cache, struct_back * sback,
@@ -2470,13 +2417,6 @@ int back_delete(httrackp * opt, cache_back * cache, struct_back * sback,
         (back_status(&back[p]) != STATUS_READY || back[p].r.statuscode <= 0)) {
       back_delayed_discard(opt, &back[p]);
     }
-    // Vérificateur d'intégrité
-#if DEBUG_CHECKINT
-    _CHECKINT(&back[p], "Appel back_delete")
-#endif
-#if HTS_DEBUG_CLOSESOCK
-      DEBUG_W("back_delete: #%d\n" _(int) p);
-#endif
 
     // Finalize
     if (!back[p].finalized) {
@@ -2514,9 +2454,6 @@ int back_clear_entry(lien_back * back) {
   if (back != NULL) {
     // Libérer tous les sockets, handles, buffers..
     if (back->r.soc != INVALID_SOCKET) {
-#if HTS_DEBUG_CLOSESOCK
-      DEBUG_W("back_delete: deletehttp\n");
-#endif
       deletehttp(&back->r);
       back->r.soc = INVALID_SOCKET;
     }
@@ -2546,18 +2483,6 @@ int back_clear_entry(lien_back * back) {
     return 1;
   }
   return 0;
-}
-
-/* Space left on backing stack */
-int back_stack_available(struct_back * sback) {
-  lien_back *const back = sback->lnk;
-  const int back_max = sback->count;
-  int p = 0, n = 0;
-
-  for(; p < back_max; p++)
-    if (back_status(&back[p]) == STATUS_FREE)
-      n++;
-  return n;
 }
 
 // ajouter un lien en backing
@@ -2662,10 +2587,8 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
     /* Stop requested - abort backing */
     /* For update mode: second check after cache lookup not to lose all previous cache data ! */
     if (hts_load_acquire_int(&opt->state.stop) && !opt->is_update) {
-      back[p].r.statuscode = STATUSCODE_INVALID;        // fatal
-      strcpybuff(back[p].r.msg, "mirror stopped by user");
-      back[p].status = STATUS_READY;    // terminé
-      back_set_finished(opt, sback, p);
+      back_slot_fail(opt, sback, p, STATUSCODE_INVALID,
+                     "mirror stopped by user");
       hts_log_print(opt, LOG_WARNING,
                     "File not added due to mirror cancel: %s%s",
                     adr_nologin(opt, adr), fil);
@@ -2815,7 +2738,6 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
           /* Interdiction taille par le wizard? --> détruire */
           if (back[p].r.statuscode != -1) {     // pas d'erreur de lecture
             if (!back_checksize(opt, &back[p], 0)) {
-              back[p].status = STATUS_READY;    // FINI
               back_set_finished(opt, sback, p);
               back[p].r.statuscode = STATUSCODE_TOO_BIG;
               if (!back[p].testmode)
@@ -2840,7 +2762,6 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
             back[p].r.notmodified = 1;  // fichier non modifié
             // no request was sent at all, so this is never a server 304 (#839)
             back[p].r.warc_forced_notmodified = HTS_TRUE;
-            back[p].status = STATUS_READY; // OK prêt
             back_set_finished(opt, sback, p);
 
             // finalize transfer
@@ -2912,9 +2833,6 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
 
             }
           }
-#if DEBUGCA
-          printf("..is modified test %s\n", back[p].send_too);
-#endif
         }
       }
       /* Not in cache ; maybe in temporary cache ? Warning: non-movable
@@ -2970,40 +2888,19 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
             char lastmodified[256];
 
             get_filetime_rfc822(save, lastmodified);
-            if (strnotempty(lastmodified)) {    /* pas de If-.. possible */
-#if DEBUGCA
-              printf("..if unmodified since %s size " LLintP "\n", lastmodified,
-                     (LLint) sz);
-#endif
+            if (strnotempty(lastmodified)) { /* pas de If-.. possible */
               hts_log_print(opt, LOG_DEBUG,
                             "File partially present (" LLintP " bytes): %s%s",
                             (LLint) sz, adr_nologin(opt, back[p].url_adr),
                             back[p].url_fil);
 
-              /* impossible - don't have etag or date
-                 if (strnotempty(back[p].r.etag)) {  // ETag (RFC2616)
-                 sprintf(back[p].send_too,"If-None-Match: %s\r\n",back[p].r.etag);
-                 back[p].http11=1;    // En tête 1.1
-                 } else if (strnotempty(back[p].r.lastmodified)) {
-                 sprintf(back[p].send_too,"If-Unmodified-Since: %s\r\n",back[p].r.lastmodified);
-                 back[p].http11=1;    // En tête 1.1
-                 } else 
-               */
-              if (strlen(lastmodified)) {
-                slprintfbuff_clip(
-                    back[p].send_too, sizeof(back[p].send_too),
-                    "If-Unmodified-Since: %s\r\nRange: bytes=" LLintP "-\r\n",
-                    lastmodified, (LLint) sz);
-                back[p].http11 = 1;     // En tête 1.1
-                back[p].is_update = 1;  /* this is an update of a file */
-                back[p].range_req_size = sz;
-              } else {
-                hts_log_print(opt, LOG_WARNING,
-                              "Could not find timestamp for partially present "
-                              "file, restarting (lost " LLintP " bytes): %s%s",
-                              (LLint) sz, adr_nologin(opt, back[p].url_adr),
-                              back[p].url_fil);
-              }
+              slprintfbuff_clip(
+                  back[p].send_too, sizeof(back[p].send_too),
+                  "If-Unmodified-Since: %s\r\nRange: bytes=" LLintP "-\r\n",
+                  lastmodified, (LLint) sz);
+              back[p].http11 = 1;    // HTTP/1.1 header
+              back[p].is_update = 1; /* this is an update of a file */
+              back[p].range_req_size = sz;
 
             } else {
               hts_log_print(opt, LOG_NOTICE,
@@ -3018,10 +2915,8 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
             filenote(&opt->state.strc, save, NULL);     // ne pas purger tout de même
             file_notify(opt, back[p].url_adr, back[p].url_fil, back[p].url_sav,
                         0, 0, back[p].r.notmodified);
-            back[p].status = STATUS_READY;      // OK prêt
-            back_set_finished(opt, sback, p);
-            back[p].r.statuscode = STATUSCODE_INVALID;  // erreur
-            strcpybuff(back[p].r.msg, "Null-size file not recaught");
+            back_slot_fail(opt, sback, p, STATUSCODE_INVALID,
+                           "Null-size file not recaught");
             return 0;
           }
         } else {
@@ -3038,10 +2933,8 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
 
     /* Stop requested - abort backing */
     if (hts_load_acquire_int(&opt->state.stop)) {
-      back[p].r.statuscode = STATUSCODE_INVALID;        // fatal
-      strcpybuff(back[p].r.msg, "mirror stopped by user");
-      back[p].status = STATUS_READY;    // terminé
-      back_set_finished(opt, sback, p);
+      back_slot_fail(opt, sback, p, STATUSCODE_INVALID,
+                     "mirror stopped by user");
       hts_log_print(opt, LOG_WARNING,
                     "File not added due to mirror cancel: %s%s",
                     adr_nologin(opt, adr), fil);
@@ -3049,8 +2942,7 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
     }
 
     {
-      ///htsblk r;   non directement dans la structure-réponse!
-      T_SOC soc;
+      /// htsblk r;   non directement dans la structure-réponse!
 
       // ouvrir liaison, envoyer requète
       // ne pas traiter ou recevoir l'en tête immédiatement
@@ -3101,25 +2993,22 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
         // the proxy, so fail the link rather than leak the connection (#563)
         if (back[p].r.req.proxy.active &&
             hts_proxy_is_socks(back[p].r.req.proxy.name)) {
-          back[p].r.statuscode = STATUSCODE_NON_FATAL;
-          strcpybuff(back[p].r.msg,
-                     "ftp:// is not supported over a SOCKS proxy");
-          back[p].status = STATUS_READY;
-          back_set_finished(opt, sback, p);
+          back_slot_fail(opt, sback, p, STATUSCODE_NON_FATAL,
+                         "ftp:// is not supported over a SOCKS proxy");
           return 0;
         }
         if (!(back[p].r.req.proxy.active && opt->ftp_proxy)) {  // connexion directe, gérée en thread
-          FTPDownloadStruct *str =
-            (FTPDownloadStruct *) malloc(sizeof(FTPDownloadStruct));
+          FTPDownloadStruct *str = calloct(1, sizeof(FTPDownloadStruct));
+          if (str == NULL) {
+            back_slot_fail(opt, sback, p, STATUSCODE_CONNERROR,
+                           "Out of memory");
+            return 0;
+          }
           str->pBack = &back[p];
           str->pOpt = opt;
           /* */
           back[p].status = STATUS_FTP_TRANSFER; // connexion ftp
-#if USE_BEGINTHREAD
           launch_ftp(str);
-#else
-#error Must have pthreads
-#endif
           return 0;
         }
       } else if (strfield(back[p].url_adr, "https://")) {
@@ -3128,52 +3017,23 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
         back[p].r.ssl_con = NULL;
 #else
         // Transferring it would mean a cleartext request to an https URL.
-        back[p].r.statuscode = STATUSCODE_NON_FATAL;
-        strcpybuff(back[p].r.msg, "https:// is not supported by this build");
-        back[p].status = STATUS_READY;
-        back_set_finished(opt, sback, p);
+        back_slot_fail(opt, sback, p, STATUSCODE_NON_FATAL,
+                       "https:// is not supported by this build");
         return 0;
 #endif
       }
 
       if (!back_trylive(opt, cache, sback, p)) {
-#if HTS_XGETHOST
-        back[p].status = STATUS_WAIT_DNS; // host name resolution attempt
-        soc = INVALID_SOCKET;             // not opened yet
-        if (host_wait(opt, &back[p])) {   // ready (file, or cached dns)
-#if HDEBUG
-          printf("ok, dns cache ready..\n");
-#endif
-          soc =
-            http_xfopen(opt, 0, 0, 0, back[p].send_too, adr, fil, &back[p].r);
-          if (soc == INVALID_SOCKET) {
-            back[p].status = STATUS_READY;      // fini, erreur
-            back_set_finished(opt, sback, p);
-          }
+        const T_SOC soc = http_xfopen(opt, adr, fil, &back[p].r);
+
+        if (soc == INVALID_SOCKET) {
+          back_set_finished(opt, sback, p);
+        } else if (!back[p].r.is_file) {
+          back[p].status = STATUS_CONNECTING; // connecting
+        } else {
+          back[p].status = 1; // file
         }
-        //
-#else
-        //
-#if CNXDEBUG
-        printf("XFopen..\n");
-#endif
-
-        if (strnotempty(back[p].send_too))      // envoyer un if-modified-since
-#if HTS_XCONN
-          soc = http_xfopen(0, 0, 0, back[p].send_too, adr, fil, &(back[p].r));
-#else
-          soc = http_xfopen(0, 0, 1, back[p].send_too, adr, fil, &(back[p].r));
-#endif
-        else
-#if HTS_XCONN
-          soc = http_xfopen(test, 0, 0, NULL, adr, fil, &(back[p].r));
-#else
-          soc = http_xfopen(test, 0, 1, NULL, adr, fil, &(back[p].r));
-#endif
-#endif
       } else {
-        soc = back[p].r.soc;
-
         hts_log_print(opt, LOG_DEBUG,
                       "(Keep-Alive): successfully linked #%d (for %s%s)",
                       back[p].r.debugid, adr_nologin(opt, back[p].url_adr),
@@ -3197,39 +3057,6 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
       // Note: on charge les code-page erreurs (erreur 404, etc) dans le cas où
       // cela est rattrapable (exemple: 301,302 moved xxx -> refresh sur la
       // page!)
-
-#if CNXDEBUG
-      printf("Xfopen ok, poll..\n");
-#endif
-
-#if HTS_XGETHOST
-      if (soc != INVALID_SOCKET)
-        if (back_status(&back[p]) == STATUS_WAIT_DNS) { // no error
-          if (!back[p].r.is_file)
-            back[p].status = STATUS_CONNECTING; // connexion en cours
-          else
-            back[p].status = 1; // fichier
-        }
-#else
-      if (soc == INVALID_SOCKET) {      // erreur socket
-        back[p].status = STATUS_READY;  // FINI
-        back_set_finished(opt, sback, p);
-        back[p].r.soc = INVALID_SOCKET;
-      } else {
-        if (!back[p].r.is_file)
-#if HTS_XCONN
-          back[p].status = STATUS_CONNECTING;   // connexion en cours
-#else
-          back[p].status = STATUS_WAIT_HEADERS;  // chargement en tête en cours
-#endif
-        else
-          back[p].status = 1;   // chargement fichier
-#if BDEBUG==1
-        printf("..loading header\n");
-#endif
-      }
-#endif
-
     }
 
     // note: si il y a erreur (404,etc) status=2 (terminé/échec) mais
@@ -3282,12 +3109,6 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
     return -1;                  // plus de place
   }
 }
-
-#if HTS_XGETHOST
-// Resolution is synchronous inside the connect path; no pre-resolve step, so
-// the host is always immediately ready.
-int host_wait(httrackp *opt, lien_back *back) { return 1; }
-#endif
 
 // élimine les fichiers non html en backing (anticipation)
 // cleanup non-html files in backing to save backing space
@@ -3455,7 +3276,6 @@ static void back_abort_slot(httrackp *opt, struct_back *sback, const int p,
   }
   if (back->r.soc != INVALID_SOCKET)
     deletehttp(&back->r);
-  back->r.soc = INVALID_SOCKET;
   /* drop a .delayed placeholder; real partials survive for resume */
   if (back->r.is_write && IS_DELAYED_EXT(back->url_sav))
     back_delayed_discard(opt, back);
@@ -3463,10 +3283,7 @@ static void back_abort_slot(httrackp *opt, struct_back *sback, const int p,
      --continue refetches the file whole (#1595). */
   else if (back->r.is_write)
     opt->abort_left_partial = HTS_TRUE;
-  back->r.statuscode = statuscode;
-  strcpybuff(back->r.msg, msg);
-  back->status = STATUS_READY;
-  back_set_finished(opt, sback, p);
+  back_slot_fail(opt, sback, p, statuscode, msg);
 }
 
 /* Drop what a user stop must not leave running, and return the count. A cap
@@ -3511,7 +3328,34 @@ static int back_abort_limit(httrackp *opt, struct_back *sback,
   return aborted;
 }
 
+/* Keep the file already on disk: end the transfer and report it as a 304. */
+static void back_keep_existing(httrackp *opt, struct_back *sback, int i,
+                               LLint size_on_disk, const char *why) {
+  lien_back *const b = &sback->lnk[i];
+
+  deletehttp(&b->r);
+  back_set_finished(opt, sback, i);
+  b->r.size = b->r.totalsize = size_on_disk;
+  filenote(&opt->state.strc, b->url_sav, NULL);
+  file_notify(opt, b->url_adr, b->url_fil, b->url_sav, 0, 0, b->r.notmodified);
+  b->r.statuscode = HTTP_NOT_MODIFIED;
+  hts_log_print(
+      opt, LOG_NOTICE, "Kept existing file %s (" LLintP " bytes), %s: %s%s",
+      b->url_sav, size_on_disk, why, adr_nologin(opt, b->url_adr), b->url_fil);
+}
+
 // attente (gestion des buffers des sockets)
+/* Fail a slot whose socket cannot go into an fd_set, rather than overflow it.
+ */
+static void back_fail_unselectable(httrackp *opt, struct_back *sback, int i) {
+  lien_back *const b = &sback->lnk[i];
+
+  hts_log_print(opt, LOG_WARNING, "Socket %d is beyond FD_SETSIZE",
+                (int) b->r.soc);
+  back_slot_close_fail(opt, sback, i, STATUSCODE_CONNERROR,
+                       "Socket number too high for select()");
+}
+
 void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                TStamp stat_timestart) {
   char catbuff[CATBUFF_SIZE];
@@ -3585,12 +3429,12 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
       /* clang-format off: an edit reindents this whole #if-split chain. */
       /* clang-format off */
-      // en cas de gestion du connect préemptif
-#if HTS_XCONN
       if (st == STATUS_CONNECTING) {        // connecting
         // a connecting slot always carries a live socket; guard anyway so a
         // stray INVALID_SOCKET can never reach FD_SET (mirrors the recv branch)
-        if (back[i].r.soc != INVALID_SOCKET) {
+        if (back[i].r.soc != INVALID_SOCKET && !hts_soc_selectable(back[i].r.soc)) {
+          back_fail_unselectable(opt, sback, i);
+        } else if (back[i].r.soc != INVALID_SOCKET) {
           do_wait = 1;
 
           // noter socket write
@@ -3610,23 +3454,17 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
         }
 
       } else
-#endif
-#if HTS_XGETHOST
-      if (st == STATUS_WAIT_DNS) {  // waiting for DNS
-        // rien à faire..
-      } else
-#endif
         // poll pour la lecture sur les sockets
       if ((st > 0) && (st < 100)) {     // receiving http
 
-#if BDEBUG == 1
-#endif
         // non local et non ftp
         if (!back[i].r.is_file) {
           //## if (back[i].url_adr[0]!=lOCAL_CHAR) {
 
           // vérification de sécurité
-          if (back[i].r.soc != INVALID_SOCKET) {        // hey, you never know..
+          if (back[i].r.soc != INVALID_SOCKET && !hts_soc_selectable(back[i].r.soc)) {
+            back_fail_unselectable(opt, sback, i);
+          } else if (back[i].r.soc != INVALID_SOCKET) {        // hey, you never know..
             if (
                 // Do not endlessly wait when receiving SSL http data (Patrick Pfeifer)
 #if HTS_USEOPENSSL
@@ -3659,7 +3497,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               strcpybuff(back[i].r.msg, "Connect Error");
             else
               strcpybuff(back[i].r.msg, "Receive Error");
-            back[i].status = STATUS_READY;      // terminé
             back_set_finished(opt, sback, i);
             hts_log_print(opt, LOG_WARNING,
                           "Unexpected socket error during pre-loop");
@@ -3676,14 +3513,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
       tv.tv_sec = HTS_SOCK_SEC;
       tv.tv_usec = HTS_SOCK_MS;
 
-#if BDEBUG==1
-      printf("..select\n");
-#endif
-
       // poller les sockets-attention au noyau sous Unix..
-#if HTS_WIDE_DEBUG
-      DEBUG_W("select\n");
-#endif
       /* Discard the sets select() did not write: on EINTR they still hold
          every socket we filled in, which reads back as an error (#1110). */
       if (select((int) nfds, &fds, &fds_c, &fds_e, &tv) <= 0) {
@@ -3691,9 +3521,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
         FD_ZERO(&fds_c);
         FD_ZERO(&fds_e);
       }
-#if HTS_WIDE_DEBUG
-      DEBUG_W("select done\n");
-#endif
     }
     // maximum data which can be received for a socket, if limited
     if (nsockets) {
@@ -3725,9 +3552,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
             if (err) {
               if (back[i].r.soc != INVALID_SOCKET) {
-#if HTS_DEBUG_CLOSESOCK
-                DEBUG_W("back_wait: deletehttp\n");
-#endif
                 deletehttp(&back[i].r);
               }
               back[i].r.soc = INVALID_SOCKET;
@@ -3736,7 +3560,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               if (back_status(&back[i]) == STATUS_ALIVE) { /* keep-alive */
                 back_delete(opt, cache, sback, i);
               } else {
-                back[i].status = STATUS_READY;  // terminé
                 back_set_finished(opt, sback, i);
               }
             }
@@ -3776,12 +3599,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
           // probe SO_ERROR and, on failure, fall back to the next address
           if (connect_socket_error(back[i].r.soc) != 0) {
             if (!back_connect_next(opt, sback, i)) {
-              deletehttp(&back[i].r);
-              back[i].r.soc = INVALID_SOCKET;
-              back[i].r.statuscode = STATUSCODE_CONNERROR;
-              strcpybuff(back[i].r.msg, "Connect Error");
-              back[i].status = STATUS_READY;
-              back_set_finished(opt, sback, i);
+              back_slot_close_fail(opt, sback, i, STATUSCODE_CONNERROR,
+                                   "Connect Error");
             }
             continue; // reconnected (stay connecting) or failed
           }
@@ -3808,13 +3627,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
             const int timeout = back[i].timeout > 0 ? back[i].timeout : 30;
 
             if (!socks5_handshake(opt, &back[i].r, back[i].url_adr, timeout)) {
-              if (!strnotempty(back[i].r.msg))
-                strcpybuff(back[i].r.msg, "SOCKS5 handshake failed");
-              deletehttp(&back[i].r);
-              back[i].r.soc = INVALID_SOCKET;
-              back[i].r.statuscode = STATUSCODE_NON_FATAL;
-              back[i].status = STATUS_READY;
-              back_set_finished(opt, sback, i);
+              back_slot_fail_nonfatal(opt, sback, i, "SOCKS5 handshake failed");
               continue;
             }
           }
@@ -3830,13 +3643,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
             const int timeout = back[i].timeout > 0 ? back[i].timeout : 30;
 
             if (!http_proxy_tunnel(opt, &back[i].r, back[i].url_adr, timeout)) {
-              if (!strnotempty(back[i].r.msg))
-                strcpybuff(back[i].r.msg, "proxy CONNECT failed");
-              deletehttp(&back[i].r);
-              back[i].r.soc = INVALID_SOCKET;
-              back[i].r.statuscode = STATUSCODE_NON_FATAL;
-              back[i].status = STATUS_READY;
-              back_set_finished(opt, sback, i);
+              back_slot_fail_nonfatal(opt, sback, i, "proxy CONNECT failed");
               continue;
             }
           }
@@ -3856,13 +3663,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               tunnel_ok =
                   http_proxy_tunnel(opt, &back[i].r, back[i].url_adr, timeout);
               if (!tunnel_ok) {
-                if (!strnotempty(back[i].r.msg))
-                  strcpybuff(back[i].r.msg, "proxy CONNECT failed");
-                deletehttp(&back[i].r);
-                back[i].r.soc = INVALID_SOCKET;
-                back[i].r.statuscode = STATUSCODE_NON_FATAL;
-                back[i].status = STATUS_READY;
-                back_set_finished(opt, sback, i);
+                back_slot_fail_nonfatal(opt, sback, i, "proxy CONNECT failed");
               }
             }
             // handshake not yet launched
@@ -3871,12 +3672,21 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               // new session
               back[i].r.ssl_con = SSL_new(openssl_ctx);
               if (back[i].r.ssl_con) {
-                /* non-const twin: the OpenSSL macro casts the qualifier away */
-                char *hostname = jump_protocol(back[i].url_adr);
+                char hostname[256];
                 // some servers expect the hostname on the clienthello (SNI TLS extension)
-                SSL_set_tlsext_host_name(back[i].r.ssl_con, hostname);
+                if (hts_sni_hostname(back[i].url_adr, hostname,
+                                     sizeof(hostname)))
+                  SSL_set_tlsext_host_name(back[i].r.ssl_con, hostname);
                 SSL_clear(back[i].r.ssl_con);
-                if (SSL_set_fd(back[i].r.ssl_con, (int) back[i].r.soc) == 1) {
+                if (opt->check_cert == HTS_TRUE &&
+                    !hts_ssl_check_cert(back[i].r.ssl_con, back[i].url_adr)) {
+                  htsblk_failf(&back[i].r,
+                               "cannot check the certificate of %s "
+                               "(--check-cert)",
+                               jump_identification_const(back[i].url_adr));
+                  back[i].r.statuscode = STATUSCODE_SSL_HANDSHAKE;
+                } else if (SSL_set_fd(back[i].r.ssl_con, (int) back[i].r.soc) ==
+                           1) {
                   SSL_set_connect_state(back[i].r.ssl_con);
                   back[i].status = STATUS_SSL_WAIT_HANDSHAKE;   /* handshake wait */
                   // the handshake gets its own timeout window, as connect does
@@ -3889,18 +3699,9 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
             }
             /* Error */
             if (tunnel_ok && back[i].r.statuscode == STATUSCODE_SSL_HANDSHAKE) {
-              strcpybuff(back[i].r.msg, "bad SSL/TLS handshake");
-              deletehttp(&back[i].r);
-              back[i].r.soc = INVALID_SOCKET;
-              back[i].r.statuscode = STATUSCODE_NON_FATAL;
-              back[i].status = STATUS_READY;
-              back_set_finished(opt, sback, i);
+              back_slot_fail_nonfatal(opt, sback, i, "bad SSL/TLS handshake");
             }
           }
-#endif
-
-#if BDEBUG==1
-          printf("..connect ok on socket %d\n", back[i].r.soc);
 #endif
 
           if ((back[i].r.soc != INVALID_SOCKET) &&
@@ -3967,99 +3768,28 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               if (!strnotempty(back[i].r.msg)) {
                 htsblk_failf(&back[i].r, "SSL/TLS error %d", err_code);
               }
-              deletehttp(&back[i].r);
-              back[i].r.soc = INVALID_SOCKET;
-              back[i].r.statuscode = STATUSCODE_NON_FATAL;
-              back[i].status = STATUS_READY;
-              back_set_finished(opt, sback, i);
+              if (opt->check_cert == HTS_TRUE) {
+                const long verdict = SSL_get_verify_result(back[i].r.ssl_con);
+
+                if (verdict != X509_V_OK)
+                  htsblk_failf(&back[i].r,
+                               "certificate of %s rejected (--check-cert): %s",
+                               jump_identification_const(back[i].url_adr),
+                               X509_verify_cert_error_string(verdict));
+              }
+              back_slot_close_fail(opt, sback, i, STATUSCODE_NON_FATAL, NULL);
             }
           } else {                              /* got it! */
-            back[i].status = STATUS_CONNECTING; // back to waitconnect
+            back[i].status = STATUS_CONNECTING; // connecting again
           }
         } else {
-          strcpybuff(back[i].r.msg, "unexpected SSL/TLS error");
-          deletehttp(&back[i].r);
-          back[i].r.soc = INVALID_SOCKET;
-          back[i].r.statuscode = STATUSCODE_NON_FATAL;
-          back[i].status = STATUS_READY;
-          back_set_finished(opt, sback, i);
+          back_slot_close_fail(opt, sback, i, STATUSCODE_NON_FATAL,
+                               "unexpected SSL/TLS error");
         }
 
-      }
-#endif
-#if HTS_XGETHOST
-      else if (st == STATUS_WAIT_DNS) { // waiting for DNS
-#if DEBUGDNS
-#endif
-
-        if (!gestion_timeout)
-          if (back[i].timeout > 0)
-            gestion_timeout = 1;
-
-        if (host_wait(opt, &back[i])) { // prêt
-          back[i].status = STATUS_CONNECTING;   // attente connexion
-          if (back[i].timeout > 0) {    // refresh timeout si besoin est
-            back[i].timeout_refresh = time_local();
-          }
-          if (back[i].rateout > 0) {    // le taux de transfert de base sur le début de la connexion
-            back[i].rateout_time = time_local();
-          }
-
-          back[i].r.soc =
-            http_xfopen(opt, 0, 0, 0, back[i].send_too, back[i].url_adr,
-                        back[i].url_fil, &(back[i].r));
-          if (back[i].r.soc == INVALID_SOCKET) {
-            back[i].status = STATUS_READY;      // fini, erreur
-            back_set_finished(opt, sback, i);
-            if (back[i].r.soc != INVALID_SOCKET) {
-#if HTS_DEBUG_CLOSESOCK
-              DEBUG_W("back_wait(2): deletehttp\n");
-#endif
-              deletehttp(&back[i].r);
-            }
-            back[i].r.soc = INVALID_SOCKET;
-            back[i].r.statuscode = STATUSCODE_NON_FATAL;
-            if (strnotempty(back[i].r.msg) == 0)
-              strcpybuff(back[i].r.msg, "Unable to resolve host name");
-          }
-        }
-
-        // ---- FLAG READ MIS A UN?: POUR LA RECEPTION
-      }
-#endif
-#if USE_BEGINTHREAD
-      // ..rien à faire, c'est magic les threads
-#else
-      else if (st == STATUS_FTP_TRANSFER) {     // receiving ftp
-        if (!fexist(back[i].location_buffer)) { // terminé
-          FILE *fp;
-
-          fp =
-            FOPEN(fconcat(OPT_GET_BUFF(opt), back[i].location_buffer, ".ok"),
-                  "rb");
-          if (fp) {
-            back_read_ftp_result(fp, &back[i].r);
-            fclose(fp);
-            UNLINK(fconcat(OPT_GET_BUFF(opt), back[i].location_buffer, ".ok"));
-            strcpybuff(fconcat
-                       (OPT_GET_BUFF(opt), back[i].location_buffer, ".ok"), "");
-          } else {
-            strcpybuff(back[i].r.msg,
-                       "Unknown ftp result, check if file is ok");
-            back[i].r.statuscode = STATUSCODE_INVALID;
-          }
-          back[i].status = STATUS_READY;
-          back_set_finished(opt, sback, i);
-          // finalize transfer
-          if (back[i].r.statuscode > 0) {
-            hts_log_print(opt, LOG_TRACE, "finalizing ftp");
-            back_finalize(opt, cache, sback, i);
-          }
-        }
       }
 #endif
       else if (back_ftp_handed_back(&back[i])) {
-        back[i].status = STATUS_READY;
         back_set_finished(opt, sback, i);
         // finalize transfer
         if (back[i].r.statuscode > 0) {
@@ -4092,10 +3822,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
         if (dispo) {            // données dispo
           LLint retour_fread;
 
-          busy_recv = 1;        // on récupère encore
-#if BDEBUG==1
-          printf("..data available on socket %d\n", back[i].r.soc);
-#endif
+          busy_recv = 1; // on récupère encore
 
           // range size hack old location
 
@@ -4154,9 +3881,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                 hts_store_release_int(&opt->state.exit_xh, -1);
                               }
                             }
-#if HDEBUG
-                            printf("direct-disk: %s\n", back[i].url_sav);
-#endif
                             hts_log_print(
                                 opt, LOG_DEBUG,
                                 "File received from net to disk: %s%s",
@@ -4171,12 +3895,10 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                 hts_log_print(opt, LOG_ERROR,
                                               "* * Fatal write error, giving up");
                               }
-                              back[i].r.is_write = 0;   // erreur, abandonner
-                              back[i].status = STATUS_READY;      // terminé
+                              back[i].r.is_write = 0; // erreur, abandonner
                               back_set_finished(opt, sback, i);
                               if (back[i].r.soc != INVALID_SOCKET) {
                                 deletehttp(&back[i].r);
-                                back[i].r.soc = INVALID_SOCKET;
                               }
                             } else {
 #ifndef _WIN32
@@ -4199,19 +3921,14 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                           "File cancelled (non HTML): %s%s",
                                           adr_nologin(opt, back[i].url_adr),
                                           back[i].url_fil);
-                            back[i].status = STATUS_READY;      // terminé
-                            back_set_finished(opt, sback, i);
-                            if (!back[i].testmode)
-                              back[i].r.statuscode = STATUSCODE_INVALID;        // EUHH CANCEL
-                            else
-                              back[i].r.statuscode = STATUSCODE_TEST_OK;        // "TEST OK"
                             if (back[i].r.soc != INVALID_SOCKET) {
-#if HTS_DEBUG_CLOSESOCK
-                              DEBUG_W("back_wait(3): deletehttp\n");
-#endif
                               deletehttp(&back[i].r);
                             }
-                            back[i].r.soc = INVALID_SOCKET;
+                            back_slot_fail(opt, sback, i,
+                                           back[i].testmode
+                                               ? STATUSCODE_TEST_OK
+                                               : STATUSCODE_INVALID,
+                                           NULL);
                           }
                         }
                       }
@@ -4252,11 +3969,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               back[i].chunk_size = back[i].r.size;      // taille taille chunk
               memcpy(&(back[i].r), &r, sizeof(htsblk)); // restaurer véritable r
             } else if (back[i].is_chunk) { // chunked: cap the read size
-#if CHUNKDEBUG==1
-              printf("[%d] read %d bytes\n", (int) back[i].r.soc,
-                     (int) min(back[i].r.totalsize - back[i].r.size,
-                               max_read_bytes));
-#endif
               retour_fread =
                 (int) http_xfread1(&(back[i].r),
                                    (int) min(back[i].r.totalsize -
@@ -4280,11 +3992,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                   back[i].chunk_adr = NULL;
                 }
                 back[i].chunk_size = 0;
-                retour_fread = 0;       // pas d'erreur
-#if CHUNKDEBUG==1
-                printf("[%d] waiting for current chunk CRLF..\n",
-                       (int) back[i].r.soc);
-#endif
+                retour_fread = 0; // pas d'erreur
               }
             } else if (back[i].r.keep_alive) {
               if (back[i].r.size == back[i].r.totalsize) {      // fin!
@@ -4293,17 +4001,9 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
             }
           }
 
-          if (retour_fread < 0) {       // fin réception
-            back[i].status = STATUS_READY;      // terminé
+          if (retour_fread < 0) { // fin réception
             back_set_finished(opt, sback, i);
             /*KA back[i].r.soc=INVALID_SOCKET; */
-#if CHUNKDEBUG==1
-            if (back[i].is_chunk)
-              printf
-                ("[%d] must be the last chunk for %s (connection closed) - %d/%d\n",
-                 (int) back[i].r.soc, back[i].url_fil, back[i].r.size,
-                 back[i].r.totalsize);
-#endif
             if (retour_fread < 0 && retour_fread != READ_EOF) {
               if (statuscode_is_write_error(back[i].r.statuscode)) {
                 /* our disk, not the server: keep the write error rather than
@@ -4325,11 +4025,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                   strcpybuff(back[i].r.msg, "No data (connection closed)");
                 back[i].r.statuscode = STATUSCODE_CONNERROR;
               }
-            } else if ((back[i].r.statuscode <= 0)
-                       && (strnotempty(back[i].r.msg) == 0)) {
-#if HDEBUG
-              printf("error interruped: %s\n", back[i].r.adr);
-#endif
+            } else if ((back[i].r.statuscode <= 0) &&
+                       (strnotempty(back[i].r.msg) == 0)) {
               if (back[i].r.size > 0)
                 strcpybuff(back[i].r.msg, "Interrupted transfer");
               else
@@ -4338,9 +4035,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
             }
             // Close socket
             if (back[i].r.soc != INVALID_SOCKET) {
-#if HTS_DEBUG_CLOSESOCK
-              DEBUG_W("back_wait(4): deletehttp\n");
-#endif
               /*KA deletehttp(&back[i].r); */
               back_maydeletehttp(opt, cache, sback, i);
             }
@@ -4397,10 +4091,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                 }
               }
             }
-#if BDEBUG==1
-            printf("transfer ok\n");
-#endif
-          } else if (retour_fread > 0) {        // pas d'erreur de réception et data
+          } else if (retour_fread > 0) { // pas d'erreur de réception et data
             if (back[i].timeout > 0) {  // refresh timeout si besoin est
               back[i].timeout_refresh = time_local();
             }
@@ -4427,7 +4118,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
                   back[i].chunk_adr[back[i].chunk_size - 1] = '\0';     // octet nul 
                   // skip leading spaces or cr
-                  while(isspace(*chstrip))
+                  while (isspace((unsigned char) *chstrip))
                     chstrip++;
                   chunk_data[0] = '\0';
                   strncatbuff(chunk_data, chstrip, sizeof(chunk_data) - 2);
@@ -4438,10 +4129,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                     *chstrip = '\0';
                   while((chstrip = strchr(chunk_data, '\r')))
                     *chstrip = '\0';
-#if CHUNKDEBUG==1
-                  printf("[%d] chunk received and read: %s\n",
-                         (int) back[i].r.soc, chunk_data);
-#endif
                   if (back[i].r.totalsize < 0)
                     back[i].r.totalsize = 0;    // initialiser à 0 (-1 == unknown)
                   if (back_status(&back[i]) == STATUS_CHUNK_WAIT) {
@@ -4510,11 +4197,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                           }
                         }
                       }
-#if CHUNKDEBUG==1
-                      printf("[%d] chunk length: %d - next total " LLintP ":\n",
-                             (int) back[i].r.soc, (int) chunk_size,
-                             (LLint) back[i].r.totalsize);
-#endif
                     } else {
                       hts_log_print(
                           opt, LOG_WARNING, "Illegal chunk (%s) for %s%s",
@@ -4528,19 +4210,13 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                       else if (back[i].chunk_blocksize == -1)
                         chunk_size = 0; /* ending chunk */
                       else
-                        chunk_size = 1; /* fake positive size for 1st chunk history */
-#if CHUNKDEBUG==1
-                      printf("[%d] chunk CRLF seen\n", (int) back[i].r.soc);
-#endif
+                        chunk_size =
+                            1; /* fake positive size for 1st chunk history */
                     } else {
                       hts_log_print(
                           opt, LOG_WARNING, "illegal chunk CRLF (%s) for %s%s",
                           back[i].chunk_adr, adr_nologin(opt, back[i].url_adr),
                           back[i].url_fil);
-#if CHUNKDEBUG==1
-                      printf("[%d] chunk CRLF ERROR!! : '%s'\n",
-                             (int) back[i].r.soc, chunk_data);
-#endif
                     }
                   }
                 } else {
@@ -4555,31 +4231,16 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                 // si chunk non nul continuer (ou commencer)
                 if (back_status(&back[i]) == STATUS_CHUNK_CR &&
                     chunk_size > 0) {
-                  back[i].status = STATUS_CHUNK_WAIT;   /* waiting for next chunk (NN\r\n<data>\r\nNN\r\n<data>..\r\n0\r\n\r\n) */
-#if CHUNKDEBUG==1
-                  printf("[%d] waiting for next chunk\n", (int) back[i].r.soc);
-#endif
+                  /* waiting for the next chunk */
+                  back[i].status = STATUS_CHUNK_WAIT;
                 } else if (back_status(&back[i]) == STATUS_CHUNK_WAIT &&
                            chunk_size == 0) {           /* final chunk */
                   back[i].status = STATUS_CHUNK_CR;     /* final CRLF */
-#if CHUNKDEBUG==1
-                  printf("[%d] waiting for final CRLF (chunk)\n",
-                         (int) back[i].r.soc);
-#endif
                 } else if (back_status(&back[i]) == STATUS_CHUNK_WAIT &&
                            chunk_size >= 0) { /* will fetch data now */
-                  back[i].status = 1;   // continuer body    
-#if CHUNKDEBUG==1
-                  printf("[%d] waiting for body (chunk)\n",
-                         (int) back[i].r.soc);
-#endif
+                  back[i].status = 1;         // continuer body
                 } else { /* zero-size-chunk-CRLF (end) or error */
-#if CHUNKDEBUG==1
-                  printf("[%d] chunk end, total: %d\n", (int) back[i].r.soc,
-                         back[i].r.size);
-#endif
                   /* End */
-                  back[i].status = STATUS_READY; // fin
                   back_set_finished(opt, sback, i);
 
                   // finalize transfer if not temporary
@@ -4595,25 +4256,13 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                     }
                   }
                   if (back[i].r.soc != INVALID_SOCKET) {
-#if HTS_DEBUG_CLOSESOCK
-                    DEBUG_W("back_wait(5): deletehttp\n");
-#endif
                     /* Error */
                     if (chunk_size < 0) {
                       deletehttp(&back[i].r);
-                      back[i].r.soc = INVALID_SOCKET;
                       deleteaddr(&back[i].r);
                       back[i].r.statuscode = STATUSCODE_INVALID;
                       strcpybuff(back[i].r.msg, "Invalid chunk");
-#if CHUNKDEBUG==1
-                      printf("[%d] chunk error\n", (int) back[i].r.soc);
-#endif
                     } else {    /* if chunk_size == 0 */
-
-#if CHUNKDEBUG==1
-                      printf("[%d] all chunks now received\n",
-                             (int) back[i].r.soc);
-#endif
 
                       /* Tester totalsize en fin de chunk */
                       if ((back[i].r.totalsize >= 0)) { // tester totalsize
@@ -4635,7 +4284,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                         }
                       }
                     }
-
                   }
                 }
 
@@ -4662,10 +4310,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                   int adv = 0;
                   int noFreebuff = 0;
 
-#if BDEBUG==1
-                  printf("..ok, header received\n");
-#endif
-
                   /* Hack for zero-length headers */
                   if (back_status(&back[i]) != 0 && back[i].r.adr[0] != '<') {
 
@@ -4686,9 +4330,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                     // traiter status-line
                     treatfirstline(&back[i].r, rcvd);
 
-#if HDEBUG
-                    printf("(Buffer) Status-Code=%d\n", back[i].r.statuscode);
-#endif
                     if (_DEBUG_HEAD) {
                       if (ioinfo) {
                         hts_secret_fprintf(
@@ -4719,9 +4360,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                             adr_nologin(opt, back[i].url_adr), back[i].url_fil);
                         continue;
                       }
-#if HDEBUG
-                      printf("(buffer)>%s\n", rcvd);
-#endif
                       /*
                          if (_DEBUG_HEAD) {
                          if (ioinfo) {
@@ -4771,13 +4409,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                     "breaking connection: %s%s",
                                     adr_nologin(opt, back[i].url_adr),
                                     back[i].url_fil);
-                      back[i].status = STATUS_READY;    // FINI
-                      back_set_finished(opt, sback, i);
-                      deletehttp(&back[i].r);
-                      back[i].r.soc = INVALID_SOCKET;
-                      strcpybuff(back[i].r.msg,
-                                 "External wrapper aborted transfer");
-                      back[i].r.statuscode = STATUSCODE_INVALID;
+                      back_slot_close_fail(opt, sback, i, STATUSCODE_INVALID,
+                                           "External wrapper aborted transfer");
                     }
                   }
 
@@ -4854,22 +4487,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                     // ->
                     // Content-Range: bytes */2830
                     if (back[i].range_req_size == back[i].r.crange) {
-                      filenote(&opt->state.strc, back[i].url_sav, NULL);
-                      file_notify(opt, back[i].url_adr, back[i].url_fil,
-                                  back[i].url_sav, 0, 0, back[i].r.notmodified);
-                      deletehttp(&back[i].r);
-                      back[i].r.soc = INVALID_SOCKET;
-                      back[i].status = STATUS_READY;    // READY
-                      back_set_finished(opt, sback, i);
-                      back[i].r.size = back[i].r.totalsize =
-                        back[i].range_req_size;
-                      back[i].r.statuscode = HTTP_NOT_MODIFIED; // NOT MODIFIED
-                      hts_log_print(
-                          opt, LOG_NOTICE,
-                          "Kept existing file %s (" LLintP
-                          " bytes), matching size and timestamp: %s%s",
-                          back[i].url_sav, (LLint) back[i].range_req_size,
-                          adr_nologin(opt, back[i].url_adr), back[i].url_fil);
+                      back_keep_existing(opt, sback, i, back[i].range_req_size,
+                                         "matching size and timestamp");
                     }
                   }
                   // transform 406 into 200 ; we'll catch embedded links inside the choice page
@@ -4890,7 +4509,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                         adr_nologin(opt, back[i].url_adr), back[i].url_fil);
                     back[i].r.statuscode = HTTP_NOT_MODIFIED;
                     deletehttp(&back[i].r);
-                    back[i].r.soc = INVALID_SOCKET;
                   }
                   // Various hacks to limit re-transfers when updating a mirror
                   // Force update if same size detected
@@ -4925,7 +4543,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                             if (len1 == len2 && ondisk == len2) {
                               back[i].r.statuscode = HTTP_NOT_MODIFIED; // forcer NOT MODIFIED
                               deletehttp(&back[i].r);
-                              back[i].r.soc = INVALID_SOCKET;
                               hts_log_print(
                                   opt, LOG_NOTICE,
                                   "Kept existing file %s (" LLintP
@@ -4961,24 +4578,9 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
                             if (size >= 0) {
                               if (back[i].r.totalsize == size) {        // same size!
-                                deletehttp(&back[i].r);
-                                back[i].r.soc = INVALID_SOCKET;
-                                back[i].status = STATUS_READY;  // READY
-                                back_set_finished(opt, sback, i);
-                                back[i].r.size = back[i].r.totalsize;
-                                filenote(&opt->state.strc, back[i].url_sav,
-                                         NULL);
-                                file_notify(opt, back[i].url_adr,
-                                            back[i].url_fil, back[i].url_sav, 0,
-                                            0, back[i].r.notmodified);
-                                back[i].r.statuscode = HTTP_NOT_MODIFIED;       // NOT MODIFIED
-                                hts_log_print(opt, LOG_NOTICE,
-                                              "Kept existing file %s (" LLintP
-                                              " bytes), matching the announced "
-                                              "size: %s%s",
-                                              back[i].url_sav, (LLint) size,
-                                              adr_nologin(opt, back[i].url_adr),
-                                              back[i].url_fil);
+                                back_keep_existing(
+                                    opt, sback, i, size,
+                                    "matching the announced size");
                               }
                             }
                           }
@@ -5002,32 +4604,14 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                 if (!is_hypertext_mime(opt, back[i].r.contenttype, back[i].url_fil)) {  // pas HTML
                                   if (back[i].r.statuscode == HTTP_OK) {        // "OK"
                                     if (back[i].range_req_size > 0) {   // but Range: requested
-                                      if (back[i].range_req_size == back[i].r.totalsize) {      // And same size
-#if HTS_DEBUG_CLOSESOCK
-                                        DEBUG_W
-                                          ("back_wait(skip_range): deletehttp\n");
-#endif
-                                        deletehttp(&back[i].r);
-                                        back[i].r.soc = INVALID_SOCKET;
-                                        back[i].status = STATUS_READY;  // READY
-                                        back_set_finished(opt, sback, i);
-                                        back[i].r.size = back[i].r.totalsize;
-                                        filenote(&opt->state.strc,
-                                                 back[i].url_sav, NULL);
-                                        file_notify(opt, back[i].url_adr,
-                                                    back[i].url_fil,
-                                                    back[i].url_sav, 0, 0,
-                                                    back[i].r.notmodified);
-                                        back[i].r.statuscode = HTTP_NOT_MODIFIED;       // NOT MODIFIED
-                                        hts_log_print(
-                                            opt, LOG_NOTICE,
-                                            "Kept existing file %s (" LLintP
-                                            " bytes), matching the announced "
-                                            "size, range ignored: %s%s",
-                                            back[i].url_sav,
-                                            (LLint) back[i].range_req_size,
-                                            adr_nologin(opt, back[i].url_adr),
-                                            back[i].url_fil);
+                                      if (back[i].range_req_size ==
+                                          back[i]
+                                              .r.totalsize) { // And same size
+                                        back_keep_existing(
+                                            opt, sback, i,
+                                            back[i].range_req_size,
+                                            "matching the announced size, "
+                                            "range ignored");
                                       }
                                     }
                                   }
@@ -5060,13 +4644,11 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                                 back[i].url_fil);
                     UNLINK(back[i].url_sav);
                     deletehttp(&back[i].r);
-                    back[i].r.soc = INVALID_SOCKET;
                     back[i].r.statuscode = STATUSCODE_NON_FATAL;
                     back[i].r.refetch_wholefile =
                         HTS_TRUE; // retry whole, no Range (#581)
                     strcpybuff(back[i].r.msg,
                                "Bogus 304 on resume, restarting");
-                    back[i].status = STATUS_READY;
                     back_set_finished(opt, sback, i);
                   }
 
@@ -5077,25 +4659,18 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                     hts_log_print(opt, LOG_DEBUG, "Tested file: %s%s",
                                   adr_nologin(opt, back[i].url_adr),
                                   back[i].url_fil);
-#if HTS_DEBUG_CLOSESOCK
-                    DEBUG_W("back_wait(head request): deletehttp\n");
-#endif
                     // Couper connexion
                     if (!back[i].http11) {      /* NO KA */
                       deletehttp(&back[i].r);
-                      back[i].r.soc = INVALID_SOCKET;
                     }
-                    back[i].status = STATUS_READY;      // terminé
                     back_set_finished(opt, sback, i);
                   }
                   // traiter une éventuelle erreur 304 (cache à jour utilisable)
                   else if (back[i].r.statuscode == HTTP_NOT_MODIFIED) { // document à jour dans le cache
                     // lire dans le cache
                     // ** NOTE: pas de vérif de la taille ici!!
-#if HTS_DEBUG_CLOSESOCK
-                    DEBUG_W("back_wait(file is not modified): deletehttp\n");
-#endif
-                    /* clear everything but connection: switch, close, and reswitch */
+                    /* clear everything but connection: switch, close, and
+                     * reswitch */
                     {
                       htsblk tmp;
 
@@ -5137,8 +4712,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                       }
                     }
                     // Status is okay?
-                    if (back[i].r.statuscode != -1) {   // pas d'erreur de lecture
-                      back[i].status = STATUS_READY;    // OK prêt
+                    if (back[i].r.statuscode != -1) { // pas d'erreur de lecture
                       back_set_finished(opt, sback, i);
                       back[i].r.notmodified = 1;        // NON modifié!
                       // WARC must not claim a 304 the server never sent (#839)
@@ -5154,13 +4728,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                         hts_log_print(opt, LOG_TRACE, "finalizing after cache load");
                         back_finalize(opt, cache, sback, i);
                       }
-#if DEBUGCA
-                      printf("..document à jour après requète: %s%s\n",
-                             back[i].url_adr, back[i].url_fil);
-#endif
 
-                    } else {    // erreur
-                      back[i].status = STATUS_READY;    // terminé
+                    } else { // erreur
                       back_set_finished(opt, sback, i);
                     }
 
@@ -5173,12 +4742,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                            hts_acceptmime(opt, 0, back[i].url_adr,
                                           back[i].url_fil,
                                           back[i].r.contenttype) == 1) {
-                    deletehttp(&back[i].r);
-                    back[i].r.soc = INVALID_SOCKET;
-                    back[i].status = STATUS_READY;
-                    back_set_finished(opt, sback, i);
-                    back[i].r.statuscode = STATUSCODE_EXCLUDED;
-                    strcpybuff(back[i].r.msg, "Excluded by MIME type filter");
+                    back_slot_close_fail(opt, sback, i, STATUSCODE_EXCLUDED,
+                                         "Excluded by MIME type filter");
                     hts_log_print(
                         opt, LOG_NOTICE,
                         "File excluded by MIME type filter (%s): %s%s",
@@ -5208,10 +4773,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                            back[i].r.totalsize ==
                                back[i].r.crange_end - resume + 1);
 
-#if HDEBUG
-                      printf("partial content: " LLintP " on disk..\n",
-                             (LLint) sz);
-#endif
                       if (sz >= 0 && range_ok) {
                         if (!is_hypertext_mime(opt, back[i].r.contenttype, back[i].url_sav)) {  // pas HTML
                           if (opt->getmode & HTS_GETMODE_NONHTML) {
@@ -5240,7 +4801,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                 url_savename_refname_remove(
                                     opt, back[i].url_adr, back[i].url_fil);
                                 UNLINK(back[i].url_sav);
-                                back[i].status = STATUS_READY;
                                 back_set_finished(opt, sback, i);
                                 strcpybuff(back[i].r.msg,
                                            "Can not truncate partial file, "
@@ -5259,12 +4819,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                       adr_nologin(opt, back[i].url_adr),
                                       back[i].url_fil);
                                 }
-#if HDEBUG
-                                printf("continue interrupted file\n");
-#endif
                               }
-                            } else {    // On est dans la m**
-                              back[i].status = STATUS_READY;    // terminé (voir plus loin)
+                            } else { // On est dans la m**
                               back_set_finished(opt, sback, i);
                               strcpybuff(back[i].r.msg,
                                          "Can not open partial file");
@@ -5298,26 +4854,20 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                 back[i].r.totalsize += resume; // -> full size
                               if (!hts_fread_exact(back[i].r.adr,
                                                    (size_t) resume, fp)) {
-                                back[i].status = STATUS_READY;  // terminé (voir plus loin)
                                 back_set_finished(opt, sback, i);
                                 strcpybuff(back[i].r.msg,
                                            "Can not read partial file");
                               } else {
                                 back[i].r.statuscode = HTTP_OK; // Forcer 'OK'
-#if HDEBUG
-                                printf("continue in mem interrupted file\n");
-#endif
                               }
                             } else {
-                              back[i].status = STATUS_READY;    // terminé (voir plus loin)
                               back_set_finished(opt, sback, i);
                               strcpybuff(back[i].r.msg,
                                          "No memory for partial file");
                             }
                             if (fp != NULL)
                               fclose(fp);
-                          } else {                              // open failed
-                            back[i].status = STATUS_READY;      // terminé (voir plus loin)
+                          } else { // open failed
                             back_set_finished(opt, sback, i);
                             strcpybuff(back[i].r.msg,
                                        "Can not open partial file");
@@ -5336,22 +4886,16 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                         url_savename_refname_remove(opt, back[i].url_adr,
                                                     back[i].url_fil);
                         UNLINK(back[i].url_sav);
-                        back[i].status = STATUS_READY;
                         back_set_finished(opt, sback, i);
                         strcpybuff(back[i].r.msg,
                                    "Unusable partial content, restarting");
-                      } else {                          // partial not found
-                        back[i].status = STATUS_READY;  // terminé (voir plus loin)
+                      } else { // partial not found
                         back_set_finished(opt, sback, i);
                         strcpybuff(back[i].r.msg, "Can not find partial file");
                       }
                       // Erreur?
                       if (back_status(&back[i]) == STATUS_READY) {
                         if (back[i].r.soc != INVALID_SOCKET) {
-#if HTS_DEBUG_CLOSESOCK
-                          DEBUG_W
-                            ("back_wait(206 solve problems): deletehttp\n");
-#endif
                           deletehttp(&back[i].r);
                         }
                         back[i].r.soc = INVALID_SOCKET;
@@ -5371,8 +4915,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                         if (back[i].r.empty /* ?? && back[i].r.statuscode==HTTP_OK */ ) {       // empty response
                           // Couper connexion
                           back_maydeletehttp(opt, cache, sback, i);
-                          /* KA deletehttp(&back[i].r); back[i].r.soc=INVALID_SOCKET; */
-                          back[i].status = STATUS_READY;        // terminé
+                          /* KA deletehttp(&back[i].r);
+                           * back[i].r.soc=INVALID_SOCKET; */
                           back_set_finished(opt, sback, i);
                           if (deleteaddr(&back[i].r)
                               && (back[i].r.adr = (char *) malloct(2))) {
@@ -5389,10 +4933,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                           back[i].is_chunk = 0;
                           back[i].status = 1;   // start body
                         } else {
-#if CHUNKDEBUG==1
-                          printf("[%d] chunk encoding detected %s..\n",
-                                 (int) back[i].r.soc, back[i].url_fil);
-#endif
                           back[i].is_chunk = 1;
                           back[i].chunk_adr = NULL;
                           back[i].chunk_size = 0;
@@ -5403,17 +4943,9 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                         if (back[i].rateout > 0) {
                           back[i].rateout_time = time_local();  // refresh pour transfer rate
                         }
-#if HDEBUG
-                        printf("(buffer) start body!\n");
-#endif
-                      } else {  // mode test, ne pas passer en 1!!
-                        back[i].status = STATUS_READY;  // READY
+                      } else { // mode test, ne pas passer en 1!!
                         back_set_finished(opt, sback, i);
-#if HTS_DEBUG_CLOSESOCK
-                        DEBUG_W("back_wait(test ok): deletehttp\n");
-#endif
                         deletehttp(&back[i].r);
-                        back[i].r.soc = INVALID_SOCKET;
                         if (back[i].r.statuscode == HTTP_OK) {
                           strcpybuff(back[i].r.msg, "Test: OK");
                           back[i].r.statuscode = STATUSCODE_TEST_OK;    // test réussi
@@ -5424,7 +4956,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                           strcpybuff(back[i].r.msg, "Test: ");
                           strcatbuff(back[i].r.msg, tempo);
                         }
-
                       }
                     }
                   }
@@ -5435,20 +4966,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               }                 // r.size>2
             } // status 99
 
-          }                     // si pas d'erreurs
-#if BDEBUG==1
-          printf("bytes overall: %d\n", back[i].r.size);
-#endif
+          } // si pas d'erreurs
         }                       // données dispo
-
-        // en cas d'erreur cl, supprimer éventuel fichier sur disque
-#if HTS_REMOVE_BAD_FILES
-        if (back_status(&back[i]) < 0) {
-          if (!back[i].testmode) {      // pas en test
-            UNLINK(back[i].url_sav);    // éliminer fichier (endommagé)
-          }
-        }
-#endif
 
         /* funny log for commandline users */
         if (opt->verbosedisplay == HTS_VERBOSE_SIMPLE) {
@@ -5495,48 +5014,34 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                 // (back_connect_next closed the dead one): stop now rather than
                 // spin on an invalid fd
                 back[i].r.soc = INVALID_SOCKET;
-                back[i].r.statuscode = STATUSCODE_CONNERROR;
-                strcpybuff(back[i].r.msg, "Connect Error");
-                back[i].status = STATUS_READY;
-                back_set_finished(opt, sback, i);
+                back_slot_fail(opt, sback, i, STATUSCODE_CONNERROR,
+                               "Connect Error");
                 continue;
               }
             }
             if (((int) (act - back[i].timeout_refresh)) >= back[i].timeout) {
+              const int slot_status = back_status(&back[i]);
+
               hts_log_print(opt, LOG_DEBUG, "connection timed out for %s%s",
                             adr_nologin(opt, back[i].url_adr), back[i].url_fil);
               if (back[i].r.soc != INVALID_SOCKET) {
-#if HTS_DEBUG_CLOSESOCK
-                DEBUG_W("back_wait(timeout): deletehttp\n");
-#endif
                 deletehttp(&back[i].r);
               }
-              back[i].r.soc = INVALID_SOCKET;
-              back[i].r.statuscode = STATUSCODE_TIMEOUT;
-              if (back_status(&back[i]) == STATUS_CONNECTING)
-                strcpybuff(back[i].r.msg, "Connect Time Out");
-              else if (back_status(&back[i]) == STATUS_WAIT_DNS)
-                strcpybuff(back[i].r.msg, "DNS Time Out");
-              else if (back_status(&back[i]) == STATUS_SSL_WAIT_HANDSHAKE)
-                strcpybuff(back[i].r.msg, "SSL/TLS Handshake Time Out");
-              else
-                strcpybuff(back[i].r.msg, "Receive Time Out");
-              back[i].status = STATUS_READY;    // terminé
-              back_set_finished(opt, sback, i);
+              back_slot_fail(opt, sback, i, STATUSCODE_TIMEOUT,
+                             slot_status == STATUS_CONNECTING
+                                 ? "Connect Time Out"
+                             : slot_status == STATUS_SSL_WAIT_HANDSHAKE
+                                 ? "SSL/TLS Handshake Time Out"
+                                 : "Receive Time Out");
             } else if ((back[i].rateout > 0) && (back_status(&back[i]) < 99)) {
               if (((int) (act - back[i].rateout_time)) >= HTS_WATCHRATE) {      // checker au bout de 15s
-                if ((int) ((back[i].r.size) / (act - back[i].rateout_time)) < back[i].rateout) {        // trop lent
-                  back[i].status = STATUS_READY;        // terminé
-                  back_set_finished(opt, sback, i);
+                if ((int) ((back[i].r.size) / (act - back[i].rateout_time)) <
+                    back[i].rateout) { // trop lent
                   if (back[i].r.soc != INVALID_SOCKET) {
-#if HTS_DEBUG_CLOSESOCK
-                    DEBUG_W("back_wait(rateout): deletehttp\n");
-#endif
                     deletehttp(&back[i].r);
                   }
-                  back[i].r.soc = INVALID_SOCKET;
-                  back[i].r.statuscode = STATUSCODE_SLOW;
-                  strcpybuff(back[i].r.msg, "Transfer Rate Too Low");
+                  back_slot_fail(opt, sback, i, STATUSCODE_SLOW,
+                                 "Transfer Rate Too Low");
                 }
               }
             }
@@ -5671,20 +5176,7 @@ LLint back_transferred(LLint nb, struct_back * sback) {
   }
   // stored (ready) slots
   if (sback->ready != NULL) {
-#ifndef HTS_NO_BACK_ON_DISK
     nb += sback->ready_size_bytes;
-#else
-    struct_coucal_enum e = coucal_enum_new(sback->ready);
-    coucal_item *item;
-
-    while((item = coucal_enum_next(&e))) {
-      lien_back *ritem = (lien_back *) item->value.ptr;
-      const int st = back_status(ritem);
-
-      if ((st > 0) && (st < 99 || st >= 1000))
-        nb += ritem->r.size;
-    }
-#endif
   }
   return nb;
 }
@@ -5721,66 +5213,48 @@ void back_infostr(struct_back *sback, int i, int j, char *s, size_t size) {
     int aff = 0;
 
     if (j & 1) {
-      if (back_status(&back[i]) == STATUS_CONNECTING) {
+      const int status = back_status(&back[i]);
+      const char *tag = NULL;
+
+      /* the connect tag is not shown with the URL, and INFOSC has no space */
+      if (status == STATUS_CONNECTING) {
         strlcatbuff(s, "CONNECT ", size);
-      } else if (back_status(&back[i]) == STATUS_WAIT_HEADERS) {
-        strlcatbuff(s, "INFOS ", size);
-        aff = 1;
-      } else if (back_status(&back[i]) == STATUS_CHUNK_WAIT ||
-                 back_status(&back[i]) == STATUS_CHUNK_CR) {
-        strlcatbuff(s, "INFOSC", size); // chunk info
-        aff = 1;
-      } else if (back_status(&back[i]) > 0) {
-        strlcatbuff(s, "RECEIVE ", size);
+      } else if (status == STATUS_WAIT_HEADERS) {
+        tag = "INFOS ";
+      } else if (status == STATUS_CHUNK_WAIT || status == STATUS_CHUNK_CR) {
+        tag = "INFOSC";
+      } else if (status > 0) {
+        tag = "RECEIVE ";
+      }
+      if (tag != NULL) {
+        strlcatbuff(s, tag, size);
         aff = 1;
       }
     }
-    if (j & 2) {
-      if (back_status(&back[i]) == STATUS_READY) {
-        switch (back[i].r.statuscode) {
-        case 200:
-          strlcatbuff(s, "READY ", size);
-          aff = 1;
-          break;
-        case -1:
-          strlcatbuff(s, "ERROR ", size);
-          aff = 1;
-          break;
-        case -2:
-          strlcatbuff(s, "TIMEOUT ", size);
-          aff = 1;
-          break;
-        case -3:
-          strlcatbuff(s, "TOOSLOW ", size);
-          aff = 1;
-          break;
-        case 400:
-          strlcatbuff(s, "BADREQUEST ", size);
-          aff = 1;
-          break;
-        case 401:
-        case 403:
-          strlcatbuff(s, "FORBIDDEN ", size);
-          aff = 1;
-          break;
-        case 404:
-          strlcatbuff(s, "NOT FOUND ", size);
-          aff = 1;
-          break;
-        case 500:
-          strlcatbuff(s, "SERVERROR ", size);
-          aff = 1;
-          break;
-        default:
-          {
-            char s2[256];
+    if ((j & 2) && back_status(&back[i]) == STATUS_READY) {
+      static const struct {
+        int code;
+        const char *text;
+      } names[] = {
+          {200, "READY "},     {-1, "ERROR "},       {-2, "TIMEOUT "},
+          {-3, "TOOSLOW "},    {400, "BADREQUEST "}, {401, "FORBIDDEN "},
+          {403, "FORBIDDEN "}, {404, "NOT FOUND "},  {500, "SERVERROR "}};
 
-            snprintf(s2, sizeof(s2), "ERROR(%d)", back[i].r.statuscode);
-            strlcatbuff(s, s2, size);
-          }
-          aff = 1;
+      size_t k;
+
+      for (k = 0; k < sizeof(names) / sizeof(names[0]); k++) {
+        if (names[k].code == back[i].r.statuscode) {
+          strlcatbuff(s, names[k].text, size);
+          break;
         }
       }
+      if (k == sizeof(names) / sizeof(names[0])) {
+        char s2[256];
+
+        snprintf(s2, sizeof(s2), "ERROR(%d)", back[i].r.statuscode);
+        strlcatbuff(s, s2, size);
+      }
+      aff = 1;
     }
 
     if (aff) {

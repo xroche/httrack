@@ -61,9 +61,31 @@ int optreal_find(const char *token);
    option of its own (-1), which names none. Returns HTS_FALSE past the end. */
 hts_boolean optcluster_next(const char *token, size_t *at, char *name,
                             size_t name_size);
+/* Reads the -%c rate at VAL. Returns the bytes it spans: the number, or the
+   rest of the word when no usable rate is there, in which case *RATE is -1. */
+size_t optrate_read(const char *val, double *rate);
 const char *optreal_value(int p);
 const char *optalias_value(int p);
-const char *opttype_value(int p);
+
+/* Class of an option row: how its value is written (see hts_optalias). */
+typedef enum hts_optclass {
+  HTS_OPT_UNKNOWN = 0,
+  HTS_OPT_SINGLE,
+  HTS_OPT_ONOFF,
+  HTS_OPT_LEVEL,
+  HTS_OPT_PARAM,
+  HTS_OPT_PARAM1,
+  HTS_OPT_PARAM0,
+  HTS_OPT_PARAMN
+} hts_optclass;
+
+/* Class of row P; HTS_OPT_UNKNOWN when its class string is not one of the
+ * seven. */
+hts_optclass optclass_of(int p);
+/* Table spelling of CLS ("param1"), or "unknown". */
+const char *optclass_name(hts_optclass cls);
+/* Does CLS take a value (param, param1, param0, paramn)? */
+hts_boolean optclass_takes_param(hts_optclass cls);
 const char *hts_gethome(void);
 void expand_home(String * str);
 

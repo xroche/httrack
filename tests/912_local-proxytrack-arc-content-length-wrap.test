@@ -1,0 +1,52 @@
+#!/bin/bash
+#
+# An ARC Content-Length past 4 GiB must not wrap to a small length and serve a
+# clipped body as a valid entry.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+# shellcheck source=tests/arclib.sh
+. "${0%"${0##*/}"}./arclib.sh"
+
+export LC_ALL=C
+
+dir=$(mktemp -d)
+cleanup_push rm -rf "$dir"
+
+BODY=helloworld
+
+# Convert one record declaring Content-Length $1, print its status line and body.
+convert() { # convert LENGTH
+    printf 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %s\r\n\r\n' \
+        "$1" >"$dir/hdr"
+    printf '%s' "$BODY" >"$dir/body"
+    {
+        arc_filedesc
+        arc_record http://example.com/p.html text/html 200 "$dir/hdr" "$dir/body"
+    } >"$dir/in.arc"
+    rm -f "$dir/out.arc"
+    proxytrack --convert "$dir/out.arc" "$dir/in.arc" >/dev/null 2>&1 ||
+        fail "proxytrack died on Content-Length $1"
+    test -s "$dir/out.arc" || fail "no output for Content-Length $1"
+    tr -d '\r' <"$dir/out.arc" | awk '
+        /^HTTP\/1\.0 / && !status { status = $0; next }
+        status && body { print status "|" $0; done = 1; exit }
+        status && $0 == "" { body = 1 }
+        END { if (status && !done) print status "|" }'
+}
+
+# Controls: the declared length bounds the body, and a short one is honoured,
+# so the probe can see a 5-byte body.
+got=$(convert 10)
+test "$got" = "HTTP/1.0 200 OK|$BODY" || fail "Content-Length 10 gave '$got'"
+got=$(convert 5)
+test "$got" = "HTTP/1.0 200 OK|hello" || fail "Content-Length 5 gave '$got'"
+
+# 2^32 + 5: read through an int it became 5 and served 'hello' as the page.
+got=$(convert 4294967301)
+case $got in
+"HTTP/1.0 -1 Cache Read Error : Truncated Data"*) ;;
+*) fail "Content-Length 4294967301 gave '$got'" ;;
+esac

@@ -75,6 +75,13 @@ chk application/x-java-vm hex:CAFEBABE "$yes"
 chk application/wasm hex:0061736D "$yes"
 chk text/html $'  \r\n<!DOCTYPE html><html>' "$yes"
 chk text/html '<html lang="en">' "$yes"
+# leading whitespace is the WHATWG set: SPACE, TAB, CR, LF, FF, but not VT
+for ws in 09 0C 200C EFBBBF0C; do
+    chk text/html "hex:${ws}3C68746D6C3E" "$yes"
+done
+for ws in 0B 1F 00; do
+    chk text/html "hex:${ws}3C68746D6C3E" "$no"
+done
 chk text/html 'plain text, no markup' "$no"
 chk text/xml '<?xml version="1.0"?>' "$yes"
 

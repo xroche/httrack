@@ -31,9 +31,6 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
-/* Internal engine bytecode */
-#define HTS_INTERNAL_BYTECODE
-
 // *.gif                  match all gif files 
 // *[file]/*[file].exe    match all exe files with one folder structure
 // *[A-Z,a-z,0-9,/,?]     match letters, nums, / and ?

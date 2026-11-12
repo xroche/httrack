@@ -4,6 +4,7 @@
 <a href="SITEBASE/a-abs.html">absolute, same host</a>
 <a href="SITEHOSTREL/a-protorel.html">protocol relative, same host</a>
 <a href="http://parser-offhost.invalid/a-offhost.html">absolute, off host</a>
+<a href="http://parser-offhost.invalid/a&quot;quote&#39;d.html">absolute, off host, quotes in the path</a>
 <a href="mailto:nobody@example.invalid">mailto</a>
 <a href="tel:+15550100">tel</a>
 <a href="javascript:void(0)">javascript</a>
@@ -11,4 +12,8 @@
 <a href="//parser-offhost.invalid/a-protorel-off.html">protocol relative, off host</a>
 <img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="data uri">
 <a href="ftp://parser-offhost.invalid/pub/">ftp</a>
+<a href="http://parser-offhost.invalid/p:80.html">colon in the path</a>
+<a href="http://parser-offhost.invalid/q.html?u=1:80">colon in the query</a>
+<a href="http://parser-offhost.invalid:80/d.html">default port, stripped</a>
+<a href="http://parser-offhost.invalid:8080/k.html">real port, kept</a>
 </body></html>

@@ -30,8 +30,6 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
-#define HTS_INTERNAL_BYTECODE
-
 #include "htscore.h"
 #include "htssitemap.h"
 
@@ -344,13 +342,7 @@ static hts_boolean sitemap_queue_(httrackp *opt, const char *adr,
     return HTS_TRUE;
   if (!hts_record_link(opt, adr, fil, "", "", "", NULL))
     return HTS_FALSE;
-  heap_top()->testmode = 0;
-  heap_top()->link_import = 0;
-  heap_top()->depth = opt->depth + 1;
-  heap_top()->pass2 = 0;
-  heap_top()->retry = opt->retry;
-  heap_top()->premier = heap_top_index();
-  heap_top()->precedent = heap_top_index();
+  hts_link_set_self_parented(opt, opt->depth + 1, 0);
   hts_log_print(opt, LOG_INFO, "Sitemap: queued %s%s", adr_nologin(opt, adr),
                 fil);
   return HTS_TRUE;
@@ -410,13 +402,7 @@ void hts_sitemap_seed(httrackp *opt, const char *starturl) {
     return;
   /* Answered in hts_sitemap_robots, once the parsed rules are installed. */
   if (hts_record_link(opt, af.adr, "/robots.txt", "", "", "", NULL)) {
-    heap_top()->testmode = 0;
-    heap_top()->link_import = 0;
-    heap_top()->depth = 0;
-    heap_top()->pass2 = 0;
-    heap_top()->retry = opt->retry;
-    heap_top()->premier = heap_top_index();
-    heap_top()->precedent = heap_top_index();
+    hts_link_set_self_parented(opt, 0, 0);
     /* Claim the host so the parser does not queue robots.txt a second time. */
     if (opt->robotsptr != NULL)
       (void) checkrobots_set((robots_wizard *) opt->robotsptr, af.adr, "");

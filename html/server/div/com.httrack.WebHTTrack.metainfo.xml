@@ -53,6 +53,17 @@
   <content_rating type="oars-1.1"/>
   <!-- Newest first; tests/01_engine-version-macros.test enforces it. -->
   <releases>
+    <release version="3.51.0" date="2026-10-28">
+      <description>
+        <ul>
+          <li>Mirror a site that needs a login: log in with your browser, use its "Copy as cURL", and paste the result into WebHTTrack. The login is saved and used again for the same site</li>
+          <li>The cookies file keeps each cookie's scope and expiry, and is written back at the end of the crawl</li>
+          <li>Requests look more like a real browser's, with the Accept and Sec-Fetch headers a browser sends</li>
+          <li>WebHTTrack has a dark mode, themes and a user stylesheet</li>
+          <li>Passwords in addresses and headers are hidden from the logs, and the logs can only be read by their owner</li>
+        </ul>
+      </description>
+    </release>
     <release version="3.50.5" date="2026-10-02">
       <description>
         <ul>

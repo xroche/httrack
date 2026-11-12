@@ -1,0 +1,55 @@
+#!/bin/bash
+#
+# FTP URL credentials are percent-decoded like HTTP Basic before USER and PASS,
+# and a decoded control byte is refused rather than sent as a command.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+require_httrack
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ftpdecode.XXXXXX")
+cleanup_push rm -rf "$tmpdir"
+
+root="${tmpdir}/root"
+out="${tmpdir}/crawl"
+cmds="${tmpdir}/cmds"
+mkdir -p "$root" "$out"
+printf 'body\n' >"${root}/f.txt"
+
+ftp_server_start --root "$root" --require-pass --log "$(nativepath "$cmds")"
+
+crawl() {
+    : >"$cmds"
+    rm -rf "${out:?}"
+    mkdir -p "$out"
+    run_with_timeout 60 httrack "ftp://$1@127.0.0.1:${FTP_PORT}/f.txt" -O "$out" \
+        --quiet --disable-security-limits --robots=0 --timeout=20 \
+        --max-time=45 --retries=1 -c1 >"${tmpdir}/log" 2>&1
+}
+
+# expect_login URL-USERINFO USER PASS
+expect_login() {
+    local sent
+    crawl "$1" || fail "the crawl for $1 never finished"
+    sent=$(<"$cmds")
+    grep -qxF "USER $2" <<<"$sent" || fail "$1: no USER $2 on the wire: ${sent}"
+    grep -qxF "PASS $3" <<<"$sent" || fail "$1: no PASS $3 on the wire: ${sent}"
+    ok "$1 logs in as $2 / $3"
+}
+
+expect_login "bob:secret" "bob" "secret"
+expect_login "us%40er:p%3Ass" "us@er" "p:ss"
+# the raw colon splits, so an encoded one stays in the name
+expect_login "a%3Ab:c%2540" "a:b" "c%40"
+
+for u in "u%0D%0ANOOP:pw" "u:p%0D%0ANOOP" "u%00x:pw" "u:p%00x"; do
+    crawl "$u" || fail "the crawl for $u never finished"
+    grep -aq "FTP user name or password too long or invalid" "${out}/hts-log.txt" ||
+        fail "$u was not refused: $(<"${out}/hts-log.txt")"
+    sent=$(<"$cmds")
+    test -z "$sent" || fail "$u opened a session: ${sent}"
+done
+ok "a decoded CR, LF or NUL never reaches the control channel"

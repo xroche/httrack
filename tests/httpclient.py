@@ -17,6 +17,8 @@ def host_header(args):
 
 
 def build_request(args, path):
+    if args.request is not None:
+        return "%s\r\n%s\r\n" % (args.request, host_header(args))
     if args.field or args.post is not None:
         if args.field:
             # urlencode, not quote(): a browser sends "+" for a space, and the
@@ -55,6 +57,10 @@ def main():
         "--host",
         default="127.0.0.1",
         help="Host header value; empty sends none",
+    )
+    p.add_argument(
+        "--request",
+        help="raw request line, sent as is with the Host header; overrides --path",
     )
     p.add_argument("--timeout", type=float, default=30)
     p.add_argument(

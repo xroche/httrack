@@ -56,10 +56,39 @@ Please visit our Website: http://www.httrack.com
 #include "htsback.h"
 #include "htslib.h" /* hts_effective_mime */
 #include "htsio.h"
+#include "htsurlport.h"
+#include "htscachecodec.h"
 
 #include "store.h"
 #include "proxystrings.h"
 #include "proxytrack.h"
+
+/* Layout of the cache 1.0 record, read back with fread: do not change. */
+typedef struct OLD_t_proxy {
+  int active;
+  char name[1024];
+  int port;
+} OLD_t_proxy;
+
+typedef struct OLD_htsblk {
+  int statuscode;
+  int notmodified;
+  int is_write;
+  char *adr;
+  FILE *out;
+  int size;
+  char msg[80];
+  char contenttype[64];
+  char *location;
+  int totalsize;
+  int is_file;
+  T_SOC soc;
+  FILE *fp;
+  OLD_t_proxy proxy;
+  int user_agent_send;
+  char user_agent[64];
+  int http11;
+} OLD_htsblk;
 
 /* Unlocked functions */
 
@@ -579,7 +608,8 @@ PT_Index PT_LoadCache(const char *filename) {
           chain = coucal_enum_next(&en);
         }
         if (chain != NULL) {
-          const char *scheme = link_has_authority(chain->name) ? "" : "http://";
+          const char *scheme =
+              hts_shared_link_has_authority(chain->name) ? "" : "http://";
 
           /* dropped rather than truncated: empty already reads as "unset" */
           if (!sprintfbuff(index->slots.common.startUrl, "%s%s", scheme,
@@ -601,6 +631,66 @@ static long int filesize(const char *filename) {
     return (long int) st.st_size;
   }
   return -1;
+}
+
+/* Return the size of an open file, or -1, and keep the read position. */
+static long int stream_size(FILE *fp) {
+  const long int at = ftell(fp);
+  long int size;
+
+  if (at < 0 || fseek(fp, 0, SEEK_END) != 0)
+    return -1;
+  size = ftell(fp);
+  if (fseek(fp, at, SEEK_SET) != 0)
+    return -1;
+  return size;
+}
+
+/** Would reading n bytes at fp's offset stay inside a file of fileSize bytes?
+    An unknown size (< 0), which a 32-bit long gives past 2 GB, is refused. **/
+static hts_boolean cache_fits(FILE *fp, long int fileSize, size_t n) {
+  const long int at = ftell(fp);
+
+  if (at < 0 || fileSize < 0)
+    return HTS_FALSE;
+  return at <= fileSize && n <= (size_t) (fileSize - at) ? HTS_TRUE : HTS_FALSE;
+}
+
+/** Read exactly size (< INT_MAX) bytes of the open zip entry into a new
+    NUL-terminated buffer, or NULL with *short_read telling a short entry from
+    an allocation failure. The buffer grows with the data, so a lying size in
+    X-Size or in the zip header cannot buy a large allocation. **/
+static char *read_zip_entry(unzFile z, size_t size, hts_boolean *short_read) {
+  char *buf = malloct(1);
+  size_t got = 0, cap = 0;
+
+  *short_read = HTS_FALSE;
+  while (buf != NULL && got < size) {
+    int n;
+
+    if (got == cap) {
+      const size_t step = cap < 65536 ? 65536 : cap;
+      char *grown;
+
+      cap += step < size - got ? step : size - got;
+      grown = realloct(buf, cap + 1);
+      if (grown == NULL) {
+        freet(buf);
+        return NULL;
+      }
+      buf = grown;
+    }
+    n = unzReadCurrentFile(z, buf + got, (unsigned int) (cap - got));
+    if (n <= 0) {
+      freet(buf);
+      *short_read = HTS_TRUE;
+      return NULL;
+    }
+    got += (size_t) n;
+  }
+  if (buf != NULL)
+    buf[got] = '\0';
+  return buf;
 }
 
 int PT_LookupCache(PT_Index index, const char *url) {
@@ -718,7 +808,7 @@ int PT_IndexMerge(PT_Indexes indexes, PT_Index * pindex) {
             if (previous_index_id >= 0
                 && previous_index_id < indexes->index_size) {
               if (indexes->index[previous_index_id]->slots.common.timestamp > index->slots.common.timestamp)    // existing entry is newer
-                break;
+                continue;
             } else {
               proxytrack_print_log(CRITICAL,
                                    "PT_IndexMerge:Corrupted central index locator");
@@ -867,59 +957,6 @@ static PT_Element PT_ReadCache__New(PT_Index index, const char *url, int flags) 
 /* New HTTrack cache (new.zip) format                           */
 /* ------------------------------------------------------------ */
 
-/* Values read back off a cache, so the block is bounded rather than trusted to
-   the element caps; a field that does not fit is dropped whole and counted,
-   since a clipped one reads back as valid. `headers` must be an array. */
-#define ZIP_FIELD_STRING(headers, headersSize, dropped, field, value)          \
-  do {                                                                         \
-    if ((value) != NULL && (value)[0] != '\0' &&                               \
-        !slcatprintfbuff(headers, sizeof(headers), &(headersSize),             \
-                         "%s: %s\r\n", field, value)) {                        \
-      (dropped)++;                                                             \
-    }                                                                          \
-  } while (0)
-#define ZIP_FIELD_INT(headers, headersSize, dropped, field, value)             \
-  do {                                                                         \
-    if ((value) != 0 &&                                                        \
-        !slcatprintfbuff(headers, sizeof(headers), &(headersSize),             \
-                         "%s: " LLintP "\r\n", field, (LLint) (value))) {      \
-      (dropped)++;                                                             \
-    }                                                                          \
-  } while (0)
-#define ZIP_FIELD_INT_FORCE(headers, headersSize, dropped, field, value)       \
-  do {                                                                         \
-    if (!slcatprintfbuff(headers, sizeof(headers), &(headersSize),             \
-                         "%s: " LLintP "\r\n", field, (LLint) (value))) {      \
-      (dropped)++;                                                             \
-    }                                                                          \
-  } while (0)
-/* refvalue_size is mandatory: the cache line is bounded only by the line
-   buffer, not by the destination. */
-#define ZIP_READFIELD_STRING(line, value, refline, refvalue, refvalue_size)    \
-  do {                                                                         \
-    if (line[0] != '\0' && strfield2(line, refline)) {                         \
-      (void) strclipbuff(refvalue, refvalue_size, value);                      \
-      line[0] = '\0';                                                          \
-    }                                                                          \
-  } while (0)
-#define ZIP_READFIELD_INT(line, value, refline, refvalue) do { \
-  if (line[0] != '\0' && strfield2(line, refline)) { \
-    int intval = 0; \
-    sscanf(value, "%d", &intval); \
-    (refvalue) = intval; \
-    line[0] = '\0'; \
-	} \
-} while(0)
-#define ZIP_READFIELD_LLINT(line, value, refline, refvalue)                    \
-  do {                                                                         \
-    if (line[0] != '\0' && strfield2(line, refline)) {                         \
-      LLint intval = 0;                                                        \
-      sscanf(value, LLintP, &intval);                                          \
-      (refvalue) = intval;                                                     \
-      line[0] = '\0';                                                          \
-    }                                                                          \
-  } while (0)
-
 /* Set path (capacity size) to filename's parent directory, separator included,
    from an absolute filename. Empty when there is none, or when it would not
    fit: a truncated prefix names a different directory. */
@@ -993,6 +1030,82 @@ static void PT_Element_refuse_save(PT_Element r, const char *save) {
   r->statuscode = STATUSCODE_INVALID;
 }
 
+/* Resolve save under root into dst, refusing a name that leaves it. */
+static void PT_resolve_previous_save(char *dst, size_t size, const char *root,
+                                     const char *save, PT_Element r,
+                                     const char *url, int *fixedPath,
+                                     int *safeCache) {
+  int pathLen;
+
+  if (save[0] == '\0')
+    return;
+  if (!hts_path_is_contained(save)) {
+    /* save is opened and its bytes go to the client */
+    proxytrack_print_log(WARNING,
+                         "cache filename holds a \"..\" component, "
+                         "not serving it: %s",
+                         save);
+    PT_Element_refuse_save(r, save);
+    return;
+  }
+  pathLen = (int) strlen(root);
+  /* old (<3.40) buggy format */
+  if (pathLen > 0 && strncmp(save, root, pathLen) == 0) {
+    strlcpybuff(dst, save, size);
+  }
+  // relative ? (hack)
+  else if (*safeCache || (save[0] != '/' // /home/foo/bar.gif
+                          && (!isalpha((unsigned char) save[0]) ||
+                              save[1] != ':')) // c:/home/foo/bar.gif
+  ) {
+    if (!index_join_root(dst, size, root, save)) {
+      PT_Element_refuse_save(r, save);
+    } else {
+      *safeCache = 1;
+    }
+  }
+  // bogus format (includes buggy absolute path)
+  else {
+    /* guess previous path */
+    if (*fixedPath == 0) {
+      const char *start = jump_protocol_and_auth(url);
+      const char *end = start ? strchr(start, '/') : NULL;
+      int len = (int) (end - start);
+
+      if (start != NULL && end != NULL && len > 0 && len < 128) {
+        char piece[128 + 2];
+        const char *where;
+
+        piece[0] = '\0';
+        strncat(piece, start, len);
+        if ((where = save_find_host(save, piece)) != NULL) {
+          *fixedPath = (int) (where - save);
+        }
+      }
+    }
+    if (*fixedPath > 0) {
+      int saveLen = (int) strlen(save);
+
+      if (*fixedPath >= saveLen) {
+        PT_Element_failf(r, "Bogus fixePath prefix for %s (prefixLen=%d)", save,
+                         *fixedPath);
+        r->statuscode = STATUSCODE_INVALID;
+      } else if (!index_join_root(dst, size, root, save + *fixedPath)) {
+        PT_Element_refuse_save(r, save);
+      }
+    } else {
+      /* an absolute name the host guess could not reduce, so no relative
+         part is left to join onto the root */
+      proxytrack_print_log(
+          WARNING,
+          "cache filename is absolute and holds no path to reduce, "
+          "not serving it: %s",
+          save);
+      PT_Element_refuse_save(r, save);
+    }
+  }
+}
+
 int PT_LoadCache__New(PT_Index index_, const char *filename) {
   if (index_ != NULL && filename != NULL) {
     PT_Index__New index = &index_->slots.formatNew;
@@ -1010,7 +1123,8 @@ int PT_LoadCache__New(PT_Index index_, const char *filename) {
       /* Ready directory entries */
       if (unzGoToFirstFile(zFile) == Z_OK) {
         char comment[128];
-        char filename[HTS_URLMAXSIZE * 4];
+        char filename[CACHE_ENTRYNAME_SIZE];
+        unz_file_info zfi;
         int entries = 0;
         int firstSeen = 0;
 
@@ -1020,12 +1134,15 @@ int PT_LoadCache__New(PT_Index index_, const char *filename) {
 
           filename[0] = '\0';
           comment[0] = '\0';
+          memset(&zfi, 0, sizeof(zfi));
           if (unzOpenCurrentFile(zFile) == Z_OK) {
-            if ((readSizeHeader =
-                 unzGetLocalExtrafield(zFile, comment, sizeof(comment) - 2)) > 0
-                && unzGetCurrentFileInfo(zFile, NULL, filename,
-                                         sizeof(filename) - 2, NULL, 0, NULL,
-                                         0) == Z_OK) {
+            if ((readSizeHeader = unzGetLocalExtrafield(
+                     zFile, comment, sizeof(comment) - 2)) > 0 &&
+                unzGetCurrentFileInfo(zFile, &zfi, filename,
+                                      sizeof(filename) - 2, NULL, 0, NULL,
+                                      0) == Z_OK
+                /* minizip leaves a longer name clipped and unterminated */
+                && zfi.size_filename < sizeof(filename) - 2) {
               long int pos = (long int) unzGetOffset(zFile);
 
               assertf((size_t) readSizeHeader < sizeof(comment));
@@ -1035,7 +1152,7 @@ int PT_LoadCache__New(PT_Index index_, const char *filename) {
                 int dataincache = 0;    // data in cache ?
                 char *filenameIndex = filename;
 
-                if (strncmp(filenameIndex, "http://", 7) == 0) {
+                if (strfield(filenameIndex, "http://")) {
                   filenameIndex += 7;
                 }
                 if (comment[0] != '\0') {
@@ -1047,8 +1164,8 @@ int PT_LoadCache__New(PT_Index index_, const char *filename) {
 
                     line[0] = '\0';
                     a += binput(a, line, sizeof(line) - 2, NULL);
-                    if (strncmp(line, "X-In-Cache:", 11) == 0) {
-                      if (strcmp(line, "X-In-Cache: 1") == 0) {
+                    if (strfield(line, "X-In-Cache:")) {
+                      if (strfield2(line, "X-In-Cache: 1")) {
                         dataincache = 1;
                       } else {
                         dataincache = 0;
@@ -1066,7 +1183,9 @@ int PT_LoadCache__New(PT_Index index_, const char *filename) {
                 if (!firstSeen) {
                   if (strstr(filenameIndex, "/robots.txt") == NULL) {
                     const char *scheme =
-                        link_has_authority(filenameIndex) ? "" : "http://";
+                        hts_shared_link_has_authority(filenameIndex)
+                            ? ""
+                            : "http://";
 
                     /* dropped rather than truncated; try the next entry */
                     if (sprintfbuff(index->startUrl, "%s%s", scheme,
@@ -1180,10 +1299,13 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
           /* the longest stored line is "Location: " plus a full-capacity URL;
              a shorter buffer truncates it into a valid-looking wrong target */
           char BIGSTK line[HTS_LOCATION_SIZE + 32];
+          /* the writers store strlen(headers), so a NUL inside is damage */
+          const hts_boolean has_nul =
+              memchr(headerBuff, '\0', (size_t) readSizeHeader) != NULL;
           int lineEof = 0;
 
           headerBuff[readSizeHeader] = '\0';
-          do {
+          while (!has_nul && offset < readSizeHeader && !lineEof) {
             char *value;
             hts_boolean cut;
 
@@ -1199,108 +1321,43 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
               *value++ = '\0';
               if (*value == ' ' || *value == '\t')
                 value++;
-              ZIP_READFIELD_INT(line, value, "X-In-Cache", dataincache);
-              ZIP_READFIELD_INT(line, value, "X-Statuscode", r->statuscode);
-              ZIP_READFIELD_STRING(line, value, "X-StatusMessage", r->msg,
-                                   sizeof(r->msg));
-              ZIP_READFIELD_LLINT(line, value, "X-Size", declared_size); // size
-              ZIP_READFIELD_STRING(line, value, "Content-Type", r->contenttype,
-                                   sizeof(r->contenttype));
-              ZIP_READFIELD_STRING(line, value, "X-Charset", r->charset,
-                                   sizeof(r->charset));
-              ZIP_READFIELD_STRING(line, value, "Last-Modified",
-                                   r->lastmodified, sizeof(r->lastmodified));
-              ZIP_READFIELD_STRING(line, value, "Etag", r->etag,
-                                   sizeof(r->etag));
-              ZIP_READFIELD_STRING(line, value, "Location", r->location,
-                                   sizeof(location_default));
-              ZIP_READFIELD_STRING(line, value, "Content-Disposition",
-                                   r->cdispo, sizeof(r->cdispo));
-              ZIP_READFIELD_STRING(line, value, "X-Save", previous_save_,
-                                   sizeof(previous_save_));
+              CACHE_READFIELD_INT(line, value, "X-In-Cache", dataincache);
+              CACHE_READFIELD_INT(line, value, "X-Statuscode", r->statuscode);
+              CACHE_READFIELD_STRING(line, value, "X-StatusMessage", r->msg,
+                                     sizeof(r->msg));
+              CACHE_READFIELD_LLINT(line, value, "X-Size",
+                                    declared_size); // size
+              CACHE_READFIELD_STRING(line, value, "Content-Type",
+                                     r->contenttype, sizeof(r->contenttype));
+              CACHE_READFIELD_STRING(line, value, "X-Charset", r->charset,
+                                     sizeof(r->charset));
+              CACHE_READFIELD_STRING(line, value, "Last-Modified",
+                                     r->lastmodified, sizeof(r->lastmodified));
+              CACHE_READFIELD_STRING(line, value, "Etag", r->etag,
+                                     sizeof(r->etag));
+              CACHE_READFIELD_STRING(line, value, "Location", r->location,
+                                     sizeof(location_default));
+              CACHE_READFIELD_STRING(line, value, "Content-Disposition",
+                                     r->cdispo, sizeof(r->cdispo));
+              CACHE_READFIELD_STRING(line, value, "X-Save", previous_save_,
+                                     sizeof(previous_save_));
+              /* naming-only marker: consumed so it never reaches a reply */
+              if (line[0] != '\0' && strfield2(line, "X-Kept"))
+                line[0] = '\0';
               if (line[0] != '\0') {
                 PT_AppendHeader(&r->headers, &headersLen, &headersCap, line,
                                 value);
               }
             }
-          } while (offset < readSizeHeader && !lineEof);
-
-          /* Previous entry */
-          if (previous_save_[0] != '\0' &&
-              !hts_path_is_contained(previous_save_)) {
-            /* the archive is someone else's file, and previous_save is opened
-               at :1982 and served to the client */
-            proxytrack_print_log(WARNING,
-                                 "cache filename holds a \"..\" component, "
-                                 "not serving it: %s",
-                                 previous_save_);
-            PT_Element_refuse_save(r, previous_save_);
-            previous_save_[0] = '\0';
           }
-          if (previous_save_[0] != '\0') {
-            int pathLen = (int) strlen(index->path);
-
-            if (pathLen > 0 && strncmp(previous_save_, index->path, pathLen) == 0) {    // old (<3.40) buggy format
-              strcpybuff(previous_save, previous_save_);
-            }
-            // relative ? (hack)
-            else if (index->safeCache ||
-                     (previous_save_[0] != '/' // /home/foo/bar.gif
-                      && (!isalpha((unsigned char) previous_save_[0]) ||
-                          previous_save_[1] != ':')) // c:/home/foo/bar.gif
-            ) {
-              if (!index_join_root(previous_save, sizeof(previous_save),
-                                   index->path, previous_save_)) {
-                PT_Element_refuse_save(r, previous_save_);
-              } else {
-                index->safeCache = 1;
-              }
-            }
-            // bogus format (includes buggy absolute path)
-            else {
-              /* guess previous path */
-              if (index->fixedPath == 0) {
-                const char *start = jump_protocol_and_auth(url);
-                const char *end = start ? strchr(start, '/') : NULL;
-                int len = (int) (end - start);
-
-                if (start != NULL && end != NULL && len > 0 && len < 128) {
-                  char piece[128 + 2];
-                  const char *where;
-
-                  piece[0] = '\0';
-                  strncat(piece, start, len);
-                  if ((where = save_find_host(previous_save_, piece)) != NULL) {
-                    index->fixedPath = (int) (where - previous_save_);
-                  }
-                }
-              }
-              if (index->fixedPath > 0) {
-                int saveLen = (int) strlen(previous_save_);
-
-                if (index->fixedPath >= saveLen) {
-                  PT_Element_failf(
-                      r, "Bogus fixePath prefix for %s (prefixLen=%d)",
-                      previous_save_, (int) index->fixedPath);
-                  r->statuscode = STATUSCODE_INVALID;
-                } else if (!index_join_root(previous_save,
-                                            sizeof(previous_save), index->path,
-                                            previous_save_ +
-                                                index->fixedPath)) {
-                  PT_Element_refuse_save(r, previous_save_);
-                }
-              } else {
-                /* an absolute name the host guess could not reduce, so no
-                   relative part is left to join onto the root */
-                proxytrack_print_log(
-                    WARNING,
-                    "cache filename is absolute and holds no path to reduce, "
-                    "not serving it: %s",
-                    previous_save_);
-                PT_Element_refuse_save(r, previous_save_);
-              }
-            }
+          if (has_nul) {
+            r->statuscode = STATUSCODE_INVALID;
+            strcpybuff(r->msg, "Cache Read Error : NUL In Header");
           }
+
+          PT_resolve_previous_save(previous_save, sizeof(previous_save),
+                                   index->path, previous_save_, r, url,
+                                   &index->fixedPath, &index->safeCache);
 
           /* Corrupt: negative, or in-cache at or above what the 32-bit zip
              writer could store. A headers-only entry above INT_MAX is
@@ -1341,7 +1398,14 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
                   } else {
                     FILE *fp = fopen(file_convert(catbuff, sizeof(catbuff), previous_save), "rb");
 
-                    if (fp != NULL) {
+                    if (fp != NULL &&
+                        !cache_fits(fp, stream_size(fp), r->size)) {
+                      /* not a Bad Size, but refused before allocating */
+                      r->statuscode = STATUSCODE_INVALID;
+                      strcpybuff(r->msg, "Read error in cache disk data: "
+                                         "file shorter than X-Size");
+                      fclose(fp);
+                    } else if (fp != NULL) {
                       r->adr = (char *) malloc(r->size + 1);
                       if (r->adr != NULL) {
                         if (r->size > 0 &&
@@ -1372,21 +1436,17 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
                   }
                 }
               } else {
-                // lire fichier (d'un coup)
+                // read the whole entry at once
                 if (flags & FETCH_BODY) {
-                  r->adr = (char *) malloc(r->size + 1);
-                  if (r->adr != NULL) {
-                    if ((size_t) unzReadCurrentFile(index->zFile, r->adr,
-                                                    (unsigned int) r->size) !=
-                        r->size) {
-                      PT_Element_DropBody(r);
-                      r->statuscode = STATUSCODE_INVALID;
-                      strcpybuff(r->msg, "Cache Read Error : Read Data");
-                    } else
-                      *(r->adr + r->size) = '\0';
-                  } else {      // erreur
+                  hts_boolean short_read;
+
+                  r->adr = read_zip_entry(index->zFile, r->size, &short_read);
+                  if (r->adr == NULL) {
                     r->statuscode = STATUSCODE_INVALID;
-                    strcpybuff(r->msg, "Cache Memory Error");
+                    strcpybuff(r->msg, short_read
+                                           ? "Cache Read Error : Read Data, "
+                                             "entry shorter than X-Size"
+                                           : "Cache Memory Error");
                   }
                 }
               }
@@ -1438,20 +1498,9 @@ static int PT_SaveCache__New_Fun(void *arg, const char *url, PT_Element element)
   /* Fields */
   headers[0] = '\0';
   /* */
-  {
-    const char *message;
-
-    if (strlen(element->msg) < 32) {
-      message = element->msg;
-    } else {
-      message = "(See X-StatusMessage)";
-    }
-    /* 64 characters MAX for first line */
-    if (!slcatprintfbuff(headers, sizeof(headers), &headersSize,
-                         "HTTP/1.%c %d %s\r\n", '1', element->statuscode,
-                         message)) {
-      headersDropped++;
-    }
+  if (!hts_cache_status_line(headers, sizeof(headers), &headersSize,
+                             element->statuscode, element->msg)) {
+    headersDropped++;
   }
 
   /* Second line MUST ALWAYS be X-In-Cache */
@@ -1486,20 +1535,7 @@ static int PT_SaveCache__New_Fun(void *arg, const char *url, PT_Element element)
   }
 
   /* Time */
-  memset(&fi, 0, sizeof(fi));
-  if (element->lastmodified[0] != '\0') {
-    struct tm buffer;
-    struct tm *tm_s = convert_time_rfc822(&buffer, element->lastmodified);
-
-    if (tm_s) {
-      fi.tmz_date.tm_sec = (uInt) tm_s->tm_sec;
-      fi.tmz_date.tm_min = (uInt) tm_s->tm_min;
-      fi.tmz_date.tm_hour = (uInt) tm_s->tm_hour;
-      fi.tmz_date.tm_mday = (uInt) tm_s->tm_mday;
-      fi.tmz_date.tm_mon = (uInt) tm_s->tm_mon;
-      fi.tmz_date.tm_year = (uInt) tm_s->tm_year;
-    }
-  }
+  hts_cache_zip_date(&fi, element->lastmodified);
 
   /* Open file - NOTE: headers in "comment" */
   if ((zErr = zipOpenNewFileInZip(zFileOut, url, &fi,
@@ -1562,6 +1598,8 @@ static int cache_brstr(char *adr, char *s, size_t s_size) {
   int i;
   int off;
   char buff[256 + 4];
+  const char *num = buff;
+  LLint len;
 
   off = binput(adr, buff, 256, NULL);
   /* no length-prefixed value follows a field the terminating NUL stopped */
@@ -1570,8 +1608,9 @@ static int cache_brstr(char *adr, char *s, size_t s_size) {
     return off;
   }
   /* an empty/non-numeric field leaves i unset: treat as length 0 */
-  if (sscanf(buff, "%d", &i) != 1 || i < 0 || i > CACHE_FIELD_MAXSIZE)
-    i = 0;
+  i = hts_scan_llint(&num, 0, CACHE_FIELD_MAXSIZE, &len) == HTS_SCAN_OK
+          ? (int) len
+          : 0;
   if (i > 0) {
     /* a corrupt cache may declare a length past the buffer end; bound the copy
        and the advance to the bytes actually present */
@@ -1587,29 +1626,18 @@ static int cache_brstr(char *adr, char *s, size_t s_size) {
   return off;
 }
 
-/** Would reading n bytes at the current offset stay inside the .dat? A size
-    the host could not report is refused rather than waived: filesize() answers
-    in a long int, so a 32-bit build handed a .dat past 2 GB reads back a value
-    that bounds nothing. **/
-static hts_boolean cache_fits(FILE *fp, long int datSize, size_t n) {
-  const long int at = ftell(fp);
-
-  if (at < 0 || datSize < 0)
-    return HTS_FALSE;
-  return at <= datSize && n <= (size_t) (datSize - at) ? HTS_TRUE : HTS_FALSE;
-}
-
 /** Read a field's length prefix. HTS_FALSE on a truncated line, an unparseable
     or out-of-range length, or one running past the end of the file: the record
     is unreadable, and refusing it is the only way to keep the fields after it
     aligned. **/
 static hts_boolean cache_rlen(FILE *fp, long int datSize, size_t *len) {
-  INTsys i = 0;
+  LLint i;
   char buff[256 + 4];
+  const char *num = buff;
 
   *len = 0;
-  linput(fp, buff, 256);
-  if (sscanf(buff, INTsysP, &i) != 1 || i < 0 || i > CACHE_FIELD_MAXSIZE)
+  hts_shared_linput(fp, buff, 256, HTS_LINPUT_SKIP_NUL);
+  if (hts_scan_llint(&num, 0, CACHE_FIELD_MAXSIZE, &i) != HTS_SCAN_OK)
     return HTS_FALSE;
   if (!cache_fits(fp, datSize, (size_t) i))
     return HTS_FALSE;
@@ -1684,13 +1712,14 @@ static hts_boolean cache_rint(FILE *fp, long int datSize, int *i) {
 /** Same, for a size field: a negative value is refused rather than wrapped,
     since cast to unsigned it would shrink a later body allocation. **/
 static hts_boolean cache_rLLint(FILE *fp, long int datSize, unsigned long *i) {
-  int l;
+  LLint l;
   char s[256];
+  const char *num = s;
 
   *i = 0;
   if (!cache_rstr(fp, s, sizeof(s), datSize))
     return HTS_FALSE;
-  if (sscanf(s, "%d", &l) != 1 || l < 0)
+  if (hts_scan_llint(&num, 0, INT_MAX, &l) != HTS_SCAN_OK)
     return HTS_FALSE;
   *i = (unsigned long) l;
   return HTS_TRUE;
@@ -1802,7 +1831,7 @@ static int PT_LoadCache__Old(PT_Index index_, const char *filename) {
                 if (strstr(line, "/robots.txt") == NULL) {
                   PT_Index__Old index = cache;
                   const char *scheme =
-                      link_has_authority(line) ? "" : "http://";
+                      hts_shared_link_has_authority(line) ? "" : "http://";
 
                   /* dropped rather than truncated; try the next entry */
                   if (sprintfbuff(index->startUrl, "%s%s", scheme, line))
@@ -1988,88 +2017,9 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
         r->size = ok ? (size_t) size_read : 0;
       }
 
-      /* Check destination filename */
-
-      {
-        PT_Index__Old index = cache;
-
-        /* -------------------- COPY OF THE __New() CODE -------------------- */
-        if (previous_save_[0] != '\0' &&
-            !hts_path_is_contained(previous_save_)) {
-          /* same reason as the __New() reader: previous_save is opened and its
-             bytes go to the client */
-          proxytrack_print_log(WARNING,
-                               "cache filename holds a \"..\" component, "
-                               "not serving it: %s",
-                               previous_save_);
-          PT_Element_refuse_save(r, previous_save_);
-          previous_save_[0] = '\0';
-        }
-        if (previous_save_[0] != '\0') {
-          int pathLen = (int) strlen(index->path);
-
-          if (pathLen > 0 && strncmp(previous_save_, index->path, pathLen) == 0) {      // old (<3.40) buggy format
-            strcpybuff(previous_save, previous_save_);
-          }
-          // relative ? (hack)
-          else if (index->safeCache ||
-                   (previous_save_[0] != '/' // /home/foo/bar.gif
-                    && (!isalpha((unsigned char) previous_save_[0]) ||
-                        previous_save_[1] != ':')) // c:/home/foo/bar.gif
-          ) {
-            if (!index_join_root(previous_save, sizeof(previous_save),
-                                 index->path, previous_save_)) {
-              PT_Element_refuse_save(r, previous_save_);
-            } else {
-              index->safeCache = 1;
-            }
-          }
-          // bogus format (includes buggy absolute path)
-          else {
-            /* guess previous path */
-            if (index->fixedPath == 0) {
-              const char *start = jump_protocol_and_auth(url);
-              const char *end = start ? strchr(start, '/') : NULL;
-              int len = (int) (end - start);
-
-              if (start != NULL && end != NULL && len > 0 && len < 128) {
-                char piece[128 + 2];
-                const char *where;
-
-                piece[0] = '\0';
-                strncat(piece, start, len);
-                if ((where = save_find_host(previous_save_, piece)) != NULL) {
-                  index->fixedPath = (int) (where - previous_save_);
-                }
-              }
-            }
-            if (index->fixedPath > 0) {
-              int saveLen = (int) strlen(previous_save_);
-
-              if (index->fixedPath >= saveLen) {
-                PT_Element_failf(r,
-                                 "Bogus fixePath prefix for %s (prefixLen=%d)",
-                                 previous_save_, (int) index->fixedPath);
-                r->statuscode = STATUSCODE_INVALID;
-              } else if (!index_join_root(previous_save, sizeof(previous_save),
-                                          index->path,
-                                          previous_save_ + index->fixedPath)) {
-                PT_Element_refuse_save(r, previous_save_);
-              }
-            } else {
-              /* an absolute name the host guess could not reduce, so no
-                 relative part is left to join onto the root */
-              proxytrack_print_log(
-                  WARNING,
-                  "cache filename is absolute and holds no path to reduce, "
-                  "not serving it: %s",
-                  previous_save_);
-              PT_Element_refuse_save(r, previous_save_);
-            }
-          }
-        }
-        /* -------------------- END OF COPY OF THE __New() CODE -------------------- */
-      }
+      PT_resolve_previous_save(previous_save, sizeof(previous_save),
+                               cache->path, previous_save_, r, url,
+                               &cache->fixedPath, &cache->safeCache);
 
       /* Read data */
       if (ok) {
@@ -2309,7 +2259,8 @@ static time_t getArcTimestamp(const char *const line) {
 
 static int readArcURLRecord(PT_Index__Arc index) {
   index->line[0] = '\0';
-  if (linput(index->file, index->line, sizeof(index->line) - 1)) {
+  if (hts_shared_linput(index->file, index->line, sizeof(index->line) - 1,
+                        HTS_LINPUT_SKIP_NUL)) {
     return 0;
   }
   return -1;
@@ -2327,15 +2278,15 @@ static hts_boolean arcPastRecordEnd(FILE *file, long int end) {
   return (end >= 0 && ftell(file) > end) ? HTS_TRUE : HTS_FALSE;
 }
 
-/* Characters linput() returns for one line at most, given the size the walk
-   passes it: one below the buffer it is handed, which is itself one below the
-   field. Matching it exactly is what keeps the scan and the walk from reading
-   the same long line differently. */
+/* Characters hts_shared_linput() returns for one line at most, given the size
+   the walk passes it: one below the buffer it is handed, which is itself one
+   below the field. Matching it exactly is what keeps the scan and the walk from
+   reading the same long line differently. */
 #define ARC_LINE_MAX ((int) sizeof(((PT_Index__Arc) NULL)->line) - 2)
 
-/* Bytes this reader's own linput(), the one in proxytrack.h rather than the one
-   in htslib.c, never returns wherever they sit on the line. NUL is among them,
-   so a record line carrying one is indexed and served all the same. */
+/* Bytes hts_shared_linput() with HTS_LINPUT_SKIP_NUL, unlike htslib.c's
+   linput(), never returns wherever they sit on the line. NUL is among them, so
+   a record line carrying one is indexed and served all the same. */
 static hts_boolean arcDroppedByte(char c) {
   return (c == 0 || c == 9 || c == 12 || c == 13) ? HTS_TRUE : HTS_FALSE;
 }
@@ -2414,7 +2365,8 @@ static hts_boolean arcMayOpenRecord(const char *raw, size_t len) {
   return HTS_FALSE;
 }
 
-/* Append what linput() would have kept of a raw span, to the same cap. */
+/* Append what hts_shared_linput() would have kept of a raw span, to the same
+ * cap. */
 static size_t arcAppendLine(char *line, size_t len, const char *raw,
                             size_t rawlen) {
   size_t i;
@@ -2600,23 +2552,6 @@ int PT_LoadCache__Arc(PT_Index index_, const char *filename) {
   return 0;
 }
 
-/* Same contract as ZIP_READFIELD_STRING, for the ARC reader's header lines. */
-#define HTTP_READFIELD_STRING(line, value, refline, refvalue, refvalue_size)   \
-  do {                                                                         \
-    if (line[0] != '\0' && strfield2(line, refline)) {                         \
-      (void) strclipbuff(refvalue, refvalue_size, value);                      \
-      line[0] = '\0';                                                          \
-    }                                                                          \
-  } while (0)
-#define HTTP_READFIELD_INT(line, value, refline, refvalue) do { \
-  if (line[0] != '\0' && strfield2(line, refline)) { \
-    int intval = 0; \
-    sscanf(value, "%d", &intval); \
-    (refvalue) = intval; \
-    line[0] = '\0'; \
-	} \
-} while(0)
-
 static PT_Element PT_ReadCache__Arc(PT_Index index, const char *url, int flags) {
   PT_Element retCode;
 
@@ -2657,10 +2592,12 @@ static PT_Element PT_ReadCache__Arc_u(PT_Index index_, const char *url,
         /* a line reaching past this belongs to the record stored after it */
         const long int fposEnd = dataLength >= 0 ? fposMeta + dataLength : -1;
         const char *pos;
+        LLint declaredLength = 0;
 
         /* Read HTTP headers */
         /* HTTP/1.1 404 Not Found */
-        if (linput(index->file, index->line, sizeof(index->line) - 1) &&
+        if (hts_shared_linput(index->file, index->line, sizeof(index->line) - 1,
+                              HTS_LINPUT_SKIP_NUL) &&
             !arcPastRecordEnd(index->file, fposEnd)) {
           if ((pos = getArcField(index->line, 1)) != NULL) {
             if (sscanf(pos, "%d", &r->statuscode) != 1) {
@@ -2671,8 +2608,10 @@ static PT_Element PT_ReadCache__Arc_u(PT_Index index_, const char *url,
             r->msg[0] = '\0';
             strncatbuff(r->msg, pos, sizeof(r->msg) - 1);
           }
-          while(linput(index->file, index->line, sizeof(index->line) - 1)
-                && index->line[0] != '\0') {
+          while (hts_shared_linput(index->file, index->line,
+                                   sizeof(index->line) - 1,
+                                   HTS_LINPUT_SKIP_NUL) &&
+                 index->line[0] != '\0') {
             char *const line = index->line;
             char *value = strchr(line, ':');
 
@@ -2681,17 +2620,18 @@ static PT_Element PT_ReadCache__Arc_u(PT_Index index_, const char *url,
             if (value != NULL) {
               *value = '\0';
               for(value++; *value == ' ' || *value == '\t'; value++) ;
-              HTTP_READFIELD_INT(line, value, "Content-Length", r->size);       // size
-              HTTP_READFIELD_STRING(line, value, "Content-Type", r->contenttype,
-                                    sizeof(r->contenttype));
-              HTTP_READFIELD_STRING(line, value, "Last-Modified",
-                                    r->lastmodified, sizeof(r->lastmodified));
-              HTTP_READFIELD_STRING(line, value, "Etag", r->etag,
-                                    sizeof(r->etag));
-              HTTP_READFIELD_STRING(line, value, "Location", r->location,
-                                    sizeof(location_default));
-              HTTP_READFIELD_STRING(line, value, "Content-Disposition",
-                                    r->cdispo, sizeof(r->cdispo));
+              CACHE_READFIELD_LLINT(line, value, "Content-Length",
+                                    declaredLength);
+              CACHE_READFIELD_STRING(line, value, "Content-Type",
+                                     r->contenttype, sizeof(r->contenttype));
+              CACHE_READFIELD_STRING(line, value, "Last-Modified",
+                                     r->lastmodified, sizeof(r->lastmodified));
+              CACHE_READFIELD_STRING(line, value, "Etag", r->etag,
+                                     sizeof(r->etag));
+              CACHE_READFIELD_STRING(line, value, "Location", r->location,
+                                     sizeof(location_default));
+              CACHE_READFIELD_STRING(line, value, "Content-Disposition",
+                                     r->cdispo, sizeof(r->cdispo));
               if (line[0] != '\0') {
                 PT_AppendHeader(&r->headers, &headersLen, &headersCap, line,
                                 value);
@@ -2699,13 +2639,16 @@ static PT_Element PT_ReadCache__Arc_u(PT_Index index_, const char *url,
             }
           }
 
+          /* size_t is 32 bits on some targets, so narrow only what fits */
+          r->size = declaredLength > 0 && (uint64_t) declaredLength <= SIZE_MAX
+                        ? (size_t) declaredLength
+                        : 0;
+
           /* FIXME charset */
           if (r->contenttype[0] != '\0') {
             char *pos = strchr(r->contenttype, ';');
 
             if (pos != NULL) {
-              /*char *chs = strchr(pos, "charset="); */
-              /*HTTP_READFIELD_STRING(line, value, "X-Charset", r->charset); */
               *pos = 0;
               if ((pos = strchr(r->contenttype, ' ')) != NULL) {
                 *pos = 0;
@@ -2718,7 +2661,7 @@ static PT_Element PT_ReadCache__Arc_u(PT_Index index_, const char *url,
             if (flags & FETCH_BODY) {
               long int fposCurrent = ftell(index->file);
               long int metaSize = fposCurrent - fposMeta;
-              long int fetchSize = (long int) r->size;
+              LLint fetchSize = declaredLength;
 
               if (fetchSize <= 0) {
                 fetchSize = dataLength - metaSize;
@@ -2731,11 +2674,11 @@ static PT_Element PT_ReadCache__Arc_u(PT_Index index_, const char *url,
               }
               r->size = 0;
               if (r->statuscode != STATUSCODE_INVALID) {
-                r->adr = (char *) malloc(fetchSize);
+                r->adr = (char *) malloc((size_t) fetchSize);
                 if (r->adr != NULL) {
                   if (fetchSize > 0 &&
-                      (r->size = fread(r->adr, 1, fetchSize, index->file)) !=
-                          (size_t) fetchSize) {
+                      (r->size = fread(r->adr, 1, (size_t) fetchSize,
+                                       index->file)) != (size_t) fetchSize) {
                     int last_errno = errno;
 
                     r->statuscode = STATUSCODE_INVALID;
@@ -2904,7 +2847,7 @@ static int PT_SaveCache__Arc_Fun(void *arg, const char *url, PT_Element element)
           /* nl */
           "\n",
           /* args */
-          (link_has_authority(url) ? "" : "http://"), url, "0.0.0.0",
+          (hts_shared_link_has_authority(url) ? "" : "http://"), url, "0.0.0.0",
           tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour,
           tm->tm_min, tm->tm_sec, hts_effective_mime(element->contenttype),
           element->statuscode, st->md5,

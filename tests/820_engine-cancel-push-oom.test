@@ -1,0 +1,25 @@
+#!/bin/bash
+#
+# A cancel request whose URL cannot be copied must be refused, not stored with
+# no URL. The cap is RLIMIT_AS, so a host where it is advisory reports a skip.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+rc=0
+out=$(ASAN_OPTIONS="${ASAN_OPTIONS-}${ASAN_OPTIONS:+:}allocator_may_return_null=1" \
+    httrack -O /dev/null -#test=cancelpushoom 2>&1) || rc=$?
+test "$rc" -eq 0 || fail "-#test=cancelpushoom: exited $rc, output: $(tail -c 2000 <<<"$out")"
+last=$(tail -n 1 <<<"$out")
+case "$last" in
+"cancelpushoom: oom OK") ;;
+*skipped*)
+    echo "SKIP: $last" >&2
+    ;;
+*)
+    fail "expected the refused push to leave no entry, got: $out"
+    ;;
+esac
+exit 0

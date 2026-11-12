@@ -24,6 +24,7 @@ import socketserver
 import struct
 import sys
 import time
+import zlib
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import quote, unquote, urlsplit
 
@@ -970,6 +971,49 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_raw(
             gzip.compress(self.WARCGZ_BIN_BODY),
             "application/octet-stream",
+            extra_headers=[("Content-Encoding", "gzip")],
+        )
+
+    # 200 KB of zeros in a few hundred gzip bytes: over a -m between the two.
+    def route_warcgz_big(self):
+        self.send_raw(
+            gzip.compress(b"\0" * 200000),
+            "application/octet-stream",
+            extra_headers=[("Content-Encoding", "gzip")],
+        )
+
+    # 257 MiB of zeros in ~260 KB of gzip: just past the default decode cap.
+    _warcgz_huge = None
+
+    @classmethod
+    def warcgz_huge_body(cls):
+        if cls._warcgz_huge is None:
+            # a full flush resets the window, so the one block repeats verbatim
+            chunk = b"\0" * (1 << 20)
+            z = zlib.compressobj(9, zlib.DEFLATED, -15)
+            block = z.compress(chunk) + z.flush(zlib.Z_FULL_FLUSH)
+            crc = 0
+            for _ in range(257):
+                crc = zlib.crc32(chunk, crc)
+            cls._warcgz_huge = (
+                b"\x1f\x8b\x08\0\0\0\0\0\0\xff"
+                + block * 257
+                + zlib.compressobj(9, zlib.DEFLATED, -15).flush()
+                + struct.pack("<II", crc, (257 << 20) & 0xFFFFFFFF)
+            )
+        return cls._warcgz_huge
+
+    def route_warcgz_huge_bin(self):
+        self.send_raw(
+            self.warcgz_huge_body(),
+            "application/octet-stream",
+            extra_headers=[("Content-Encoding", "gzip")],
+        )
+
+    def route_warcgz_huge_html(self):
+        self.send_raw(
+            self.warcgz_huge_body(),
+            "text/html",
             extra_headers=[("Content-Encoding", "gzip")],
         )
 
@@ -1933,6 +1977,13 @@ class Handler(SimpleHTTPRequestHandler):
         if counter:
             with open(counter, "a") as fp:
                 fp.write("x")
+        log = os.environ.get("RESUME_LOG")
+        if log:
+            with open(log, "a", newline="\n") as fp:
+                fp.write(
+                    "range=%s referer=%s\n"
+                    % (self.headers.get("Range"), self.headers.get("Referer"))
+                )
         # First GET: stall mid-body so the crawl can be interrupted with a partial.
         if not Handler._resume_started:
             Handler._resume_started = True
@@ -3929,6 +3980,9 @@ class Handler(SimpleHTTPRequestHandler):
         "/warcgz/index.html": route_warcgz_index,
         "/warcgz/page.html": route_warcgz_page,
         "/warcgz/data.bin": route_warcgz_data,
+        "/warcgz/big.bin": route_warcgz_big,
+        "/warcgz/huge.bin": route_warcgz_huge_bin,
+        "/warcgz/huge.html": route_warcgz_huge_html,
         "/codec/index.html": route_codec_index,
         "/codec/br.html": route_codec_br,
         "/codec/zstd.html": route_codec_zstd,

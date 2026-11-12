@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# An option value beginning with '-' (#1425). The shared "the next word looks
-# like an option" guard refused it for 25 options, and the run died during
-# option parsing, before any log file exists to say why.
+# An option value beginning with '-' (#1425). Every option that takes a value
+# accepts one, unless the word names an option (#1179).
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
@@ -107,6 +106,21 @@ parse --cookies-file '-cookies.txt' --assume '-foo=text/html'
 accepted "a dash value beside another"
 echo OK
 
+# Every string option, not an allowlist of them.
+printf '[every string option takes a dash value] ..\t'
+for name in accept bind disable-module from lang language path proxy referer \
+    sitemap-url structure user-structure usercommand userdef-cmd why; do
+    parse "--${name}" '-my%n'
+    accepted "--${name} -my%n"
+    parse "--${name}=-my%n"
+    accepted "--${name}=-my%n"
+done
+for opt in -%R -%E -%b -%l -%a -%w -P -V -N; do
+    parse "$opt" '-my%n'
+    accepted "$opt -my%n"
+done
+echo OK
+
 # Only where the alias layer put the word there as the option's parameter.
 # Nothing vets a clustered spelling, and the URL pass reads the word after it as
 # short options, so -q%F -mirrored would silently mean -i; left relaxed, -qF
@@ -123,21 +137,20 @@ for opt in %A %F %K %L %S %rf %X F; do
 done
 echo OK
 
-# Control: every option this change did not relax keeps the answer it gave
-# before, in the clustered spelling as much as the bare one.
-printf '[an option that was not relaxed is untouched] ..\t'
+# Control: a clustered spelling vets nothing, so it still refuses, for every
+# option alike.
+printf '[a clustered spelling still refuses the word after it] ..\t'
 parse -qP -8080
 refused "-qP -8080" 'Option P needs'
 parse -qV -c8
 refused "-qV -c8" 'Option V needs'
-parse -N '-%h/%p/%n.%t'
-refused "-N -%h/%p/%n.%t" 'Option N needs'
 noparam "-wO -c8" -wO -c8
 refused "-wO -c8" 'Option O needs'
-# The long spelling of -N has to agree with it, having the same value to judge.
+# The long spelling of -N agrees with it, having the same value to judge.
+parse -N '-%h/%p/%n.%t'
+accepted "-N -%h/%p/%n.%t"
 parse --user-structure '-%h/%p/%n.%t'
-refused "--user-structure" 'Option --user-structure takes a value' \
-    '"-%h/%p/%n.%t" begins'
+accepted "--user-structure -%h/%p/%n.%t"
 echo OK
 
 # The bytes, not just the verdict. -#test=optalias calls optalias_check alone, so
@@ -168,26 +181,38 @@ echo OK
 # tests rejected it. The old message claimed the parameter was missing and named
 # the internal -%A.
 printf '[a refusal names the option, the value and the reason] ..\t'
-parse --proxy '-proxy:8080'
-refused "--proxy -proxy:8080" 'Option --proxy takes a value' \
-    '"-proxy:8080" begins with' 'read as the next option'
-parse -P '-proxy:8080'
-refused "-P -proxy:8080" 'Option -P takes a value' '"-proxy:8080" begins with'
+parse --proxy -q
+refused "--proxy -q" 'Option --proxy takes a value' '"-q" names an option'
+parse -P --mirror
+refused "-P --mirror" 'Option -P takes a value' '"--mirror" names an option'
 noparam "-O -q" -O -q
 refused "-O -q" 'Option -O takes a value' '"-q" names an option'
-# An allowlisted option still refuses a real option name (#1179), and says which
-# of the two tests it was.
+# So does an option glued to its number or to one more option.
+noparam "-O -r6" -O -r6
+refused "-O -r6" '"-r6" names an option'
+parse -P -c8
+refused "-P -c8" '"-c8" names an option'
+parse --proxy -qO
+refused "--proxy -qO" '"-qO" names an option'
+parse -P -archive
+accepted "-P -archive"
+# The options that took a glued value before #1425 still take one.
+parse --user-agent -Oz
+accepted "--user-agent -Oz"
+parse -F -x1
+accepted "-F -x1"
+parse --strip-query -ab
+accepted "--strip-query -ab"
+# A value option still refuses a real option name (#1179).
 parse --assume -q
 refused "--assume -q" 'Option --assume takes a value' '"-q" names an option'
 parse --assume --mirror
 refused "--assume --mirror" '"--mirror" names an option'
 echo OK
 
-# Why no spelling is suggested. --name=value is a real escape, but only for the
-# options exempted above, following what #1179 documented for --strip-query; for
-# the rest it meets the engine's own guard, and a '--' value is rejected as an
-# unknown long option whatever the option was.
-printf '[the escape exists for the exempted options only] ..\t'
+# --name=value passes even an option name through, as #1179 documented for
+# --strip-query, but a '--' value is rejected as an unknown long option.
+printf '[the --name=value escape works for every option] ..\t'
 parse --assume=-q
 accepted "--assume=-q"
 parse --cookies-file=-q
@@ -197,11 +222,11 @@ accepted "--user-agent=-q"
 parse --strip-query=-q
 accepted "--strip-query=-q"
 parse --path=-q
-refused "--path=-q" 'Option O needs'
+accepted "--path=-q"
 parse --referer=-q
-refused "--referer=-q" 'Option %R needs'
+accepted "--referer=-q"
 parse --userdef-cmd=-q
-refused "--userdef-cmd=-q" 'Option V needs'
+accepted "--userdef-cmd=-q"
 parse --assume=--mirror
 refused "--assume=--mirror" 'not recognized'
 parse --proxy=--nope

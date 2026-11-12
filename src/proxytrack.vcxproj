@@ -119,6 +119,7 @@
     <ClCompile Include="proxy\main.c" />
     <ClCompile Include="proxy\proxytrack.c" />
     <ClCompile Include="proxy\store.c" />
+    <ClCompile Include="htsshared.c" />
     <ClCompile Include="htsurlport.c" />
     <ClCompile Include="htsdate.c" />
     <ClCompile Include="htsnet.c" />
@@ -126,7 +127,6 @@
     <ClCompile Include="htsmd5.c" />
     <ClCompile Include="md5.c" />
     <ClCompile Include="minizip\ioapi.c" />
-    <ClCompile Include="minizip\iowin32.c" />
     <ClCompile Include="minizip\mztools.c" />
     <ClCompile Include="minizip\unzip.c" />
     <ClCompile Include="minizip\zip.c" />

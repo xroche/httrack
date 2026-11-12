@@ -30,8 +30,6 @@ Please visit our Website: http://www.httrack.com
 /*       Public Suffix List lookups                             */
 /* ------------------------------------------------------------ */
 
-#define HTS_INTERNAL_BYTECODE
-
 #include "htspsl.h"
 
 #include "htscore.h"
@@ -50,7 +48,6 @@ static char psl_version[64] = "";
 /* Add one rule as the list spells it, converting a Unicode name to IDNA. */
 static void psl_add(coucal rules, const char *rule, size_t len) {
   intptr_t kind = PSL_EXACT, old = 0;
-  char *idna = NULL;
   char key[256];
 
   if (len > 2 && rule[0] == '*' && rule[1] == '.') {
@@ -62,21 +59,11 @@ static void psl_add(coucal rules, const char *rule, size_t len) {
     rule++;
     len--;
   }
-  if (!hts_isStringAscii(rule, len)) {
-    idna = hts_convertStringUTF8ToIDNA(rule, len);
-    if (idna == NULL)
-      return;
-    rule = idna;
-    len = strlen(idna);
-  }
-  if (len > 0 && len < sizeof(key)) {
-    memcpy(key, rule, len);
-    key[len] = '\0';
+  if (hts_host_to_ascii(key, sizeof(key), rule, len) && key[0] != '\0') {
     hts_lowcase(key);
     (void) coucal_read(rules, key, &old);
     coucal_write(rules, key, old | kind);
   }
-  freet(idna);
 }
 
 /* Replace the list in use with rules, freeing the old one. */
