@@ -34,6 +34,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsindex.h"
 #include "htsglobal.h"
 #include "htslib.h"
+#include "htslines.h"
 #include "htsio.h"
 
 #include "htshash.h"
