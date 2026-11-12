@@ -648,6 +648,8 @@ jobs:
         run: |
           set -euo pipefail
           apt-get update
+          # The image lags sid mid-transition, which can make the install unsolvable.
+          apt-get -y full-upgrade
           apt-get install -y --no-install-recommends \
             ca-certificates git \
             build-essential autoconf automake libtool autoconf-archive \
