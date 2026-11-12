@@ -4989,6 +4989,24 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
   return 0;
 }
 
+/* Recheck a link against its known MIME type; true when filters forbid it. */
+static hts_boolean mime_forbids_link(httrackp *opt, int ptr,
+                                     const lien_adrfilsave *afs,
+                                     const char *mime, int *forbidden_url) {
+  const int verdict = hts_acceptmime(opt, ptr, afs->af.adr, afs->af.fil, mime);
+
+  if (verdict == -1)
+    return HTS_FALSE;
+  hts_log_print(opt, LOG_DEBUG, "result for wizard mime test: %d", verdict);
+  if (verdict != 1)
+    return HTS_FALSE;
+  *forbidden_url = verdict;
+  hts_log_print(opt, LOG_DEBUG,
+                "link forbidden because of MIME types restrictions: %s%s",
+                adr_nologin(opt, afs->af.adr), afs->af.fil);
+  return HTS_TRUE;
+}
+
 /* Wait for delayed types */
 int hts_wait_delayed(htsmoduleStruct *str, lien_adrfilsave *afs,
                      char *parent_adr, char *parent_fil, lien_adrfil *former,
@@ -5045,25 +5063,9 @@ int hts_wait_delayed(htsmoduleStruct *str, lien_adrfilsave *afs,
                        heap(ptr)->fil, opt, sback, cache,
                        hash, ptr, numero_passe, &back);
 
-          /* Recompute authorization with MIME type */
-          {
-            int new_forbidden_url =
-              hts_acceptmime(opt, ptr, afs->af.adr, afs->af.fil, back.r.contenttype);
-            if (new_forbidden_url != -1) {
-              hts_log_print(opt, LOG_DEBUG, "result for wizard mime test: %d",
-                            new_forbidden_url);
-              if (new_forbidden_url == 1) {
-                *forbidden_url = new_forbidden_url;
-                hts_log_print(
-                    opt, LOG_DEBUG,
-                    "link forbidden because of MIME types restrictions: %s%s",
-                    adr_nologin(opt, afs->af.adr), afs->af.fil);
-                break;          // exit loop
-              }
-            }
-          }
-
-          /* And exit loop */
+          /* Recompute authorization with MIME type, then exit loop either way
+           */
+          mime_forbids_link(opt, ptr, afs, back.r.contenttype, forbidden_url);
           break;
         }
       }
@@ -5123,22 +5125,9 @@ int hts_wait_delayed(htsmoduleStruct *str, lien_adrfilsave *afs,
                        hash, ptr, numero_passe, &delayed_back);
 
           /* Recompute authorization with MIME type */
-          {
-            int new_forbidden_url =
-              hts_acceptmime(opt, ptr, afs->af.adr, afs->af.fil, delayed_back.r.contenttype);
-            if (new_forbidden_url != -1) {
-              hts_log_print(opt, LOG_DEBUG, "result for wizard mime test: %d",
-                            *forbidden_url);
-              if (new_forbidden_url == 1) {
-                *forbidden_url = new_forbidden_url;
-                hts_log_print(
-                    opt, LOG_DEBUG,
-                    "link forbidden because of MIME types restrictions: %s%s",
-                    adr_nologin(opt, afs->af.adr), afs->af.fil);
-                break;          // exit loop
-              }
-            }
-          }
+          if (mime_forbids_link(opt, ptr, afs, delayed_back.r.contenttype,
+                                forbidden_url))
+            break; // exit loop
 
           /* Re-Add wiht correct type */
           if (back_add_if_not_exists(sback, opt, cache, afs->af.adr,
@@ -5354,22 +5343,9 @@ int hts_wait_delayed(htsmoduleStruct *str, lien_adrfilsave *afs,
               back_set_unlocked(sback, b);
 
             /* Recompute authorization with MIME type */
-            {
-              int new_forbidden_url =
-                hts_acceptmime(opt, ptr, afs->af.adr, afs->af.fil, delayed_back.r.contenttype);
-              if (new_forbidden_url != -1) {
-                hts_log_print(opt, LOG_DEBUG, "result for wizard mime test: %d",
-                              *forbidden_url);
-                if (new_forbidden_url == 1) {
-                  *forbidden_url = new_forbidden_url;
-                  hts_log_print(
-                      opt, LOG_DEBUG,
-                      "link forbidden because of MIME types restrictions: %s%s",
-                      adr_nologin(opt, afs->af.adr), afs->af.fil);
-                  break;        // exit loop
-                }
-              }
-            }
+            if (mime_forbids_link(opt, ptr, afs, delayed_back.r.contenttype,
+                                  forbidden_url))
+              break; // exit loop
           }
 
           /* Still have a back reference */

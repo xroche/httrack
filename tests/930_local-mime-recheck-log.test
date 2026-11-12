@@ -1,0 +1,15 @@
+#!/bin/bash
+#
+# A link a -mime: filter forbids after its type arrives logs the verdict it got (1), not the stale 0.
+
+set -e
+
+: "${top_srcdir:=..}"
+
+bash "$top_srcdir/tests/local-crawl.sh" \
+    --found 'types/control.html' \
+    --not-found 'types/gen.png' \
+    --log-found 'link forbidden because of MIME types restrictions: .*/types/gen\.php' \
+    --log-found 'result for wizard mime test: 1' \
+    --log-not-found 'result for wizard mime test: 0' \
+    httrack 'BASEURL/types/index.html' '-mime:image/png' -Z
