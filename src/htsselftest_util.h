@@ -56,6 +56,13 @@ Please visit our Website: http://www.httrack.com
 
 size_t st_decode_body(const char *arg, char *buf, size_t size);
 
+/* Write size bytes of data to path, replacing it. Abort when that fails. */
+void st_put_file(const char *path, const void *data, size_t size);
+
+/* Copy the file at path into buf, clipped to size - 1 bytes. buf holds "" when
+   the file cannot be read. */
+void st_read_file(const char *path, char *buf, size_t size);
+
 /* Set *dest to the Sec-Fetch-Dest named name, "empty" being UNKNOWN. Return
    HTS_FALSE, after complaining, when name is no destination. */
 hts_boolean st_dest_of(const char *name, int *dest);

@@ -3167,14 +3167,6 @@ static void ref_st_refpath(httrackp *opt, char *dst, size_t size) {
               size);
 }
 
-static void ref_st_put(const char *path, const void *data, size_t size) {
-  FILE *const fp = fopen(path, "wb");
-
-  assertf(fp != NULL);
-  assertf(hts_fwrite_exact(data, size, fp));
-  fclose(fp);
-}
-
 static int ref_st_str(const char *got, const char *want, const char *field) {
   if (strcmp(got, want) != 0) {
     fprintf(stderr, "%s: %s is '%s', expected '%s'\n", selftest_tag, field, got,
@@ -3276,7 +3268,7 @@ static int ref_st_refuse(httrackp *opt, const char *path, const void *data,
                          size_t size, const char *what) {
   lien_back *back = NULL;
 
-  ref_st_put(path, data, size);
+  st_put_file(path, data, size);
   if (back_unserialize_ref(opt, REF_ST_ADR, REF_ST_FIL, &back) == 0) {
     fprintf(stderr, "%s: %s was accepted\n", selftest_tag, what);
     back_clear_entry(back);
@@ -3468,7 +3460,7 @@ static int ref_portable_selftest(httrackp *opt, const char *dir) {
   }
 
   /* and the reader takes them back, whatever host laid them down */
-  ref_st_put(path, ref_golden, ref_golden_size);
+  st_put_file(path, ref_golden, ref_golden_size);
   back = ref_st_accept(opt, "the golden reference", &fail);
   if (back != NULL) {
     fail += ref_st_check(back);
@@ -3531,7 +3523,7 @@ static int ref_portable_selftest(httrackp *opt, const char *dir) {
     size_t size;
     unsigned char *at = ref_st_oversize("url_sav", HTS_REF_MAX_STR, &size);
 
-    ref_st_put(path, at, size);
+    st_put_file(path, at, size);
     freet(at);
     back = ref_st_accept(opt, "a name declaring exactly the cap", &fail);
     if (back != NULL) {
@@ -3558,7 +3550,7 @@ static int ref_portable_selftest(httrackp *opt, const char *dir) {
     size_t size;
     unsigned char *bad = ref_st_oversize("cdispo", 3000, &size);
 
-    ref_st_put(path, bad, size);
+    st_put_file(path, bad, size);
     freet(bad);
     back = ref_st_accept(opt, "an over-long content-disposition", &fail);
     if (back != NULL) {

@@ -1786,14 +1786,7 @@ static void cookie_log_stop(httrackp *opt, cookie_logcap *cap, char *buf,
 
 /* Read the whole file at path into buf, or "" when it cannot be opened. */
 static void cookiejar_slurp(const char *path, char *buf, size_t size) {
-  FILE *const fp = FOPEN(path, "rb");
-  size_t n = 0;
-
-  if (fp != NULL) {
-    n = fread(buf, 1, size - 1, fp);
-    fclose(fp);
-  }
-  buf[n] = '\0';
+  st_read_file(path, buf, size);
 }
 
 /* -#test=cookiejar <dir>: the jar keeps every cookie attribute. */
