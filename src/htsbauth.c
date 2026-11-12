@@ -54,8 +54,6 @@ Please visit our Website: http://www.httrack.com
 
 /* END specific definitions */
 
-/* A cookies.txt line marks HttpOnly by this prefix. */
-#define COOKIE_HTTPONLY_PREFIX "#HttpOnly_"
 /* A jar record marks it in field 7. The fields are 0 domain, 1 subdomains,
    2 path, 3 secure, 4 expiry, 5 name, 6 value and 7 HttpOnly. */
 #define COOKIE_HTTPONLY_FIELD "HttpOnly"

@@ -31,6 +31,8 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsbauth.h"
 
+/* A cookies.txt line marks HttpOnly by this prefix. */
+#define COOKIE_HTTPONLY_PREFIX "#HttpOnly_"
 /* Internal: the cookie jar file writer, used by htsbauth.c. */
 
 /* Is the record at rec host-only? Defined in htsbauth.c. */

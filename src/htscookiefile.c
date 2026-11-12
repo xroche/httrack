@@ -44,9 +44,6 @@ Please visit our Website: http://www.httrack.com
 #include <io.h> /* _commit */
 #endif
 
-/* A cookies.txt line marks HttpOnly by this prefix. */
-#define COOKIE_HTTPONLY_PREFIX "#HttpOnly_"
-
 /* Flush fp to the disk and close it. Did every step succeed? */
 hts_boolean cookie_close_synced(FILE *fp) {
   // a crash after the rename must not leave an empty file behind it
