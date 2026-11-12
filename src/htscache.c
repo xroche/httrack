@@ -594,57 +594,31 @@ static htsblk cache_readex_new(httrackp *opt, cache_back *cache,
           /*if (unzGetCurrentFileInfo((unzFile) cache->zipInput, NULL,
              NULL, 0, NULL, 0, headerBuff, sizeof(headerBuff) - 2) == Z_OK ) */
         {
-          int offset = 0;
-          /* the longest stored line is "Location: " plus a full-capacity URL;
-             a shorter buffer truncates it into a valid-looking wrong target */
-          char BIGSTK line[HTS_LOCATION_SIZE + 32];
-          /* the writers store strlen(headers), so a NUL inside is damage */
-          const hts_boolean has_nul =
-              memchr(headerBuff, '\0', (size_t) readSizeHeader) != NULL;
-          int lineEof = 0;
+          const hts_cache_field fields[] = {
+              {"X-In-Cache", HTS_CACHE_FIELD_INT, &dataincache, 0},
+              {"X-Statuscode", HTS_CACHE_FIELD_INT, &r.statuscode, 0},
+              {"X-Kept", HTS_CACHE_FIELD_INT, &kept, 0},
+              {"X-StatusMessage", HTS_CACHE_FIELD_STRING, r.msg, sizeof(r.msg)},
+              {"X-Size", HTS_CACHE_FIELD_LLINT, &r.size, 0},
+              {"Content-Type", HTS_CACHE_FIELD_STRING, r.contenttype,
+               sizeof(r.contenttype)},
+              {"X-Charset", HTS_CACHE_FIELD_STRING, r.charset,
+               sizeof(r.charset)},
+              {"Last-Modified", HTS_CACHE_FIELD_STRING, r.lastmodified,
+               sizeof(r.lastmodified)},
+              {"Etag", HTS_CACHE_FIELD_STRING, r.etag, sizeof(r.etag)},
+              {"Location", HTS_CACHE_FIELD_STRING, r.location,
+               HTS_LOCATION_SIZE},
+              {"Content-Disposition", HTS_CACHE_FIELD_STRING, r.cdispo,
+               sizeof(r.cdispo)},
+              {"X-Save", HTS_CACHE_FIELD_STRING, previous_save_,
+               sizeof(previous_save_)},
+          };
 
           headerBuff[readSizeHeader] = '\0';
-          while (!has_nul && offset < readSizeHeader && !lineEof) {
-            char *value;
-            int adv;
-            /* no line we write is this long, so a cut one is foreign or
-               damaged and its prefix would parse as a wrong value */
-            const hts_boolean cut =
-                binput_line(headerBuff + offset, headerBuff + readSizeHeader,
-                            line, sizeof(line) - 1, &adv);
-
-            offset += adv;
-            if (line[0] == '\0') {
-              lineEof = 1;
-            }
-            value = cut ? NULL : strchr(line, ':');
-            if (value != NULL) {
-              *value++ = '\0';
-              if (*value == ' ' || *value == '\t')
-                value++;
-              CACHE_READFIELD_INT(line, value, "X-In-Cache", dataincache);
-              CACHE_READFIELD_INT(line, value, "X-Statuscode", r.statuscode);
-              CACHE_READFIELD_INT(line, value, "X-Kept", kept);
-              CACHE_READFIELD_STRING(line, value, "X-StatusMessage", r.msg,
-                                     sizeof(r.msg));
-              CACHE_READFIELD_LLINT(line, value, "X-Size", r.size); // size
-              CACHE_READFIELD_STRING(line, value, "Content-Type", r.contenttype,
-                                     sizeof(r.contenttype));
-              CACHE_READFIELD_STRING(line, value, "X-Charset", r.charset,
-                                     sizeof(r.charset));
-              CACHE_READFIELD_STRING(line, value, "Last-Modified",
-                                     r.lastmodified, sizeof(r.lastmodified));
-              CACHE_READFIELD_STRING(line, value, "Etag", r.etag,
-                                     sizeof(r.etag));
-              CACHE_READFIELD_STRING(line, value, "Location", r.location,
-                                     HTS_LOCATION_SIZE);
-              CACHE_READFIELD_STRING(line, value, "Content-Disposition",
-                                     r.cdispo, sizeof(r.cdispo));
-              CACHE_READFIELD_STRING(line, value, "X-Save", previous_save_,
-                                     sizeof(previous_save_));
-            }
-          }
-          if (has_nul) {
+          if (!hts_cache_read_fields(headerBuff, (size_t) readSizeHeader,
+                                     fields, sizeof(fields) / sizeof(fields[0]),
+                                     NULL, NULL)) {
             hts_log_print(opt, LOG_WARNING,
                           "cached headers hold a NUL byte, "
                           "not using the cache entry: %s%s",
