@@ -93,7 +93,7 @@ jobs:
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             build-essential autoconf automake libtool autoconf-archive \
-            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev \
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev pkgconf \
             git ca-certificates python3 procps
 
       - name: Assert the coreutils dispatch on argv[0]

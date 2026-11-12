@@ -56,6 +56,8 @@ Please visit our Website: http://www.httrack.com
 #include "htsback.h"
 #include "htslib.h" /* hts_effective_mime */
 #include "htsio.h"
+#include "htsurlport.h"
+#include "htscachecodec.h"
 
 #include "store.h"
 #include "proxystrings.h"
@@ -955,59 +957,6 @@ static PT_Element PT_ReadCache__New(PT_Index index, const char *url, int flags) 
 /* New HTTrack cache (new.zip) format                           */
 /* ------------------------------------------------------------ */
 
-/* Values read back off a cache, so the block is bounded rather than trusted to
-   the element caps; a field that does not fit is dropped whole and counted,
-   since a clipped one reads back as valid. `headers` must be an array. */
-#define ZIP_FIELD_STRING(headers, headersSize, dropped, field, value)          \
-  do {                                                                         \
-    if ((value) != NULL && (value)[0] != '\0' &&                               \
-        !slcatprintfbuff(headers, sizeof(headers), &(headersSize),             \
-                         "%s: %s\r\n", field, value)) {                        \
-      (dropped)++;                                                             \
-    }                                                                          \
-  } while (0)
-#define ZIP_FIELD_INT(headers, headersSize, dropped, field, value)             \
-  do {                                                                         \
-    if ((value) != 0 &&                                                        \
-        !slcatprintfbuff(headers, sizeof(headers), &(headersSize),             \
-                         "%s: " LLintP "\r\n", field, (LLint) (value))) {      \
-      (dropped)++;                                                             \
-    }                                                                          \
-  } while (0)
-#define ZIP_FIELD_INT_FORCE(headers, headersSize, dropped, field, value)       \
-  do {                                                                         \
-    if (!slcatprintfbuff(headers, sizeof(headers), &(headersSize),             \
-                         "%s: " LLintP "\r\n", field, (LLint) (value))) {      \
-      (dropped)++;                                                             \
-    }                                                                          \
-  } while (0)
-/* refvalue_size is mandatory: the cache line is bounded only by the line
-   buffer, not by the destination. */
-#define ZIP_READFIELD_STRING(line, value, refline, refvalue, refvalue_size)    \
-  do {                                                                         \
-    if (line[0] != '\0' && strfield2(line, refline)) {                         \
-      (void) strclipbuff(refvalue, refvalue_size, value);                      \
-      line[0] = '\0';                                                          \
-    }                                                                          \
-  } while (0)
-#define ZIP_READFIELD_INT(line, value, refline, refvalue) do { \
-  if (line[0] != '\0' && strfield2(line, refline)) { \
-    int intval = 0; \
-    sscanf(value, "%d", &intval); \
-    (refvalue) = intval; \
-    line[0] = '\0'; \
-	} \
-} while(0)
-#define ZIP_READFIELD_LLINT(line, value, refline, refvalue)                    \
-  do {                                                                         \
-    if (line[0] != '\0' && strfield2(line, refline)) {                         \
-      LLint intval = 0;                                                        \
-      sscanf(value, LLintP, &intval);                                          \
-      (refvalue) = intval;                                                     \
-      line[0] = '\0';                                                          \
-    }                                                                          \
-  } while (0)
-
 /* Set path (capacity size) to filename's parent directory, separator included,
    from an absolute filename. Empty when there is none, or when it would not
    fit: a truncated prefix names a different directory. */
@@ -1215,8 +1164,8 @@ int PT_LoadCache__New(PT_Index index_, const char *filename) {
 
                     line[0] = '\0';
                     a += binput(a, line, sizeof(line) - 2, NULL);
-                    if (strncmp(line, "X-In-Cache:", 11) == 0) {
-                      if (strcmp(line, "X-In-Cache: 1") == 0) {
+                    if (strfield(line, "X-In-Cache:")) {
+                      if (strfield2(line, "X-In-Cache: 1")) {
                         dataincache = 1;
                       } else {
                         dataincache = 0;
@@ -1372,25 +1321,26 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
               *value++ = '\0';
               if (*value == ' ' || *value == '\t')
                 value++;
-              ZIP_READFIELD_INT(line, value, "X-In-Cache", dataincache);
-              ZIP_READFIELD_INT(line, value, "X-Statuscode", r->statuscode);
-              ZIP_READFIELD_STRING(line, value, "X-StatusMessage", r->msg,
-                                   sizeof(r->msg));
-              ZIP_READFIELD_LLINT(line, value, "X-Size", declared_size); // size
-              ZIP_READFIELD_STRING(line, value, "Content-Type", r->contenttype,
-                                   sizeof(r->contenttype));
-              ZIP_READFIELD_STRING(line, value, "X-Charset", r->charset,
-                                   sizeof(r->charset));
-              ZIP_READFIELD_STRING(line, value, "Last-Modified",
-                                   r->lastmodified, sizeof(r->lastmodified));
-              ZIP_READFIELD_STRING(line, value, "Etag", r->etag,
-                                   sizeof(r->etag));
-              ZIP_READFIELD_STRING(line, value, "Location", r->location,
-                                   sizeof(location_default));
-              ZIP_READFIELD_STRING(line, value, "Content-Disposition",
-                                   r->cdispo, sizeof(r->cdispo));
-              ZIP_READFIELD_STRING(line, value, "X-Save", previous_save_,
-                                   sizeof(previous_save_));
+              CACHE_READFIELD_INT(line, value, "X-In-Cache", dataincache);
+              CACHE_READFIELD_INT(line, value, "X-Statuscode", r->statuscode);
+              CACHE_READFIELD_STRING(line, value, "X-StatusMessage", r->msg,
+                                     sizeof(r->msg));
+              CACHE_READFIELD_LLINT(line, value, "X-Size",
+                                    declared_size); // size
+              CACHE_READFIELD_STRING(line, value, "Content-Type",
+                                     r->contenttype, sizeof(r->contenttype));
+              CACHE_READFIELD_STRING(line, value, "X-Charset", r->charset,
+                                     sizeof(r->charset));
+              CACHE_READFIELD_STRING(line, value, "Last-Modified",
+                                     r->lastmodified, sizeof(r->lastmodified));
+              CACHE_READFIELD_STRING(line, value, "Etag", r->etag,
+                                     sizeof(r->etag));
+              CACHE_READFIELD_STRING(line, value, "Location", r->location,
+                                     sizeof(location_default));
+              CACHE_READFIELD_STRING(line, value, "Content-Disposition",
+                                     r->cdispo, sizeof(r->cdispo));
+              CACHE_READFIELD_STRING(line, value, "X-Save", previous_save_,
+                                     sizeof(previous_save_));
               /* naming-only marker: consumed so it never reaches a reply */
               if (line[0] != '\0' && strfield2(line, "X-Kept"))
                 line[0] = '\0';
@@ -1548,20 +1498,9 @@ static int PT_SaveCache__New_Fun(void *arg, const char *url, PT_Element element)
   /* Fields */
   headers[0] = '\0';
   /* */
-  {
-    const char *message;
-
-    if (strlen(element->msg) < 32) {
-      message = element->msg;
-    } else {
-      message = "(See X-StatusMessage)";
-    }
-    /* 64 characters MAX for first line */
-    if (!slcatprintfbuff(headers, sizeof(headers), &headersSize,
-                         "HTTP/1.%c %d %s\r\n", '1', element->statuscode,
-                         message)) {
-      headersDropped++;
-    }
+  if (!hts_cache_status_line(headers, sizeof(headers), &headersSize,
+                             element->statuscode, element->msg)) {
+    headersDropped++;
   }
 
   /* Second line MUST ALWAYS be X-In-Cache */
@@ -1596,20 +1535,7 @@ static int PT_SaveCache__New_Fun(void *arg, const char *url, PT_Element element)
   }
 
   /* Time */
-  memset(&fi, 0, sizeof(fi));
-  if (element->lastmodified[0] != '\0') {
-    struct tm buffer;
-    struct tm *tm_s = convert_time_rfc822(&buffer, element->lastmodified);
-
-    if (tm_s) {
-      fi.tmz_date.tm_sec = (uInt) tm_s->tm_sec;
-      fi.tmz_date.tm_min = (uInt) tm_s->tm_min;
-      fi.tmz_date.tm_hour = (uInt) tm_s->tm_hour;
-      fi.tmz_date.tm_mday = (uInt) tm_s->tm_mday;
-      fi.tmz_date.tm_mon = (uInt) tm_s->tm_mon;
-      fi.tmz_date.tm_year = (uInt) tm_s->tm_year;
-    }
-  }
+  hts_cache_zip_date(&fi, element->lastmodified);
 
   /* Open file - NOTE: headers in "comment" */
   if ((zErr = zipOpenNewFileInZip(zFileOut, url, &fi,
@@ -1672,6 +1598,8 @@ static int cache_brstr(char *adr, char *s, size_t s_size) {
   int i;
   int off;
   char buff[256 + 4];
+  const char *num = buff;
+  LLint len;
 
   off = binput(adr, buff, 256, NULL);
   /* no length-prefixed value follows a field the terminating NUL stopped */
@@ -1680,8 +1608,9 @@ static int cache_brstr(char *adr, char *s, size_t s_size) {
     return off;
   }
   /* an empty/non-numeric field leaves i unset: treat as length 0 */
-  if (sscanf(buff, "%d", &i) != 1 || i < 0 || i > CACHE_FIELD_MAXSIZE)
-    i = 0;
+  i = hts_scan_llint(&num, 0, CACHE_FIELD_MAXSIZE, &len) == HTS_SCAN_OK
+          ? (int) len
+          : 0;
   if (i > 0) {
     /* a corrupt cache may declare a length past the buffer end; bound the copy
        and the advance to the bytes actually present */
@@ -1702,12 +1631,13 @@ static int cache_brstr(char *adr, char *s, size_t s_size) {
     is unreadable, and refusing it is the only way to keep the fields after it
     aligned. **/
 static hts_boolean cache_rlen(FILE *fp, long int datSize, size_t *len) {
-  INTsys i = 0;
+  LLint i;
   char buff[256 + 4];
+  const char *num = buff;
 
   *len = 0;
   hts_shared_linput(fp, buff, 256, HTS_LINPUT_SKIP_NUL);
-  if (sscanf(buff, INTsysP, &i) != 1 || i < 0 || i > CACHE_FIELD_MAXSIZE)
+  if (hts_scan_llint(&num, 0, CACHE_FIELD_MAXSIZE, &i) != HTS_SCAN_OK)
     return HTS_FALSE;
   if (!cache_fits(fp, datSize, (size_t) i))
     return HTS_FALSE;
@@ -1782,13 +1712,14 @@ static hts_boolean cache_rint(FILE *fp, long int datSize, int *i) {
 /** Same, for a size field: a negative value is refused rather than wrapped,
     since cast to unsigned it would shrink a later body allocation. **/
 static hts_boolean cache_rLLint(FILE *fp, long int datSize, unsigned long *i) {
-  int l;
+  LLint l;
   char s[256];
+  const char *num = s;
 
   *i = 0;
   if (!cache_rstr(fp, s, sizeof(s), datSize))
     return HTS_FALSE;
-  if (sscanf(s, "%d", &l) != 1 || l < 0)
+  if (hts_scan_llint(&num, 0, INT_MAX, &l) != HTS_SCAN_OK)
     return HTS_FALSE;
   *i = (unsigned long) l;
   return HTS_TRUE;
@@ -2353,9 +2284,9 @@ static hts_boolean arcPastRecordEnd(FILE *file, long int end) {
    reading the same long line differently. */
 #define ARC_LINE_MAX ((int) sizeof(((PT_Index__Arc) NULL)->line) - 2)
 
-/* Bytes hts_shared_linput() with skip_nul set, unlike htslib.c's linput(),
-   never returns wherever they sit on the line. NUL is among them, so a record
-   line carrying one is indexed and served all the same. */
+/* Bytes hts_shared_linput() with HTS_LINPUT_SKIP_NUL, unlike htslib.c's
+   linput(), never returns wherever they sit on the line. NUL is among them, so
+   a record line carrying one is indexed and served all the same. */
 static hts_boolean arcDroppedByte(char c) {
   return (c == 0 || c == 9 || c == 12 || c == 13) ? HTS_TRUE : HTS_FALSE;
 }
@@ -2621,23 +2552,6 @@ int PT_LoadCache__Arc(PT_Index index_, const char *filename) {
   return 0;
 }
 
-/* Same contract as ZIP_READFIELD_STRING, for the ARC reader's header lines. */
-#define HTTP_READFIELD_STRING(line, value, refline, refvalue, refvalue_size)   \
-  do {                                                                         \
-    if (line[0] != '\0' && strfield2(line, refline)) {                         \
-      (void) strclipbuff(refvalue, refvalue_size, value);                      \
-      line[0] = '\0';                                                          \
-    }                                                                          \
-  } while (0)
-#define HTTP_READFIELD_INT(line, value, refline, refvalue) do { \
-  if (line[0] != '\0' && strfield2(line, refline)) { \
-    int intval = 0; \
-    sscanf(value, "%d", &intval); \
-    (refvalue) = intval; \
-    line[0] = '\0'; \
-	} \
-} while(0)
-
 static PT_Element PT_ReadCache__Arc(PT_Index index, const char *url, int flags) {
   PT_Element retCode;
 
@@ -2678,6 +2592,7 @@ static PT_Element PT_ReadCache__Arc_u(PT_Index index_, const char *url,
         /* a line reaching past this belongs to the record stored after it */
         const long int fposEnd = dataLength >= 0 ? fposMeta + dataLength : -1;
         const char *pos;
+        LLint declaredLength = 0;
 
         /* Read HTTP headers */
         /* HTTP/1.1 404 Not Found */
@@ -2705,17 +2620,18 @@ static PT_Element PT_ReadCache__Arc_u(PT_Index index_, const char *url,
             if (value != NULL) {
               *value = '\0';
               for(value++; *value == ' ' || *value == '\t'; value++) ;
-              HTTP_READFIELD_INT(line, value, "Content-Length", r->size);       // size
-              HTTP_READFIELD_STRING(line, value, "Content-Type", r->contenttype,
-                                    sizeof(r->contenttype));
-              HTTP_READFIELD_STRING(line, value, "Last-Modified",
-                                    r->lastmodified, sizeof(r->lastmodified));
-              HTTP_READFIELD_STRING(line, value, "Etag", r->etag,
-                                    sizeof(r->etag));
-              HTTP_READFIELD_STRING(line, value, "Location", r->location,
-                                    sizeof(location_default));
-              HTTP_READFIELD_STRING(line, value, "Content-Disposition",
-                                    r->cdispo, sizeof(r->cdispo));
+              CACHE_READFIELD_LLINT(line, value, "Content-Length",
+                                    declaredLength);
+              CACHE_READFIELD_STRING(line, value, "Content-Type",
+                                     r->contenttype, sizeof(r->contenttype));
+              CACHE_READFIELD_STRING(line, value, "Last-Modified",
+                                     r->lastmodified, sizeof(r->lastmodified));
+              CACHE_READFIELD_STRING(line, value, "Etag", r->etag,
+                                     sizeof(r->etag));
+              CACHE_READFIELD_STRING(line, value, "Location", r->location,
+                                     sizeof(location_default));
+              CACHE_READFIELD_STRING(line, value, "Content-Disposition",
+                                     r->cdispo, sizeof(r->cdispo));
               if (line[0] != '\0') {
                 PT_AppendHeader(&r->headers, &headersLen, &headersCap, line,
                                 value);
@@ -2723,13 +2639,16 @@ static PT_Element PT_ReadCache__Arc_u(PT_Index index_, const char *url,
             }
           }
 
+          /* size_t is 32 bits on some targets, so narrow only what fits */
+          r->size = declaredLength > 0 && (uint64_t) declaredLength <= SIZE_MAX
+                        ? (size_t) declaredLength
+                        : 0;
+
           /* FIXME charset */
           if (r->contenttype[0] != '\0') {
             char *pos = strchr(r->contenttype, ';');
 
             if (pos != NULL) {
-              /*char *chs = strchr(pos, "charset="); */
-              /*HTTP_READFIELD_STRING(line, value, "X-Charset", r->charset); */
               *pos = 0;
               if ((pos = strchr(r->contenttype, ' ')) != NULL) {
                 *pos = 0;
@@ -2742,7 +2661,7 @@ static PT_Element PT_ReadCache__Arc_u(PT_Index index_, const char *url,
             if (flags & FETCH_BODY) {
               long int fposCurrent = ftell(index->file);
               long int metaSize = fposCurrent - fposMeta;
-              long int fetchSize = (long int) r->size;
+              LLint fetchSize = declaredLength;
 
               if (fetchSize <= 0) {
                 fetchSize = dataLength - metaSize;
@@ -2755,11 +2674,11 @@ static PT_Element PT_ReadCache__Arc_u(PT_Index index_, const char *url,
               }
               r->size = 0;
               if (r->statuscode != STATUSCODE_INVALID) {
-                r->adr = (char *) malloc(fetchSize);
+                r->adr = (char *) malloc((size_t) fetchSize);
                 if (r->adr != NULL) {
                   if (fetchSize > 0 &&
-                      (r->size = fread(r->adr, 1, fetchSize, index->file)) !=
-                          (size_t) fetchSize) {
+                      (r->size = fread(r->adr, 1, (size_t) fetchSize,
+                                       index->file)) != (size_t) fetchSize) {
                     int last_errno = errno;
 
                     r->statuscode = STATUSCODE_INVALID;

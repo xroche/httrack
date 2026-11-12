@@ -113,6 +113,7 @@ Remark: If no cache newer than the added one is found, all entries can be added 
 #include "htsglobal.h"
 #include "htsurlport.h"
 #include <limits.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -186,67 +187,6 @@ static int recv_until(T_SOC soc, char *buf, int len, time_t deadline) {
     return -1;
   set_recv_timeout(soc, (int) left);
   return (int) recv(soc, buf, len, 0);
-}
-
-static int linputsoc(T_SOC soc, char *s, int max, time_t deadline) {
-  int c;
-  int j = 0;
-
-  do {
-    unsigned char ch;
-
-    if (recv_until(soc, (char *) &ch, 1, deadline) == 1) {
-      c = ch;
-    } else {
-      c = EOF;
-    }
-    if (c != EOF) {
-      switch (c) {
-      case 13:
-        break;                  // sauter CR
-      case 10:
-        c = -1;
-        break;
-      case 9:
-      case 12:
-        break;                  // sauter ces caractères
-      default:
-        s[j++] = (char) c;
-        break;
-      }
-    }
-  } while((c != -1) && (c != EOF) && (j < (max - 1)));
-  s[j] = '\0';
-  return j;
-}
-
-static int check_readinput_t(T_SOC soc, time_t deadline) {
-  const time_t left = deadline - time(NULL);
-
-  if (soc != INVALID_SOCKET && left > 0) {
-    fd_set fds;                 // poll structures
-    struct timeval tv;          // structure for select
-
-    if (!hts_soc_selectable(soc))
-      return 0;
-    FD_ZERO(&fds);
-    FD_SET(soc, &fds);
-    tv.tv_sec = (long) left;
-    tv.tv_usec = 0;
-    select((int) (soc + 1), &fds, NULL, NULL, &tv);
-    if (FD_ISSET(soc, &fds))
-      return 1;
-    else
-      return 0;
-  } else
-    return 0;
-}
-
-static int linputsoc_t(T_SOC soc, char *s, int max, time_t deadline) {
-  if (check_readinput_t(soc, deadline)) {
-    return linputsoc(soc, s, max, deadline);
-  }
-  return -1;
 }
 
 static int gethost(const char *hostname, SOCaddr * server) {
@@ -753,6 +693,7 @@ static hts_boolean recv_exact(T_SOC soc, char *buf, int len, time_t deadline) {
 static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
   const int timeout = 30; /* seconds a request may take */
   time_t deadline = 0;
+  hts_boolean cut;
   int buffer_size = 32768;
   char *buffer = (char *) malloc(buffer_size);
   int line1Size = 1024;
@@ -817,15 +758,19 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
     StringClear(davRequest);
 
     /* line1: "GET http://www.example.com/ HTTP/1.0" */
-    if (linputsoc_t(soc_c, line1, line1Size - 2, deadline) > 0 &&
+    /* A request line too long for line1 is served clipped. */
+    if (hts_shared_linputsoc(soc_c, line1, line1Size - 2, deadline, &cut) > 0 &&
         (surl = strchr(line1, ' ')) && !(*surl = '\0') && ++surl &&
         (proto = strchr(surl, ' ')) && !(*proto = '\0') && ++proto) {
       /* Flush headers */
-      while (linputsoc_t(soc_c, line, lineSize - 2, deadline) > 0 &&
+      while (hts_shared_linputsoc(soc_c, line, lineSize - 2, deadline, &cut) >
+                 0 &&
              line[0] != 0) {
         int p;
 
-        if ((p = strfield(line, "Content-length:")) != 0) {
+        if (cut) {
+          /* A clipped header is not the one the client sent. */
+        } else if ((p = strfield(line, "Content-length:")) != 0) {
           const char *a = line + p;
           LLint value;
 
@@ -848,11 +793,13 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
             chost++;
           StringCopy(host, chost);
         } else if ((p = strfield(line, "Depth: "))) {
-          char *depth = line + p;
+          const char *depth = line + p;
+          LLint value;
 
-          if (sscanf(depth, "%d", &davDepth) != 1) {
-            davDepth = 0;
-          }
+          /* past 1 is refused below, so clamp rather than let it wrap */
+          davDepth = hts_scan_llint(&depth, 0, INT64_MAX, &value) == HTS_SCAN_OK
+                         ? (int) (value < 2 ? value : 2)
+                         : 0;
         }
       }
 

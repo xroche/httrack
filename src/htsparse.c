@@ -1042,6 +1042,32 @@ static void sink_add_url_htmlescaped(parse_sink *const sink,
   }
 }
 
+/* Append the absolute URL of adr and fil, with the login unless privacy is on.
+   An adr with no "//" gets "http://", and is written as it is if noauth_raw. */
+static void sink_add_absolute_url(parse_sink *const sink, const char *const adr,
+                                  const char *const fil,
+                                  const hts_boolean passprivacy,
+                                  const hts_boolean noauth_raw) {
+  const hts_boolean has_authority = link_has_authority(adr);
+
+  if (!has_authority) {
+    sink_add(sink, "http://");
+  } else {
+    const char *const aut = strstr(adr, "//");
+
+    sink_add_n(sink, adr, (size_t) (aut - adr) + 2);
+  }
+  if (passprivacy)
+    sink_add_url_htmlescaped(sink, jump_identification_const(adr));
+  else if (!has_authority && noauth_raw)
+    sink_add_url_htmlescaped(sink, adr);
+  else
+    sink_add_url_htmlescaped(sink, jump_protocol_const(adr));
+  if (fil[0] != '/')
+    sink_add(sink, "/");
+  sink_add_url_htmlescaped(sink, fil);
+}
+
 char *hts_parse_sink_selftest(const hts_boolean enabled, const int inscript,
                               const int inscript_tag, const char *const s) {
   parse_sink sink = {EMPTY_TYPED_ARRAY, HTS_FALSE, enabled, &inscript,
@@ -3158,35 +3184,10 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     }
                     /* */
                     else if (opt->urlmode == HTS_URLMODE_ABSOLUTE) {
-                      /* Not only output: also fills tmp[256] below. */
-                      if (sink.enabled) {
-                        if (!link_has_authority(afs.af.adr)) {
-                          HT_ADD("http://");
-                        } else {
-                          char *aut = strstr(afs.af.adr, "//");
-
-                          if (aut) {
-                            char tmp[256];
-
-                            tmp[0] = '\0';
-                            strncatbuff(tmp, afs.af.adr, aut - afs.af.adr);   // scheme
-                            HT_ADD(tmp);        // Protocol
-                            HT_ADD("//");
-                          }
-                        }
-
-                        if (!opt->passprivacy) {
-                          HT_ADD_URL_HTMLESCAPED(
-                              jump_protocol_const(afs.af.adr)); // Password
-                        } else {
-                          HT_ADD_URL_HTMLESCAPED(jump_identification_const(
-                              afs.af.adr)); // No Password
-                        }
-                        if (afs.af.fil[0] != '/')
-                          HT_ADD("/");
-                        HT_ADD_URL_HTMLESCAPED(afs.af.fil);
-                      }
-                      lastsaved = eadr - 1;     // dernier écrit+1 (enfin euh apres on fait un ++ alors hein)
+                      // -K strips a scheme word from an adr with no "//"
+                      sink_add_absolute_url(&sink, afs.af.adr, afs.af.fil,
+                                            opt->passprivacy, HTS_FALSE);
+                      lastsaved = eadr - 1; // the caller's ++ skips the quote
                       /* */
                     } else if (opt->urlmode == HTS_URLMODE_KEEP_ORIGINAL) {
                       /* */
@@ -3197,46 +3198,11 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                     // externe!
                       /* Not only output: also writes external.html or .gif. */
                       if (sink.enabled) {
-                        if (p_type != -1) {     // pas que le nom de fichier (pas classe java)
+                        if (p_type != -1) { // a link, not a java class name
                           if (!opt->external) {
-                            if (!link_has_authority(afs.af.adr)) {
-                              HT_ADD("http://");
-                              if (!opt->passprivacy) {
-                                HT_ADD_URL_HTMLESCAPED(afs.af.adr); // Password
-                              } else {
-                                HT_ADD_URL_HTMLESCAPED(
-                                    jump_identification_const(
-                                        afs.af.adr)); // No Password
-                              }
-                              if (afs.af.fil[0] != '/')
-                                HT_ADD("/");
-                              HT_ADD_URL_HTMLESCAPED(afs.af.fil);
-                            } else {
-                              char *aut = strstr(afs.af.adr, "//");
-
-                              if (aut) {
-                                char tmp[256];
-
-                                tmp[0] = '\0';
-                                strncatbuff(tmp, afs.af.adr, (aut - afs.af.adr));       // scheme
-                                HT_ADD(tmp);    // Protocol
-                                HT_ADD("//");
-                                if (!opt->passprivacy) {
-                                  HT_ADD_URL_HTMLESCAPED(jump_protocol_const(
-                                      afs.af.adr)); // Password
-                                } else {
-                                  HT_ADD_URL_HTMLESCAPED(
-                                      jump_identification_const(
-                                          afs.af.adr)); // No Password
-                                }
-                                if (afs.af.fil[0] != '/')
-                                  HT_ADD("/");
-                                HT_ADD_URL_HTMLESCAPED(afs.af.fil);
-                              }
-                            }
-                            //
-                          } else {      // fichier/page externe, mais on veut générer une erreur
-                            //
+                            sink_add_absolute_url(&sink, afs.af.adr, afs.af.fil,
+                                                  opt->passprivacy, HTS_TRUE);
+                          } else { // external page: link to an error page
                             const char *cat_name = NULL;
                             const char *cat_data = NULL;
                             int cat_nb = 0;
@@ -3293,43 +3259,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                               HT_ADD_HTMLESCAPED(tempo); // page externe
                               HT_ADD("?link=");          // page externe
 
-                              // same as above
-                              if (!link_has_authority(afs.af.adr)) {
-                                HT_ADD("http://");
-                                if (!opt->passprivacy) {
-                                  HT_ADD_URL_HTMLESCAPED(
-                                      afs.af.adr); // Password
-                                } else {
-                                  HT_ADD_URL_HTMLESCAPED(
-                                      jump_identification_const(
-                                          afs.af.adr)); // No Password
-                                }
-                                if (afs.af.fil[0] != '/')
-                                  HT_ADD("/");
-                                HT_ADD_URL_HTMLESCAPED(afs.af.fil);
-                              } else {
-                                char *aut = strstr(afs.af.adr, "//");
-
-                                if (aut) {
-                                  char tmp[256];
-
-                                  tmp[0] = '\0';
-                                  strncatbuff(tmp, afs.af.adr,
-                                              (aut - afs.af.adr) + 2); // scheme
-                                  HT_ADD(tmp);
-                                  if (!opt->passprivacy) {
-                                    HT_ADD_URL_HTMLESCAPED(jump_protocol_const(
-                                        afs.af.adr)); // Password
-                                  } else {
-                                    HT_ADD_URL_HTMLESCAPED(
-                                        jump_identification_const(
-                                            afs.af.adr)); // No Password
-                                  }
-                                  if (afs.af.fil[0] != '/')
-                                    HT_ADD("/");
-                                  HT_ADD_URL_HTMLESCAPED(afs.af.fil);
-                                }
-                              }
+                              sink_add_absolute_url(&sink, afs.af.adr,
+                                                    afs.af.fil,
+                                                    opt->passprivacy, HTS_TRUE);
                             }
                             // écrire fichier?
                             if (verif_external(opt, cat_nb, 1)) {
@@ -3362,9 +3294,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                     "", "");
                               }
                             }
-                          }     // external
-                        } else {        // que le nom de fichier (classe java)
-                          // en gros recopie de plus bas: copier codebase et base
+                          } // external
+                        } else { // a bare java class name
+                          // as below: copy codebase and base
                           if (p_flush) {
                             char BIGSTK tempo[HTS_URLMAXSIZE * 2];      // <-- ajouté
                             char BIGSTK tempo_pat[HTS_URLMAXSIZE * 2];
@@ -3402,17 +3334,10 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
                             // write codebase="path"
                             if (strnotempty(tempo_pat)) {
-                              HT_ADD("codebase=\"http://");
-                              if (!opt->passprivacy) {
-                                HT_ADD_URL_HTMLESCAPED(afs.af.adr); // Password
-                              } else {
-                                HT_ADD_URL_HTMLESCAPED(
-                                    jump_identification_const(
-                                        afs.af.adr)); // No Password
-                              }
-                              if (*tempo_pat != '/')
-                                HT_ADD("/");
-                              HT_ADD_URL_HTMLESCAPED(tempo_pat);
+                              HT_ADD("codebase=\"");
+                              sink_add_absolute_url(&sink, afs.af.adr,
+                                                    tempo_pat, opt->passprivacy,
+                                                    HTS_TRUE);
                               HT_ADD("\" ");
                             }
 
@@ -4667,13 +4592,7 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
             // record the link
             if (hts_record_link(opt, add.af.adr, add.af.fil, add.save,
                                 former.adr, former.fil, NULL)) {
-              heap_top()->testmode = 0;    // mode test?
-              heap_top()->link_import = 0; // mode normal
-              heap_top()->depth = opt->depth;
-              heap_top()->pass2 = max(0, numero_passe);
-              heap_top()->retry = opt->retry;
-              heap_top()->premier = heap_top_index();
-              heap_top()->precedent = heap_top_index();
+              hts_link_set_self_parented(opt, opt->depth, max(0, numero_passe));
               //
               hts_log_print(opt, LOG_INFO, "Link added by user: %s%s",
                             adr_nologin(opt, add.af.adr), add.af.fil);

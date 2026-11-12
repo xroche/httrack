@@ -360,6 +360,18 @@ int hts_record_link(httrackp * opt,
   return success;
 }
 
+void hts_link_set_self_parented(httrackp *opt, int depth, int pass2) {
+  lien_url *const link = heap_top();
+
+  link->testmode = 0;
+  link->link_import = 0;
+  link->depth = depth;
+  link->pass2 = pass2;
+  link->retry = opt->retry;
+  link->premier = heap_top_index();
+  link->precedent = heap_top_index();
+}
+
 void hts_invalidate_link(httrackp * opt, int lpos) {
   /* devalidate entry  */
   opt->liens[lpos]->pass2 = -1;
@@ -583,6 +595,31 @@ void hts_mirror_clock_start(void) {
 
 TStamp hts_mirror_elapsed_ms(void) {
   return mtime_monotonic() - mirror_start_ms;
+}
+
+/* Seconds since local midnight, or 0 if the local time is unavailable. */
+static TStamp seconds_since_midnight(void) {
+  TStamp tl = 0;
+  struct tm tmv;
+
+  if (hts_localtime(time(NULL), &tmv)) {
+    tl += tmv.tm_sec;
+    tl += tmv.tm_min * 60;
+    tl += tmv.tm_hour * 60 * 60;
+  }
+  return tl;
+}
+
+/* Start the stat timers of the shell and of the stat/track files. */
+static void mirror_stat_timers_start(const httrackp *opt,
+                                     TStamp *last_info_shell,
+                                     TStamp *makestat_time) {
+  if (opt->shell) {
+    *last_info_shell = HTS_STAT.stat_timestart;
+  }
+  if ((opt->makestat) || (opt->maketrack)) {
+    *makestat_time = HTS_STAT.stat_timestart;
+  }
 }
 
 // Début de httpmirror, robot
@@ -917,12 +954,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
   /* reset stats */
   hts_stat_recv_set(0);
   HTS_STAT.istat_bytes[0] = HTS_STAT.istat_bytes[1] = 0;
-  if (opt->shell) {
-    last_info_shell = HTS_STAT.stat_timestart;
-  }
-  if ((opt->makestat) || (opt->maketrack)) {
-    makestat_time = HTS_STAT.stat_timestart;
-  }
+  mirror_stat_timers_start(opt, &last_info_shell, &makestat_time);
   // init external modules
   htspe_init();
 
@@ -1291,13 +1323,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
       XH_extuninit;             // désallocation mémoire & buffers
       return 0;
     }
-    heap_top()->testmode = 0;      // pas mode test
-    heap_top()->link_import = 0;   // pas mode import
-    heap_top()->depth = opt->depth + 1;    // lien de priorité maximale
-    heap_top()->pass2 = 0; // 1ère passe
-    heap_top()->retry = opt->retry;        // lien de priorité maximale
-    heap_top()->premier = heap_top_index();        // premier lien, objet-père=objet              
-    heap_top()->precedent = heap_top_index();      // lien précédent
+    hts_link_set_self_parented(opt, opt->depth + 1, 0);
 
     /* --sitemap: queue the sitemap probe just after the seeds, so its URLs are
        injected before the crawl gets far. */
@@ -1379,34 +1405,13 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
     int rollover = 0;
     int ok = 0;
 
-    {
-      TStamp tl = 0;
-      time_t tt;
-      struct tm tmv;
-
-      tt = time(NULL);
-      if (hts_localtime(tt, &tmv)) {
-        tl += tmv.tm_sec;
-        tl += tmv.tm_min * 60;
-        tl += tmv.tm_hour * 60 * 60;
-      }
-      if (tl > opt->waittime)   // attendre minuit
-        rollover = 1;
-    }
+    if (seconds_since_midnight() > opt->waittime) // attendre minuit
+      rollover = 1;
 
     // attendre..
     opt->state._hts_in_html_parsing = 5;
     do {
-      TStamp tl = 0;
-      time_t tt;
-      struct tm tmv;
-
-      tt = time(NULL);
-      if (hts_localtime(tt, &tmv)) {
-        tl += tmv.tm_sec;
-        tl += tmv.tm_min * 60;
-        tl += tmv.tm_hour * 60 * 60;
-      }
+      const TStamp tl = seconds_since_midnight();
 
       if (rollover) {
         if (tl <= opt->waittime)
@@ -1419,14 +1424,11 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
       {
         int r;
 
-        if (rollover)
-          r =
-            RUN_CALLBACK7(opt, loop, sback->lnk, sback->count, 0, 0, opt->lien_tot,
-                          (int) (opt->waittime - tl + 24 * 3600), NULL);
-        else
-          r =
-            RUN_CALLBACK7(opt, loop, sback->lnk, sback->count, 0, 0, opt->lien_tot,
-                          (int) (opt->waittime - tl), NULL);
+        const int wait =
+            (int) (opt->waittime - tl + (rollover ? 24 * 3600 : 0));
+
+        r = RUN_CALLBACK7(opt, loop, sback->lnk, sback->count, 0, 0,
+                          opt->lien_tot, wait, NULL);
         if (!r) {
           hts_store_release_int(&opt->state.exit_xh, 1); // exit requested
           ok = 1;
@@ -1440,13 +1442,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
     // note: recopie de plus haut
     // noter heure actuelle de départ en secondes
     hts_mirror_clock_start();
-    if (opt->shell) {
-      last_info_shell = HTS_STAT.stat_timestart;
-    }
-    if ((opt->makestat) || (opt->maketrack)) {
-      makestat_time = HTS_STAT.stat_timestart;
-    }
-
+    mirror_stat_timers_start(opt, &last_info_shell, &makestat_time);
   }
   /* Info for wrappers */
   hts_log_print(opt, LOG_INFO, "engine: start");
@@ -3841,7 +3837,7 @@ static void postprocess_file(httrackp *opt, const char *save, const char *adr,
           mimehtml_create(opt, cid);
         }
         if (opt->state.mimefp != NULL) {
-          char buff[60 * 100 + 2];
+          char buff[60 * 100];
           char mimebuff[256];
           size_t len;
 
@@ -3858,8 +3854,7 @@ static void postprocess_file(httrackp *opt, const char *save, const char *adr,
                   "Content-ID: <%s>\r\n"
                   "\r\n",
                   mimebuff, isHtml ? "8bit" : "base64", cid);
-          while((len = fread(buff, 1, sizeof(buff) - 2, fp)) > 0) {
-            buff[len] = '\0';
+          while ((len = fread(buff, 1, sizeof(buff), fp)) > 0) {
             if (!isHtml) {
               char base64buff[60 * 100 * 2];
 
@@ -3867,7 +3862,7 @@ static void postprocess_file(httrackp *opt, const char *save, const char *adr,
                      (unsigned char *) base64buff, 1);
               fprintf(opt->state.mimefp, "%s", base64buff);
             } else {
-              fprintf(opt->state.mimefp, "%s", buff);
+              fwrite(buff, 1, len, opt->state.mimefp);
             }
           }
           fprintf(opt->state.mimefp, "\r\n\r\n");
@@ -4331,18 +4326,12 @@ HTSEXT_API int hts_is_parsing(httrackp * opt, int flag) {
     return 0;                   // non
   }
 }
-HTSEXT_API int hts_is_testing(httrackp * opt) { // 0 non 1 test 2 purge
-  if (opt->state._hts_in_html_parsing == 2)
-    return 1;
-  else if (opt->state._hts_in_html_parsing == 3)
-    return 2;
-  else if (opt->state._hts_in_html_parsing == 4)
-    return 3;
-  else if (opt->state._hts_in_html_parsing == 5)        // scheduling
-    return 4;
-  else if (opt->state._hts_in_html_parsing == 6)        // wait for slot
-    return 5;
-  return 0;
+
+HTSEXT_API int hts_is_testing(httrackp *opt) {
+  /* engine phases 2..6 report 1..5, named in httrack-library.h */
+  const int phase = opt->state._hts_in_html_parsing;
+
+  return phase >= 2 && phase <= 6 ? phase - 1 : 0;
 }
 HTSEXT_API int hts_is_exiting(httrackp * opt) {
   return hts_load_acquire_int(&opt->state.exit_xh);

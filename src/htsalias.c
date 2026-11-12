@@ -405,11 +405,10 @@ static const char *optalias_prefix_count(const char *name) {
    the word (-N <template>, -c8) or holding it alone (-O <path>), a long form,
    the -% and -# families (-%r plus a c is the -%rc of --warc-cdx), a cluster
    already carrying -c, and -h, which the caller matches as a whole word. */
-static hts_boolean optalias_clusters(const char *type, const char *command) {
+static hts_boolean optalias_clusters(hts_optclass type, const char *command) {
   size_t i;
 
-  if (strcmp(type, "single") != 0 && strcmp(type, "onoff") != 0 &&
-      strcmp(type, "level") != 0)
+  if (type != HTS_OPT_SINGLE && type != HTS_OPT_ONOFF && type != HTS_OPT_LEVEL)
     return HTS_FALSE;
   if (command[0] != '-' || command[1] == '\0' || strcmp(command, "-h") == 0)
     return HTS_FALSE;
@@ -431,10 +430,10 @@ static hts_boolean optalias_run_fits(const char *run, LLint max) {
 
 /* Suffix the short form takes for a value ("0", "2", or none), or NULL when
    the class refuses it: onoff reads 0/1 only, level reads a number. */
-static const char *optalias_suffix(const char *type, const char *value) {
-  const hts_boolean level = strcmp(type, "level") == 0 ? HTS_TRUE : HTS_FALSE;
+static const char *optalias_suffix(hts_optclass type, const char *value) {
+  const hts_boolean level = type == HTS_OPT_LEVEL ? HTS_TRUE : HTS_FALSE;
 
-  if (!level && strcmp(type, "onoff") != 0)
+  if (!level && type != HTS_OPT_ONOFF)
     return NULL;
   if (level && isdigit((unsigned char) value[0])) {
     size_t i;
@@ -678,12 +677,13 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
       /* Now solve the alias */
       pos = optalias_find(command);
       if (pos >= 0) {
+        const hts_optclass cls = optclass_of(pos);
+
         /* Copy real name */
         strcpybuff(command, hts_optalias[pos][1]);
         /* Say so where the expansion cannot carry the prefix, rather than
            drop the count in silence */
-        if (addcommand[0] != '\0' &&
-            !optalias_clusters(hts_optalias[pos][2], command)) {
+        if (addcommand[0] != '\0' && !optalias_clusters(cls, command)) {
 #if OPTALIAS_PREFIX_STRICT
           slprintfbuff_clip(return_error, return_error_size,
                             "Syntax error:\n\tThe %s- prefix does not apply to "
@@ -702,7 +702,7 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
 #endif
         }
         /* With parameters? */
-        if (strncmp(hts_optalias[pos][2], "param", 5) == 0) {
+        if (optclass_takes_param(cls)) {
           /* Copy parameters? */
           if (need_param == 2) {
             const optparam_state state =
@@ -720,7 +720,7 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
         }
         /* a detached value, but only a word that cannot be a URL of its own */
         else if (need_param == 2 && n_arg + 1 < argc &&
-                 optalias_suffix(hts_optalias[pos][2], argv[n_arg + 1]) != NULL)
+                 optalias_suffix(cls, argv[n_arg + 1]) != NULL)
           strcpybuff(param, argv[n_arg + 1]);
         else
           need_param = 1;
@@ -728,7 +728,7 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
         /* A cluster tail hides a second option in one value, and a %-free
            template maps every URL onto one name; --user-structure takes
            both. */
-        if (strcmp(hts_optalias[pos][2], "paramn") == 0 && param[0] != '\0' &&
+        if (cls == HTS_OPT_PARAMN && param[0] != '\0' &&
             !optalias_paramn_glues(param) &&
             (optalias_paramn_cluster_tail(param) ||
              strchr(param, '%') == NULL)) {
@@ -740,9 +740,8 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
         /* Final result */
 
         /* Alone (-P /tmp), or a paramn value -N cannot take glued */
-        detached = strcmp(hts_optalias[pos][2], "param1") == 0 ||
-                   (strcmp(hts_optalias[pos][2], "paramn") == 0 &&
-                    !optalias_paramn_glues(param));
+        detached = cls == HTS_OPT_PARAM1 ||
+                   (cls == HTS_OPT_PARAMN && !optalias_paramn_glues(param));
 
         /* Every other class glues the value onto the short form in one
            buffer, where strlcatbuff aborts rather than clips. */
@@ -758,7 +757,7 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
           *return_argc = 2;     /* 2 parameters returned */
         }
         /* Alone with parameter (+*.gif) */
-        else if (strcmp(hts_optalias[pos][2], "param0") == 0) {
+        else if (cls == HTS_OPT_PARAM0) {
           /* Command */
           strlcpybuff(return_argv[0], command, return_argv_size);
           strlcatbuff(return_argv[0], param, return_argv_size);
@@ -768,12 +767,12 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
           /* Command */
           strlcpybuff(return_argv[0], command, return_argv_size);
           /* Parameters accepted */
-          if (strncmp(hts_optalias[pos][2], "param", 5) == 0) {
+          if (optclass_takes_param(cls)) {
             /* refuse rather than glue on a value the short form cannot
                read (#1426); "paramn" reads a template too, and rules its
                own values out above */
-            if (strcmp(hts_optalias[pos][2], "param") == 0 &&
-                param[0] != '\0' && !optalias_param_takes(command, param)) {
+            if (cls == HTS_OPT_PARAM && param[0] != '\0' &&
+                !optalias_param_takes(command, param)) {
               optvalue_error(hts_optalias[pos][0], param, return_error,
                              return_error_size);
               return 0;
@@ -784,13 +783,12 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
             else if (strcmp(param, "on") == 0) {
               /* a bare -N reads the next word as a template and would eat the
                  URL, so "on" names the default preset instead (#1434) */
-              if (strcmp(hts_optalias[pos][2], "paramn") == 0)
+              if (cls == HTS_OPT_PARAMN)
                 strlcatbuff(return_argv[0], "0", return_argv_size);
             } else
               strlcatbuff(return_argv[0], param, return_argv_size);
           } else if (param[0] != '\0') {
-            const char *const suffix =
-                optalias_suffix(hts_optalias[pos][2], param);
+            const char *const suffix = optalias_suffix(cls, param);
 
             /* refuse rather than drop: a dropped --index=0 reads back as the
                enabling bare --index */
@@ -822,9 +820,11 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
     int pos;
 
     if ((pos = optreal_find(argv[n_arg])) >= 0) {
+      const hts_optclass cls = optclass_of(pos);
+
       /* -N 1 is preset 1; anything else stays detached, since a template may
          legitimately open with a digit (-N 2col/%n.%t) */
-      if (strcmp(hts_optalias[pos][2], "paramn") == 0 && n_arg + 1 < argc &&
+      if (cls == HTS_OPT_PARAMN && n_arg + 1 < argc &&
           optalias_is_digits(argv[n_arg + 1])) {
         strlcpybuff(return_argv[0], argv[n_arg], return_argv_size);
         strlcatbuff(return_argv[0], argv[n_arg + 1], return_argv_size);
@@ -834,15 +834,14 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
       /* -N DIGITS is a preset; any other next word not naming an option is
          the template the parse loop takes (htscoremain.c case 'N'), so it is
          never a URL. Keep both tests in step. */
-      if (strcmp(hts_optalias[pos][2], "paramn") == 0 &&
+      if (cls == HTS_OPT_PARAMN &&
           optparam_check(argc, argv, n_arg, argv[n_arg]) == OPTPARAM_PRESENT) {
         strlcpybuff(return_argv[0], argv[n_arg], return_argv_size);
         strlcpybuff(return_argv[1], argv[n_arg + 1], return_argv_size);
         *return_argc = 2;
         return 2;
       }
-      if ((strcmp(hts_optalias[pos][2], "param1") == 0)
-          || (strcmp(hts_optalias[pos][2], "param0") == 0)) {
+      if ((cls == HTS_OPT_PARAM1) || (cls == HTS_OPT_PARAM0)) {
         const optparam_state state =
             optparam_check(argc, argv, n_arg, argv[n_arg]);
 
@@ -952,7 +951,42 @@ const char *optreal_value(int p) { return hts_optalias[p][1]; }
 
 const char *optalias_value(int p) { return hts_optalias[p][0]; }
 
-const char *opttype_value(int p) { return hts_optalias[p][2]; }
+static const struct {
+  hts_optclass cls;
+  const char *name;
+} optclass_names[] = {
+    {HTS_OPT_SINGLE, "single"}, {HTS_OPT_ONOFF, "onoff"},
+    {HTS_OPT_LEVEL, "level"},   {HTS_OPT_PARAM, "param"},
+    {HTS_OPT_PARAM1, "param1"}, {HTS_OPT_PARAM0, "param0"},
+    {HTS_OPT_PARAMN, "paramn"},
+};
+
+hts_optclass optclass_of(int p) {
+  size_t i;
+
+  for (i = 0; i < sizeof(optclass_names) / sizeof(optclass_names[0]); i++) {
+    if (strcmp(hts_optalias[p][2], optclass_names[i].name) == 0)
+      return optclass_names[i].cls;
+  }
+  return HTS_OPT_UNKNOWN;
+}
+
+const char *optclass_name(hts_optclass cls) {
+  size_t i;
+
+  for (i = 0; i < sizeof(optclass_names) / sizeof(optclass_names[0]); i++) {
+    if (optclass_names[i].cls == cls)
+      return optclass_names[i].name;
+  }
+  return "unknown";
+}
+
+hts_boolean optclass_takes_param(hts_optclass cls) {
+  return cls == HTS_OPT_PARAM || cls == HTS_OPT_PARAM1 ||
+                 cls == HTS_OPT_PARAM0 || cls == HTS_OPT_PARAMN
+             ? HTS_TRUE
+             : HTS_FALSE;
+}
 
 /* Help for option <token>, empty if not available, or NULL if unknown <token> */
 const char *optalias_help(const char *token) {
@@ -1061,7 +1095,7 @@ static void optinclude_fold(const char *key, char *value) {
   const char *const *keywords;
   const char *word = value;
   size_t len = strlen(value);
-  const char *type;
+  hts_optclass type;
   hts_boolean unquote;
   int pos = optalias_find(key), i;
 
@@ -1073,12 +1107,11 @@ static void optinclude_fold(const char *key, char *value) {
     hts_lowcase(value);
     return;
   }
-  type = hts_optalias[pos][2];
-  if (strcmp(type, "param0") == 0)
+  type = optclass_of(pos);
+  if (type == HTS_OPT_PARAM0)
     return;
-  keywords = strcmp(type, "param1") == 0 ? none : onoff;
-  unquote = keywords == none || strcmp(type, "onoff") == 0 ||
-            strcmp(type, "level") == 0;
+  keywords = type == HTS_OPT_PARAM1 ? none : onoff;
+  unquote = keywords == none || type == HTS_OPT_ONOFF || type == HTS_OPT_LEVEL;
   if (unquote && len >= 2 && value[0] == '"' && value[len - 1] == '"') {
     word++;
     len -= 2;

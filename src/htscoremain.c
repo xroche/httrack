@@ -496,7 +496,7 @@ static hts_boolean cmdl_cluster_step(const char *word, size_t *at, char *name,
   pos = optreal_find(name);
   *value = -1;
   /* only a lone -N reads the next word; a clustered one reads its digits */
-  if (pos < 0 || strcmp(opttype_value(pos), "param1") != 0 ||
+  if (pos < 0 || optclass_of(pos) != HTS_OPT_PARAM1 ||
       strcmp(name, "-N") == 0 || *next >= argc ||
       (argv[*next][0] == '-' && (param == NULL || !param[*next])))
     return HTS_TRUE;
@@ -535,6 +535,22 @@ static int cmdl_cluster_params(cmdl_argv *cmd, const char *word, int argc,
    stays the next option it always was (#1425). */
 static hts_boolean optparam_dash_ok(const cmdl_argv *cmd, int na) {
   return na + 1 < cmd->argc && cmd->param[na + 1];
+}
+
+/* Advances *NA to the word after the option, its value. HTS_FALSE after a panic
+   with MSG and EXAMPLE (NULL for none) when that word is missing or reads as an
+   option. */
+static hts_boolean cmdl_take_value(httrackp *opt, const cmdl_argv *cmd, int *na,
+                                   const char *msg, const char *example) {
+  if (*na + 1 >= cmd->argc ||
+      (cmd->argv[*na + 1][0] == '-' && !optparam_dash_ok(cmd, *na))) {
+    HTS_PANIC_PRINTF(msg);
+    if (example != NULL)
+      printf("Example: %s\n", example);
+    return HTS_FALSE;
+  }
+  (*na)++;
+  return HTS_TRUE;
 }
 
 /* Store the --bundle-dir at na in opt and cmd as an absolute path, so doit.log
@@ -1620,15 +1636,12 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
             //
           case 'N':
             if (strcmp(argv[na], "-N") == 0) {  // Tout seul
-              if ((na + 1 >= argc) ||
-                  (argv[na + 1][0] == '-' &&
-                   !optparam_dash_ok(x_cmd, na))) { // erreur
-                HTS_PANIC_PRINTF
-                  ("Option N needs a number, or needs to be followed by a blank space, and a string");
-                printf("Example: -N4\n");
+              if (!cmdl_take_value(opt, x_cmd, &na,
+                                   "Option N needs a number, or needs to be "
+                                   "followed by a blank space, and a string",
+                                   "-N4")) {
                 return -1;
               } else {
-                na++;
                 if (strlen(argv[na]) >= 127) {
                   HTS_PANIC_PRINTF("Userdef structure string too long");
                   return -1;
@@ -1831,14 +1844,12 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                 readGluedOnOff(opt->bypass_limits);
                 break;
               case 'w':        // disable specific plugin
-                if ((na + 1 >= argc) ||
-                    (argv[na + 1][0] == '-' && !optparam_dash_ok(x_cmd, na))) {
-                  HTS_PANIC_PRINTF
-                    ("Option %w needs to be followed by a blank space, and a module name");
-                  printf("Example: -%%w httrack-plugin\n");
+                if (!cmdl_take_value(opt, x_cmd, &na,
+                                     "Option %w needs to be followed by a "
+                                     "blank space, and a module name",
+                                     "-%w httrack-plugin")) {
                   return -1;
                 } else {
-                  na++;
                   StringCat(opt->mod_blacklist, argv[na]);
                   StringCat(opt->mod_blacklist, "\n");
                 }
@@ -1850,15 +1861,12 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                 opt->urlmode = HTS_URLMODE_KEEP_ORIGINAL;
                 break;
               case 'L':        // URL list
-                /* a vetted pair's value may begin with '-' (#1425) */
-                if ((na + 1 >= argc) ||
-                    (argv[na + 1][0] == '-' && !optparam_dash_ok(x_cmd, na))) {
-                  HTS_PANIC_PRINTF
-                    ("Option %L needs to be followed by a blank space, and a text filename");
-                  printf("Example: -%%L \"mylist.txt\"\n");
+                if (!cmdl_take_value(opt, x_cmd, &na,
+                                     "Option %L needs to be followed by a "
+                                     "blank space, and a text filename",
+                                     "-%L \"mylist.txt\"")) {
                   return -1;
                 } else {
-                  na++;
                   if (strlen(argv[na]) >= HTS_FILELIST_MAXSIZE) {
                     HTS_PANIC_PRINTF("File list string too long");
                     return -1;
@@ -1867,14 +1875,12 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                 }
                 break;
               case 'b':        // bind
-                if ((na + 1 >= argc) ||
-                    (argv[na + 1][0] == '-' && !optparam_dash_ok(x_cmd, na))) {
-                  HTS_PANIC_PRINTF
-                    ("Option %b needs to be followed by a blank space, and a local hostname");
-                  printf("Example: -%%b \"ip4.localhost\"\n");
+                if (!cmdl_take_value(opt, x_cmd, &na,
+                                     "Option %b needs to be followed by a "
+                                     "blank space, and a local hostname",
+                                     "-%b \"ip4.localhost\"")) {
                   return -1;
                 } else {
-                  na++;
                   if (strlen(argv[na]) >= HTS_BINDHOST_MAXSIZE) {
                     HTS_PANIC_PRINTF("Hostname string too long");
                     return -1;
@@ -1883,17 +1889,14 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                 }
                 break;
               case 'S':        // Scan Rules list
-                /* a vetted pair's value may begin with '-' (#1425) */
-                if ((na + 1 >= argc) ||
-                    (argv[na + 1][0] == '-' && !optparam_dash_ok(x_cmd, na))) {
-                  HTS_PANIC_PRINTF
-                    ("Option %S needs to be followed by a blank space, and a text filename");
-                  printf("Example: -%%S \"myfilterlist.txt\"\n");
+                if (!cmdl_take_value(opt, x_cmd, &na,
+                                     "Option %S needs to be followed by a "
+                                     "blank space, and a text filename",
+                                     "-%S \"myfilterlist.txt\"")) {
                   return -1;
                 } else {
                   LLint fz;
 
-                  na++;
                   fz = fsize_utf8(argv[na]);
                   if (fz < 0) {
                     HTS_PANIC_PRINTF("File url list could not be opened");
@@ -1928,15 +1931,13 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                 }
                 break;
               case 'A':        // assume
-                /* a vetted pair's value may begin with '-' (#1425) */
-                if ((na + 1 >= argc) ||
-                    (argv[na + 1][0] == '-' && !optparam_dash_ok(x_cmd, na))) {
-                  HTS_PANIC_PRINTF
-                    ("Option %A needs to be followed by a blank space, and a filesystemtype=mimetype/mimesubtype parameters");
-                  printf("Example: -%%A php3=text/html,asp=text/html\n");
+                if (!cmdl_take_value(
+                        opt, x_cmd, &na,
+                        "Option %A needs to be followed by a blank space, and "
+                        "a filesystemtype=mimetype/mimesubtype parameters",
+                        "-%A php3=text/html,asp=text/html")) {
                   return -1;
                 } else {
-                  na++;
                   // --assume standard
                   if (strcmp(argv[na], "standard") == 0) {
                     StringCopy(opt->mimedefs, "\n");
@@ -1961,14 +1962,12 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                 break;
                 //
               case 'l': // Accept-language
-                if ((na + 1 >= argc) ||
-                    (argv[na + 1][0] == '-' && !optparam_dash_ok(x_cmd, na))) {
-                  HTS_PANIC_PRINTF
-                    ("Option %l needs to be followed by a blank space, and an ISO language code");
-                  printf("Example: -%%l \"en\"\n");
+                if (!cmdl_take_value(opt, x_cmd, &na,
+                                     "Option %l needs to be followed by a "
+                                     "blank space, and an ISO language code",
+                                     "-%l \"en\"")) {
                   return -1;
                 } else {
-                  na++;
                   if (strlen(argv[na]) >= HTS_LANGISO_MAXSIZE) {
                     HTS_PANIC_PRINTF("Lang list string too long");
                     return -1;
@@ -1979,14 +1978,13 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                 break;
                 //
               case 'a':  // Accept
-                if ((na + 1 >= argc) ||
-                    (argv[na + 1][0] == '-' && !optparam_dash_ok(x_cmd, na))) {
-                  HTS_PANIC_PRINTF
-                    ("Option %a needs to be followed by a blank space, and a list of formats");
-                  printf("Example: -%%a \"text/html,*/*;q=0.1\"\n");
+                if (!cmdl_take_value(opt, x_cmd, &na,
+                                     "Option %a needs to be followed by a "
+                                     "blank space, and a list of formats",
+                                     "-%a \"text/html,*/*;q=0.1\"")) {
                   return -1;
                 } else {
-                  const int kind = hts_accept_kind_of(argv[++na]);
+                  const int kind = hts_accept_kind_of(argv[na]);
                   const char *const value =
                       kind >= 0 ? strchr(argv[na], '=') + 1 : argv[na];
 
@@ -2006,15 +2004,12 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                 break;
                 //
               case 'X':  // HTTP header line
-                /* a vetted pair's value may begin with '-' (#1425) */
-                if ((na + 1 >= argc) ||
-                    (argv[na + 1][0] == '-' && !optparam_dash_ok(x_cmd, na))) {
-                  HTS_PANIC_PRINTF
-                    ("Option %X needs to be followed by a blank space, and a raw HTTP header line");
-                  printf("Example: -%%X \"X-Magic: 42\"\n");
+                if (!cmdl_take_value(opt, x_cmd, &na,
+                                     "Option %X needs to be followed by a "
+                                     "blank space, and a raw HTTP header line",
+                                     "-%X \"X-Magic: 42\"")) {
                   return -1;
                 } else {
-                  na++;
                   if (argv[na][0] == '\0') {
                     HTS_PANIC_PRINTF("Empty string given");
                     return -1;
@@ -2043,17 +2038,15 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                 break;
                 //
               case 'F':        // footer id
-                /* a vetted pair's value may begin with '-' (#1425) */
-                if ((na + 1 >= argc) ||
-                    (argv[na + 1][0] == '-' && !optparam_dash_ok(x_cmd, na))) {
-                  HTS_PANIC_PRINTF
-                    ("Option %F needs to be followed by a blank space, and a footer string");
-                  printf("Example: -%%F \"<!-- Mirrored from {addr}{path} by "
-                         "HTTrack Website Copier/"
-                         "{version} " HTTRACK_AFF_AUTHORS ", {date} -->\"\n");
+                if (!cmdl_take_value(opt, x_cmd, &na,
+                                     "Option %F needs to be followed by a "
+                                     "blank space, and a footer string",
+                                     "-%F \"<!-- Mirrored from {addr}{path} by "
+                                     "HTTrack Website Copier/"
+                                     "{version} " HTTRACK_AFF_AUTHORS
+                                     ", {date} -->\"")) {
                   return -1;
                 } else {
-                  na++;
                   if (strlen(argv[na]) >= HTS_FOOTER_MAXSIZE) {
                     HTS_PANIC_PRINTF("Footer string too long");
                     return -1;
@@ -2075,16 +2068,15 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
 
               case 'W':        // Wrapper callback
                 // --wrapper check-link=obj.so:check_link
-                if ((na + 1 >= argc) ||
-                    (argv[na + 1][0] == '-' && !optparam_dash_ok(x_cmd, na))) {
-                  HTS_PANIC_PRINTF
-                    ("Option %W needs to be followed by a blank space, and a <callback-name>=<myfile.so>:<function-name> field");
-                  printf("Example: -%%W check-link=checklink.so:check\n");
+                if (!cmdl_take_value(
+                        opt, x_cmd, &na,
+                        "Option %W needs to be followed by a blank space, and "
+                        "a <callback-name>=<myfile.so>:<function-name> field",
+                        "-%W check-link=checklink.so:check")) {
                   return -1;
                 } else {
                   char *pos;
 
-                  na++;
                   for(pos = argv[na];
                       *pos != '\0' && *pos != '=' && *pos != ',' && *pos != ':';
                       pos++) ;
@@ -2145,14 +2137,12 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                 break;
 
               case 'R':        // Referer
-                if ((na + 1 >= argc) ||
-                    (argv[na + 1][0] == '-' && !optparam_dash_ok(x_cmd, na))) {
-                  HTS_PANIC_PRINTF
-                    ("Option %R needs to be followed by a blank space, and a referer URL");
-                  printf("Example: -%%R \"http://www.example.com/\"\n");
+                if (!cmdl_take_value(opt, x_cmd, &na,
+                                     "Option %R needs to be followed by a "
+                                     "blank space, and a referer URL",
+                                     "-%R \"http://www.example.com/\"")) {
                   return -1;
                 } else {
-                  na++;
                   if (strlen(argv[na]) >= HTS_REFERER_MAXSIZE) {
                     HTS_PANIC_PRINTF("Referer URL too long");
                     return -1;
@@ -2161,14 +2151,12 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                 }
                 break;
               case 'E':        // From Email address
-                if ((na + 1 >= argc) ||
-                    (argv[na + 1][0] == '-' && !optparam_dash_ok(x_cmd, na))) {
-                  HTS_PANIC_PRINTF
-                    ("Option %E needs to be followed by a blank space, and an email");
-                  printf("Example: -%%E \"postmaster@example.com\"\n");
+                if (!cmdl_take_value(opt, x_cmd, &na,
+                                     "Option %E needs to be followed by a "
+                                     "blank space, and an email",
+                                     "-%E \"postmaster@example.com\"")) {
                   return -1;
                 } else {
-                  na++;
                   if (strlen(argv[na]) >= HTS_FROMEMAIL_MAXSIZE) {
                     HTS_PANIC_PRINTF("From email too long");
                     return -1;
@@ -2178,16 +2166,14 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                 break;
 
               case 'g': // strip-query: accumulate "[pattern=]keys" entries
-                /* a vetted pair's key may begin with '-' (#1179) */
-                if ((na + 1 >= argc) ||
-                    (argv[na + 1][0] == '-' && !optparam_dash_ok(x_cmd, na))) {
-                  HTS_PANIC_PRINTF("Option strip-query needs a blank space and "
-                                   "[host/pattern=]key1,key2,...");
-                  printf("Example: --strip-query "
-                         "\"www.example.com/*=utm_source,sid\"\n");
+                if (!cmdl_take_value(
+                        opt, x_cmd, &na,
+                        "Option strip-query needs a blank space and "
+                        "[host/pattern=]key1,key2,...",
+                        "--strip-query "
+                        "\"www.example.com/*=utm_source,sid\"")) {
                   return -1;
                 } else {
-                  na++;
                   if (StringNotEmpty(opt->strip_query))
                     StringCat(opt->strip_query, "\n");
                   StringCat(opt->strip_query, argv[na]);
@@ -2195,18 +2181,17 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                 break;
 
               case 'C': // host-alias: accumulate "alias[,alias...]=host" rules
-                /* a vetted pair's alias may begin with '-' (#1179) */
-                if ((na + 1 >= argc) ||
-                    (argv[na + 1][0] == '-' && !optparam_dash_ok(x_cmd, na))) {
-                  HTS_PANIC_PRINTF("Option host-alias needs a blank space and "
-                                   "alias[,alias...]=canonical-host");
-                  printf("Example: --host-alias "
-                         "\"www2.example.com,m.example.com=example.com\"\n");
-                  printf("Example: --host-alias "
-                         "\"legacy.example.com=https://example.com\"\n");
+                if (!cmdl_take_value(
+                        opt, x_cmd, &na,
+                        "Option host-alias needs a blank space and "
+                        "alias[,alias...]=canonical-host",
+                        "--host-alias "
+                        "\"www2.example.com,m.example.com=example.com\""
+                        "\nExample: "
+                        "--host-alias "
+                        "\"legacy.example.com=https://example.com\"")) {
                   return -1;
                 } else {
-                  na++;
                   if (!hts_host_alias_rule_ok(argv[na])) {
                     HTS_PANIC_PRINTF("Invalid host-alias rule: expected "
                                      "alias[,alias...]=canonical-host");
@@ -2222,16 +2207,13 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                 }
                 break;
               case 'K': // cookies-file: the Netscape jar, rewritten at the end
-                /* a vetted pair's value may begin with '-' (#1425) */
-                if ((na + 1 >= argc) ||
-                    (argv[na + 1][0] == '-' && !optparam_dash_ok(x_cmd, na))) {
-                  HTS_PANIC_PRINTF(
-                      "Option cookies-file needs a blank space and "
-                      "a cookies.txt path");
-                  printf("Example: --cookies-file \"/home/me/cookies.txt\"\n");
+                if (!cmdl_take_value(
+                        opt, x_cmd, &na,
+                        "Option cookies-file needs a blank space and "
+                        "a cookies.txt path",
+                        "--cookies-file \"/home/me/cookies.txt\"")) {
                   return -1;
                 } else {
-                  na++;
                   if (strlen(argv[na]) >= 1024) {
                     HTS_PANIC_PRINTF("Cookie file path too long");
                     return -1;
@@ -2245,14 +2227,11 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
               case 'r': // warc / warc-file: write an ISO-28500 WARC archive
                 if (*(com + 1) == 'f') { // --warc-file NAME: explicit basename
                   com++;
-                  /* a vetted pair's value may begin with '-' (#1425) */
-                  if ((na + 1 >= argc) || (argv[na + 1][0] == '-' &&
-                                           !optparam_dash_ok(x_cmd, na))) {
-                    HTS_PANIC_PRINTF(
-                        "Option warc-file needs a blank space and a WARC name");
+                  if (!cmdl_take_value(opt, x_cmd, &na,
+                                       "Option warc-file needs a blank space "
+                                       "and a WARC name",
+                                       NULL))
                     return -1;
-                  }
-                  na++;
                   if (strlen(argv[na]) >= 1024) {
                     HTS_PANIC_PRINTF("WARC file name too long");
                     return -1;
@@ -2260,13 +2239,11 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                   StringCopy(opt->warc_file, argv[na]);
                 } else if (*(com + 1) == 's') { // --warc-max-size N: rotation
                   com++;
-                  if ((na + 1 >= argc) || (argv[na + 1][0] == '-' &&
-                                           !optparam_dash_ok(x_cmd, na))) {
-                    HTS_PANIC_PRINTF(
-                        "Option warc-max-size needs a blank space and a size");
+                  if (!cmdl_take_value(
+                          opt, x_cmd, &na,
+                          "Option warc-max-size needs a blank space and a size",
+                          NULL))
                     return -1;
-                  }
-                  na++;
                   if (hts_is_quoted(argv[na], strlen(argv[na]))) {
                     cmdl_panic_value(opt, "Option warc-max-size needs a size",
                                      argv[na]);
@@ -2309,14 +2286,12 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
               case 'Z': // single-file: inline each page's assets as data: URIs
                 if (*(com + 1) == 's') { // --single-file-max-size N
                   com++;
-                  if ((na + 1 >= argc) || (argv[na + 1][0] == '-' &&
-                                           !optparam_dash_ok(x_cmd, na))) {
-                    HTS_PANIC_PRINTF(
-                        "Option single-file-max-size needs a blank "
-                        "space and a size");
+                  if (!cmdl_take_value(
+                          opt, x_cmd, &na,
+                          "Option single-file-max-size needs a blank "
+                          "space and a size",
+                          NULL))
                     return -1;
-                  }
-                  na++;
                   { // a typo must not enable single-file on the default cap
                     char *end;
                     LLint v;
@@ -2350,13 +2325,11 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
               case 'm': // sitemap / sitemap-url: seed the crawl from sitemaps
                 if (*(com + 1) == 'u') { // --sitemap-url URL: explicit sitemap
                   com++;
-                  if ((na + 1 >= argc) || (argv[na + 1][0] == '-' &&
-                                           !optparam_dash_ok(x_cmd, na))) {
-                    HTS_PANIC_PRINTF(
-                        "Option sitemap-url needs a blank space and a URL");
+                  if (!cmdl_take_value(
+                          opt, x_cmd, &na,
+                          "Option sitemap-url needs a blank space and a URL",
+                          NULL))
                     return -1;
-                  }
-                  na++;
                   if (strlen(argv[na]) >= HTS_URLMAXSIZE) {
                     HTS_PANIC_PRINTF("Sitemap URL too long");
                     return -1;
@@ -2367,14 +2340,12 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                 }
                 break;
               case 'Y': // why: explain the filter verdict for a URL, no crawl
-                if ((na + 1 >= argc) ||
-                    (argv[na + 1][0] == '-' && !optparam_dash_ok(x_cmd, na))) {
-                  HTS_PANIC_PRINTF("Option why needs a blank space and a URL");
-                  printf(
-                      "Example: --why \"http://www.example.com/file.zip\"\n");
+                if (!cmdl_take_value(
+                        opt, x_cmd, &na,
+                        "Option why needs a blank space and a URL",
+                        "--why \"http://www.example.com/file.zip\"")) {
                   return -1;
                 } else {
-                  na++;
                   if (strlen(argv[na]) >= HTS_URLMAXSIZE) {
                     HTS_PANIC_PRINTF("why URL too long");
                     return -1;
@@ -2414,17 +2385,15 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                   com++;
               } break;
               case 'G': // pause: randomized inter-file delay MIN[:MAX] seconds
-                if ((na + 1 >= argc) ||
-                    (argv[na + 1][0] == '-' && !optparam_dash_ok(x_cmd, na))) {
-                  HTS_PANIC_PRINTF("Option pause needs a blank space and a "
-                                   "delay in seconds (MIN[:MAX])");
-                  printf("Example: --pause 5:10\n");
+                if (!cmdl_take_value(opt, x_cmd, &na,
+                                     "Option pause needs a blank space and a "
+                                     "delay in seconds (MIN[:MAX])",
+                                     "--pause 5:10")) {
                   return -1;
                 } else {
                   double pmin = 0, pmax = 0;
                   int nf;
 
-                  na++;
                   nf = sscanf(argv[na], "%lf:%lf", &pmin, &pmax);
                   if (nf < 2)
                     pmax = pmin; /* a single value means a fixed delay */
@@ -2757,31 +2726,27 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
             na++;               // sauter, déja traité
             break;
           case 'P':            // proxy
-            if ((na + 1 >= argc) ||
-                (argv[na + 1][0] == '-' && !optparam_dash_ok(x_cmd, na))) {
-              HTS_PANIC_PRINTF
-                ("Option P needs to be followed by a blank space, and a proxy proxy:port or user:id@proxy:port");
-              printf("Example: -P proxy.example.com:8080\n");
+            if (!cmdl_take_value(
+                    opt, x_cmd, &na,
+                    "Option P needs to be followed by a blank space, and a "
+                    "proxy proxy:port or user:id@proxy:port",
+                    "-P proxy.example.com:8080")) {
               return -1;
             } else {
               char BIGSTK pname[HTS_URLMAXSIZE * 2];
 
-              na++;
               opt->proxy.active = 1;
               hts_parse_proxy(argv[na], pname, sizeof(pname), &opt->proxy.port);
               StringCopy(opt->proxy.name, pname);
             }
             break;
           case 'F':            // user-agent field
-            /* a vetted pair's value may begin with '-' (#1425) */
-            if ((na + 1 >= argc) ||
-                (argv[na + 1][0] == '-' && !optparam_dash_ok(x_cmd, na))) {
-              HTS_PANIC_PRINTF
-                ("Option F needs to be followed by a blank space, and a user-agent name");
-              printf("Example: -F \"my_user_agent/1.0\"\n");
+            if (!cmdl_take_value(opt, x_cmd, &na,
+                                 "Option F needs to be followed by a blank "
+                                 "space, and a user-agent name",
+                                 "-F \"my_user_agent/1.0\"")) {
               return -1;
             } else {
-              na++;
               StringCopy(opt->user_agent, argv[na]);
               if (StringNotEmpty(opt->user_agent))
                 opt->user_agent_send = 1;
@@ -2791,14 +2756,12 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
             break;
             //
           case 'V':            // execute command
-            if ((na + 1 >= argc) ||
-                (argv[na + 1][0] == '-' && !optparam_dash_ok(x_cmd, na))) {
-              HTS_PANIC_PRINTF
-                ("Option V needs to be followed by a system-command string");
-              printf("Example: -V \"tar uvf some.tar \\$0\"\n");
+            if (!cmdl_take_value(
+                    opt, x_cmd, &na,
+                    "Option V needs to be followed by a system-command string",
+                    "-V \"tar uvf some.tar \\$0\"")) {
               return -1;
             } else {
-              na++;
               if (strlen(argv[na]) >= 2048) {
                 HTS_PANIC_PRINTF("System-command length too long");
                 return -1;

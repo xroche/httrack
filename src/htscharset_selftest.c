@@ -241,6 +241,52 @@ static int st_idna_encode(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* One row: host, its length, dst size, in place, expected result or NULL. */
+static int host_ascii_case(const char *host, size_t len, size_t size,
+                           hts_boolean inplace, const char *want) {
+  char buf[64], before[64];
+  const char *src = host;
+
+  memset(buf, 'Z', sizeof(buf) - 1);
+  buf[sizeof(buf) - 1] = '\0';
+  if (inplace) {
+    strcpybuff(buf, host);
+    src = buf;
+  }
+  memcpy(before, buf, sizeof(buf));
+  if (hts_host_to_ascii(buf, size, src, len) != (want != NULL) ||
+      (want != NULL && strcmp(buf, want) != 0) ||
+      (want == NULL && memcmp(buf, before, sizeof(buf)) != 0)) {
+    printf("host-ascii: '%s' (%u bytes into %u) gave '%s'\n", host,
+           (unsigned) len, (unsigned) size, buf);
+    return 1;
+  }
+  return 0;
+}
+
+static int st_host_ascii(httrackp *opt, int argc, char **argv) {
+  static const char mu[] = "m\xc3\xbcnchen.de";
+  static const char mu_idna[] = "xn--mnchen-3ya.de";
+  int fail = 0;
+
+  fail |= host_ascii_case("abc.com:80", 7, 64, HTS_FALSE, "abc.com");
+  fail |= host_ascii_case(mu, strlen(mu), 64, HTS_FALSE, mu_idna);
+  fail |= host_ascii_case(mu, strlen(mu), 64, HTS_TRUE, mu_idna);
+  fail |= host_ascii_case(mu, strlen(mu), sizeof(mu_idna), HTS_FALSE, mu_idna);
+  // one byte short: refused, and dst keeps its old bytes
+  fail |= host_ascii_case(mu, strlen(mu), sizeof(mu_idna) - 1, HTS_FALSE, NULL);
+  fail |= host_ascii_case(mu, strlen(mu), sizeof(mu_idna) - 1, HTS_TRUE, NULL);
+  fail |= host_ascii_case("abc", 3, 4, HTS_FALSE, "abc");
+  fail |= host_ascii_case("abc", 3, 3, HTS_FALSE, NULL);
+  fail |= host_ascii_case("b\xc3", 2, 64, HTS_FALSE, NULL);
+  fail |= host_ascii_case("", 0, 1, HTS_FALSE, "");
+  fail |= host_ascii_case("", 0, 0, HTS_FALSE, NULL);
+  if (fail)
+    return 1;
+  printf("host-ascii self-test OK\n");
+  return 0;
+}
+
 static int st_idna_decode(httrackp *opt, int argc, char **argv) {
   char *s;
 
@@ -819,6 +865,8 @@ const struct selftest_entry selftests_charset[] = {
      st_idna_encode},
     {"idna-decode", "<host>", "decode an IDNA/punycode hostname",
      st_idna_decode},
+    {"host-ascii", "", "hts_host_to_ascii() converts, bounds and refuses",
+     st_host_ascii},
     {"entities", "<string> [encoding]", "unescape HTML entities", st_entities},
     {"entities-sweep", "<file>",
      "decode each 'name cp' line of <file> and its one-byte misses",

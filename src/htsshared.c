@@ -31,13 +31,14 @@ Please visit our Website: http://www.httrack.com
 /* ------------------------------------------------------------ */
 
 #include "htsshared.h"
+#include "htsnet.h"
 
 #include <ctype.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
-int hts_shared_linput(FILE *fp, char *s, int max, hts_boolean skip_nul) {
+int hts_shared_linput(FILE *fp, char *s, int max, int flags) {
   int c;
   int j = 0;
 
@@ -54,7 +55,7 @@ int hts_shared_linput(FILE *fp, char *s, int max, hts_boolean skip_nul) {
       case 12:
         break;
       case 0:
-        if (skip_nul)
+        if ((flags & HTS_LINPUT_SKIP_NUL) != 0)
           break;
         s[j++] = (char) c;
         break;
@@ -66,10 +67,15 @@ int hts_shared_linput(FILE *fp, char *s, int max, hts_boolean skip_nul) {
   } while ((c != -1) && (c != EOF) && (j < (max - 1)));
   if (j == max - 1 && c != -1 && c != EOF) {
     /* Stopped at the bound: consume the newline, or the next read returns "" */
-    while ((c = fgetc(fp)) == 13)
-      ;
-    if (c != 10 && c != EOF)
-      ungetc(c, fp);
+    if ((flags & HTS_LINPUT_DROP_TAIL) != 0) {
+      while ((c = fgetc(fp)) != 10 && c != EOF)
+        ;
+    } else {
+      while ((c = fgetc(fp)) == 13)
+        ;
+      if (c != 10 && c != EOF)
+        ungetc(c, fp);
+    }
   }
   s[j] = '\0';
   return j;
@@ -94,4 +100,65 @@ hts_boolean hts_shared_link_has_authority(const char *lien) {
       return HTS_FALSE;
   }
   return strncmp(a, "//", 2) == 0;
+}
+
+hts_boolean hts_shared_readable(T_SOC soc, time_t deadline) {
+  fd_set fds;
+  struct timeval tv;
+  time_t left = 0;
+
+  if (soc == INVALID_SOCKET || !hts_soc_selectable(soc))
+    return HTS_FALSE;
+  if (deadline != 0) {
+    left = deadline - time(NULL);
+    if (left <= 0)
+      return HTS_FALSE;
+  }
+  FD_ZERO(&fds);
+  FD_SET(soc, &fds);
+  tv.tv_sec = (long) left;
+  tv.tv_usec = 0;
+  /* No deadline: wait forever. */
+  struct timeval *const timeout = deadline != 0 ? &tv : NULL;
+  return select((int) soc + 1, &fds, NULL, NULL, timeout) > 0 &&
+         FD_ISSET(soc, &fds);
+}
+
+int hts_shared_linputsoc(T_SOC soc, char *s, int max, time_t deadline,
+                         hts_boolean *cut) {
+  int c;
+  int j = 0;
+
+  *cut = HTS_FALSE;
+  s[0] = '\0';
+  if (!hts_shared_readable(soc, deadline))
+    return -1;
+  do {
+    unsigned char ch;
+
+    if (hts_shared_readable(soc, deadline) &&
+        recv(soc, (char *) &ch, 1, 0) == 1) {
+      c = ch;
+    } else {
+      c = EOF;
+    }
+    switch (c) {
+    case EOF:
+    case 13:
+    case 9:
+    case 12:
+      break;
+    case 10:
+      c = -1;
+      break;
+    default:
+      if (j < max - 1)
+        s[j++] = (char) c;
+      else
+        *cut = HTS_TRUE;
+      break;
+    }
+  } while (c != -1 && c != EOF);
+  s[j] = '\0';
+  return j;
 }

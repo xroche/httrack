@@ -92,15 +92,15 @@ void infomsg(const char *msg) {
     }
     if (p >= 0) {
       /* type of parameter: number, param, param concatenated, single cmd */
-      if (strcmp(opttype_value(p), "param") == 0 ||
-          strcmp(opttype_value(p), "paramn") == 0 ||
-          strcmp(opttype_value(p), "level") == 0)
+      const hts_optclass cls = optclass_of(p);
+
+      if (cls == HTS_OPT_PARAM || cls == HTS_OPT_PARAMN || cls == HTS_OPT_LEVEL)
         printf("%s (--%s[=N])\n", msg, optalias_value(p));
-      else if (strcmp(opttype_value(p), "onoff") == 0)
+      else if (cls == HTS_OPT_ONOFF)
         printf("%s (--%s[=0])\n", msg, optalias_value(p));
-      else if (strcmp(opttype_value(p), "param1") == 0)
+      else if (cls == HTS_OPT_PARAM1)
         printf("%s (--%s <param>)\n", msg, optalias_value(p));
-      else if (strcmp(opttype_value(p), "param0") == 0)
+      else if (cls == HTS_OPT_PARAM0)
         printf("%s (--%s<param>)\n", msg, optalias_value(p));
       else
         printf("%s (--%s)\n", msg, optalias_value(p));

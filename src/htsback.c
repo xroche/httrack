@@ -3328,6 +3328,22 @@ static int back_abort_limit(httrackp *opt, struct_back *sback,
   return aborted;
 }
 
+/* Keep the file already on disk: end the transfer and report it as a 304. */
+static void back_keep_existing(httrackp *opt, struct_back *sback, int i,
+                               LLint size_on_disk, const char *why) {
+  lien_back *const b = &sback->lnk[i];
+
+  deletehttp(&b->r);
+  back_set_finished(opt, sback, i);
+  b->r.size = b->r.totalsize = size_on_disk;
+  filenote(&opt->state.strc, b->url_sav, NULL);
+  file_notify(opt, b->url_adr, b->url_fil, b->url_sav, 0, 0, b->r.notmodified);
+  b->r.statuscode = HTTP_NOT_MODIFIED;
+  hts_log_print(
+      opt, LOG_NOTICE, "Kept existing file %s (" LLintP " bytes), %s: %s%s",
+      b->url_sav, size_on_disk, why, adr_nologin(opt, b->url_adr), b->url_fil);
+}
+
 // attente (gestion des buffers des sockets)
 /* Fail a slot whose socket cannot go into an fd_set, rather than overflow it.
  */
@@ -4471,20 +4487,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                     // ->
                     // Content-Range: bytes */2830
                     if (back[i].range_req_size == back[i].r.crange) {
-                      filenote(&opt->state.strc, back[i].url_sav, NULL);
-                      file_notify(opt, back[i].url_adr, back[i].url_fil,
-                                  back[i].url_sav, 0, 0, back[i].r.notmodified);
-                      deletehttp(&back[i].r);
-                      back_set_finished(opt, sback, i);
-                      back[i].r.size = back[i].r.totalsize =
-                        back[i].range_req_size;
-                      back[i].r.statuscode = HTTP_NOT_MODIFIED; // NOT MODIFIED
-                      hts_log_print(
-                          opt, LOG_NOTICE,
-                          "Kept existing file %s (" LLintP
-                          " bytes), matching size and timestamp: %s%s",
-                          back[i].url_sav, (LLint) back[i].range_req_size,
-                          adr_nologin(opt, back[i].url_adr), back[i].url_fil);
+                      back_keep_existing(opt, sback, i, back[i].range_req_size,
+                                         "matching size and timestamp");
                     }
                   }
                   // transform 406 into 200 ; we'll catch embedded links inside the choice page
@@ -4574,22 +4578,9 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
                             if (size >= 0) {
                               if (back[i].r.totalsize == size) {        // same size!
-                                deletehttp(&back[i].r);
-                                back_set_finished(opt, sback, i);
-                                back[i].r.size = back[i].r.totalsize;
-                                filenote(&opt->state.strc, back[i].url_sav,
-                                         NULL);
-                                file_notify(opt, back[i].url_adr,
-                                            back[i].url_fil, back[i].url_sav, 0,
-                                            0, back[i].r.notmodified);
-                                back[i].r.statuscode = HTTP_NOT_MODIFIED;       // NOT MODIFIED
-                                hts_log_print(opt, LOG_NOTICE,
-                                              "Kept existing file %s (" LLintP
-                                              " bytes), matching the announced "
-                                              "size: %s%s",
-                                              back[i].url_sav, (LLint) size,
-                                              adr_nologin(opt, back[i].url_adr),
-                                              back[i].url_fil);
+                                back_keep_existing(
+                                    opt, sback, i, size,
+                                    "matching the announced size");
                               }
                             }
                           }
@@ -4616,25 +4607,11 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                       if (back[i].range_req_size ==
                                           back[i]
                                               .r.totalsize) { // And same size
-                                        deletehttp(&back[i].r);
-                                        back_set_finished(opt, sback, i);
-                                        back[i].r.size = back[i].r.totalsize;
-                                        filenote(&opt->state.strc,
-                                                 back[i].url_sav, NULL);
-                                        file_notify(opt, back[i].url_adr,
-                                                    back[i].url_fil,
-                                                    back[i].url_sav, 0, 0,
-                                                    back[i].r.notmodified);
-                                        back[i].r.statuscode = HTTP_NOT_MODIFIED;       // NOT MODIFIED
-                                        hts_log_print(
-                                            opt, LOG_NOTICE,
-                                            "Kept existing file %s (" LLintP
-                                            " bytes), matching the announced "
-                                            "size, range ignored: %s%s",
-                                            back[i].url_sav,
-                                            (LLint) back[i].range_req_size,
-                                            adr_nologin(opt, back[i].url_adr),
-                                            back[i].url_fil);
+                                        back_keep_existing(
+                                            opt, sback, i,
+                                            back[i].range_req_size,
+                                            "matching the announced size, "
+                                            "range ignored");
                                       }
                                     }
                                   }
