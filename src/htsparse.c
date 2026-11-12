@@ -45,6 +45,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsbauth.h"
 #include "htsmd5.h"
 #include "htsindex.h"
+#include "htslines.h"
 #include "htscharset.h"
 #include "htsencoding.h"
 #include "htssniff.h"

@@ -38,6 +38,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscoremain.h"
 #include "htscatchurl.h"
 #include "htslib.h"
+#include "htslines.h"
 #include "htsio.h"
 #include "htstools.h"
 #include "htsalias.h"
