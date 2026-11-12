@@ -1,0 +1,5 @@
+User-agent: *
+Disallow: /private/
+Allow: /private/ok/
+Crawl-delay: 5
+Sitemap: http://fuzz.example/s.xml
