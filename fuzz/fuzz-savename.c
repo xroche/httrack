@@ -49,7 +49,6 @@ static void fuzz_line(const char *line, httrackp *opt, cache_back *cache,
                       hash_struct *hash, int flags) {
   lien_adrfilsave afs;
   lien_adrfil former;
-  const char *sep;
   size_t n;
 
   memset(&afs, 0, sizeof(afs));
@@ -66,8 +65,12 @@ static void fuzz_line(const char *line, httrackp *opt, cache_back *cache,
     strlcpybuff(afs.af.fil, line, HTS_URLMAXSIZE * 2);
   }
 
-  (void) url_savename(&afs, &former, "example.com", "/", opt, NULL, cache,
-                      hash, 1, 0, NULL);
+  /* Record the name as the engine does, so later lines can collide with it. */
+  if (url_savename(&afs, &former, "example.com", "/", opt, NULL, cache, hash, 1,
+                   0, NULL) != -1 &&
+      !IS_DELAYED_EXT(afs.save) &&
+      hash_read(hash, afs.save, NULL, HASH_STRUCT_FILENAME) < 0)
+    (void) hts_record_link(opt, afs.af.adr, afs.af.fil, afs.save, "", "", NULL);
   savename_sink += (unsigned long) strlen(afs.save);
   savename_sink += (unsigned char) afs.save[0];
 
