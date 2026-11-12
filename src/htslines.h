@@ -57,6 +57,10 @@ FILE *hts_fopen_private_new(const char *name, const char *mode);
    when a non-space byte was dropped. At EOF it reads an empty line. */
 hts_boolean hts_readline(FILE *fp, char *s, size_t max, int flags);
 
+/* hts_readline(fp, s, max, HTS_LINE_DROP_TAB | HTS_LINE_DROP_FF), returning
+   the number of bytes stored. */
+int linput(FILE *fp, char *s, int max);
+
 /* hts_readline(fp, s, max, 0) keeping CR and NUL, and storing the byte count
    in len. HTS_TRUE when the line was cut. */
 hts_boolean hts_readline_raw(FILE *fp, char *s, size_t max, size_t *len);
