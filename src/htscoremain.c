@@ -1107,13 +1107,15 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
             argv[i][1] = '\0';
             {
               static const char *const log_names[] = {
-                  "hts-log.txt", "hts-err.txt", "hts-cache/new.zip",
-                  "hts-cache/old.zip", "hts-cache/new.dat", "hts-cache/new.ndx",
-                  "hts-cache/old.dat", "hts-cache/old.ndx", "hts-cache/new.lst",
-                  "hts-cache/old.lst", "hts-cache/new.txt", "hts-cache/old.txt",
+                  "hts-log.txt",           "hts-err.txt",
+                  "hts-cache/new.zip",     "hts-cache/old.zip",
+                  "hts-cache/new.dat",     "hts-cache/new.ndx",
+                  "hts-cache/old.dat",     "hts-cache/old.ndx",
+                  "hts-cache/new.lst",     "hts-cache/old.lst",
+                  "hts-cache/new.txt",     "hts-cache/old.txt",
                   "hts-cache/damaged.zip", "hts-cache/damaged.lst",
                   "hts-cache/damaged.txt", "hts-cache/readme.txt",
-                  "hts-cache/repair.zip", "hts-cache/doit.log",
+                  "hts-cache/repair.zip",  "hts-cache/doit.log",
                   "hts-in_progress.lock"};
               size_t i;
 
