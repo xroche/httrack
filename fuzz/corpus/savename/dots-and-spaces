@@ -1,0 +1,2 @@
+example.com /a//b/./c/../d%20e.html
+example.com /a/b/d e.html
