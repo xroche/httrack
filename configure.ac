@@ -1146,7 +1146,7 @@ AC_SUBST([FUZZ_CORPUS_LIST])
 AC_MSG_RESULT([$hts_ncorpus])
 test "$hts_ncorpus" -gt 0 || AC_MSG_ERROR([no fuzz corpus file matched fuzz/corpus/*/*])
 
-# The libFuzzer dictionaries and options files next to the harnesses.
+# Same for the libFuzzer .dict and .options files.
 FUZZ_AUX_LIST=
 for hts_c in "$srcdir"/fuzz/*.dict "$srcdir"/fuzz/*.options; do
 	test -f "$hts_c" || continue
