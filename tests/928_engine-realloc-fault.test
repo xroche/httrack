@@ -1,0 +1,19 @@
+#!/bin/bash
+#
+# A failed realloct leaves the filter list, the module list and an in-memory
+# body as they were, rather than dropping or leaking them.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+for t in filtersoom libhandlesoom; do
+    out=$(httrack -O /dev/null -#test=$t) || fail "$t: $out"
+    grep -q "$t self-test OK" <<<"$out" || fail "$t: $out"
+done
+
+out=$(httrack -O /dev/null -#test=xfread-limit)
+grep -q '^oom: refused=1 adr=kept ' <<<"$out" || fail "xfread: $out"
+grep -q '^oom body: BODYREAD$' <<<"$out" || fail "xfread body: $out"
+echo "realloc faults keep their data"

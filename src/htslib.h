@@ -195,6 +195,11 @@ hts_boolean hts_file_backdate(const char *file, int seconds);
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
 
+/* Record a loaded module in opt->libHandles, copying its name. HTS_FALSE when
+   out of memory, and opt->libHandles is then unchanged. */
+hts_boolean hts_libhandles_add(httrackp *opt, void *handle,
+                               const char *moduleName);
+
 /** An opt that hts_log_vprint drops every message for. Never dereferenced. */
 extern char hts_log_quiet_tag;
 #define HTS_LOG_QUIET ((httrackp *) (void *) &hts_log_quiet_tag)

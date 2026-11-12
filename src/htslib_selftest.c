@@ -4260,7 +4260,43 @@ static int st_headerorder(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* A module that cannot be recorded leaves opt->libHandles as it was. */
+static int st_libhandlesoom(httrackp *opt, int argc, char **argv) {
+  const htslibhandles saved = opt->libHandles;
+  hts_boolean added;
+  int ok, all;
+
+  opt->libHandles.count = 0;
+  opt->libHandles.handles = NULL;
+  hts_realloct_fault_selftest = 1;
+  added = hts_libhandles_add(opt, NULL, "first");
+  hts_realloct_fault_selftest = 0;
+  ok = !added && opt->libHandles.count == 0 && opt->libHandles.handles == NULL;
+  printf("empty list: ok=%d\n", ok);
+  all = ok;
+
+  ok = hts_libhandles_add(opt, NULL, "first") && opt->libHandles.count == 1;
+  printf("control: ok=%d\n", ok);
+  all = all && ok;
+
+  hts_realloct_fault_selftest = 1;
+  added = hts_libhandles_add(opt, NULL, "second");
+  hts_realloct_fault_selftest = 0;
+  ok = !added && opt->libHandles.count == 1 &&
+       strcmp(opt->libHandles.handles[0].moduleName, "first") == 0;
+  printf("one module: ok=%d\n", ok);
+  all = all && ok;
+
+  freet(opt->libHandles.handles[0].moduleName);
+  freet(opt->libHandles.handles);
+  opt->libHandles = saved;
+  printf("libhandlesoom self-test %s\n", all ? "OK" : "FAILED");
+  return all ? 0 : 1;
+}
+
 const struct selftest_entry selftests_lib[] = {
+    {"libhandlesoom", "", "a module that cannot be recorded changes nothing",
+     st_libhandlesoom},
     {"clienthints", "<user-agent>",
      "the client hints a browser sending this User-Agent adds", st_clienthints},
     {"headerverdict", "<line> [earlier...]",

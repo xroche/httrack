@@ -593,6 +593,33 @@ static int st_filtergrow(httrackp *opt, int argc, char **argv) {
   return all ? 0 : 1;
 }
 
+/* A list that cannot grow stays as it was, whichever block fails. */
+static int st_filtersoom(httrackp *opt, int argc, char **argv) {
+  int fault, all = 1;
+
+  for (fault = 1; fault <= 3; fault++) {
+    char **filters = NULL;
+    int size, ok;
+
+    assertf(filters_init(&filters, 128, 0) == 128);
+    strlcpybuff(filters[127], "+kept*", HTS_FILTER_SLOT_SIZE);
+    hts_realloct_fault_selftest = fault;
+    size = filters_init(&filters, 128 + HTS_FILTERSINC, HTS_FILTERSINC);
+    hts_realloct_fault_selftest = 0;
+    /* fault 3 is the control: both blocks grow */
+    ok = filters != NULL && strcmp(filters[127], "+kept*") == 0 &&
+         filters[127] == filters[0] + (size_t) 127 * HTS_FILTER_SLOT_SIZE &&
+         size == (fault == 3 ? 128 + HTS_FILTERSINC : 0);
+    printf("fault %d: size=%d ok=%d\n", fault, size, ok);
+    all = all && ok;
+    if (filters != NULL)
+      freet(filters[0]);
+    freet(filters);
+  }
+  printf("filtersoom self-test %s\n", all ? "OK" : "FAILED");
+  return all ? 0 : 1;
+}
+
 /* A live set replaces only the user's rules, and lands before the adds queued
    after it, between the wizard's rules and the engine's bans. */
 static int st_filterlayout(httrackp *opt, int argc, char **argv) {
@@ -708,6 +735,8 @@ const struct selftest_entry selftests_filters[] = {
      st_filterremove},
     {"filtergrow", "", "the filter list stops growing at HTS_FILTERS_MAX",
      st_filtergrow},
+    {"filtersoom", "", "a filter list that cannot grow stays as it was",
+     st_filtersoom},
     {"filterlayout", "", "a live set replaces only the user's rules",
      st_filterlayout},
     {"filterkeep", "", "a live rule drops only what its change refuses",
