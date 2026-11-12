@@ -1,0 +1,60 @@
+#!/bin/bash
+#
+# --clean deletes a fixed list of files. It runs with no URL, so nothing is
+# written back and a file that is still there is one --clean skipped.
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_clean.XXXXXX") || fail "no tmpdir"
+cleanup() {
+    rm -rf "${tmp}"
+}
+trap 'set +e; cleanup' EXIT
+trap 'set +e; cleanup; exit 1' HUP INT QUIT TERM
+
+require_httrack
+out="${tmp}/out"
+
+names="hts-log.txt hts-err.txt index.html
+hts-cache/new.zip hts-cache/old.zip hts-cache/new.dat hts-cache/new.ndx
+hts-cache/old.dat hts-cache/old.ndx hts-cache/new.lst hts-cache/old.lst
+hts-cache/new.txt hts-cache/old.txt hts-cache/damaged.zip
+hts-cache/damaged.lst hts-cache/damaged.txt hts-cache/readme.txt
+hts-cache/repair.zip hts-cache/doit.log hts-in_progress.lock
+hts-cache/ref/entry"
+keep="cookies.txt hts-cache/keep.me"
+
+plant() { # plant FILE...
+    local f
+    for f in "$@"; do
+        mkdir -p "${out}/$(dirname "${f}")"
+        echo STALE >"${out}/${f}"
+    done
+}
+
+run() { # run ARG...
+    rm -rf "${out}"
+    mkdir -p "${out}"
+    # shellcheck disable=SC2086
+    plant ${names} ${keep}
+    RC=0
+    httrack -O "${out}" --quiet "$@" >"${tmp}/run.log" 2>&1 || RC=$?
+}
+
+stale_files() {
+    grep -rl STALE "${out}" || true
+}
+
+# Control: without --clean the planted files are still there.
+run
+test -n "$(stale_files)" || fail "a run without --clean removed the files"
+
+run --clean
+left=$(stale_files | sed "s|^${out}/||" | sort | tr '\n' ' ')
+assert_eq "cookies.txt hts-cache/keep.me " "${left}" "files --clean left behind"
+assert_file "${out}/cookies.txt" "cookies.txt kept"
+ok "--clean removes every listed file and keeps the others"
