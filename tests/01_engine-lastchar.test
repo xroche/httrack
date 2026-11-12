@@ -19,12 +19,10 @@ test "$out" = "lastchar self-test: OK" || {
     exit 1
 }
 
-# The self-test only covers the helpers, so guard the class at the source: the
-# lone survivor is inside a comment block in htsname.c. coucal is vendored, so
-# its idioms are not ours to police.
+# The self-test only covers the helpers, so guard the class at the source.
+# coucal is vendored, so its idioms are not ours to police.
 hits=$(command grep -rn 'strlen([^)]*) *- *1\]' "$top_srcdir/src" \
     --include='*.c' --include='*.h' --exclude-dir=coucal |
-    grep -v 'htsname\.c:.*save\[strlen(save)-1\]' |
     grep -v 'Replaces s\[strlen(s) - 1\]' |
     grep -v 'The x\[strlen(x) - 1\] class' || true)
 
@@ -34,12 +32,10 @@ test -z "$hits" || {
     exit 1
 }
 
-# Same for the pointer spelling. The three survivors sit in commented-out
-# blocks in htsname.c; the rest are this class being named, plus the self-test's
-# own deliberate underflow.
+# Same for the pointer spelling. The survivors are this class being named, plus
+# the self-test's own deliberate underflow.
 hits=$(command grep -rnE '\+ *\(?(int|size_t)?\)? *strlen *\([^)]*\) *- *1' \
     "$top_srcdir/src" --include='*.c' --include='*.h' --exclude-dir=coucal |
-    grep -v 'htsname\.c:.*char\* a=\(fil+strlen(fil)\|save+strlen(save)\)-1;' |
     grep -v 'htslib_selftest\.c:.*pointer spelling x + strlen(x) - 1' |
     grep -v 'htslib_selftest\.c:.*\*(s + strlen(s) - 1) =' || true)
 

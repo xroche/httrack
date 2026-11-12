@@ -37,6 +37,15 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsglobal.h"
 
+/** Cut an open file to sz bytes: 0 on success. **/
+#ifdef _WIN32
+#include <io.h>
+#define HTS_FTRUNCATE(fp, sz) _chsize_s(_fileno(fp), (sz))
+#else
+#include <unistd.h>
+#define HTS_FTRUNCATE(fp, sz) ftruncate(fileno(fp), (sz))
+#endif
+
 /** Read exactly size bytes into dest. HTS_TRUE only when the whole block was
     read; a short read, EOF or error alike, is a failure, with errno left as
     fread() set it. A zero size succeeds without touching dest. Wrong for a

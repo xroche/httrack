@@ -34,8 +34,6 @@ Please visit our Website: http://www.httrack.com
    run a no-op. */
 /* ------------------------------------------------------------ */
 
-#define HTS_INTERNAL_BYTECODE
-
 #include "htssinglefile.h"
 
 #include "htscore.h"
@@ -153,7 +151,7 @@ const char *singlefile_mark(httrackp *opt, char *buf, size_t bufsize, char cls,
 /* (tag, attribute) pairs htsparse detects that name a page or a media stream
    rather than an asset; a NULL tag matches any. Everything else it detects is
    offered to the pass, which decides from the referenced file's own MIME
-   type, so a new row in hts_detect[] is covered without a change here. */
+   type, so a new row in hts_attrs[] is covered without a change here. */
 static const htspair_t sf_deny_rules[] = {
     {"a", "href"},      {"area", "href"},   {"iframe", "src"},
     {"frame", "src"},   {"applet", "code"}, {NULL, "longdesc"},

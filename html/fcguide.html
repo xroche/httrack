@@ -230,7 +230,7 @@ Browser ID:
  %l  preferred language (-%l "fr, en, jp, *" (--language &lt;param&gt;)
 
 Log, index, cache
-  C  create/use a cache for updates and retries (C0 no cache,C1 cache is prioritary,* C2 test update before) (--cache[=N])
+  C  create/use a cache for updates and retries (C0 no cache,C1 cache is prioritary,C2 test update before; the default is C1, or C2 when a finished mirror is in the folder) (--cache[=N])
   k  store all files in cache (not useful if files on disk) (--store-all-in-cache)
  %n  do not re-download locally erased files (--do-not-recatch)
  %v  display on screen filenames downloaded (in realtime) (--display)
@@ -393,7 +393,7 @@ site. Specifically, the defauls are:
   u check document type if unknown (cgi,asp..) (u0 don't check, * u1 check but /, u2 check always)
   j *parse scripts (j0 don't parse)
   sN  follow robots.txt and meta robots tags (0=never,1=sometimes,* 2=always)
-  C  create/use a cache for updates and retries (C0 no cache,C1 cache is prioritary,* C2 test update before)
+  C  create/use a cache for updates and retries (C0 no cache,C1 cache is prioritary,C2 test update before; the default is C1, or C2 when a finished mirror is in the folder)
   f *log file mode
   I *make an index (I0 don't make)
   pN priority mode: (* p3)  *3 save all files
@@ -481,7 +481,7 @@ URLs.
 <p align=justify> This tells the program to follow the wishes of the
 site owner with respect to limiting where robots like this one search. 
 
-<pre><b><i>  C  create/use a cache for updates and retries (C0 no cache,C1 cache is prioritary,* C2 test update before) </i></b></pre>
+<pre><b><i>  C  create/use a cache for updates and retries (C0 no cache,C1 cache is prioritary,C2 test update before; the default is C1, or C2 when a finished mirror is in the folder) </i></b></pre>
 
 <p align=justify> If you are downloading a site you have a previous copy
 of, supplemental parameters are transmitted to the server, for example
@@ -1403,7 +1403,7 @@ of sites, and cached results:
 
 <pre><b><i>
 Log, index, cache
-  C  create/use a cache for updates and retries (C0 no cache,C1 cache is prioritary,* C2 test update before)
+  C  create/use a cache for updates and retries (C0 no cache,C1 cache is prioritary,C2 test update before; the default is C1, or C2 when a finished mirror is in the folder)
   k  store all files in cache (not useful if files on disk)
  %n  do not re-download locally erased files
   Q  log quiet mode (no log)

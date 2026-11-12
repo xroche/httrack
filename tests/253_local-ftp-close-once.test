@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Cancelling a link mid-FTP-transfer used to reach _HALT_FTP with the data
+# Cancelling a link mid-FTP-transfer used to reach the FTP cleanup with the data
 # socket already closed and its descriptor still in the variable, closing it a
 # second time. The interposer catches that second close as EBADF.
 
@@ -86,7 +86,7 @@ crawlpid=
 
 # Floors: without these a crawl that never reached the halt path passes
 # silently. stop_ftp() is what writes this message, so it stands for the
-# _HALT_FTP that follows.
+# cleanup that follows.
 grep -aq 'Cancelled by User' "${out}/hts-log.txt" ||
     fail "the cancel never reached the transfer: $(grep -a Error "${out}/hts-log.txt" || true)"
 test -s "$closes" || fail "the interposer logged no close() at all"

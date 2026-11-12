@@ -1,0 +1,37 @@
+#!/bin/bash
+#
+# An old.lst line holding ".." must not make the update purge delete files or
+# empty directories outside the mirror.
+
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+require_httrack
+PATH="$(dirname "$(httrack_path)"):$PATH"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_purgedotdot.XXXXXX")
+cleanup() { rm -rf "$tmpdir"; }
+cleanup_push cleanup
+
+root="${tmpdir}/root"
+mkdir -p "$root"
+printf '<html>hi</html>\n' >"${root}/index.html"
+local_server_start --root "$root" --log "${tmpdir}/server.log"
+
+mirror="${tmpdir}/work/mirror"
+mkdir -p "${tmpdir}/work/emptydir"
+printf 'mine\n' >"${tmpdir}/work/victim.txt"
+opts=(--quiet --robots=0 --retries=1 -c1 --timeout=20 -I0
+    -O "${mirror},${tmpdir}/cache")
+local_crawl --log "${tmpdir}/log1" "${opts[@]}" "${BASEURL}/index.html"
+mkdir -p "$mirror"
+printf 'x\n' >"${mirror}/inside.txt"
+printf '[inside.txt]\n[../victim.txt]\n[./../victim.txt]\n[../emptydir/x]\n' >>"${tmpdir}/cache/hts-cache/new.lst"
+local_crawl --log "${tmpdir}/log2" "${opts[@]}" --update "${BASEURL}/index.html"
+
+test ! -e "${mirror}/inside.txt" || fail "the purge did not run"
+assert_alive "${tmpdir}/work/victim.txt" mine
+test -d "${tmpdir}/work/emptydir" || fail "the purge removed a directory outside the mirror"
+ok "the purge ignored old.lst lines that leave the mirror"

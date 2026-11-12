@@ -150,7 +150,7 @@ jobs:
 
       - name: Print the test log on failure
         if: failure()
-        run: cat tests/test-suite.log 2>/dev/null || true
+        run: sh tools/ci-test-log.sh
 
       - name: Collect sanitizer findings
         if: always()

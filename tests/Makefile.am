@@ -18,7 +18,7 @@ EXTRA_DIST = $(TESTS) renamefail.c unlinkfail.c threadattrfail.c gaistall.c noba
 	guide-image-check.py check-subshell-errexit.py check-log-logins.py \
 	ci-windows-suite.sh ci-suite-stage.sh ci-windows-watchdog.ps1 install-headers-sweep.sh \
 	wsl2-exe-shim.sh \
-	server.crt server.key \
+	server.crt server.key other.crt other.key \
 	server-root/simple/basic.html server-root/simple/link.html \
 	server-root/stripquery/index.html server-root/stripquery/a.html \
 	server-root/hostalias/index.html server-root/hostalias/a.html \
@@ -26,10 +26,15 @@ EXTRA_DIST = $(TESTS) renamefail.c unlinkfail.c threadattrfail.c gaistall.c noba
 	server-root/hostalias/e.html \
 	server-root/fraglink/index.html server-root/fraglink/target.html \
 	server-root/extplaceholder/index.html \
+	server-root/quoteurl/index.html server-root/quoteurl/page.html \
+	server-root/appletscheme/index.html \
+	server-root/abslogin/index.html \
 	fixtures/cache-golden/hts-cache/new.zip \
 	install-manifest.txt \
 	62_lang-untranslated.counts \
-	62_lang-linebreaks.counts
+	62_lang-linebreaks.counts \
+	834_engine-entities-sweep.pairs \
+	topindex.golden
 
 TESTS_ENVIRONMENT =
 TESTS_ENVIRONMENT += PATH=$(top_builddir)/src$(PATH_SEPARATOR)$$PATH

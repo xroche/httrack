@@ -149,6 +149,8 @@ clear language!
 
 <li><a href="#Q1c">I can not access several pages (access forbidden, or redirect to another location), but I can with my browser, what's going on?</a><br></li>
 
+<li><a href="#Q1d">The mirror holds a login page, a CAPTCHA or a "checking your browser" page instead of the site!</a><br></li>
+
 <li><a href="#Q2">Some pages can't be seen, or are displayed with errors!</a><br></li>
 
 <li><a href="#QT4">Files are created with strange names, like '-1.html'!</a><br></li>
@@ -404,7 +406,8 @@ This will cause a performance loss, but will increase the compatibility with som
 A: <em>First, check the <tt>hts-log.txt</tt> file (and/or <tt>hts-err.txt</tt> error log file) - this can give you precious information.<br>
 The problem can be a website that redirects you to another site (for example, <tt>www.example.com</tt> to <tt>public.example.com</tt>) : 
 in this case, use filters to accept this site<br>
-This can be, also, a problem in the HTTrack options (link depth too low, for example)</em>
+This can be, also, a problem in the HTTrack options (link depth too low, for example)<br>
+If the first page is a login page, see <a href="#Q1d">the question about login pages</a>.</em>
 
 <br><br><a NAME="QT2">Q: <strong>With WinHTTrack, sometimes the minimize in system tray causes a crash!</a></strong></a></br>
 A: <em>This bug sometimes appears in the shell on some systems. If you encounter this problem, avoid minimizing the window!</em>
@@ -423,8 +426,7 @@ A: <em>The .ra/.rm associated file can be captured together with the shortcut, i
 
 <br><br><a NAME="QT6">Q: <strong>Using user:password@address is not working!</a></strong></a></br>
 A: <em>Again, first check the <tt>hts-log.txt</tt> and <tt>hts-err.txt</tt> error log files - this can give you precious information<br>
-The site may have a different authentication scheme - form based authentication, for example.
-In this case, use the URL capture features of HTTrack, it might work.
+If the site uses a login form, see <a href="login.html">Mirror a site behind a login or a CAPTCHA</a>.
 <br>Note: If your username and/or password contains a '<tt>@</tt>' character, you may have to replace all '<tt>@</tt>' 
 occurrences by '<tt>%40</tt>' so that it can work, such as in <tt>user%40domain.com:foobar@www.foo.com/auth/. 
 You may have to do the same for all "special" characters like spaces (%20), quotes (%22)..</tt>
@@ -554,11 +556,17 @@ A: <em>Simply use the <tt>--assume dat=application/x-zip</tt> option
 <br>
 
 <a NAME="Q1c">Q: <strong>I can not access several pages (access forbidden, or redirect to another location), but I can with my browser, what's going on?</strong><br>
-A: <em>You may need cookies! Cookies are specific data (for example, your username or password) that are sent to your browser once
-you have logged in certain sites so that you only have to log-in once. For example, after having entered your username in a website, you can
-view pages and articles, and the next time you will go to this site, you will not have to re-enter your username/password.<br>
-To supply your own cookies to an HTTrack project, put a Netscape-format <tt>cookies.txt</tt> file in your project folder, or point HTTrack at one with the <tt>--cookies-file</tt> option. You can export your browser's session cookies to that format with a browser extension.
-<br>The page <a href="login.html">Mirror a site behind a login or a CAPTCHA</a> tells how, step by step.
+A: <em>The site probably needs a login, or checks that you use a real browser.<br>
+Since version 3.51, WinHTTrack, WebHTTrack and the Android app have a "Log in with a browser" button. Log in with it, and the mirror uses that session.
+<br>The page <a href="login.html">Mirror a site behind a login or a CAPTCHA</a> tells how, step by step, for each interface and for the command line.
+</em>
+<br>
+<br>
+
+<a NAME="Q1d">Q: <strong>The mirror holds a login page, a CAPTCHA or a "checking your browser" page instead of the site!</strong></a><br>
+A: <em>HTTrack saved what the site shows to a visitor who is not logged in. HTTrack may also stop with "MIRROR ERROR" and say that the mirror is empty.
+Log in first, as <a href="login.html">Mirror a site behind a login or a CAPTCHA</a> shows. Solve the CAPTCHA or the browser check while you log in.
+<br>Bot protection can still refuse HTTrack after this. When Cloudflare refuses it, HTTrack writes a "Bot protection challenge" warning in its log.
 </em>
 <br>
 <br>
@@ -783,7 +791,7 @@ A: <em>Use the footer option (-%F, or see the WinHTTrack options)</em>
 A: <em>No, http files are always transferred as binary files. Ftp files, too (even if ascii mode could be selected)</em>
 
 <br><br><a NAME="QM4">Q: <strong>Can HTTrack perform form-based authentication?</strong></a><br>
-A: <em>Yes. See the URL capture abilities (--catchurl for command-line release, or in the WinHTTrack interface)</em>
+A: <em>No, but it can use the session of a browser where you logged in. See <a href="login.html">Mirror a site behind a login or a CAPTCHA</a>.</em>
 
 <br><br><a NAME="QM5">Q: <strong>Can I redirect downloads to tar/zip archive?</strong></a><br>
 A: <em>Yes. See the shell system command option (-V option for command-line release)</em>

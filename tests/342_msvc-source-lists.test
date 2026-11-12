@@ -15,9 +15,6 @@ top=${abs_top_srcdir}
 am="$top/src/Makefile.am"
 test -r "$am" || fail "no $am"
 
-# iowin32.c is the Win32 ioapi: MSVC-only by design, never in Makefile.am.
-win_only="minizip/iowin32.c"
-
 # Sources of one automake variable, one per line, continuations folded.
 am_sources() {
     awk -v var="$1" '
@@ -44,8 +41,7 @@ check() {
     missing=$(comm -23 <(am_sources "$var") <(proj_sources "$proj") | tr '\n' ' ')
     [ -z "$missing" ] || fail "$proj is missing: $missing"
 
-    extra=$(comm -13 <(am_sources "$var") <(proj_sources "$proj") |
-        grep -v -x -F "$win_only" | tr '\n' ' ' || true)
+    extra=$(comm -13 <(am_sources "$var") <(proj_sources "$proj") | tr '\n' ' ')
     [ -z "$extra" ] || fail "$proj builds sources $var does not: $extra"
 }
 

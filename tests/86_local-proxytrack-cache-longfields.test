@@ -12,7 +12,7 @@ set -euo pipefail
 dir=$(mktemp -d)
 cleanup_push rm -rf "$dir"
 
-# --- ARC reader (HTTP_READFIELD_STRING), no python needed -------------------
+# --- ARC reader (CACHE_READFIELD_STRING), no python needed ------------------
 # Each header overshoots its own destination, so a per-field clip is the only
 # way to get every expected length right at once.
 {
@@ -37,7 +37,7 @@ test -s "$dir/out.arc" || fail "ARC entry dropped instead of clipped"
 got=$(runlen "$dir/out.arc" A)
 test "${got:-0}" = 54 || fail "ARC content-type clipped to ${got:-0}, expected 54"
 
-# --- ZIP reader (ZIP_READFIELD_STRING) --------------------------------------
+# --- ZIP reader (CACHE_READFIELD_STRING) ------------------------------------
 python=$(find_python) || {
     echo "python3 missing; ARC half only" >&2
     exit 0

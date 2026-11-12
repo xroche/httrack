@@ -61,10 +61,12 @@ htsserver_SOURCES = htsserver.c htsserver.h htsweb.c htsweb.h htsstats.h \
 	htsrandom.c htsrandom.h \
 	htscmdline.c htscmdline.h \
 	htslines.c htslines.h \
-	htsurlport.c htsurlport.h htsescape.c htsescape.h
+	htsurlport.c htsurlport.h htsescape.c htsescape.h \
+	htsshared.c htsshared.h
 proxytrack_SOURCES = proxy/main.c \
 	proxy/proxytrack.c proxy/store.c \
-	htsurlport.c htsurlport.h htsdate.c htsdate.h htsnet.c \
+	htsurlport.c htsurlport.h htsdate.c htsdate.h htsnet.c htscachecodec.h \
+	htsshared.c htsshared.h \
 	coucal/coucal.c htsmd5.c md5.c \
 	minizip/ioapi.c minizip/mztools.c minizip/unzip.c minizip/zip.c
 
@@ -83,7 +85,7 @@ CLEANFILES = webhttrack
 
 libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
 	htscatchurl.c htsfetch.c htspsl.c htspsl_data.c htsfilters.c htsftp.c htshash.c coucal/coucal.c \
-	htscmdline.c htshelp.c htslib.c htslines.c htsurlport.c htsdate.c htscoremain.c \
+	htscmdline.c htshelp.c htsbase.c htsdns.c htslib.c htslines.c htsurlport.c htsdate.c htscoremain.c \
 	htsname.c htsrobots.c htstools.c htsrandom.c htswizard.c \
 	htsalias.c htsthread.c htsindex.c htsbauth.c htsbundle.c \
 	htscrashtest.c \
@@ -92,7 +94,7 @@ libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
 	md5.c \
 	minizip/ioapi.c minizip/mztools.c minizip/unzip.c minizip/zip.c \
 	hts-indextmpl.h htsalias.h htsback.h htsbase.h htssafe.h htsdate.h \
-	htsbasenet.h htsbauth.h htsbundle.h htscache.h htscache_selftest.h htscookie_selftest.h htsdns_selftest.h htsparse_selftest.h \
+	htsbasenet.h htsbauth.h htsbundle.h htscache.h htscachecodec.h htscookie_selftest.h \
 	htsselftest.h htsselftest_int.h htsselftest_util.h htscatchurl.h  \
 	htscmdline.h htsconfig.h htscore.h htsparse.h htscoremain.h htsdefines.h  \
 	htsfilters.h htsftp.h htsglobal.h htshash.h coucal/coucal.h \
@@ -107,7 +109,8 @@ libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
 	md5.h coucal/murmurhash3.h \
 	minizip/crypt.h minizip/ioapi.h minizip/mztools.h minizip/unzip.h minizip/zip.h
 libhttrack_la_LIBADD = $(THREADS_LIBS) $(ZLIB_LIBS) $(BROTLI_LIBS) $(ZSTD_LIBS) $(OPENSSL_LIBS) $(DL_LIBS) $(SOCKET_LIBS) $(ICONV_LIBS)
-libhttrack_la_CFLAGS = $(AM_CFLAGS) -DLIBHTTRACK_EXPORTS -DZLIB_CONST
+# HTS_INTERNAL_BYTECODE shows the engine-only half of the headers to the library.
+libhttrack_la_CFLAGS = $(AM_CFLAGS) -DLIBHTTRACK_EXPORTS -DZLIB_CONST -DHTS_INTERNAL_BYTECODE
 libhttrack_la_LDFLAGS = $(AM_LDFLAGS) -version-info $(VERSION_INFO)
 
 # --disable-selftests leaves these out and defines HTS_NO_SELFTEST.
@@ -116,6 +119,7 @@ libhttrack_la_SOURCES += htsselftest.c htsselftest_util.c \
 	htsback_selftest.c htscache_selftest.c htscharset_selftest.c \
 	htscmdline_selftest.c \
 	htscookie_selftest.c htsdns_selftest.c htsfetch_selftest.c htspsl_selftest.c \
+	htsindex_selftest.c \
 	htsbundle_selftest.c \
 	htsfilters_selftest.c \
 	htsheader_selftest.c htsio_selftest.c htslib_selftest.c \
@@ -126,16 +130,12 @@ libhttrack_la_SOURCES += htsselftest.c htsselftest_util.c \
 	htswizard_selftest.c
 endif
 
-EXTRA_DIST = httrack.h htsstats.h webhttrack.in \
+EXTRA_DIST = htsstats.h webhttrack.in \
 		version.rc \
 		libhttrack.rc \
 		httrack.rc \
 		coucal/murmurhash3.h.diff \
 		coucal/murmurhash3.h.orig \
-		minizip/iowin32.c \
-		minizip/iowin32.h \
-		minizip/iowin32.c.diff \
-		minizip/iowin32.c.orig \
 		minizip/ioapi.c.diff \
 		minizip/ioapi.h.diff \
 		minizip/zip.c.diff \

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Several sites behind one proxy port, for 656_local-bundles.
+"""Several sites behind one proxy port, for 656_local-bundles and
+788_local-travel-domain.
 
 httrack reaches it as its -P proxy, so the absolute request URL names the
 site. Every request prints one "HIT <host><path> ua=<...> auth=<...>
@@ -13,6 +14,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit
 
 CDN = "http://cdn.gamma.test"
+# a host past the 255 bytes a public suffix lookup takes
+LONG = ".".join(["x" * 60] * 5)
 PAGES = {
     "www.alpha.test/": '<a href="/page.html">p</a><img src="%s/a.gif">' % CDN,
     "www.alpha.test/page.html": "alpha page",
@@ -24,6 +27,16 @@ PAGES = {
     "attacker.github.io/x.html": "another user's site",
     "evil.test/": "another site",
     "sub.alpha.test/home": "back on the alpha site",
+    "example.com/": '<a href="http://www.example.com/w.html">w</a>'
+    '<a href="http://sub.example.com/s.html">s</a>'
+    '<a href="http://example.net/n.html">n</a>',
+    "a.co.uk/": '<a href="http://www.a.co.uk/w.html">w</a>'
+    '<a href="http://b.co.uk/b.html">b</a>'
+    '<a href="http://%s.b.co.uk/long.html">long</a>' % LONG,
+    "192.0.2.1/": '<a href="http://192.0.2.1/same.html">same</a>'
+    '<a href="http://192.0.2.2/other.html">other</a>'
+    '<a href="http://10.9.2.1/f.html">f</a>',
+    "example.org/": '<a href="http://www.example.org/l.html">l</a>',
 }
 # out of the bundle's site and back in
 REDIRECTS = {

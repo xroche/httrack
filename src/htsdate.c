@@ -96,7 +96,9 @@ struct tm *convert_time_rfc822_pivot(struct tm *result, const char *s,
 
       strncatbuff(tok, first, (int) (last - first));
       /* classify it */
-      if ((pos = strstr(months, tok))) { /* month always in letters */
+      /* a whole three-letter name: "n" or "c" is a zone letter, not a month */
+      if (strlen(tok) == 3 && (pos = strstr(months, tok)) != NULL &&
+          (pos - months) % 4 == 0) { /* month always in letters */
         result_mm = ((int) (pos - months)) / 4;
       } else {
         const char *digits = tok;

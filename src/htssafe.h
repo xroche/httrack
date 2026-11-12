@@ -41,9 +41,8 @@ Please visit our Website: http://www.httrack.com
  * aborts either way. Aborting is right for data we built ourselves and wrong
  * for a value read off the wire, out of a cache or out of a header, because it
  * turns a memory smash into a crash on malformed input. Clip such a value
- * instead, with strclipbuff() or slprintfbuff(), or from the buff() family with
- * dest[0] = '\0'; strlncatbuff(dest, src, size, size - 1). The clip helpers
- * still abort on a NULL buffer or a zero size, so check a computed size first.
+ * instead, with strclipbuff() or slprintfbuff(). Both still abort on a NULL
+ * buffer or a zero size, so check a computed size first.
  */
 
 #ifndef HTSSAFE_DEFH

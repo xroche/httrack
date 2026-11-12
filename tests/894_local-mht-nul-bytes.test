@@ -1,0 +1,41 @@
+#!/bin/bash
+# A page holding a NUL byte must reach the .mht archive whole, not cut at the NUL.
+# The parser turns a NUL into a space, so the page is served as a PDF and only
+# --assume makes it a page.
+set -eu
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_894.XXXXXX") || exit 1
+cleanup() {
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+mkdir -p "${tmpdir}/root"
+printf '<html><body>BEFORE-NUL\000AFTER-NUL-MARKER</body></html>\n' \
+    >"${tmpdir}/root/page.pdf"
+
+require_httrack
+local_server_start --root "${tmpdir}/root" --log "${tmpdir}/server.log"
+local_crawl --log "${tmpdir}/crawl.log" "http://127.0.0.1:${SRV_PORT}/page.pdf" \
+    -O "${tmpdir}/out" --quiet --max-time=120 --timeout=30 --robots=0 '-%M' \
+    --assume pdf=text/html ||
+    fail "crawl failed"
+
+page="${tmpdir}/out/127.0.0.1_${SRV_PORT}/page.html"
+mht="${tmpdir}/out/index.mht"
+test -s "$mht" || fail "no .mht archive was written"
+test -f "$page" || fail "the page was not saved as page.html"
+command grep -qa '^Content-Transfer-Encoding: 8bit' "$mht" ||
+    fail "the archive did not take the page as text"
+# Control: the saved page itself still holds the NUL and the text after it.
+test "$(tr -cd '\000' <"$page" | wc -c)" -eq 1 ||
+    fail "the saved page lost its NUL byte, so the archive check proves nothing"
+command grep -qa 'AFTER-NUL-MARKER' "$page" || fail "the saved page lost its tail"
+
+test "$(tr -cd '\000' <"$mht" | wc -c)" -eq 1 ||
+    fail "the archive dropped the NUL byte of the page"
+command grep -qa 'AFTER-NUL-MARKER' "$mht" ||
+    fail "the archive stops at the NUL byte of the page"

@@ -109,8 +109,11 @@ Remark: If no cache newer than the added one is found, all entries can be added 
 #include "htsbase.h"
 #include "htsnet.h"
 #include "htslib.h"
+#include "htsthread.h"
 #include "htsglobal.h"
+#include "htsurlport.h"
 #include <limits.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -153,61 +156,37 @@ Remark: If no cache newer than the added one is found, all entries can be added 
 
 /* Static definitions */
 
-static int linputsoc(T_SOC soc, char *s, int max) {
-  int c;
-  int j = 0;
-
-  do {
-    unsigned char ch;
-
-    if (recv(soc, &ch, 1, 0) == 1) {
-      c = ch;
-    } else {
-      c = EOF;
-    }
-    if (c != EOF) {
-      switch (c) {
-      case 13:
-        break;                  // sauter CR
-      case 10:
-        c = -1;
-        break;
-      case 9:
-      case 12:
-        break;                  // sauter ces caractères
-      default:
-        s[j++] = (char) c;
-        break;
-      }
-    }
-  } while((c != -1) && (c != EOF) && (j < (max - 1)));
-  s[j] = '\0';
-  return j;
+static void close_client(T_SOC soc) {
+#ifdef _WIN32
+  closesocket(soc);
+#else
+  close(soc);
+#endif
 }
 
-static int check_readinput_t(T_SOC soc, int timeout) {
-  if (soc != INVALID_SOCKET) {
-    fd_set fds;                 // poll structures
-    struct timeval tv;          // structure for select
+/* Bound the next recv() on a client by `seconds`. */
+static void set_recv_timeout(T_SOC soc, int seconds) {
+#ifdef _WIN32
+  DWORD tv = (DWORD) seconds * 1000;
+#else
+  struct timeval tv;
 
-    FD_ZERO(&fds);
-    FD_SET(soc, &fds);
-    tv.tv_sec = timeout;
-    tv.tv_usec = 0;
-    select((int) (soc + 1), &fds, NULL, NULL, &tv);
-    if (FD_ISSET(soc, &fds))
-      return 1;
-    else
-      return 0;
-  } else
-    return 0;
+  tv.tv_sec = seconds;
+  tv.tv_usec = 0;
+#endif
+  (void) setsockopt(soc, SOL_SOCKET, SO_RCVTIMEO, (const char *) &tv,
+                    sizeof(tv));
 }
 
-static int linputsoc_t(T_SOC soc, char *s, int max, int timeout) {
-  if (check_readinput_t(soc, timeout)) {
-    return linputsoc(soc, s, max);
-  }
-  return -1;
+/* recv() that gives up at `deadline`, so a client trickling bytes cannot hold
+   the thread past it. */
+static int recv_until(T_SOC soc, char *buf, int len, time_t deadline) {
+  const time_t left = deadline - time(NULL);
+
+  if (left <= 0)
+    return -1;
+  set_recv_timeout(soc, (int) left);
+  return (int) recv(soc, buf, len, 0);
 }
 
 static int gethost(const char *hostname, SOCaddr * server) {
@@ -403,147 +382,11 @@ int proxytrack_main(char *proxyAddr, int proxyPort, char *icpAddr, int icpPort,
 }
 
 static const char *GetHttpMessage(int statuscode) {
-  // Erreurs HTTP, selon RFC
-  switch (statuscode) {
-  case 100:
-    return "Continue";
-    break;
-  case 101:
-    return "Switching Protocols";
-    break;
-  case 200:
-    return "OK";
-    break;
-  case 201:
-    return "Created";
-    break;
-  case 202:
-    return "Accepted";
-    break;
-  case 203:
-    return "Non-Authoritative Information";
-    break;
-  case 204:
-    return "No Content";
-    break;
-  case 205:
-    return "Reset Content";
-    break;
-  case 206:
-    return "Partial Content";
-    break;
-  case 207:
-    return "Multi-Status";
-    break;
-  case 300:
-    return "Multiple Choices";
-    break;
-  case 301:
-    return "Moved Permanently";
-    break;
-  case 302:
-    return "Moved Temporarily";
-    break;
-  case 303:
-    return "See Other";
-    break;
-  case 304:
-    return "Not Modified";
-    break;
-  case 305:
-    return "Use Proxy";
-    break;
-  case 306:
-    return "Undefined 306 error";
-    break;
-  case 307:
-    return "Temporary Redirect";
-    break;
-  case 400:
-    return "Bad Request";
-    break;
-  case 401:
-    return "Unauthorized";
-    break;
-  case 402:
-    return "Payment Required";
-    break;
-  case 403:
-    return "Forbidden";
-    break;
-  case 404:
-    return "Not Found";
-    break;
-  case 405:
-    return "Method Not Allowed";
-    break;
-  case 406:
-    return "Not Acceptable";
-    break;
-  case 407:
-    return "Proxy Authentication Required";
-    break;
-  case 408:
-    return "Request Time-out";
-    break;
-  case 409:
-    return "Conflict";
-    break;
-  case 410:
-    return "Gone";
-    break;
-  case 411:
-    return "Length Required";
-    break;
-  case 412:
-    return "Precondition Failed";
-    break;
-  case 413:
-    return "Request Entity Too Large";
-    break;
-  case 414:
-    return "Request-URI Too Large";
-    break;
-  case 415:
-    return "Unsupported Media Type";
-    break;
-  case 416:
-    return "Requested Range Not Satisfiable";
-    break;
-  case 417:
-    return "Expectation Failed";
-    break;
-  case 429:
-    return "Too Many Requests";
-    break;
-  case 451:
-    return "Unavailable For Legal Reasons";
-    break;
-  case 500:
-    return "Internal Server Error";
-    break;
-  case 501:
-    return "Not Implemented";
-    break;
-  case 502:
-    return "Bad Gateway";
-    break;
-  case 503:
-    return "Service Unavailable";
-    break;
-  case 504:
-    return "Gateway Time-out";
-    break;
-  case 505:
-    return "HTTP Version Not Supported";
-    break;
-  default:
-    return "Unknown HTTP Error";
-    break;
-  }
+  const char *const text = hts_status_reason(statuscode);
+
+  return text != NULL ? text : "Unknown HTTP Error";
 }
 
-#ifndef NO_WEBDAV
 static void proxytrack_add_DAV_Item(String * item, String * buff,
                                     const char *filename, size_t size,
                                     time_t timestamp, const char *mime,
@@ -631,6 +474,8 @@ static PT_Element proxytrack_process_DAV_Request(PT_Indexes indexes,
   if (strncmp(file, "/webdav", 7) != 0) {
     PT_Element elt = PT_ElementNew();
 
+    if (elt == NULL)
+      return NULL;
     elt->statuscode = 405;
     strcpybuff(elt->msg, "Method Not Allowed");
     return elt;
@@ -756,19 +601,20 @@ static PT_Element proxytrack_process_DAV_Request(PT_Indexes indexes,
     StringFree(url);
     StringFree(buff);
 
-    elt->size = StringLength(response);
-    elt->adr = StringAcquire(&response);
-    elt->statuscode = 207;      /* Multi-Status */
-    strcpybuff(elt->charset, "utf-8");
-    strcpybuff(elt->contenttype, "text/xml");
-    strcpybuff(elt->msg, "Multi-Status");
+    if (elt != NULL) {
+      elt->size = StringLength(response);
+      elt->adr = StringAcquire(&response);
+      elt->statuscode = 207; /* Multi-Status */
+      strcpybuff(elt->charset, "utf-8");
+      strcpybuff(elt->contenttype, "text/xml");
+      strcpybuff(elt->msg, "Multi-Status");
+    }
     StringFree(response);
 
     return elt;
   }
   return NULL;
 }
-#endif
 
 static PT_Element proxytrack_process_HTTP_List(PT_Indexes indexes,
                                                const char *url) {
@@ -810,12 +656,14 @@ static PT_Element proxytrack_process_HTTP_List(PT_Indexes indexes,
     }
     StringCat(html, "</body>" "</html>");
     PT_Enumerate_Delete(&list);
-    elt->size = StringLength(html);
-    elt->adr = StringAcquire(&html);
-    elt->statuscode = HTTP_OK;
-    strcpybuff(elt->charset, "iso-8859-1");
-    strcpybuff(elt->contenttype, "text/html");
-    strcpybuff(elt->msg, "OK");
+    if (elt != NULL) {
+      elt->size = StringLength(html);
+      elt->adr = StringAcquire(&html);
+      elt->statuscode = HTTP_OK;
+      strcpybuff(elt->charset, "iso-8859-1");
+      strcpybuff(elt->contenttype, "text/html");
+      strcpybuff(elt->msg, "OK");
+    }
     StringFree(html);
     return elt;
   }
@@ -828,8 +676,24 @@ static size_t element_body_size(const PT_Element element) {
   return (element != NULL && element->adr != NULL) ? element->size : 0;
 }
 
+/* Read exactly len bytes: a slow client may split them over several recv(). */
+static hts_boolean recv_exact(T_SOC soc, char *buf, int len, time_t deadline) {
+  int got = 0;
+
+  while (got < len) {
+    const int n = recv_until(soc, buf + got, len - got, deadline);
+
+    if (n <= 0)
+      return HTS_FALSE;
+    got += n;
+  }
+  return HTS_TRUE;
+}
+
 static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
-  int timeout = 30;
+  const int timeout = 30; /* seconds a request may take */
+  time_t deadline = 0;
+  hts_boolean cut;
   int buffer_size = 32768;
   char *buffer = (char *) malloc(buffer_size);
   int line1Size = 1024;
@@ -846,10 +710,8 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
   String host = STRING_EMPTY;
   String localhost = STRING_EMPTY;
 
-#ifndef NO_WEBDAV
   String davHeaders = STRING_EMPTY;
   String davRequest = STRING_EMPTY;
-#endif
 
   StringRoom(localhost, 256);
   if (gethostname(StringBuffRW(localhost), (int) StringCapacity(localhost) - 1)
@@ -865,11 +727,7 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
 
   if (buffer == NULL || line == NULL || line1 == NULL) {
     proxytrack_print_log(CRITICAL, "proxytrack_process_HTTP:memory exhausted");
-#ifdef _WIN32
-    closesocket(soc_c);
-#else
-    close(soc_c);
-#endif
+    close_client(soc_c);
     return;
   }
 
@@ -883,11 +741,11 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
     int headRequest = 0;
     int listRequest = 0;
 
-#ifndef NO_WEBDAV
     int davDepth = 0;
-#endif
 
     /* Clear context */
+    length = 0;
+    deadline = time(NULL) + timeout;
     line[0] = line1[0] = '\0';
     buffer[0] = '\0';
     command = line1;
@@ -896,21 +754,23 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
     StringClear(headers);
     StringClear(output);
     StringClear(host);
-#ifndef NO_WEBDAV
     StringClear(davHeaders);
     StringClear(davRequest);
-#endif
 
     /* line1: "GET http://www.example.com/ HTTP/1.0" */
-    if (linputsoc_t(soc_c, line1, line1Size - 2, timeout) > 0
-        && (surl = strchr(line1, ' '))
-        && !(*surl = '\0')
-        && ++surl && (proto = strchr(surl, ' ')) && !(*proto = '\0') && ++proto) {
+    /* A request line too long for line1 is served clipped. */
+    if (hts_shared_linputsoc(soc_c, line1, line1Size - 2, deadline, &cut) > 0 &&
+        (surl = strchr(line1, ' ')) && !(*surl = '\0') && ++surl &&
+        (proto = strchr(surl, ' ')) && !(*proto = '\0') && ++proto) {
       /* Flush headers */
-      while(linputsoc_t(soc_c, line, lineSize - 2, timeout) > 0 && line[0] != 0) {
+      while (hts_shared_linputsoc(soc_c, line, lineSize - 2, deadline, &cut) >
+                 0 &&
+             line[0] != 0) {
         int p;
 
-        if ((p = strfield(line, "Content-length:")) != 0) {
+        if (cut) {
+          /* A clipped header is not the one the client sent. */
+        } else if ((p = strfield(line, "Content-length:")) != 0) {
           const char *a = line + p;
           LLint value;
 
@@ -932,24 +792,22 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
           if (*chost == ' ')
             chost++;
           StringCopy(host, chost);
-        }
-#ifndef NO_WEBDAV
-        else if ((p = strfield(line, "Depth: "))) {
-          char *depth = line + p;
+        } else if ((p = strfield(line, "Depth: "))) {
+          const char *depth = line + p;
+          LLint value;
 
-          if (sscanf(depth, "%d", &davDepth) != 1) {
-            davDepth = 0;
-          }
+          /* past 1 is refused below, so clamp rather than let it wrap */
+          davDepth = hts_scan_llint(&depth, 0, INT64_MAX, &value) == HTS_SCAN_OK
+                         ? (int) (value < 2 ? value : 2)
+                         : 0;
         }
-#endif
       }
 
       /* Flush body */
-#ifndef NO_WEBDAV
       if (length > 0) {
         if (length < 32768) {
           StringRoom(davRequest, length + 1);
-          if (recv(soc_c, StringBuffRW(davRequest), length, 0) == length) {
+          if (recv_exact(soc_c, StringBuffRW(davRequest), length, deadline)) {
             StringBuffRW(davRequest)[length] = 0;
           } else {
             msgCode = 500;
@@ -962,24 +820,16 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
           keepAlive = 0;
         }
       }
-#endif
 
       /* Switch protocol ID */
       if (strcasecmp(command, "post") == 0) {
-#ifndef NO_WEBDAV
         msgCode = 404;
-#else
-        msgCode = 501;
-        keepAlive = 0;
-#endif
         msgError = "Proxy Error (POST Request Forbidden)";
       } else if (strcasecmp(command, "get") == 0) {
         headRequest = 0;
       } else if (strcasecmp(command, "head") == 0) {
         headRequest = 1;
-      }
-#ifndef NO_WEBDAV
-      else if (strcasecmp(command, "options") == 0) {
+      } else if (strcasecmp(command, "options") == 0) {
         const char *options = "GET, HEAD, OPTIONS, POST, PROPFIND, TRACE" ", MKCOL, DELETE, PUT";       /* Not supported */
 
         msgCode = HTTP_OK;
@@ -997,19 +847,17 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
         } else {
           listRequest = 2;      /* propfind */
         }
-      } else if (strcasecmp(command, "mkcol") == 0
-                 || strcasecmp(command, "delete") == 0
-                 || strcasecmp(command, "put") == 0
-                 || strcasecmp(command, "proppatch") == 0
-                 || strcasecmp(command, "lock") == 0
-                 || strcasecmp(command, "unlock") == 0
-                 || strcasecmp(command, "copy") == 0
-                 || strcasecmp(command, "trace") == 0) {
+      } else if (strcasecmp(command, "mkcol") == 0 ||
+                 strcasecmp(command, "delete") == 0 ||
+                 strcasecmp(command, "put") == 0 ||
+                 strcasecmp(command, "proppatch") == 0 ||
+                 strcasecmp(command, "lock") == 0 ||
+                 strcasecmp(command, "unlock") == 0 ||
+                 strcasecmp(command, "copy") == 0 ||
+                 strcasecmp(command, "trace") == 0) {
         msgCode = 403;
         msgError = "Method Forbidden";
-      }
-#endif
-      else {
+      } else {
         msgCode = 501;
         msgError = "Proxy Error (Unsupported or Unknown HTTP Command Request)";
         keepAlive = 0;
@@ -1025,7 +873,7 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
       }
 
       /* Post-process request */
-      if (link_has_authority(surl)) {
+      if (hts_shared_link_has_authority(surl)) {
         if (strncasecmp(surl, "http://proxytrack/",
                         sizeof("http://proxytrack/") - 1) == 0) {
         }
@@ -1034,15 +882,12 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
         /* PT_ReadIndex() strips the scheme off this archive lookup key. */
         if (StringLength(host) > 0) {
           /* Direct hit */
-          if (
-#ifndef NO_WEBDAV
-               listRequest != 2 &&
-#endif
-               strncasecmp(StringBuff(host), StringBuff(localhost),
-                           StringLength(localhost)) == 0
-               && (StringBuff(host)[StringLength(localhost)] == '\0'
-                   || StringBuff(host)[StringLength(localhost)] == ':')
-               && surl[0] == '/') {
+          if (listRequest != 2 &&
+              strncasecmp(StringBuff(host), StringBuff(localhost),
+                          StringLength(localhost)) == 0 &&
+              (StringBuff(host)[StringLength(localhost)] == '\0' ||
+               StringBuff(host)[StringLength(localhost)] == ':') &&
+              surl[0] == '/') {
             const char *toHit = surl + 1;
 
             if (strncmp(toHit, "webdav/", 7) == 0) {
@@ -1050,17 +895,16 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
             }
             /* Direct hit */
             StringCopy(url, "");
-            if (!link_has_authority(toHit))
+            if (!hts_shared_link_has_authority(toHit))
               StringCat(url, "http://");
             StringCat(url, toHit);
-          } else
-            if (strncasecmp(surl, "/proxytrack/", sizeof("/proxytrack/") - 1) ==
-                0) {
+          } else if (strncasecmp(surl, "/proxytrack/",
+                                 sizeof("/proxytrack/") - 1) == 0) {
             const char *toHit = surl + sizeof("/proxytrack/") - 1;
 
             /* Direct hit */
             StringCopy(url, "");
-            if (!link_has_authority(toHit))
+            if (!hts_shared_link_has_authority(toHit))
               StringCat(url, "http://");
             StringCat(url, toHit);
           } else {
@@ -1081,9 +925,7 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
       if (msgCode == 0) {
         if (listRequest == 1) {
           element = proxytrack_process_HTTP_List(indexes, StringBuff(url));
-        }
-#ifndef NO_WEBDAV
-        else if (listRequest == 2) {
+        } else if (listRequest == 2) {
           if ((element =
                proxytrack_process_DAV_Request(indexes, StringBuff(url),
                                               davDepth)) != NULL) {
@@ -1092,30 +934,23 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
                                       "MS-Author-Via: DAV\r\n"
                                       "Cache-Control: private\r\n");
           }
-        }
-#endif
-        else {
+        } else {
           element = PT_ReadIndex(indexes, StringBuff(url), FETCH_BODY);
         }
-        if (element == NULL
-#ifndef NO_WEBDAV
-            && listRequest == 2
-#endif
-            && StringLength(url) > 0
-            && StringBuff(url)[StringLength(url) - 1] == '/') {
+        if (element == NULL && listRequest == 2 && StringLength(url) > 0 &&
+            StringBuff(url)[StringLength(url) - 1] == '/') {
           element = PT_Index_HTML_BuildRootInfo(indexes);
           if (element != NULL) {
             element->statuscode = 404;  /* HTML page, but in error */
           }
         }
+        /* a refused record carries -1, which is no HTTP status */
+        if (element != NULL && element->statuscode == STATUSCODE_INVALID)
+          element->statuscode = 502;
         if (element != NULL) {
           /* lifted out of the format: a directive inside a macro argument list
              is undefined, and MSVC rejects it */
-#ifndef NO_WEBDAV
           const char *const davPart = StringBuff(davHeaders);
-#else
-          const char *const davPart = "";
-#endif
 
           msgCode = element->statuscode;
           StringSprintf(
@@ -1310,15 +1145,13 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
 #else
       shutdown(soc_c, 1);
 #endif
-      while(recv(soc_c, ((char *) &c), 1, 0) > 0) ;
+      deadline = time(NULL) + timeout;
+      while (recv_until(soc_c, &c, 1, deadline) > 0)
+        ;
     }
   } while(keepAlive);
 
-#ifdef _WIN32
-  closesocket(soc_c);
-#else
-  close(soc_c);
-#endif
+  close_client(soc_c);
 
   StringFree(url);
   StringFree(urlRedirect);
@@ -1326,10 +1159,8 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
   StringFree(output);
   StringFree(host);
   StringFree(localhost);
-#ifndef NO_WEBDAV
   StringFree(davHeaders);
   StringFree(davRequest);
-#endif
 
   if (buffer)
     free(buffer);
@@ -1423,9 +1254,19 @@ proxytrack_process_generic(void (*process) (PT_Indexes indexes, T_SOC soc_c),
   return 0;
 }
 
+/* Client threads alive; a flood past the cap gets 503 instead of a thread. */
+#define PROXYTRACK_MAX_CLIENTS 256
+static volatile int proxytrack_clients = 0;
+
+static void proxytrack_process_HTTP_counted(PT_Indexes indexes, T_SOC soc_c) {
+  proxytrack_process_HTTP(indexes, soc_c);
+  hts_add_int(&proxytrack_clients, -1);
+}
+
 /* Process HTTP proxy requests */
 static int proxytrack_process_HTTP_threaded(PT_Indexes indexes, T_SOC soc) {
-  return proxytrack_process_generic(proxytrack_process_HTTP, indexes, soc);
+  return proxytrack_process_generic(proxytrack_process_HTTP_counted, indexes,
+                                    soc);
 }
 
 /* HTTP Server */
@@ -1434,9 +1275,19 @@ static int proxytrack_start_HTTP(PT_Indexes indexes, T_SOC soc) {
     T_SOC soc_c;
 
     if ((soc_c = (T_SOC) accept(soc, NULL, NULL)) != INVALID_SOCKET) {
-      if (!proxytrack_process_HTTP_threaded(indexes, soc_c)) {
+      if (hts_add_int(&proxytrack_clients, 1) > PROXYTRACK_MAX_CLIENTS) {
+        static const char busy[] =
+            "HTTP/1.1 503 Too Many Connections\r\nContent-Length: 0\r\n"
+            "Connection: close\r\n\r\n";
+
+        (void) send(soc_c, busy, (int) sizeof(busy) - 1, 0);
+        hts_add_int(&proxytrack_clients, -1);
+        close_client(soc_c);
+      } else if (!proxytrack_process_HTTP_threaded(indexes, soc_c)) {
         proxytrack_print_log(CRITICAL,
                              "proxytrack_start_HTTP::Can not fork a thread");
+        hts_add_int(&proxytrack_clients, -1);
+        close_client(soc_c);
       }
     }
   }

@@ -1,0 +1,42 @@
+#!/bin/bash
+#
+# Pins the parser's link attribute table: each name keeps the kind it had in
+# the five lists it replaced, and no row is lost or added.
+
+set -euo pipefail
+
+link="archive background data data-src data-srcset dynsrc lowsrc profile src
+srcset swurl url usemap longdesc xlink:href poster"
+event="onAbort onBlur onChange onClick onDblClick onDragDrop onError onFocus
+onKeyDown onKeyPress onKeyUp onLoad onMouseDown onMouseMove onMouseOut
+onMouseOver onMouseUp onMove onReset onResize onSelect onSubmit onUnload"
+
+expected=""
+for n in $link; do expected+="$n link"$'\n'; done
+expected+="hotspot hotspot"$'\n'"content refresh"$'\n'"action leave"$'\n'
+for n in $event; do expected+="$n event"$'\n'; done
+expected+="style style"$'\n'"href none"$'\n'"id none"$'\n'
+
+names=$(cut -d' ' -f1 <<<"$expected")
+# shellcheck disable=SC2086 # one argument per name
+out=$(httrack -#test=attrkind $names) || {
+    echo "httrack -#test=attrkind exited non-zero: $out" >&2
+    exit 1
+}
+
+expected=${expected%$'\n'}
+nrows=$(($(wc -l <<<"$expected") - 2))
+case "$out" in
+"attrkind self-test OK ($nrows rows)"*) ;;
+*)
+    echo "expected 'attrkind self-test OK ($nrows rows)', got: $out" >&2
+    exit 1
+    ;;
+esac
+
+out=${out//$'\r'/}
+got=$(tail -n +2 <<<"$out")
+if [ "$got" != "$expected" ]; then
+    diff <(echo "$expected") <(echo "$got") >&2 || true
+    exit 1
+fi

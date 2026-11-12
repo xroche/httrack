@@ -63,23 +63,6 @@ extern "C" {
 #endif
 #include <assert.h>
 
-/* Compiler-portability attribute macros (no-ops on non-GCC). HTS_INLINE comes
- * from htsglobal.h. */
-#ifndef HTS_UNUSED
-#ifdef __GNUC__
-#define HTS_UNUSED __attribute__ ((unused))
-
-#define HTS_STATIC static __attribute__ ((unused))
-
-/* printf-style format check; fmt/arg are 1-based argument positions. */
-#define HTS_PRINTF_FUN(fmt, arg) __attribute__ ((format (printf, fmt, arg)))
-#else
-#define HTS_UNUSED
-#define HTS_STATIC static
-#define HTS_PRINTF_FUN(fmt, arg)
-#endif
-#endif
-
 /* min/max evaluate their arguments twice; pass side-effect-free expressions. */
 #undef min
 #undef max
@@ -89,10 +72,6 @@ extern "C" {
 
 #ifndef _WIN32
 #undef Sleep
-#define min(a,b) ((a)>(b)?(b):(a))
-
-#define max(a,b) ((a)>(b)?(a):(b))
-
 /* Win32 Sleep() shim for POSIX; argument is milliseconds. */
 #define Sleep(a) { if (((a)*1000)%1000000) usleep(((a)*1000)%1000000); if (((a)*1000)/1000000) sleep(((a)*1000)/1000000); }
 #endif

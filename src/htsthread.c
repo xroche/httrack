@@ -30,18 +30,13 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
-/* Internal engine bytecode */
-#define HTS_INTERNAL_BYTECODE
-
 #include "htsglobal.h"
 #include "htsbase.h"
 #include "htsthread.h"
 #include "httrack-library.h"
 
-#if USE_BEGINTHREAD
 #ifdef _WIN32
 #include <process.h>
-#endif
 #endif
 
 /* Outstanding threads, counted at spawn rather than by the child at entry, so
@@ -61,7 +56,6 @@ HTSEXT_API void htsthread_wait(void) {
 }
 
 HTSEXT_API void htsthread_wait_n(int n_wait) {
-#if USE_BEGINTHREAD
   int wait = 0;
 
   do {
@@ -70,24 +64,29 @@ HTSEXT_API void htsthread_wait_n(int n_wait) {
     hts_mutexrelease(&process_chain_mutex);
     if (wait)
       Sleep(100);
-  } while(wait);
-#endif
+  } while (wait);
 }
 
 /* hts_mutexlock() builds process_chain_mutex on first use. */
 void htsthread_init(void) {
-#if USE_BEGINTHREAD
 #if (defined(_DEBUG) || defined(DEBUG))
   assertf(process_chain == 0);
-#endif
 #endif
 }
 
 void htsthread_uninit(void) {
-  htsthread_wait();
-#if USE_BEGINTHREAD
-  hts_mutexfree(&process_chain_mutex);
-#endif
+  hts_boolean idle;
+
+  hts_mutexlock(&process_chain_mutex);
+  idle = process_chain == 0;
+  hts_mutexrelease(&process_chain_mutex);
+  /* a live worker, maybe the caller, still takes the lock when it ends */
+  if (idle)
+    hts_mutexfree(&process_chain_mutex);
+}
+
+hts_boolean htsthread_lock_live(void) {
+  return process_chain_mutex != HTSMUTEX_INIT;
 }
 
 typedef struct hts_thread_s {
@@ -244,8 +243,6 @@ int hts_newthread_tail(void (*fun)(void *arg), void *arg,
   return 0;
 }
 
-#if USE_BEGINTHREAD
-
 /* Note: new 3.41 cleaned up functions. */
 
 HTSEXT_API void hts_mutexinit(htsmutex * mutex) {
@@ -327,5 +324,3 @@ HTSEXT_API void hts_mutexrelease(htsmutex * mutex) {
   pthread_mutex_unlock(&lock->handle);
 #endif
 }
-
-#endif

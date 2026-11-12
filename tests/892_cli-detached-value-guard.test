@@ -1,0 +1,64 @@
+#!/bin/bash
+#
+# A clustered option (-q%R) that reads the next word refuses a missing word or
+# an option-like one, and says so with its usage line.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_detachedvalue.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmp"
+
+bin=$(httrack_path)
+
+# option|message|usage line, "-" when the option prints none
+rows='%w|Option %w needs to be followed by a blank space, and a module name|-%w httrack-plugin
+%L|Option %L needs to be followed by a blank space, and a text filename|-%L "mylist.txt"
+%b|Option %b needs to be followed by a blank space, and a local hostname|-%b "ip4.localhost"
+%S|Option %S needs to be followed by a blank space, and a text filename|-%S "myfilterlist.txt"
+%A|Option %A needs to be followed by a blank space, and a filesystemtype=mimetype/mimesubtype parameters|-%A php3=text/html,asp=text/html
+%l|Option %l needs to be followed by a blank space, and an ISO language code|-%l "en"
+%a|Option %a needs to be followed by a blank space, and a list of formats|-%a "text/html,*/*;q=0.1"
+%X|Option %X needs to be followed by a blank space, and a raw HTTP header line|-%X "X-Magic: 42"
+%F|Option %F needs to be followed by a blank space, and a footer string|-%F "<!-- Mirrored from {addr}{path} by HTTrack
+%W|Option %W needs to be followed by a blank space, and a <callback-name>=<myfile.so>:<function-name> field|-%W check-link=checklink.so:check
+%R|Option %R needs to be followed by a blank space, and a referer URL|-%R "http://www.example.com/"
+%E|Option %E needs to be followed by a blank space, and an email|-%E "postmaster@example.com"
+%g|Option strip-query needs a blank space and [host/pattern=]key1,key2,...|--strip-query "www.example.com/*=utm_source,sid"
+%C|Option host-alias needs a blank space and alias[,alias...]=canonical-host|--host-alias "www2.example.com,m.example.com=example.com"
+%K|Option cookies-file needs a blank space and a cookies.txt path|--cookies-file "/home/me/cookies.txt"
+%rf|Option warc-file needs a blank space and a WARC name|-
+%rs|Option warc-max-size needs a blank space and a size|-
+%Zs|Option single-file-max-size needs a blank space and a size|-
+%mu|Option sitemap-url needs a blank space and a URL|-
+%Y|Option why needs a blank space and a URL|--why "http://www.example.com/file.zip"
+%G|Option pause needs a blank space and a delay in seconds (MIN[:MAX])|--pause 5:10
+P|Option P needs to be followed by a blank space, and a proxy proxy:port or user:id@proxy:port|-P proxy.example.com:8080
+F|Option F needs to be followed by a blank space, and a user-agent name|-F "my_user_agent/1.0"
+V|Option V needs to be followed by a system-command string|-V "tar uvf some.tar'
+
+# --testscan opens no socket, so the dead URL is never dialled
+probe() { # probe ARG...
+    rc=0
+    reply=$("$bin" --quiet -O "$tmp/out" --testscan http://127.0.0.1:1/ "$@" 2>&1) || rc=$?
+}
+
+count=0
+while IFS='|' read -r opt msg usage; do
+    count=$((count + 1))
+    for word in -zzfoo --mirror ""; do
+        if test -n "$word"; then
+            probe "-q${opt}" "$word"
+        else
+            probe "-q${opt}"
+        fi
+        test "$rc" -ne 0 || fail "-q${opt} ${word}: the option took the word after it"
+        grep -qF -- "* ${msg}" <<<"$reply" || fail "-q${opt} ${word}: no '${msg}' in: ${reply}"
+        if test "$usage" != "-"; then
+            grep -qF -- "Example: ${usage}" <<<"$reply" || fail "-q${opt} ${word}: no usage '${usage}' in: ${reply}"
+        fi
+    done
+done <<<"$rows"
+assert_eq 24 "$count" "options probed"
+echo OK

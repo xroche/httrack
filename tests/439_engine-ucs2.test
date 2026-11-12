@@ -7,7 +7,7 @@ set -euo pipefail
 
 # UCS2 to UTF-8 re-encoding (driven by 'httrack -#test=ucs2').
 
-# Every BMP code unit, plus a BOM and an unpaired surrogate.
+# Every code unit alone, plus a BOM, surrogate pairs and unpaired surrogates.
 assert_selftest "ucs2: OK" ucs2 run
 
 # An output the process cannot allocate must come back as a NULL the caller

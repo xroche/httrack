@@ -1,0 +1,96 @@
+#!/bin/bash
+#
+# --check-cert against the self-signed fixture (CN 127.0.0.1, SAN IP:127.0.0.1
+# and DNS:localhost). SSL_CERT_FILE decides whether that cert is trusted.
+
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+tmpdir=$(mktemp -d)
+cleanup() {
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+# Windows refuses the option rather than crawl unverified.
+windows_refuses() {
+    local rc=0
+    httrack --check-cert -O "$tmpdir/win" 'https://127.0.0.1:1/' \
+        >"$tmpdir/win.out" 2>&1 || rc=$?
+    test "$rc" -ne 0 || fail "--check-cert accepted on Windows"
+    grep -q 'not supported on Windows' "$tmpdir/win.out" ||
+        fail_dump "no refusal message" "$tmpdir/win.out"
+}
+if target_is_windows; then
+    windows_refuses
+    exit 0
+fi
+
+if test "${HTTPS_SUPPORT:-}" == "no"; then
+    echo "no https support compiled, skipping"
+    exit 77
+fi
+
+local_server_start --tls --log "$tmpdir/srv.out"
+port=$SRV_PORT
+# a second server whose cert names other.example and 192.0.2.1, never 127.0.0.1
+local_server_start --tls --log "$tmpdir/srv2.out" -- \
+    --cert "$(nativepath "${testdir}/other.crt")" \
+    --key "$(nativepath "${testdir}/other.key")"
+other=$SRV_PORT
+: >"$tmpdir/empty.pem"
+mkdir "$tmpdir/nocerts"
+trusted="$(nativepath "${testdir}/server.crt")"
+cat "${testdir}/server.crt" "${testdir}/other.crt" >"$tmpdir/both.pem"
+
+# crawl NAME HOST CAFILE [httrack args]: mirror HOST's basic.html into NAME.
+crawl() {
+    local name=$1 host=$2 ca=$3
+    shift 3
+    SSL_CERT_FILE="$ca" SSL_CERT_DIR="$tmpdir/nocerts" \
+        local_crawl --log "$tmpdir/$name.out" \
+        "https://${host}:${port}/simple/basic.html" -O "$tmpdir/$name" \
+        -r1 -c1 --robots=0 --retries=0 --quiet "$@" || true
+}
+# saved NAME HOST [PORT]
+saved() { test -f "$tmpdir/$1/$2_${3:-$port}/simple/basic.html"; }
+# rejected NAME HOST REASON [PORT]
+rejected() {
+    grep -q "certificate of $2:${4:-$port} rejected (--check-cert): $3" \
+        "$tmpdir/$1/hts-log.txt" ||
+        fail_dump "$1: no rejection naming '$3'" "$tmpdir/$1/hts-log.txt"
+    ! saved "$1" "$2" "${4:-$port}" || fail "$1: page saved despite the rejection"
+}
+
+crawl untrusted 127.0.0.1 "$tmpdir/empty.pem" --check-cert
+rejected untrusted 127.0.0.1 'self.signed certificate'
+
+crawl ip 127.0.0.1 "$trusted" --check-cert
+saved ip 127.0.0.1 || fail_dump "trusted IP host refused" "$tmpdir/ip/hts-log.txt"
+
+# both certs trusted: the second connection, to a cert not naming 127.0.0.1,
+# is checked too
+crawl twohosts 127.0.0.1 "$tmpdir/both.pem" --check-cert \
+    "https://127.0.0.1:${other}/simple/basic.html"
+saved twohosts 127.0.0.1 || fail_dump "trusted host refused" "$tmpdir/twohosts/hts-log.txt"
+rejected twohosts 127.0.0.1 'IP address mismatch' "$other"
+
+# the default stays unverified
+crawl control 127.0.0.1 "$tmpdir/empty.pem"
+saved control 127.0.0.1 || fail_dump "default crawl refused" "$tmpdir/control/hts-log.txt"
+
+# DNS names need the resolver override, which is IPv6-build only
+if test "${V6_SUPPORT:-}" == "no"; then
+    echo "SKIP: the DNS name rows need an IPv6 build"
+    exit 0
+fi
+HTTRACK_DEBUG_RESOLVE=localhost:127.0.0.1 crawl name localhost "$trusted" --check-cert
+saved name localhost || fail_dump "trusted DNS host refused" "$tmpdir/name/hts-log.txt"
+
+HTTRACK_DEBUG_RESOLVE=localhost.:127.0.0.1 crawl dot localhost. "$trusted" --check-cert
+saved dot localhost. || fail_dump "trusted absolute DNS host refused" "$tmpdir/dot/hts-log.txt"
+
+HTTRACK_DEBUG_RESOLVE=wrong.example:127.0.0.1 crawl wrong wrong.example "$trusted" --check-cert
+rejected wrong wrong.example 'hostname mismatch'
