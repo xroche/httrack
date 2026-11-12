@@ -1,0 +1,4 @@
+user-agent: big
+ disallow : /spaces/ 
+ALLOW:/UPPER/
+Sitemap:

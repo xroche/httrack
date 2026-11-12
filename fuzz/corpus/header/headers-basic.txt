@@ -1,0 +1,7 @@
+HTTP/1.1 200 OK
+Content-Type: text/html; charset=utf-8
+Content-Length: 10
+Location: /redirected.html
+Set-Cookie: a=1; Path=/; Secure; HttpOnly
+Content-Disposition: attachment; filename="f.zip"
+
