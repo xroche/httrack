@@ -2284,9 +2284,9 @@ static hts_boolean arcPastRecordEnd(FILE *file, long int end) {
    reading the same long line differently. */
 #define ARC_LINE_MAX ((int) sizeof(((PT_Index__Arc) NULL)->line) - 2)
 
-/* Bytes hts_shared_linput() with HTS_LINPUT_SKIP_NUL, unlike htslib.c's
-   linput(), never returns wherever they sit on the line. NUL is among them, so
-   a record line carrying one is indexed and served all the same. */
+/* Bytes hts_shared_linput() with HTS_LINPUT_SKIP_NUL, unlike linput(), never
+   returns wherever they sit on the line. NUL is among them, so a record line
+   carrying one is indexed and served all the same. */
 static hts_boolean arcDroppedByte(char c) {
   return (c == 0 || c == 9 || c == 12 || c == 13) ? HTS_TRUE : HTS_FALSE;
 }

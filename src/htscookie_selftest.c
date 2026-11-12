@@ -1141,7 +1141,14 @@ static int st_cookieimport(httrackp *opt, int argc, char **argv) {
     FILE *fp = FOPEN(file, "wb");
 
     assertf(fp != NULL);
+    char longval[400];
+
+    memset(longval, 'v', sizeof(longval) - 1);
+    longval[sizeof(longval) - 1] = '\0';
     fprintf(fp, "IECOOK\nieval\nwww.example.com/\n0\n0\n0\n0\n0\n*\n");
+    /* a value past the reader's cap must not shift the next record */
+    fprintf(fp, "IELONG\n%s\nwww.example.com/\n0\n0\n0\n0\n0\n*\n", longval);
+    fprintf(fp, "IECOOK2\nieval2\nwww.example.com/\n0\n0\n0\n0\n0\n*\n");
     fclose(fp);
   }
 
@@ -1154,6 +1161,7 @@ static int st_cookieimport(httrackp *opt, int argc, char **argv) {
 #ifdef _WIN32
   /* the IE scan merged the cookie and unlinked the consumed file */
   assertf(strstr(ck.data, "IECOOK") != NULL);
+  assertf(strstr(ck.data, "\tIECOOK2\tieval2\n") != NULL);
   assertf(FOPEN(file, "rb") == NULL);
 #endif
 
