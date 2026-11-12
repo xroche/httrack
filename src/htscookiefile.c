@@ -40,6 +40,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsbundle.h"
 #include "htsio.h"
 #include "htscookie_selftest.h"
+#include "htscharset.h"
 #ifdef _WIN32
 #include <io.h> /* _commit */
 #endif
