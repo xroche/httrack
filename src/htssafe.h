@@ -739,7 +739,16 @@ static HTS_INLINE HTS_UNUSED size_t hts_lastcharoffset(const char *s) {
 
 /** Resize A to B bytes. Returns NULL when out of memory and A then stays
     allocated, so test the result before overwriting A with it. */
+#ifdef LIBHTTRACK_EXPORTS
+/* Self-tests set it to N to make the Nth realloct from now fail. */
+extern int hts_realloct_fault_selftest;
+#define realloct(A, B)                                                         \
+  (hts_realloct_fault_selftest > 0 && --hts_realloct_fault_selftest == 0       \
+       ? NULL                                                                  \
+       : realloc(A, B))
+#else
 #define realloct(A, B) realloc(A, B)
+#endif
 
 /** Raw memcpy despite the name, and the caller owns the bounds. */
 #define memcpybuff(A, B, N) memcpy((A), (B), (N))

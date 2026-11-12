@@ -495,6 +495,9 @@ void hts_finish_html_file(httrackp *opt, cache_back *cache, htsblk *r,
    HTS_FILTERSINC, because the list's byte size must fit an int. */
 #define HTS_FILTERS_MAX (INT_MAX / HTS_FILTER_SLOT_SIZE - HTS_FILTERSINC - 2)
 
+/* Allocate or grow the list to maxfilter rules (at least 128), clearing the
+   last filterinc. Returns the size, or 0 when out of memory, and the list as it
+   was then stays valid. */
 int filters_init(char ***ptrfilters, int maxfilter, int filterinc);
 
 /* Binds this crawl's filter array to `opt`, and empties the wizard block with

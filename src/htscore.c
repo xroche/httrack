@@ -2566,9 +2566,8 @@ hts_boolean filters_may_grow(int maxfilter) {
 hts_boolean filters_grow(httrackp *opt, int n) {
   if (*opt->filters.filptr + n >= opt->maxfilter &&
       filters_may_grow(opt->maxfilter)) {
-    opt->maxfilter += HTS_FILTERSINC;
-    if (filters_init(opt->filters.filters, opt->maxfilter, HTS_FILTERSINC) ==
-        0) {
+    if (filters_init(opt->filters.filters, opt->maxfilter + HTS_FILTERSINC,
+                     HTS_FILTERSINC) == 0) {
       printf("PANIC! : Too many filters : >%d [%d]\n", *opt->filters.filptr,
              __LINE__);
       fflush(stdout);
@@ -2579,6 +2578,7 @@ hts_boolean filters_grow(httrackp *opt, int n) {
           "To avoid that: use #F option for more filters (example: -#F5000)");
       return HTS_FALSE;
     }
+    opt->maxfilter += HTS_FILTERSINC;
   }
   return HTS_TRUE;
 }
@@ -2811,41 +2811,40 @@ void filters_remove(httrackp *opt, int pos, int n) {
 int filters_init(char ***ptrfilters, int maxfilter, int filterinc) {
   char **filters = *ptrfilters;
   int filter_max = maximum(maxfilter, 128);
+  int i;
 
   if (filters == NULL) {
     filters = (char **) calloct(filter_max + 2, sizeof(char *));
-  } else {
-    filters = (char **) realloct(filters, sizeof(char *) * (filter_max + 2));
-  }
-  if (filters) {
-    if (filters[0] == NULL) {
-      filters[0] = (char *) calloct(filter_max + 2, HTS_FILTER_SLOT_SIZE);
-    } else {
-      filters[0] = (char *) realloct(
-          filters[0], sizeof(char) * (filter_max + 2) * HTS_FILTER_SLOT_SIZE);
-    }
+    if (filters == NULL)
+      return 0;
+    filters[0] = (char *) calloct(filter_max + 2, HTS_FILTER_SLOT_SIZE);
     if (filters[0] == NULL) {
       freet(filters);
-      filters = NULL;
+      return 0;
     }
-  }
-  if (filters != NULL) {
-    int i;
-    int from;
+  } else {
+    char **const grown =
+        (char **) realloct(filters, sizeof(char *) * (filter_max + 2));
+    char *slots;
 
-    if (filterinc == 0)
-      from = 0;
-    else
-      from = filter_max - filterinc;
-    for(i = 0; i <= filter_max; i++) {  // PLUS UN (sécurité)
-      filters[i] = filters[0] + (size_t) i * HTS_FILTER_SLOT_SIZE;
-    }
-    for(i = from; i <= filter_max; i++) {       // PLUS UN (sécurité)
-      filters[i][0] = '\0';     // clear
-    }
+    if (grown == NULL)
+      return 0;
+    filters = grown;
+    *ptrfilters = filters;
+    slots = (char *) realloct(filters[0],
+                              (size_t) (filter_max + 2) * HTS_FILTER_SLOT_SIZE);
+    // The old slots and their pointers stay valid, so the list is unchanged.
+    if (slots == NULL)
+      return 0;
+    filters[0] = slots;
   }
+  // One slot past filter_max, as a guard.
+  for (i = 0; i <= filter_max; i++)
+    filters[i] = filters[0] + (size_t) i * HTS_FILTER_SLOT_SIZE;
+  for (i = filterinc == 0 ? 0 : filter_max - filterinc; i <= filter_max; i++)
+    filters[i][0] = '\0';
   *ptrfilters = filters;
-  return (filters != NULL) ? filter_max : 0;
+  return filter_max;
 }
 
 static int mkdir_compat(const char *pathname) {

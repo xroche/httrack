@@ -527,6 +527,39 @@ static int st_xfread_limit(httrackp *opt, int argc, char **argv) {
   st_xfread_case("accept_grow", &r, 8192, NULL);
   freet(r.adr);
 
+  /* Out of memory growing an unknown-length body keeps what was read. The
+     failure comes before any read, so no socket is needed. */
+  memset(&r, 0, sizeof(r));
+  r.soc = INVALID_SOCKET;
+  r.totalsize = -1;
+  r.size = 8;
+  r.adr = (char *) malloct(64);
+  strlcpybuff(r.adr, "BODYREAD", 64);
+  hts_realloct_fault_selftest = 1;
+  st_xfread_case("oom", &r, 8192, r.adr);
+  hts_realloct_fault_selftest = 0;
+  printf("oom body: %s\n", r.adr != NULL ? r.adr : "(null)");
+  freet(r.adr);
+
+  /* A failed shrink after a read keeps the larger block and what it read. */
+  memset(&r, 0, sizeof(r));
+  r.soc = INVALID_SOCKET;
+  r.is_file = 1;
+  r.fp = tmpfile();
+  assertf(r.fp != NULL && fputs("MORE", r.fp) >= 0);
+  rewind(r.fp);
+  r.totalsize = -1;
+  r.size = 8;
+  r.adr = (char *) malloct(64);
+  strlcpybuff(r.adr, "BODYREAD", 64);
+  hts_realloct_fault_selftest = 2;
+  http_xfread1(&r, 8192);
+  hts_realloct_fault_selftest = 0;
+  printf("shrink body: %s size=" LLintP "\n", r.adr != NULL ? r.adr : "(null)",
+         r.size);
+  fclose(r.fp);
+  freet(r.adr);
+
   // The bound itself, which the chunk and decode paths share.
   for (i = 0; i < sizeof(sizes) / sizeof(sizes[0]); i++)
     printf("fits(" LLintP ")=%d\n", sizes[i],

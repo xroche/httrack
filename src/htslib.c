@@ -2536,26 +2536,32 @@ LLint http_xfread1(htsblk * r, int bufl) {
           r->adr = (char *) malloct(bufl + 1);
           r->size = 0;
         } else {
-          r->adr = (char *) realloct(r->adr, (int) r->size + bufl + 1);
+          char *const grown =
+              (char *) realloct(r->adr, (size_t) r->size + bufl + 1);
+
+          if (grown == NULL) {
+            // Out of memory: keep what was read, as the size guard does.
+            return READ_ERROR;
+          }
+          r->adr = grown;
         }
 
         if (r->adr != NULL) {
-          // lecture
           nl = hts_read(r, r->adr + (int) r->size, bufl);
           if (nl > 0) {
-            // resize
-            r->adr = (char *) realloct(r->adr, (int) r->size + nl + 1);
-            // nouvelle taille
-            r->size += nl;
-            // octet nul
-            if (r->adr)
-              r->adr[r->size] = '\0';
+            // A failed shrink leaves the larger block, which still fits.
+            char *const fit =
+                (char *) realloct(r->adr, (size_t) r->size + nl + 1);
 
-          } // sinon on a fini
+            if (fit != NULL)
+              r->adr = fit;
+            r->size += nl;
+            r->adr[r->size] = '\0';
+          }
         }
       }
 
-      // pas de adr=erreur
+      // No buffer is an error.
       if (r->adr == NULL)
         nl = READ_ERROR;
 
@@ -6287,6 +6293,8 @@ void cut_path(char *fullpath, char *path, size_t path_size, char *pname,
   }
 }
 
+int hts_realloct_fault_selftest = 0;
+
 static void hts_debug_log_print(const char *format, ...) HTS_PRINTF_FUN(1, 2);
 
 static int hts_dgb_init = 0;
@@ -6619,6 +6627,27 @@ HTSEXT_API void hts_log_print(httrackp * opt, int type, const char *format, ...)
 HTSEXT_API void set_wrappers(httrackp * opt) {  // LEGACY
 }
 
+hts_boolean hts_libhandles_add(httrackp *opt, void *handle,
+                               const char *moduleName) {
+  char *name = strdupt(moduleName);
+  htslibhandle *grown;
+
+  if (name == NULL)
+    return HTS_FALSE;
+  grown = (htslibhandle *) realloct(opt->libHandles.handles,
+                                    ((size_t) opt->libHandles.count + 1) *
+                                        sizeof(htslibhandle));
+  if (grown == NULL) {
+    freet(name);
+    return HTS_FALSE;
+  }
+  opt->libHandles.handles = grown;
+  grown[opt->libHandles.count].handle = handle;
+  grown[opt->libHandles.count].moduleName = name;
+  opt->libHandles.count++;
+  return HTS_TRUE;
+}
+
 HTSEXT_API int plug_wrapper(httrackp * opt, const char *moduleName,
                             const char *argv) {
   void *handle = openFunctionLib(moduleName);
@@ -6635,15 +6664,11 @@ HTSEXT_API int plug_wrapper(httrackp * opt, const char *moduleName,
                             ret);
       }
       if (ret == 1) {           /* Success! */
-        opt->libHandles.handles =
-          (htslibhandle *) realloct(opt->libHandles.handles,
-                                    (opt->libHandles.count +
-                                     1) * sizeof(htslibhandle));
-        opt->libHandles.handles[opt->libHandles.count].handle = handle;
-        opt->libHandles.handles[opt->libHandles.count].moduleName =
-          strdupt(moduleName);
-        opt->libHandles.count++;
-        return 1;
+        if (hts_libhandles_add(opt, handle, moduleName))
+          return 1;
+        hts_debug_log_print("* note: out of memory registering %s", moduleName);
+        if (unplug)
+          unplug(opt);
       } else {
         hts_debug_log_print
           ("* note: error while running entry point 'hts_plug' in %s",
