@@ -3,7 +3,9 @@ if FUZZERS
 noinst_PROGRAMS = fuzz-charset fuzz-codepage fuzz-meta fuzz-idna fuzz-entities \
 	fuzz-unescape fuzz-filters fuzz-url fuzz-header fuzz-cachendx \
 	fuzz-htsparse fuzz-singlefile fuzz-sitemap fuzz-arc fuzz-cookie \
-	fuzz-robots fuzz-savename
+	fuzz-robots \
+	fuzz-bundle \
+	fuzz-savename
 endif
 
 AM_CPPFLAGS = \
@@ -49,6 +51,9 @@ fuzz_arc_CPPFLAGS = $(AM_CPPFLAGS) -DZLIB_CONST
 
 # The robots.txt parser and its RFC 9309 wildcard matcher.
 fuzz_robots_SOURCES = fuzz-robots.c fuzz.h
+
+# The login-bundle reader: a plain file parser, the library links everything.
+fuzz_bundle_SOURCES = fuzz-bundle.c fuzz.h
 
 # The save-name builder: hostile URLs in, on-disk paths out.
 fuzz_savename_SOURCES = fuzz-savename.c fuzz.h
