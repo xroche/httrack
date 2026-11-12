@@ -6,10 +6,22 @@ set -e
 
 : "${top_srcdir:=..}"
 
-bash "$top_srcdir/tests/local-crawl.sh" \
-    --found 'types/control.html' \
-    --not-found 'types/gen.png' \
-    --log-found 'link forbidden because of MIME types restrictions: .*/types/gen\.php' \
-    --log-found 'result for wizard mime test: 1' \
-    --log-not-found 'result for wizard mime test: 0' \
+# gen.php?id=5 is saved as gend61c.png when fetched.
+check() {
+    bash "$top_srcdir/tests/local-crawl.sh" \
+        --found 'types/control.html' \
+        --log-found 'link forbidden because of MIME types restrictions: .*/types/gen\.php' \
+        --log-found 'result for wizard mime test: 1' \
+        --log-not-found 'result for wizard mime test: 0' \
+        "$@"
+}
+
+# Type known from the server reply.
+check --not-found 'types/gend61c.png' \
     httrack 'BASEURL/types/index.html' '-mime:image/png' -Z
+# Update pass, type read straight from the cache (-%D1).
+check --rerun-args '-mime:image/png' \
+    httrack 'BASEURL/types/index.html' -Z
+# Update pass without -%D1, the cached copy damaged so the cache read fails.
+check --plant-file 'types/gend61c.png' --rerun-args '-mime:image/png -%D0 -C1' \
+    httrack 'BASEURL/types/index.html' -Z

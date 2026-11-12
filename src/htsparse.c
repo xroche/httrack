@@ -5063,10 +5063,10 @@ int hts_wait_delayed(htsmoduleStruct *str, lien_adrfilsave *afs,
                        heap(ptr)->fil, opt, sback, cache,
                        hash, ptr, numero_passe, &back);
 
-          /* Recompute authorization with MIME type, then exit loop either way
-           */
-          mime_forbids_link(opt, ptr, afs, back.r.contenttype, forbidden_url);
-          break;
+          /* Recompute authorization with MIME type */
+          (void) mime_forbids_link(opt, ptr, afs, back.r.contenttype,
+                                   forbidden_url);
+          break; /* exit loop, forbidden or not */
         }
       }
 
