@@ -1,0 +1,13 @@
+# Entity shapes for the decoder.
+named="&amp;"
+named_long="&Aacute;"
+numeric="&#65;"
+hex="&#x41;"
+hex_upper="&#X41;"
+no_semi="&amp"
+empty="&#;"
+overflow="&#1114112;"
+surrogate="&#xD800;"
+neg="&#-1;"
+unknown="&notanentity;"
+stray="&"

@@ -1,0 +1,6 @@
+https://fuzz.example/
+# Netscape HTTP Cookie File
+.fuzz.example	TRUE	/	FALSE	1770000000	sid	abc
+.example.com	TRUE	/secure	TRUE	0	auth	tok
+bad-line-no-tabs
+.example.com	TRUE	/	FALSE	99999999999	old	x
