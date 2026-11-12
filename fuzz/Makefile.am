@@ -62,7 +62,8 @@ fuzz_savename_SOURCES = fuzz-savename.c fuzz.h
 fuzz_warc_SOURCES = fuzz-warc.c fuzz.h
 
 # Corpus list comes from configure: automake does not expand EXTRA_DIST globs.
-EXTRA_DIST = README.md run-fuzzers.sh check-corpus-list.sh ubsan-ignorelist.txt $(FUZZ_CORPUS_LIST)
+EXTRA_DIST = README.md run-fuzzers.sh check-corpus-list.sh ubsan-ignorelist.txt \
+	generate-extra-seeds.py $(FUZZ_CORPUS_LIST) $(FUZZ_AUX_LIST)
 
 # The cookie jar and basic-auth store: jar files in, credentials scoped out.
 fuzz_cookie_SOURCES = fuzz-cookie.c fuzz.h

@@ -57,6 +57,18 @@ if [ -n "$tracked" ]; then
     [ -z "$gone" ] || bad "tracked but absent, so the corpus is short of them: $gone"
 fi
 
+# A tracked fuzz/ file ships only if Makefile.am names it or configure globs it.
+fuzzdir=$(dirname "$corpusdir")
+if [ -n "$tracked" ] && [ -f "$fuzzdir/Makefile.am" ]; then
+    for name in $(git -C "$fuzzdir" ls-files -- ':(glob)*'); do
+        case $name in
+        .gitignore | Makefile.am | *.dict | *.options) continue ;;
+        esac
+        grep -qwF -- "$name" "$fuzzdir/Makefile.am" ||
+            bad "tracked but in no EXTRA_DIST or SOURCES, so the tarball lacks it: fuzz/$name"
+    done
+fi
+
 if [ "$status" -eq 0 ]; then
     echo "$count fuzz corpus files, all tracked and reachable by the glob"
 fi

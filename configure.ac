@@ -1146,6 +1146,14 @@ AC_SUBST([FUZZ_CORPUS_LIST])
 AC_MSG_RESULT([$hts_ncorpus])
 test "$hts_ncorpus" -gt 0 || AC_MSG_ERROR([no fuzz corpus file matched fuzz/corpus/*/*])
 
+# The libFuzzer dictionaries and options files next to the harnesses.
+FUZZ_AUX_LIST=
+for hts_c in "$srcdir"/fuzz/*.dict "$srcdir"/fuzz/*.options; do
+	test -f "$hts_c" || continue
+	FUZZ_AUX_LIST="$FUZZ_AUX_LIST `echo "$hts_c" | sed 's|.*/||'`"
+done
+AC_SUBST([FUZZ_AUX_LIST])
+
 # The parser differential's corpus needs the same list, two levels deep at most.
 # A whitespace-holding name is refused here, where the file can be named,
 # because make dist would otherwise split the entry and blame distdir-am.
