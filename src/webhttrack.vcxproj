@@ -68,6 +68,8 @@
       <PreprocessorDefinitions>WIN32;_CONSOLE;_MBCS;ZLIB_CONST;HTS_INTHASH_USES_MD5;WINVER=0x0601;_WIN32_WINNT=0x0601;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(MSBuildThisFileDirectory);$(MSBuildThisFileDirectory)coucal;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <WarningLevel>Level3</WarningLevel>
+      <!-- An undeclared call (C4013) truncates a returned pointer on x64 (C4047). -->
+      <TreatSpecificWarningsAsErrors>4013;4047;%(TreatSpecificWarningsAsErrors)</TreatSpecificWarningsAsErrors>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <CompileAs>CompileAsC</CompileAs>
       <!-- Hardening: /guard:cf and an explicit /GS, so the set is a contract. -->
