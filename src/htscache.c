@@ -43,6 +43,7 @@ Please visit our Website: http://www.httrack.com
 #include <time.h>
 
 #include "htszlib.h"
+#include "htscachecodec.h"
 /* END specific definitions */
 
 /* Cache backend (zip-based since 3.31; the pre-3.31 .dat/.ndx import was
@@ -120,59 +121,6 @@ void cache_mayadd(httrackp * opt, cache_back * cache, htsblk * r,
   }
   // ---fin stockage en cache---
 }
-
-/* Remote-controlled values (ETag, Location, the URL) can together outgrow the
-   block, and a clipped field reads back as a valid shorter one, so one that
-   does not fit is dropped whole and counted. `headers` must be an array. */
-#define ZIP_FIELD_STRING(headers, headersSize, dropped, field, value)          \
-  do {                                                                         \
-    if ((value) != NULL && (value)[0] != '\0' &&                               \
-        !slcatprintfbuff(headers, sizeof(headers), &(headersSize),             \
-                         "%s: %s\r\n", field, value)) {                        \
-      (dropped)++;                                                             \
-    }                                                                          \
-  } while (0)
-#define ZIP_FIELD_INT(headers, headersSize, dropped, field, value)             \
-  do {                                                                         \
-    if ((value) != 0 &&                                                        \
-        !slcatprintfbuff(headers, sizeof(headers), &(headersSize),             \
-                         "%s: " LLintP "\r\n", field, (LLint) (value))) {      \
-      (dropped)++;                                                             \
-    }                                                                          \
-  } while (0)
-#define ZIP_FIELD_INT_FORCE(headers, headersSize, dropped, field, value)       \
-  do {                                                                         \
-    if (!slcatprintfbuff(headers, sizeof(headers), &(headersSize),             \
-                         "%s: " LLintP "\r\n", field, (LLint) (value))) {      \
-      (dropped)++;                                                             \
-    }                                                                          \
-  } while (0)
-
-/* A corrupt cache can carry a field wider than ours; clipping it keeps the
-   entry, where aborting would take the crawl down. */
-#define ZIP_READFIELD_STRING(line, value, refline, refvalue, refvalue_size)    \
-  do {                                                                         \
-    if (line[0] != '\0' && strfield2(line, refline)) {                         \
-      (void) strclipbuff(refvalue, refvalue_size, value);                      \
-      line[0] = '\0';                                                          \
-    }                                                                          \
-  } while (0)
-#define ZIP_READFIELD_INT(line, value, refline, refvalue) do { \
-  if (line[0] != '\0' && strfield2(line, refline)) { \
-    int intval = 0; \
-    sscanf(value, "%d", &intval); \
-    (refvalue) = intval; \
-    line[0] = '\0'; \
-	} \
-} while(0)
-#define ZIP_READFIELD_LLINT(line, value, refline, refvalue) do { \
-  if (line[0] != '\0' && strfield2(line, refline)) { \
-    LLint intval = 0; \
-    sscanf(value, LLintP, &intval); \
-    (refvalue) = intval; \
-    line[0] = '\0'; \
-	} \
-} while(0)
 
 /* Cache write failed: a fatal errno or a failure streak aborts the mirror
    (exit_xh); an isolated failure only drops the current entry. */
@@ -351,19 +299,9 @@ static void cache_add_ex(httrackp *opt, cache_back *cache, const htsblk *r,
   headers[0] = '\0';
   headersSize = 0;
   /* */
-  {
-    const char *message;
-
-    if (strlen(r->msg) < 32) {
-      message = r->msg;
-    } else {
-      message = "(See X-StatusMessage)";
-    }
-    /* 64 characters MAX for first line */
-    if (!slcatprintfbuff(headers, sizeof(headers), &headersSize,
-                         "HTTP/1.%c %d %s\r\n", '1', r->statuscode, message)) {
-      headersDropped++;
-    }
+  if (!hts_cache_status_line(headers, sizeof(headers), &headersSize,
+                             r->statuscode, r->msg)) {
+    headersDropped++;
   }
 
   if (path_prefix != NULL && path_prefix[0] != '\0' && url_save != NULL
@@ -428,20 +366,7 @@ static void cache_add_ex(httrackp *opt, cache_back *cache, const htsblk *r,
   }
 
   /* Time */
-  memset(&fi, 0, sizeof(fi));
-  if (r->lastmodified[0] != '\0') {
-    struct tm buffer;
-    struct tm *tm_s = convert_time_rfc822(&buffer, r->lastmodified);
-
-    if (tm_s) {
-      fi.tmz_date.tm_sec = (uInt) tm_s->tm_sec;
-      fi.tmz_date.tm_min = (uInt) tm_s->tm_min;
-      fi.tmz_date.tm_hour = (uInt) tm_s->tm_hour;
-      fi.tmz_date.tm_mday = (uInt) tm_s->tm_mday;
-      fi.tmz_date.tm_mon = (uInt) tm_s->tm_mon;
-      fi.tmz_date.tm_year = (uInt) tm_s->tm_year;
-    }
-  }
+  hts_cache_zip_date(&fi, r->lastmodified);
 
   /* Open file - NOTE: headers in "comment" */
   if ((zErr = zipOpenNewFileInZip((zipFile) cache->zipOutput, filename, &fi,
@@ -697,25 +622,26 @@ static htsblk cache_readex_new(httrackp *opt, cache_back *cache,
               *value++ = '\0';
               if (*value == ' ' || *value == '\t')
                 value++;
-              ZIP_READFIELD_INT(line, value, "X-In-Cache", dataincache);
-              ZIP_READFIELD_INT(line, value, "X-Statuscode", r.statuscode);
-              ZIP_READFIELD_INT(line, value, "X-Kept", kept);
-              ZIP_READFIELD_STRING(line, value, "X-StatusMessage", r.msg,
-                                   sizeof(r.msg));
-              ZIP_READFIELD_LLINT(line, value, "X-Size", r.size);       // size
-              ZIP_READFIELD_STRING(line, value, "Content-Type", r.contenttype,
-                                   sizeof(r.contenttype));
-              ZIP_READFIELD_STRING(line, value, "X-Charset", r.charset,
-                                   sizeof(r.charset));
-              ZIP_READFIELD_STRING(line, value, "Last-Modified", r.lastmodified,
-                                   sizeof(r.lastmodified));
-              ZIP_READFIELD_STRING(line, value, "Etag", r.etag, sizeof(r.etag));
-              ZIP_READFIELD_STRING(line, value, "Location", r.location,
-                                   HTS_LOCATION_SIZE);
-              ZIP_READFIELD_STRING(line, value, "Content-Disposition", r.cdispo,
-                                   sizeof(r.cdispo));
-              ZIP_READFIELD_STRING(line, value, "X-Save", previous_save_,
-                                   sizeof(previous_save_));
+              CACHE_READFIELD_INT(line, value, "X-In-Cache", dataincache);
+              CACHE_READFIELD_INT(line, value, "X-Statuscode", r.statuscode);
+              CACHE_READFIELD_INT(line, value, "X-Kept", kept);
+              CACHE_READFIELD_STRING(line, value, "X-StatusMessage", r.msg,
+                                     sizeof(r.msg));
+              CACHE_READFIELD_LLINT(line, value, "X-Size", r.size); // size
+              CACHE_READFIELD_STRING(line, value, "Content-Type", r.contenttype,
+                                     sizeof(r.contenttype));
+              CACHE_READFIELD_STRING(line, value, "X-Charset", r.charset,
+                                     sizeof(r.charset));
+              CACHE_READFIELD_STRING(line, value, "Last-Modified",
+                                     r.lastmodified, sizeof(r.lastmodified));
+              CACHE_READFIELD_STRING(line, value, "Etag", r.etag,
+                                     sizeof(r.etag));
+              CACHE_READFIELD_STRING(line, value, "Location", r.location,
+                                     HTS_LOCATION_SIZE);
+              CACHE_READFIELD_STRING(line, value, "Content-Disposition",
+                                     r.cdispo, sizeof(r.cdispo));
+              CACHE_READFIELD_STRING(line, value, "X-Save", previous_save_,
+                                     sizeof(previous_save_));
             }
           }
           if (has_nul) {
