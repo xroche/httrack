@@ -1243,6 +1243,20 @@ static void PT_AppendHeader(char **headers, size_t *len, size_t *cap,
   *len += nameLen + 2 + valueLen + 2;
 }
 
+typedef struct PT_HeaderSink {
+  char **headers;
+  size_t *len;
+  size_t *cap;
+} PT_HeaderSink;
+
+/* hts_cache_read_fields() callback: pass an unknown cached line through. */
+static void PT_AppendHeaderSink(void *arg, const char *name,
+                                const char *value) {
+  PT_HeaderSink *const sink = (PT_HeaderSink *) arg;
+
+  PT_AppendHeader(sink->headers, sink->len, sink->cap, name, value);
+}
+
 static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
                                       int flags) {
   PT_Index__New index = (PT_Index__New) & index_->slots.formatNew;
@@ -1295,62 +1309,37 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
         if ((readSizeHeader =
              unzGetLocalExtrafield(index->zFile, headerBuff,
                                    sizeof(headerBuff) - 2)) > 0) {
-          int offset = 0;
-          /* the longest stored line is "Location: " plus a full-capacity URL;
-             a shorter buffer truncates it into a valid-looking wrong target */
-          char BIGSTK line[HTS_LOCATION_SIZE + 32];
-          /* the writers store strlen(headers), so a NUL inside is damage */
-          const hts_boolean has_nul =
-              memchr(headerBuff, '\0', (size_t) readSizeHeader) != NULL;
-          int lineEof = 0;
-
-          headerBuff[readSizeHeader] = '\0';
-          while (!has_nul && offset < readSizeHeader && !lineEof) {
-            char *value;
-            hts_boolean cut;
-
-            line[0] = '\0';
-            offset += binput(headerBuff + offset, line, sizeof(line) - 2, &cut);
-            if (line[0] == '\0') {
-              lineEof = 1;
-            }
-            /* no line HTTrack writes is this long, so a cut one is foreign or
-               damaged and its prefix would parse as a wrong value */
-            value = cut ? NULL : strchr(line, ':');
-            if (value != NULL) {
-              *value++ = '\0';
-              if (*value == ' ' || *value == '\t')
-                value++;
-              CACHE_READFIELD_INT(line, value, "X-In-Cache", dataincache);
-              CACHE_READFIELD_INT(line, value, "X-Statuscode", r->statuscode);
-              CACHE_READFIELD_STRING(line, value, "X-StatusMessage", r->msg,
-                                     sizeof(r->msg));
-              CACHE_READFIELD_LLINT(line, value, "X-Size",
-                                    declared_size); // size
-              CACHE_READFIELD_STRING(line, value, "Content-Type",
-                                     r->contenttype, sizeof(r->contenttype));
-              CACHE_READFIELD_STRING(line, value, "X-Charset", r->charset,
-                                     sizeof(r->charset));
-              CACHE_READFIELD_STRING(line, value, "Last-Modified",
-                                     r->lastmodified, sizeof(r->lastmodified));
-              CACHE_READFIELD_STRING(line, value, "Etag", r->etag,
-                                     sizeof(r->etag));
-              CACHE_READFIELD_STRING(line, value, "Location", r->location,
-                                     sizeof(location_default));
-              CACHE_READFIELD_STRING(line, value, "Content-Disposition",
-                                     r->cdispo, sizeof(r->cdispo));
-              CACHE_READFIELD_STRING(line, value, "X-Save", previous_save_,
-                                     sizeof(previous_save_));
+          PT_HeaderSink sink;
+          const hts_cache_field fields[] = {
+              {"X-In-Cache", HTS_CACHE_FIELD_INT, &dataincache, 0},
+              {"X-Statuscode", HTS_CACHE_FIELD_INT, &r->statuscode, 0},
+              {"X-StatusMessage", HTS_CACHE_FIELD_STRING, r->msg,
+               sizeof(r->msg)},
+              {"X-Size", HTS_CACHE_FIELD_LLINT, &declared_size, 0},
+              {"Content-Type", HTS_CACHE_FIELD_STRING, r->contenttype,
+               sizeof(r->contenttype)},
+              {"X-Charset", HTS_CACHE_FIELD_STRING, r->charset,
+               sizeof(r->charset)},
+              {"Last-Modified", HTS_CACHE_FIELD_STRING, r->lastmodified,
+               sizeof(r->lastmodified)},
+              {"Etag", HTS_CACHE_FIELD_STRING, r->etag, sizeof(r->etag)},
+              {"Location", HTS_CACHE_FIELD_STRING, r->location,
+               sizeof(location_default)},
+              {"Content-Disposition", HTS_CACHE_FIELD_STRING, r->cdispo,
+               sizeof(r->cdispo)},
+              {"X-Save", HTS_CACHE_FIELD_STRING, previous_save_,
+               sizeof(previous_save_)},
               /* naming-only marker: consumed so it never reaches a reply */
-              if (line[0] != '\0' && strfield2(line, "X-Kept"))
-                line[0] = '\0';
-              if (line[0] != '\0') {
-                PT_AppendHeader(&r->headers, &headersLen, &headersCap, line,
-                                value);
-              }
-            }
-          }
-          if (has_nul) {
+              {"X-Kept", HTS_CACHE_FIELD_SKIP, NULL, 0},
+          };
+
+          sink.headers = &r->headers;
+          sink.len = &headersLen;
+          sink.cap = &headersCap;
+          headerBuff[readSizeHeader] = '\0';
+          if (!hts_cache_read_fields(headerBuff, (size_t) readSizeHeader,
+                                     fields, sizeof(fields) / sizeof(fields[0]),
+                                     PT_AppendHeaderSink, &sink)) {
             r->statuscode = STATUSCODE_INVALID;
             strcpybuff(r->msg, "Cache Read Error : NUL In Header");
           }
@@ -2593,6 +2582,18 @@ static PT_Element PT_ReadCache__Arc_u(PT_Index index_, const char *url,
         const long int fposEnd = dataLength >= 0 ? fposMeta + dataLength : -1;
         const char *pos;
         LLint declaredLength = 0;
+        const hts_cache_field fields[] = {
+            {"Content-Length", HTS_CACHE_FIELD_LLINT, &declaredLength, 0},
+            {"Content-Type", HTS_CACHE_FIELD_STRING, r->contenttype,
+             sizeof(r->contenttype)},
+            {"Last-Modified", HTS_CACHE_FIELD_STRING, r->lastmodified,
+             sizeof(r->lastmodified)},
+            {"Etag", HTS_CACHE_FIELD_STRING, r->etag, sizeof(r->etag)},
+            {"Location", HTS_CACHE_FIELD_STRING, r->location,
+             sizeof(location_default)},
+            {"Content-Disposition", HTS_CACHE_FIELD_STRING, r->cdispo,
+             sizeof(r->cdispo)},
+        };
 
         /* Read HTTP headers */
         /* HTTP/1.1 404 Not Found */
@@ -2620,19 +2621,10 @@ static PT_Element PT_ReadCache__Arc_u(PT_Index index_, const char *url,
             if (value != NULL) {
               *value = '\0';
               for(value++; *value == ' ' || *value == '\t'; value++) ;
-              CACHE_READFIELD_LLINT(line, value, "Content-Length",
-                                    declaredLength);
-              CACHE_READFIELD_STRING(line, value, "Content-Type",
-                                     r->contenttype, sizeof(r->contenttype));
-              CACHE_READFIELD_STRING(line, value, "Last-Modified",
-                                     r->lastmodified, sizeof(r->lastmodified));
-              CACHE_READFIELD_STRING(line, value, "Etag", r->etag,
-                                     sizeof(r->etag));
-              CACHE_READFIELD_STRING(line, value, "Location", r->location,
-                                     sizeof(location_default));
-              CACHE_READFIELD_STRING(line, value, "Content-Disposition",
-                                     r->cdispo, sizeof(r->cdispo));
-              if (line[0] != '\0') {
+              if (!hts_cache_store_field(fields,
+                                         sizeof(fields) / sizeof(fields[0]),
+                                         line, value) &&
+                  line[0] != '\0') {
                 PT_AppendHeader(&r->headers, &headersLen, &headersCap, line,
                                 value);
               }

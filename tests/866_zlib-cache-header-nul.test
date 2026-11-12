@@ -24,8 +24,18 @@ proxytrack --convert "$dir/out.arc" "$dir/hts-cache/new.zip" >"$dir/log" 2>&1 ||
 arc=$(<"$dir/out.arc")
 grep -qF 'http://example.com/clean.html' <<<"$arc" ||
     fail "the control entry is missing from the ARC"
-# exactly one: the entry holding the NUL must not read as 200 too
-test "$(grep -cF 'HTTP/1.0 200 OK' <<<"$arc")" = 1 ||
-    fail "expected only the control entry to read as 200"
+# the control and blank.html: the entry holding the NUL must not read as 200
+test "$(grep -cF 'HTTP/1.0 200 OK' <<<"$arc")" = 2 ||
+    fail "expected only the control and blank.html to read as 200"
+grep -qF 'http://example.com/blank.html' <<<"$arc" ||
+    fail "blank.html is missing from the ARC"
+# blank.html: nothing past its blank line is read, and a nameless line is not
+# copied into the record
+if grep -qE '^(HTTP/1\.[01] 203|X-Late:)' <<<"$arc"; then
+    fail "a field past the blank line was read"
+fi
+if grep -q '^: nameless' <<<"$arc"; then
+    fail "a nameless header line was copied into the record"
+fi
 grep -qF 'Cache Read Error : NUL In Header' <<<"$arc" ||
     fail "ProxyTrack did not refuse the entry holding a NUL"

@@ -34,7 +34,7 @@ Please visit our Website: http://www.httrack.com
 #define HTSCACHECODEC_DEFH
 
 /* No engine header here: proxytrack and the fuzzers build it without one. The
-   READFIELD macros expand strfield2() from the caller's htslib.h. */
+   field readers expand strfield2() from the caller's htslib.h. */
 #include "htsglobal.h"
 #include "htssafe.h"
 #include "htsdate.h"
@@ -70,33 +70,107 @@ Please visit our Website: http://www.httrack.com
     }                                                                          \
   } while (0)
 
-/* A corrupt cache can carry a field wider than ours; clipping it keeps the
-   entry, where aborting would take the crawl down. */
-#define CACHE_READFIELD_STRING(line, value, refline, refvalue, refvalue_size)  \
-  do {                                                                         \
-    if (line[0] != '\0' && strfield2(line, refline)) {                         \
-      (void) strclipbuff(refvalue, refvalue_size, value);                      \
-      line[0] = '\0';                                                          \
-    }                                                                          \
-  } while (0)
-#define CACHE_READFIELD_INT(line, value, refline, refvalue)                    \
-  do {                                                                         \
-    if (line[0] != '\0' && strfield2(line, refline)) {                         \
-      int intval = 0;                                                          \
-      sscanf(value, "%d", &intval);                                            \
-      (refvalue) = intval;                                                     \
-      line[0] = '\0';                                                          \
-    }                                                                          \
-  } while (0)
-#define CACHE_READFIELD_LLINT(line, value, refline, refvalue)                  \
-  do {                                                                         \
-    if (line[0] != '\0' && strfield2(line, refline)) {                         \
-      LLint intval = 0;                                                        \
-      sscanf(value, LLintP, &intval);                                          \
-      (refvalue) = intval;                                                     \
-      line[0] = '\0';                                                          \
-    }                                                                          \
-  } while (0)
+typedef enum hts_cache_field_kind {
+  HTS_CACHE_FIELD_INT,    /* dest is an int */
+  HTS_CACHE_FIELD_LLINT,  /* dest is an LLint */
+  HTS_CACHE_FIELD_STRING, /* dest is a char[dest_size], clipped to it */
+  HTS_CACHE_FIELD_SKIP    /* consumed, dest unused */
+} hts_cache_field_kind;
+
+typedef struct hts_cache_field {
+  const char *name;
+  hts_cache_field_kind kind;
+  void *dest;
+  size_t dest_size;
+} hts_cache_field;
+
+/* Store value into the field called name, matched case-insensitively.
+   HTS_FALSE when no field has that name. */
+static HTS_UNUSED hts_boolean
+hts_cache_store_field(const hts_cache_field *fields, size_t count,
+                      const char *name, const char *value) {
+  size_t i;
+
+  for (i = 0; i < count && !strfield2(name, fields[i].name); i++) {
+  }
+  if (i == count) {
+    return HTS_FALSE;
+  } else if (fields[i].kind == HTS_CACHE_FIELD_INT) {
+    int intval = 0;
+
+    sscanf(value, "%d", &intval);
+    *(int *) fields[i].dest = intval;
+  } else if (fields[i].kind == HTS_CACHE_FIELD_LLINT) {
+    LLint intval = 0;
+
+    sscanf(value, LLintP, &intval);
+    *(LLint *) fields[i].dest = intval;
+  } else if (fields[i].kind == HTS_CACHE_FIELD_STRING) {
+    /* a corrupt cache can carry a field wider than ours; clipping keeps the
+       entry, where aborting would take the crawl down */
+    (void) strclipbuff(fields[i].dest, fields[i].dest_size, value);
+  }
+  return HTS_TRUE;
+}
+
+/* Receives a header line no field names; may be NULL. */
+typedef void (*hts_cache_field_other)(void *arg, const char *name,
+                                      const char *value);
+
+/* Read the header block buff[0..size) of one ZIP cache entry into fields,
+   matching names case-insensitively, until the first empty line. HTS_FALSE
+   when the block holds a NUL: the writers store strlen(headers), so it is
+   damage and the entry must be refused. */
+static HTS_UNUSED hts_boolean hts_cache_read_fields(
+    const char *buff, size_t size, const hts_cache_field *fields, size_t count,
+    hts_cache_field_other other, void *arg) {
+  const char *p = buff;
+  const char *const end = buff + size;
+  /* the longest stored line is "Location: " plus a full-capacity URL;
+     a shorter buffer truncates it into a valid-looking wrong target */
+  char BIGSTK line[HTS_LOCATION_SIZE + 32];
+
+  if (memchr(buff, '\0', size) != NULL) {
+    return HTS_FALSE;
+  }
+  while (p < end) {
+    size_t used = 0;
+    hts_boolean cut = HTS_FALSE;
+    char *value;
+
+    /* a cut line is consumed whole, so its tail never reads as a field */
+    for (; p < end && *p != '\n'; p++) {
+      if (*p == '\r') {
+        continue;
+      } else if (used < sizeof(line) - 2) {
+        line[used++] = *p;
+      } else {
+        cut = HTS_TRUE;
+      }
+    }
+    if (p < end) {
+      p++;
+    }
+    line[used] = '\0';
+    if (used == 0) {
+      break;
+    }
+    /* no line we write is this long, so a cut one is foreign or damaged and
+       its prefix would parse as a wrong value */
+    value = cut ? NULL : strchr(line, ':');
+    if (value == NULL || value == line) {
+      continue;
+    }
+    *value++ = '\0';
+    if (*value == ' ' || *value == '\t') {
+      value++;
+    }
+    if (!hts_cache_store_field(fields, count, line, value) && other != NULL) {
+      other(arg, line, value);
+    }
+  }
+  return HTS_TRUE;
+}
 
 /* Append an entry's first line to headers[*used], capacity size. A message
    too long for it points at X-StatusMessage instead. HTS_FALSE when it does
