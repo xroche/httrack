@@ -24,7 +24,7 @@ Please visit our Website: http://www.httrack.com
 /* Fuzz the robots.txt handler (htsrobots.c): robots_parse() reads the body a
    server hands back for /robots.txt and keeps the HTTrack group's rules;
    checkrobots() then matches every fetch path against them with the RFC 9309
-   wildcard matcher ('*' any run, '$' anchors the end). The input's first byte
+   wildcard matcher ('*' any run, '$' anchors the end). The input's last byte
    picks the parse variants (keep_root_disallow), the rest is the body, and
    every body line doubles as a matched path, plus a probe host for the
    per-host list walk. The raw rule-store path (checkrobots_set) runs on the
@@ -48,9 +48,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
   if (size < 2)
     return 0;
-  keep_root = (data[0] & 1) ? HTS_TRUE : HTS_FALSE;
-  data++;
-  size--;
+  size--; /* the last byte is the keep_root flag, so seeds keep their text */
+  keep_root = (data[size] & 1) ? HTS_TRUE : HTS_FALSE;
   body = fuzz_strdup(data, size);
 
   memset(&robots, 0, sizeof(robots));
