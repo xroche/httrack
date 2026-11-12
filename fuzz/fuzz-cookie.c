@@ -99,7 +99,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   (void) cookie_add(&jar, "pref", "p1", ".example.com", "/");
 
   switch (data[0] % 8) {
-  case 0: {                       /* store and erase, with attributes */
+  case 0: { /* store and erase, with attributes */
     cookie_attr attr;
 
     memset(&attr, 0, sizeof(attr));
@@ -113,12 +113,11 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     (void) cookie_set(&jar, lines[0], nlines > 1 ? lines[1] : "v",
                       nlines > 2 ? lines[2] : "fuzz.example",
                       nlines > 3 ? lines[3] : "/", NULL);
-    (void) cookie_remove(&jar, lines[0],
-                         nlines > 2 ? lines[2] : "fuzz.example",
+    (void) cookie_remove(&jar, lines[0], nlines > 2 ? lines[2] : "fuzz.example",
                          nlines > 3 ? lines[3] : "/");
     break;
   }
-  case 1: {                       /* send-side lookups */
+  case 1: { /* send-side lookups */
     const char *dom = nlines > 0 ? lines[0] : "fuzz.example";
     const char *path = nlines > 1 ? lines[1] : "/";
     char *rec = cookie_find(jar.data, "", dom, path);
@@ -143,7 +142,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
                                  nlines > 2 ? lines[2] : "www.fuzz.example");
     break;
   }
-  case 2: {                       /* jar file load, save and reload */
+  case 2: { /* jar file load, save and reload */
     char dir[] = "/tmp/fuzz-cookie-XXXXXX";
     char path[256];
     char base[256]; /* the loaders join base and name with no separator */
@@ -171,7 +170,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     }
     break;
   }
-  case 3: {                       /* basic auth */
+  case 3: { /* basic auth */
     (void) bauth_add(&jar, nlines > 0 ? lines[0] : "fuzz.example",
                      nlines > 1 ? lines[1] : "/secure/",
                      nlines > 2 ? lines[2] : "dXNlcjpwYXNz");
@@ -184,7 +183,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     bauth_free(&jar);
     break;
   }
-  case 4: {                       /* expiry parsing */
+  case 4: { /* expiry parsing */
     int64_t when = 0;
     int64_t now = (int64_t) time(NULL);
 
@@ -195,7 +194,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
       cookie_sink += (unsigned long) when;
     break;
   }
-  case 5: {                       /* jar text surgery */
+  case 5: { /* jar text surgery */
     char s[1024];
 
     s[0] = '\0';
@@ -214,7 +213,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     cookie_sink += (unsigned long) strlen(s);
     break;
   }
-  case 6: {                       /* the flat helpers the bundles share */
+  case 6: { /* the flat helpers the bundles share */
     char host[COOKIE_MAX_DOMAIN];
     cookie_attr attr;
     char pair[512];
@@ -239,7 +238,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     StringFree(text);
     break;
   }
-  default: {                      /* host scoping and a field sweep */
+  default: { /* host scoping and a field sweep */
     char host[COOKIE_MAX_DOMAIN];
     char field[8192];
     int i;
