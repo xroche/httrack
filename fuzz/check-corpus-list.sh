@@ -4,6 +4,7 @@
 # ships the vectors in a tarball. The glob carries no oracle, so a file nobody
 # git-added, one sitting a level deeper, or one whose name make would split
 # leaves a smaller corpus with no complaint (three were missing that way).
+# It also checks that every tracked file directly under fuzz/ ships.
 
 set -euo pipefail
 export LC_ALL=C
@@ -55,6 +56,31 @@ if [ -n "$tracked" ]; then
     [ -z "$untracked" ] || bad "untracked, so the tarball would ship without them: $untracked"
     gone=$(comm -23 <(sort <<<"$tracked") <(printf '%s' "$present" | sort))
     [ -z "$gone" ] || bad "tracked but absent, so the corpus is short of them: $gone"
+fi
+
+# A tracked fuzz/ file ships only if EXTRA_DIST or a _SOURCES line lists it,
+# or configure globs it as a top-level .dict or .options file.
+fuzzdir=$(dirname "$corpusdir")
+if [ -n "$tracked" ] && [ -f "$fuzzdir/Makefile.am" ]; then
+    listed=$(awk '{
+        sub(/#.*/, ""); line = line $0
+        if (line ~ /\\$/) { sub(/\\$/, " ", line); next }
+        if (line ~ /^[[:space:]]*(EXTRA_DIST|[A-Za-z0-9_]+_SOURCES)[[:space:]]*\+?=/) {
+            sub(/^[^=]*=/, "", line)
+            n = split(line, w, /[[:space:]]+/)
+            for (i = 1; i <= n; i++) if (w[i] != "") print w[i]
+        }
+        line = ""
+    }' "$fuzzdir/Makefile.am")
+    while IFS= read -r -d '' name; do
+        case $name in
+        .gitignore | Makefile.am) continue ;;
+        */*) ;;
+        *.dict | *.options) continue ;;
+        esac
+        grep -qxF -- "$name" <<<"$listed" ||
+            bad "tracked but not listed in fuzz/Makefile.am, so the tarball lacks it: fuzz/$name"
+    done < <(git -C "$fuzzdir" ls-files -z -- . ':(exclude)corpus')
 fi
 
 if [ "$status" -eq 0 ]; then
