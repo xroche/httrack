@@ -121,12 +121,14 @@ static int wc_hex(const char *s, char *dst, size_t dsize) {
     unsigned int byte;
     int hi, lo;
 
-    hi = s[0] >= '0' && s[0] <= '9' ? s[0] - '0'
+    hi = s[0] >= '0' && s[0] <= '9'   ? s[0] - '0'
          : s[0] >= 'a' && s[0] <= 'f' ? s[0] - 'a' + 10
-         : s[0] >= 'A' && s[0] <= 'F' ? s[0] - 'A' + 10 : -1;
-    lo = s[1] >= '0' && s[1] <= '9' ? s[1] - '0'
+         : s[0] >= 'A' && s[0] <= 'F' ? s[0] - 'A' + 10
+                                      : -1;
+    lo = s[1] >= '0' && s[1] <= '9'   ? s[1] - '0'
          : s[1] >= 'a' && s[1] <= 'f' ? s[1] - 'a' + 10
-         : s[1] >= 'A' && s[1] <= 'F' ? s[1] - 'A' + 10 : -1;
+         : s[1] >= 'A' && s[1] <= 'F' ? s[1] - 'A' + 10
+                                      : -1;
     if (hi < 0 || lo < 0) {
       break;
     }
@@ -138,10 +140,10 @@ static int wc_hex(const char *s, char *dst, size_t dsize) {
   return (int) n;
 }
 
-static const int wc_codes[] = { 200, 206, 301, 304, 404, 0, -1, 999 };
-static const int wc_unchanged[] = { WARC_UNCHANGED_NONE,
-                                    WARC_UNCHANGED_SERVER_304,
-                                    WARC_UNCHANGED_ENGINE_FORCED };
+static const int wc_codes[] = {200, 206, 301, 304, 404, 0, -1, 999};
+static const int wc_unchanged[] = {WARC_UNCHANGED_NONE,
+                                   WARC_UNCHANGED_SERVER_304,
+                                   WARC_UNCHANGED_ENGINE_FORCED};
 
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   static int inited = 0;
@@ -174,7 +176,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   statuscode = wc_codes[data[0] & 7];
   truncated = (int) (data[2] & 3);
   unchanged = wc_unchanged[(data[2] >> 2) % 3];
-  set_cl = (int[]) { -1, 0, 5, 1048576 }[(data[2] >> 4) & 3];
+  set_cl = (int[]) {-1, 0, 5, 1048576}[(data[2] >> 4) & 3];
 
   p = data + 3;
   end = data + size;
@@ -259,21 +261,17 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
      wraps: wire-derived header blocks, body, status, revisit and truncation
      tags, then whatever second transaction the sheet asks for. */
   if ((w = warc_open(opt, wc_path)) != NULL) {
-    (void) warc_write_transaction(w, uri, ip[0] != '\0' ? ip : NULL,
-                                  reqhdr_len > 0 ? reqhdr : NULL,
-                                  resphdr_len > 0 ? resphdr : NULL, body,
-                                  (size_t) body_len, NULL,
-                                  ctype[0] != '\0' ? ctype : NULL, statuscode,
-                                  WARC_UNCHANGED_NONE,
-                                  truncated != 0 ? truncated : 0);
+    (void) warc_write_transaction(
+        w, uri, ip[0] != '\0' ? ip : NULL, reqhdr_len > 0 ? reqhdr : NULL,
+        resphdr_len > 0 ? resphdr : NULL, body, (size_t) body_len, NULL,
+        ctype[0] != '\0' ? ctype : NULL, statuscode, WARC_UNCHANGED_NONE,
+        truncated != 0 ? truncated : 0);
     if ((data[1] & 0x04) != 0) {
       statuscode2 = statuscode;
-      (void) warc_write_transaction(w, uri, ip[0] != '\0' ? ip : NULL,
-                                    reqhdr_len > 0 ? reqhdr : NULL,
-                                    resphdr_len > 0 ? resphdr : NULL, body,
-                                    (size_t) body_len, NULL,
-                                    ctype[0] != '\0' ? ctype : NULL,
-                                    statuscode2, unchanged, 0);
+      (void) warc_write_transaction(
+          w, uri, ip[0] != '\0' ? ip : NULL, reqhdr_len > 0 ? reqhdr : NULL,
+          resphdr_len > 0 ? resphdr : NULL, body, (size_t) body_len, NULL,
+          ctype[0] != '\0' ? ctype : NULL, statuscode2, unchanged, 0);
     }
     if ((data[1] & 0x08) != 0) {
       (void) warc_write_resource(w, uri, ip[0] != '\0' ? ip : NULL,
