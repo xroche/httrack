@@ -1106,36 +1106,20 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
           if ((strfield2(argv[i] + 2, "clean")) || (strfield2(argv[i] + 2, "tide"))) {  // nettoyer
             argv[i][1] = '\0';
             {
-              /* index.html lives in path_html, the others in path_log */
-              static const char *const names[] = {"hts-log.txt",
-                                                  "hts-err.txt",
-                                                  NULL, /* index.html */
-                                                  "hts-cache/new.zip",
-                                                  "hts-cache/old.zip",
-                                                  "hts-cache/new.dat",
-                                                  "hts-cache/new.ndx",
-                                                  "hts-cache/old.dat",
-                                                  "hts-cache/old.ndx",
-                                                  "hts-cache/new.lst",
-                                                  "hts-cache/old.lst",
-                                                  "hts-cache/new.txt",
-                                                  "hts-cache/old.txt",
-                                                  "hts-cache/damaged.zip",
-                                                  "hts-cache/damaged.lst",
-                                                  "hts-cache/damaged.txt",
-                                                  "hts-cache/readme.txt",
-                                                  "hts-cache/repair.zip",
-                                                  "hts-cache/doit.log",
-                                                  "hts-in_progress.lock"};
+              static const char *const log_names[] = {
+                  "hts-log.txt", "hts-err.txt", "hts-cache/new.zip",
+                  "hts-cache/old.zip", "hts-cache/new.dat", "hts-cache/new.ndx",
+                  "hts-cache/old.dat", "hts-cache/old.ndx", "hts-cache/new.lst",
+                  "hts-cache/old.lst", "hts-cache/new.txt", "hts-cache/old.txt",
+                  "hts-cache/damaged.zip", "hts-cache/damaged.lst",
+                  "hts-cache/damaged.txt", "hts-cache/readme.txt",
+                  "hts-cache/repair.zip", "hts-cache/doit.log",
+                  "hts-in_progress.lock"};
               size_t i;
 
-              for (i = 0; i < sizeof(names) / sizeof(names[0]); i++) {
-                if (names[i] == NULL)
-                  unlink_if_exists(opt, StringBuff(opt->path_html),
-                                   "index.html");
-                else
-                  unlink_if_exists(opt, StringBuff(opt->path_log), names[i]);
-              }
+              unlink_if_exists(opt, StringBuff(opt->path_html), "index.html");
+              for (i = 0; i < sizeof(log_names) / sizeof(log_names[0]); i++)
+                unlink_if_exists(opt, StringBuff(opt->path_log), log_names[i]);
             }
             purge_ref_dir(opt);
             RMDIR(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),

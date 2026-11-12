@@ -41,8 +41,7 @@ run() { # run ARG...
     mkdir -p "${out}"
     # shellcheck disable=SC2086
     plant ${names} ${keep}
-    RC=0
-    httrack -O "${out}" --quiet "$@" >"${tmp}/run.log" 2>&1 || RC=$?
+    httrack -O "${out}" --quiet "$@" >"${tmp}/run.log" 2>&1 || true
 }
 
 stale_files() {
@@ -58,3 +57,17 @@ left=$(stale_files | sed "s|^${out}/||" | sort | tr '\n' ' ')
 assert_eq "cookies.txt hts-cache/keep.me " "${left}" "files --clean left behind"
 assert_file "${out}/cookies.txt" "cookies.txt kept"
 ok "--clean removes every listed file and keeps the others"
+
+# Split paths: index.html is in the html dir, the log names in the log dir.
+rm -rf "${out}"
+mkdir -p "${out}/html" "${out}/log"
+for d in html log; do
+    echo STALE >"${out}/${d}/index.html"
+    echo STALE >"${out}/${d}/hts-log.txt"
+done
+httrack -O "${out}/html,${out}/log" --quiet --clean >"${tmp}/run.log" 2>&1 || true
+test ! -e "${out}/html/index.html" || fail "html/index.html not removed"
+test -e "${out}/log/index.html" || fail "log/index.html was removed"
+test ! -e "${out}/log/hts-log.txt" || fail "log/hts-log.txt not removed"
+test -e "${out}/html/hts-log.txt" || fail "html/hts-log.txt was removed"
+ok "--clean resolves index.html in the html dir and the rest in the log dir"
