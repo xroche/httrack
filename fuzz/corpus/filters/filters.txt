@@ -1,0 +1,11 @@
++*.example.com/*
+-*/private/*
++*.html
+-*.css
+*[path]/*
++*/*[file]
+localhost
+127.0.0.1
++http://*/x.html
+-*cgi-bin*
++*.example.com:8080/*

@@ -1,0 +1,11 @@
+# Charset declaration shapes.
+meta_charset="<meta charset="
+h_equiv="http-equiv=\"Content-Type\""
+content="content=\"text/html; charset="
+utf8="utf-8"
+latin1="iso-8859-1"
+cp1252="windows-1252"
+shiftjis="shift_jis"
+koi8="koi8-r"
+bom="\xef\xbb\xbf"
+unknown_cs="not-a-charset"
