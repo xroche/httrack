@@ -130,6 +130,7 @@
     <ClCompile Include="htsback.c" />
     <ClCompile Include="htsback_selftest.c" />
     <ClCompile Include="htsbauth.c" />
+    <ClCompile Include="htscookiefile.c" />
     <ClCompile Include="htscache.c" />
     <ClCompile Include="htscache_selftest.c" />
     <ClCompile Include="htscatchurl.c" />
