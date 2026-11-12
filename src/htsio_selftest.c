@@ -910,7 +910,7 @@ static hts_boolean gif_is(const char *dir, const char *name, const char *data,
   hts_boolean ok;
 
   snprintf(path, sizeof(path), "%s/%s", dir, name);
-  got = st_slurp(path, &len);
+  got = st_slurp_ansi(path, &len);
   ok = got != NULL && len == size && memcmp(got, data, size) == 0 ? HTS_TRUE
                                                                   : HTS_FALSE;
   freet(got);
@@ -974,8 +974,8 @@ static int st_topindexgolden(httrackp *opt, int argc, char **argv) {
   assertf(hts_buildtopindex(opt, topdir, "") != 0);
 
   snprintf(path, sizeof(path), "%s/index.html", topdir);
-  got = st_slurp(path, &gotlen);
-  want = st_slurp(argv[1], &wantlen);
+  got = st_slurp_ansi(path, &gotlen);
+  want = st_slurp_ansi(argv[1], &wantlen);
   assertf(got != NULL && want != NULL);
   /* LF is CR LF on Windows, and the golden is LF only */
   gotlen = golden_drop_cr(got, gotlen);

@@ -67,6 +67,10 @@ void st_read_file(const char *path, char *buf, size_t size);
    Return NULL when it cannot be read. The caller frees it with freet(). */
 char *st_slurp(const char *path, size_t *len);
 
+/* Same as st_slurp, but path is in the system charset (not UTF-8 on Windows).
+ */
+char *st_slurp_ansi(const char *path, size_t *len);
+
 /* Set *dest to the Sec-Fetch-Dest named name, "empty" being UNKNOWN. Return
    HTS_FALSE, after complaining, when name is no destination. */
 hts_boolean st_dest_of(const char *name, int *dest);
