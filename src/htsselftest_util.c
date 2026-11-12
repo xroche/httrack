@@ -79,6 +79,15 @@ void st_read_file(const char *path, char *buf, size_t size) {
   }
 }
 
+char *st_slurp(const char *path, size_t *len) {
+  LLint size;
+  char *const buf = readfile2_utf8(path, &size);
+
+  if (buf != NULL)
+    *len = (size_t) size;
+  return buf;
+}
+
 /* Decode an argument ("hex:FFD8.." or literal text) into buf. Raw non-UTF-8
    bytes cannot survive a Windows command line, so hostile inputs go as hex. */
 size_t st_decode_body(const char *arg, char *buf, size_t size) {

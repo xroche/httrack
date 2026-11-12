@@ -778,7 +778,19 @@ static int st_topindex(httrackp *opt, int argc, char **argv) {
 
   /* #216: the listed name is utf-8, not raw system-charset mojibake */
   snprintf(path, sizeof(path), "%s/index.html", topdir);
-  st_read_file(path, buf, sizeof(buf));
+  /* ANSI fopen: on Windows the dir name is in the system charset, which a
+     UTF-8 reader cannot open */
+  {
+    FILE *const rf = fopen(path, "rb");
+    size_t n = 0;
+
+    buf[0] = '\0';
+    if (rf != NULL) {
+      n = fread(buf, 1, sizeof(buf) - 1, rf);
+      fclose(rf);
+    }
+    buf[n] = '\0';
+  }
   assertf(buf[0] != '\0');
   assertf(strstr(buf, projUTF8) != NULL);
   assertf(strstr(buf, catUTF8) != NULL);
@@ -877,16 +889,6 @@ static int st_topindex(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* Reads a whole file into a heap buffer, NUL-terminated, or NULL. */
-static char *golden_slurp(const char *path, size_t *len) {
-  LLint size;
-  char *const buf = readfile2_utf8(path, &size);
-
-  if (buf != NULL)
-    *len = (size_t) size;
-  return buf;
-}
-
 /* Turns each CR LF into LF in place, and returns the new length. */
 static size_t golden_drop_cr(char *buf, size_t len) {
   size_t i, o = 0;
@@ -908,7 +910,7 @@ static hts_boolean gif_is(const char *dir, const char *name, const char *data,
   hts_boolean ok;
 
   snprintf(path, sizeof(path), "%s/%s", dir, name);
-  got = golden_slurp(path, &len);
+  got = st_slurp(path, &len);
   ok = got != NULL && len == size && memcmp(got, data, size) == 0 ? HTS_TRUE
                                                                   : HTS_FALSE;
   freet(got);
@@ -972,8 +974,8 @@ static int st_topindexgolden(httrackp *opt, int argc, char **argv) {
   assertf(hts_buildtopindex(opt, topdir, "") != 0);
 
   snprintf(path, sizeof(path), "%s/index.html", topdir);
-  got = golden_slurp(path, &gotlen);
-  want = golden_slurp(argv[1], &wantlen);
+  got = st_slurp(path, &gotlen);
+  want = st_slurp(argv[1], &wantlen);
   assertf(got != NULL && want != NULL);
   /* LF is CR LF on Windows, and the golden is LF only */
   gotlen = golden_drop_cr(got, gotlen);
@@ -1046,7 +1048,7 @@ static int st_topindexoom(httrackp *opt, int argc, char **argv) {
     assertf(hts_buildtopindex(opt, topdir, "") != 0);
     assertf(topindex_failrow == 0);
     snprintf(path, sizeof(path), "%s/index.html", topdir);
-    got = golden_slurp(path, &len);
+    got = st_slurp(path, &len);
     assertf(got != NULL);
     for (i = 0; i < count; i++) {
       char needle[32];

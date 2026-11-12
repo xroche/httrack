@@ -35,16 +35,6 @@ Please visit our Website: http://www.httrack.com
 
 #include <stdint.h>
 
-/* Slurp a whole file into a malloc'd buffer; sets *len. NULL on error. */
-static unsigned char *warc_slurp(const char *path, size_t *len) {
-  LLint size;
-  char *const buf = readfile2_utf8(path, &size);
-
-  if (buf != NULL)
-    *len = (size_t) size;
-  return (unsigned char *) buf;
-}
-
 /* Inflate one gzip member at *in (limit end); returns the decompressed record
    in a malloc'd buffer (*out_len), advancing *in past the member. NULL at end
    or on error (*out_len distinguishes: 0 and NULL = clean end). */
@@ -170,7 +160,7 @@ static int st_warc(httrackp *opt, int argc, char **argv) {
 
   warc_close(w);
 
-  data = warc_slurp(path, &data_len);
+  data = (unsigned char *) st_slurp(path, &data_len);
   assertf(data != NULL);
   p = data;
   end = data + data_len;
@@ -339,7 +329,7 @@ static int st_warc_trunc(httrackp *opt, int argc, char **argv) {
       (const char *) gz, sizeof(gz), NULL, NULL, 200, 0, WARC_TRUNC_TIME);
   warc_close(w);
 
-  data = warc_slurp(path, &data_len);
+  data = (unsigned char *) st_slurp(path, &data_len);
   assertf(data != NULL);
   p = data;
   end = data + data_len;
@@ -408,7 +398,7 @@ static int st_warc_ftp(httrackp *opt, int argc, char **argv) {
                       0);
   warc_close(w);
 
-  data = warc_slurp(path, &data_len);
+  data = (unsigned char *) st_slurp(path, &data_len);
   assertf(data != NULL);
   p = data;
   end = data + data_len;
@@ -489,7 +479,7 @@ static int st_warc_rotate(httrackp *opt, int argc, char **argv) {
     int first = 1;
     snprintf(fname, sizeof(fname), "warc-rot-%05d.warc.gz", i);
     fconcat(seg, sizeof(seg), argv[0], fname);
-    data = warc_slurp(seg, &data_len);
+    data = (unsigned char *) st_slurp(seg, &data_len);
     if (data == NULL)
       break; /* past the last segment */
     nseg++;
@@ -553,7 +543,7 @@ static int st_warc_verbatim(httrackp *opt, int argc, char **argv) {
       (const char *) a_gz, sizeof(a_gz), NULL, NULL, 200, 0, 0);
   warc_close(w);
 
-  data = warc_slurp(path, &data_len);
+  data = (unsigned char *) st_slurp(path, &data_len);
   assertf(data != NULL);
   p = data;
   end = data + data_len;
@@ -933,8 +923,8 @@ static int st_warc_cdx(httrackp *opt, int argc, char **argv) {
   warc_close(w);
   opt->warc_cdx = saved_cdx;
 
-  warc = warc_slurp(wpath, &warc_len);
-  cdx = warc_slurp(cpath, &cdx_len);
+  warc = (unsigned char *) st_slurp(wpath, &warc_len);
+  cdx = (unsigned char *) st_slurp(cpath, &cdx_len);
   assertf(warc != NULL);
   assertf(cdx != NULL);
 
@@ -1043,7 +1033,7 @@ static int st_warc_cdx_utf8(httrackp *opt, int argc, char **argv) {
   warc_close(w);
   opt->warc_cdx = saved_cdx;
 
-  cdx = warc_slurp(cpath, &cdx_len);
+  cdx = (unsigned char *) st_slurp(cpath, &cdx_len);
   assertf(cdx != NULL);
   lp = (const char *) cdx;
   cend = (const char *) cdx + cdx_len;
@@ -1297,7 +1287,7 @@ static int st_warc_holds(const char *name, const char *path, const char *want,
                          const char *absent1, const char *absent2) {
   const char *const absent[2] = {absent1, absent2};
   size_t len = 0, i;
-  unsigned char *blob = warc_slurp(path, &len);
+  unsigned char *blob = (unsigned char *) st_slurp(path, &len);
   int err = 0;
 
   if (blob == NULL) {

@@ -63,6 +63,10 @@ void st_put_file(const char *path, const void *data, size_t size);
    the file cannot be read. */
 void st_read_file(const char *path, char *buf, size_t size);
 
+/* Read the whole file at path into a heap buffer, NUL-terminated, and set *len.
+   Return NULL when it cannot be read. The caller frees it with freet(). */
+char *st_slurp(const char *path, size_t *len);
+
 /* Set *dest to the Sec-Fetch-Dest named name, "empty" being UNKNOWN. Return
    HTS_FALSE, after complaining, when name is no destination. */
 hts_boolean st_dest_of(const char *name, int *dest);
