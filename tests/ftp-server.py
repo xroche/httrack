@@ -12,6 +12,7 @@ directory). Each line is "<path> <mode>...", path "*" matching everything:
   trickle   send the body in small chunks, slowly enough to stay in flight
   norest    answer REST with 500, so the client re-fetches from scratch
   nomdtm    answer MDTM with 500, like a server predating RFC 3659
+  hold      never answer RETR, leaving the client's data connection idle
 
 --require-pass answers USER with 331, the only way the client's PASS is sent.
 --mute accepts the control connection and never speaks, not even the greeting.
@@ -31,6 +32,9 @@ QUIET_SECONDS = 900
 
 TRICKLE_CHUNK = 8192
 TRICKLE_PAUSE = 0.2
+
+
+PASV_HOST = "127.0.0.1"
 
 
 def reply(conn, text):
@@ -79,7 +83,8 @@ class Session(threading.Thread):
         srv.listen(1)
         self.pasv = srv
         port = srv.getsockname()[1]
-        return "227 Entering Passive Mode (127,0,0,1,%d,%d)" % (port >> 8, port & 0xFF)
+        host = PASV_HOST.replace(".", ",")
+        return "227 Entering Passive Mode (%s,%d,%d)" % (host, port >> 8, port & 0xFF)
 
     def accept_data(self):
         if self.pasv is None:
@@ -130,6 +135,9 @@ class Session(threading.Thread):
         with open(path, "rb") as fp:
             body = fp.read()
         modes = self.modes()
+        if "hold" in modes:
+            time.sleep(QUIET_SECONDS)
+            return
         reply(self.conn, "150 opening binary mode")
         self.send_body(body[self.rest :], modes)
         self.rest = 0
@@ -240,7 +248,12 @@ def main():
     ap.add_argument("--log")
     ap.add_argument("--require-pass", action="store_true")
     ap.add_argument("--mute", action="store_true")
+    ap.add_argument(
+        "--pasv-host", default="127.0.0.1", help="address the 227 reply names"
+    )
     args = ap.parse_args()
+    global PASV_HOST
+    PASV_HOST = args.pasv_host
 
     # newline="\n": the shell greps these lines and Windows text mode adds a CR.
     logfp = open(args.log, "a", encoding="utf-8", newline="\n") if args.log else None

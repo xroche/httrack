@@ -58,7 +58,7 @@ if ! target_is_windows; then # an empty word through the WSL2 bridge
     test -n "$(find "$tmp/empty" -name page.html)" || fail "-N '' URL mirrored nothing: $(<"$tmp/empty.out")"
 fi
 
-# a word beginning with - is the next option, not a template
-run dash -N -r1 "$url"
-test "$rc" -ne 0 || fail "-N -r1 was accepted: $(<"$tmp/dash.out")"
-grep -qF "Option N needs" "$tmp/dash.out" || fail "-N -r1: $(<"$tmp/dash.out")"
+# a word naming an option is the next option, not a template
+run dash -N -q "$url"
+test "$rc" -ne 0 || fail "-N -q was accepted: $(<"$tmp/dash.out")"
+grep -qF "Option N needs" "$tmp/dash.out" || fail "-N -q: $(<"$tmp/dash.out")"

@@ -78,10 +78,6 @@ void back_free(struct_back ** sback);
 // backing
 #define BACK_ADD_TEST "(dummy)"
 #define BACK_ADD_TEST2 "(dummy2)"
-/* Parse an external FTP helper's "<statuscode> <message>" result file into r,
-   clipping the message to r->msg. */
-void back_read_ftp_result(FILE *fp, htsblk *r);
-
 int back_index(httrackp * opt, struct_back * sback, const char *adr, const char *fil,
                const char *sav);
 int back_available(const struct_back * sback);
@@ -93,8 +89,7 @@ int back_index_peek(httrackp *opt, struct_back *sback, const char *adr,
                     const char *fil, const char *sav);
 HTS_INLINE int back_exist(struct_back * sback, httrackp * opt, const char *adr,
                           const char *fil, const char *sav);
-int back_nsoc(const struct_back * sback);
-int back_nsoc_overall(const struct_back * sback);
+int back_nsoc(const struct_back *sback);
 /* refetch_whole: force a whole-file GET, ignoring any partial/temp-ref resume;
    also the caller's latch marking this link's one free restart spent (#581). */
 int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
@@ -105,19 +100,10 @@ int back_add_if_not_exists(struct_back *sback, httrackp *opt, cache_back *cache,
                            const char *adr, const char *fil, const char *save,
                            const char *referer_adr, const char *referer_fil,
                            int test, const hts_fetch_meta *fetch);
-int back_stack_available(struct_back * sback);
-int back_search(httrackp * opt, struct_back * sback);
 int back_search_quick(struct_back * sback);
-void back_clean(httrackp * opt, cache_back * cache, struct_back * sback);
-int back_cleanup_background(httrackp * opt, cache_back * cache,
-                            struct_back * sback);
-void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
+void back_clean(httrackp *opt, cache_back *cache, struct_back *sback);
+void back_wait(struct_back *sback, httrackp *opt, cache_back *cache,
                TStamp stat_timestart);
-int back_letlive(httrackp * opt, cache_back * cache, struct_back * sback,
-                 const int p);
-int back_searchlive(httrackp * opt, struct_back * sback, const char *search_addr);
-void back_connxfr(htsblk * src, htsblk * dst);
-void back_move(lien_back * src, lien_back * dst);
 void back_copy_static(const lien_back * src, lien_back * dst);
 /* The .ref record's framing, shared with the self-test that pins it. */
 #define HTS_REF_MAGIC "HTSREF1\n"
@@ -138,6 +124,16 @@ int back_serialize_ref(httrackp * opt, const lien_back * src);
 int back_unserialize_ref(httrackp * opt, const char *adr, const char *fil,
                          lien_back ** dst);
 void back_set_finished(httrackp *opt, struct_back *sback, const int p);
+/* Fail slot p as statuscode and finish it. msg is clipped into r.msg, and NULL
+   keeps the reason already there. The caller closes the connection. */
+void back_slot_fail(httrackp *opt, struct_back *sback, const int p,
+                    const int statuscode, const char *msg);
+/* back_slot_fail(), closing the connection first. */
+void back_slot_close_fail(httrackp *opt, struct_back *sback, const int p,
+                          const int statuscode, const char *msg);
+/* Close slot p as non-fatal, keeping a reason already set over fallback. */
+void back_slot_fail_nonfatal(httrackp *opt, struct_back *sback, const int p,
+                             const char *fallback);
 /* lien_back.locked: 1 keeps a slot in the table with its body in memory, and
    BACK_PINNED keeps it in the table but lets it write to disk.
    back_set_unlocked() releases both. */
@@ -157,12 +153,8 @@ int back_clear_entry(lien_back * back);
 int back_flush_output(httrackp * opt, cache_back * cache, struct_back * sback,
                       const int p);
 void back_delete_all(httrackp * opt, cache_back * cache, struct_back * sback);
-int back_maydelete(httrackp * opt, cache_back * cache, struct_back * sback,
+int back_maydelete(httrackp *opt, cache_back *cache, struct_back *sback,
                    const int p);
-void back_maydeletehttp(httrackp * opt, cache_back * cache, struct_back * sback,
-                        const int p);
-int back_trylive(httrackp * opt, cache_back * cache, struct_back * sback,
-                 const int p);
 int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                   const int p);
 /* Did the fetch fail to produce a response, as opposed to the engine
@@ -209,10 +201,6 @@ void back_info(struct_back * sback, int i, int j, FILE * fp);
 void back_infostr(struct_back *sback, int i, int j, char *s, size_t size);
 LLint back_transferred(LLint add, struct_back * sback);
 
-// hostback
-#if HTS_XGETHOST
-int host_wait(httrackp * opt, lien_back * sback);
-#endif
 int back_checksize(httrackp * opt, lien_back * eback, int check_only_totalsize);
 /* Enforce -M/-E quotas: smooth-stops when reached; returns 0 once the -M cap
    or -E deadline overruns its grace period (callers must stop waiting). */

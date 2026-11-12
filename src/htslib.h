@@ -107,57 +107,13 @@ hts_boolean hts_location_is_safe(const char *location);
 
 /* concat */
 
-#if ( defined(_WIN32) && defined(_MSC_VER) && ( _MSC_VER >= 1300 ) && (_MSC_VER <= 1310 ) )
-/* NOTE: VC2003 inlining bug in optim mode not respecting function call sequence point */
-#define MSVC2003INLINEBUG __declspec(noinline)
-#else
-#define MSVC2003INLINEBUG
-#endif
-MSVC2003INLINEBUG HTS_STATIC char *getHtsOptBuff_(httrackp * opt) {
+HTS_STATIC char *getHtsOptBuff_(httrackp *opt) {
   opt->state.concat.index = (opt->state.concat.index + 1) % 16;
   return opt->state.concat.buff[opt->state.concat.index];
 }
 
-#undef MSVC2003INLINEBUG
 #define OPT_GET_BUFF(OPT)      ( getHtsOptBuff_(OPT) )
 #define OPT_GET_BUFF_SIZE(OPT) ( sizeof(opt->state.concat.buff[0]) )
-
-/* ANCIENNE STURCTURE pour cache 1.0 */
-#ifndef HTS_DEF_FWSTRUCT_OLD_t_proxy
-#define HTS_DEF_FWSTRUCT_OLD_t_proxy
-typedef struct OLD_t_proxy OLD_t_proxy;
-#endif
-struct OLD_t_proxy {
-  int active;
-  char name[1024];
-  int port;
-};
-
-#ifndef HTS_DEF_FWSTRUCT_OLD_htsblk
-#define HTS_DEF_FWSTRUCT_OLD_htsblk
-typedef struct OLD_htsblk OLD_htsblk;
-#endif
-struct OLD_htsblk {
-  int statuscode;               // ANCIENNE STURCTURE - status-code, -1=erreur, 200=OK,201=..etc (cf RFC1945)
-  int notmodified;              // ANCIENNE STURCTURE - page ou fichier NON modifié (transféré)
-  int is_write;                 // ANCIENNE STURCTURE - sortie sur disque (out) ou en mémoire (adr)
-  char *adr;                    // ANCIENNE STURCTURE - adresse du bloc de mémoire, NULL=vide
-  FILE *out;                    // ANCIENNE STURCTURE - écriture directe sur disque (si is_write=1)
-  int size;                     // ANCIENNE STURCTURE - taille fichier
-  char msg[80];                 // ANCIENNE STURCTURE - message éventuel si échec ("\0"=non précisé)
-  char contenttype[64];         // ANCIENNE STURCTURE - content-type ("text/html" par exemple)
-  char *location;               // ANCIENNE STURCTURE - on copie dedans éventuellement la véritable 'location'
-  int totalsize;                // ANCIENNE STURCTURE - taille totale à télécharger (-1=inconnue)
-  int is_file;                  // ANCIENNE STURCTURE - ce n'est pas une socket mais un descripteur de fichier si 1
-  T_SOC soc;                    // ANCIENNE STURCTURE - ID socket
-  FILE *fp;                     // ANCIENNE STURCTURE - fichier pour file://
-  OLD_t_proxy proxy;            // ANCIENNE STURCTURE - proxy
-  int user_agent_send;          // ANCIENNE STURCTURE - user agent (ex: httrack/1.0 [sun])
-  char user_agent[64];
-  int http11;                   // ANCIENNE STURCTURE - l'en tête doit être signé HTTP/1.1 et non HTTP/1.0
-};
-
-/* fin ANCIENNE STURCTURE pour cache 1.0 */
 
 // cache pour le dns, pour éviter de faire des gethostbyname sans arrêt
 #ifndef HTS_DEF_FWSTRUCT_t_dnscache
@@ -257,9 +213,6 @@ int64_t hts_parse_date(const char *s, int pivot);
 // attach specific project log to hachtable logger
 void hts_set_hash_handler(coucal hashtable, httrackp *opt);
 
-// version
-HTSEXT_API const char* hts_version(void);
-
 // fonctions unix/winsock
 int hts_read(htsblk * r, char *buff, int size);
 
@@ -276,8 +229,6 @@ void hts_stat_recv_set(LLint bytes);
 void hts_stat_recv_publish(void);
 
 LLint check_downloadable_bytes(int rate);
-
-int hts_uninit_module(void);
 
 /* Client hints a Chromium browser sends by default (Sec-CH-UA*). */
 typedef struct hts_client_hints {
@@ -304,8 +255,11 @@ const char *http_header_slot_name(int slot);
 int http_header_slot_count(void);
 
 // fonctions principales
-T_SOC http_xfopen(httrackp * opt, int mode, int treat, int waitconnect,
-                  const char *xsend, const char *adr, const char *fil, htsblk * retour);
+/* Start a non-blocking connect to adr (or to retour's proxy) for a GET, or open
+   a file:// target. retour must not be NULL; it gets the socket and any error.
+ */
+T_SOC http_xfopen(httrackp *opt, const char *adr, const char *fil,
+                  htsblk *retour);
 int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
                   const char *adr, const char *fil, const char *referer_adr,
                   const char *referer_fil, const hts_fetch_meta *fetch,
@@ -361,15 +315,16 @@ hts_boolean socket_set_nonblocking(T_SOC soc, hts_boolean nonblocking);
    without blocking. */
 int connect_socket_error(T_SOC soc);
 
-T_SOC newhttp(httrackp * opt, const char *iadr, htsblk * retour, int port,
-              int waitconnect);
+/* Start a non-blocking connect to iadr; port -1 takes it from iadr or the
+   scheme default. */
+T_SOC newhttp(httrackp *opt, const char *iadr, htsblk *retour, int port);
 /* Like newhttp(), but connect to the addr_index-th resolved address of the host
    (0-based) instead of always the first; *addr_count, if non-NULL, is set to
    the total resolved addresses. newhttp() == newhttp_addr(...,0,NULL). Used by
    the slot scheduler to try the next address when a connect fails (dead IPv6
    etc.). */
 T_SOC newhttp_addr(httrackp *opt, const char *iadr, htsblk *retour, int port,
-                   int waitconnect, int addr_index, int *addr_count);
+                   int addr_index, int *addr_count);
 /* Clips the formatted failure reason into r->msg, which also round-trips
    through the cache as X-StatusMessage. Leaves r->statuscode to the caller. */
 #define htsblk_failf(R, ...)                                                   \
@@ -379,6 +334,8 @@ HTS_INLINE void deletehttp(htsblk * r);
 HTS_INLINE int deleteaddr(htsblk * r);
 HTS_INLINE void deletesoc(T_SOC soc);
 HTS_INLINE void deletesoc_r(htsblk *r);
+/* Return 1 once soc is readable (writable) within timeout seconds, 0 otherwise.
+   check_readinput polls r->soc without waiting. */
 int check_readinput(htsblk * r);
 int check_readinput_t(T_SOC soc, int timeout);
 int check_writeinput_t(T_SOC soc, int timeout);
@@ -394,6 +351,26 @@ hts_boolean hts_is_control_free(const char *str);
 /* TRUE if host[0..len) is an IPv4 literal: digits and dots, at least one dot.
    Such a host has no domain structure to reverse or to widen into. */
 hts_boolean hts_host_is_ipv4(const char *host, size_t len);
+
+/* Base-64 "user:pass" of the userinfo in a URL or proxy name, for a Basic
+   Authorization header, into out[out_size] (at least 1100 bytes). Returns 1
+   when filled, 0 when there is no userinfo, -1 when it is too long (765 bytes
+   max, as a clipped credential would authenticate as somebody else). */
+int hts_basic_auth_value(httrackp *opt, const char *url, char *out,
+                         size_t out_size);
+
+/* Copy the bare host name of a URL address into out[size] for the TLS SNI
+   extension: no scheme, userinfo or port. FALSE with out emptied when there is
+   no DNS name to send (IP literal, empty, or too long), as RFC 6066 forbids
+   literals. */
+hts_boolean hts_sni_hostname(const char *url_adr, char *out, size_t size);
+
+#if HTS_USEOPENSSL
+/* Make ssl's handshake fail unless the server's chain verifies against the
+   system CA store and its certificate names url_adr's host (--check-cert).
+   FALSE when the checks could not be armed: the caller must not connect. */
+hts_boolean hts_ssl_check_cert(SSL *ssl, const char *url_adr);
+#endif
 
 /* TRUE if host[0..len) is an IPv4 or IPv6 address literal. */
 hts_boolean hts_host_is_address(const char *host, size_t len);
@@ -452,9 +429,6 @@ SOCaddr *hts_dns_resolve_nocache2(const char *const hostname,
                                   SOCaddr *const addr, const char **error);
 SOCaddr *hts_dns_resolve_nocache(const char *const hostname,
                                  SOCaddr *const addr);
-int check_hostname_dns(const char *const hostname);
-
-int ftp_available(void);
 
 #if HTS_DNSCACHE
 /* Return opt's DNS cache hashtable (hostname -> t_dnscache record), creating it
@@ -505,18 +479,15 @@ HTS_INLINE int sendc(htsblk * r, const char *s);
 /* Returns the advance past the line's terminator. Unlike binput_line(), "max"
    excludes the NUL: "s" must hold max + 1 bytes. */
 int binput(const char *buff, char *s, int max);
-/* Read one line, from a buffer up to "end" or from a socket, consuming it whole
-   even when it does not fit "s". HTS_TRUE means it was cut: the value is not
-   what was written, so drop it rather than parse a prefix of it.
-   binput_line() reports the advance through *offset. */
+/* Read one line from a buffer up to "end", consuming it whole even when it
+   does not fit "s". HTS_TRUE means it was cut: the value is not what was
+   written, so drop it rather than parse a prefix of it. The advance is reported
+   through *offset. */
 hts_boolean binput_line(const char *buff, const char *end, char *s, int max,
                         int *offset);
-hts_boolean finput_line(T_SOC fd, char *s, int max);
 /* Does treathead() read the header that "line" starts with? Keep in step. */
 hts_boolean hts_header_is_read(const char *line);
-int linput(FILE * fp, char *s, int max);
-int linputsoc(T_SOC soc, char *s, int max);
-int linputsoc_t(T_SOC soc, char *s, int max, int timeout);
+int linput(FILE *fp, char *s, int max);
 const char *strstrcase(const char *s, const char *o);
 int ident_url_absolute(const char *url, lien_adrfil *adrfil);
 void fil_simplifie(char *f);
@@ -764,11 +735,6 @@ LLint fpsize(FILE *fp);
 LLint fsize(const char *s);
 LLint fsize_utf8(const char *s);
 
-// Threads
-typedef void *(*beginthread_type) (void *);
-
-/*unsigned long _beginthread( beginthread_type start_address, unsigned stack_size, void *arglist );*/
-
 /* variables globales */
 extern int _DEBUG_HEAD;
 extern FILE *ioinfo;
@@ -777,19 +743,13 @@ extern FILE *ioinfo;
 extern const char *hts_mime_keep[];
 extern const char *hts_mime[][2];
 extern const char *hts_main_mime[];
-extern const char *hts_detect[];
-extern const char *hts_detectbeg[];
 extern const char *hts_nodetect[];
-extern const char *hts_detectURL[];
-extern const char *hts_detectandleave[];
-extern const char *hts_detect_js[];
 
 // htsmodule.c definitions
 extern void *openFunctionLib(const char *file_);
 extern void *getFunctionPtr(void *handle, const char *fncname);
 extern void closeFunctionLib(void *handle);
 
-extern void clearCallbacks(htscallbacks * chain);
 int hts_set_callback(t_hts_htmlcheck_callbacks * callbacks,
                      const char *name, void *function);
 void *hts_get_callback(t_hts_htmlcheck_callbacks * callbacks,
@@ -800,7 +760,8 @@ void *hts_get_callback(t_hts_htmlcheck_callbacks * callbacks,
 #define GET_USERARG(OPT, NAME) ( CBSTRUCT(OPT)-> NAME .carg )
 /* True when a front end registered its own NAME callback */
 #define HAS_CALLBACK(OPT, NAME)                                                \
-  (CBSTRUCT(OPT) != NULL && CBSTRUCT(OPT)->NAME.fun != NULL)
+  (CBSTRUCT(OPT) != NULL && CBSTRUCT(OPT)->NAME.fun != NULL &&                 \
+   CBSTRUCT(OPT)->NAME.fun != default_callbacks.NAME.fun)
 #define GET_CALLBACK(OPT, NAME)                                                \
   (HAS_CALLBACK(OPT, NAME) ? (GET_USERCALLBACK(OPT, NAME))                     \
                            : (default_callbacks.NAME.fun))
@@ -817,46 +778,6 @@ void *hts_get_callback(t_hts_htmlcheck_callbacks * callbacks,
 #define RUN_CALLBACK7(OPT, NAME, ARG1, ARG2, ARG3, ARG4, ARG5, ARG6, ARG7)     \
   GET_CALLBACK(OPT, NAME)(GET_USERARG(OPT, NAME), OPT, ARG1, ARG2, ARG3, ARG4, \
                           ARG5, ARG6, ARG7)
-
-/* UTF-8 aware FILE API */
-#ifndef HTS_DEF_FILEAPI
-#ifdef _WIN32
-#define FOPEN hts_fopen_utf8
-     HTSEXT_API FILE *hts_fopen_utf8(const char *path, const char *mode);
-
-#define STAT hts_stat_utf8
-     /* _stat64: _stat's st_size is a 32-bit long, even in x64 builds */
-     typedef struct _stat64 STRUCT_STAT;
-     HTSEXT_API int hts_stat_utf8(const char *path, STRUCT_STAT * buf);
-
-#define UNLINK hts_unlink_utf8
-     HTSEXT_API int hts_unlink_utf8(const char *pathname);
-
-#define RENAME hts_rename_utf8
-     HTSEXT_API int hts_rename_utf8(const char *oldpath, const char *newpath);
-
-#define MKDIR(F) hts_mkdir_utf8(F)
-     HTSEXT_API int hts_mkdir_utf8(const char *pathname);
-
-#define UTIME(A,B) hts_utime_utf8(A,B)
-     typedef struct _utimbuf STRUCT_UTIMBUF;
-     HTSEXT_API int hts_utime_utf8(const char *filename,
-                                   const STRUCT_UTIMBUF * times);
-#else
-/* The underlying filesystem charset is supposed to be UTF-8 */
-#define FOPEN fopen
-#define STAT stat
-     typedef struct stat STRUCT_STAT;
-
-#define UNLINK unlink
-#define RENAME rename
-#define MKDIR(F) mkdir(F, HTS_ACCESS_FOLDER)
-     typedef struct utimbuf STRUCT_UTIMBUF;
-
-#define UTIME(A,B) utime(A,B)
-#endif
-#define HTS_DEF_FILEAPI
-#endif
 
 #endif // internals
 
@@ -908,16 +829,15 @@ HTS_STATIC int strfield(const char *f, const char *s) {
 
 /* clang-format on */
 
+/* Compare a and b ignoring ASCII case, like strcmp: 0 only when both match
+   to the end. */
 HTS_STATIC int strcmpnocase(const char *a, const char *b) {
-  while(*a) {
-    int cmp = hichar(*a) - hichar(*b);
+  for (;; a++, b++) {
+    const int cmp = hichar(*a) - hichar(*b);
 
-    if (cmp != 0)
+    if (cmp != 0 || *a == '\0')
       return cmp;
-    a++;
-    b++;
   }
-  return 0;
 }
 
 #ifdef _WIN32

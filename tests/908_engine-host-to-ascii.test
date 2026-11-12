@@ -1,0 +1,20 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+assert_selftest "host-ascii self-test OK" host-ascii
+
+resolve() { selftest_queue "$2" resolve "$1" www.example.com /; }
+
+# a link to an international host is requested in its ASCII form
+resolve 'http://münchen.de/x' 'adr=xn--mnchen-3ya.de fil=/x'
+resolve 'http://ab.com/x' 'adr=ab.com fil=/x'
+# a host 1200 bytes long once converted is kept raw
+long=ü
+for _ in $(seq 149); do long="$long.ü"; done
+resolve "http://$long/x" "adr=$long fil=/x"
+selftest_run_queued

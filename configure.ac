@@ -1,6 +1,6 @@
 AC_PREREQ([2.71])
 
-AC_INIT([httrack], [3.50.5], [roche+packaging@httrack.com], [httrack], [https://www.httrack.com/])
+AC_INIT([httrack], [3.51.0], [roche+packaging@httrack.com], [httrack], [https://www.httrack.com/])
 AC_COPYRIGHT([
 HTTrack Website Copier, Offline Browser for Windows and Unix
 Copyright (C) 1998-2015 Xavier Roche and other contributors
@@ -41,8 +41,11 @@ AC_CONFIG_HEADERS(config.h)
 # header we can install without handing a consumer our PACKAGE_* and HAVE_*.
 AC_CONFIG_HEADERS([htsfeatures.h:src/htsfeatures.h.in])
 AM_INIT_AUTOMAKE([subdir-objects])
-# 3:27:0: revision-only bump. httrackp gained two tail fields (bundle_dir,
-# bundle_state) for the login bundles; no export came or went.
+# 3:28:0: revision-only bump for 3.51.0, measured against 3.50.5 (3:26:0; the
+# interim 3:27:0 never shipped). httrack-library.h gained 17 HTSEXT_API calls
+# and none went away or changed signature. httrackp gained ten tail fields
+# (live_filters to bundle_state) and lien_url a tail hts_fetch_meta fetch.
+# No field moved before a tail, so the soname stays.
 # 3:26:0: revision-only bump. No export came or went and no installed struct
 # moved, per nm -D and gdb ptype /o against 3.50.4. The installed headers
 # gained HTS_FALLTHROUGH and two static inline path checks in htssafe.h, and
@@ -114,7 +117,7 @@ AM_INIT_AUTOMAKE([subdir-objects])
 # moves nothing). Soname stays .so.3: HTTrackQt is the only consumer of the installed
 # headers, so a libhttrack4 rename isn't worth it.
 # (3:0:0 was the htsblk mime-buffer widening, the ABI break that moved .so.2 -> .so.3.)
-VERSION_INFO="3:27:0"
+VERSION_INFO="3:28:0"
 AM_MAINTAINER_MODE
 AC_USE_SYSTEM_EXTENSIONS
 
@@ -856,8 +859,7 @@ THREADS_CFLAGS=
 AC_SUBST(THREADS_CFLAGS)
 
 ### Check for socket/nsl (solaris)
-AC_CHECK_LIB(socket, socket, [SOCKET_LIBS="-lnsl -lsocket"
-AC_DEFINE(LIBSOCKET, 1,[Check for libsocket])], AC_MSG_RESULT([not necessary]))
+AC_CHECK_LIB(socket, socket, [SOCKET_LIBS="-lnsl -lsocket"], AC_MSG_RESULT([not necessary]))
 AC_SUBST(SOCKET_LIBS)
 
 ### Charset conversion: iconv(), or the built-in codepage tables
@@ -903,7 +905,6 @@ if test "$iconv_want" != "no"; then
 		AC_LINK_IFELSE([HTS_ICONV_PROG],
 			[iconv_have=yes
 			ICONV_LIBS="-liconv"
-			AC_DEFINE(LIBICONV, 1,[Check for libiconv])
 			AC_MSG_RESULT([yes, in -liconv])],
 			[AC_MSG_RESULT([no])])])
 	CPPFLAGS="$iconv_old_cppflags"
@@ -1034,9 +1035,6 @@ AC_SUBST([PKGCONFIG_LIBS_PRIVATE])
 ### Check for setuid
 AC_CHECK_LIB(c, setuid, [
 AC_DEFINE(SETUID, 1,[Check for setuid])], AC_MSG_RESULT([not found]))
-
-### Check for snprintf
-AC_FUNC_SNPRINTF()
 
 ### Check for strnlen
 AC_CHECK_LIB(c, strnlen, [

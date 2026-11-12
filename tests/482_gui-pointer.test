@@ -18,7 +18,6 @@ tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_902.XXXXXX") || exit 1
 cleanup_push rm -rf "$tmp"
 
 printf '[--help names the GUI] ..\t'
-# --quiet, or help() pages every 20 lines and waits on stdin.
 help=$(httrack --quiet --help 2>&1) || fail "httrack --help failed"
 grep -q "'${gui}'" <<<"$help" || fail "--help never names ${gui}"
 # Debian's httrack package only Suggests webhttrack, so naming it is safe and

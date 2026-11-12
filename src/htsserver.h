@@ -36,6 +36,7 @@ Please visit our Website: http://www.httrack.com
 #define HTS_SERVER_DEFH
 
 #include <sys/stat.h>
+#include "htsbase.h"
 #include "htsnet.h"
 
 /* String */
@@ -86,11 +87,6 @@ extern coucal NewLangList;
 
 extern httrackp *global_opt;
 
-#undef min
-#undef max
-#define min(a,b) ((a)>(b)?(b):(a))
-#define max(a,b) ((a)>(b)?(a):(b))
-
 /* What the UI just told us about itself, reported to the ping handler. */
 typedef enum {
   SMALLSERVER_CLIENT_REQUEST, /* any request; claims no window */
@@ -114,65 +110,6 @@ int htslang_init(void);
 /* Static definitions */
 
 HTS_UNUSED static const char *gethomedir(void);
-HTS_UNUSED static int fexist(const char *s);
-HTS_UNUSED static int linput(FILE * fp, char *s, int max);
-
-HTS_UNUSED static int linputsoc(T_SOC soc, char *s, int max) {
-  int c;
-  int j = 0;
-
-  do {
-    unsigned char ch;
-
-    if (recv(soc, &ch, 1, 0) == 1) {
-      c = ch;
-    } else {
-      c = EOF;
-    }
-    if (c != EOF) {
-      switch (c) {
-      case 13:
-        break;                  // sauter CR
-      case 10:
-        c = -1;
-        break;
-      case 9:
-      case 12:
-        break;                  // sauter ces caractères
-      default:
-        s[j++] = (char) c;
-        break;
-      }
-    }
-  } while((c != -1) && (c != EOF) && (j < (max - 1)));
-  s[j] = '\0';
-  return j;
-}
-
-HTS_UNUSED static int check_readinput_t(T_SOC soc, int timeout) {
-  if (soc != INVALID_SOCKET) {
-    fd_set fds;                 // poll structures
-    struct timeval tv;          // structure for select
-
-    FD_ZERO(&fds);
-    FD_SET(soc, &fds);
-    tv.tv_sec = timeout;
-    tv.tv_usec = 0;
-    select((int) soc + 1, &fds, NULL, NULL, &tv);
-    if (FD_ISSET(soc, &fds))
-      return 1;
-    else
-      return 0;
-  } else
-    return 0;
-}
-
-HTS_UNUSED static int linputsoc_t(T_SOC soc, char *s, int max, int timeout) {
-  if (check_readinput_t(soc, timeout)) {
-    return linputsoc(soc, s, max);
-  }
-  return -1;
-}
 
 /* Same contract as hts_gethome(), which is hidden and out of reach from here */
 static const char *gethomedir(void) {
@@ -180,44 +117,6 @@ static const char *gethomedir(void) {
 
   /* An empty $HOME would put the base path and httrack.ini at the root */
   return strnotempty(home) ? home : ".";
-}
-
-static int fexist(const char *s) {
-  struct stat st;
-
-  memset(&st, 0, sizeof(st));
-  if (stat(s, &st) == 0) {
-    if (S_ISREG(st.st_mode)) {
-      return 1;
-    }
-  }
-  return 0;
-}
-static int linput(FILE * fp, char *s, int max) {
-  int c;
-  int j = 0;
-
-  do {
-    c = fgetc(fp);
-    if (c != EOF) {
-      switch (c) {
-      case 13:
-        break;                  // sauter CR
-      case 10:
-        c = -1;
-        break;
-      case 0:
-      case 9:
-      case 12:
-        break;                  // sauter ces caractères
-      default:
-        s[j++] = (char) c;
-        break;
-      }
-    }
-  } while((c != -1) && (c != EOF) && (j < (max - 1)));
-  s[j] = '\0';
-  return j;
 }
 
 #endif

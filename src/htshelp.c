@@ -31,9 +31,6 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
-/* Internal engine bytecode */
-#define HTS_INTERNAL_BYTECODE
-
 #include "htshelp.h"
 
 /* specific definitions */
@@ -73,73 +70,46 @@ Please visit our Website: http://www.httrack.com
 #define HTS_GUI_HINT "the GUI version is 'webhttrack'."
 #endif
 
-#define waitkey if (more) { char s[4]; printf("\nMORE.. q to quit\n"); linput(stdin,s,4); if (strcmp(s,"q")==0) quit=1; else printf("Page %d\n\n",++m); }
 void infomsg(const char *msg) {
-  int l = 0;
-  int m = 0;
-  int more = 0;
-  int quit = 0;
   int done = 0;
 
-  //
   if (msg == NULL)
-    quit = 0;
-  if (msg) {
-    if (!quit) {
-      if (strlen(msg) == 1) {
-        if (msg[0] == '1') {
-          more = 1;
-          return;
-        }
-      }
+    return;
 
-      /* afficher alias? */
-      if (((int) strlen(msg)) > 4) {
-        if (msg[0] == ' ') {
-          if (msg[2] != ' ') {
-            if ((msg[3] == ' ') || (msg[4] == ' ')) {
-              char cmd[32] = "-";
-              int p;
+  /* show the long-option alias? */
+  if (((int) strlen(msg)) > 4 && msg[0] == ' ' && msg[2] != ' ' &&
+      (msg[3] == ' ' || msg[4] == ' ')) {
+    char cmd[32] = "-";
+    int p;
 
-              sscanf(msg, "%30s", cmd + strlen(cmd));
-              /* try the flag as-is, then strip a trailing N as the numeric-arg
-                 placeholder (cN -> c); this order keeps -%N from becoming -% */
-              p = optreal_find(cmd);
-              if (p < 0 && (int) strlen(cmd) > 2 && hts_lastchar(cmd) == 'N') {
-                hts_striplastchar(cmd, 'N');
-                p = optreal_find(cmd);
-              }
-              if (p >= 0) {
-                /* fings type of parameter: number,param,param concatenated,single cmd */
-                if (strcmp(opttype_value(p), "param") == 0 ||
-                    strcmp(opttype_value(p), "paramn") == 0 ||
-                    strcmp(opttype_value(p), "level") == 0)
-                  printf("%s (--%s[=N])\n", msg, optalias_value(p));
-                else if (strcmp(opttype_value(p), "onoff") == 0)
-                  printf("%s (--%s[=0])\n", msg, optalias_value(p));
-                else if (strcmp(opttype_value(p), "param1") == 0)
-                  printf("%s (--%s <param>)\n", msg, optalias_value(p));
-                else if (strcmp(opttype_value(p), "param0") == 0)
-                  printf("%s (--%s<param>)\n", msg, optalias_value(p));
-                else
-                  printf("%s (--%s)\n", msg, optalias_value(p));
-                done = 1;
-              }
-            }
-          }
-        }
-      }
+    sscanf(msg, "%30s", cmd + strlen(cmd));
+    /* try the flag as-is, then strip a trailing N as the numeric-arg
+       placeholder (cN -> c); this order keeps -%N from becoming -% */
+    p = optreal_find(cmd);
+    if (p < 0 && (int) strlen(cmd) > 2 && hts_lastchar(cmd) == 'N') {
+      hts_striplastchar(cmd, 'N');
+      p = optreal_find(cmd);
+    }
+    if (p >= 0) {
+      /* type of parameter: number, param, param concatenated, single cmd */
+      const hts_optclass cls = optclass_of(p);
 
-      /* sinon */
-      if (!done)
-        printf("%s\n", msg);
-      l++;
-      if (l > 20) {
-        l = 0;
-        waitkey;
-      }
+      if (cls == HTS_OPT_PARAM || cls == HTS_OPT_PARAMN || cls == HTS_OPT_LEVEL)
+        printf("%s (--%s[=N])\n", msg, optalias_value(p));
+      else if (cls == HTS_OPT_ONOFF)
+        printf("%s (--%s[=0])\n", msg, optalias_value(p));
+      else if (cls == HTS_OPT_PARAM1)
+        printf("%s (--%s <param>)\n", msg, optalias_value(p));
+      else if (cls == HTS_OPT_PARAM0)
+        printf("%s (--%s<param>)\n", msg, optalias_value(p));
+      else
+        printf("%s (--%s)\n", msg, optalias_value(p));
+      done = 1;
     }
   }
+
+  if (!done)
+    printf("%s\n", msg);
 }
 
 typedef struct help_wizard_buffers {
@@ -326,6 +296,7 @@ void help_wizard(httrackp * opt) {
       int argc = 1;
       int g = 0;
       int i = 0;
+      char prog[] = "winhttrack";
 
       //
       printf("\n");
@@ -352,7 +323,7 @@ void help_wizard(httrackp * opt) {
       printf("\n");
 
       // couper en morceaux
-      argv[0] = strdup("winhttrack");
+      argv[0] = prog;
       argv[1] = cmd;
       argc++;
       while(cmd[i]) {
@@ -360,6 +331,12 @@ void help_wizard(httrackp * opt) {
           g = !g;
         if (cmd[i] == ' ') {
           if (!g) {
+            if (argc >= (int) (sizeof(argv) / sizeof(argv[0]))) {
+              printf("* too many arguments (%d max)\n",
+                     (int) (sizeof(argv) / sizeof(argv[0])));
+              freet(buffers);
+              return;
+            }
             cmd[i] = '\0';
             argv[argc++] = cmd + i + 1;
           }
@@ -482,8 +459,6 @@ void help(const char *app, int more) {
   char fields[256];
 
   infomsg("");
-  if (more)
-    infomsg("1");
   if (more != 2) {
     snprintf(info, sizeof(info),
             "HTTrack version " HTTRACK_VERSION "%s",
@@ -517,7 +492,9 @@ void help(const char *app, int more) {
   infomsg("  rN set the mirror depth to N (* r9999)");
   infomsg(" %eN set the external links depth to N (* %e0)");
   infomsg("  mN maximum file length for a non-html file");
-  infomsg("  mN,N2 maximum file length for non html (N) and html (N2)");
+  infomsg("  mN,N2 maximum file length for non html (N) and html (N2); with no "
+          "limit for its kind, a compressed file stops at 256 MiB once "
+          "decoded");
   infomsg("  MN maximum overall size that can be uploaded/scanned");
   infomsg("  EN maximum mirror time in seconds (60=1 minute, 3600=1 hour)");
   infomsg("  AN maximum transfer rate in bytes/seconds (1000=1KB/s max)");
@@ -628,6 +605,8 @@ void help(const char *app, int more) {
     (" @iN internet protocol (0=both ipv6+ipv4, 4=ipv4 only, 6=ipv6 only)");
   infomsg(" @mN carry connections over Multipath TCP where the system offers"
           " it (0=no, 1=yes)");
+  infomsg(" @cN verify https certificates and host names against the system "
+          "CA store (0=no, 1=yes)");
   infomsg(" %w  disable a specific external mime module (-%w httrack-plugin)");
   infomsg("");
   infomsg("Browser ID:");
@@ -644,17 +623,21 @@ void help(const char *app, int more) {
   infomsg(" %a  accepted formats (-%a \"text/html,image/png;q=0.9,*/*;q=0.1\""
           "; repeat as -%a \"KIND=formats\" for one kind of link: document"
           " iframe frame image style script font audio video object embed");
-  infomsg(" %X  additional HTTP header line (-%X \"X-Magic: 42\"; an Accept"
-          " line replaces every computed Accept, per-kind values included;"
-          " Content-Length, Transfer-Encoding, Connection, Keep-Alive, TE,"
-          " Upgrade and Expect are dropped");
+  infomsg(
+      " %X  additional HTTP header line (-%X \"X-Magic: 42\"; an Accept"
+      " line replaces every computed Accept, per-kind values included;"
+      " Content-Length, Transfer-Encoding, Connection, Keep-Alive, TE,"
+      " Upgrade and Expect are dropped; the line goes to every host the crawl"
+      " touches, other sites and redirect targets included, so put no secret"
+      " in it for a multi-host crawl");
   infomsg(" %Q  send the headers a browser -F implies: its Accept values,"
           " header order and Sec-Fetch-*, and client hints over HTTPS (%Q0"
           " don't)");
   infomsg("");
   infomsg("Log, index, cache");
-  infomsg("  C  create/use a cache for updates and retries (C0 no cache,* C1 "
-          "cache is prioritary,C2 test update before)");
+  infomsg("  C  create/use a cache for updates and retries (C0 no cache,C1 "
+          "cache is prioritary,C2 test update before; the default is C1, or C2 "
+          "when a finished mirror is in the folder)");
   infomsg("  k  store all files in cache (not useful if files on disk)");
   infomsg(" %r  write an ISO-28500 WARC/1.1 archive; --warc-file NAME sets the "
           "output name, --warc-max-size N rotates segments past N bytes, "

@@ -52,6 +52,8 @@ scan 'got=-1 value=-1 end=4' ' 101' 0 100
 scan 'got=0 value=-1 end=0' ' abc' 0 100
 scan 'got=0 value=-1 end=0' -x 0 100
 scan 'got=0 value=-1 end=0' '' 0 100
+# 2^32 + 5 against a cache field's int range: %d read it as 5.
+scan 'got=-1 value=-1 end=10' 4294967301 0 2147483647
 
 # Refusals the sweep counts as intended changes without checking them.
 selftest_queue '0 0 0' int-parse-diff content-range ' bytes 0-+5/10'
@@ -62,7 +64,7 @@ selftest_queue 'keep_alive=0 timeout=15 max=0' int-parse-diff keep-alive \
     ' max=4294967311'
 
 # The counts pin the corpus, so a sweep that silently shrinks goes red.
-selftest_queue 'int-parse-diff: 6495 compared, 8902 intended changes, 0 failures' \
+selftest_queue 'int-parse-diff: 6499 compared, 8906 intended changes, 0 failures' \
     int-parse-diff
 
 selftest_run_queued

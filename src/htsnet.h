@@ -90,6 +90,18 @@ typedef unsigned long in_addr_t;
 extern "C" {
 #endif
 
+/** Can this socket go into an fd_set? A POSIX fd_set is a fixed bit array,
+    so a descriptor >= FD_SETSIZE would write past it. A Winsock fd_set is a
+    list, and FD_SET silently drops a socket past FD_SETSIZE. */
+static HTS_INLINE HTS_UNUSED hts_boolean hts_soc_selectable(T_SOC soc) {
+#ifdef _WIN32
+  (void) soc;
+  return HTS_TRUE;
+#else
+  return soc >= 0 && soc < FD_SETSIZE ? HTS_TRUE : HTS_FALSE;
+#endif
+}
+
 /** Raw IP address type: in6_addr when IPv6 is enabled, else in_addr. */
 #if HTS_INET6 != 0
 typedef struct in6_addr INaddr;

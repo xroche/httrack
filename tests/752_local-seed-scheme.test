@@ -1,0 +1,72 @@
+#!/bin/bash
+#
+# A start URL with no scheme gets http:// even when its path or query holds
+# ":/", from the command line, -%L, a login bundle and --why.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+python=$(find_python) || skip "python3 missing"
+
+bin=$(httrack_path)
+server=$(nativepath "$top_srcdir/tests/local-server.py")
+tmpdir=$(mktemp -d)
+serverpid=
+
+cleanup() {
+    stop_server "$serverpid"
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+mkdir "$tmpdir/root"
+echo '<html><body>seed</body></html>' >"$tmpdir/root/page.html"
+echo '<html><body>start</body></html>' >"$tmpdir/root/start.html"
+"$python" "$server" --root "$(nativepath "$tmpdir/root")" \
+    >"$tmpdir/srv.out" 2>"$tmpdir/srv.err" &
+serverpid=$!
+port=$(discover_server_port "$tmpdir/srv.out" "$serverpid") || exit 1
+seed="127.0.0.1:$port/page.html?u=http://x"
+start="http://127.0.0.1:$port/start.html"
+
+crawl() { # crawl NAME ARGS... -- the seed must be fetched from the server
+    local out="$tmpdir/$1" log
+    shift
+    "$bin" -O "$out" -q -r1 "$@" >"$tmpdir/stdout" 2>&1 ||
+        fail_dump "httrack failed" "$tmpdir/stdout"
+    log=$(<"$out/hts-log.txt")
+    if grep -q 'primary/' <<<"$log"; then
+        fail_dump "seed crawled as a relative link" "$out/hts-log.txt"
+    fi
+    compgen -G "$out/127.0.0.1_$port/page*.html" >/dev/null ||
+        fail_dump "seed page not mirrored" "$out/hts-log.txt"
+}
+
+crawl argv "$seed"
+# The command line escapes the space to %20.
+crawl spaced " http://127.0.0.1:$port/page.html"
+printf '%s\n' "$seed" >"$tmpdir/list.txt"
+crawl list -%L "$tmpdir/list.txt"
+printf '  %s\n' "http://127.0.0.1:$port/page.html" >"$tmpdir/indented.txt"
+crawl indented -%L "$tmpdir/indented.txt"
+mkdir "$tmpdir/logins"
+printf '%s\n' '# HTTrack bundle 1' "url $seed" >"$tmpdir/logins/seed.hts"
+# A bundle loads only when a start URL names it.
+crawl bundle --bundle-dir "$tmpdir/logins" "$start#httrack-bundle=seed"
+
+why=$("$bin" -O "$tmpdir/why" -q --why 'host.example/a:/b' \
+    'http://host.example/' | tr -d '\r')
+assert_match '^http://host\.example/a:/b: ' "$(grep 'host.example/a' <<<"$why")" \
+    "--why"
+why=$("$bin" -O "$tmpdir/why" -q --why ' http://host.example/a' \
+    'http://host.example/' | tr -d '\r')
+assert_match '^ http://host\.example/a: ' "$(grep 'host.example/a' <<<"$why")" \
+    "--why with a leading space"
+# A //host seed still gets http://.
+why=$("$bin" -O "$tmpdir/why" -q --why '//host.example/a' \
+    'http://host.example/' | tr -d '\r')
+assert_match '^http:////host\.example/a: ' "$(grep 'host.example/a' <<<"$why")" \
+    "--why //host"
+ok "seeds with :/ in the path get http://"

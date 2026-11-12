@@ -44,8 +44,8 @@ Please visit our Website: http://www.httrack.com
    shape-free short form used in the User-Agent and the mirrored-page footer.
    None of them is the library ABI version, which is VERSION_INFO in
    configure.ac. */
-#define HTTRACK_VERSION "3.50-5"
-#define HTTRACK_VERSIONID "3.50.5"
+#define HTTRACK_VERSION "3.51-0"
+#define HTTRACK_VERSIONID "3.51.0"
 #define HTTRACK_AFF_VERSION "3.x"
 /* Nothing in the engine reads this one. */
 #define HTTRACK_LIB_VERSION "2.0"
@@ -529,102 +529,11 @@ typedef int T_SOC;
 // Per-connection transfer buffer size, in bytes
 #define TAILLE_BUFFER 65536
 
-#ifdef HTS_DO_NOT_USE_PTHREAD
-#error needs threads support
-#endif
 #define USE_BEGINTHREAD 1
-
-#ifdef _DEBUG
-// trace mallocs
-// #define HTS_TRACE_MALLOC
-#ifdef HTS_TRACE_MALLOC
-/* Type of the guard word written on both sides of a traced block. */
-typedef unsigned long int t_htsboundary;
-
-#ifndef HTS_DEF_FWSTRUCT_mlink
-#define HTS_DEF_FWSTRUCT_mlink
-typedef struct mlink mlink;
-#endif
-struct mlink {
-  char *adr;
-  int len;
-  int id; /**< serial number of the allocation */
-  struct mlink *next;
-};
-
-static const t_htsboundary htsboundary = 0xDEADBEEF;
-#endif
-#endif
 
 /* Nothing reads this any more. */
 #ifndef NOSTRDEBUG
 #define STRDEBUG 1
-#endif
-
-/* ------------------------------------------------------------ */
-/* Debugging                                                    */
-/* ------------------------------------------------------------ */
-
-// type-detection debug
-#define DEBUG_SHOWTYPES 0
-// backing debug
-#define BDEBUG 0
-// chunk receive
-#define CHUNKDEBUG 0
-// realloc links debug
-#define MDEBUG 0
-// cache debug
-#define DEBUGCA 0
-// DNS debug
-#define DEBUGDNS 0
-// savename debug
-#define DEBUG_SAVENAME 0
-// debug robots
-#define DEBUG_ROBOTS 0
-// debug hash
-#define DEBUG_HASH 0
-// integrity-check debug
-#define DEBUG_CHECKINT 0
-// nbr sockets debug
-#define NSDEBUG 0
-
-// HTSLib debug
-#define HDEBUG 0
-// connection monitoring debug
-#define CNXDEBUG 0
-// cookie debug
-#define DEBUG_COOK 0
-// heavy/low-level debug
-#define HTS_WIDE_DEBUG 0
-// socket close debug
-#define HTS_DEBUG_CLOSESOCK 0
-// memory-tracing debug
-#define MEMDEBUG 0
-
-// htsmain
-#define DEBUG_STEPS 0
-
-// Derived debug control switches
-#if HTS_DEBUG_CLOSESOCK
-#define _HTS_WIDE 1
-#endif
-#if HTS_WIDE_DEBUG
-#define _HTS_WIDE 1
-#endif
-#if _HTS_WIDE
-extern FILE *DEBUG_fp;
-
-#define DEBUG_W(A)                                                             \
-  {                                                                            \
-    if (DEBUG_fp == NULL)                                                      \
-      DEBUG_fp = fopen("bug.out", "wb");                                       \
-    fprintf(DEBUG_fp, ":>" A);                                                 \
-    fflush(DEBUG_fp);                                                          \
-  }
-/* Lets DEBUG_W("a" _ b) pass several fprintf arguments, by redefining the
-   identifier _. Debug builds only. */
-#undef _
-#define _ ,
 #endif
 
 #endif

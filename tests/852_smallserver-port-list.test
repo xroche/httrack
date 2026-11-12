@@ -1,0 +1,18 @@
+#!/bin/bash
+#
+# The WebHTTrack fallback port list tried 32006 and 42006 twice and never 32005 or 42005.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+src="${abs_top_srcdir:-$top_srcdir}/src/htsserver.c"
+test -r "$src" || skip "htsserver.c not in the tree"
+
+ports=$(sed -n '/try_to_listen_to\[\] =/,/};/p' "$src" | tr -c '0-9\n' ' ' | tr -s ' ' '\n' | grep -E '^[0-9]+$' || true)
+test -n "$ports" || fail "no port list found"
+dups=$(sort <<<"$ports" | uniq -d)
+test -z "$dups" || fail "port tried twice: $dups"
+for p in 32005 42005; do
+    grep -qx "$p" <<<"$ports" || fail "port $p is never tried"
+done

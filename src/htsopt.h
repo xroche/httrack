@@ -122,8 +122,7 @@ typedef int (*htscallbacksfncptr)(void);
 
 typedef struct htscallbacks htscallbacks;
 
-/** One module's exit callback. The head entry is embedded in htsoptstate, so
-    the engine frees every entry but that one. */
+/** Reserved for ABI: the engine no longer reads or fills this chain. */
 struct htscallbacks {
   void *moduleHandle;         /**< module to unload once exitFnc has run */
   htscallbacksfncptr exitFnc; /**< called once, before the module is unloaded */
@@ -251,7 +250,7 @@ struct htsoptstate {
   /* */
   filenote_strc strc; /**< filenote() listing state */
   /* Per-call function contexts (thread-local scratch, avoids globals) */
-  htscallbacks callbacks;   /**< user callback chain head */
+  htscallbacks callbacks;   /**< reserved, unused (ABI) */
   concat_strc concat;       /**< concat() rotating buffers */
   usercommand_strc usercmd; /**< pending user shell command */
   fspc_strc fspc;           /**< error/warning/info counters */
@@ -663,6 +662,8 @@ struct httrackp {
                          ABI */
   void *bundle_state; /**< hts_bundle_state*, or NULL. Live state, so
                            copy_htsopt must leave it alone. Tail: ABI */
+  hts_tristate check_cert; /**< verify https certificates (--check-cert).
+                                HTS_DEFAULT: off. Tail: ABI */
 };
 
 /** Running statistics for a mirror. */
@@ -863,9 +864,6 @@ struct lien_url {
 typedef struct lien_back lien_back;
 #endif
 struct lien_back {
-#if DEBUG_CHECKINT
-  char magic; /**< leading guard byte, must stay 0 */
-#endif
   char url_adr[HTS_URLMAXSIZE * 2];     /**< host/address part of the URL */
   char url_fil[HTS_URLMAXSIZE * 2];     /**< remote file path */
   char url_sav[HTS_URLMAXSIZE * 2];     /**< local save name (with any path) */
@@ -902,9 +900,6 @@ struct lien_back {
   volatile int stop_ftp; /**< stop flag for FTP, polled without a lock */
   int finalized;  /**< finalized (memory optimization) */
   int early_add;  /**< was added before the link heap saw it */
-#if DEBUG_CHECKINT
-  char magic2; /**< trailing guard byte, must stay 0 */
-#endif
 };
 
 #ifdef __cplusplus

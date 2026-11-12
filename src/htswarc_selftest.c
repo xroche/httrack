@@ -130,10 +130,6 @@ static int st_warc(httrackp *opt, int argc, char **argv) {
   int seen_a_body = 0, body_occurrences = 0, a2_bodyless = 0, nm_cl_ok = 0;
   static const char a_body[] = "Hello, WARC!\n";
 
-  if (argc < 1) {
-    fprintf(stderr, "warc: needs a writable directory\n");
-    return 1;
-  }
   fconcat(path, sizeof(path), argv[0], "warc-selftest.warc.gz");
 
   w = warc_open(opt, path);
@@ -206,8 +202,7 @@ static int st_warc(httrackp *opt, int argc, char **argv) {
     }
     nrec++;
     /* magic */
-    if (rlen < 8 || memcmp(rec, "WARC/1.", 7) != 0)
-      err = 1;
+    ST_FAIL_IF(err, rlen < 8 || memcmp(rec, "WARC/1.", 7) != 0);
     /* record header ends at the first blank line */
     sep = warc_memstr((char *) rec, "\r\n\r\n", rlen, 4);
     if (sep == NULL) {
@@ -263,16 +258,15 @@ static int st_warc(httrackp *opt, int argc, char **argv) {
       else {
         size_t bodyoff = (size_t) (bsep - (char *) rec) + 4;
         size_t got = rlen - 4 - bodyoff; /* minus record trailer */
-        if (got != sizeof(a_body) - 1 ||
-            memcmp(rec + bodyoff, a_body, got) != 0)
-          err = 1;
+        ST_FAIL_IF(err, got != sizeof(a_body) - 1 ||
+                            memcmp(rec + bodyoff, a_body, got) != 0);
         seen_a_body = 1;
       }
-      if (warc_memstr((char *) rec, "Content-Encoding",
-                      hdr_len + (size_t) block_len, 16) != NULL ||
-          warc_memstr((char *) rec, "Transfer-Encoding",
-                      hdr_len + (size_t) block_len, 17) != NULL)
-        err = 1;
+      ST_FAIL_IF(err,
+                 warc_memstr((char *) rec, "Content-Encoding",
+                             hdr_len + (size_t) block_len, 16) != NULL ||
+                     warc_memstr((char *) rec, "Transfer-Encoding",
+                                 hdr_len + (size_t) block_len, 17) != NULL);
     }
     freet(rec);
   }
@@ -280,19 +274,18 @@ static int st_warc(httrackp *opt, int argc, char **argv) {
 
   /* warcinfo + 6 transactions (response/revisit + request each) = 13 records.
    */
-  if (ninfo != 1 || nreq != 6 || nrec != 13 || !seen_a_body || !nm_cl_ok)
-    err = 1;
+  ST_FAIL_IF(err, ninfo != 1 || nreq != 6 || nrec != 13 || !seen_a_body ||
+                      !nm_cl_ok);
 #if HTS_USEOPENSSL
   /* a.html + b.bin + trunc + 302 are full responses; a2.html deduped to a
      revisit (bodyless), nm is the 304 revisit; the body appears exactly once.
    */
-  if (nrevisit != 2 || nresp != 4 || !a2_bodyless || body_occurrences != 1)
-    err = 1;
+  ST_FAIL_IF(err, nrevisit != 2 || nresp != 4 || !a2_bodyless ||
+                      body_occurrences != 1);
 #else
   /* No digests: a2.html is a second full response, so the body appears twice
      and only the 304 nm is a revisit. */
-  if (nrevisit != 1 || nresp != 5 || body_occurrences != 2)
-    err = 1;
+  ST_FAIL_IF(err, nrevisit != 1 || nresp != 5 || body_occurrences != 2);
   (void) a2_bodyless; /* only meaningful with digests */
 #endif
 
@@ -343,10 +336,6 @@ static int st_warc_trunc(httrackp *opt, int argc, char **argv) {
       0x50, 0xc8, 0x2a, 0xcd, 0x2d, 0x28, 0xd6, 0xe3, 0x02, 0x00, 0x5e, 0xb8,
       0xe7, 0x66, 0x3a, 0x00, 0x00, 0x00};
 
-  if (argc < 1) {
-    fprintf(stderr, "warc-trunc: needs a writable directory\n");
-    return 1;
-  }
   fconcat(path, sizeof(path), argv[0], "warc-trunc.warc.gz");
   w = warc_open(opt, path);
   assertf(w != NULL);
@@ -372,8 +361,7 @@ static int st_warc_trunc(httrackp *opt, int argc, char **argv) {
     long long block_len = 0;
     unsigned char *rec = warc_next_member(&p, end, &rlen);
     if (rec == NULL) {
-      if (rlen != 0)
-        err = 1;
+      ST_FAIL_IF(err, rlen != 0);
       break;
     }
     if (warc_rec_split(rec, rlen, &hdr_len, &block_len) != 0) {
@@ -408,10 +396,8 @@ static int st_warc_trunc(httrackp *opt, int argc, char **argv) {
     freet(rec);
   }
   freet(data);
-  if (!trunc_len || !trunc_gz || nresp != 2)
-    err = 1;
-  printf("warc-trunc: %s\n", err ? "FAIL" : "OK");
-  return err;
+  ST_FAIL_IF(err, !trunc_len || !trunc_gz || nresp != 2);
+  return st_verdict("warc-trunc", err);
 }
 
 /* An ftp:// capture is ONE resource record: WARC-Type: resource, the payload's
@@ -427,10 +413,6 @@ static int st_warc_ftp(httrackp *opt, int argc, char **argv) {
                              "FTP payload"
                              "\x02\x03";
 
-  if (argc < 1) {
-    fprintf(stderr, "warc-ftp: needs a writable directory\n");
-    return 1;
-  }
   fconcat(path, sizeof(path), argv[0], "warc-ftp.warc.gz");
   w = warc_open(opt, path);
   assertf(w != NULL);
@@ -448,17 +430,15 @@ static int st_warc_ftp(httrackp *opt, int argc, char **argv) {
     long long block_len = 0;
     unsigned char *rec = warc_next_member(&p, end, &rlen);
     if (rec == NULL) {
-      if (rlen != 0)
-        err = 1;
+      ST_FAIL_IF(err, rlen != 0);
       break;
     }
-    if (warc_rec_split(rec, rlen, &hdr_len, &block_len) != 0)
-      err = 1;
+    ST_FAIL_IF(err, warc_rec_split(rec, rlen, &hdr_len, &block_len) != 0);
     if (warc_memstr((char *) rec, "WARC-Type: resource", hdr_len, 19) != NULL) {
       nresource++;
-      if ((size_t) block_len != sizeof(body) - 1 ||
-          memcmp(rec + hdr_len, body, sizeof(body) - 1) != 0)
-        err = 1; /* block is the raw payload, no HTTP envelope */
+      /* block is the raw payload, no HTTP envelope */
+      ST_FAIL_IF(err, (size_t) block_len != sizeof(body) - 1 ||
+                          memcmp(rec + hdr_len, body, sizeof(body) - 1) != 0);
       if (warc_memstr((char *) rec, "WARC-Target-URI: ftp://ftp.local/file.bin",
                       hdr_len, 41) == NULL ||
           warc_memstr((char *) rec, "Content-Type: application/octet-stream",
@@ -472,8 +452,7 @@ static int st_warc_ftp(httrackp *opt, int argc, char **argv) {
     freet(rec);
   }
   freet(data);
-  if (nresource != 1 || nresp != 0 || nreq != 0)
-    err = 1;
+  ST_FAIL_IF(err, nresource != 1 || nresp != 0 || nreq != 0);
   printf("warc-ftp: resource=%d response=%d request=%d: %s\n", nresource, nresp,
          nreq, err ? "FAIL" : "OK");
   return err;
@@ -491,10 +470,6 @@ static int st_warc_rotate(httrackp *opt, int argc, char **argv) {
   int err = 0, nseg = 0, i;
   size_t j;
 
-  if (argc < 1) {
-    fprintf(stderr, "warc-rotate: needs a writable directory\n");
-    return 1;
-  }
   for (j = 0; j < sizeof(body);
        j++) { /* incompressible: gzip can't shrink it */
     rng ^= rng << 13;
@@ -538,16 +513,13 @@ static int st_warc_rotate(httrackp *opt, int argc, char **argv) {
       long long block_len = 0;
       unsigned char *rec = warc_next_member(&p, pend, &rlen);
       if (rec == NULL) {
-        if (rlen != 0)
-          err = 1;
+        ST_FAIL_IF(err, rlen != 0);
         break;
       }
-      if (warc_rec_split(rec, rlen, &hdr_len, &block_len) != 0)
-        err = 1;
+      ST_FAIL_IF(err, warc_rec_split(rec, rlen, &hdr_len, &block_len) != 0);
       if (first) { /* each segment leads with its own warcinfo */
-        if (warc_memstr((char *) rec, "WARC-Type: warcinfo", hdr_len, 19) ==
-            NULL)
-          err = 1;
+        ST_FAIL_IF(err, warc_memstr((char *) rec, "WARC-Type: warcinfo",
+                                    hdr_len, 19) == NULL);
         first = 0;
       }
       freet(rec);
@@ -556,8 +528,7 @@ static int st_warc_rotate(httrackp *opt, int argc, char **argv) {
     if (first) /* empty segment */
       err = 1;
   }
-  if (nseg < 2)
-    err = 1;
+  ST_FAIL_IF(err, nseg < 2);
   printf("warc-rotate: %d segments: %s\n", nseg, err ? "FAIL" : "OK");
   return err;
 }
@@ -582,10 +553,6 @@ static int st_warc_verbatim(httrackp *opt, int argc, char **argv) {
       0x50, 0xc8, 0x2a, 0xcd, 0x2d, 0x28, 0xd6, 0xe3, 0x02, 0x00, 0x5e, 0xb8,
       0xe7, 0x66, 0x3a, 0x00, 0x00, 0x00};
 
-  if (argc < 1) {
-    fprintf(stderr, "warc-verbatim: needs a writable directory\n");
-    return 1;
-  }
   fconcat(path, sizeof(path), argv[0], "warc-verbatim.warc.gz");
 
   w = warc_open(opt, path);
@@ -609,8 +576,7 @@ static int st_warc_verbatim(httrackp *opt, int argc, char **argv) {
     long long block_len = 0;
     unsigned char *rec = warc_next_member(&p, end, &rlen);
     if (rec == NULL) {
-      if (rlen != 0)
-        err = 1;
+      ST_FAIL_IF(err, rlen != 0);
       break;
     }
     if (warc_memstr((char *) rec, "msgtype=response", rlen, 16) == NULL) {
@@ -638,14 +604,12 @@ static int st_warc_verbatim(httrackp *opt, int argc, char **argv) {
         nce++;
         scan = warc_memstr(scan + 17, "Content-Encoding:", rem - 17, 17);
       }
-      if (ce == NULL || strncasecmp(ce + 17, " gzip", 5) != 0 || nce != 1)
-        err = 1;
-      if (warc_memstr(block, "Transfer-Encoding:", (size_t) block_len, 18) !=
-          NULL)
-        err = 1;
-      if (hcl == NULL || sscanf(hcl + 15, "%lld", &http_cl) != 1 ||
-          http_cl != (long long) sizeof(a_gz))
-        err = 1;
+      ST_FAIL_IF(err, ce == NULL || strncasecmp(ce + 17, " gzip", 5) != 0 ||
+                          nce != 1);
+      ST_FAIL_IF(err, warc_memstr(block, "Transfer-Encoding:",
+                                  (size_t) block_len, 18) != NULL);
+      ST_FAIL_IF(err, hcl == NULL || sscanf(hcl + 15, "%lld", &http_cl) != 1 ||
+                          http_cl != (long long) sizeof(a_gz));
     }
     /* Stored block bytes equal the gzip input, and inflate to the plaintext. */
     {
@@ -663,9 +627,8 @@ static int st_warc_verbatim(httrackp *opt, int argc, char **argv) {
           const unsigned char *bp = rec + bodyoff;
           size_t plen = 0;
           unsigned char *plain = warc_next_member(&bp, bp + got, &plen);
-          if (plain == NULL || plen != sizeof(a_plain) - 1 ||
-              memcmp(plain, a_plain, plen) != 0)
-            err = 1;
+          ST_FAIL_IF(err, plain == NULL || plen != sizeof(a_plain) - 1 ||
+                              memcmp(plain, a_plain, plen) != 0);
           freet(plain);
         }
       }
@@ -674,10 +637,8 @@ static int st_warc_verbatim(httrackp *opt, int argc, char **argv) {
     freet(rec);
   }
   freet(data);
-  if (!checked)
-    err = 1;
-  printf("warc-verbatim: %s\n", err ? "FAIL" : "OK");
-  return err;
+  ST_FAIL_IF(err, !checked);
+  return st_verdict("warc-verbatim", err);
 }
 
 /* SURT canonicalization vectors (the CDXJ sort key: www-strip, default-port
@@ -692,18 +653,23 @@ static int st_warc_surt(httrackp *opt, int argc, char **argv) {
       {"https://example.com:443/", "com,example)/"},
       {"http://www2.example.com/x", "com,example)/x"},
       {"http://example.com:8080/p", "com,example:8080)/p"},
+      {"http://example.com:99999999999999999999/p",
+       "com,example:99999999999999999999)/p"},
+      {"http://example.com:4294967376/", "com,example:4294967376)/"},
       {"http://user:pass@www.example.com/y", "com,example)/y"},
       {"http://192.168.0.1/z", "192.168.0.1)/z"},
       {"http://[2001:db8::1]/w", "[2001:db8::1])/w"},
       {"http://sub.a.example.co.uk/deep?x=1#frag",
        "uk,co,example,a,sub)/deep?x=1"},
+      {"http://example.com/caf\xe9", "com,example)/caf%E9"},
+      {"http://example.com/caf\xc3\xa9", "com,example)/caf\xc3\xa9"},
+      {"http://example.com/d\xed\xa0\x80z", "com,example)/d%ED%A0%80z"},
+      {"http://example.com/tr\xe2\x82", "com,example)/tr%E2%82"},
+      {"http://ex\xe9.com/", "com,ex%E9)/"},
   };
 
   int err = 0;
   size_t i;
-  (void) opt;
-  (void) argc;
-  (void) argv;
   for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
     char out[512];
     if (warc_surt(cases[i].url, out, sizeof(out)) != 0 ||
@@ -713,8 +679,7 @@ static int st_warc_surt(httrackp *opt, int argc, char **argv) {
       err = 1;
     }
   }
-  printf("warc-surt: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("warc-surt", err);
 }
 
 /* The CDXJ offset is a uint64_t, and the tell behind it must carry the same
@@ -737,11 +702,6 @@ static int st_warc_offset(httrackp *opt, int argc, char **argv) {
   size_t i;
   size_t wide = 0; /* offsets measured past what a 32-bit tell could hold */
 
-  (void) opt;
-  if (argc < 1) {
-    fprintf(stderr, "warc-offset: needs a writable directory\n");
-    return 1;
-  }
   fconcat(path, sizeof(path), argv[0], "warc-offset.bin");
   fp = FOPEN(fconv(catbuff, sizeof(catbuff), path), "wb");
   if (fp == NULL) {
@@ -852,8 +812,7 @@ static int st_warc_offset(httrackp *opt, int argc, char **argv) {
       }
     }
   }
-  printf("warc-offset: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("warc-offset", err);
 }
 
 /* A URL longer than the old 1024-byte header-format buffer must still reach the
@@ -875,10 +834,6 @@ static int st_warc_longurl(httrackp *opt, int argc, char **argv) {
   size_t i, n, nrec = 0;
   int err = 0;
 
-  if (argc < 1) {
-    fprintf(stderr, "warc-longurl: need a writable directory\n");
-    return 1;
-  }
   snprintf(path, sizeof(path), "%s/longurl.warc", argv[0]);
 
   w = warc_open(opt, path);
@@ -947,8 +902,7 @@ static int st_warc_longurl(httrackp *opt, int argc, char **argv) {
   }
 
   freet(blob);
-  printf("warc-longurl: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("warc-longurl", err);
 }
 
 /* End-to-end CDXJ: crawl a handful of records with --warc-cdx, then verify the
@@ -965,10 +919,6 @@ static int st_warc_cdx(httrackp *opt, int argc, char **argv) {
   const char *lp, *cend;
   char prev[2048];
 
-  if (argc < 1) {
-    fprintf(stderr, "warc-cdx: needs a writable directory\n");
-    return 1;
-  }
   fconcat(wpath, sizeof(wpath), argv[0], "warc-cdx.warc.gz");
   fconcat(cpath, sizeof(cpath), argv[0], "warc-cdx.cdx");
   saved_cdx = opt->warc_cdx;
@@ -1031,8 +981,8 @@ static int st_warc_cdx(httrackp *opt, int argc, char **argv) {
     memcpy(line, lp, llen);
     line[llen] = '\0';
     nlines++;
-    if (prev[0] != '\0' && strcmp(prev, line) > 0)
-      err = 1; /* must be sorted */
+    /* must be sorted */
+    ST_FAIL_IF(err, prev[0] != '\0' && strcmp(prev, line) > 0);
     strlcpybuff(prev, line, sizeof(prev));
     j = strstr(line, "\"url\": \"");
     o = strstr(line, "\"offset\": \"");
@@ -1053,8 +1003,7 @@ static int st_warc_cdx(httrackp *opt, int argc, char **argv) {
     url[urllen] = '\0';
     if (strstr(url, "nm.example.com") != NULL) {
       nm_lines++;
-      if (strstr(line, "\"mime\": \"text/html\"") == NULL)
-        err = 1;
+      ST_FAIL_IF(err, strstr(line, "\"mime\": \"text/html\"") == NULL);
     }
     if (len == 0 || off > warc_len || len > warc_len - off) {
       err = 1;
@@ -1070,8 +1019,8 @@ static int st_warc_cdx(httrackp *opt, int argc, char **argv) {
     {
       char needle[1100];
       snprintf(needle, sizeof(needle), "WARC-Target-URI: %s\r\n", url);
-      if (warc_memstr((char *) rec, needle, rlen, strlen(needle)) == NULL)
-        err = 1;
+      ST_FAIL_IF(err, warc_memstr((char *) rec, needle, rlen, strlen(needle)) ==
+                          NULL);
     }
     freet(rec);
   nextline:
@@ -1079,10 +1028,71 @@ static int st_warc_cdx(httrackp *opt, int argc, char **argv) {
   }
   freet(warc);
   freet(cdx);
-  if (nlines != 5 || nm_lines != 1)
-    err = 1; /* 4 responses/revisits + 1 resource; no warcinfo/request */
+  /* 4 responses/revisits + 1 resource; no warcinfo/request */
+  ST_FAIL_IF(err, nlines != 5 || nm_lines != 1);
   printf("warc-cdx: %d index lines: %s\n", nlines, err ? "FAIL" : "OK");
   return err;
+}
+
+/* A URL carrying a raw Latin-1 byte still gives a CDXJ line whose JSON is
+   valid UTF-8, while a well-formed UTF-8 URL passes through unchanged. */
+static int st_warc_cdx_utf8(httrackp *opt, int argc, char **argv) {
+  static const char *const urls[] = {"http://www.example.com/caf\xe9",
+                                     "http://www.example.com/caf\xc3\xa9"};
+  char wpath[HTS_URLMAXSIZE], cpath[HTS_URLMAXSIZE];
+  warc_writer *w;
+  unsigned char *cdx;
+  size_t cdx_len = 0, i;
+  hts_boolean saved_cdx;
+  int err = 0, nlines = 0, nescaped = 0, nverbatim = 0;
+  const char *lp, *cend;
+
+  fconcat(wpath, sizeof(wpath), argv[0], "warc-cdx-utf8.warc.gz");
+  fconcat(cpath, sizeof(cpath), argv[0], "warc-cdx-utf8.cdx");
+  saved_cdx = opt->warc_cdx;
+  opt->warc_cdx = HTS_TRUE;
+  w = warc_open(opt, wpath);
+  assertf(w != NULL);
+  for (i = 0; i < sizeof(urls) / sizeof(urls[0]); i++)
+    warc_write_transaction(w, urls[i], "127.0.0.1",
+                           "GET /caf HTTP/1.1\r\nHost: www.example.com\r\n\r\n",
+                           "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n",
+                           i == 0 ? "first\n" : "second\n", i == 0 ? 6 : 7,
+                           NULL, NULL, 200, 0, 0);
+  warc_close(w);
+  opt->warc_cdx = saved_cdx;
+
+  cdx = warc_slurp(cpath, &cdx_len);
+  assertf(cdx != NULL);
+  lp = (const char *) cdx;
+  cend = (const char *) cdx + cdx_len;
+  while (lp < cend) {
+    const char *eol = memchr(lp, '\n', (size_t) (cend - lp));
+    const char *end = eol != NULL ? eol : cend;
+    const char *json = memchr(lp, '{', (size_t) (end - lp));
+
+    if (end != lp) {
+      nlines++;
+      if (json == NULL || !hts_isStringUTF8(lp, (size_t) (end - lp))) {
+        fprintf(stderr, "warc-cdx-utf8: line %d is not UTF-8\n", nlines);
+        err = 1;
+      } else if (warc_memstr(json, "/caf\\ufffd\"", (size_t) (end - json),
+                             11) != NULL) {
+        nescaped++;
+      } else if (warc_memstr(json, "/caf\xc3\xa9\"", (size_t) (end - json),
+                             7) != NULL) {
+        nverbatim++;
+      }
+    }
+    lp = end < cend ? end + 1 : cend;
+  }
+  freet(cdx);
+  if (nlines != 2 || nescaped != 1 || nverbatim != 1) {
+    fprintf(stderr, "warc-cdx-utf8: %d lines, %d escaped, %d verbatim\n",
+            nlines, nescaped, nverbatim);
+    err = 1;
+  }
+  return st_verdict("warc-cdx-utf8", err);
 }
 
 static char st_cdx_log[2048];
@@ -1093,7 +1103,6 @@ static HTS_PRINTF_FUN(3, 0) void st_cdx_log_cb(httrackp *opt, int type,
                                                const char *format,
                                                va_list args) {
   char line[512];
-  (void) opt;
   (void) type;
   (void) vsnprintf(line, sizeof(line), format, args);
   if (strncmp(line, "WARC:", 5) == 0)
@@ -1153,10 +1162,6 @@ static int st_warc_cdx_errors(httrackp *opt, int argc, char **argv) {
   warc_writer *w;
   int err = 0;
 
-  if (argc < 1) {
-    fprintf(stderr, "warc-cdx-errors: needs a writable directory\n");
-    return 1;
-  }
   saved_state = opt->state.warc;
   saved_cdx = opt->warc_cdx;
   opt->warc_cdx = 1;
@@ -1272,8 +1277,7 @@ static int st_warc_cdx_errors(httrackp *opt, int argc, char **argv) {
   hts_set_log_vprint_callback(NULL);
   opt->warc_cdx = saved_cdx;
   opt->state.warc = saved_state;
-  printf("warc-cdx-errors: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("warc-cdx-errors", err);
 }
 
 /* One finished transaction through the engine hook. No stashed headers, so the
@@ -1397,10 +1401,6 @@ static int st_warc_teardown(httrackp *opt, int argc, char **argv) {
   void *saved_state;
   int err = 0;
 
-  if (argc < 1) {
-    fprintf(stderr, "warc-teardown: needs a writable directory\n");
-    return 1;
-  }
   saved_state = opt->state.warc;
   strlcpybuff(saved_file, StringBuff(opt->warc_file), sizeof(saved_file));
 
@@ -1411,8 +1411,7 @@ static int st_warc_teardown(httrackp *opt, int argc, char **argv) {
 
   StringCopy(opt->warc_file, saved_file);
   opt->state.warc = saved_state;
-  printf("warc-teardown: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("warc-teardown", err);
 }
 
 #if HTS_USEOPENSSL
@@ -1461,10 +1460,6 @@ static int st_warc_wacz(httrackp *opt, int argc, char **argv) {
   int have_archive = 0, have_index = 0, all_store = 1;
   LLint good_size;
 
-  if (argc < 1) {
-    fprintf(stderr, "warc-wacz: needs a writable directory\n");
-    return 1;
-  }
   fconcat(wpath, sizeof(wpath), argv[0], "warc-wacz.warc.gz");
   fconcat(waczpath, sizeof(waczpath), argv[0], "warc-wacz.wacz");
   fconcat(cdxpath, sizeof(cdxpath), argv[0], "warc-wacz.cdx");
@@ -1510,9 +1505,9 @@ static int st_warc_wacz(httrackp *opt, int argc, char **argv) {
         err = 1;
         break;
       }
-      if (e->len > 0 &&
-          unzReadCurrentFile(uf, e->data, (unsigned) e->len) != (int) e->len)
-        err = 1;
+      ST_FAIL_IF(err, e->len > 0 &&
+                          unzReadCurrentFile(uf, e->data, (unsigned) e->len) !=
+                              (int) e->len);
       unzCloseCurrentFile(uf);
       nent++;
     } while (unzGoToNextFile(uf) == UNZ_OK);
@@ -1535,9 +1530,8 @@ static int st_warc_wacz(httrackp *opt, int argc, char **argv) {
     else if (strcmp(e->name, "datapackage-digest.json") == 0)
       dig = e;
   }
-  if (!have_archive || !have_index || pages == NULL || dp == NULL ||
-      dig == NULL || !all_store)
-    err = 1;
+  ST_FAIL_IF(err, !have_archive || !have_index || pages == NULL || dp == NULL ||
+                      dig == NULL || !all_store);
 
   /* pages.jsonl: header line, then >= 1 body row carrying url + ts. */
   if (pages != NULL) {
@@ -1549,10 +1543,9 @@ static int st_warc_wacz(httrackp *opt, int argc, char **argv) {
       const char *body = nl ? nl + 1 : NULL;
       size_t blen =
           body ? pages->len - (size_t) (body - (char *) pages->data) : 0;
-      if (body == NULL || blen == 0 ||
-          warc_memstr(body, "\"url\": ", blen, 7) == NULL ||
-          warc_memstr(body, "\"ts\": ", blen, 6) == NULL)
-        err = 1;
+      ST_FAIL_IF(err, body == NULL || blen == 0 ||
+                          warc_memstr(body, "\"url\": ", blen, 7) == NULL ||
+                          warc_memstr(body, "\"ts\": ", blen, 6) == NULL);
     }
   }
 
@@ -1565,9 +1558,8 @@ static int st_warc_wacz(httrackp *opt, int argc, char **argv) {
       const char *p;
       memcpy(json, dp->data, dp->len);
       json[dp->len] = '\0';
-      if (strstr(json, "\"profile\": \"data-package\"") == NULL ||
-          strstr(json, "\"wacz_version\": \"") == NULL)
-        err = 1;
+      ST_FAIL_IF(err, strstr(json, "\"profile\": \"data-package\"") == NULL ||
+                          strstr(json, "\"wacz_version\": \"") == NULL);
       p = json;
       while ((p = strstr(p, "\"path\": \"")) != NULL) {
         char path[256], want[80], got[65];
@@ -1589,9 +1581,9 @@ static int st_warc_wacz(httrackp *opt, int argc, char **argv) {
         for (i = 0; i < nent; i++)
           if (strcmp(ent[i].name, path) == 0)
             break;
-        if (i == nent || !wacz_test_sha256(ent[i].data, ent[i].len, got) ||
-            strcmp(got, want) != 0)
-          err = 1;
+        ST_FAIL_IF(err, i == nent ||
+                            !wacz_test_sha256(ent[i].data, ent[i].len, got) ||
+                            strcmp(got, want) != 0);
         p = pe;
       }
       freet(json);
@@ -1608,12 +1600,10 @@ static int st_warc_wacz(httrackp *opt, int argc, char **argv) {
     } else {
       memcpy(djson, dig->data, dig->len);
       djson[dig->len] = '\0';
-      if (strstr(djson, "\"path\": \"datapackage.json\"") == NULL)
-        err = 1;
+      ST_FAIL_IF(err, strstr(djson, "\"path\": \"datapackage.json\"") == NULL);
       h = strstr(djson, "\"hash\": \"sha256:");
-      if (h == NULL || sscanf(h + 16, "%79[0-9a-f]", want) != 1 ||
-          strcmp(want, dphex) != 0)
-        err = 1;
+      ST_FAIL_IF(err, h == NULL || sscanf(h + 16, "%79[0-9a-f]", want) != 1 ||
+                          strcmp(want, dphex) != 0);
     }
     freet(djson);
   }
@@ -1624,8 +1614,7 @@ static int st_warc_wacz(httrackp *opt, int argc, char **argv) {
   /* #522-class: a failed re-package must leave the existing .wacz untouched.
      Drop the .cdx and re-run empty so packaging fails on the missing index. */
   good_size = fsize(waczpath);
-  if (good_size <= 0)
-    err = 1;
+  ST_FAIL_IF(err, good_size <= 0);
   (void) UNLINK(cdxpath);
   w = warc_open(opt, wpath);
   assertf(w != NULL);
@@ -1978,7 +1967,6 @@ static int st_singlefileclass(httrackp *opt, int argc, char **argv) {
   const char cls =
       href != NULL ? singlefile_ref_class(tag + 1, href, tag) : '\0';
 
-  (void) opt;
   printf("class=%c\n", cls != '\0' ? cls : '0');
   return 0;
 }
@@ -1992,10 +1980,6 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
   char *out, *css, *nested;
   size_t outlen = 0, len = 0;
 
-  if (argc < 1) {
-    fprintf(stderr, "singlefile: needs a writable directory\n");
-    return 1;
-  }
   sf_err = 0;
   sf_put(argv[0], "escape.png", sf_png,
          SF_PNG_LEN); /* just outside the mirror */
@@ -2375,8 +2359,7 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
     printf("singlefile: ':' is not a legal filename here, so the scheme guard "
            "only gets the weaker check\n");
   opt->single_file_max_size = saved_cap;
-  printf("singlefile: %s\n", sf_err ? "FAIL" : "OK");
-  return sf_err;
+  return st_verdict("singlefile", sf_err);
 }
 
 /* Compare the WARC header walks with frozen copies. */
@@ -2548,9 +2531,6 @@ static int st_warcspandiff(httrackp *opt, int argc, char **argv) {
   size_t i;
   int r;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   /* An OUTSZ of 0 leaves OUT alone. */
   {
     char z = 'Z';
@@ -2616,6 +2596,9 @@ const struct selftest_entry selftests_warc[] = {
     {"warc-cdx-errors", "<dir>",
      "--warc-cdx diagnostics when the index cannot be written or is empty",
      st_warc_cdx_errors},
+    {"warc-cdx-utf8", "<dir>",
+     "--warc-cdx JSON stays valid UTF-8 for a raw Latin-1 URL",
+     st_warc_cdx_utf8},
     {"warc-teardown", "<dir>",
      "a closed or abandoned archive is not reopened by a late transaction",
      st_warc_teardown},
@@ -2623,7 +2606,7 @@ const struct selftest_entry selftests_warc[] = {
     {"warc-wacz", "<dir>", "--wacz package: layout, STORE mode, sha256 digests",
      st_warc_wacz},
 #endif
-    {"singlefileclass", "<link tag>",
+    {"singlefileclass", "[link tag]",
      "class single-file gives a <link href> reference", st_singlefileclass},
     {"singlefile", "<dir>",
      "--single-file: what is inlined, the per-asset cap, idempotence",

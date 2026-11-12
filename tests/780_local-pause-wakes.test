@@ -1,0 +1,110 @@
+#!/bin/bash
+# A -G pause waits on hts-paused.lock, but an abort request, SIGTERM or ^C must
+# still end it, and the run must then stop rather than pause again.
+set -eu
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+require_httrack
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_pausewake.XXXXXX") || exit 1
+crawlpid=
+cleanup() {
+    test -z "$crawlpid" || kill_tree "$crawlpid"
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+local_server_start
+fail_dump_var crawllog enginelog
+
+# Asks for a pause after the first 640KB file, with seven more still to fetch.
+start_crawl() { # start_crawl NAME [ARGS..]: leaves $out, $crawllog, $enginelog
+    out="${tmpdir}/$1"
+    shift
+    crawllog="${out}.log"
+    # shellcheck disable=SC2034 # read by fail_dump_var above, by name
+    enginelog="${out}/hts-log.txt"
+    httrack -O "$out" --quiet --disable-security-limits --robots=0 \
+        --timeout=30 --retries=0 --max-rate=400000 --max-pause=30000 "$@" \
+        "${BASEURL}/bigfiles/index.html" >"$crawllog" 2>&1 &
+    crawlpid=$!
+}
+
+start_paused() { # start_paused NAME
+    start_crawl "$1" -c1
+    wait_until_still_running "test -e '${out}/hts-paused.lock'" \
+        "the engine never paused" "$crawlpid"
+}
+
+# 30s, where an engine paused for good waits on the lock forever.
+assert_run_ends() { # assert_run_ends WHAT
+    wait_until "! kill -0 '$crawlpid' 2>/dev/null" "$1 left the run paused" 300
+    wait "$crawlpid" 2>/dev/null || true
+    crawlpid=
+}
+
+printf '[an abort request ends a -G pause and the run] ..\t'
+start_paused abort
+# A pause taken after the abort would rewrite the lock later than this marker.
+sleep 1
+: >"${tmpdir}/aborted"
+write_lock_request "$out" hts-abort.lock "$crawlpid"
+assert_run_ends "an abort request"
+test ! "${out}/hts-paused.lock" -nt "${tmpdir}/aborted" ||
+    fail "the run paused again after the abort"
+echo "OK"
+
+printf '[an abort lock older than the run does not end a -G pause] ..\t'
+mkdir -p "${tmpdir}/stale"
+: >"${tmpdir}/stale/hts-abort.lock"
+touch -t 200001010000 "${tmpdir}/stale/hts-abort.lock"
+start_paused stale
+sleep 1
+: >"${tmpdir}/stale-paused"
+# A woken engine fetches the next file and pauses again, rewriting the lock.
+sleep 4
+kill -0 "$crawlpid" 2>/dev/null || fail "a stale abort lock ended the run"
+test ! "${out}/hts-paused.lock" -nt "${tmpdir}/stale-paused" ||
+    fail "a stale abort lock ended the pause"
+write_lock_request "$out" hts-abort.lock "$crawlpid"
+assert_run_ends "an abort request"
+echo "OK"
+
+if target_is_windows; then
+    echo "MSYS cannot signal a native httrack.exe, so the signal arms are skipped"
+    exit 0
+fi
+
+printf '[SIGTERM ends a -G pause and the run] ..\t'
+start_paused term
+kill -TERM "$crawlpid"
+assert_run_ends "SIGTERM"
+echo "OK"
+
+printf '[^C ends a -G pause and the run] ..\t'
+start_paused int
+kill -INT "$crawlpid"
+assert_run_ends "^C"
+echo "OK"
+
+# With -c4 the engine first drains three transfers, and a stop then must not pause.
+for sig in INT TERM; do
+    printf '[SIG%s while draining for a -G pause stops the run unpaused] ..\t' "$sig"
+    start_crawl "drain-$sig" -c4 -z
+    wait_until_still_running "grep -qs 'pause requested' '${enginelog}'" \
+        "the engine never asked for a pause" "$crawlpid"
+    : >"${tmpdir}/signalled"
+    if test -e "${out}/hts-paused.lock"; then
+        kill -TERM "$crawlpid"
+        assert_run_ends "SIGTERM"
+        echo "SKIP (the drain ended before the signal)"
+        continue
+    fi
+    kill -"$sig" "$crawlpid"
+    assert_run_ends "SIG${sig}"
+    test ! "${out}/hts-paused.lock" -nt "${tmpdir}/signalled" ||
+        fail "SIG${sig} during the drain still paused the run"
+    echo "OK"
+done

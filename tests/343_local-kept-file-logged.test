@@ -76,12 +76,15 @@ test "$n" -eq 2 || fail "kept: log names $n kept files, expected 2:
 $(grep -a 'complete\|Kept existing' "${keptout}/hts-log.txt" || true)"
 # A count alone passes a line naming the wrong file or a garbage size, which is
 # the whole value of the line.
-names_file() { # names_file <mirror-relative path>
-    count_matching_lines -F "$1 ($(size_of "${refhost}/$1") bytes)" \
+# Each file takes a different arm, so the reason pins which one fired.
+names_file() { # names_file <mirror-relative path> <reason>
+    count_matching_lines -F "$1 ($(size_of "${refhost}/$1") bytes), $2:" \
         "${keptout}/hts-log.txt"
 }
-for want in plain.bin ranged/asset.bin; do
-    test "$(names_file "$want")" -ge 1 || fail "kept: no line names $want with its size:
+for want in 'plain.bin|matching the announced size, range ignored' \
+    'ranged/asset.bin|matching size and timestamp'; do
+    test "$(names_file "${want%%|*}" "${want#*|}")" -ge 1 ||
+        fail "kept: no line names ${want%%|*} with its size and reason:
 $(grep -a 'Kept existing' "${keptout}/hts-log.txt" || true)"
 done
 cmp -s "${poison}/plain.bin" "${kepthost}/plain.bin" ||

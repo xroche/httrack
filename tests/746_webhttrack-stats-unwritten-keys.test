@@ -1,0 +1,78 @@
+#!/bin/bash
+#
+# The progress panel publishes only the per-row fields the engine fills: a row
+# never carries info.url_adr or info.url_fil, which no code writes. A default
+# build zero-fills the stack, so only a pattern-init or sanitizer build fails.
+
+set -euo pipefail
+
+# shellcheck source=tests/webhttracklib.sh
+. "${0%"${0##*/}"}./webhttracklib.sh"
+
+htsserver_require
+
+work=$(mktemp -d)
+csrv=
+cleanup_push htsserver_cleanup_dir "${work}"
+cleanup_push htsserver_reap_vars csrv
+
+# The shipped tree, with a refresh.html that prints the row keys between markers.
+htsserver_distroot
+root="${work}/root"
+mkdir -p "${root}/html/server"
+for entry in "${HTS_DISTROOT}"/*; do
+    test "${entry##*/}" = html || ln -s "${entry}" "${root}/"
+done
+for entry in "${HTS_DISTROOT}"/html/*; do
+    test "${entry##*/}" = server || ln -s "${entry}" "${root}/html/"
+done
+for entry in "${HTS_DISTDIR}"/html/server/*; do
+    test "${entry##*/}" = refresh.html || ln -s "${entry}" "${root}/html/server/"
+done
+# shellcheck disable=SC2016
+{
+    for i in 0 1; do
+        printf 'SAV%s=[${html:info.url_sav[%s]}]\n' "$i" "$i"
+        printf 'ADR%s=[${html:info.url_adr[%s]}]\n' "$i" "$i"
+        printf 'FIL%s=[${html:info.url_fil[%s]}]\n' "$i" "$i"
+    done
+} >"${root}/html/server/refresh.html"
+
+htsserver_start --root "${root}" --home "${work}"
+
+clog="${work}/content.log"
+"${HTS_PYTHON}" "${testdir}/local-server.py" --root "${work}" >"${clog}" 2>&1 &
+csrv=$!
+cport=$(discover_server_port "${clog}" "${csrv}") ||
+    fail "content server did not come up"
+
+printf '[a live row publishes no unwritten field] ..\t'
+htsserver_python - "${HTS_URL}" "${cport}" "${work}" <<'PY' || fail "see above"
+import re, sys, time
+
+from webtestlib import Session
+
+s, cport, work = Session(sys.argv[1], timeout=60), sys.argv[2], sys.argv[3]
+s.post("step4.html", [
+    ("path", work), ("projname", "crawl"), ("winprofile", "x"),
+    ("command_do", "start"),
+    ("command", "httrack --quiet --robots=0 -c2 http://127.0.0.1:%s/trickle/index.html -O %s/crawl"
+     % (cport, work)),
+])
+
+# Positive control: both rows must be live, or empty values prove nothing.
+deadline = time.time() + 90
+while True:
+    body = s.get("refresh.html")
+    # A row may still hold the engine's temporary name, such as p3.bin.4.delayed.
+    if all(re.search(r"SAV%d=\[[^]\n]*/trickle/[^]\n]+\]" % i, body) for i in (0, 1)):
+        break
+    if time.time() > deadline:
+        sys.exit("the trickled rows never reached the panel:\n%s" % body[-2000:])
+    time.sleep(1)
+
+for key in ("ADR0", "FIL0", "ADR1", "FIL1"):
+    if key + "=[]" not in body:
+        sys.exit("%s is not empty:\n%r" % (key, body[:2000]))
+PY
+echo OK

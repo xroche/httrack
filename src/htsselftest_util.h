@@ -41,6 +41,19 @@ Please visit our Website: http://www.httrack.com
 
 #ifdef HTS_INTERNAL_BYTECODE
 
+/* Set var to 1 and print the failing file, line and condition when cond holds
+   no more. */
+#define ST_CHECK(var, cond)                                                    \
+  do {                                                                         \
+    if (!(cond)) {                                                             \
+      printf("  FAIL %s:%d: %s\n", __FILE__, __LINE__, #cond);                 \
+      (var) = 1;                                                               \
+    }                                                                          \
+  } while (0)
+
+/* Same, with the failure condition spelled out. */
+#define ST_FAIL_IF(var, bad) ST_CHECK(var, !(bad))
+
 size_t st_decode_body(const char *arg, char *buf, size_t size);
 
 /* Set *dest to the Sec-Fetch-Dest named name, "empty" being UNKNOWN. Return
@@ -75,6 +88,10 @@ void st_cache_close(httrackp *opt, cache_back *cache);
 
 /* mkdir `path`, tolerating one that exists; HTS_FALSE after complaining. */
 hts_boolean st_mkdir_at(const char *path, size_t n, const char *who);
+
+/* Print "<label>: FAIL" if err is non-zero, else "<label>: OK", and return err
+   as the self-test exit code. */
+int st_verdict(const char *label, int err);
 
 /* UTF-16 units s[0..n) costs, which is what Windows measures MAX_PATH in. */
 size_t st_utf16_units(const char *s, size_t n);

@@ -34,10 +34,6 @@ Please visit our Website: http://www.httrack.com
 /* The parser decides three things about a quoted string, and each decision is
    swept here over a generated corpus rather than a list of past incidents. */
 
-#define HTS_INTERNAL_BYTECODE
-
-#include "htsparse_selftest.h"
-
 #include "htsselftest_int.h"
 
 #include <ctype.h>
@@ -194,7 +190,11 @@ static void dirtylink_enumerate_tokens(httrackp *opt, selftest_sweep *sw) {
   }
 }
 
-int parse_selftest_dirtylink(httrackp *opt, hts_boolean dump) {
+/* Sweep hts_dirty_link_is_url over every string of up to four bytes across the
+   alphabet it branches on, plus token combinations reaching the scheme and
+   extension branches, against a model of its rules. "dump" prints the whole
+   verdict table instead of judging it. Returns 0 when all agree. */
+static int parse_selftest_dirtylink(httrackp *opt, hts_boolean dump) {
   /* Verdicts to hold whatever the sweep says, each naming why. */
   static const struct {
     const char *str;
@@ -643,7 +643,11 @@ static void jsscan_sweep(httrackp *opt, selftest_sweep *sw) {
   }
 }
 
-int parse_selftest_jsscan(httrackp *opt, hts_boolean dump) {
+/* Sweep hts_js_scan_link over the shapes a script statement takes, one
+   representative per class it branches on, against a model of its rules, and
+   pin a table of named statements. "dump" prints the verdicts instead.
+   Returns 0 when all agree. */
+static int parse_selftest_jsscan(httrackp *opt, hts_boolean dump) {
   /* What the sweep only pins by agreeing with the model. The cursor sits at
      "at", the offset and length are counted from it. */
   static const struct {
@@ -876,7 +880,9 @@ static int jsimport_case(const char *before, hts_boolean want) {
   return 0;
 }
 
-int parse_selftest_jsimport(httrackp *opt) {
+/* Check hts_js_quote_is_import_arg against a table of statements where the
+   keyword is, and is not, a dynamic import call. Returns 0 when all agree. */
+static int parse_selftest_jsimport(httrackp *opt) {
   static const struct {
     const char *before;
     hts_boolean want;
@@ -915,7 +921,6 @@ int parse_selftest_jsimport(httrackp *opt) {
   size_t i;
   int err = 0;
 
-  (void) opt;
   for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++)
     err |= jsimport_case(cases[i].before, cases[i].want);
   printf("jsimport self-test %s (%d cases)\n", err ? "FAILED" : "OK",
@@ -1101,7 +1106,10 @@ static int tagattr_junk_names(selftest_sweep *sw) {
   return err;
 }
 
-int parse_selftest_tagattr(httrackp *opt) {
+/* Check hts_dirty_attr_name and hts_dirty_attr_detectable twice: against tags
+   built from a known attribute, and against malformed ones where only what the
+   walk may claim can be checked. Returns 0 when both hold. */
+static int parse_selftest_tagattr(httrackp *opt) {
   /* names that may carry a link, and names that never do */
   static const char *const linky[] = {"href",   "src",        "data-src",
                                       "srcset", "background", "longdesc",
@@ -1115,7 +1123,6 @@ int parse_selftest_tagattr(httrackp *opt) {
   size_t b, g, i;
   int err = 0;
 
-  (void) opt;
   memset(&sw, 0, sizeof(sw));
   for (b = 0; b < sizeof(before) / sizeof(before[0]); b++) {
     for (g = 0; g < sizeof(gap) / sizeof(gap[0]); g++) {
@@ -1206,9 +1213,6 @@ static int st_linkdir(httrackp *opt, int argc, char **argv) {
       {"/?a=1&b=2", HTS_TRUE, HTS_FALSE},
   };
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
     st_linkdir_case(cases[i].lien, cases[i].frag_or_query,
                     cases[i].multisegment);
@@ -1228,15 +1232,121 @@ static int st_jsscan(httrackp *opt, int argc, char **argv) {
 }
 
 static int st_jsimport(httrackp *opt, int argc, char **argv) {
-  (void) argc;
-  (void) argv;
   return parse_selftest_jsimport(opt);
 }
 
 static int st_tagattr(httrackp *opt, int argc, char **argv) {
-  (void) argc;
-  (void) argv;
   return parse_selftest_tagattr(opt);
+}
+
+static const char *attr_kind_name(const hts_attr *at) {
+  static const char *const names[] = {"link",  "hotspot", "refresh",
+                                      "leave", "event",   "style"};
+
+  return at == NULL ? "none" : names[at->kind];
+}
+
+/* Does the lookup at text + 1 give want, and the offset past '=' wantp? */
+static int attr_case(const char *text, hts_boolean scripts,
+                     const hts_attr *want, int wantp) {
+  int p = -1;
+  const hts_attr *const got = hts_attr_match(text + 1, scripts, &p);
+
+  if (got != want || p != wantp) {
+    fprintf(stderr, "attrkind \"%s\" scripts=%d: %s at %d, wanted %s at %d\n",
+            text, (int) scripts, got != NULL ? got->name : "(none)", p,
+            want != NULL ? want->name : "(none)", wantp);
+    return 1;
+  }
+  return 0;
+}
+
+/* Each row matches its own name in any case and nothing longer, and the
+   script rows only when asked. Then prints "name kind" for each argument. */
+static int st_attrkind(httrackp *opt, int argc, char **argv) {
+  int err = 0;
+  int rows;
+  int i;
+
+  for (rows = 0; hts_attrs[rows].name != NULL; rows++) {
+    const hts_attr *const at = &hts_attrs[rows];
+    const int len = (int) strlen(at->name);
+    const hts_boolean script =
+        at->kind == HTS_ATTR_EVENT || at->kind == HTS_ATTR_STYLE;
+    char text[64];
+    char upper[32];
+    size_t k;
+
+    snprintf(text, sizeof(text), "<%s=x", at->name);
+    err |= attr_case(text, HTS_TRUE, at, len + 1);
+    err |= attr_case(text, HTS_FALSE, script ? NULL : at, script ? 0 : len + 1);
+    for (k = 0; at->name[k] != '\0' && k + 1 < sizeof(upper); k++)
+      upper[k] = (char) toupper((unsigned char) at->name[k]);
+    upper[k] = '\0';
+    snprintf(text, sizeof(text), " %s = x", upper);
+    err |= attr_case(text, HTS_TRUE, at, len + 2);
+    snprintf(text, sizeof(text), " %s12=x", at->name);
+    err |= attr_case(text, HTS_TRUE, at->kind == HTS_ATTR_HOTSPOT ? at : NULL,
+                     at->kind == HTS_ATTR_HOTSPOT ? len + 3 : 0);
+    snprintf(text, sizeof(text), " %sx=x", at->name);
+    err |= attr_case(text, HTS_TRUE, NULL, 0);
+    snprintf(text, sizeof(text), "a%s=x", at->name);
+    err |= attr_case(text, HTS_TRUE, NULL, 0);
+  }
+  printf("attrkind self-test %s (%d rows)\n", err ? "FAILED" : "OK", rows);
+  for (i = 0; i < argc; i++) {
+    char text[64];
+    int p;
+
+    snprintf(text, sizeof(text), "<%s=x", argv[i]);
+    printf("%s %s\n", argv[i],
+           attr_kind_name(hts_attr_match(text + 1, HTS_TRUE, &p)));
+  }
+  return err;
+}
+
+/* Writers: raw, html-escaped, fully escaped, URL-escaped, joined by '|'. */
+static int st_sink(httrackp *opt, int argc, char **argv) {
+  static const char in[] = "a&\"<\xe9";
+
+  static const struct {
+    hts_boolean enabled;
+    int inscript, inscript_tag;
+    const char *want;
+  } cases[] = {
+      {HTS_TRUE, 0, 0,
+       "a&\"<\xe9|a&amp;\"<\xe9|a&amp;\"<&#xe9;|a&amp;%22%3c\xe9"},
+      /* Script text is raw, except the always-escaped full writer. */
+      {HTS_TRUE, 1, 0, "a&\"<\xe9|a&\"<\xe9|a&amp;\"<&#xe9;|a&%22%3c\xe9"},
+      /* An event handler is markup. */
+      {HTS_TRUE, 1, 1,
+       "a&\"<\xe9|a&amp;\"<\xe9|a&amp;\"<&#xe9;|a&amp;%22%3c\xe9"},
+      /* A page not saved as HTML (-p2) buffers nothing. */
+      {HTS_FALSE, 0, 0, ""},
+      {HTS_FALSE, 1, 0, ""},
+      {HTS_FALSE, 1, 1, ""},
+  };
+
+  size_t i;
+  int err = 0;
+
+  for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+    char *got = hts_parse_sink_selftest(cases[i].enabled, cases[i].inscript,
+                                        cases[i].inscript_tag, in);
+
+    if (strcmp(got, cases[i].want) != 0) {
+      fprintf(stderr, "sink case %d: got \"%s\", wanted \"%s\"\n", (int) i, got,
+              cases[i].want);
+      err = 1;
+    }
+    freet(got);
+  }
+  if (err) {
+    printf("sink self-test FAILED\n");
+    return 1;
+  }
+  printf("sink self-test OK (%d cases)\n", (int) i);
+  return 0;
 }
 
 /* Each call parses `txt` under a fresh host, then checkrobots() for `path`. */
@@ -1277,9 +1387,6 @@ static char *rb_bulk(size_t blobsize) {
 
 static int st_robots(httrackp *opt, int argc, char **argv) {
   robots_wizard robots;
-  (void) opt;
-  (void) argc;
-  (void) argv;
   memset(&robots, 0, sizeof(robots));
 
   /* Longer Allow re-opens subtree under Disallow: / (old matcher couldn't). */
@@ -1321,6 +1428,73 @@ static int st_robots(httrackp *opt, int argc, char **argv) {
     assertf(rb_decide(&robots, txt, "/a") == -1);
     assertf(rb_decide(&robots, txt, "/ab") == 0);
     assertf(rb_decide(&robots, txt, "/a/b") == 0);
+  }
+
+  /* Several '*' pieces match left to right, and '$' pins the last piece. */
+  {
+    const char *txt = "User-agent: *\nDisallow: /a*b*c$\nDisallow: /x*y*\n";
+
+    assertf(rb_decide(&robots, txt, "/a1b2c") == -1);
+    assertf(rb_decide(&robots, txt, "/abc") == -1);
+    assertf(rb_decide(&robots, txt, "/a1b2c3") == 0);
+    assertf(rb_decide(&robots, txt, "/acb") == 0);
+    assertf(rb_decide(&robots, txt, "/xyy") == -1);
+    assertf(rb_decide(&robots, txt, "/yx") == 0);
+  }
+
+  /* Pieces must not overlap, '$' pins the end, '**' is one '*', and a '$' that
+     is not last is a plain character. */
+  {
+    const char *t1 = "User-agent: *\nDisallow: /a*ab$\n";
+    const char *t2 = "User-agent: *\nDisallow: /a*b$\n";
+    const char *t3 = "User-agent: *\nDisallow: /a*b*c$\n";
+    const char *t4 = "User-agent: *\nDisallow: /a**b\n";
+    const char *t5 = "User-agent: *\nDisallow: /a$b\n";
+
+    assertf(rb_decide(&robots, t1, "/ab") == 0);
+    assertf(rb_decide(&robots, t1, "/aab") == -1);
+    assertf(rb_decide(&robots, t2, "/abb") == -1);
+    assertf(rb_decide(&robots, t3, "/abcbc") == -1);
+    assertf(rb_decide(&robots, t4, "/axb") == -1);
+    assertf(rb_decide(&robots, t4, "/ab") == -1);
+    assertf(rb_decide(&robots, t4, "/a") == 0);
+    assertf(rb_decide(&robots, t5, "/a$b") == -1);
+    assertf(rb_decide(&robots, t5, "/a") == 0);
+  }
+
+  /* Hostile backtracking rules still decide. The longest
+     matching rule wins, so a hostile rule is what answers each path. */
+  {
+    const size_t capa = 450000;
+    char *txt = (char *) malloct(capa);
+    char path[1024], path2[1024];
+    size_t n;
+    int i;
+
+    assertf(txt != NULL);
+    n = (size_t) snprintf(txt, capa, "User-agent: *\nDisallow: /\n");
+    for (i = 0; i < 800; i++) {
+      n += (size_t) snprintf(txt + n, capa - n, "Disallow: /*");
+      memset(txt + n, 'a', 500);
+      n += 500;
+      n += (size_t) snprintf(txt + n, capa - n, "%03db\n", i);
+    }
+    /* Longer than every rule above, so it wins only if it matches. */
+    n += (size_t) snprintf(txt + n, capa - n, "Allow: /*");
+    memset(txt + n, 'a', 600);
+    n += 600;
+    (void) snprintf(txt + n, capa - n, "c\n");
+    path[0] = '/';
+    memset(path + 1, 'a', 900);
+    path[901] = '\0';
+    memcpy(path2, path, 902);
+    path2[901] = 'c';
+    path2[902] = '\0';
+    for (i = 0; i < 20; i++) {
+      assertf(rb_decide(&robots, txt, path) == -1); /* only Disallow: / */
+      assertf(rb_decide(&robots, txt, path2) == 0); /* Allow wins */
+    }
+    freet(txt);
   }
 
   /* The httrack-specific group replaces the generic '*' group entirely. */
@@ -1556,9 +1730,6 @@ static int sm_scan(const char *doc, int maxurls, hts_boolean *is_index,
 static int st_sitemap(httrackp *opt, int argc, char **argv) {
   sm_collect c;
   hts_boolean idx;
-  (void) opt;
-  (void) argc;
-  (void) argv;
 
   /* A urlset yields its <loc> URLs, in order, unescaped. */
   assertf(sm_scan("<?xml version=\"1.0\"?><urlset>"
@@ -1804,6 +1975,14 @@ const struct selftest_entry selftests_parse[] = {
      "may the dirty parser read this in-tag quoted value? resolves the owning "
      "attribute and refuses the names that carry no link",
      st_tagattr},
+    {"attrkind", "[name...]",
+     "which link attribute is written here? each row matches its own name "
+     "only; prints the kind of each name given",
+     st_attrkind},
+    {"sink", "",
+     "the parser's output writers: escaping per script state, and nothing "
+     "buffered for a page not saved as HTML",
+     st_sink},
     {"robots", "", "robots.txt RFC 9309 Allow/Disallow precedence self-test",
      st_robots},
     {"sitemap", "",

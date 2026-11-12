@@ -38,11 +38,6 @@ static int st_charset(httrackp *opt, int argc, char **argv) {
   size_t len;
   char *s;
 
-  (void) opt;
-  if (argc < 2) {
-    fprintf(stderr, "charset: needs a charset and a string\n");
-    return 1;
-  }
   len = st_decode_body(argv[1], buf, sizeof(buf));
   s = hts_convertStringToUTF8(buf, len, argv[0]);
   if (s != NULL) {
@@ -68,9 +63,6 @@ static int st_syscharset(httrackp *opt, int argc, char **argv) {
   char *sys, *back, *part;
   int wn, n, lossless;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   wn = MultiByteToWideChar(CP_UTF8, 0, utf8, len, wide,
                            (int) (sizeof(wide) / sizeof(wide[0])));
   assertf(wn > 0);
@@ -108,9 +100,6 @@ static int st_syscharset(httrackp *opt, int argc, char **argv) {
          lossless ? "round-trip" : "one-way");
   return 0;
 #else
-  (void) opt;
-  (void) argc;
-  (void) argv;
   return 77; /* WIN32-only entry point */
 #endif
 }
@@ -138,9 +127,6 @@ static int st_nobestfit(httrackp *opt, int argc, char **argv) {
   char *s;
   int wn, n;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   assertf(cp == 932);
   if (!IsValidCodePage(cp)) {
     printf("nobestfit: CP932 is not installed\n");
@@ -217,9 +203,6 @@ static int st_nobestfit(httrackp *opt, int argc, char **argv) {
   printf("nobestfit: OK\n");
   return 0;
 #else
-  (void) opt;
-  (void) argc;
-  (void) argv;
   return 77; /* WIN32-only entry point */
 #endif
 }
@@ -227,11 +210,6 @@ static int st_nobestfit(httrackp *opt, int argc, char **argv) {
 static int st_metacharset(httrackp *opt, int argc, char **argv) {
   char *s;
 
-  (void) opt;
-  if (argc < 1) {
-    fprintf(stderr, "metacharset: needs an html string\n");
-    return 1;
-  }
   s = hts_getCharsetFromMeta(argv[0], strlen(argv[0]));
   printf("%s\n", s != NULL ? s : "(none)");
   freet(s);
@@ -242,11 +220,6 @@ static int st_isutf8(httrackp *opt, int argc, char **argv) {
   char buf[512];
   size_t len;
 
-  (void) opt;
-  if (argc < 1) {
-    fprintf(stderr, "isutf8: needs a string\n");
-    return 1;
-  }
   len = st_decode_body(argv[0], buf, sizeof(buf));
   printf("%d\n", hts_isStringUTF8(buf, len) ? 1 : 0);
   return 0;
@@ -257,11 +230,6 @@ static int st_idna_encode(httrackp *opt, int argc, char **argv) {
   size_t len;
   char *s;
 
-  (void) opt;
-  if (argc < 1) {
-    fprintf(stderr, "idna-encode: needs a hostname\n");
-    return 1;
-  }
   len = st_decode_body(argv[0], buf, sizeof(buf));
   s = hts_convertStringUTF8ToIDNA(buf, len);
   if (s != NULL) {
@@ -273,14 +241,55 @@ static int st_idna_encode(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* One row: host, its length, dst size, in place, expected result or NULL. */
+static int host_ascii_case(const char *host, size_t len, size_t size,
+                           hts_boolean inplace, const char *want) {
+  char buf[64], before[64];
+  const char *src = host;
+
+  memset(buf, 'Z', sizeof(buf) - 1);
+  buf[sizeof(buf) - 1] = '\0';
+  if (inplace) {
+    strcpybuff(buf, host);
+    src = buf;
+  }
+  memcpy(before, buf, sizeof(buf));
+  if (hts_host_to_ascii(buf, size, src, len) != (want != NULL) ||
+      (want != NULL && strcmp(buf, want) != 0) ||
+      (want == NULL && memcmp(buf, before, sizeof(buf)) != 0)) {
+    printf("host-ascii: '%s' (%u bytes into %u) gave '%s'\n", host,
+           (unsigned) len, (unsigned) size, buf);
+    return 1;
+  }
+  return 0;
+}
+
+static int st_host_ascii(httrackp *opt, int argc, char **argv) {
+  static const char mu[] = "m\xc3\xbcnchen.de";
+  static const char mu_idna[] = "xn--mnchen-3ya.de";
+  int fail = 0;
+
+  fail |= host_ascii_case("abc.com:80", 7, 64, HTS_FALSE, "abc.com");
+  fail |= host_ascii_case(mu, strlen(mu), 64, HTS_FALSE, mu_idna);
+  fail |= host_ascii_case(mu, strlen(mu), 64, HTS_TRUE, mu_idna);
+  fail |= host_ascii_case(mu, strlen(mu), sizeof(mu_idna), HTS_FALSE, mu_idna);
+  // one byte short: refused, and dst keeps its old bytes
+  fail |= host_ascii_case(mu, strlen(mu), sizeof(mu_idna) - 1, HTS_FALSE, NULL);
+  fail |= host_ascii_case(mu, strlen(mu), sizeof(mu_idna) - 1, HTS_TRUE, NULL);
+  fail |= host_ascii_case("abc", 3, 4, HTS_FALSE, "abc");
+  fail |= host_ascii_case("abc", 3, 3, HTS_FALSE, NULL);
+  fail |= host_ascii_case("b\xc3", 2, 64, HTS_FALSE, NULL);
+  fail |= host_ascii_case("", 0, 1, HTS_FALSE, "");
+  fail |= host_ascii_case("", 0, 0, HTS_FALSE, NULL);
+  if (fail)
+    return 1;
+  printf("host-ascii self-test OK\n");
+  return 0;
+}
+
 static int st_idna_decode(httrackp *opt, int argc, char **argv) {
   char *s;
 
-  (void) opt;
-  if (argc < 1) {
-    fprintf(stderr, "idna-decode: needs a hostname\n");
-    return 1;
-  }
   s = hts_convertStringIDNAToUTF8(argv[0], strlen(argv[0]));
   if (s != NULL) {
     printf("%s\n", s);
@@ -295,11 +304,6 @@ static int st_entities(httrackp *opt, int argc, char **argv) {
   char *s;
   const char *enc;
 
-  (void) opt;
-  if (argc < 1) {
-    fprintf(stderr, "entities: needs a string\n");
-    return 1;
-  }
   s = strdupt(argv[0]);
   enc = argc >= 2 ? argv[1] : "UTF-8";
   if (s != NULL &&
@@ -312,15 +316,272 @@ static int st_entities(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+#define ENTITY_SWEEP_MAX 4096
+
+/* One oracle row: a name and its code point, or -1 when it stays verbatim. */
+typedef struct entity_ref {
+  char name[40];
+  int cp;
+} entity_ref;
+
+static int entity_ref_cmp(const void *a, const void *b) {
+  return strcmp(((const entity_ref *) a)->name, ((const entity_ref *) b)->name);
+}
+
+/* Checks that "&name;" decodes to what the oracle holds for name, or stays
+   verbatim, and counts the input and any failure. */
+static void entity_sweep_one(const entity_ref *refs, const size_t n,
+                             const char *name, size_t *inputs,
+                             size_t *failures) {
+  char src[48], dest[48], want[48];
+  entity_ref key;
+  const entity_ref *hit;
+
+  snprintf(src, sizeof(src), "&%s;", name);
+  snprintf(key.name, sizeof(key.name), "%s", name);
+  hit = bsearch(&key, refs, n, sizeof(*refs), entity_ref_cmp);
+  if (hit == NULL || hit->cp <= 0) {
+    snprintf(want, sizeof(want), "%s", src);
+  } else if (hit->cp == 160) {
+    /* the caller maps U+00A0 to a space */
+    snprintf(want, sizeof(want), " ");
+  } else {
+    const size_t len = hts_writeUTF8(hit->cp, want, sizeof(want) - 1);
+
+    want[len] = '\0';
+  }
+  if (hts_unescapeEntitiesWithCharset(src, dest, sizeof(dest), "UTF-8") != 0 ||
+      strcmp(dest, want) != 0) {
+    fprintf(stderr, "entities-sweep: '%s' gave '%s', want '%s'\n", src, dest,
+            want);
+    (*failures)++;
+  }
+  (*inputs)++;
+}
+
+/* Decodes every name of a "name cp" file, then each one-byte alphanumeric
+   change, truncation and 'x' suffix of it. */
+static int st_entities_sweep(httrackp *opt, int argc, char **argv) {
+  static const char alnum[] =
+      "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+  FILE *fp;
+  entity_ref *refs;
+  char line[128];
+  size_t n = 0, i, inputs = 0, failures = 0;
+
+  (void) opt;
+  fp = argc >= 1 ? FOPEN(argv[0], "rb") : NULL;
+  if (fp == NULL) {
+    fprintf(stderr, "entities-sweep: needs a readable <file>\n");
+    return 1;
+  }
+  refs = calloct(ENTITY_SWEEP_MAX, sizeof(*refs));
+  assertf(refs != NULL);
+  while (fgets(line, sizeof(line), fp) != NULL) {
+    assertf(n < ENTITY_SWEEP_MAX);
+    if (sscanf(line, "%31s %d", refs[n].name, &refs[n].cp) == 2) {
+      n++;
+    }
+  }
+  fclose(fp);
+  qsort(refs, n, sizeof(*refs), entity_ref_cmp);
+
+  for (i = 0; i < n; i++) {
+    char var[40];
+    const size_t len = strlen(refs[i].name);
+    size_t p, k;
+
+    entity_sweep_one(refs, n, refs[i].name, &inputs, &failures);
+    for (p = 0; p < len; p++) {
+      for (k = 0; alnum[k] != '\0'; k++) {
+        if (alnum[k] != refs[i].name[p]) {
+          snprintf(var, sizeof(var), "%s", refs[i].name);
+          var[p] = alnum[k];
+          entity_sweep_one(refs, n, var, &inputs, &failures);
+        }
+      }
+    }
+    snprintf(var, sizeof(var), "%sx", refs[i].name);
+    entity_sweep_one(refs, n, var, &inputs, &failures);
+    if (len > 1) {
+      snprintf(var, sizeof(var), "%.*s", (int) (len - 1), refs[i].name);
+      entity_sweep_one(refs, n, var, &inputs, &failures);
+    }
+  }
+  freet(refs);
+  printf("entities-sweep: %d names, %d inputs, %d failures\n", (int) n,
+         (int) inputs, (int) failures);
+  return failures == 0 ? 0 : 1;
+}
+
+/* Length of the first well-formed sequence of s (Unicode table 3-7), or 0. */
+static size_t utf8_oracle(const unsigned char *s, size_t n) {
+  unsigned lo = 0x80, hi = 0xbf;
+  size_t len, k;
+
+  if (n == 0)
+    return 0;
+  if (s[0] < 0x80)
+    return 1;
+  if (s[0] >= 0xc2 && s[0] <= 0xdf)
+    len = 2;
+  else if (s[0] >= 0xe0 && s[0] <= 0xef)
+    len = 3;
+  else if (s[0] >= 0xf0 && s[0] <= 0xf4)
+    len = 4;
+  else
+    return 0;
+  if (s[0] == 0xe0)
+    lo = 0xa0;
+  else if (s[0] == 0xed)
+    hi = 0x9f;
+  else if (s[0] == 0xf0)
+    lo = 0x90;
+  else if (s[0] == 0xf4)
+    hi = 0x8f;
+  if (n < len || s[1] < lo || s[1] > hi)
+    return 0;
+  for (k = 2; k < len; k++)
+    if ((s[k] & 0xc0) != 0x80)
+      return 0;
+  return len;
+}
+
+static int utf8_strict_bytes(const unsigned char *x, size_t n) {
+  size_t i, m;
+  hts_UCS4 uc;
+  int whole = 1;
+  const size_t want = utf8_oracle(x, n);
+  const size_t got = hts_readUTF8((const char *) x, n, &uc);
+
+  for (i = 0; i < n && whole; i += m)
+    whole = (m = utf8_oracle(&x[i], n - i)) != 0;
+  if (got != want || (hts_isStringUTF8((const char *) x, n) != 0) != whole) {
+    printf("utf8-strict: %02x.. (%u bytes) read %u, want %u\n", x[0],
+           (unsigned) n, (unsigned) got, (unsigned) want);
+    return 1;
+  }
+  return 0;
+}
+
+/* An escaped, entity or IDNA input must come out as want. */
+static int utf8_strict_pin(const char *what, const char *in, const char *got,
+                           const char *want) {
+  if (strcmp(got != NULL ? got : "(null)", want) != 0) {
+    printf("utf8-strict: %s '%s' gave '%s', want '%s'\n", what, in,
+           got != NULL ? got : "(null)", want);
+    return 1;
+  }
+  return 0;
+}
+
+static int st_utf8_strict(httrackp *opt, int argc, char **argv) {
+  static const unsigned char tails[] = {0x00, 0x41, 0x7f, 0x80, 0x8f, 0x90,
+                                        0x9f, 0xa0, 0xbf, 0xc0, 0xff};
+  static const char *const urls[][2] = {
+      {"/a%C0%AFb", "/a%C0%AFb"},
+      {"/a%ED%A0%80b", "/a%ED%A0%80b"},
+      {"/a%F4%90%80%80b", "/a%F4%90%80%80b"},
+      {"/a%F8%88%80%80%80b", "/a%F8%88%80%80%80b"},
+      {"/a%E2%82%ACb", "/a\xe2\x82\xac"
+                       "b"}};
+  static const char *const ents[][2] = {{"a&#xD800;b", "a&#xD800;b"},
+                                        {"a&#xDFFF;b", "a&#xDFFF;b"},
+                                        {"a&#xE9;b", "a\xc3\xa9"
+                                                     "b"},
+                                        {"a&#x10FFFF;b", "a\xf4\x8f\xbf\xbf"
+                                                         "b"}};
+  static const char *const hosts[][2] = {{"h\xc0\xaf.com", "(null)"},
+                                         {"h\xed\xa0\x80.com", "(null)"},
+                                         {"h\xc3\xa9\xa9.com", "(null)"},
+                                         {"h\xc3\xa9.com", "xn--h-bga.com"}};
+  unsigned char x[4];
+  unsigned a, b, c, d, i;
+  hts_UCS4 cp, *u;
+  size_t n;
+  int fail = 0;
+  char buf[64];
+
+  for (a = 0; a < 256; a++) {
+    x[0] = (unsigned char) a;
+    fail |= utf8_strict_bytes(x, 1);
+    for (b = 0; b < 256; b++) {
+      x[1] = (unsigned char) b;
+      fail |= utf8_strict_bytes(x, 2);
+      for (c = 0; c < 256; c++) {
+        x[2] = (unsigned char) c;
+        fail |= utf8_strict_bytes(x, 3);
+        for (d = 0; a >= 0xf0 && d < sizeof(tails); d++) {
+          x[3] = tails[d];
+          fail |= utf8_strict_bytes(x, 4);
+        }
+      }
+    }
+    if (fail)
+      return 1;
+  }
+  for (cp = 0; cp < 0x110010; cp++) {
+    const hts_boolean ok = cp <= 0x10ffff && (cp < 0xd800 || cp > 0xdfff);
+    hts_UCS4 back = 0;
+
+    n = hts_writeUTF8(cp, buf, sizeof(buf));
+    if ((n != 0) != ok ||
+        (ok && (hts_readUTF8(buf, n, &back) != n || back != cp))) {
+      printf("utf8-strict: U+%X wrote %u bytes\n", (unsigned) cp, (unsigned) n);
+      return 1;
+    }
+  }
+  for (i = 0; i < sizeof(urls) / sizeof(urls[0]); i++) {
+    buf[0] = '\0';
+    (void) hts_unescapeUrl(urls[i][0], buf, sizeof(buf));
+    fail |= utf8_strict_pin("unescape", urls[i][0], buf, urls[i][1]);
+  }
+  for (i = 0; i < sizeof(ents) / sizeof(ents[0]); i++) {
+    buf[0] = '\0';
+    (void) hts_unescapeEntitiesWithCharset(ents[i][0], buf, sizeof(buf),
+                                           "UTF-8");
+    fail |= utf8_strict_pin("entity", ents[i][0], buf, ents[i][1]);
+  }
+  for (i = 0; i < sizeof(hosts) / sizeof(hosts[0]); i++) {
+    char *idna = hts_convertStringUTF8ToIDNA(hosts[i][0], strlen(hosts[i][0]));
+
+    fail |= utf8_strict_pin("idna", hosts[i][0], idna, hosts[i][1]);
+    freet(idna);
+  }
+  /* one U+FFFD per refused byte, and the next character survives */
+  u = hts_convertUTF8StringToUCS4("\xc3"
+                                  "A\xe0\x80"
+                                  "B",
+                                  5, &n);
+  if (u == NULL || n != 5 || u[0] != 0xfffd || u[1] != 'A' || u[2] != 0xfffd ||
+      u[3] != 0xfffd || u[4] != 'B') {
+    printf("utf8-strict: UCS4 of C3 41 E0 80 42 gave %u characters\n",
+           (unsigned) n);
+    fail = 1;
+  }
+  freet(u);
+  {
+    static const hts_UCS4 bad[] = {'a', 0xd800, 'b', 0x110000, 'c'};
+    char *s = hts_convertUCS4StringToUTF8(bad, 5);
+
+    fail |= utf8_strict_pin("UCS4", "a D800 b 110000 c", s,
+                            "a\xef\xbf\xbd"
+                            "b\xef\xbf\xbd"
+                            "c");
+    freet(s);
+  }
+  if (fail)
+    return 1;
+  printf("utf8-strict self-test OK\n");
+  return 0;
+}
+
 /* The unescapers must reserve one byte for the trailing NUL: a 'max'-byte
    dest holding 'max' output chars pre-fix wrote dest[max] (1-byte OOB, caught
    by ASan). Both unescapeEntities and unescapeUrl share the guard. */
 static int st_unescape_bounds(httrackp *opt, int argc, char **argv) {
   char dest[4];
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   assertf(hts_unescapeEntities("abcd", dest, sizeof(dest)) == -1);
   assertf(hts_unescapeUrl("abcd", dest, sizeof(dest)) == -1);
   assertf(hts_unescapeEntities("abc", dest, sizeof(dest)) == 0);
@@ -372,9 +633,6 @@ static int st_unescape_form(httrackp *opt, int argc, char **argv) {
 
   size_t i;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
     String out = STRING_EMPTY;
     const char *got;
@@ -410,9 +668,6 @@ static int st_escape_append_room(httrackp *opt, int argc, char **argv) {
   char buf[64];
   size_t room;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   for (room = 1; room <= 2 * sizeof(void *); room++) {
     const size_t used = sizeof(buf) - room;
     size_t ret;
@@ -459,7 +714,6 @@ static int st_escape_control(httrackp *opt, int argc, char **argv) {
   char buf[1024];
   size_t k, m;
 
-  (void) opt;
   if (argc > 0) {
     const size_t n = st_decode_body(argv[0], buf, sizeof(buf));
 
@@ -507,10 +761,6 @@ static int st_inplace_escape(httrackp *opt, int argc, char **argv) {
       escape_uri};
   size_t i, f;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
-
   memset(longstr, 'a', sizeof(longstr) - 1);
   for (f = 0; f < sizeof(inplace) / sizeof(inplace[0]); f++) {
     for (i = 0; i < sizeof(samples) / sizeof(samples[0]); i++) {
@@ -535,9 +785,6 @@ static int st_escape_room(httrackp *opt, int argc, char **argv) {
   char *src = malloct(N + 1);
   char *dst;
   size_t room, got;
-  (void) opt;
-  (void) argc;
-  (void) argv;
 
   /* _full worst case: a high byte expands to "&#xHH;" (6 bytes) */
   memset(src, 0xE9, N);
@@ -589,9 +836,6 @@ static int st_unescape_plus(httrackp *opt, int argc, char **argv) {
 
   size_t i;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
     char dst[64];
 
@@ -621,7 +865,15 @@ const struct selftest_entry selftests_charset[] = {
      st_idna_encode},
     {"idna-decode", "<host>", "decode an IDNA/punycode hostname",
      st_idna_decode},
+    {"host-ascii", "", "hts_host_to_ascii() converts, bounds and refuses",
+     st_host_ascii},
     {"entities", "<string> [encoding]", "unescape HTML entities", st_entities},
+    {"entities-sweep", "<file>",
+     "decode each 'name cp' line of <file> and its one-byte misses",
+     st_entities_sweep},
+    {"utf8-strict", "",
+     "every UTF-8 reader and writer refuses overlongs and surrogates",
+     st_utf8_strict},
     {"unescape-bounds", "", "unescapers reserve the NUL byte (no 1-byte OOB)",
      st_unescape_bounds},
     {"unescape-plus", "",

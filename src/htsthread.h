@@ -39,9 +39,6 @@ Please visit our Website: http://www.httrack.com
 #include <pthread.h>
 #endif
 #include "htswin32.h"
-#ifndef USE_BEGINTHREAD
-#error needs USE_BEGINTHREAD
-#endif
 
 #ifdef _WIN32
 struct htsmutex_s {
@@ -84,6 +81,16 @@ static HTS_INLINE HTS_UNUSED int hts_increment_int(volatile int *dst) {
   return (int) InterlockedIncrement((volatile LONG *) dst);
 #else
   return __atomic_add_fetch(dst, 1, __ATOMIC_RELAXED);
+#endif
+}
+
+/* Add delta to a counter other threads also update, and return its new value.
+ */
+static HTS_INLINE HTS_UNUSED int hts_add_int(volatile int *dst, int delta) {
+#ifdef _MSC_VER
+  return (int) InterlockedExchangeAdd((volatile LONG *) dst, delta) + delta;
+#else
+  return __atomic_add_fetch(dst, delta, __ATOMIC_RELAXED);
 #endif
 }
 
@@ -160,6 +167,8 @@ void hts_worker_fault_clear(void);
 /* Thread initialization */
 void htsthread_init(void);
 void htsthread_uninit(void);
+/* Does the thread-count lock exist? It is built on first use. */
+hts_boolean htsthread_lock_live(void);
 #endif
 
 #endif
