@@ -60,6 +60,7 @@ Please visit our Website: http://www.httrack.com
 
 // parser
 #include "htsparse.h"
+#include "htsmirror.h"
 #include "htssinglefile.h"
 #include "htsback.h"
 #include "htsfetch.h"

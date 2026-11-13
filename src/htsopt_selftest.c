@@ -32,6 +32,7 @@ Please visit our Website: http://www.httrack.com
 /* ------------------------------------------------------------ */
 
 #include "htsselftest_int.h"
+#include "htsmirror.h"
 #include <limits.h>
 #include <stdint.h>
 

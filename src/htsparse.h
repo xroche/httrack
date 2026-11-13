@@ -215,15 +215,6 @@ const char *hts_dirty_attr_name(const char *quote, const char *tag_start,
                                 const char **nend);
 
 /*
-  Check for 301,302.. errors ("moved") and handle them; re-isuue requests, make
-  rediretc file, handle filters considerations..
-  Parameters: The public module structure, and the private module variables
-  Returns 0 upon success
-*/
-int hts_mirror_check_moved(htsmoduleStruct * str,
-                           htsmoduleStructExtended * stre);
-
-/*
   Non-zero if a redirect (cur_adr,cur_fil)->(moved_adr,moved_fil) saves to the
   same local file, so it must be followed rather than turned into a
   self-pointing "moved" stub (#159). Mirrors the savename: scheme+userinfo
@@ -263,39 +254,6 @@ hts_boolean hts_postprocess_reply_ok(const char *html, int len,
   from the parser and the mirror loop.
 */
 void maxlinks_give_up(httrackp *opt, volatile int *exit_xh);
-
-/*
-  Take the pending request NAME (HTS_ABORT_LOCKNAME or HTS_PAUSE_LOCKNAME) in
-  the output directory, deleting the file, and answer whether the mirror must
-  act on it. True only for a request newer than this run's own
-  hts-in_progress.lock and deletable, so neither one inherited from an earlier
-  run nor one the engine cannot remove ever reaches the mirror.
-*/
-hts_boolean hts_take_lock_request(httrackp *opt, const char *name);
-
-/*
-  Process user intercations: pause, add link, delete link..
-*/
-void hts_mirror_process_user_interaction(htsmoduleStruct * str,
-                                         htsmoduleStructExtended * stre);
-
-/*
-  Get the next file on the queue, waiting for it, handling other files in background..
-  Parameters: The public module structure, and the private module variables
-  Returns 0 upon success
-*/
-int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
-                                  htsmoduleStructExtended * stre);
-
-/*
-  Wait for (adr, fil, save) to be started, that is, 
-  to be ready for naming, having its header MIME type
-  If the final URL is to be forbidden, sets 'forbidden_url' to the corresponding value
-*/
-/* When fetch is not NULL, each redirect hop followed is merged into it. */
-int hts_wait_delayed(htsmoduleStruct *str, lien_adrfilsave *afs,
-                     char *parent_adr, char *parent_fil, lien_adrfil *former,
-                     int *forbidden_url, hts_fetch_meta *fetch);
 
 /* Context state */
 

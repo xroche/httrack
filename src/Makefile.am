@@ -96,7 +96,7 @@ libhttrack_la_SOURCES =  htscore.c htsusercmd.c htsmhtml.c htsparse.c htsmirror.
 	hts-indextmpl.h htsalias.h htsback.h htsbase.h htssafe.h htsdate.h \
 	htsbasenet.h htsbauth.h htscookiefile.h htsbundle.h htscache.h htscachecodec.h htscookie_selftest.h \
 	htsselftest.h htsselftest_int.h htsselftest_util.h htscatchurl.h  \
-	htscmdline.h htsconfig.h htscore.h htsparse.h htscoremain.h htsdefines.h  \
+	htscmdline.h htsconfig.h htscore.h htsparse.h htsmirror.h htscoremain.h htsdefines.h  \
 	htsfilters.h htsftp.h htsglobal.h htshash.h coucal/coucal.h \
 	htshelp.h htsindex.h htsio.h htslib.h htslines.h htsurlport.h htsmd5.h \
 	htsmodules.h htsname.h htsnet.h htsshared.h htssniff.h \
