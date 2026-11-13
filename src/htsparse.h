@@ -172,6 +172,12 @@ typedef struct hts_attr {
   hts_attr_kind kind;
 } hts_attr;
 
+/* Attribute names that never hold a link, ending with "". */
+extern const char *hts_nodetect[];
+
+/* Top-level MIME types, ending with "". */
+extern const char *hts_main_mime[];
+
 /* The known attributes, ending with a NULL name. */
 extern const hts_attr hts_attrs[];
 

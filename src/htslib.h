@@ -758,10 +758,6 @@ LLint fsize_utf8(const char *s);
 extern int _DEBUG_HEAD;
 extern FILE *ioinfo;
 
-/* constantes */
-extern const char *hts_main_mime[];
-extern const char *hts_nodetect[];
-
 // htsmodule.c definitions
 extern void *openFunctionLib(const char *file_);
 extern void *getFunctionPtr(void *handle, const char *fncname);
