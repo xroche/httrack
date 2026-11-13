@@ -5965,20 +5965,18 @@ void *hts_get_callback(t_hts_htmlcheck_callbacks *callbacks, const char *name) {
 /* libc stubs */
 
 HTSEXT_API char *hts_strdup(const char *str) {
-  return strdup(str);
+  return strdup(str); /* libc on purpose */
 }
 
 HTSEXT_API void *hts_malloc(size_t size) {
-  return malloc(size);
+  return malloc(size); /* libc on purpose */
 }
 
 HTSEXT_API void *hts_realloc(void *const data, const size_t size) {
-  return realloc(data, size);
+  return realloc(data, size); /* libc on purpose */
 }
 
-HTSEXT_API void hts_free(void *data) {
-  free(data);
-}
+HTSEXT_API void hts_free(void *data) { free(data); /* libc on purpose */ }
 
 /* Dummy functions */
 HTSEXT_API int hts_resetvar(void) {
