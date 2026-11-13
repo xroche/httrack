@@ -421,51 +421,54 @@ void hts_finish_makeindex(httrackp *opt, int *makeindex_done,
   *makeindex_done = 1;
 }
 
+/* Write len bytes of buf to fp, then close it. On failure errno says why. */
+static hts_boolean hts_write_and_close(FILE *fp, const char *buf, size_t len) {
+  hts_boolean written = len == 0 || hts_fwrite_exact(buf, len, fp);
+  int last_errno = written ? 0 : errno;
+
+  /* a body small enough to sit in stdio's buffer only fails at fclose */
+  if (fclose(fp) != 0) {
+    written = HTS_FALSE;
+    last_errno = errno;
+  }
+  if (!written)
+    errno = last_errno;
+  return written;
+}
+
 /* Flush the parsed HTML output buffer to disk. */
 void hts_finish_html_file(httrackp *opt, cache_back *cache, htsblk *r,
                           FILE **fp, const char *ht_buff, size_t ht_len,
                           const char *adr, const char *fil, const char *save) {
-  {
-    file_notify(opt, adr, fil, save, 1, 1, r->notmodified);
-    hts_changes_html(opt, cache, r, adr, fil, save);
-    *fp = filecreate(&opt->state.strc, save);
-    if (*fp) {
-      hts_boolean written =
-          ht_len == 0 || hts_fwrite_exact(ht_buff, (size_t) ht_len, *fp);
-      int last_errno = written ? 0 : errno;
+  file_notify(opt, adr, fil, save, 1, 1, r->notmodified);
+  hts_changes_html(opt, cache, r, adr, fil, save);
+  *fp = filecreate(&opt->state.strc, save);
+  if (*fp) {
+    const hts_boolean written = hts_write_and_close(*fp, ht_buff, ht_len);
 
-      /* a page small enough to sit in stdio's buffer only fails at fclose */
-      if (fclose(*fp) != 0) {
-        written = HTS_FALSE;
-        last_errno = errno;
-      }
-      if (!written) {
-        int fcheck;
+    *fp = NULL;
+    if (!written) {
+      const int fcheck = check_fatal_io_errno();
 
-        errno = last_errno; /* fclose() clobbered it */
-        fcheck = check_fatal_io_errno();
-
+      if (fcheck)
+        hts_store_release_int(&opt->state.exit_xh, -1);
+      if (opt->log) {
+        hts_log_print(opt, LOG_ERROR | LOG_ERRNO,
+                      "Unable to write HTML file %s", save);
         if (fcheck)
-          hts_store_release_int(&opt->state.exit_xh, -1);
-        if (opt->log) {
-          hts_log_print(opt, LOG_ERROR | LOG_ERRNO,
-                        "Unable to write HTML file %s", save);
-          if (fcheck)
-            hts_log_print(opt, LOG_ERROR, "* * Fatal write error, giving up");
-        }
+          hts_log_print(opt, LOG_ERROR, "* * Fatal write error, giving up");
       }
-      *fp = NULL;
-      if (strnotempty(r->lastmodified))
-        set_filetime_rfc822(save, r->lastmodified);
-    } else {
-      int fcheck = check_fatal_io_errno();
-
-      if (fcheck)
-        hts_io_fatal_abort(opt);
-      hts_log_print(opt, LOG_ERROR | LOG_ERRNO, "Unable to save file %s", save);
-      if (fcheck)
-        hts_log_print(opt, LOG_ERROR, "* * Fatal write error, giving up");
     }
+    if (strnotempty(r->lastmodified))
+      set_filetime_rfc822(save, r->lastmodified);
+  } else {
+    int fcheck = check_fatal_io_errno();
+
+    if (fcheck)
+      hts_io_fatal_abort(opt);
+    hts_log_print(opt, LOG_ERROR | LOG_ERRNO, "Unable to save file %s", save);
+    if (fcheck)
+      hts_log_print(opt, LOG_ERROR, "* * Fatal write error, giving up");
   }
 }
 
@@ -3045,33 +3048,18 @@ HTSEXT_API int structcheck_utf8(const char *path) {
   return structcheck_impl(path, HTS_TRUE);
 }
 
-// sauver un fichier
+/* Save len bytes of adr as s: 0 on success, -1 with errno set on failure. */
 int filesave(httrackp * opt, const char *adr, int len, const char *s,
              const char *url_adr, const char *url_fil) {
-  FILE *fp;
+  FILE *const fp = filecreate(&opt->state.strc, s);
 
-  // écrire le fichier
-  if ((fp = filecreate(&opt->state.strc, s)) != NULL) {
-    hts_boolean written = (len == 0);
-    int last_errno;
-
-    if (len > 0) {
-      written = hts_fwrite_exact(adr, (size_t) len, fp);
-    }
-    last_errno = written ? 0 : errno;
-    /* stdio may hold the whole body, so a full disk surfaces only here */
-    if (fclose(fp) != 0) {
-      written = HTS_FALSE;
-      last_errno = errno;
-    }
-    if (!written) { // the caller reads errno
-      errno = last_errno;
-      return -1;
-    }
-  } else
+  if (fp == NULL)
     return -1;
-
-  return 0;
+  if (len < 0) {
+    (void) fclose(fp);
+    return -1;
+  }
+  return hts_write_and_close(fp, adr, (size_t) len) ? 0 : -1;
 }
 
 /* We should stop */
@@ -3101,34 +3089,17 @@ void hts_io_fatal_abort(httrackp *opt) {
   hts_store_release_int(&opt->state.exit_xh, -1);
 }
 
-// ouvrir un fichier (avec chemin Un*x)
-/* Note: utf-8 */
+/* Create the UTF-8 '/'-separated file s for writing, and list it in strc. An
+   over-long s fails to open rather than aborting. */
 FILE *filecreate(filenote_strc * strc, const char *s) {
   char BIGSTK fname[HTS_URLMAXSIZE * 2];
   FILE *fp;
   int last_errno = 0;
 
-  fname[0] = '\0';
-
-  // noter lst
   if (strc != NULL) {
     filenote(strc, s, NULL);
   }
-
-  strcpybuff(fname, s);
-#if HTS_DOSNAME
-  // remplacer / par des slash arrière
-  {
-    int i = 0;
-
-    while(fname[i]) {
-      if (fname[i] == '/')
-        fname[i] = '\\';
-      i++;
-    }
-  }
-  // a partir d'ici le slash devient antislash
-#endif
+  fconv(fname, sizeof(fname), s);
 
   /* Try to open the file */
   fp = FOPEN(fname, "wb");
@@ -3154,33 +3125,13 @@ FILE *filecreate(filenote_strc * strc, const char *s) {
   return fp;
 }
 
-// ouvrir un fichier (avec chemin Un*x)
+/* Open the '/'-separated file s for appending, and list it in strc. */
 FILE *fileappend(filenote_strc * strc, const char *s) {
   char BIGSTK fname[HTS_URLMAXSIZE * 2];
   FILE *fp;
 
-  fname[0] = '\0';
-
-  // noter lst
   filenote(strc, s, NULL);
-
-  strcpybuff(fname, s);
-
-#if HTS_DOSNAME
-  // remplacer / par des slash arrière
-  {
-    int i = 0;
-
-    while(fname[i]) {
-      if (fname[i] == '/')
-        fname[i] = '\\';
-      i++;
-    }
-  }
-  // a partir d'ici le slash devient antislash
-#endif
-
-  // ouvrir
+  fconv(fname, sizeof(fname), s);
   fp = FOPEN(fname, "ab");
 
 #ifndef _WIN32

@@ -171,11 +171,14 @@ int st_verdict(const char *label, int err) {
   return err;
 }
 
-// mkdir path, tolerating one that already exists.
+// mkdir path, tolerating one that already exists; a failure keeps its errno.
 hts_boolean st_mkdir_at(const char *path, size_t n, const char *who) {
   if (MKDIR(path) != 0 && errno != EEXIST) {
+    const int err = errno;
+
     fprintf(stderr, "%s: mkdir failed at %u chars: %s\n", who, (unsigned) n,
-            strerror(errno));
+            strerror(err));
+    errno = err;
     return HTS_FALSE;
   }
   return HTS_TRUE;

@@ -1,0 +1,19 @@
+#!/bin/bash
+#
+# concat() and the save-file openers keep a string that exactly fills their
+# buffer, a 2047-byte save path in a 2048-byte name, and refuse a longer one.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+dir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_fullpath.XXXXXX")
+cleanup_push rm -rf "$dir"
+
+too_long="fullpath: concat OK, path too long for this system"
+got=$(httrack -O /dev/null "-#test=fullpath" "$dir") ||
+    fail "-#test=fullpath exited $?, output: $got"
+strip_trailing_eol "$got"
+test "$STRIPPED" != "$too_long" || skip "a 2047-byte path is too long here"
+test "$STRIPPED" = "fullpath: kept a 2047-byte save path, refused 2048: OK" ||
+    fail "-#test=fullpath: got [$STRIPPED]"
