@@ -10,4 +10,10 @@ set -euo pipefail
 dir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_fullpath.XXXXXX")
 cleanup_push rm -rf "$dir"
 
-assert_selftest "fullpath: kept a 2047-byte save path, refused 2048: OK" fullpath "$dir"
+too_long="fullpath: concat OK, path too long for this system"
+got=$(httrack -O /dev/null "-#test=fullpath" "$dir") ||
+    fail "-#test=fullpath exited $?, output: $got"
+strip_trailing_eol "$got"
+test "$STRIPPED" != "$too_long" || skip "a 2047-byte path is too long here"
+test "$STRIPPED" = "fullpath: kept a 2047-byte save path, refused 2048: OK" ||
+    fail "-#test=fullpath: got [$STRIPPED]"

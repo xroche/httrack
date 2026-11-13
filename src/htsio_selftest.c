@@ -1129,16 +1129,16 @@ static int st_filesave(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* Fill path with dir plus '/'-cut runs of 'a' up to len bytes, creating each
-   directory, because structcheck() refuses a path this long. */
-static hts_boolean st_fill_path(char *path, size_t len, const char *dir) {
+/* Fill path with dir plus '/'-cut runs of 'a' to a string of want_len bytes,
+   creating each directory, because structcheck() refuses a path this long. */
+static hts_boolean st_fill_path(char *path, size_t want_len, const char *dir) {
   size_t n = strlen(dir);
   size_t i;
 
-  assertf(n < len - 2);
+  assertf(n < want_len - 2);
   memcpy(path, dir, n);
   /* 200-byte components stay under the 255-byte name limit */
-  for (i = 0; n < len - 1; n++, i++) {
+  for (i = 0; n < want_len - 1; n++, i++) {
     if (i % 200 == 0) {
       path[n] = '\0';
       if (i != 0 && !st_mkdir_at(path, n, "fullpath")) {
@@ -1149,9 +1149,15 @@ static hts_boolean st_fill_path(char *path, size_t len, const char *dir) {
       path[n] = 'a';
     }
   }
-  path[len - 1] = 'b';
-  path[len] = '\0';
+  path[want_len - 1] = 'b';
+  path[want_len] = '\0';
   return HTS_TRUE;
+}
+
+/* The concat() half passed, but this system refuses a 2047-byte path. */
+static int st_fullpath_skip(void) {
+  printf("fullpath: concat OK, path too long for this system\n");
+  return 0;
 }
 
 /* -#test=fullpath <dir>: concat() keeps a string that fills its buffer, and
@@ -1162,6 +1168,7 @@ static int st_fullpath(httrackp *opt, int argc, char **argv) {
   char small[12];
   char path[HTS_URLMAXSIZE * 2 + 1];
   char buf[2 * sizeof(payload)];
+  char canary[13];
   FILE *fp;
 
   assertf(strcmp(concat(small, sizeof(small), "abcdefghijk", NULL),
@@ -1171,11 +1178,19 @@ static int st_fullpath(httrackp *opt, int argc, char **argv) {
   assertf(strcmp(fconv(small, sizeof(small), "abcdefghijk"), "abcdefghijk") ==
           0);
   assertf(concat(small, sizeof(small), "abcdefghijkl", NULL)[0] == '\0');
+  /* a fits and b is one byte over: b is refused, canary[12] stays poisoned */
+  memset(canary, 'X', sizeof(canary));
+  assertf(strcmp(concat(canary, sizeof(canary) - 1, "abcde", "fghijkl"),
+                 "abcde") == 0);
+  assertf(canary[sizeof(canary) - 1] == 'X');
 
-  if (!st_fill_path(path, sizeof(path) - 2, argv[0])) {
-    return 1;
+  if (!st_fill_path(path, HTS_URLMAXSIZE * 2 - 1, argv[0])) {
+    return errno == ENAMETOOLONG ? st_fullpath_skip() : 1;
   }
   fp = filecreate(&opt->state.strc, path);
+  if (fp == NULL && errno == ENAMETOOLONG) {
+    return st_fullpath_skip();
+  }
   if (fp == NULL) {
     fprintf(stderr, "fullpath: create failed: %s\n", strerror(errno));
     return 1;
@@ -1194,7 +1209,7 @@ static int st_fullpath(httrackp *opt, int argc, char **argv) {
   assertf(UNLINK(path) == 0);
   printf("fullpath: kept a %u-byte save path", (unsigned) strlen(path));
 
-  if (!st_fill_path(path, sizeof(path) - 1, argv[0])) {
+  if (!st_fill_path(path, HTS_URLMAXSIZE * 2, argv[0])) {
     return 1;
   }
   assertf(filecreate(&opt->state.strc, path) == NULL);
