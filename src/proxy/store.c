@@ -312,13 +312,14 @@ static int PT_Index_Check__(PT_Index index, const char *file, int line) {
 
 #define SAFE_INDEX(index) PT_Index_Check__(index, __FILE__, __LINE__)
 
-/* The mutex serializing reads of a checked index. */
+/* Return the lock that serializes reads; index must have passed SAFE_INDEX. */
 static PT_Mutex *PT_Index_Lock(PT_Index index) {
   switch (index->type) {
   case PT_CACHE__NEW:
     return &index->slots.formatNew.zFileLock;
   case PT_CACHE__OLD:
     return &index->slots.formatOld.fileLock;
+  case PT_CACHE__ARC:
   default:
     return &index->slots.formatArc.fileLock;
   }
