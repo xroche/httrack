@@ -1106,6 +1106,32 @@ static void PT_resolve_previous_save(char *dst, size_t size, const char *root,
   }
 }
 
+typedef struct index_walk_new {
+  PT_Index__New index;
+  hts_boolean firstSeen;
+} index_walk_new;
+
+static void index_entry_new(void *arg, const char *name, long pos) {
+  index_walk_new *const walk = (index_walk_new *) arg;
+
+  coucal_add(walk->index->hash, name, pos);
+  /* First link as starting URL */
+  if (!walk->firstSeen && strstr(name, "/robots.txt") == NULL) {
+    const char *scheme = hts_shared_link_has_authority(name) ? "" : "http://";
+
+    /* dropped rather than truncated; try the next entry */
+    if (sprintfbuff(walk->index->startUrl, "%s%s", scheme, name))
+      walk->firstSeen = HTS_TRUE;
+    else
+      walk->index->startUrl[0] = '\0';
+  }
+}
+
+static void index_bad_new(void *arg, const char *what, int entry) {
+  (void) arg;
+  fprintf(stderr, "%s #%d" LF, what, entry);
+}
+
 int PT_LoadCache__New(PT_Index index_, const char *filename) {
   if (index_ != NULL && filename != NULL) {
     PT_Index__New index = &index_->slots.formatNew;
@@ -1116,97 +1142,16 @@ int PT_LoadCache__New(PT_Index index_, const char *filename) {
 
     // Opened ?
     if (zFile != NULL) {
-      coucal hashtable = index->hash;
+      index_walk_new walk;
+      int entries;
 
+      walk.index = index;
+      walk.firstSeen = HTS_FALSE;
       index_base_path(index->path, sizeof(index->path), filename);
 
       /* Ready directory entries */
-      if (unzGoToFirstFile(zFile) == Z_OK) {
-        char comment[128];
-        char filename[CACHE_ENTRYNAME_SIZE];
-        unz_file_info zfi;
-        int entries = 0;
-        int firstSeen = 0;
-
-        memset(comment, 0, sizeof(comment));    // for truncated reads
-        do {
-          int readSizeHeader = 0;
-
-          filename[0] = '\0';
-          comment[0] = '\0';
-          memset(&zfi, 0, sizeof(zfi));
-          if (unzOpenCurrentFile(zFile) == Z_OK) {
-            if ((readSizeHeader = unzGetLocalExtrafield(
-                     zFile, comment, sizeof(comment) - 2)) > 0 &&
-                unzGetCurrentFileInfo(zFile, &zfi, filename,
-                                      sizeof(filename) - 2, NULL, 0, NULL,
-                                      0) == Z_OK
-                /* minizip leaves a longer name clipped and unterminated */
-                && zfi.size_filename < sizeof(filename) - 2) {
-              long int pos = (long int) unzGetOffset(zFile);
-
-              assertf((size_t) readSizeHeader < sizeof(comment));
-              comment[readSizeHeader] = '\0';
-              entries++;
-              if (pos > 0) {
-                int dataincache = 0;    // data in cache ?
-                char *filenameIndex = filename;
-
-                if (strfield(filenameIndex, "http://")) {
-                  filenameIndex += 7;
-                }
-                if (comment[0] != '\0') {
-                  int maxLine = 2;
-                  char *a = comment;
-
-                  while(*a && maxLine-- > 0) {  // parse only few first lines
-                    char line[1024];
-
-                    line[0] = '\0';
-                    a += binput(a, line, sizeof(line) - 2, NULL);
-                    if (strfield(line, "X-In-Cache:")) {
-                      if (strfield2(line, "X-In-Cache: 1")) {
-                        dataincache = 1;
-                      } else {
-                        dataincache = 0;
-                      }
-                      break;
-                    }
-                  }
-                }
-                if (dataincache)
-                  coucal_add(hashtable, filenameIndex, pos);
-                else
-                  coucal_add(hashtable, filenameIndex, -pos);
-
-                /* First link as starting URL */
-                if (!firstSeen) {
-                  if (strstr(filenameIndex, "/robots.txt") == NULL) {
-                    const char *scheme =
-                        hts_shared_link_has_authority(filenameIndex)
-                            ? ""
-                            : "http://";
-
-                    /* dropped rather than truncated; try the next entry */
-                    if (sprintfbuff(index->startUrl, "%s%s", scheme,
-                                    filenameIndex))
-                      firstSeen = 1;
-                    else
-                      index->startUrl[0] = '\0';
-                  }
-                }
-              } else {
-                fprintf(stderr, "Corrupted cache meta entry #%d" LF,
-                        (int) entries);
-              }
-            } else {
-              fprintf(stderr, "Corrupted cache entry #%d" LF, (int) entries);
-            }
-            unzCloseCurrentFile(zFile);
-          } else {
-            fprintf(stderr, "Corrupted cache entry #%d" LF, (int) entries);
-          }
-        } while(unzGoToNextFile(zFile) == Z_OK);
+      if (hts_cache_walk_index(zFile, index_entry_new, index_bad_new, &walk,
+                               &entries) == Z_OK) {
         return 1;
       } else {
         coucal_delete(&index->hash);
