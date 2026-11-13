@@ -437,12 +437,8 @@ T_SOC smallserver_init(int *port, char *adr, size_t adr_size,
   /* the watchdog thread may be polling it */
   hts_store_release_int(&commandRunning, 0);
   commandEnd = commandReturn = commandReturnSet = commandEndRequested = 0;
-  if (commandReturnMsg)
-    free(commandReturnMsg);
-  commandReturnMsg = NULL;
-  if (commandReturnCmdl)
-    free(commandReturnCmdl);
-  commandReturnCmdl = NULL;
+  freet(commandReturnMsg);
+  freet(commandReturnCmdl);
 
   /* Loopback unless asked otherwise: the handler trusts its client, and every
      request is unauthenticated. --bind widens it deliberately. */
@@ -487,10 +483,11 @@ typedef struct {
   const char *value;
 } initStrElt;
 
-#define SET_ERROR(err) do { \
-  coucal_write(NewLangList, "error", (intptr_t)strdup(err)); \
-  error_redirect = "/server/error.html"; \
-} while(0)
+#define SET_ERROR(err)                                                         \
+  do {                                                                         \
+    coucal_write(NewLangList, "error", (intptr_t) strdupt(err));               \
+    error_redirect = "/server/error.html";                                     \
+  } while (0)
 
 /* Longest error message shown on the error page; the rest is clipped. */
 #define ERROR_MESSAGE_MAX 1024
@@ -1376,7 +1373,7 @@ static void ini_publish_gated_values(void) {
     snprintf(name, sizeof(name), "%s_eff", ini_gated_values[i].value);
     coucal_write(
         NewLangList, name,
-        (intptr_t) strdup(on ? ini_value_of(ini_gated_values[i].value) : ""));
+        (intptr_t) strdupt(on ? ini_value_of(ini_gated_values[i].value) : ""));
   }
 }
 
@@ -1529,14 +1526,14 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
       char tmp[32];
 
       sprintf(tmp, "%d", initInt[i].value);
-      coucal_write(NewLangList, initInt[i].name, (intptr_t) strdup(tmp));
+      coucal_write(NewLangList, initInt[i].name, (intptr_t) strdupt(tmp));
     }
     for(i = 0; initOn[i]; i++) {
-      coucal_write(NewLangList, initOn[i], (intptr_t) strdup("1"));    /* "on" */
+      coucal_write(NewLangList, initOn[i], (intptr_t) strdupt("1")); /* "on" */
     }
     for(i = 0; initStr[i].name; i++) {
       coucal_write(NewLangList, initStr[i].name,
-                    (intptr_t) strdup(initStr[i].value));
+                   (intptr_t) strdupt(initStr[i].value));
     }
     if (!path_from_cmdline) {
       strcpybuff(pth, gethomedir());
@@ -1714,7 +1711,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
           char tmp[32];
 
           sprintf(tmp, "%d", commandReturn);
-          coucal_write(NewLangList, "commandReturn", (intptr_t) strdup(tmp));
+          coucal_write(NewLangList, "commandReturn", (intptr_t) strdupt(tmp));
           /* copies: the table frees its values, the crawl thread the originals
            */
           coucal_write(
@@ -1736,8 +1733,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
         intptr_t adr = 0;
 
         if (coucal_readptr(NewLangList, "_sid", &adr)) {
-          if (coucal_write
-              (NewLangList, "sid", (intptr_t) strdup((char *) adr))) {
+          if (coucal_write(NewLangList, "sid",
+                           (intptr_t) strdupt((char *) adr))) {
           }
         }
       }
@@ -1828,7 +1825,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
             LANG_T(path, n - 1);
             /* make a backup, because the GUI will override it */
             coucal_write(NewLangList, "lang_",
-                          (intptr_t) strdup((char *) adr));
+                         (intptr_t) strdupt((char *) adr));
           }
         }
 
@@ -1846,7 +1843,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
           char *pname = (char *) adr;
 
           if (*pname) {
-            coucal_write(NewLangList, "projname", (intptr_t) strdup(pname));
+            coucal_write(NewLangList, "projname", (intptr_t) strdupt(pname));
           }
           coucal_write(NewLangList, "loadprojname", (intptr_t) NULL);
           doLoad = 1;
@@ -1854,7 +1851,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
           char *pname = (char *) adr;
 
           if (*pname) {
-            coucal_write(NewLangList, "projcateg", (intptr_t) strdup(pname));
+            coucal_write(NewLangList, "projcateg", (intptr_t) strdupt(pname));
           }
           coucal_write(NewLangList, "loadprojcateg", (intptr_t) NULL);
         }
@@ -1863,7 +1860,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
         {
           if (!coucal_read(NewLangList, "conf_file_loaded", NULL)) {
             coucal_write(NewLangList, "conf_file_loaded",
-                          (intptr_t) strdup("true"));
+                         (intptr_t) strdupt("true"));
             doLoad = 2;
           }
         }
@@ -2203,7 +2200,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                 "Content-type: text/html\r\n" SMALLSERVER_NO_CACHE;
 
             /* register current page */
-            coucal_write(NewLangList, "thisfile", (intptr_t) strdup(file));
+            coucal_write(NewLangList, "thisfile", (intptr_t) strdupt(file));
 
             /* Force GET for the last request */
             if (meth == 2 && willexit) {
@@ -2490,7 +2487,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                             *pos3++ = '\0';
                             if (coucal_readptr(NewLangList, pos2, &adr)) {
                               coucal_write(NewLangList, pos3,
-                                            (intptr_t) strdup((char *) adr));
+                                           (intptr_t) strdupt((char *) adr));
                               coucal_write(NewLangList, pos2, (intptr_t) NULL);
                             }
                           }
@@ -2502,7 +2499,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                           if (pos3) {
                             *pos3++ = '\0';
                             coucal_write(NewLangList, pos2,
-                                          (intptr_t) strdup(pos3));
+                                         (intptr_t) strdupt(pos3));
                           } else {
                             coucal_write(NewLangList, pos2, (intptr_t) NULL);
                           }
@@ -2947,12 +2944,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 
   freet(buffer);
 
-  if (commandReturnMsg)
-    free(commandReturnMsg);
-  commandReturnMsg = NULL;
-  if (commandReturnCmdl)
-    free(commandReturnCmdl);
-  commandReturnCmdl = NULL;
+  freet(commandReturnMsg);
+  freet(commandReturnCmdl);
 
   /* Unlock */
   webhttrack_release();
@@ -2983,20 +2976,20 @@ void smallserver_setpinghandler(void (*fun)(void *, smallserver_client_event,
 }
 
 int smallserver_setkey(const char *key, const char *value) {
-  return coucal_write(NewLangList, key, (intptr_t) strdup(value));
+  return coucal_write(NewLangList, key, (intptr_t) strdupt(value));
 }
 
 int smallserver_setkeyint(const char *key, LLint value) {
   char tmp[256];
 
   snprintf(tmp, sizeof(tmp), LLintP, value);
-  return coucal_write(NewLangList, key, (intptr_t) strdup(tmp));
+  return coucal_write(NewLangList, key, (intptr_t) strdupt(tmp));
 }
 int smallserver_setkeyarr(const char *key, int id, const char *key2, const char *value) {
   char tmp[256];
 
   snprintf(tmp, sizeof(tmp), "%s%d%s", key, id, key2);
-  return coucal_write(NewLangList, tmp, (intptr_t) strdup(value));
+  return coucal_write(NewLangList, tmp, (intptr_t) strdupt(value));
 }
 
 /* Read one key and value pair of a lang file into key and value, each of size
@@ -3133,7 +3126,7 @@ static int htslang_load(char *limit_to, size_t limit_size, const char *path) {
 
           if (!strnotempty(test)) { // éviter doublons
             const size_t len = strlen(intkey);
-            char *const buff = (char *) malloc(len + 1);
+            char *const buff = (char *) malloct(len + 1);
 
             if (buff) {
               strlcpybuff(buff, intkey, len + 1);

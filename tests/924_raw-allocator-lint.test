@@ -11,7 +11,7 @@ set -euo pipefail
 
 top="${abs_top_srcdir:-}"
 test -n "$top" || fail "not run under make check"
-files="htscharset.c proxy/*.c proxy/*.h"
+files="htscharset.c htsserver.c htsweb.c proxy/*.c proxy/*.h"
 
 raw() { # raw FILE -> the lines calling a raw libc allocator
     LC_ALL=C grep -nE '(^|[^[:alnum:]_.>])(malloc|calloc|realloc|free|strdup)[[:space:]]*\(' "$1" || true
