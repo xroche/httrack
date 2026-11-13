@@ -1155,11 +1155,12 @@ static hts_boolean st_fill_path(char *path, size_t len, const char *dir) {
 }
 
 /* -#test=fullpath <dir>: concat() keeps a string that fills its buffer, and
-   filecreate()/fileappend() keep a save path that fills theirs. */
+   filecreate()/fileappend() keep a save path that fills theirs and refuse,
+   without aborting, one byte more. */
 static int st_fullpath(httrackp *opt, int argc, char **argv) {
   static const char payload[] = "fullpath";
   char small[12];
-  char path[HTS_URLMAXSIZE * 2];
+  char path[HTS_URLMAXSIZE * 2 + 1];
   char buf[2 * sizeof(payload)];
   FILE *fp;
 
@@ -1171,7 +1172,7 @@ static int st_fullpath(httrackp *opt, int argc, char **argv) {
           0);
   assertf(concat(small, sizeof(small), "abcdefghijkl", NULL)[0] == '\0');
 
-  if (!st_fill_path(path, sizeof(path) - 1, argv[0])) {
+  if (!st_fill_path(path, sizeof(path) - 2, argv[0])) {
     return 1;
   }
   fp = filecreate(&opt->state.strc, path);
@@ -1191,8 +1192,14 @@ static int st_fullpath(httrackp *opt, int argc, char **argv) {
   fclose(fp);
   assertf(memcmp(buf, "fullpathfullpath", 2 * (sizeof(payload) - 1)) == 0);
   assertf(UNLINK(path) == 0);
+  printf("fullpath: kept a %u-byte save path", (unsigned) strlen(path));
 
-  printf("fullpath: kept a %u-byte save path: OK\n", (unsigned) strlen(path));
+  if (!st_fill_path(path, sizeof(path) - 1, argv[0])) {
+    return 1;
+  }
+  assertf(filecreate(&opt->state.strc, path) == NULL);
+  assertf(fileappend(&opt->state.strc, path) == NULL);
+  printf(", refused %u: OK\n", (unsigned) strlen(path));
   return 0;
 }
 

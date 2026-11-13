@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # concat() and the save-file openers keep a string that exactly fills their
-# buffer: a 2047-byte save path in a 2048-byte name.
+# buffer, a 2047-byte save path in a 2048-byte name, and refuse a longer one.
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
@@ -10,4 +10,4 @@ set -euo pipefail
 dir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_fullpath.XXXXXX")
 cleanup_push rm -rf "$dir"
 
-assert_selftest "fullpath: kept a 2047-byte save path: OK" fullpath "$dir"
+assert_selftest "fullpath: kept a 2047-byte save path, refused 2048: OK" fullpath "$dir"
