@@ -536,15 +536,15 @@ jobs:
           set -euo pipefail
           sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
           sudo apt-get install -y --no-install-recommends \
-            build-essential clang lld llvm libc++-dev libc++abi-dev autoconf automake \
-            libtool autoconf-archive zlib1g-dev zip unzip
+            build-essential clang lld llvm autoconf automake libtool \
+            autoconf-archive zlib1g-dev zip unzip
 
       - name: Build
         env:
           CC: clang
           CXX: clang++
           CFLAGS: -O1 -fno-omit-frame-pointer -gline-tables-only -fsanitize=address -fsanitize=fuzzer-no-link
-          CXXFLAGS: -O1 -fno-omit-frame-pointer -gline-tables-only -fsanitize=address -fsanitize=fuzzer-no-link -stdlib=libc++
+          CXXFLAGS: -O1 -fno-omit-frame-pointer -gline-tables-only -fsanitize=address -fsanitize=fuzzer-no-link
           LIB_FUZZING_ENGINE: -fsanitize=fuzzer
         run: |
           set -euo pipefail
