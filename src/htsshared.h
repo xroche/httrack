@@ -35,6 +35,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsglobal.h"
 #include "htsbasenet.h"
+#include "htsnet.h"
 
 #include <stdio.h>
 #include <time.h>
@@ -67,5 +68,9 @@ hts_boolean hts_shared_readable(T_SOC soc, time_t deadline);
    *cut, so its tail is never read as a line of its own. */
 int hts_shared_linputsoc(T_SOC soc, char *s, int max, time_t deadline,
                          hts_boolean *cut);
+
+/* Store the first address of hostname in *server. Return HTS_FALSE when
+   hostname is NULL, empty or does not resolve. */
+hts_boolean hts_shared_gethost(const char *hostname, SOCaddr *server);
 
 #endif

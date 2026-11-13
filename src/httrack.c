@@ -252,22 +252,8 @@ int main(int argc, char **argv) {
 #ifdef _WIN32
   hts_binary_stdio();
   hts_argv_utf8(&argc, &argv);
-  {
-    WORD wVersionRequested;     // requested version WinSock API
-    WSADATA wsadata;            // Windows Sockets API data
-    int stat;
-
-    wVersionRequested = 0x0101;
-    stat = WSAStartup(wVersionRequested, &wsadata);
-    if (stat != 0) {
-      printf("Winsock not found!\n");
-      return;
-    } else if (LOBYTE(wsadata.wVersion) != 1 && HIBYTE(wsadata.wVersion) != 1) {
-      printf("WINSOCK.DLL does not support version 1.1\n");
-      WSACleanup();
-      return;
-    }
-  }
+  if (!hts_winsock_start())
+    return 1;
 #endif
 
   signal_handlers();

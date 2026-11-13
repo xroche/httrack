@@ -33,6 +33,8 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsnet.h"
 
+#include <stdio.h>
+
 HTSNET_API void SOCaddr_inetntoa_(char *namebuf, size_t namebuflen,
                                   SOCaddr *const ss, const char *file,
                                   const int line) {
@@ -68,3 +70,20 @@ HTSNET_API hts_boolean SOCaddr_inetntoa_port_(char *namebuf, size_t namebuflen,
       namebuf, namebuflen, &used, ":%u",
       (unsigned int) ntohs(*SOCaddr_sinport_(ss, file, line)));
 }
+
+#ifdef _WIN32
+HTSNET_API hts_boolean hts_winsock_start(void) {
+  WSADATA wsadata;
+
+  if (WSAStartup(0x0101, &wsadata) != 0) {
+    fprintf(stderr, "Winsock not found!\n");
+    return HTS_FALSE;
+  }
+  if (LOBYTE(wsadata.wVersion) != 1 || HIBYTE(wsadata.wVersion) != 1) {
+    fprintf(stderr, "WINSOCK.DLL does not support version 1.1\n");
+    WSACleanup();
+    return HTS_FALSE;
+  }
+  return HTS_TRUE;
+}
+#endif

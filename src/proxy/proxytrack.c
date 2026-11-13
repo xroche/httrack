@@ -142,6 +142,7 @@ Remark: If no cache newer than the added one is found, all entries can be added 
 
 /* ProxyTrack */
 #include "proxytrack.h"
+#include "htsshared.h"
 
 /* Store manager */
 #include "../minizip/mztools.h"
@@ -184,48 +185,6 @@ static int recv_until(T_SOC soc, char *buf, int len, time_t deadline) {
   return (int) recv(soc, buf, len, 0);
 }
 
-static int gethost(const char *hostname, SOCaddr * server) {
-  if (hostname != NULL && *hostname != '\0') {
-#if HTS_INET6==0
-    /*
-       ipV4 resolver
-     */
-    struct hostent *hp = gethostbyname(hostname);
-
-    if (hp != NULL) {
-      if (hp->h_length) {
-        SOCaddr_copyaddr2(*server, hp->h_addr_list[0], hp->h_length);
-        return 1;
-      }
-    }
-#else
-    /*
-       ipV6 resolver
-     */
-    struct addrinfo *res = NULL;
-    struct addrinfo hints;
-
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family = PF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_protocol = IPPROTO_TCP;
-    if (getaddrinfo(hostname, NULL, &hints, &res) == 0) {
-      if (res) {
-        if ((res->ai_addr) && (res->ai_addrlen)) {
-          SOCaddr_copyaddr2(*server, res->ai_addr, res->ai_addrlen);
-          freeaddrinfo(res);
-          return 1;
-        }
-      }
-    }
-    if (res) {
-      freeaddrinfo(res);
-    }
-#endif
-  }
-  return 0;
-}
-
 static String getip(SOCaddr * server) {
   String s = STRING_EMPTY;
   char *dotted = malloct(SOCADDR_INETNTOA_PORT_SIZE);
@@ -259,7 +218,7 @@ static const char *socket_error_string(int err, char *buf, size_t size) {
   return buf;
 }
 
-/* gethost() resolves through getaddrinfo(), which never sets errno. */
+/* hts_shared_gethost() uses getaddrinfo(), which never sets errno. */
 #define SMALLSERVER_ERR_RESOLVE (-1)
 
 /* socktype is SOCK_STREAM or SOCK_DGRAM. On INVALID_SOCKET *lasterr carries the
@@ -269,7 +228,7 @@ static T_SOC smallserver_init(const char *adr, int port, int socktype,
   SOCaddr server;
   SOCaddr_initany(server);
   *lasterr = 0;
-  if (gethost(adr, &server)) {     // host name
+  if (hts_shared_gethost(adr, &server)) { // host name
     T_SOC soc = INVALID_SOCKET;
 
     if ((soc = (T_SOC) socket(SOCaddr_sinfamily(server), socktype, 0)) !=
