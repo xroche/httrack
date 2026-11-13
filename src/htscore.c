@@ -4653,13 +4653,17 @@ int htsAddLink(htsmoduleStruct * str, char *link) {
         a--;
       if (*a == '/')
         *(a + 1) = '\0';        // cut
-    } else {                    // couper http:// éventuel
-      if (strfield(codebase, "http://")) {
-        char BIGSTK tempo[HTS_URLMAXSIZE * 2];
-        char *a = codebase + 7;
+    } else {
+      // keep only the path of an absolute codebase
+      int scheme = strfield(codebase, "http://");
 
-        a = strchr(a, '/');     // après host
-        if (a) {                // ** msg erreur et vérifier?
+      if (scheme == 0)
+        scheme = strfield(codebase, "https://");
+      if (scheme != 0) {
+        char BIGSTK tempo[HTS_URLMAXSIZE * 2];
+        char *a = strchr(codebase + scheme, '/');
+
+        if (a) {
           strcpybuff(tempo, a);
           strcpybuff(codebase, tempo);  // couper host
         } else {
@@ -4669,9 +4673,10 @@ int htsAddLink(htsmoduleStruct * str, char *link) {
       }
     }
 
-    if (!((int) strlen(codebase) < HTS_URLMAXSIZE)) {   // trop long
+    if (strlen(codebase) >= HTS_URLMAXSIZE) {
       hts_log_print(opt, LOG_ERROR, "Codebase too long, parsing skipped (%s)",
                     url_nologin(opt, codebase));
+      return 0;
     }
 
     {

@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# an empty current path underflowed htsAddLink's codebase walk (#730).
+# htsAddLink codebase handling: an empty current path (#730), https://, too long.
 
 set -euo pipefail
 
