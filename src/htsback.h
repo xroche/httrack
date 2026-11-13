@@ -213,4 +213,11 @@ void back_check_worker_fault(httrackp *opt);
 
 #endif
 
+/* True if a connecting slot should give up on the current address and try the
+   next one: a fallback address remains (addr_index+1 < addr_count) and the
+   candidate has been connecting for at least its deadline, min(timeout, an
+   internal cap). elapsed/timeout in seconds. Exposed for the -#D self-test. */
+int back_connect_fallback_due(int addr_index, int addr_count, int elapsed,
+                              int timeout);
+
 #endif

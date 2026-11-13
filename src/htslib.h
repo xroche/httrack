@@ -1027,4 +1027,69 @@ struct dirent *readdir(DIR * dir);
 int closedir(DIR * dir);
 #endif
 
+/* Like fil_normalized(), but first drops query keys in STRIP (comma-separated,
+   "*" = all); STRIP NULL/empty behaves exactly like fil_normalized(). */
+char *fil_normalized_filtered(const char *source, char *dest,
+                              const char *strip);
+
+/* As fil_normalized_filtered(), but DO_SLASH/DO_QUERY gate the // collapse and
+   the query-argument sort independently (the urlhack sub-flags). */
+char *fil_normalized_filtered_ex(const char *source, char *dest,
+                                 const char *strip, int do_slash, int do_query);
+
+/* For URL ADR/FIL, return (in DEST) the comma keylist to strip from the
+   '\n'-separated "[pattern=]keys" RULES (patterns matched on host/path via
+   strjoker, last wins); NULL if none match. Feeds fil_normalized_filtered(). */
+const char *hts_query_strip_keys(const char *rules, const char *adr,
+                                 const char *fil, char *dest, size_t destsize);
+
+/* Is the key ARG[0..KEYLEN) in the comma list STRIP? Tokens are space-trimmed
+   and case-sensitive, and "*" matches any key. */
+hts_boolean hts_query_key_stripped(const char *arg, size_t keylen,
+                                   const char *strip);
+
+/* Return the canonical host (length *CANONLEN) of the last RULES entry whose
+   aliases match HOST or FULL ("scheme://host"), or NULL. COLLAPSE_WWW ignores
+   a "www." prefix on both sides. */
+const char *hts_host_alias_match(const char *rules, const char *host,
+                                 const char *full, hts_boolean collapse_www,
+                                 size_t *canonlen);
+
+/* The --host-alias rules of OPT, or NULL when the option was not given. */
+const char *hts_host_alias_rules(httrackp *opt);
+
+/* ADR with its host replaced by the canonical one, from the '\n'-separated
+   "alias[,alias...]=canonical" RULES (aliases matched with strjoker, last
+   wins). NOWWW matches the host with its www. prefix collapsed, as -%u keys it.
+   Chains are followed to their end, so the result is a fixpoint. Scheme and
+   credentials are kept. NULL when no rule applies, the mapping is a no-op, the
+   rules loop, or the result would not fit DEST. */
+const char *hts_host_alias(const char *rules, const char *adr,
+                           hts_boolean collapse_www, char *dest,
+                           size_t destsize);
+
+/* Resolve like hts_host_alias, and set *SETTLED, when SETTLED is not NULL, to
+   whether the chain ended within the hop limit. Exposed for the -#test=spandiff
+   test. */
+const char *hts_host_alias_resolve(const char *rules, const char *adr,
+                                   hts_boolean collapse_www, char *dest,
+                                   size_t destsize, hts_boolean *settled);
+
+/* HTS_TRUE when OPT's url hacks collapse www.host onto host. */
+hts_boolean hts_host_alias_collapse_www(httrackp *opt);
+
+/* Rewrite AF's host to its --host-alias canonical form, in place, and return
+   it. Idempotent; returns af->adr unchanged when no rule applies. */
+const char *hts_host_alias_fold(httrackp *opt, lien_adrfil *af);
+
+/* HTS_TRUE if ADRA and ADRB name the same host once RULES are applied. */
+hts_boolean hts_host_same_alias(const char *rules, const char *adra,
+                                const char *adrb, hts_boolean collapse_www);
+
+/* First canonical host in RULES whose chain never ends ("a=b" plus "b=a"),
+   copied into DEST, or NULL if every chain settles. Those hosts are left
+   unaliased, so the engine reports them rather than picking a hop. */
+const char *hts_host_alias_looping(const char *rules, hts_boolean collapse_www,
+                                   char *dest, size_t destsize);
+
 #endif
