@@ -25,8 +25,8 @@ would dishonor our work and waste the many hours we have spent on it.
 Please visit our Website: http://www.httrack.com
 */
 /* ------------------------------------------------------------ */
-/* File: file and URL helpers that htsserver and proxytrack     */
-/*       compile in, because libhttrack does not export them    */
+/* File: file, URL and socket helpers that htsserver,          */
+/*       proxytrack and libhttrack each compile in, unexported  */
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 

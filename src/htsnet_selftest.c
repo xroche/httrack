@@ -703,7 +703,10 @@ static int st_ftp_datasocket(httrackp *opt, int argc, char **argv) {
   assertf(getsockname(srv, &SOCaddr_sockaddr(bound), &len) == 0);
   port = ntohs(SOCaddr_sinport(bound));
   assertf(port != 0);
-  SOCaddr_inetntoa(dot, sizeof(dot), bound);
+  /* the listener sits on the resolved address, which PORT/EPRT then names */
+  SOCaddr_inetntoa(dot, sizeof(dot), addr);
+  SOCaddr_inetntoa(want, sizeof(want), bound);
+  assertf(strcmp(dot, want) == 0);
 #if HTS_INET6 == 0
   {
     char *p;
