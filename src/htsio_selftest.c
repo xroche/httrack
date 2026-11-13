@@ -1207,7 +1207,8 @@ static int st_fullpath(httrackp *opt, int argc, char **argv) {
   assertf(canary[sizeof(canary) - 1] == 'X');
 
   if (!st_fill_path(path, HTS_URLMAXSIZE * 2 - 1, argv[0])) {
-    return errno == ENAMETOOLONG ? st_fullpath_skip() : 1;
+    /* GNU/Hurd reports ENOENT for a path past its 1024-byte lookup string */
+    return errno == ENAMETOOLONG || errno == ENOENT ? st_fullpath_skip() : 1;
   }
   fp = filecreate(&opt->state.strc, path);
   if (fp == NULL && errno == ENAMETOOLONG) {
