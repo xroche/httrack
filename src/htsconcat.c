@@ -37,8 +37,8 @@ Please visit our Website: http://www.httrack.com
 #include "htssafe.h"
 #include "httrack-library.h"
 
-// concat, concatène deux chaines et renvoi le résultat
-// permet d'alléger grandement le code
+/* Concatenate a and b into catbuff; an overflow stops before the part that
+   does not fit. */
 #undef concat
 HTSEXT_API char *concat(char *catbuff, size_t size, const char *a, const char *b) {
   size_t max = 0;
@@ -48,14 +48,14 @@ HTSEXT_API char *concat(char *catbuff, size_t size, const char *a, const char *b
   catbuff[0] = '\0';
   if (a != NULL && a[0] != '\0') {
     max += strlen(a);
-    if (max + 1 >= size) {
+    if (max >= size) {
       return catbuff;
     }
     strcat(catbuff, a);
   }
   if (b != NULL && b[0] != '\0') {
     max += strlen(b);
-    if (max + 1 >= size) {
+    if (max >= size) {
       return catbuff;
     }
     strcat(catbuff, b);

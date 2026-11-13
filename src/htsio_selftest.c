@@ -1129,6 +1129,73 @@ static int st_filesave(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Fill path with dir plus '/'-cut runs of 'a' up to len bytes, creating each
+   directory, because structcheck() refuses a path this long. */
+static hts_boolean st_fill_path(char *path, size_t len, const char *dir) {
+  size_t n = strlen(dir);
+  size_t i;
+
+  assertf(n < len - 2);
+  memcpy(path, dir, n);
+  /* 200-byte components stay under the 255-byte name limit */
+  for (i = 0; n < len - 1; n++, i++) {
+    if (i % 200 == 0) {
+      path[n] = '\0';
+      if (i != 0 && !st_mkdir_at(path, n, "fullpath")) {
+        return HTS_FALSE;
+      }
+      path[n] = '/';
+    } else {
+      path[n] = 'a';
+    }
+  }
+  path[len - 1] = 'b';
+  path[len] = '\0';
+  return HTS_TRUE;
+}
+
+/* -#test=fullpath <dir>: concat() keeps a string that fills its buffer, and
+   filecreate()/fileappend() keep a save path that fills theirs. */
+static int st_fullpath(httrackp *opt, int argc, char **argv) {
+  static const char payload[] = "fullpath";
+  char small[12];
+  char path[HTS_URLMAXSIZE * 2];
+  char buf[2 * sizeof(payload)];
+  FILE *fp;
+
+  assertf(strcmp(concat(small, sizeof(small), "abcdefghijk", NULL),
+                 "abcdefghijk") == 0);
+  assertf(strcmp(concat(small, sizeof(small), "abcde", "fghijk"),
+                 "abcdefghijk") == 0);
+  assertf(strcmp(fconv(small, sizeof(small), "abcdefghijk"), "abcdefghijk") ==
+          0);
+  assertf(concat(small, sizeof(small), "abcdefghijkl", NULL)[0] == '\0');
+
+  if (!st_fill_path(path, sizeof(path) - 1, argv[0])) {
+    return 1;
+  }
+  fp = filecreate(&opt->state.strc, path);
+  if (fp == NULL) {
+    fprintf(stderr, "fullpath: create failed: %s\n", strerror(errno));
+    return 1;
+  }
+  assertf(hts_fwrite_exact(payload, sizeof(payload) - 1, fp));
+  fclose(fp);
+  fp = fileappend(&opt->state.strc, path);
+  assertf(fp != NULL);
+  assertf(hts_fwrite_exact(payload, sizeof(payload) - 1, fp));
+  fclose(fp);
+  fp = FOPEN(path, "rb");
+  assertf(fp != NULL);
+  assertf(fread(buf, 1, sizeof(buf), fp) == 2 * (sizeof(payload) - 1));
+  fclose(fp);
+  assertf(memcmp(buf, "fullpathfullpath", 2 * (sizeof(payload) - 1)) == 0);
+  assertf(UNLINK(path) == 0);
+
+  printf("fullpath: kept a %u-byte save path: OK\n", (unsigned) strlen(path));
+  return 0;
+}
+
 // -#test=longpath <dir>: round-trip a >MAX_PATH (260) file through the file
 // wrappers, exercising hts_pathToUCS2's \\?\ prefixing on Windows (#133).
 static int st_longpath(httrackp *opt, int argc, char **argv) {
@@ -1859,6 +1926,9 @@ const struct selftest_entry selftests_io[] = {
      st_makeindex},
     {"filesave", "<doomed-save> <control-save>",
      "filesave() reports a failing close, errno intact", st_filesave},
+    {"fullpath", "<dir>",
+     "concat() and filecreate() keep a string that fills the buffer",
+     st_fullpath},
     {"topindex", "[dir]",
      "hts_buildtopindex charset handling of a non-ASCII project dir",
      st_topindex},
