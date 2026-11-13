@@ -2917,49 +2917,45 @@ TStamp mtime_monotonic(void) {
 #endif
 }
 
-// convertit un nombre de secondes en temps (chaine)
-void sec2str(char *st, TStamp t) {
-  int j, h, m, s;
+/* Writes t seconds as days, hours, minutes and seconds, dropping the empty
+   leading units. The caller's buffer holds 256 bytes. */
+static void duration_str(char *st, TStamp t, hts_boolean quick) {
+  const int j = (int) (t / (3600 * 24));
+  int h, m, s;
 
-  j = (int) (t / (3600 * 24));
   t -= ((TStamp) j) * (3600 * 24);
-  h = (int) (t / (3600));
+  h = (int) (t / 3600);
   t -= ((TStamp) h) * 3600;
   m = (int) (t / 60);
   t -= ((TStamp) m) * 60;
   s = (int) t;
 
-  if (j > 0)
-    sprintf(st, "%d days, %d hours %d minutes %d seconds", j, h, m, s);
-  else if (h > 0)
-    sprintf(st, "%d hours %d minutes %d seconds", h, m, s);
-  else if (m > 0)
-    sprintf(st, "%d minutes %d seconds", m, s);
-  else
-    sprintf(st, "%d seconds", s);
+  if (j > 0) {
+    if (quick == HTS_TRUE)
+      snprintf(st, 256, "%dd,%02dh,%02dmin%02ds", j, h, m, s);
+    else
+      snprintf(st, 256, "%d days, %d hours %d minutes %d seconds", j, h, m, s);
+  } else if (h > 0) {
+    if (quick == HTS_TRUE)
+      snprintf(st, 256, "%dh,%02dmin%02ds", h, m, s);
+    else
+      snprintf(st, 256, "%d hours %d minutes %d seconds", h, m, s);
+  } else if (m > 0) {
+    if (quick == HTS_TRUE)
+      snprintf(st, 256, "%dmin%02ds", m, s);
+    else
+      snprintf(st, 256, "%d minutes %d seconds", m, s);
+  } else {
+    if (quick == HTS_TRUE)
+      snprintf(st, 256, "%ds", s);
+    else
+      snprintf(st, 256, "%d seconds", s);
+  }
 }
 
-// idem, plus court (chaine)
-HTSEXT_API void qsec2str(char *st, TStamp t) {
-  int j, h, m, s;
+void sec2str(char *st, TStamp t) { duration_str(st, t, HTS_FALSE); }
 
-  j = (int) (t / (3600 * 24));
-  t -= ((TStamp) j) * (3600 * 24);
-  h = (int) (t / (3600));
-  t -= ((TStamp) h) * 3600;
-  m = (int) (t / 60);
-  t -= ((TStamp) m) * 60;
-  s = (int) t;
-
-  if (j > 0)
-    sprintf(st, "%dd,%02dh,%02dmin%02ds", j, h, m, s);
-  else if (h > 0)
-    sprintf(st, "%dh,%02dmin%02ds", h, m, s);
-  else if (m > 0)
-    sprintf(st, "%dmin%02ds", m, s);
-  else
-    sprintf(st, "%ds", s);
-}
+HTSEXT_API void qsec2str(char *st, TStamp t) { duration_str(st, t, HTS_TRUE); }
 
 // heure actuelle, GMT, format rfc (taille buffer 256o)
 void time_gmt_rfc822(char *s) {

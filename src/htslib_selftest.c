@@ -42,6 +42,19 @@ Please visit our Website: http://www.httrack.com
 #include <sys/wait.h> /* the forking sigterm self-test reaps its children */
 #endif
 
+/* Prints the long and the short rendering of a duration. */
+static int st_duration(httrackp *opt, int argc, char **argv) {
+  char lng[256], shrt[256];
+
+  (void) opt;
+  if (argc < 1)
+    return 1;
+  sec2str(lng, (TStamp) strtoll(argv[0], NULL, 10));
+  qsec2str(shrt, (TStamp) strtoll(argv[0], NULL, 10));
+  printf("%s|%s\n", lng, shrt);
+  return 0;
+}
+
 /* very minimalistic internal tests */
 static void basic_selftests(void) {
   // BUG 756328
@@ -4334,6 +4347,8 @@ const struct selftest_entry selftests_lib[] = {
     {"hashtable", "<count|file>", "coucal hashtable stress test", st_hashtable},
     {"strsafe", "[overflow|overflow-buff|overflow-src [str]]",
      "bounded string-op self-test", st_strsafe},
+    {"duration", "<seconds>", "a duration as long and as short text",
+     st_duration},
     {"strsprintf", "", "StringSprintf grows to fit at every capacity boundary",
      st_strsprintf},
     {"arena", "", "htsarena.h hands out addresses that never move", st_arena},

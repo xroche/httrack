@@ -1,0 +1,30 @@
+#!/bin/bash
+#
+# sec2str and qsec2str render a duration, padding and unit cut-offs included.
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# Resolve httrack before any cd: PATH may carry a build-relative entry.
+bin=$(command -v httrack) || fail "httrack not found on PATH"
+
+check() {
+    local got
+    got=$("$bin" -#test=duration "$1") || fail "duration $1 exited non-zero"
+    test "$got" = "$2" || fail "duration $1: expected '$2', got '$got'"
+}
+
+check 0 "0 seconds|0s"
+check 59 "59 seconds|59s"
+check 60 "1 minutes 0 seconds|1min00s"
+check 125 "2 minutes 5 seconds|2min05s"
+check 3599 "59 minutes 59 seconds|59min59s"
+check 3600 "1 hours 0 minutes 0 seconds|1h,00min00s"
+check 3725 "1 hours 2 minutes 5 seconds|1h,02min05s"
+check 86399 "23 hours 59 minutes 59 seconds|23h,59min59s"
+check 86400 "1 days, 0 hours 0 minutes 0 seconds|1d,00h,00min00s"
+check 90061 "1 days, 1 hours 1 minutes 1 seconds|1d,01h,01min01s"
+check 1234567 "14 days, 6 hours 56 minutes 7 seconds|14d,06h,56min07s"
+
+exit 0
