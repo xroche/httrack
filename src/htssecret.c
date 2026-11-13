@@ -149,7 +149,7 @@ void hts_secret_add_login(httrackp *opt, const char *url) {
 /* Does a word start at s + i, after the line start, a blank, a quote, '(' or
    '<', or right after "://"? */
 static hts_boolean word_start(const char *s, size_t i) {
-  return i == 0 || strchr(" \t\r\n\"'(<", s[i - 1]) != NULL ||
+  return i == 0 || strchr(HTS_BLANKS "\"'(<", s[i - 1]) != NULL ||
                  (i >= 3 && strncmp(s + i - 3, "://", 3) == 0)
              ? HTS_TRUE
              : HTS_FALSE;
@@ -439,8 +439,8 @@ static size_t mask_passwords(const char *s, char *dst, hts_mask_mode mode) {
   else
     for (; *i != '\0'; i++)
       // a token that is no filter is a start URL
-      if ((i == s || strchr(" \t\r\n", i[-1]) != NULL) &&
-          strchr(" \t\r\n+-", *i) == NULL)
+      if ((i == s || strchr(HTS_BLANKS, i[-1]) != NULL) &&
+          strchr(HTS_BLANKS "+-", *i) == NULL)
         mask_at(&m, i, HTS_TRUE, &i);
   mask_copy(&m, m.p, strlen(m.p) + 1);
   return m.o - 1;
@@ -465,7 +465,7 @@ static size_t secret_name_len(const char *line, size_t len) {
     return header_name_len(line);
   if (memchr(line, ':', len) != NULL)
     return 0;
-  word = strcspn(line, " \t\r\n");
+  word = strcspn(line, HTS_BLANKS);
   for (i = 0; i < sizeof(secret_fields) / sizeof(secret_fields[0]); i++)
     if (header_name_is(line, word, secret_fields[i], strlen(secret_fields[i])))
       return word;

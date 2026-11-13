@@ -1002,10 +1002,10 @@ static hts_boolean cookie_is_flat(FILE *fp, int *quote) {
     if (first && strncmp(p, cookie_bom, sizeof(cookie_bom) - 1) == 0)
       p += sizeof(cookie_bom) - 1;
     first = HTS_FALSE;
-    if (p[strspn(p, " \t\r\n")] == '\0')
+    if (p[strspn(p, HTS_BLANKS)] == '\0')
       continue;
     p += strspn(p, " \t");
-    for (end = strlen(p); end > 0 && strchr(" \t\r\n", p[end - 1]); end--)
+    for (end = strlen(p); end > 0 && strchr(HTS_BLANKS, p[end - 1]); end--)
       ;
     // a browser console shows the string quoted
     if ((p[0] == '\'' || p[0] == '"') && end > 1 && p[end - 1] == p[0])

@@ -89,8 +89,7 @@ void hts_lowcase(char *s) {
   size_t i;
 
   for (i = 0; s[i] != '\0'; i++)
-    if ((s[i] >= 'A') && (s[i] <= 'Z'))
-      s[i] += ('a' - 'A');
+    s[i] = lochar(s[i]);
 }
 
 /* File size, -1 if absent */

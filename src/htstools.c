@@ -222,8 +222,7 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
     char *a = jump_identification(adrfil->adr);
 
     while(*a) {
-      if ((*a >= 'A') && (*a <= 'Z'))
-        *a += 'a' - 'A';
+      *a = lochar(*a);
       a++;
     }
   }
