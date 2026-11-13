@@ -522,6 +522,48 @@ jobs:
       - name: Build
         run: make -j"$(nproc)"
 
+  # Build the way OSS-Fuzz does, so a harness that stops linking reds the PR (#2152).
+  fuzz-oss-fuzz-build:
+    name: fuzz (OSS-Fuzz build script, clang)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
+          sudo apt-get install -y --no-install-recommends \
+            build-essential clang lld llvm autoconf automake libtool \
+            autoconf-archive zlib1g-dev zip unzip
+
+      - name: Build
+        env:
+          CC: clang
+          CXX: clang++
+          CFLAGS: -O1 -fno-omit-frame-pointer -gline-tables-only -fsanitize=address -fsanitize=fuzzer-no-link
+          CXXFLAGS: -O1 -fno-omit-frame-pointer -gline-tables-only -fsanitize=address -fsanitize=fuzzer-no-link
+          LIB_FUZZING_ENGINE: -fsanitize=fuzzer
+        run: |
+          set -euo pipefail
+          export OUT="$RUNNER_TEMP/out"
+          mkdir -p "$OUT"
+          bash fuzz/oss-fuzz-build.sh
+
+      - name: Replay each seed corpus from the output directory
+        env:
+          ASAN_OPTIONS: detect_leaks=1:abort_on_error=1:halt_on_error=1
+        run: |
+          set -euo pipefail
+          for c in fuzz/fuzz-*.c; do
+            f=$(basename "$c" .c)
+            mkdir -p "$RUNNER_TEMP/corpus/$f"
+            unzip -q "$RUNNER_TEMP/out/${f}_seed_corpus.zip" -d "$RUNNER_TEMP/corpus/$f"
+            "$RUNNER_TEMP/out/$f" -runs=0 -timeout=25 "$RUNNER_TEMP/corpus/$f"
+          done
+
   # Optional-dependency build: compile and test with HTTPS/OpenSSL disabled --
   # the configuration users on minimal systems build, and one libssl is not even
   # installed here so configure cannot silently re-enable it. The matrix above
@@ -1034,6 +1076,7 @@ jobs:
       - tsan
       - fuzz
       - fuzz-no-sanitizer
+      - fuzz-oss-fuzz-build
       - no-ssl
       - openssl-no-deprecated
       - no-selftests

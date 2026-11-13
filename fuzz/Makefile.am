@@ -19,8 +19,9 @@ AM_CPPFLAGS = \
 	-I$(top_srcdir)/src/coucal
 
 # Static-link libhttrack.la: the internal symbols are hidden in the .so.
-AM_LDFLAGS = @DEFAULT_LDFLAGS@ -fsanitize=fuzzer -static-libtool-libs
-LDADD = $(top_builddir)/src/libhttrack.la $(THREADS_LIBS)
+# An archive engine (OSS-Fuzz AFL) must follow the objects.
+AM_LDFLAGS = @DEFAULT_LDFLAGS@ -static-libtool-libs
+LDADD = $(top_builddir)/src/libhttrack.la $(FUZZ_ENGINE) $(THREADS_LIBS)
 
 fuzz_charset_SOURCES = fuzz-charset.c fuzz.h
 
@@ -62,7 +63,7 @@ fuzz_savename_SOURCES = fuzz-savename.c fuzz.h
 fuzz_warc_SOURCES = fuzz-warc.c fuzz.h
 
 # Corpus and dictionary lists come from configure: automake does not expand EXTRA_DIST globs.
-EXTRA_DIST = README.md run-fuzzers.sh check-corpus-list.sh ubsan-ignorelist.txt \
+EXTRA_DIST = README.md run-fuzzers.sh check-corpus-list.sh oss-fuzz-build.sh ubsan-ignorelist.txt \
 	generate-extra-seeds.py $(FUZZ_CORPUS_LIST) $(FUZZ_AUX_LIST)
 
 # The cookie jar and basic-auth store: jar files in, credentials scoped out.
