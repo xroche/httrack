@@ -69,7 +69,8 @@ hts_boolean hts_shared_readable(T_SOC soc, time_t deadline);
 int hts_shared_linputsoc(T_SOC soc, char *s, int max, time_t deadline,
                          hts_boolean *cut);
 
-/* Resolve hostname into server, IPv6 included. */
+/* Store the first address of hostname in *server. Return HTS_FALSE when
+   hostname is NULL, empty or does not resolve. */
 hts_boolean hts_shared_gethost(const char *hostname, SOCaddr *server);
 
 #endif
