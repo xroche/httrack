@@ -39,7 +39,6 @@ DEBUG_IF = re.compile(r"\s*#\s*if(def)?\s+(0|\w*DEBUG\w*(\s*==\s*\d+)?)\s*(/[/*]
 ALLOW = {
     "htsback.c: Illegal chunk (%s) for %s%s": "chunk_adr is a chunk size",
     "htsback.c: illegal chunk CRLF (%s) for %s%s": "chunk_adr is a chunk size",
-    "htscore.c: dump 1024 bytes (address %p): ": "a pointer",
     "htscoremain.c: X-Host: %s\\r\\n": "the -#C cache dump lists the entry",
     "htscoremain.c: X-URL: %s\\r\\nX-Cache-Entry-Unreadable: yes\\r\\n\\r\\n": "-#C",
     "htscoremain.c: X-URL: %s\\r\\n": "-#C",

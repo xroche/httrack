@@ -2503,45 +2503,13 @@ void host_ban(httrackp * opt, int ptr,
       }
   }
 
-  // effacer liens
+  // cancel the host's links, whatever their address length
   for (i = 0; i < opt->lien_tot; i++) {
-    // bounded length
-    if (heap(i)) {
-      if (heap(i)->adr) {
-        int l = 0;
-
-        while (l < 1020 && heap(i)->adr[l] != '\0')
-          l++;
-        if ((l > 0) && (l < 1020)) { // in range
-          if (strfield2(jump_identification_const(heap(i)->adr), host)) {    // host
-            hts_log_print(opt, LOG_DEBUG, "Cancel: %s%s",
-                          adr_nologin(opt, heap(i)->adr), heap(i)->fil);
-            hts_invalidate_link(opt, i);  // invalidate hashtable entry
-            // on efface pas le hash, because si on rencontre le lien, reverif sav..
-          }
-        } else {
-          if (opt->log != NULL) {
-            char dmp[1040];
-
-            dmp[0] = '\0';
-            strncatbuff(dmp, heap(i)->adr, 1024);
-            hts_log_print(opt, LOG_WARNING,
-                          "WARNING! HostCancel detected memory leaks [len %d at %d]",
-                          l, i);
-            hts_log_print(opt, LOG_WARNING,
-                          "dump 1024 bytes (address %p): " LF "%s",
-                          heap(i)->adr, dmp);
-          }
-        }
-      } else {
-        hts_log_print(opt, LOG_WARNING,
-                      "WARNING! HostCancel detected memory leaks [adr at %d]",
-                      i);
-      }
-    } else {
-      hts_log_print(opt, LOG_WARNING,
-                    "WARNING! HostCancel detected memory leaks [null at %d]",
-                    i);
+    if (strfield2(jump_identification_const(heap(i)->adr), host)) {
+      hts_log_print(opt, LOG_DEBUG, "Cancel: %s%s",
+                    adr_nologin(opt, heap(i)->adr), heap(i)->fil);
+      // keep the hash entry, so meeting the link again re-checks its save name
+      hts_invalidate_link(opt, i);
     }
   }
 }

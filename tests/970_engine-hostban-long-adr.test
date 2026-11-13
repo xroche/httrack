@@ -1,0 +1,13 @@
+#!/bin/bash
+#
+# host_ban() cancels a banned host's links even when their address is 1020
+# bytes or longer, and leaves other hosts' links alone.
+
+set -eu
+
+out=$(httrack -#test=hostbanlinks)
+
+test "$out" = "hostbanlinks self-test: OK" || {
+    echo "expected 'hostbanlinks self-test: OK', got: $out" >&2
+    exit 1
+}
