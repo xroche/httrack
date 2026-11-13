@@ -31,7 +31,7 @@ test -z "$(raw "$work/member.c")" || fail "the scan flags a member call"
 
 # A tagged call is allowed, an untagged one in the same file is not.
 printf 'void f(void) {\n  free(p); /* libc on purpose */\n  free(q);\n}\n' >"$work/tag.c"
-test "$(raw "$work/tag.c" | wc -l)" = 1 || fail "the libc tag hides an untagged call"
+test "$(raw "$work/tag.c" | wc -l)" -eq 1 || fail "the libc tag hides an untagged call"
 
 checked=0
 for src in "$top"/src/*.c "$top"/src/proxy/*.c "$top"/src/proxy/*.h; do
