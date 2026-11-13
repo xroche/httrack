@@ -522,6 +522,53 @@ jobs:
       - name: Build
         run: make -j"$(nproc)"
 
+  # OSS-Fuzz runs fuzz/oss-fuzz-build.sh; build it here with OSS-Fuzz's libFuzzer
+  # ASan flags, so a harness that stops linking reds the PR, not OSS-Fuzz (#2152).
+  fuzz-oss-fuzz-build:
+    name: fuzz (OSS-Fuzz build script, clang)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
+          sudo apt-get install -y --no-install-recommends \
+            build-essential clang lld llvm autoconf automake libtool autoconf-archive \
+            zlib1g-dev zip unzip
+
+      - name: Build
+        env:
+          CC: clang
+          CXX: clang++
+          CFLAGS: -O1 -fno-omit-frame-pointer -gline-tables-only -fsanitize=address -fsanitize=fuzzer-no-link
+          CXXFLAGS: -O1 -fno-omit-frame-pointer -gline-tables-only -fsanitize=address -fsanitize=fuzzer-no-link
+          LIB_FUZZING_ENGINE: -fsanitize=fuzzer
+        run: |
+          set -euo pipefail
+          export OUT="$RUNNER_TEMP/out"
+          mkdir -p "$OUT"
+          bash fuzz/oss-fuzz-build.sh
+
+      - name: Replay each seed corpus from the output directory
+        run: |
+          set -euo pipefail
+          n=0
+          for b in "$RUNNER_TEMP"/out/fuzz-*; do
+            case "$b" in *.*) continue ;; esac
+            c="$RUNNER_TEMP/corpus/${b##*/}"
+            mkdir -p "$c"
+            unzip -q "${b}_seed_corpus.zip" -d "$c"
+            "$b" -runs=0 -timeout=25 "$c"
+            n=$((n + 1))
+          done
+          harnesses=(fuzz/fuzz-*.c)
+          echo "$n of ${#harnesses[@]} fuzzers replayed"
+          test "$n" -eq "${#harnesses[@]}"
+
   # Optional-dependency build: compile and test with HTTPS/OpenSSL disabled --
   # the configuration users on minimal systems build, and one libssl is not even
   # installed here so configure cannot silently re-enable it. The matrix above
@@ -1034,6 +1081,7 @@ jobs:
       - tsan
       - fuzz
       - fuzz-no-sanitizer
+      - fuzz-oss-fuzz-build
       - no-ssl
       - openssl-no-deprecated
       - no-selftests
