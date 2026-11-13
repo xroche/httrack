@@ -40,6 +40,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsthread.h"
 #include "htscrashtest.h"
 #include "htsencoding.h"
+#include "htsshared.h"
 
 #include <limits.h>
 #include <stdint.h>
@@ -1283,82 +1284,42 @@ done:
   return 0;
 }
 
-// ouverture d'un port
+/* Listen on this host's own address for an active-mode data connection, and
+   write the PORT or EPRT command naming it into to_send. */
 T_SOC get_datasocket(char *to_send, size_t to_send_size) {
   T_SOC soc = INVALID_SOCKET;
   char h_loc[256 + 2];
+  SOCaddr server, server2;
 
   to_send[0] = '\0';
-  if (gethostname(h_loc, 256) == 0) {   // host name
-    SOCaddr server;
+  if (gethostname(h_loc, 256) == 0 &&
+      hts_dns_resolve_nocache(h_loc, &server) != NULL &&
+      (soc = hts_shared_listen(&server, SOCK_STREAM, 1, &server2, NULL)) !=
+          INVALID_SOCKET) {
+    const unsigned int port = ntohs(SOCaddr_sinport(server2));
+    char dot[256 + 2];
 
-    if (hts_dns_resolve_nocache(h_loc, &server) != NULL) {   // notre host
-      if ((soc =
-           (T_SOC) socket(SOCaddr_sinfamily(server), SOCK_STREAM,
-                          0)) != INVALID_SOCKET) {
+    SOCaddr_inetntoa(dot, 256, server2);
+#if HTS_INET6 == 0
+    {
+      const unsigned int n1 = port >> 8, n2 = port & 0xff;
+      char dots[256 + 2];
+      char *a;
 
-        if (bind(soc, &SOCaddr_sockaddr(server), SOCaddr_size(server)) == 0) {
-          SOCaddr server2;
-          SOClen len = SOCaddr_capacity(server2);
-
-          if (getsockname(soc, &SOCaddr_sockaddr(server2), &len) == 0) {
-            // *port=ntohs(server.sin_port);  // récupérer port
-            if (listen(soc, 1) >= 0) {
-#if HTS_INET6==0
-              unsigned short int a, n1, n2;
-
-              // calculer port
-              a = SOCaddr_sinport(server2);
-              n1 = (a & 0xff);
-              n2 = ((a >> 8) & 0xff);
-              {
-                char dots[256 + 2];
-                char dot[256 + 2];
-                char *a;
-
-                SOCaddr_inetntoa(dot, 256, server2);
-                //
-                dots[0] = '\0';
-                strncatbuff(dots, dot, 128);
-                while((a = strchr(dots, '.')))
-                  *a = ',';     // virgules!
-                while((a = strchr(dots, ':')))
-                  *a = ',';     // virgules!
-                snprintf(to_send, to_send_size, "PORT %s,%d,%d", dots, n1, n2);
-              }
-#else
-              /*
-                 EPRT |1|132.235.1.2|6275|
-                 EPRT |2|1080::8:800:200C:417A|5282|
-               */
-              {
-                char dot[256 + 2];
-
-                SOCaddr_inetntoa(dot, 256, server2);
-                snprintf(to_send, to_send_size, "EPRT |%c|%s|%d|",
-                         SOCaddr_getproto(server2), dot,
-                         SOCaddr_sinport(server2));
-              }
-#endif
-
-            } else {
-              hts_closesocket(soc);
-              soc = INVALID_SOCKET;
-            }
-
-          } else {
-            hts_closesocket(soc);
-            soc = INVALID_SOCKET;
-          }
-
-        } else {
-          hts_closesocket(soc);
-          soc = INVALID_SOCKET;
-        }
-      }
+      dots[0] = '\0';
+      strncatbuff(dots, dot, 128);
+      while ((a = strchr(dots, '.')))
+        *a = ',';
+      while ((a = strchr(dots, ':')))
+        *a = ',';
+      snprintf(to_send, to_send_size, "PORT %s,%u,%u", dots, n1, n2);
     }
+#else
+    /* EPRT |1|132.235.1.2|6275| or EPRT |2|1080::8:800:200C:417A|5282| */
+    snprintf(to_send, to_send_size, "EPRT |%c|%s|%u|",
+             SOCaddr_getproto(server2), dot, port);
+#endif
   }
-
   return soc;
 }
 

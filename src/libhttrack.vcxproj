@@ -177,6 +177,7 @@
     <ClCompile Include="htscmdline_selftest.c" />
     <ClCompile Include="htsselftest_util.c" />
     <ClCompile Include="htsurlport.c" />
+    <ClCompile Include="htsshared.c" />
     <ClCompile Include="htsdate.c" />
     <ClCompile Include="htsmd5.c" />
     <ClCompile Include="htsnet.c" />

@@ -25,11 +25,15 @@ would dishonor our work and waste the many hours we have spent on it.
 Please visit our Website: http://www.httrack.com
 */
 /* ------------------------------------------------------------ */
-/* File: file and URL helpers that htsserver and proxytrack     */
-/*       compile in, because libhttrack does not export them    */
+/* File: file, URL and socket helpers that htsserver,          */
+/*       proxytrack and libhttrack each compile in, unexported  */
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
+/* For the engine-only socket helpers; libhttrack defines it already. */
+#ifndef HTS_INTERNAL_BYTECODE
+#define HTS_INTERNAL_BYTECODE
+#endif
 #include "htsshared.h"
 #include "htsnet.h"
 
@@ -199,4 +203,32 @@ hts_boolean hts_shared_gethost(const char *hostname, SOCaddr *server) {
 #endif
   }
   return HTS_FALSE;
+}
+
+T_SOC hts_shared_listen(SOCaddr *addr, int socktype, int backlog,
+                        SOCaddr *bound, int *lasterr) {
+  const T_SOC soc = (T_SOC) socket(SOCaddr_sinfamily(*addr), socktype, 0);
+  int err;
+
+  if (soc == INVALID_SOCKET) {
+    err = hts_socket_errno();
+  } else {
+    if (bind(soc, &SOCaddr_sockaddr(*addr), SOCaddr_size(*addr)) == 0) {
+      SOClen len = SOCaddr_capacity(*bound);
+
+      if ((bound == NULL ||
+           getsockname(soc, &SOCaddr_sockaddr(*bound), &len) == 0) &&
+          (socktype != SOCK_STREAM || listen(soc, backlog) == 0)) {
+        if (lasterr != NULL)
+          *lasterr = 0;
+        return soc;
+      }
+    }
+    /* read before the close, which may overwrite it */
+    err = hts_socket_errno();
+    hts_closesocket(soc);
+  }
+  if (lasterr != NULL)
+    *lasterr = err;
+  return INVALID_SOCKET;
 }

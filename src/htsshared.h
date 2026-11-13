@@ -25,8 +25,8 @@ would dishonor our work and waste the many hours we have spent on it.
 Please visit our Website: http://www.httrack.com
 */
 /* ------------------------------------------------------------ */
-/* File: file and URL helpers that htsserver and proxytrack     */
-/*       compile in, because libhttrack does not export them    */
+/* File: file, URL and socket helpers that htsserver,          */
+/*       proxytrack and libhttrack each compile in, unexported  */
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
@@ -72,5 +72,12 @@ int hts_shared_linputsoc(T_SOC soc, char *s, int max, time_t deadline,
 /* Store the first address of hostname in *server. Return HTS_FALSE when
    hostname is NULL, empty or does not resolve. */
 hts_boolean hts_shared_gethost(const char *hostname, SOCaddr *server);
+
+/* Open a socktype socket bound to *addr, and listen with backlog unless it is
+   SOCK_DGRAM. bound, when not NULL, gets getsockname() before listen(). On
+   failure return INVALID_SOCKET, with the socket error in *lasterr when
+   lasterr is not NULL. */
+T_SOC hts_shared_listen(SOCaddr *addr, int socktype, int backlog,
+                        SOCaddr *bound, int *lasterr);
 
 #endif
