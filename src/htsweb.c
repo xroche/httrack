@@ -49,7 +49,10 @@ Please visit our Website: http://www.httrack.com
 #endif
 // htswrap_add
 #include "htsglobal.h"
-#include "htsbasenet.h"
+/* For the engine-only socket helpers */
+#define HTS_INTERNAL_BYTECODE
+#include "htsnet.h"
+#undef HTS_INTERNAL_BYTECODE
 #include "htswrap.h"
 #include "httrack-library.h"
 #include "htsdefines.h"
@@ -591,11 +594,7 @@ static int help_server(char *dest_path, int defaultPort, const char *bindAddr) {
 
       fprintf(stderr, "Unable to create the server: %s\n",
               strerror(last_errno));
-#ifdef _WIN32
-      closesocket(soc);
-#else
-      close(soc);
-#endif
+      hts_closesocket(soc);
       printf("Done\n");
       returncode = 1;
     } else {

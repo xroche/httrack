@@ -444,11 +444,7 @@ void help_catchurl(const char *dest_path) {
       }
     } else
       printf("Unable to analyse the URL: %s\n", catch_url_strerror(status));
-#ifdef _WIN32
-    closesocket(soc);
-#else
-    close(soc);
-#endif
+    hts_closesocket(soc);
   } else
     printf("Unable to create a temporary proxy (no remaining port)\n");
 }

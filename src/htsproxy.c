@@ -60,13 +60,8 @@ static int proxy_getline(T_SOC soc, char *s, int max, int timeout) {
     } else if (n == 0) {
       return -1; // connection closed
     } else {
-#ifdef _WIN32
-      if (WSAGetLastError() == WSAEWOULDBLOCK)
+      if (hts_socket_would_block())
         continue;
-#else
-      if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK)
-        continue;
-#endif
       return -1;
     }
   }
@@ -147,12 +142,7 @@ int http_proxy_tunnel(httrackp *opt, htsblk *retour, const char *adr,
         remain -= (size_t) n;
         stalls = 0;
       } else {
-#ifdef _WIN32
-        const int wouldblock = (WSAGetLastError() == WSAEWOULDBLOCK);
-#else
-        const int wouldblock =
-            (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR);
-#endif
+        const hts_boolean wouldblock = hts_socket_would_block();
         // don't spin forever on a fatal error or an unwritable socket
         if (!wouldblock || !check_writeinput_t(soc, timeout) ||
             ++stalls > 100) {
@@ -250,12 +240,7 @@ static int socks5_read_n(socks5_stream *st, unsigned char *buf, size_t n) {
     } else if (r == 0) {
       return 0; // proxy closed mid-frame
     } else {
-#ifdef _WIN32
-      const int wouldblock = (WSAGetLastError() == WSAEWOULDBLOCK);
-#else
-      const int wouldblock =
-          (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR);
-#endif
+      const hts_boolean wouldblock = hts_socket_would_block();
       if (!wouldblock || !check_readinput_t(st->soc, st->timeout) ||
           ++stalls > 100)
         return 0;
@@ -287,12 +272,7 @@ static int socks5_write_all(socks5_stream *st, const unsigned char *buf,
       remain -= (size_t) n;
       stalls = 0;
     } else {
-#ifdef _WIN32
-      const int wouldblock = (WSAGetLastError() == WSAEWOULDBLOCK);
-#else
-      const int wouldblock =
-          (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR);
-#endif
+      const hts_boolean wouldblock = hts_socket_would_block();
       if (!wouldblock || !check_writeinput_t(st->soc, st->timeout) ||
           ++stalls > 100)
         return 0;

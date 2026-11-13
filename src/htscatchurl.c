@@ -95,29 +95,17 @@ HTSEXT_API T_SOC catch_url_init(int *port, /* 128 bytes */ char *adr) {
         if (listen(soc, 1) >= 0) {
           SOCaddr_inetntoa(adr, 128, server2);
         } else {
-#ifdef _WIN32
-          closesocket(soc);
-#else
-          close(soc);
-#endif
+          hts_closesocket(soc);
           soc = INVALID_SOCKET;
         }
 
       } else {
-#ifdef _WIN32
-        closesocket(soc);
-#else
-        close(soc);
-#endif
+        hts_closesocket(soc);
         soc = INVALID_SOCKET;
       }
 
     } else {
-#ifdef _WIN32
-      closesocket(soc);
-#else
-      close(soc);
-#endif
+      hts_closesocket(soc);
       soc = INVALID_SOCKET;
     }
   }
@@ -275,14 +263,7 @@ catch_url_status catch_url_capture(T_SOC soc, char *url, char *method,
     }
   }
   if (soc != INVALID_SOCKET) {
-#ifdef _WIN32
-    closesocket(soc);
-    /*
-       WSACleanup();
-     */
-#else
-    close(soc);
-#endif
+    hts_closesocket(soc);
   }
   return status;
 }

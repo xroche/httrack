@@ -107,7 +107,10 @@ Remark: If no cache newer than the added one is found, all entries can be added 
 /* HTTrack definitions */
 #define HTSSAFE_ABORT_FUNCTION(A,B,C)
 #include "htsbase.h"
+/* For the engine-only socket helpers */
+#define HTS_INTERNAL_BYTECODE
 #include "htsnet.h"
+#undef HTS_INTERNAL_BYTECODE
 #include "htslib.h"
 #include "htsthread.h"
 #include "htsglobal.h"
@@ -155,14 +158,6 @@ Remark: If no cache newer than the added one is found, all entries can be added 
 #define webhttrack_lock(A) do{}while(0)
 
 /* Static definitions */
-
-static void close_client(T_SOC soc) {
-#ifdef _WIN32
-  closesocket(soc);
-#else
-  close(soc);
-#endif
-}
 
 /* Bound the next recv() on a client by `seconds`. */
 static void set_recv_timeout(T_SOC soc, int seconds) {
@@ -244,15 +239,6 @@ static String getip(SOCaddr * server) {
   return s;
 }
 
-/* Winsock reports through WSAGetLastError() and leaves errno untouched. */
-static int socket_last_error(void) {
-#ifdef _WIN32
-  return WSAGetLastError();
-#else
-  return errno;
-#endif
-}
-
 /* Winsock codes are not in strerror(); read the system message table. */
 static const char *socket_error_string(int err, char *buf, size_t size) {
 #ifdef _WIN32
@@ -293,25 +279,17 @@ static T_SOC smallserver_init(const char *adr, int port, int socktype,
         if (socktype != SOCK_STREAM || listen(soc, 10) >= 0) {
           return soc;
         } else {
-          *lasterr = socket_last_error();
-#ifdef _WIN32
-          closesocket(soc);
-#else
-          close(soc);
-#endif
+          *lasterr = hts_socket_errno();
+          hts_closesocket(soc);
           soc = INVALID_SOCKET;
         }
       } else {
-        *lasterr = socket_last_error();
-#ifdef _WIN32
-        closesocket(soc);
-#else
-        close(soc);
-#endif
+        *lasterr = hts_socket_errno();
+        hts_closesocket(soc);
         soc = INVALID_SOCKET;
       }
     } else {
-      *lasterr = socket_last_error();
+      *lasterr = hts_socket_errno();
     }
   } else {
     *lasterr = SMALLSERVER_ERR_RESOLVE;
@@ -346,11 +324,7 @@ int proxytrack_main(char *proxyAddr, int proxyPort, char *icpAddr, int icpPort,
 
       fprintf(stderr, "Unable to create the server: %s\n",
               strerror(last_errno));
-#ifdef _WIN32
-      closesocket(soc);
-#else
-      close(soc);
-#endif
+      hts_closesocket(soc);
       printf("Done\n");
       returncode = 1;
     } else {
@@ -727,7 +701,7 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
 
   if (buffer == NULL || line == NULL || line1 == NULL) {
     proxytrack_print_log(CRITICAL, "proxytrack_process_HTTP:memory exhausted");
-    close_client(soc_c);
+    hts_closesocket(soc_c);
     return;
   }
 
@@ -1151,7 +1125,7 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
     }
   } while(keepAlive);
 
-  close_client(soc_c);
+  hts_closesocket(soc_c);
 
   StringFree(url);
   StringFree(urlRedirect);
@@ -1282,21 +1256,17 @@ static int proxytrack_start_HTTP(PT_Indexes indexes, T_SOC soc) {
 
         (void) send(soc_c, busy, (int) sizeof(busy) - 1, 0);
         hts_add_int(&proxytrack_clients, -1);
-        close_client(soc_c);
+        hts_closesocket(soc_c);
       } else if (!proxytrack_process_HTTP_threaded(indexes, soc_c)) {
         proxytrack_print_log(CRITICAL,
                              "proxytrack_start_HTTP::Can not fork a thread");
         hts_add_int(&proxytrack_clients, -1);
-        close_client(soc_c);
+        hts_closesocket(soc_c);
       }
     }
   }
   if (soc != INVALID_SOCKET) {
-#ifdef _WIN32
-    closesocket(soc);
-#else
-    close(soc);
-#endif
+    hts_closesocket(soc);
   }
   return 1;
 }
@@ -1359,11 +1329,7 @@ static int proxytrack_start_ICP(PT_Indexes indexes, T_SOC soc) {
 
   if (buffer == NULL) {
     proxytrack_print_log(CRITICAL, "proxytrack_start_ICP:memory exhausted");
-#ifdef _WIN32
-    closesocket(soc);
-#else
-    close(soc);
-#endif
+    hts_closesocket(soc);
     return -1;
   }
   while(soc != INVALID_SOCKET) {
@@ -1498,11 +1464,7 @@ static int proxytrack_start_ICP(PT_Indexes indexes, T_SOC soc) {
     }
   }
   if (soc != INVALID_SOCKET) {
-#ifdef _WIN32
-    closesocket(soc);
-#else
-    close(soc);
-#endif
+    hts_closesocket(soc);
   }
   free(buffer);
   return 1;

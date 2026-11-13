@@ -48,6 +48,9 @@ Please visit our Website: http://www.httrack.com
 
 #include <string.h>
 #include <ctype.h>
+#if defined(HTS_INTERNAL_BYTECODE) && !defined(_WIN32)
+#include <errno.h>
+#endif
 /* We supply in_port_t, sa_family_t and in_addr_t where the platform declares
    none: the Winsock types below, or a uint16_t macro out of the generated
    htsfeatures.h. A consumer sees our spelling, so it must not add its own. */
@@ -101,6 +104,49 @@ static HTS_INLINE HTS_UNUSED hts_boolean hts_soc_selectable(T_SOC soc) {
   return soc >= 0 && soc < FD_SETSIZE ? HTS_TRUE : HTS_FALSE;
 #endif
 }
+
+/* Engine-only: not exported, so the installed header must not offer them. */
+#ifdef HTS_INTERNAL_BYTECODE
+/** Close soc without reporting a failure. deletesoc() logs one, but is hidden
+    from the programs built beside the library. */
+static HTS_INLINE HTS_UNUSED void hts_closesocket(T_SOC soc) {
+#ifdef _WIN32
+  closesocket(soc);
+#else
+  close(soc);
+#endif
+}
+
+/** Last socket error: WSAGetLastError() on Windows, which leaves errno
+    alone, and errno elsewhere. */
+static HTS_INLINE HTS_UNUSED int hts_socket_errno(void) {
+#ifdef _WIN32
+  return WSAGetLastError();
+#else
+  return errno;
+#endif
+}
+
+/** Did the last send or recv fail only because it would block, so a retry
+    after select() may succeed? */
+static HTS_INLINE HTS_UNUSED hts_boolean hts_socket_would_block(void) {
+#ifdef _WIN32
+  return WSAGetLastError() == WSAEWOULDBLOCK;
+#else
+  return errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR;
+#endif
+}
+
+/** Did the last connect on a non-blocking socket fail only because it is
+    still in progress? POSIX says EINPROGRESS there, never EAGAIN. */
+static HTS_INLINE HTS_UNUSED hts_boolean hts_socket_connect_pending(void) {
+#ifdef _WIN32
+  return WSAGetLastError() == WSAEWOULDBLOCK;
+#else
+  return errno == EINPROGRESS || errno == EINTR;
+#endif
+}
+#endif
 
 /** Raw IP address type: in6_addr when IPv6 is enabled, else in_addr. */
 #if HTS_INET6 != 0

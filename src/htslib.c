@@ -610,11 +610,7 @@ T_SOC http_xfopen(httrackp *opt, const char *adr, const char *fil,
   /* Check for errors */
   if (soc == INVALID_SOCKET) {
     if (!strnotempty(retour->msg)) {
-#ifdef _WIN32
-      const int last_errno = WSAGetLastError();
-#else
-      const int last_errno = errno;
-#endif
+      const int last_errno = hts_socket_errno();
       char errbuf[HTS_STRERROR_SIZE];
 
       htsblk_failf(retour, "Connect error: %s",
@@ -2934,11 +2930,7 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
     }
     if (soc == INVALID_SOCKET) {
       if (retour != NULL) {
-#ifdef _WIN32
-        const int last_errno = WSAGetLastError();
-#else
-        const int last_errno = errno;
-#endif
+        const int last_errno = hts_socket_errno();
         char errbuf[HTS_STRERROR_SIZE];
 
         htsblk_failf(retour, "Unable to create a socket: %s",
@@ -2965,11 +2957,7 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
     SOCaddr_initport(server, port);
 
     if (!socket_set_nonblocking(soc, HTS_TRUE)) {
-#ifdef _WIN32
-      const int last_errno = WSAGetLastError();
-#else
-      const int last_errno = errno;
-#endif
+      const int last_errno = hts_socket_errno();
       char errbuf[HTS_STRERROR_SIZE];
 
       htsblk_failf(retour, "Non-blocking socket failed: %s",
