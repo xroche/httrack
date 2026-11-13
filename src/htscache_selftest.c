@@ -1125,8 +1125,7 @@ static const char *const reconcile_files[] = {
     "hts-cache/repair.tmp"};
 
 static char *reconcile_st_path(httrackp *opt, const char *name) {
-  return fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                 StringBuff(opt->path_log), name);
+  return hts_logpath(opt, name);
 }
 
 static void reconcile_wipe(httrackp *opt) {

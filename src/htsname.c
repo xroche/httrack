@@ -2043,8 +2043,7 @@ char *url_savename_refname_fullpath(httrackp * opt, const char *adr,
   char digest_filename[64];
 
   url_savename_refname(adr, fil, digest_filename);
-  return fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-    StringBuff(opt->path_log), digest_filename);
+  return hts_logpath(opt, digest_filename);
 }
 
 /* remove refname if any; HTS_TRUE if it was removed */
