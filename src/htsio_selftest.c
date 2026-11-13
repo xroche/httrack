@@ -365,6 +365,7 @@ static int st_addlink(httrackp *opt, int argc, char **argv) {
   int ptr = 0;
   int rc = 0;
   int i;
+  char BIGSTK longcod[HTS_URLMAXSIZE + 2];
 
   memset(&cache, 0, sizeof(cache));
   cache.hashtable = (void *) coucal_new(0);
@@ -380,14 +381,35 @@ static int st_addlink(httrackp *opt, int argc, char **argv) {
 
   /* [0] is the underflow; [1] and [2] are controls that the trim is unchanged.
      A query-only link is the one that notices the trim at all: for the others
-     ident_url_relatif() re-derives the directory from the path it is given. */
-  for (i = 0; i < 3; i++) {
-    static const char *const fil[3] = {"", "/dir/page.html", "/dir/page.html"};
-    static const char *const lnk[3] = {"sub/page.html", "sub/page.html",
-                                       "?x=1"};
-    static const char *const want[3] = {
-        "untouched", "http://www.example.com/dir/sub/page.html",
-        "http://www.example.com/dir/?x=1"};
+     ident_url_relatif() re-derives the directory from the path it is given.
+     [3] to [5] give a class an applet codebase: http, https, too long.
+     An absolute link is the one a too-long codebase does not already stop. */
+  memset(longcod, 'a', sizeof(longcod) - 1);
+  longcod[0] = longcod[sizeof(longcod) - 2] = '/';
+  longcod[sizeof(longcod) - 1] = '\0';
+  for (i = 0; i < 6; i++) {
+    static const char *const fil[6] = {"",
+                                       "/dir/page.html",
+                                       "/dir/page.html",
+                                       "/dir/App.class",
+                                       "/dir/App.class",
+                                       "/dir/App.class"};
+    const char *const cod[6] = {"",
+                                "",
+                                "",
+                                "http://www.example.com/applets/",
+                                "https://www.example.com/applets/",
+                                longcod};
+    static const char *const lnk[6] = {
+        "sub/page.html", "sub/page.html", "?x=1",
+        "Foo.class",     "Foo.class",     "http://www.example.com/x/Foo.class"};
+    static const char *const want[6] = {
+        "untouched",
+        "http://www.example.com/dir/sub/page.html",
+        "http://www.example.com/dir/?x=1",
+        "http://www.example.com/applets/Foo.class",
+        "http://www.example.com/applets/Foo.class",
+        "untouched"};
     char BIGSTK loc[HTS_URLMAXSIZE * 2];
     char BIGSTK link[HTS_URLMAXSIZE];
 
@@ -395,7 +417,7 @@ static int st_addlink(httrackp *opt, int argc, char **argv) {
     strcpybuff(link, lnk[i]);
     str.localLink = loc;
     str.localLinkSize = (int) sizeof(loc);
-    if (!hts_record_link(opt, "www.example.com", fil[i], "", "", "", "")) {
+    if (!hts_record_link(opt, "www.example.com", fil[i], "", "", "", cod[i])) {
       rc = 1;
       goto cleanup;
     }
@@ -1940,7 +1962,7 @@ const struct selftest_entry selftests_io[] = {
      st_findall},
     {"growsize", "", "buffer capacity for a 64-bit file size (no int wrap)",
      st_growsize},
-    {"addlink", "", "htsAddLink codebase walk over an empty current path",
+    {"addlink", "", "htsAddLink codebase: empty path, https://, too long",
      st_addlink},
     {"makeindex", "[dir]", "hts_finish_makeindex footer/refresh self-test",
      st_makeindex},
