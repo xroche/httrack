@@ -158,22 +158,8 @@ int main(int argc, char *argv[]) {
 
 #ifdef _WIN32
   hts_binary_stdio();
-  {
-    WORD wVersionRequested;     // requested version WinSock API
-    WSADATA wsadata;            // Windows Sockets API data
-    int stat;
-
-    wVersionRequested = 0x0101;
-    stat = WSAStartup(wVersionRequested, &wsadata);
-    if (stat != 0) {
-      fprintf(stderr, "Winsock not found!\n");
-      return -1;
-    } else if (LOBYTE(wsadata.wVersion) != 1 && HIBYTE(wsadata.wVersion) != 1) {
-      fprintf(stderr, "WINSOCK.DLL does not support version 1.1\n");
-      WSACleanup();
-      return -1;
-    }
-  }
+  if (!hts_winsock_start())
+    return -1;
 #endif
 
   /* Before the first table is built. */
