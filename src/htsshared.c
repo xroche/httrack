@@ -162,3 +162,41 @@ int hts_shared_linputsoc(T_SOC soc, char *s, int max, time_t deadline,
   s[j] = '\0';
   return j;
 }
+
+hts_boolean hts_shared_gethost(const char *hostname, SOCaddr *server) {
+  if (hostname != NULL && *hostname != '\0') {
+#if HTS_INET6 == 0
+    /* ipV4 resolver */
+    struct hostent *hp = gethostbyname(hostname);
+
+    if (hp != NULL) {
+      if (hp->h_length) {
+        SOCaddr_copyaddr2(*server, hp->h_addr_list[0], hp->h_length);
+        return HTS_TRUE;
+      }
+    }
+#else
+    /* ipV6 resolver */
+    struct addrinfo *res = NULL;
+    struct addrinfo hints;
+
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = PF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
+    if (getaddrinfo(hostname, NULL, &hints, &res) == 0) {
+      if (res) {
+        if ((res->ai_addr) && (res->ai_addrlen)) {
+          SOCaddr_copyaddr2(*server, res->ai_addr, res->ai_addrlen);
+          freeaddrinfo(res);
+          return HTS_TRUE;
+        }
+      }
+    }
+    if (res) {
+      freeaddrinfo(res);
+    }
+#endif
+  }
+  return HTS_FALSE;
+}

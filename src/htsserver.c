@@ -315,45 +315,6 @@ T_SOC smallserver_init_std(int *port_prox, char *adr_prox, size_t adr_size,
 
 // 1- Init the URL catcher
 
-// get hostname. return 1 upon success.
-static int gethost(const char *hostname, SOCaddr * server) {
-  if (hostname != NULL && *hostname != '\0') {
-#if HTS_INET6==0
-    /* ipV4 resolver */
-    struct hostent *hp = gethostbyname(hostname);
-
-    if (hp != NULL) {
-      if (hp->h_length) {
-        SOCaddr_copyaddr2(*server, hp->h_addr_list[0], hp->h_length);
-        return 1;
-      }
-    }
-#else
-    /* ipV6 resolver */
-    struct addrinfo *res = NULL;
-    struct addrinfo hints;
-
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family = PF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_protocol = IPPROTO_TCP;
-    if (getaddrinfo(hostname, NULL, &hints, &res) == 0) {
-      if (res) {
-        if ((res->ai_addr) && (res->ai_addrlen)) {
-          SOCaddr_copyaddr2(*server, res->ai_addr, res->ai_addrlen);
-          freeaddrinfo(res);
-          return 1;
-        }
-      }
-    }
-    if (res) {
-      freeaddrinfo(res);
-    }
-#endif
-  }
-  return 0;
-}
-
 /** Remember a name we answer to, if it is new and it fits. */
 static void add_self_name(const char *name) {
   size_t i;
@@ -418,7 +379,7 @@ static void add_reverse_self_name(SOCaddr *bound) {
     return;
   }
   memset(&resolved, 0, sizeof(resolved));
-  if (!gethost(name, &resolved)) {
+  if (!hts_shared_gethost(name, &resolved)) {
     return;
   }
   SOCaddr_inetntoa(back, sizeof(back), resolved);
@@ -489,7 +450,8 @@ T_SOC smallserver_init(int *port, char *adr, size_t adr_size,
   strcpybuff(h_loc, "127.0.0.1");
   if (bindAddr != NULL && *bindAddr != '\0') {
     /* advertise the bound address, else the URL we print is unreachable */
-    if (strlen(bindAddr) >= sizeof(h_loc) || !gethost(bindAddr, &server)) {
+    if (strlen(bindAddr) >= sizeof(h_loc) ||
+        !hts_shared_gethost(bindAddr, &server)) {
       return INVALID_SOCKET;
     }
     strcpybuff(h_loc, bindAddr);
