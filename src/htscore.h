@@ -408,6 +408,9 @@ char *hts_cancel_file_pop(httrackp * opt);
 
 int check_fatal_io_errno(void);
 
+/* Log a disk-full abort and stop the mirror. */
+void hts_io_fatal_abort(httrackp *opt);
+
 int engine_stats(void);
 
 void host_ban(httrackp * opt, int ptr, struct_back * sback, const char *host);

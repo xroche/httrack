@@ -3875,10 +3875,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                             if (back[i].r.out == NULL) {
                               errno = last_errno;
                               if ((fcheck = check_fatal_io_errno())) {
-                                hts_log_print(opt, LOG_ERROR,
-                                              "Mirror aborted: disk full or filesystem problems");
-                                /* fatal error */
-                                hts_store_release_int(&opt->state.exit_xh, -1);
+                                hts_io_fatal_abort(opt);
                               }
                             }
                             hts_log_print(
@@ -4013,10 +4010,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                 if (back[i].r.statuscode == STATUSCODE_IO_FATAL) {
                   /* disk full, not a network blink: a retry writes nothing and
                      the purge would measure a truncated mirror */
-                  hts_log_print(
-                      opt, LOG_ERROR,
-                      "Mirror aborted: disk full or filesystem problems");
-                  hts_store_release_int(&opt->state.exit_xh, -1);
+                  hts_io_fatal_abort(opt);
                 }
               } else {
                 if (back[i].r.size > 0)

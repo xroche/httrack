@@ -1847,7 +1847,35 @@ static int st_maxtime(httrackp *opt, int argc, char **argv) {
   return st_verdict("maxtime self-test", err);
 }
 
+/* A disk-full abort logs its line and stops the mirror. */
+static int st_iofatal(httrackp *opt, int argc, char **argv) {
+  FILE *const saved_log = opt->log;
+  int err = 0;
+
+  if (argc < 1) {
+    fprintf(stderr, "iofatal: needs a log file\n");
+    return 1;
+  }
+  opt->log = fopen(argv[0], "wb");
+  if (opt->log == NULL) {
+    opt->log = saved_log;
+    fprintf(stderr, "iofatal: cannot open %s\n", argv[0]);
+    return 1;
+  }
+  hts_store_release_int(&opt->state.exit_xh, 0);
+  hts_io_fatal_abort(opt);
+  fclose(opt->log);
+  opt->log = saved_log;
+  if (hts_load_acquire_int(&opt->state.exit_xh) != -1) {
+    fprintf(stderr, "iofatal: the mirror was not stopped\n");
+    err = 1;
+  }
+  return st_verdict("iofatal self-test", err);
+}
+
 const struct selftest_entry selftests_back[] = {
+    {"iofatal", "<logfile>",
+     "a disk-full abort logs its line and stops the mirror", st_iofatal},
     {"strerror", "",
      "a thread's error message is its own, never another thread's (#1697)",
      st_strerror},

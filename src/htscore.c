@@ -460,11 +460,8 @@ void hts_finish_html_file(httrackp *opt, cache_back *cache, htsblk *r,
     } else {
       int fcheck = check_fatal_io_errno();
 
-      if (fcheck) {
-        hts_log_print(opt, LOG_ERROR,
-                      "Mirror aborted: disk full or filesystem problems");
-        hts_store_release_int(&opt->state.exit_xh, -1);
-      }
+      if (fcheck)
+        hts_io_fatal_abort(opt);
       hts_log_print(opt, LOG_ERROR | LOG_ERRNO, "Unable to save file %s", save);
       if (fcheck)
         hts_log_print(opt, LOG_ERROR, "* * Fatal write error, giving up");
@@ -2024,10 +2021,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
               int fcheck;
 
               if ((fcheck = check_fatal_io_errno())) {
-                hts_log_print(opt, LOG_ERROR,
-                              "Mirror aborted: disk full or filesystem problems");
-                /* fatal error */
-                hts_store_release_int(&opt->state.exit_xh, -1);
+                hts_io_fatal_abort(opt);
               }
               hts_log_print(opt, LOG_ERROR | LOG_ERRNO,
                             "Unable to save file %s", savename());
@@ -3099,6 +3093,12 @@ int check_fatal_io_errno(void) {
     break;
   }
   return 0;
+}
+
+void hts_io_fatal_abort(httrackp *opt) {
+  hts_log_print(opt, LOG_ERROR,
+                "Mirror aborted: disk full or filesystem problems");
+  hts_store_release_int(&opt->state.exit_xh, -1);
 }
 
 // ouvrir un fichier (avec chemin Un*x)
