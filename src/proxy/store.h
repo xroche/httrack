@@ -101,7 +101,6 @@ int PT_SaveCache(PT_Indexes indexes, const char *filename);
 PT_Index PT_LoadCache(const char *filename);
 void PT_Index_Delete(PT_Index * pindex);
 PT_Element PT_ReadCache(PT_Index index, const char *url, int flags);
-int PT_LookupCache(PT_Index index, const char *url);
 time_t PT_Index_Timestamp(PT_Index index);
 
 /* Elements*/
