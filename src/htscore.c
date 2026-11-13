@@ -3151,8 +3151,7 @@ void usercommand(httrackp * opt, int _exe, const char *_cmd, const char *file,
       strc->exe = 0;
   }
 
-  /* post-processing */
-  postprocess_file(opt, file, adr, fil);
+  mimehtml_add_file(opt, file, adr, fil);
 
   if (file != NULL && strnotempty(file)) {
     RUN_CALLBACK1(opt, filesave, file);

@@ -118,8 +118,8 @@ static void mimehtml_create(httrackp *opt, const char *startcid) {
   opt->state.mimehtml_created = MIMEHTML_WRITING;
 }
 
-void postprocess_file(httrackp *opt, const char *save, const char *adr,
-                      const char *fil) {
+void mimehtml_add_file(httrackp *opt, const char *save, const char *adr,
+                       const char *fil) {
   /* MIME-html archive to build */
   if (opt != NULL && opt->mimehtml) {
     if (adr != NULL && strcmp(adr, "primary") == 0) {

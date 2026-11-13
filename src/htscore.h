@@ -446,9 +446,10 @@ void file_notify(httrackp * opt, const char *adr, const char *fil,
 void usercommand(httrackp * opt, int exe, const char *cmd, const char *file,
                  const char *adr, const char *fil);
 
-/* Add the saved file to the index.mht archive when --mime-html is on. */
-void postprocess_file(httrackp *opt, const char *save, const char *adr,
-                      const char *fil);
+/* Append the saved file to index.mht when --mime-html is on; a NULL save closes
+ * the archive. */
+void mimehtml_add_file(httrackp *opt, const char *save, const char *adr,
+                       const char *fil);
 
 /* usercommand_expand() verdicts; only OK may be run. */
 #define USERCOMMAND_EXPAND_OK 1
