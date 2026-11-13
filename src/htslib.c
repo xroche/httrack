@@ -134,57 +134,6 @@ FILE *ioinfo;
 SSL_CTX *openssl_ctx = NULL;
 #endif
 
-/* ne pas détcter de liens dedans */
-const char *hts_nodetect[] = {
-  "accept-charset",
-  "accesskey",
-  "action",
-  "align",
-  "alt",
-  "axes",
-  "axis",
-  "char",
-  "charset",
-  "cite",
-  "class",
-  "classid",
-  "code",
-  "color",
-  "datetime",
-  "dir",
-  "enctype",
-  "face",
-  "height",
-  "id",
-  "lang",
-  "language",
-  "media",
-  "method",
-  "name",
-  "prompt",
-  "scheme",
-  "size",
-  "style",
-  "target",
-  "title",
-  "type",
-  "valign",
-  "version",
-  "width",
-  ""
-};
-
-const char *hts_main_mime[] = {
-  "application",
-  "audio",
-  "image",
-  "message",
-  "multipart",
-  "text",
-  "video",
-  ""
-};
-
 // Reserved (RFC2396)
 #define CIS(c,ch) ( ((unsigned char)(c)) == (ch) )
 #define CHAR_RESERVED(c)                                                       \
