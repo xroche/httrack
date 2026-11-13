@@ -559,6 +559,7 @@ jobs:
           set -euo pipefail
           for c in fuzz/fuzz-*.c; do
             f=$(basename "$c" .c)
+            mkdir -p "$RUNNER_TEMP/corpus/$f"
             unzip -q "$RUNNER_TEMP/out/${f}_seed_corpus.zip" -d "$RUNNER_TEMP/corpus/$f"
             "$RUNNER_TEMP/out/$f" -runs=0 -timeout=25 "$RUNNER_TEMP/corpus/$f"
           done
