@@ -134,4 +134,25 @@ int cache_zip_store_stream(zipFile zf, FILE *fp);
 
 #endif
 
+/* Read a whole file into a freshly malloc'd, NUL-terminated buffer; the caller
+   owns it and must release it with freet(). Return NULL on missing/unreadable
+   file (readfile_or substitutes defaultdata instead). The byte content is NOT
+   transcoded except readfile_utf8, which expects a UTF-8 path. readfile2
+   reports the byte size (excluding the NUL) via *size when non-NULL. */
+char *readfile(const char *fil);
+
+char *readfile2(const char *fil, LLint *size);
+
+/* readfile2() refusing a body too large for the int indexes downstream, on the
+   same stat that sizes the read: a caller checking the size itself would leave
+   a window for the file to grow. NULL when it does not fit. "fil" is UTF-8,
+   as a mirror path is. */
+char *readfile2_inmem(const char *fil, LLint *size);
+
+char *readfile_utf8(const char *fil);
+
+char *readfile2_utf8(const char *fil, LLint *size);
+
+char *readfile_or(const char *fil, const char *defaultdata);
+
 #endif

@@ -164,10 +164,6 @@ typedef struct hts_connect_fallback {
 /** The download-slot ring: the set of concurrent transfers in flight.
     Allocated/owned by the engine; consumers (status callbacks, the loop)
     read it but do not resize or free it. */
-#ifndef HTS_DEF_FWSTRUCT_struct_back
-#define HTS_DEF_FWSTRUCT_struct_back
-typedef struct struct_back struct_back;
-#endif
 struct struct_back {
   lien_back *lnk;         /**< slot array, valid indices [0..count-1]
                                (count+1 entries allocated); a slot is
@@ -187,10 +183,6 @@ struct struct_back {
 
 /** Open handle to the mirror cache (the read-from-old / write-to-new state
     used to resume and to avoid re-fetching unchanged files). Engine-owned. */
-#ifndef HTS_DEF_FWSTRUCT_cache_back
-#define HTS_DEF_FWSTRUCT_cache_back
-typedef struct cache_back cache_back;
-#endif
 struct cache_back {
   int version; /**< cache-file format version being read */
   /* */
@@ -221,10 +213,6 @@ struct cache_back {
   int zipWriteFailures; /**< consecutive entry write failures; reset on store */
 };
 
-#ifndef HTS_DEF_FWSTRUCT_hash_struct
-#define HTS_DEF_FWSTRUCT_hash_struct
-typedef struct hash_struct hash_struct;
-#endif
 /** Lookup indexes over the link heap: map save-name / URL back to a link, so a
     URL seen twice resolves to one entry. The coucal tables index into liens;
     they do not own the links. */
@@ -257,10 +245,6 @@ struct hash_struct {
   char catbuff[CATBUFF_SIZE];
 };
 
-#ifndef HTS_DEF_FWSTRUCT_filecreate_params
-#define HTS_DEF_FWSTRUCT_filecreate_params
-typedef struct filecreate_params filecreate_params;
-#endif
 /** Parameters threaded through file-creation callbacks (filenote). */
 struct filecreate_params {
   FILE *lst; /**< open file list to append created paths to */
@@ -563,101 +547,8 @@ int fspc(httrackp * opt, FILE * fp, const char *type);
    whether or not a log file is open. "panic" counts as an error. */
 void fspc_count(httrackp *opt, const char *type);
 
-/* Like fil_normalized(), but first drops query keys in STRIP (comma-separated,
-   "*" = all); STRIP NULL/empty behaves exactly like fil_normalized(). */
-char *fil_normalized_filtered(const char *source, char *dest,
-                              const char *strip);
-
-/* As fil_normalized_filtered(), but DO_SLASH/DO_QUERY gate the // collapse and
-   the query-argument sort independently (the urlhack sub-flags). */
-char *fil_normalized_filtered_ex(const char *source, char *dest,
-                                 const char *strip, int do_slash, int do_query);
-
-/* For URL ADR/FIL, return (in DEST) the comma keylist to strip from the
-   '\n'-separated "[pattern=]keys" RULES (patterns matched on host/path via
-   strjoker, last wins); NULL if none match. Feeds fil_normalized_filtered(). */
-const char *hts_query_strip_keys(const char *rules, const char *adr,
-                                 const char *fil, char *dest, size_t destsize);
-
-/* Is the key ARG[0..KEYLEN) in the comma list STRIP? Tokens are space-trimmed
-   and case-sensitive, and "*" matches any key. */
-hts_boolean hts_query_key_stripped(const char *arg, size_t keylen,
-                                   const char *strip);
-
-/* Return the canonical host (length *CANONLEN) of the last RULES entry whose
-   aliases match HOST or FULL ("scheme://host"), or NULL. COLLAPSE_WWW ignores
-   a "www." prefix on both sides. */
-const char *hts_host_alias_match(const char *rules, const char *host,
-                                 const char *full, hts_boolean collapse_www,
-                                 size_t *canonlen);
-
-/* The --host-alias rules of OPT, or NULL when the option was not given. */
-const char *hts_host_alias_rules(httrackp *opt);
-
-/* ADR with its host replaced by the canonical one, from the '\n'-separated
-   "alias[,alias...]=canonical" RULES (aliases matched with strjoker, last
-   wins). NOWWW matches the host with its www. prefix collapsed, as -%u keys it.
-   Chains are followed to their end, so the result is a fixpoint. Scheme and
-   credentials are kept. NULL when no rule applies, the mapping is a no-op, the
-   rules loop, or the result would not fit DEST. */
-const char *hts_host_alias(const char *rules, const char *adr,
-                           hts_boolean collapse_www, char *dest,
-                           size_t destsize);
-
-/* Resolve like hts_host_alias, and set *SETTLED, when SETTLED is not NULL, to
-   whether the chain ended within the hop limit. Exposed for the -#test=spandiff
-   test. */
-const char *hts_host_alias_resolve(const char *rules, const char *adr,
-                                   hts_boolean collapse_www, char *dest,
-                                   size_t destsize, hts_boolean *settled);
-
-/* HTS_TRUE when OPT's url hacks collapse www.host onto host. */
-hts_boolean hts_host_alias_collapse_www(httrackp *opt);
-
-/* Rewrite AF's host to its --host-alias canonical form, in place, and return
-   it. Idempotent; returns af->adr unchanged when no rule applies. */
-const char *hts_host_alias_fold(httrackp *opt, lien_adrfil *af);
-
-/* HTS_TRUE if ADRA and ADRB name the same host once RULES are applied. */
-hts_boolean hts_host_same_alias(const char *rules, const char *adra,
-                                const char *adrb, hts_boolean collapse_www);
-
-/* First canonical host in RULES whose chain never ends ("a=b" plus "b=a"),
-   copied into DEST, or NULL if every chain settles. Those hosts are left
-   unaliased, so the engine reports them rather than picking a hop. */
-const char *hts_host_alias_looping(const char *rules, hts_boolean collapse_www,
-                                   char *dest, size_t destsize);
-
-/* Read a whole file into a freshly malloc'd, NUL-terminated buffer; the caller
-   owns it and must release it with freet(). Return NULL on missing/unreadable
-   file (readfile_or substitutes defaultdata instead). The byte content is NOT
-   transcoded except readfile_utf8, which expects a UTF-8 path. readfile2
-   reports the byte size (excluding the NUL) via *size when non-NULL. */
-char *readfile(const char *fil);
-
-char *readfile2(const char *fil, LLint * size);
-
-/* readfile2() refusing a body too large for the int indexes downstream, on the
-   same stat that sizes the read: a caller checking the size itself would leave
-   a window for the file to grow. NULL when it does not fit. "fil" is UTF-8,
-   as a mirror path is. */
-char *readfile2_inmem(const char *fil, LLint *size);
-
-char *readfile_utf8(const char *fil);
-
-char *readfile2_utf8(const char *fil, LLint *size);
-
-char *readfile_or(const char *fil, const char *defaultdata);
-
 /* Backing (download-slot) scheduler. Operate on the back[] ring (struct_back).
    Not thread-safe; call from the single crawl loop. */
-
-/* True if a connecting slot should give up on the current address and try the
-   next one: a fallback address remains (addr_index+1 < addr_count) and the
-   candidate has been connecting for at least its deadline, min(timeout, an
-   internal cap). elapsed/timeout in seconds. Exposed for the -#D self-test. */
-int back_connect_fallback_due(int addr_index, int addr_count, int elapsed,
-                              int timeout);
 
 /* How many new sockets may be opened now, honoring maxsoc and the maxconn rate
    limit (>=0). _strict ignores reserved-slot headroom; the plain form leaves
