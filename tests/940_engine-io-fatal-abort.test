@@ -1,0 +1,18 @@
+#!/bin/bash
+#
+# A disk-full abort logs "Mirror aborted: disk full" and stops the mirror.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+require_httrack
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_iofatal.XXXXXX")
+cleanup() { rm -rf "$tmpdir"; }
+cleanup_push cleanup
+
+assert_selftest "iofatal self-test: OK" iofatal "${tmpdir}/log"
+grep -q 'Mirror aborted: disk full or filesystem problems' "${tmpdir}/log" ||
+    fail "the abort line is missing from the log"
+ok "a disk-full abort is logged"
