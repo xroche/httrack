@@ -83,7 +83,7 @@ webhttrack: webhttrack.in htsglobal.h Makefile
 		&& chmod +x $@.tmp && mv -f $@.tmp $@
 CLEANFILES = webhttrack
 
-libhttrack_la_SOURCES =  htscore.c htsusercmd.c htsmhtml.c htsparse.c htsback.c htscache.c \
+libhttrack_la_SOURCES =  htscore.c htsusercmd.c htsmhtml.c htsparse.c htsmirror.c htsback.c htscache.c \
 	htscatchurl.c htsfetch.c htspsl.c htspsl_data.c htsfilters.c htsftp.c htshash.c coucal/coucal.c \
 	htscmdline.c htshelp.c htsbase.c htsdns.c htslib.c htsmime.c htssecret.c htslines.c htsurlport.c htsdate.c htscoremain.c htsshared.c \
 	htsname.c htsrobots.c htstools.c htsrandom.c htswizard.c \
@@ -96,7 +96,7 @@ libhttrack_la_SOURCES =  htscore.c htsusercmd.c htsmhtml.c htsparse.c htsback.c 
 	hts-indextmpl.h htsalias.h htsback.h htsbase.h htssafe.h htsdate.h \
 	htsbasenet.h htsbauth.h htscookiefile.h htsbundle.h htscache.h htscachecodec.h htscookie_selftest.h \
 	htsselftest.h htsselftest_int.h htsselftest_util.h htscatchurl.h  \
-	htscmdline.h htsconfig.h htscore.h htsparse.h htscoremain.h htsdefines.h  \
+	htscmdline.h htsconfig.h htscore.h htsparse.h htsmirror.h htscoremain.h htsdefines.h  \
 	htsfilters.h htsftp.h htsglobal.h htshash.h coucal/coucal.h \
 	htshelp.h htsindex.h htsio.h htslib.h htslines.h htsurlport.h htsmd5.h \
 	htsmodules.h htsname.h htsnet.h htsshared.h htssniff.h \
