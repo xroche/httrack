@@ -576,6 +576,21 @@ void hts_secret_fwrite(httrackp *opt, FILE *fp, const char *s, size_t len);
 void hts_secret_fprintf(httrackp *opt, FILE *fp, const char *format, ...)
     HTS_PRINTF_FUN(3, 4);
 
+/* vfprintf() to fp, with each secret of opt as ***. */
+void secret_vfprintf(httrackp *opt, FILE *fp, const char *format, va_list args)
+    HTS_PRINTF_FUN(3, 0);
+
+/* adr past its blanks and scheme, and then past its login as well. */
+const char *login_start(const char *adr);
+const char *login_end(const char *adr);
+
+/* Header line helpers shared by the request writer and the redaction code. */
+size_t header_name_len(const char *line);
+hts_boolean header_name_is(const char *line, size_t len, const char *name,
+                           size_t name_len);
+hts_boolean header_name_in(const char *line, const char *const *names,
+                           size_t count);
+
 /* What hts_mask_passwords() reads: */
 typedef enum {
   HTS_MASK_LIST, /* blank-separated start URLs and filters */
