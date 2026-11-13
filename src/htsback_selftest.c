@@ -1821,7 +1821,14 @@ static char *st_hostban_long(const char *prefix, char fill,
 }
 
 static int st_hostbanlinks(httrackp *opt, int argc, char **argv) {
-  enum { LNK_SHORT = 0, LNK_LOGIN, LNK_LONG, LNK_OTHER, LNK_OTHERLONG, LINKS };
+  enum {
+    LNK_SHORT = 0,
+    LNK_LONGLOGIN,
+    LNK_LONGHOST,
+    LNK_OTHER,
+    LNK_OTHERLONGHOST,
+    LINKS
+  };
 
   static const int banned[LINKS] = {1, 1, 1, 0, 0};
   FILE *const saved_log = opt->log;
@@ -1848,6 +1855,7 @@ static int st_hostbanlinks(httrackp *opt, int argc, char **argv) {
     assertf(hts_record_link(opt, adr[i], "/a.html", "/p/a.html", "", "", NULL));
 
   host_ban(opt, 0, sback, ST_HOSTBAN_HOST);
+  /* a host of 1020+ bytes, banned by its own name */
   host_ban(opt, 0, sback, longhost);
 
   for (i = 0; i < LINKS; i++) {
