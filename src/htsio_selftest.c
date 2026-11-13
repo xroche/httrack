@@ -394,12 +394,12 @@ static int st_addlink(httrackp *opt, int argc, char **argv) {
                                        "/dir/App.class",
                                        "/dir/App.class",
                                        "/dir/App.class"};
-    static const char *const cod[6] = {"",
-                                       "",
-                                       "",
-                                       "http://www.example.com/applets/",
-                                       "https://www.example.com/applets/",
-                                       NULL};
+    const char *const cod[6] = {"",
+                                "",
+                                "",
+                                "http://www.example.com/applets/",
+                                "https://www.example.com/applets/",
+                                longcod};
     static const char *const lnk[6] = {
         "sub/page.html", "sub/page.html", "?x=1",
         "Foo.class",     "Foo.class",     "http://www.example.com/x/Foo.class"};
@@ -417,8 +417,7 @@ static int st_addlink(httrackp *opt, int argc, char **argv) {
     strcpybuff(link, lnk[i]);
     str.localLink = loc;
     str.localLinkSize = (int) sizeof(loc);
-    if (!hts_record_link(opt, "www.example.com", fil[i], "", "", "",
-                         cod[i] != NULL ? cod[i] : longcod)) {
+    if (!hts_record_link(opt, "www.example.com", fil[i], "", "", "", cod[i])) {
       rc = 1;
       goto cleanup;
     }
