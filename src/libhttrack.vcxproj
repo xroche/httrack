@@ -172,6 +172,7 @@
     <ClCompile Include="htsbase.c" />
     <ClCompile Include="htsdns.c" />
     <ClCompile Include="htslib.c" />
+    <ClCompile Include="htsmime.c" />
     <ClCompile Include="htscmdline.c" />
     <ClCompile Include="htslines.c" />
     <ClCompile Include="htscmdline_selftest.c" />

@@ -744,8 +744,6 @@ extern int _DEBUG_HEAD;
 extern FILE *ioinfo;
 
 /* constantes */
-extern const char *hts_mime_keep[];
-extern const char *hts_mime[][2];
 extern const char *hts_main_mime[];
 extern const char *hts_nodetect[];
 
