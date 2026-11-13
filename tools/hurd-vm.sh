@@ -30,6 +30,8 @@ BOOT_TIMEOUT=600
 # A step that hangs must say so while the job can still report it, rather than
 # run to the job's own cap and leave nothing but a cancelled leg.
 STEP_TIMEOUT=2400
+# The suite alone takes about 35 minutes and grows with every test.
+SUITE_TIMEOUT=4800
 # Silence that has the watchdog ask whether the VM is still there. A test may
 # legitimately run this quiet (budgets in tests/ reach 1200s), so the probe
 # decides and not the clock.
@@ -260,6 +262,7 @@ rm -f "$status_file"
     # first failing test, leaving no status file and the watchdog looping on a
     # VM that is answering.
     suite_rc=0
+    STEP_TIMEOUT=$SUITE_TIMEOUT
     as_user "set -eu; cd $VM_HOME/bld && make check -j2" || suite_rc=$?
     echo "$suite_rc" >"$status_file"
 ) >"$check_log" 2>&1 &

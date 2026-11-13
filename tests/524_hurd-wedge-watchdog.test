@@ -43,12 +43,16 @@ command grep -q 'went down' "$verdict" ||
     SUITE_SILENCE=3
     SUITE_TICK=1
     SUITE_PROBES=3
+    STEP_TIMEOUT=2400
+    SUITE_TIMEOUT=4800
     VM_HOME=/home/demo
 }
 
 # The VM, stubbed. Driven by the stub_* variables rather than by an eval of a
 # body, which 232 would have to pin as one more site hiding its operand.
 as_user() {
+    # The suite must run under its own budget, not the per-step one.
+    test "$STEP_TIMEOUT" -eq "$SUITE_TIMEOUT" || return 3
     test "$stub_die" -eq 0 || kill -9 $BASHPID
     # Trickles when $stub_stream is set, so a case can keep the log moving
     # while the probes fail.
