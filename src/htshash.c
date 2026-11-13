@@ -51,7 +51,7 @@ Please visit our Website: http://www.httrack.com
 static void key_freehandler(void *arg, coucal_key value) {
 }
 
-/* Key strdup (pointer copy) */
+/* Key duplication (pointer copy) */
 static coucal_key key_duphandler(void *arg, coucal_key_const name) {
   union {
     coucal_key_const roname;

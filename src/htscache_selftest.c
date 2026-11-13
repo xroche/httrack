@@ -171,7 +171,7 @@ static int check_entry(httrackp *opt, cache_back *cache, const char *adr,
   }
 
   /* loaded body must be NUL-terminated at [size] for cache_readex's strlen()
-     consumers; buffer is malloc(size + slack) so [size] is in bounds */
+     consumers; buffer holds size + slack bytes so [size] is in bounds */
   if (r.adr != NULL && r.adr[r.size] != '\0') {
     fprintf(stderr, "%s: %s%s: body not NUL-terminated at [size]\n",
             selftest_tag, adr, fil);

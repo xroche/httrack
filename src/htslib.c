@@ -2103,7 +2103,7 @@ int check_writeinput_t(T_SOC soc, int timeout) {
   return soc_wait(soc, timeout, HTS_TRUE);
 }
 
-/* Class the live errno now: back_wait() sees it after free() and fflush() and
+/* Class the live errno now: back_wait() sees it after free and fflush and
    would rewrite this as a retryable connection error. */
 static void classify_write_error(htsblk *r) {
   r->statuscode =
@@ -5413,7 +5413,7 @@ static void unplug_wrappers(httrackp * opt) {
 
 HTSEXT_API httrackp *hts_create_opt(void) {
   static const char *defaultModules[] = {"httrack-plugin", NULL};
-  httrackp *opt = malloc(sizeof(httrackp));
+  httrackp *opt = malloct(sizeof(httrackp));
 
   /* default options */
   memset(opt, 0, sizeof(httrackp));
@@ -5708,7 +5708,7 @@ HTSEXT_API void hts_free_opt(httrackp * opt) {
     hts_mutexfree(&opt->state.lock);
 
     /* Free structure */
-    free(opt);
+    freet(opt);
   }
 }
 
@@ -6010,14 +6010,14 @@ DIR *opendir(const char *name) {
     return NULL;
   }
   freet(wname);
-  dir = calloc(sizeof(DIR), 1);
+  dir = calloct(1, sizeof(DIR));
   if (dir == NULL) {
     errno = ENOMEM;
     return NULL;
   }
   len = strlen(name);
   dir->h = INVALID_HANDLE_VALUE;
-  dir->name = malloc(len + 2 + 1);
+  dir->name = malloct(len + 2 + 1);
   strcpy(dir->name, name);
   for(i = 0; dir->name[i] != '\0'; i++) {
     if (dir->name[i] == '/') {
@@ -6063,10 +6063,8 @@ int closedir(DIR * dir) {
     if (dir->h != INVALID_HANDLE_VALUE) {
       CloseHandle(dir->h);
     }
-    if (dir->name != NULL) {
-      free(dir->name);
-    }
-    free(dir);
+    freet(dir->name);
+    freet(dir);
     return 0;
   }
   errno = EBADF;
@@ -6145,7 +6143,7 @@ FILE *hts_fopen_utf8(const char *path, const char *mode) {
   if (wpath != NULL) {
     FILE *const fp = _wfopen(wpath, wmode);
 
-    free(wpath);
+    freet(wpath);
     return fp;
   } else {
     // Fallback on conversion error.
@@ -6159,7 +6157,7 @@ int hts_stat_utf8(const char *path, STRUCT_STAT * buf) {
   if (wpath != NULL) {
     const int result = _wstat64(wpath, buf);
 
-    free(wpath);
+    freet(wpath);
     return result;
   } else {
     // Fallback on conversion error.
@@ -6173,7 +6171,7 @@ int hts_unlink_utf8(const char *path) {
   if (wpath != NULL) {
     const int result = _wunlink(wpath);
 
-    free(wpath);
+    freet(wpath);
     return result;
   } else {
     // Fallback on conversion error.
@@ -6186,18 +6184,16 @@ int hts_rename_utf8(const char *oldpath, const char *newpath) {
   LPWSTR wnewpath = hts_pathToUCS2(newpath);
   if (woldpath != NULL && wnewpath != NULL) {
     const int result = _wrename(woldpath, wnewpath);
-    /* Save errno: callers key off it (#779) and free() may clobber it. */
+    /* Save errno: callers key off it (#779) and freeing may clobber it. */
     const int err = errno;
 
-    free(woldpath);
-    free(wnewpath);
+    freet(woldpath);
+    freet(wnewpath);
     errno = err;
     return result;
   } else {
-    if (woldpath != NULL)
-      free(woldpath);
-    if (wnewpath != NULL)
-      free(wnewpath);
+    freet(woldpath);
+    freet(wnewpath);
     // Fallback on conversion error.
     return rename(oldpath, newpath);
   }
@@ -6209,7 +6205,7 @@ int hts_rmdir_utf8(const char *path) {
   if (wpath != NULL) {
     const int result = _wrmdir(wpath);
 
-    free(wpath);
+    freet(wpath);
     return result;
   } else {
     // Fallback on conversion error.
@@ -6223,7 +6219,7 @@ int hts_mkdir_utf8(const char *path) {
   if (wpath != NULL) {
     const int result = _wmkdir(wpath);
 
-    free(wpath);
+    freet(wpath);
     return result;
   } else {
     // Fallback on conversion error.
@@ -6238,7 +6234,7 @@ HTSEXT_API int hts_utime_utf8(const char *path, const STRUCT_UTIMBUF * times) {
   if (wpath != NULL) {
     const int result = _wutime(wpath, &mtimes);
 
-    free(wpath);
+    freet(wpath);
     return result;
   } else {
     // Fallback on conversion error.

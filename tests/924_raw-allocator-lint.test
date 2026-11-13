@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# Files listed below must allocate through the htssafe.h wrappers, not raw libc.
-# Extend `files` as each file is converted.
+# Engine sources must allocate through the htssafe.h wrappers, not raw libc.
+# punycode.c is vendored, and the exported hts_* allocator shims stay on libc.
 # Reads the tracked source, so it is named outside the Windows CI globs.
 
 set -euo pipefail
@@ -11,7 +11,6 @@ set -euo pipefail
 
 top="${abs_top_srcdir:-}"
 test -n "$top" || fail "not run under make check"
-files="htscharset.c htsserver.c htsweb.c proxy/*.c proxy/*.h"
 
 raw() { # raw FILE -> the lines calling a raw libc allocator
     LC_ALL=C grep -nE '(^|[^[:alnum:]_.>])(malloc|calloc|realloc|free|strdup)[[:space:]]*\(' "$1" || true
@@ -28,11 +27,24 @@ test -z "$(raw "$work/clean.c")" || fail "the scan flags a wrapped call"
 printf 'void f(void) {\n  t->free(p);\n  t.free(p);\n}\n' >"$work/member.c"
 test -z "$(raw "$work/member.c")" || fail "the scan flags a member call"
 
-for f in $files; do
-    for src in "$top"/src/$f; do
-        test -r "$src" || skip "sources not shipped"
-        found=$(raw "$src")
-        test -z "$found" || fail "raw allocator calls in $src: $found"
-    done
+# The exported hts_* allocator shims in htslib.c.
+shim='^[0-9]+:  (return (strdup\(str\)|malloc\(size\)|realloc\(data, size\))|free\(data\));$'
+printf 'void f(void) {\n  return malloc(size);\n  free(other);\n}\n' >"$work/shim.c"
+test "$(raw "$work/shim.c" | LC_ALL=C grep -vcE "$shim")" = 1 || fail "the shim allowance hides a raw free"
+
+checked=0
+for src in "$top"/src/*.c "$top"/src/proxy/*.c "$top"/src/proxy/*.h; do
+    test -r "$src" || skip "sources not shipped"
+    case "$src" in
+    */punycode.c) continue ;;
+    esac
+    found=$(raw "$src")
+    case "$src" in
+    */htslib.c) found=$(LC_ALL=C grep -vE "$shim" <<<"$found" || true) ;;
+    esac
+    test -z "$found" || fail "raw allocator calls in $src: $found"
+    checked=$((checked + 1))
 done
-echo "no raw allocator call in: $files"
+# Floor: a mangled glob must not pass by scanning nothing.
+test "$checked" -ge 85 || fail "only $checked files scanned"
+echo "no raw allocator call in $checked engine and proxy files"

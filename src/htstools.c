@@ -1417,7 +1417,7 @@ HTSEXT_API find_handle hts_findfirst(char *path) {
             return find;
         }
 #endif
-        free((void *) find);
+        freet(find);
       }
     }
   }
@@ -1460,7 +1460,7 @@ HTSEXT_API int hts_findclose(find_handle find) {
       find->hdir = NULL;
     }
 #endif
-    free((void *) find);
+    freet(find);
   }
   return 0;
 }
