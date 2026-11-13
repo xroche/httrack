@@ -637,7 +637,7 @@ static void sig_ignore(int code) { // ignore the signal
 
 static void sig_term(int code) { // quit at once (never returns)
   SIG_PRINT_CODE(SIG_FD_ERR, "\nProgram terminated (signal ", code);
-  /* _exit, not exit: exit() runs OpenSSL's atexit teardown here, whose free()
+  /* _exit, not exit: exit() runs OpenSSL's atexit teardown here, whose free
      can deadlock on the malloc lock the interrupted thread holds. */
   _exit(0);
 }

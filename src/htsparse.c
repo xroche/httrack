@@ -2661,7 +2661,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   // converting those would double-encode them (#180)
                   if (hasCharset && !hts_isCharsetUTF8(charset) &&
                       !hts_isStringUTF8(lien, strlen(lien))) {
-                    char *const s = hts_convertStringToUTF8(lien, strlen(lien), charset);
+                    char *s =
+                        hts_convertStringToUTF8(lien, strlen(lien), charset);
                     if (s != NULL) {
                       hts_log_print(opt, LOG_DEBUG,
                                     "engine: save-name: '%s' charset "
@@ -2679,7 +2680,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                             "Link is too long after charset conversion: %s",
                             url_nologin(opt, lien));
                       }
-                      free(s);
+                      freet(s);
                     }
                   }
 

@@ -2103,7 +2103,7 @@ int check_writeinput_t(T_SOC soc, int timeout) {
   return soc_wait(soc, timeout, HTS_TRUE);
 }
 
-/* Class the live errno now: back_wait() sees it after free() and fflush() and
+/* Class the live errno now: back_wait() sees it after free and fflush and
    would rewrite this as a retryable connection error. */
 static void classify_write_error(htsblk *r) {
   r->statuscode =
@@ -2917,49 +2917,39 @@ TStamp mtime_monotonic(void) {
 #endif
 }
 
-// convertit un nombre de secondes en temps (chaine)
-void sec2str(char *st, TStamp t) {
-  int j, h, m, s;
+/* Writes t seconds as days, hours, minutes and seconds, dropping the empty
+   leading units. The caller's buffer holds 256 bytes. */
+static void duration_str(char *st, TStamp t, hts_boolean quick) {
+  const int j = (int) (t / (3600 * 24));
+  int h, m, s;
 
-  j = (int) (t / (3600 * 24));
   t -= ((TStamp) j) * (3600 * 24);
-  h = (int) (t / (3600));
+  h = (int) (t / 3600);
   t -= ((TStamp) h) * 3600;
   m = (int) (t / 60);
   t -= ((TStamp) m) * 60;
   s = (int) t;
 
   if (j > 0)
-    sprintf(st, "%d days, %d hours %d minutes %d seconds", j, h, m, s);
+    snprintf(st, 256,
+             quick == HTS_TRUE ? "%dd,%02dh,%02dmin%02ds"
+                               : "%d days, %d hours %d minutes %d seconds",
+             j, h, m, s);
   else if (h > 0)
-    sprintf(st, "%d hours %d minutes %d seconds", h, m, s);
+    snprintf(st, 256,
+             quick == HTS_TRUE ? "%dh,%02dmin%02ds"
+                               : "%d hours %d minutes %d seconds",
+             h, m, s);
   else if (m > 0)
-    sprintf(st, "%d minutes %d seconds", m, s);
+    snprintf(st, 256,
+             quick == HTS_TRUE ? "%dmin%02ds" : "%d minutes %d seconds", m, s);
   else
-    sprintf(st, "%d seconds", s);
+    snprintf(st, 256, quick == HTS_TRUE ? "%ds" : "%d seconds", s);
 }
 
-// idem, plus court (chaine)
-HTSEXT_API void qsec2str(char *st, TStamp t) {
-  int j, h, m, s;
+void sec2str(char *st, TStamp t) { duration_str(st, t, HTS_FALSE); }
 
-  j = (int) (t / (3600 * 24));
-  t -= ((TStamp) j) * (3600 * 24);
-  h = (int) (t / (3600));
-  t -= ((TStamp) h) * 3600;
-  m = (int) (t / 60);
-  t -= ((TStamp) m) * 60;
-  s = (int) t;
-
-  if (j > 0)
-    sprintf(st, "%dd,%02dh,%02dmin%02ds", j, h, m, s);
-  else if (h > 0)
-    sprintf(st, "%dh,%02dmin%02ds", h, m, s);
-  else if (m > 0)
-    sprintf(st, "%dmin%02ds", m, s);
-  else
-    sprintf(st, "%ds", s);
-}
+HTSEXT_API void qsec2str(char *st, TStamp t) { duration_str(st, t, HTS_TRUE); }
 
 // heure actuelle, GMT, format rfc (taille buffer 256o)
 void time_gmt_rfc822(char *s) {
@@ -5413,7 +5403,7 @@ static void unplug_wrappers(httrackp * opt) {
 
 HTSEXT_API httrackp *hts_create_opt(void) {
   static const char *defaultModules[] = {"httrack-plugin", NULL};
-  httrackp *opt = malloc(sizeof(httrackp));
+  httrackp *opt = malloct(sizeof(httrackp));
 
   /* default options */
   memset(opt, 0, sizeof(httrackp));
@@ -5708,7 +5698,7 @@ HTSEXT_API void hts_free_opt(httrackp * opt) {
     hts_mutexfree(&opt->state.lock);
 
     /* Free structure */
-    free(opt);
+    freet(opt);
   }
 }
 
@@ -5965,20 +5955,18 @@ void *hts_get_callback(t_hts_htmlcheck_callbacks *callbacks, const char *name) {
 /* libc stubs */
 
 HTSEXT_API char *hts_strdup(const char *str) {
-  return strdup(str);
+  return strdup(str); /* libc on purpose */
 }
 
 HTSEXT_API void *hts_malloc(size_t size) {
-  return malloc(size);
+  return malloc(size); /* libc on purpose */
 }
 
 HTSEXT_API void *hts_realloc(void *const data, const size_t size) {
-  return realloc(data, size);
+  return realloc(data, size); /* libc on purpose */
 }
 
-HTSEXT_API void hts_free(void *data) {
-  free(data);
-}
+HTSEXT_API void hts_free(void *data) { free(data); /* libc on purpose */ }
 
 /* Dummy functions */
 HTSEXT_API int hts_resetvar(void) {
@@ -6010,14 +5998,14 @@ DIR *opendir(const char *name) {
     return NULL;
   }
   freet(wname);
-  dir = calloc(sizeof(DIR), 1);
+  dir = calloct(1, sizeof(DIR));
   if (dir == NULL) {
     errno = ENOMEM;
     return NULL;
   }
   len = strlen(name);
   dir->h = INVALID_HANDLE_VALUE;
-  dir->name = malloc(len + 2 + 1);
+  dir->name = malloct(len + 2 + 1);
   strcpy(dir->name, name);
   for(i = 0; dir->name[i] != '\0'; i++) {
     if (dir->name[i] == '/') {
@@ -6063,10 +6051,8 @@ int closedir(DIR * dir) {
     if (dir->h != INVALID_HANDLE_VALUE) {
       CloseHandle(dir->h);
     }
-    if (dir->name != NULL) {
-      free(dir->name);
-    }
-    free(dir);
+    freet(dir->name);
+    freet(dir);
     return 0;
   }
   errno = EBADF;
@@ -6145,7 +6131,7 @@ FILE *hts_fopen_utf8(const char *path, const char *mode) {
   if (wpath != NULL) {
     FILE *const fp = _wfopen(wpath, wmode);
 
-    free(wpath);
+    freet(wpath);
     return fp;
   } else {
     // Fallback on conversion error.
@@ -6159,7 +6145,7 @@ int hts_stat_utf8(const char *path, STRUCT_STAT * buf) {
   if (wpath != NULL) {
     const int result = _wstat64(wpath, buf);
 
-    free(wpath);
+    freet(wpath);
     return result;
   } else {
     // Fallback on conversion error.
@@ -6173,7 +6159,7 @@ int hts_unlink_utf8(const char *path) {
   if (wpath != NULL) {
     const int result = _wunlink(wpath);
 
-    free(wpath);
+    freet(wpath);
     return result;
   } else {
     // Fallback on conversion error.
@@ -6186,18 +6172,16 @@ int hts_rename_utf8(const char *oldpath, const char *newpath) {
   LPWSTR wnewpath = hts_pathToUCS2(newpath);
   if (woldpath != NULL && wnewpath != NULL) {
     const int result = _wrename(woldpath, wnewpath);
-    /* Save errno: callers key off it (#779) and free() may clobber it. */
+    /* Save errno: callers key off it (#779) and freeing may clobber it. */
     const int err = errno;
 
-    free(woldpath);
-    free(wnewpath);
+    freet(woldpath);
+    freet(wnewpath);
     errno = err;
     return result;
   } else {
-    if (woldpath != NULL)
-      free(woldpath);
-    if (wnewpath != NULL)
-      free(wnewpath);
+    freet(woldpath);
+    freet(wnewpath);
     // Fallback on conversion error.
     return rename(oldpath, newpath);
   }
@@ -6209,7 +6193,7 @@ int hts_rmdir_utf8(const char *path) {
   if (wpath != NULL) {
     const int result = _wrmdir(wpath);
 
-    free(wpath);
+    freet(wpath);
     return result;
   } else {
     // Fallback on conversion error.
@@ -6223,7 +6207,7 @@ int hts_mkdir_utf8(const char *path) {
   if (wpath != NULL) {
     const int result = _wmkdir(wpath);
 
-    free(wpath);
+    freet(wpath);
     return result;
   } else {
     // Fallback on conversion error.
@@ -6238,7 +6222,7 @@ HTSEXT_API int hts_utime_utf8(const char *path, const STRUCT_UTIMBUF * times) {
   if (wpath != NULL) {
     const int result = _wutime(wpath, &mtimes);
 
-    free(wpath);
+    freet(wpath);
     return result;
   } else {
     // Fallback on conversion error.
