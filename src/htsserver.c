@@ -36,9 +36,9 @@ Please visit our Website: http://www.httrack.com
 /* Bypass internal definition protection */
 #define HTS_INTERNAL_BYTECODE
 #include "htsbase.h"
+#include "htsnet.h"
 #undef HTS_INTERNAL_BYTECODE
 
-#include "htsnet.h"
 #include "htslib.h"
 #include "htsio.h"
 #include <limits.h>
@@ -506,19 +506,11 @@ T_SOC smallserver_init(int *port, char *adr, size_t adr_size,
         advertised_host(adv, sizeof(adv), h_loc);
         strclipbuff(adr, adr_size, adv);
       } else {
-#ifdef _WIN32
-        closesocket(soc);
-#else
-        close(soc);
-#endif
+        hts_closesocket(soc);
         soc = INVALID_SOCKET;
       }
     } else {
-#ifdef _WIN32
-      closesocket(soc);
-#else
-      close(soc);
-#endif
+      hts_closesocket(soc);
       soc = INVALID_SOCKET;
     }
   }
@@ -2973,11 +2965,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
         ;
     }
 
-#ifdef _WIN32
-    closesocket(soc_c);
-#else
-    close(soc_c);
-#endif
+    hts_closesocket(soc_c);
 
     /* One large post must not pin its buffer for the life of the server. */
     if (buffer_size > SMALLSERVER_BUFFER_SIZE) {
@@ -2991,11 +2979,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
   }
 
   if (soc != INVALID_SOCKET) {
-#ifdef _WIN32
-    closesocket(soc);
-#else
-    close(soc);
-#endif
+    hts_closesocket(soc);
   }
 
   /* Only the UI asking to quit is a clean stop; losing the socket or the buffer

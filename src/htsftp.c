@@ -439,11 +439,11 @@ void launch_ftp(FTPDownloadStruct * params) {
 }
 
 // closes and invalidates, for run_launch_ftp's single cleanup
-#ifdef _WIN32
-#define _T_SOC_close(soc)  do { closesocket(soc); soc=INVALID_SOCKET; } while(0)
-#else
-#define _T_SOC_close(soc)  do { close(soc); soc=INVALID_SOCKET; } while(0)
-#endif
+#define _T_SOC_close(soc)                                                      \
+  do {                                                                         \
+    hts_closesocket(soc);                                                      \
+    soc = INVALID_SOCKET;                                                      \
+  } while (0)
 /* htsblk_failf() for a permanent failure. */
 #define ftp_fail(R, ...)                                                       \
   do {                                                                         \
@@ -686,11 +686,7 @@ static hts_boolean ftp_connect(lien_back *back, T_SOC soc, SOCaddr *server,
     return HTS_FALSE;
   if (hts_socket_connect(soc, &SOCaddr_sockaddr(*server), SOCaddr_size(*server),
                          opt) != 0) {
-#ifdef _WIN32
-    if (WSAGetLastError() != WSAEWOULDBLOCK)
-#else
-    if (errno != EINPROGRESS && errno != EINTR)
-#endif
+    if (!hts_socket_connect_pending())
       return HTS_FALSE;
     int ready;
 
@@ -1346,29 +1342,17 @@ T_SOC get_datasocket(char *to_send, size_t to_send_size) {
 #endif
 
             } else {
-#ifdef _WIN32
-              closesocket(soc);
-#else
-              close(soc);
-#endif
+              hts_closesocket(soc);
               soc = INVALID_SOCKET;
             }
 
           } else {
-#ifdef _WIN32
-            closesocket(soc);
-#else
-            close(soc);
-#endif
+            hts_closesocket(soc);
             soc = INVALID_SOCKET;
           }
 
         } else {
-#ifdef _WIN32
-          closesocket(soc);
-#else
-          close(soc);
-#endif
+          hts_closesocket(soc);
           soc = INVALID_SOCKET;
         }
       }

@@ -610,11 +610,7 @@ T_SOC http_xfopen(httrackp *opt, const char *adr, const char *fil,
   /* Check for errors */
   if (soc == INVALID_SOCKET) {
     if (!strnotempty(retour->msg)) {
-#ifdef _WIN32
-      const int last_errno = WSAGetLastError();
-#else
-      const int last_errno = errno;
-#endif
+      const int last_errno = hts_socket_errno();
       char errbuf[HTS_STRERROR_SIZE];
 
       htsblk_failf(retour, "Connect error: %s",
@@ -2934,11 +2930,7 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
     }
     if (soc == INVALID_SOCKET) {
       if (retour != NULL) {
-#ifdef _WIN32
-        const int last_errno = WSAGetLastError();
-#else
-        const int last_errno = errno;
-#endif
+        const int last_errno = hts_socket_errno();
         char errbuf[HTS_STRERROR_SIZE];
 
         htsblk_failf(retour, "Unable to create a socket: %s",
@@ -2965,11 +2957,7 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
     SOCaddr_initport(server, port);
 
     if (!socket_set_nonblocking(soc, HTS_TRUE)) {
-#ifdef _WIN32
-      const int last_errno = WSAGetLastError();
-#else
-      const int last_errno = errno;
-#endif
+      const int last_errno = hts_socket_errno();
       char errbuf[HTS_STRERROR_SIZE];
 
       htsblk_failf(retour, "Non-blocking socket failed: %s",
@@ -3231,26 +3219,16 @@ int deleteaddr(htsblk * r) {
   return 1;
 }
 
-// fermer une socket
+// Close a socket, logging a failure.
 void deletesoc(T_SOC soc) {
   if (soc != INVALID_SOCKET && soc != LOCAL_SOCKET_ID) {
-#ifdef _WIN32
-    if (closesocket(soc) != 0) {
-      const int err = WSAGetLastError();
+    if (!hts_closesocket(soc)) {
+      const int err = hts_socket_errno();
       char errbuf[HTS_STRERROR_SIZE];
 
       fprintf(stderr, "* error closing socket " T_SOCP ": %s\n", soc,
               hts_strerror(err, errbuf, sizeof(errbuf)));
     }
-#else
-    if (close(soc) != 0) {
-      const int err = errno;
-      char errbuf[HTS_STRERROR_SIZE];
-
-      fprintf(stderr, "* error closing socket " T_SOCP ": %s\n", soc,
-              hts_strerror(err, errbuf, sizeof(errbuf)));
-    }
-#endif
   }
 }
 
