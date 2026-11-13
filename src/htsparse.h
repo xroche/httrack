@@ -259,6 +259,12 @@ hts_boolean hts_postprocess_reply_ok(const char *html, int len,
                                      size_t capa);
 
 /*
+  Say once that the -#L link cap is full and record the abort. Callable
+  from the parser and the mirror loop.
+*/
+void maxlinks_give_up(httrackp *opt, volatile int *exit_xh);
+
+/*
   Take the pending request NAME (HTS_ABORT_LOCKNAME or HTS_PAUSE_LOCKNAME) in
   the output directory, deleting the file, and answer whether the mirror must
   act on it. True only for a request newer than this run's own
@@ -313,6 +319,48 @@ int hts_wait_delayed(htsmoduleStruct *str, lien_adrfilsave *afs,
 #define ENGINE_SAVE_CONTEXT_BASE() \
   /* Apply changes */ \
   * str->ptr_ = ptr
+
+/* Mutable extended-context fields: one source of truth so the DEFINE/SET/SAVE
+   load and store lists can't drift apart. */
+/* clang-format off */
+#define ENGINE_MUTABLE_FIELDS(X) \
+  X(int, error, stre->error_) \
+  X(int, store_errpage, stre->store_errpage_) \
+  X(int, makeindex_done, stre->makeindex_done_) \
+  X(FILE *, makeindex_fp, stre->makeindex_fp_) \
+  X(int, makeindex_links, stre->makeindex_links_) \
+  X(LLint, stat_fragment, stre->stat_fragment_)
+
+#define ENGINE_FIELD_DECLARE(type, name, src) type name = *(src);
+#define ENGINE_FIELD_LOAD(type, name, src) name = *(src);
+#define ENGINE_FIELD_STORE(type, name, src) *(src) = name;
+
+#define ENGINE_DEFINE_CONTEXT() \
+  ENGINE_DEFINE_CONTEXT_BASE(); \
+  htsblk* const r HTS_UNUSED = stre->r_; \
+  hash_struct* const hash HTS_UNUSED = stre->hash_; \
+  char* const codebase HTS_UNUSED = stre->codebase; \
+  char* const base HTS_UNUSED = stre->base; \
+  const char * const template_header HTS_UNUSED = stre->template_header_; \
+  const char * const template_body HTS_UNUSED = stre->template_body_; \
+  const char * const template_footer HTS_UNUSED = stre->template_footer_; \
+  HTS_UNUSED char* const makeindex_firstlink = stre->makeindex_firstlink_; \
+  ENGINE_MUTABLE_FIELDS(ENGINE_FIELD_DECLARE) \
+  /* load-once (kept out of SET/SAVE): re-reading would reset the throttle */ \
+  HTS_UNUSED TStamp makestat_time = stre->makestat_time; \
+  HTS_UNUSED FILE* makestat_fp = stre->makestat_fp
+
+#define ENGINE_SET_CONTEXT() \
+  ENGINE_SET_CONTEXT_BASE(); \
+  ENGINE_MUTABLE_FIELDS(ENGINE_FIELD_LOAD)
+
+#define ENGINE_LOAD_CONTEXT() \
+  ENGINE_DEFINE_CONTEXT()
+
+#define ENGINE_SAVE_CONTEXT() \
+  ENGINE_SAVE_CONTEXT_BASE(); \
+  ENGINE_MUTABLE_FIELDS(ENGINE_FIELD_STORE)
+/* clang-format on */
 
 #endif
 
