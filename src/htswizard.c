@@ -44,18 +44,16 @@ HTS_STATIC_ASSERT(sizeof(HTS_WIZARD_FILTER_SUFFIX) <= HTS_FILTER_SUFFIX_MAX,
 /* END specific definitions */
 
 /* "embedded" */
-htspair_t hts_detect_embed[] = {
-  {"img", "src"},
-  {"link", "href"},
+static htspair_t hts_detect_embed[] = {{"img", "src"},
+                                       {"link", "href"},
 
-  /* embedded script hack */
-  {"script", ".src"},
+                                       /* embedded script hack */
+                                       {"script", ".src"},
 
-  /* style */
-  {"style", "import"},
+                                       /* style */
+                                       {"style", "import"},
 
-  {NULL, NULL}
-};
+                                       {NULL, NULL}};
 
 /* HTML5 media siblings of <img src>: same near-link treatment (#451) */
 static const htspair_t hts_detect_embed_html5[] = {

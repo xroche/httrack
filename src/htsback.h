@@ -195,8 +195,8 @@ hts_boolean back_spool_write(httrackp *opt, const char *filename,
 /* Remove spool files whose process is gone or is this one. Call before this
    run spools anything. */
 void back_spool_sweep(httrackp *opt);
-/* -#test=backswap: slots eligible for the on-disk ready table. */
-int back_selftest_slot_swap(void);
+/* Can this slot be swapped out to disk? Hidden, shared with the self-test. */
+int slot_can_be_cached_on_disk(const lien_back *back);
 void back_info(struct_back * sback, int i, int j, FILE * fp);
 void back_infostr(struct_back *sback, int i, int j, char *s, size_t size);
 LLint back_transferred(LLint add, struct_back * sback);
