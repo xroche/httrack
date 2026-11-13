@@ -1,0 +1,16 @@
+#!/bin/bash
+#
+# FTP active mode: get_datasocket() must listen, and its PORT or EPRT command
+# must name the port it listens on, in host byte order.
+
+set -euo pipefail
+
+out=$(httrack -O /dev/null -#test=ftp-datasocket)
+if grep -q "ftp-datasocket self-test SKIP" <<<"$out"; then
+    echo "$out"
+    exit 77
+fi
+grep -q "ftp-datasocket self-test OK" <<<"$out" || {
+    echo "$out" >&2
+    exit 1
+}

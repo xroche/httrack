@@ -1304,13 +1304,9 @@ T_SOC get_datasocket(char *to_send, size_t to_send_size) {
           if (getsockname(soc, &SOCaddr_sockaddr(server2), &len) == 0) {
             // *port=ntohs(server.sin_port);  // récupérer port
             if (listen(soc, 1) >= 0) {
+              const unsigned int port = ntohs(SOCaddr_sinport(server2));
 #if HTS_INET6==0
-              unsigned short int a, n1, n2;
-
-              // calculer port
-              a = SOCaddr_sinport(server2);
-              n1 = (a & 0xff);
-              n2 = ((a >> 8) & 0xff);
+              const unsigned int n1 = port >> 8, n2 = port & 0xff;
               {
                 char dots[256 + 2];
                 char dot[256 + 2];
@@ -1324,7 +1320,7 @@ T_SOC get_datasocket(char *to_send, size_t to_send_size) {
                   *a = ',';     // virgules!
                 while((a = strchr(dots, ':')))
                   *a = ',';     // virgules!
-                snprintf(to_send, to_send_size, "PORT %s,%d,%d", dots, n1, n2);
+                snprintf(to_send, to_send_size, "PORT %s,%u,%u", dots, n1, n2);
               }
 #else
               /*
@@ -1335,9 +1331,8 @@ T_SOC get_datasocket(char *to_send, size_t to_send_size) {
                 char dot[256 + 2];
 
                 SOCaddr_inetntoa(dot, 256, server2);
-                snprintf(to_send, to_send_size, "EPRT |%c|%s|%d|",
-                         SOCaddr_getproto(server2), dot,
-                         SOCaddr_sinport(server2));
+                snprintf(to_send, to_send_size, "EPRT |%c|%s|%u|",
+                         SOCaddr_getproto(server2), dot, port);
               }
 #endif
 

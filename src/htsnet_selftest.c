@@ -668,6 +668,75 @@ static int st_ftpline(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* get_datasocket() listens on the address the host name resolves to, and its
+   PORT or EPRT command names that address and the port in host order. */
+static int st_ftp_datasocket(httrackp *opt, int argc, char **argv) {
+  char host[256 + 2];
+  char line[1024];
+  char want[1024];
+  char dot[256 + 2];
+  SOCaddr addr, bound;
+  SOClen len = SOCaddr_capacity(bound);
+  T_SOC srv, cli, acc;
+  int port;
+
+  /* a host whose own name gives no bindable address has no active mode */
+  memset(&addr, 0, sizeof(addr));
+  if (gethostname(host, 256) != 0 ||
+      hts_dns_resolve_nocache(host, &addr) == NULL ||
+      (cli = (T_SOC) socket(SOCaddr_sinfamily(addr), SOCK_STREAM, 0)) ==
+          INVALID_SOCKET) {
+    printf("ftp-datasocket self-test SKIP (no address for the host name)\n");
+    return 0;
+  }
+  if (bind(cli, &SOCaddr_sockaddr(addr), SOCaddr_size(addr)) != 0) {
+    deletesoc(cli);
+    printf("ftp-datasocket self-test SKIP (no address for the host name)\n");
+    return 0;
+  }
+  deletesoc(cli);
+
+  memset(line, 'x', sizeof(line) - 1);
+  line[sizeof(line) - 1] = '\0';
+  srv = get_datasocket(line, sizeof(line));
+  assertf(srv != INVALID_SOCKET);
+  assertf(getsockname(srv, &SOCaddr_sockaddr(bound), &len) == 0);
+  port = ntohs(SOCaddr_sinport(bound));
+  assertf(port != 0);
+  SOCaddr_inetntoa(dot, sizeof(dot), bound);
+#if HTS_INET6 == 0
+  {
+    char *p;
+
+    for (p = dot; *p != '\0'; p++) {
+      if (*p == '.')
+        *p = ',';
+    }
+  }
+  snprintf(want, sizeof(want), "PORT %s,%d,%d", dot, port >> 8, port & 0xff);
+#else
+  snprintf(want, sizeof(want), "EPRT |%c|%s|%d|", SOCaddr_getproto(bound), dot,
+           port);
+#endif
+  if (strcmp(line, want) != 0) {
+    printf("ftp-datasocket: sent \"%s\", expected \"%s\"\n", line, want);
+    fflush(stdout);
+  }
+  assertf(strcmp(line, want) == 0);
+
+  /* the socket listens, so the server's data connection gets through */
+  cli = (T_SOC) socket(SOCaddr_sinfamily(bound), SOCK_STREAM, 0);
+  assertf(cli != INVALID_SOCKET);
+  assertf(connect(cli, &SOCaddr_sockaddr(bound), SOCaddr_size(bound)) == 0);
+  acc = (T_SOC) accept(srv, NULL, NULL);
+  assertf(acc != INVALID_SOCKET);
+  deletesoc(acc);
+  deletesoc(cli);
+  deletesoc(srv);
+  printf("ftp-datasocket self-test OK (%.4s names the listening port)\n", want);
+  return 0;
+}
+
 /* ftp_split_userpass: the split, the decode, and userinfo refused rather than
    clipped into another account's name (#1032). */
 static int st_ftpuser(httrackp *opt, int argc, char **argv) {
@@ -1514,6 +1583,9 @@ const struct selftest_entry selftests_net[] = {
      st_socks5},
     {"ftp-line", "", "get_ftp_line bounds a hostile FTP reply line",
      st_ftpline},
+    {"ftp-datasocket", "",
+     "the FTP active-mode listener and the PORT or EPRT command naming it",
+     st_ftp_datasocket},
     {"ftp-userpass", "", "ftp_split_userpass decodes and bounds URL userinfo",
      st_ftpuser},
     {"ftp-ctrlchars", "", "send_line rejects a control byte in an FTP command",
