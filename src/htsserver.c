@@ -458,23 +458,13 @@ T_SOC smallserver_init(int *port, char *adr, size_t adr_size,
   }
   strcpybuff(server_bound_addr, h_loc);
 
-  if ((soc = (T_SOC) socket(SOCaddr_sinfamily(server), SOCK_STREAM, 0)) !=
-      INVALID_SOCKET) {
-    SOCaddr_initport(server, *port);
-    if (bind(soc, &SOCaddr_sockaddr(server), SOCaddr_size(server)) == 0) {
-      if (listen(soc, 10) >= 0) {
-        char adv[sizeof(h_loc) + 2]; /* + the brackets of an IPv6 literal */
+  SOCaddr_initport(server, *port);
+  soc = hts_shared_listen(&server, SOCK_STREAM, 10, NULL, NULL);
+  if (soc != INVALID_SOCKET) {
+    char adv[sizeof(h_loc) + 2]; /* + the brackets of an IPv6 literal */
 
-        advertised_host(adv, sizeof(adv), h_loc);
-        strclipbuff(adr, adr_size, adv);
-      } else {
-        hts_closesocket(soc);
-        soc = INVALID_SOCKET;
-      }
-    } else {
-      hts_closesocket(soc);
-      soc = INVALID_SOCKET;
-    }
+    advertised_host(adv, sizeof(adv), h_loc);
+    strclipbuff(adr, adr_size, adv);
   }
   return soc;
 }

@@ -85,7 +85,7 @@ CLEANFILES = webhttrack
 
 libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
 	htscatchurl.c htsfetch.c htspsl.c htspsl_data.c htsfilters.c htsftp.c htshash.c coucal/coucal.c \
-	htscmdline.c htshelp.c htsbase.c htsdns.c htslib.c htslines.c htsurlport.c htsdate.c htscoremain.c \
+	htscmdline.c htshelp.c htsbase.c htsdns.c htslib.c htslines.c htsurlport.c htsdate.c htscoremain.c htsshared.c \
 	htsname.c htsrobots.c htstools.c htsrandom.c htswizard.c \
 	htsalias.c htsthread.c htsindex.c htsbauth.c htscookiefile.c htsbundle.c \
 	htscrashtest.c \
@@ -99,7 +99,7 @@ libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
 	htscmdline.h htsconfig.h htscore.h htsparse.h htscoremain.h htsdefines.h  \
 	htsfilters.h htsftp.h htsglobal.h htshash.h coucal/coucal.h \
 	htshelp.h htsindex.h htsio.h htslib.h htslines.h htsurlport.h htsmd5.h \
-	htsmodules.h htsname.h htsnet.h htssniff.h \
+	htsmodules.h htsname.h htsnet.h htsshared.h htssniff.h \
 	htsopt.h htsrobots.h htsthread.h htswin32.h  \
 	htscrashtest.h htstools.h htsrandom.h htswizard.h htswrap.h htscodec.h htswarc.h htschanges.h htssinglefile.h htsfetch.h htspsl.h htssitemap.h htsproxy.h htszlib.h  \
 	htsstrings.h htsarrays.h htsarena.h httrack-library.h \

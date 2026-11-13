@@ -227,33 +227,12 @@ static T_SOC smallserver_init(const char *adr, int port, int socktype,
                               int *lasterr) {
   SOCaddr server;
   SOCaddr_initany(server);
-  *lasterr = 0;
-  if (hts_shared_gethost(adr, &server)) { // host name
-    T_SOC soc = INVALID_SOCKET;
-
-    if ((soc = (T_SOC) socket(SOCaddr_sinfamily(server), socktype, 0)) !=
-        INVALID_SOCKET) {
-      SOCaddr_initport(server, port);
-      if (bind(soc, &SOCaddr_sockaddr(server), SOCaddr_size(server)) == 0) {
-        if (socktype != SOCK_STREAM || listen(soc, 10) >= 0) {
-          return soc;
-        } else {
-          *lasterr = hts_socket_errno();
-          hts_closesocket(soc);
-          soc = INVALID_SOCKET;
-        }
-      } else {
-        *lasterr = hts_socket_errno();
-        hts_closesocket(soc);
-        soc = INVALID_SOCKET;
-      }
-    } else {
-      *lasterr = hts_socket_errno();
-    }
-  } else {
+  if (!hts_shared_gethost(adr, &server)) {
     *lasterr = SMALLSERVER_ERR_RESOLVE;
+    return INVALID_SOCKET;
   }
-  return INVALID_SOCKET;
+  SOCaddr_initport(server, port);
+  return hts_shared_listen(&server, socktype, 10, NULL, lasterr);
 }
 
 static int proxytrack_start(PT_Indexes indexes, T_SOC soc, T_SOC socICP);

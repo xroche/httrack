@@ -73,4 +73,11 @@ int hts_shared_linputsoc(T_SOC soc, char *s, int max, time_t deadline,
    hostname is NULL, empty or does not resolve. */
 hts_boolean hts_shared_gethost(const char *hostname, SOCaddr *server);
 
+/* Open a socktype socket bound to *addr, and listen with backlog unless it is
+   SOCK_DGRAM. bound, when not NULL, gets getsockname() before listen(). On
+   failure return INVALID_SOCKET, with the socket error in *lasterr when
+   lasterr is not NULL. */
+T_SOC hts_shared_listen(SOCaddr *addr, int socktype, int backlog,
+                        SOCaddr *bound, int *lasterr);
+
 #endif

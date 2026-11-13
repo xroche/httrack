@@ -36,6 +36,7 @@ Please visit our Website: http://www.httrack.com
 /* specific definitions */
 #include "htsbase.h"
 #include "htsnet.h"
+#include "htsshared.h"
 #include "htslib.h"
 #include "htscore.h"
 #include <fcntl.h>
@@ -76,38 +77,18 @@ HTSEXT_API T_SOC catch_url_init_std(int *port_prox, char *adr_prox) {
 
 // catch_url_init(&port,&return_host);
 HTSEXT_API T_SOC catch_url_init(int *port, /* 128 bytes */ char *adr) {
-  T_SOC soc = INVALID_SOCKET;
-  SOCaddr server;
+  SOCaddr server, bound;
+  T_SOC soc;
 
   /* Loopback only: the request this proxy captures carries the browser's
      cookies and credentials for the target site. */
   SOCaddr_initloopback(server);
-  if ((soc = (T_SOC) socket(SOCaddr_sinfamily(server), SOCK_STREAM, 0)) !=
-      INVALID_SOCKET) {
-    SOCaddr_initport(server, *port);
-    if (bind(soc, &SOCaddr_sockaddr(server), SOCaddr_size(server)) == 0) {
-      SOCaddr server2;
-      SOClen len = SOCaddr_capacity(server2);
-
-      if (getsockname(soc, &SOCaddr_sockaddr(server2), &len) == 0) {
-        /* server2, not server: an ephemeral port only appears here */
-        *port = ntohs(SOCaddr_sinport(server2));
-        if (listen(soc, 1) >= 0) {
-          SOCaddr_inetntoa(adr, 128, server2);
-        } else {
-          hts_closesocket(soc);
-          soc = INVALID_SOCKET;
-        }
-
-      } else {
-        hts_closesocket(soc);
-        soc = INVALID_SOCKET;
-      }
-
-    } else {
-      hts_closesocket(soc);
-      soc = INVALID_SOCKET;
-    }
+  SOCaddr_initport(server, *port);
+  soc = hts_shared_listen(&server, SOCK_STREAM, 1, &bound, NULL);
+  if (soc != INVALID_SOCKET) {
+    /* bound, not server: an ephemeral port only appears here */
+    *port = ntohs(SOCaddr_sinport(bound));
+    SOCaddr_inetntoa(adr, 128, bound);
   }
   return soc;
 }
