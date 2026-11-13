@@ -1,23 +1,29 @@
 #!/bin/bash
-# OSS-Fuzz build: projects/httrack/build.sh runs this from the source root.
+# OSS-Fuzz build, run from the source root.
 # fuzz/Makefile.am is the one list of harnesses and their extra sources.
 set -euo pipefail
 
 : "${CC:?} ${CXX:?} ${OUT:?} ${LIB_FUZZING_ENGINE:?}"
 
 ./bootstrap
-# afl-cc rewrites -fcf-protection into CFI+LTO, emitting bitcode objects GNU
-# binutils can't archive or link: drop the CET flag, use the llvm tools and lld.
-ax_cv_check_cflags___fcf_protection=no \
+# afl-cc turns -fcf-protection into LTO bitcode that GNU binutils cannot link, so use llvm tools and lld.
+ax_cv_check_cflags__Werror__fcf_protection=no \
     ./configure --enable-fuzzers --disable-shared --disable-https \
     AR=llvm-ar RANLIB=llvm-ranlib LDFLAGS="${LDFLAGS:-} -fuse-ld=lld"
 make -j"$(nproc)" -C src libhttrack.la
-# Link with the C++ driver, as OSS-Fuzz requires of every engine.
-make -j"$(nproc)" -C fuzz CCLD="$CXX"
+# Link with the C++ driver and flags, as OSS-Fuzz requires of every engine.
+make -j"$(nproc)" -C fuzz CCLD="$CXX $CXXFLAGS"
 
 for c in fuzz/fuzz-*.c; do
     f=$(basename "$c" .c)
     cp "fuzz/$f" "$OUT/"
     zip -qj "$OUT/${f}_seed_corpus.zip" "fuzz/corpus/${f#fuzz-}"/*
 done
-cp fuzz/fuzz-*.dict fuzz/fuzz-*.options "$OUT/"
+# OSS-Fuzz pairs these with a fuzzer by name, so a misnamed one is silently unused.
+for x in fuzz/fuzz-*.dict fuzz/fuzz-*.options; do
+    [ -f "${x%.*}.c" ] || {
+        echo "$x names no harness" >&2
+        exit 1
+    }
+    cp "$x" "$OUT/"
+done

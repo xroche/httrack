@@ -522,8 +522,7 @@ jobs:
       - name: Build
         run: make -j"$(nproc)"
 
-  # OSS-Fuzz runs fuzz/oss-fuzz-build.sh; build it here with OSS-Fuzz's libFuzzer
-  # ASan flags, so a harness that stops linking reds the PR, not OSS-Fuzz (#2152).
+  # Build the way OSS-Fuzz does, so a harness that stops linking reds the PR (#2152).
   fuzz-oss-fuzz-build:
     name: fuzz (OSS-Fuzz build script, clang)
     runs-on: ubuntu-24.04
@@ -537,15 +536,15 @@ jobs:
           set -euo pipefail
           sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
           sudo apt-get install -y --no-install-recommends \
-            build-essential clang lld llvm autoconf automake libtool autoconf-archive \
-            zlib1g-dev zip unzip
+            build-essential clang lld llvm libc++-dev libc++abi-dev autoconf automake \
+            libtool autoconf-archive zlib1g-dev zip unzip
 
       - name: Build
         env:
           CC: clang
           CXX: clang++
           CFLAGS: -O1 -fno-omit-frame-pointer -gline-tables-only -fsanitize=address -fsanitize=fuzzer-no-link
-          CXXFLAGS: -O1 -fno-omit-frame-pointer -gline-tables-only -fsanitize=address -fsanitize=fuzzer-no-link
+          CXXFLAGS: -O1 -fno-omit-frame-pointer -gline-tables-only -fsanitize=address -fsanitize=fuzzer-no-link -stdlib=libc++
           LIB_FUZZING_ENGINE: -fsanitize=fuzzer
         run: |
           set -euo pipefail
@@ -554,20 +553,15 @@ jobs:
           bash fuzz/oss-fuzz-build.sh
 
       - name: Replay each seed corpus from the output directory
+        env:
+          ASAN_OPTIONS: detect_leaks=1:abort_on_error=1:halt_on_error=1
         run: |
           set -euo pipefail
-          n=0
-          for b in "$RUNNER_TEMP"/out/fuzz-*; do
-            case "$b" in *.*) continue ;; esac
-            c="$RUNNER_TEMP/corpus/${b##*/}"
-            mkdir -p "$c"
-            unzip -q "${b}_seed_corpus.zip" -d "$c"
-            "$b" -runs=0 -timeout=25 "$c"
-            n=$((n + 1))
+          for c in fuzz/fuzz-*.c; do
+            f=$(basename "$c" .c)
+            unzip -q "$RUNNER_TEMP/out/${f}_seed_corpus.zip" -d "$RUNNER_TEMP/corpus/$f"
+            "$RUNNER_TEMP/out/$f" -runs=0 -timeout=25 "$RUNNER_TEMP/corpus/$f"
           done
-          harnesses=(fuzz/fuzz-*.c)
-          echo "$n of ${#harnesses[@]} fuzzers replayed"
-          test "$n" -eq "${#harnesses[@]}"
 
   # Optional-dependency build: compile and test with HTTPS/OpenSSL disabled --
   # the configuration users on minimal systems build, and one libssl is not even

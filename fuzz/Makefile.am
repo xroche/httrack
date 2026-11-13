@@ -19,9 +19,9 @@ AM_CPPFLAGS = \
 	-I$(top_srcdir)/src/coucal
 
 # Static-link libhttrack.la: the internal symbols are hidden in the .so.
-# FUZZ_ENGINE may be an archive (OSS-Fuzz AFL), so it links after the objects.
+# An archive engine (OSS-Fuzz AFL) must follow the objects.
 AM_LDFLAGS = @DEFAULT_LDFLAGS@ -static-libtool-libs
-LDADD = $(top_builddir)/src/libhttrack.la @FUZZ_ENGINE@ $(THREADS_LIBS)
+LDADD = $(top_builddir)/src/libhttrack.la $(FUZZ_ENGINE) $(THREADS_LIBS)
 
 fuzz_charset_SOURCES = fuzz-charset.c fuzz.h
 

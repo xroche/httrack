@@ -1103,14 +1103,11 @@ AC_ARG_ENABLE([fuzzers],
 	fuzzers=no
 	AC_MSG_RESULT(no)
 	])
-AC_ARG_VAR([LIB_FUZZING_ENGINE],
-	[fuzzing engine the fuzz/ harnesses link in place of -fsanitize=fuzzer, as OSS-Fuzz sets it; the caller's CFLAGS then carry the instrumentation])
-FUZZ_ENGINE=
-if test x"$fuzzers" = x"yes" && test -n "$LIB_FUZZING_ENGINE"; then
-	FUZZ_ENGINE=$LIB_FUZZING_ENGINE
-elif test x"$fuzzers" = x"yes"; then
-	FUZZ_ENGINE=-fsanitize=fuzzer
-	# Instrument the whole build for coverage; harnesses link -fsanitize=fuzzer.
+AC_ARG_VAR([LIB_FUZZING_ENGINE], [Fuzzing engine to link instead of -fsanitize=fuzzer, as OSS-Fuzz sets it])
+FUZZ_ENGINE=${LIB_FUZZING_ENGINE:--fsanitize=fuzzer}
+AC_SUBST([FUZZ_ENGINE])
+if test x"$fuzzers" = x"yes" && test -z "$LIB_FUZZING_ENGINE"; then
+	# Instrument the whole build for coverage; harnesses link $FUZZ_ENGINE.
 	AX_CHECK_COMPILE_FLAG([-fsanitize=fuzzer-no-link],
 		[DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fsanitize=fuzzer-no-link"],
 		[AC_MSG_ERROR([--enable-fuzzers requires libFuzzer support (clang)])])
@@ -1119,11 +1116,12 @@ elif test x"$fuzzers" = x"yes"; then
 		[DEFAULT_LDFLAGS="$DEFAULT_LDFLAGS -fsanitize=fuzzer-no-link"],
 		[AC_MSG_ERROR([--enable-fuzzers requires libFuzzer support (clang)])])
 fi
-# clang's static sanitizer runtimes clash with -Wl,--no-undefined on the .so.
-if test x"$fuzzers" = x"yes" && test x"$enable_shared" != x"no"; then
-	AC_MSG_ERROR([--enable-fuzzers requires --disable-shared])
+if test x"$fuzzers" = x"yes"; then
+	# clang's static sanitizer runtimes clash with -Wl,--no-undefined on the .so.
+	if test x"$enable_shared" != x"no"; then
+		AC_MSG_ERROR([--enable-fuzzers requires --disable-shared])
+	fi
 fi
-AC_SUBST([FUZZ_ENGINE])
 AM_CONDITIONAL([FUZZERS], [test x"$fuzzers" = x"yes"])
 
 # tests/Makefile.am takes its TESTS from here instead of a checked-in list,
