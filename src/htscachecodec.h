@@ -217,8 +217,7 @@ typedef void (*hts_cache_index_entry)(void *arg, const char *name, long pos);
 /* Receives a damaged entry: what is wrong, and how many entries read before. */
 typedef void (*hts_cache_index_bad)(void *arg, const char *what, int entry);
 
-/* Does an "X-In-Cache: 1" line sit in the first two lines? A NUL ends the scan.
- */
+/* Is "X-In-Cache: 1" among the first two lines? A NUL ends the scan. */
 static HTS_UNUSED hts_boolean
 hts_cache_header_says_data_in_zip(const char *buff, size_t size) {
   const char *p = buff;
