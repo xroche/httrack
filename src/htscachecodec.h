@@ -217,10 +217,10 @@ typedef void (*hts_cache_index_entry)(void *arg, const char *name, long pos);
 /* Receives a damaged entry: what is wrong, and how many entries read before. */
 typedef void (*hts_cache_index_bad)(void *arg, const char *what, int entry);
 
-/* Is the X-In-Cache line among the first two of a header block? Matched
-   case-insensitively; a NUL ends the block. */
-static HTS_UNUSED hts_boolean hts_cache_header_in_cache(const char *buff,
-                                                        size_t size) {
+/* Does an "X-In-Cache: 1" line sit in the first two lines? A NUL ends the scan.
+ */
+static HTS_UNUSED hts_boolean
+hts_cache_header_says_data_in_zip(const char *buff, size_t size) {
   const char *p = buff;
   const char *const end = buff + size;
   int lines;
@@ -280,10 +280,11 @@ static HTS_UNUSED int hts_cache_walk_index(unzFile zFile,
         const char *const name =
             filename + (strfield(filename, "http://") ? 7 : 0);
 
-        entry(arg, name,
-              hts_cache_header_in_cache(comment, (size_t) readSizeHeader)
-                  ? pos
-                  : -pos);
+        entry(
+            arg, name,
+            hts_cache_header_says_data_in_zip(comment, (size_t) readSizeHeader)
+                ? pos
+                : -pos);
       } else {
         bad(arg, "Corrupted cache meta entry", *entries);
       }

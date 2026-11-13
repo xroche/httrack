@@ -3693,6 +3693,12 @@ static const struct {
 } walk_cases[] = {
 
 #define WALK_HDR(s) s, sizeof(s) - 1
+    /* first in the zip, so ProxyTrack must skip it for its start URL */
+    {"http://example.com/robots.txt", "example.com/robots.txt",
+     WALK_HDR("HTTP/1.1 200 OK\r\nX-In-Cache: 1\r\n"), 1},
+    /* ProxyTrack's start URL: no http:// added to it */
+    {"https://example.com/s.html", "https://example.com/s.html",
+     WALK_HDR("HTTP/1.1 200 OK\r\nX-In-Cache: 1\r\n"), 1},
     {"HTTP://example.com/upper.html", "example.com/upper.html",
      WALK_HDR("HTTP/1.1 200 OK\r\nX-In-Cache: 1\r\n"), 1},
     {"http://example.com/lower.html", "example.com/lower.html",
@@ -3704,8 +3710,6 @@ static const struct {
      WALK_HDR("S\0X-In-Cache: 1\r\n"), -1},
     {"http://example.com/third.html", "example.com/third.html",
      WALK_HDR("A: 1\r\nB: 2\r\nX-In-Cache: 1\r\n"), -1},
-    {"https://example.com/s.html", "https://example.com/s.html",
-     WALK_HDR("HTTP/1.1 200 OK\r\nX-In-Cache: 1\r\n"), 1},
 #undef WALK_HDR
 };
 
