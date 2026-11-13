@@ -1157,6 +1157,20 @@ static void cache_set_aside_damaged(httrackp *opt) {
                 "cache is used instead");
 }
 
+typedef struct cache_index_walk {
+  httrackp *opt;
+  coucal hashtable;
+} cache_index_walk;
+
+static void cache_index_entry(void *arg, const char *name, long pos) {
+  coucal_add(((cache_index_walk *) arg)->hashtable, name, pos);
+}
+
+static void cache_index_bad(void *arg, const char *what, int entry) {
+  hts_log_print(((cache_index_walk *) arg)->opt, LOG_WARNING, "%s #%d", what,
+                entry);
+}
+
 // Initialisation du cache: créer nouveau, renomer ancien, charger..
 void cache_init(cache_back * cache, httrackp * opt) {
   hts_boolean keep_old = HTS_FALSE;
@@ -1258,88 +1272,19 @@ void cache_init(cache_back * cache, httrackp * opt) {
       }
       // Opened ?
       if (cache->zipInput != NULL) {
+        cache_index_walk walk;
+        int entries;
         int zErr;
 
+        walk.opt = opt;
+        walk.hashtable = cache->hashtable;
         /* Ready directory entries */
-        if ((zErr = unzGoToFirstFile((unzFile) cache->zipInput)) == Z_OK) {
-          char comment[128];
-          char BIGSTK filename[CACHE_ENTRYNAME_SIZE];
-          unz_file_info zfi;
-          int entries = 0;
-
-          memset(comment, 0, sizeof(comment));  // for truncated reads
-          do {
-            int readSizeHeader = 0;
-
-            filename[0] = '\0';
-            comment[0] = '\0';
-            memset(&zfi, 0, sizeof(zfi));
-            if (unzOpenCurrentFile((unzFile) cache->zipInput) == Z_OK) {
-              if ((readSizeHeader =
-                       unzGetLocalExtrafield((unzFile) cache->zipInput, comment,
-                                             sizeof(comment) - 2)) > 0 &&
-                  unzGetCurrentFileInfo((unzFile) cache->zipInput, &zfi,
-                                        filename, sizeof(filename) - 2, NULL, 0,
-                                        NULL, 0) == Z_OK
-                  /* minizip leaves a name this long unterminated, and a clipped
-                     one would index as another URL's key */
-                  && zfi.size_filename < sizeof(filename) - 2) {
-                long int pos =
-                  (long int) unzGetOffset((unzFile) cache->zipInput);
-                assertf((size_t) readSizeHeader < sizeof(comment));
-                comment[readSizeHeader] = '\0';
-                entries++;
-                if (pos > 0) {
-                  int dataincache = 0;  // data in cache ?
-                  char *filenameIndex = filename;
-
-                  if (strfield(filenameIndex, "http://")) {
-                    filenameIndex += 7;
-                  }
-                  if (comment[0] != '\0') {
-                    int maxLine = 2;
-                    char *a = comment;
-
-                    while(*a && maxLine-- > 0) {        // parse only few first lines
-                      char BIGSTK line[1024];
-                      int adv;
-
-                      /* the budget must count lines, not halves of one */
-                      (void) binput_line(a, comment + readSizeHeader, line,
-                                         sizeof(line) - 1, &adv);
-                      a += adv;
-                      if (strfield(line, "X-In-Cache:")) {
-                        if (strfield2(line, "X-In-Cache: 1")) {
-                          dataincache = 1;
-                        } else {
-                          dataincache = 0;
-                        }
-                        break;
-                      }
-                    }
-                  }
-                  if (dataincache)
-                    coucal_add(cache->hashtable, filenameIndex, pos);
-                  else
-                    coucal_add(cache->hashtable, filenameIndex, -pos);
-                } else {
-                  hts_log_print(opt, LOG_WARNING,
-                                "Corrupted cache meta entry #%d",
-                                (int) entries);
-                }
-              } else {
-                hts_log_print(opt, LOG_WARNING, "Corrupted cache entry #%d",
-                              (int) entries);
-              }
-              unzCloseCurrentFile((unzFile) cache->zipInput);
-            } else {
-              hts_log_print(opt, LOG_WARNING, "Corrupted cache entry #%d",
-                            (int) entries);
-            }
-          } while(unzGoToNextFile((unzFile) cache->zipInput) == Z_OK);
+        if ((zErr = hts_cache_walk_index((unzFile) cache->zipInput,
+                                         cache_index_entry, cache_index_bad,
+                                         &walk, &entries)) == Z_OK) {
           hts_log_print(opt, LOG_DEBUG, "Cache index loaded: %d entries loaded",
                         (int) entries);
-          opt->is_update = 1;   // signaler comme update
+          opt->is_update = 1; // flag as an update
 
         } else {
           char errbuf[HTS_STRERROR_SIZE];

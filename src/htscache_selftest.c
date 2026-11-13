@@ -3682,6 +3682,88 @@ static int st_cache_nul(httrackp *opt, int argc, char **argv) {
   return fail;
 }
 
+/* Index walk cases: the key each entry indexes under, and whether its data is
+   in the zip (1), not (-1). */
+static const struct {
+  const char *name;
+  const char *key;
+  const char *hdr;
+  size_t hdrlen;
+  int sign;
+} walk_cases[] = {
+
+#define WALK_HDR(s) s, sizeof(s) - 1
+    /* first in the zip, so ProxyTrack must skip it for its start URL */
+    {"http://example.com/robots.txt", "example.com/robots.txt",
+     WALK_HDR("HTTP/1.1 200 OK\r\nX-In-Cache: 1\r\n"), 1},
+    /* ProxyTrack's start URL: no http:// added to it */
+    {"https://example.com/s.html", "https://example.com/s.html",
+     WALK_HDR("HTTP/1.1 200 OK\r\nX-In-Cache: 1\r\n"), 1},
+    {"HTTP://example.com/upper.html", "example.com/upper.html",
+     WALK_HDR("HTTP/1.1 200 OK\r\nX-In-Cache: 1\r\n"), 1},
+    {"http://example.com/lower.html", "example.com/lower.html",
+     WALK_HDR("HTTP/1.1 200 OK\r\nx-in-cache: 1\r\n"), 1},
+    {"http://example.com/zero.html", "example.com/zero.html",
+     WALK_HDR("HTTP/1.1 200 OK\r\nX-In-Cache: 0\r\n"), -1},
+    /* the line after a NUL is never read */
+    {"http://example.com/nul.html", "example.com/nul.html",
+     WALK_HDR("S\0X-In-Cache: 1\r\n"), -1},
+    {"http://example.com/third.html", "example.com/third.html",
+     WALK_HDR("A: 1\r\nB: 2\r\nX-In-Cache: 1\r\n"), -1},
+#undef WALK_HDR
+};
+
+/* The index walk keys each entry and reads its X-In-Cache line. */
+static int st_cache_walk(httrackp *opt, int argc, char **argv) {
+  char zippath[HTS_URLMAXSIZE];
+  cache_back cache;
+  zip_fileinfo fi;
+  zipFile z;
+  size_t i;
+  int fail = 0;
+
+  if (argc < 1) {
+    fprintf(stderr, "cache-walk: needs a directory\n");
+    return 1;
+  }
+  selftest_setup_dir(opt, argv[0]);
+  slprintfbuff_clip(zippath, sizeof(zippath), "%shts-cache/new.zip",
+                    StringBuff(opt->path_log));
+  if ((z = zipOpen(zippath, APPEND_STATUS_CREATE)) == NULL) {
+    fprintf(stderr, "cache-walk: could not write the cache\n");
+    return 1;
+  }
+  memset(&fi, 0, sizeof(fi));
+  for (i = 0; i < sizeof(walk_cases) / sizeof(walk_cases[0]); i++) {
+    fail |= zipOpenNewFileInZip(z, walk_cases[i].name, &fi, walk_cases[i].hdr,
+                                (uInt) walk_cases[i].hdrlen, NULL, 0, NULL,
+                                Z_DEFLATED, Z_DEFAULT_COMPRESSION) != ZIP_OK;
+    fail |= zipWriteInFileInZip(z, "okay", 4) != ZIP_OK;
+    fail |= zipCloseFileInZip(z) != ZIP_OK;
+  }
+  fail |= zipClose(z, NULL) != ZIP_OK;
+  if (fail) {
+    fprintf(stderr, "cache-walk: could not write the cache\n");
+    return 1;
+  }
+  selftest_open_for_read(&cache, opt);
+  for (i = 0; i < sizeof(walk_cases) / sizeof(walk_cases[0]); i++) {
+    intptr_t pos = 0;
+
+    if (!coucal_read(cache.hashtable, walk_cases[i].key, &pos)) {
+      fprintf(stderr, "cache-walk: %s is not indexed\n", walk_cases[i].key);
+      fail = 1;
+    } else if ((pos > 0 ? 1 : -1) != walk_cases[i].sign) {
+      fprintf(stderr, "cache-walk: %s indexed as %s\n", walk_cases[i].key,
+              pos > 0 ? "in the zip" : "not in the zip");
+      fail = 1;
+    }
+  }
+  selftest_close(&cache);
+  printf("cache-walk: %s\n", fail ? "FAIL" : "OK");
+  return fail;
+}
+
 /* binput_line must stay inside the buffer it is given. */
 static int st_cacheindex(httrackp *opt, int argc, char **argv) {
   int fail = 0;
@@ -4451,6 +4533,8 @@ const struct selftest_entry selftests_cache[] = {
      st_cache_urlbounds},
     {"cache-nul", "<dir>", "a NUL in a cache entry's headers makes it corrupt",
      st_cache_nul},
+    {"cache-walk", "<dir>", "the cache index walk keys and flags each entry",
+     st_cache_walk},
     {"cache-savebounds", "<dir>",
      "cached save name rebuilt under a deeper html path must fit or be refused",
      st_cache_savebounds},

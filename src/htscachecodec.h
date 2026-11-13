@@ -34,11 +34,12 @@ Please visit our Website: http://www.httrack.com
 #define HTSCACHECODEC_DEFH
 
 /* No engine header here: proxytrack and the fuzzers build it without one. The
-   field readers expand strfield2() from the caller's htslib.h. */
+   readers expand strfield2() and CACHE_ENTRYNAME_SIZE from the caller's. */
 #include "htsglobal.h"
 #include "htssafe.h"
 #include "htsdate.h"
 #include "minizip/zip.h"
+#include "minizip/unzip.h"
 
 #include <string.h>
 #include <time.h>
@@ -69,6 +70,28 @@ Please visit our Website: http://www.httrack.com
       (dropped)++;                                                             \
     }                                                                          \
   } while (0)
+
+/* Copy the line at p, without its CRs, into line[size] and return where the
+   next one starts. Stops at end or a NUL. A line too long for line is consumed
+   whole, so its tail never reads as another line, and *cut is set. */
+static HTS_UNUSED const char *hts_cache_line(const char *p, const char *end,
+                                             char *line, size_t size,
+                                             hts_boolean *cut) {
+  size_t used = 0;
+
+  *cut = HTS_FALSE;
+  for (; p < end && *p != '\0' && *p != '\n'; p++) {
+    if (*p == '\r') {
+      continue;
+    } else if (used < size - 1) {
+      line[used++] = *p;
+    } else {
+      *cut = HTS_TRUE;
+    }
+  }
+  line[used] = '\0';
+  return p < end && *p == '\n' ? p + 1 : p;
+}
 
 typedef enum hts_cache_field_kind {
   HTS_CACHE_FIELD_INT,    /* dest is an int */
@@ -134,25 +157,11 @@ static HTS_UNUSED hts_boolean hts_cache_read_fields(
     return HTS_FALSE;
   }
   while (p < end) {
-    size_t used = 0;
-    hts_boolean cut = HTS_FALSE;
+    hts_boolean cut;
     char *value;
 
-    /* a cut line is consumed whole, so its tail never reads as a field */
-    for (; p < end && *p != '\n'; p++) {
-      if (*p == '\r') {
-        continue;
-      } else if (used < sizeof(line) - 2) {
-        line[used++] = *p;
-      } else {
-        cut = HTS_TRUE;
-      }
-    }
-    if (p < end) {
-      p++;
-    }
-    line[used] = '\0';
-    if (used == 0) {
+    p = hts_cache_line(p, end, line, sizeof(line) - 1, &cut);
+    if (line[0] == '\0') {
       break;
     }
     /* no line we write is this long, so a cut one is foreign or damaged and
@@ -200,6 +209,90 @@ static HTS_INLINE HTS_UNUSED void hts_cache_zip_date(zip_fileinfo *fi,
       fi->tmz_date.tm_year = (uInt) tm_s->tm_year;
     }
   }
+}
+
+/* Receives each indexed entry: its name without "http://", and its offset,
+   negated when the data is not in the zip. */
+typedef void (*hts_cache_index_entry)(void *arg, const char *name, long pos);
+/* Receives a damaged entry: what is wrong, and how many entries read before. */
+typedef void (*hts_cache_index_bad)(void *arg, const char *what, int entry);
+
+/* Is "X-In-Cache: 1" among the first two lines? A NUL ends the scan. */
+static HTS_UNUSED hts_boolean
+hts_cache_header_says_data_in_zip(const char *buff, size_t size) {
+  const char *p = buff;
+  const char *const end = buff + size;
+  int lines;
+
+  for (lines = 0; lines < 2 && p < end && *p != '\0'; lines++) {
+    char line[1024];
+    hts_boolean cut;
+
+    p = hts_cache_line(p, end, line, sizeof(line), &cut);
+    if (strfield(line, "X-In-Cache:")) {
+      return strfield2(line, "X-In-Cache: 1") ? HTS_TRUE : HTS_FALSE;
+    }
+  }
+  return HTS_FALSE;
+}
+
+/* Walk every entry of an open ZIP cache, passing each to entry and each damaged
+   one to bad. Returns unzGoToFirstFile()'s error, Z_OK when the walk ran, and
+   the number of entries read through *entries. */
+static HTS_UNUSED int hts_cache_walk_index(unzFile zFile,
+                                           hts_cache_index_entry entry,
+                                           hts_cache_index_bad bad, void *arg,
+                                           int *entries) {
+  char comment[128];
+  char BIGSTK filename[CACHE_ENTRYNAME_SIZE];
+  unz_file_info zfi;
+  const int err = unzGoToFirstFile(zFile);
+
+  *entries = 0;
+  if (err != Z_OK) {
+    return err;
+  }
+  memset(comment, 0, sizeof(comment)); // for truncated reads
+  do {
+    int readSizeHeader;
+
+    filename[0] = '\0';
+    comment[0] = '\0';
+    memset(&zfi, 0, sizeof(zfi));
+    if (unzOpenCurrentFile(zFile) != Z_OK) {
+      bad(arg, "Corrupted cache entry", *entries);
+      continue;
+    }
+    if ((readSizeHeader =
+             unzGetLocalExtrafield(zFile, comment, sizeof(comment) - 2)) > 0 &&
+        unzGetCurrentFileInfo(zFile, &zfi, filename, sizeof(filename) - 2, NULL,
+                              0, NULL, 0) == Z_OK
+        /* minizip leaves a name this long unterminated, and a clipped one
+           would index as another URL's key */
+        && zfi.size_filename < sizeof(filename) - 2) {
+      const long pos = (long) unzGetOffset(zFile);
+
+      assertf((size_t) readSizeHeader < sizeof(comment));
+      comment[readSizeHeader] = '\0';
+      (*entries)++;
+      if (pos > 0) {
+        const char *const name =
+            filename + (strfield(filename, "http://") ? 7 : 0);
+
+        entry(
+            arg, name,
+            hts_cache_header_says_data_in_zip(comment, (size_t) readSizeHeader)
+                ? pos
+                : -pos);
+      } else {
+        bad(arg, "Corrupted cache meta entry", *entries);
+      }
+    } else {
+      bad(arg, "Corrupted cache entry", *entries);
+    }
+    unzCloseCurrentFile(zFile);
+  } while (unzGoToNextFile(zFile) == Z_OK);
+  return Z_OK;
 }
 
 #endif

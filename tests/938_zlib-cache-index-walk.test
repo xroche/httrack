@@ -1,0 +1,66 @@
+#!/bin/bash
+#
+# The shared ZIP cache index walk: keys, case-insensitive matching, and a NUL
+# ending the header scan (-#test=cache-walk).
+
+set -eu
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+python=$(find_python) || skip "python3 missing"
+
+dir=$(mktemp -d)
+ptpid=
+cleanup() {
+    stop_server "$ptpid"
+    rm -rf "$dir"
+}
+cleanup_push cleanup
+mkdir "$dir/hts-cache"
+
+httrack -#test=cache-walk "$dir" >"$dir/out" 2>"$dir/err" ||
+    fail_dump "the engine self-test failed" "$dir/out" "$dir/err"
+out=$(tail -n1 "$dir/out")
+test "$out" = "cache-walk: OK" ||
+    fail_dump "expected 'cache-walk: OK', got: $out" "$dir/out" "$dir/err"
+
+# ProxyTrack walks the same zip: every entry reaches the ARC
+proxytrack --convert "$dir/out.arc" "$dir/hts-cache/new.zip" >"$dir/log" 2>&1 ||
+    fail_dump "proxytrack died reading the cache" "$dir/log"
+arc=$(<"$dir/out.arc")
+for url in http://example.com/robots.txt http://example.com/upper.html \
+    http://example.com/lower.html http://example.com/zero.html \
+    http://example.com/nul.html http://example.com/third.html \
+    https://example.com/s.html; do
+    grep -qF "$url " <<<"$arc" || fail "$url is missing from the ARC"
+done
+
+# ProxyTrack never reads the index sign, so its start URL shows its walk: the
+# first entry that is not robots.txt, with no "http://" added to an https key.
+launch_proxytrack() {
+    proxytrack "127.0.0.1:$proxyport" "127.0.0.1:$icpport" \
+        "$dir/hts-cache/new.zip" >"$ptlog" 2>&1 &
+    ptpid=$!
+}
+start_proxytrack "$dir/pt" launch_proxytrack
+# Only a PROPFIND on a URL with no path reaches the catalog of start URLs.
+"$python" - "$proxyport" >"$dir/catalog" <<'PY' ||
+import socket, sys
+
+sock = socket.create_connection(("127.0.0.1", int(sys.argv[1])), 10)
+sock.settimeout(10)
+sock.sendall(b"PROPFIND http:// HTTP/1.0\r\nHost: 127.0.0.1\r\nDepth: 0\r\n\r\n")
+reply = b""
+while True:
+    chunk = sock.recv(65536)
+    if not chunk:
+        break
+    reply += chunk
+sys.stdout.write(reply.decode("latin-1"))
+PY
+    fail_dump "could not read the ProxyTrack catalog" "$ptlog"
+grep -q "Available sites" "$dir/catalog" ||
+    fail_dump "the reply holds no catalog" "$dir/catalog"
+sites=$(sed -n 's/.*<a href="\([^"]*\)">.*/\1/p' "$dir/catalog")
+test "$sites" = "https://example.com/s.html" ||
+    fail_dump "the start URL is '$sites', not https://example.com/s.html" "$dir/catalog"
