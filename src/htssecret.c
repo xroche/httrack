@@ -439,7 +439,7 @@ static size_t mask_passwords(const char *s, char *dst, hts_mask_mode mode) {
   else
     for (; *i != '\0'; i++)
       // a token that is no filter is a start URL
-      if ((i == s || strchr(" \t\r\n", i[-1]) != NULL) &&
+      if ((i == s || strchr(HTS_BLANKS, i[-1]) != NULL) &&
           strchr(" \t\r\n+-", *i) == NULL)
         mask_at(&m, i, HTS_TRUE, &i);
   mask_copy(&m, m.p, strlen(m.p) + 1);
@@ -465,7 +465,7 @@ static size_t secret_name_len(const char *line, size_t len) {
     return header_name_len(line);
   if (memchr(line, ':', len) != NULL)
     return 0;
-  word = strcspn(line, " \t\r\n");
+  word = strcspn(line, HTS_BLANKS);
   for (i = 0; i < sizeof(secret_fields) / sizeof(secret_fields[0]); i++)
     if (header_name_is(line, word, secret_fields[i], strlen(secret_fields[i])))
       return word;

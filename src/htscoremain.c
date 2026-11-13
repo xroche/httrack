@@ -674,7 +674,7 @@ static void hts_secret_learn_options(httrackp *opt, const char *urls) {
   const char *u = urls;
 
   while (*u != '\0') {
-    const size_t n = strcspn(u, " \t\r\n");
+    const size_t n = strcspn(u, HTS_BLANKS);
 
     // a start URL never exceeds the URL buffers, so a longer word is no URL
     if (n != 0 && *u != '+' && *u != '-' && n < HTS_URLMAXSIZE * 2) {

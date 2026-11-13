@@ -33,6 +33,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsdate.h"
 
 #include "htsglobal.h"
+#include "htsbase.h"
 #include "htssafe.h"
 #include "htsurlport.h"
 
@@ -46,8 +47,7 @@ static void lowcase(char *s) {
   size_t i;
 
   for (i = 0; s[i] != '\0'; i++)
-    if ((s[i] >= 'A') && (s[i] <= 'Z'))
-      s[i] += ('a' - 'A');
+    s[i] = lochar(s[i]);
 }
 
 struct tm *convert_time_rfc822(struct tm *result, const char *s) {

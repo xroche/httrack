@@ -55,7 +55,7 @@ int hts_isStringAscii(const char *s, size_t size) {
 }
 
 #define IS_ALNUM(C) ( ((C) >= 'A' && (C) <= 'Z') || ((C) >= 'a' && (C) <= 'z') || ((C) >= '0' && (C) <= '9') )
-#define CHAR_LOWER(C) ( ((C) >= 'A' && (C) <= 'Z') ? ((C) + 'a' - 'A') : (C) )
+#define CHAR_LOWER(C) lochar(C)
 static int hts_equalsAlphanum(const char *a, const char *b) {
   size_t i, j;
   for(i = 0, j = 0;; i++, j++) {
@@ -499,7 +499,7 @@ static int hts_equalsCodepageName(const char *table_name, const char *label) {
   static const char *const prefixes[] = {"windows", "ibm", NULL};
   size_t p, i;
 
-#define LOWER(C) (((C) >= 'A' && (C) <= 'Z') ? ((C) + 'a' - 'A') : (C))
+#define LOWER(C) lochar(C)
   if (hts_equalsAlphanum(table_name, label)) {
     return 1;
   }

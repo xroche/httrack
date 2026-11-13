@@ -2472,6 +2472,34 @@ static hts_boolean cc_span_agrees(size_t cls, const char *s) {
   return strspn(s, set) == span && strcspn(s, set) == cspan;
 }
 
+/* -#test=chartab: HTS_BLANKS holds exactly SPACE, TAB, CR and LF, and lochar()
+   lowercases ASCII letters only, for every byte. */
+static int st_chartab(httrackp *opt, int argc, char **argv) {
+  int err = 0;
+  int c;
+
+  for (c = 1; c < 256; c++) {
+    const hts_boolean blank = c == 32 || c == 9 || c == 13 || c == 10;
+    const char ch = (char) c;
+
+    if ((strchr(HTS_BLANKS, ch) != NULL) != blank) {
+      printf("HTS_BLANKS: byte %d is %s\n", c, blank ? "missing" : "present");
+      err = 1;
+    }
+  }
+  for (c = 0; c < 256; c++) {
+    const char ch = (char) c;
+    const char want = (char) (c >= 65 && c <= 90 ? c + 32 : c);
+
+    if (lochar(ch) != want) {
+      printf("lochar: byte %d gives %d, want %d\n", c, (int) lochar(ch),
+             (int) want);
+      err = 1;
+    }
+  }
+  return st_verdict("chartab", err);
+}
+
 /* -#test=strcmpnocase: equal only when both strings end together, and the
    order flips with the arguments. */
 static int st_strcmpnocase(httrackp *opt, int argc, char **argv) {
@@ -4369,6 +4397,7 @@ const struct selftest_entry selftests_lib[] = {
     {"rtrim", "", "hts_rtrim never walks below the buffer", st_rtrim},
     {"uninit", "", "hts_uninit releases what hts_init sets up, twice safely",
      st_uninit},
+    {"chartab", "", "HTS_BLANKS and lochar() over every byte", st_chartab},
     {"strcmpnocase", "",
      "strcmpnocase compares the whole of both strings, ignoring case",
      st_strcmpnocase},

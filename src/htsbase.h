@@ -80,6 +80,9 @@ extern "C" {
    two chars. ASCII only; not locale-aware. */
 #define hichar(a) ((((a)>='a') && ((a)<='z')) ? ((a)-('a'-'A')) : (a))
 
+/* lochar: ASCII lowercasing of one char. ASCII only; not locale-aware. */
+#define lochar(a) ((((a) >= 'A') && ((a) <= 'Z')) ? ((a) + ('a' - 'A')) : (a))
+
 #define streql(a,b) (hichar(a)==hichar(b))
 
 /* True if c is an ASCII uppercase letter. */

@@ -2692,8 +2692,7 @@ int ident_url_absolute(const char *url, lien_adrfil *adrfil) {
     char *a = jump_identification(adrfil->adr);
 
     while(*a) {
-      if ((*a >= 'A') && (*a <= 'Z'))
-        *a += 'a' - 'A';
+      *a = lochar(*a);
       a++;
     }
   }

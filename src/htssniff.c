@@ -206,7 +206,7 @@ static hts_boolean has_bytes(const unsigned char *d, size_t n, size_t off,
 }
 
 static unsigned char ascii_lower(unsigned char c) {
-  return c >= 'A' && c <= 'Z' ? (unsigned char) (c + 32) : c;
+  return (unsigned char) lochar(c);
 }
 
 /* Case-insensitive text prefix after an optional UTF-8 BOM and WHATWG

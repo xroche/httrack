@@ -1208,7 +1208,7 @@ static const char *curl_split(const char *s, paste_curl *c) {
     }
     if (*p == '\0')
       break;
-    while (why == NULL && *p != '\0' && strchr(" \t\r\n", *p) == NULL) {
+    while (why == NULL && *p != '\0' && strchr(HTS_BLANKS, *p) == NULL) {
       if (*p == '\'') {
         const char *const end = strchr(p + 1, '\'');
 
@@ -1335,7 +1335,7 @@ static const char *curl_options(paste_curl *c) {
 
 /* Is the paste at s a cURL command? */
 static hts_boolean paste_is_curl(const char *s) {
-  s += strspn(s, " \t\r\n");
+  s += strspn(s, HTS_BLANKS);
   return strncmp(s, "curl", 4) == 0 &&
          (s[4] == ' ' || s[4] == '\t' || curl_join(s + 4) != 0);
 }
@@ -1818,7 +1818,8 @@ HTSEXT_API hts_boolean hts_bundle_from_paste_hosts(
   if (paste == NULL && keep_empty)
     paste = "";
   // validate the paste before reading it, so a stray byte never reaches a file
-  if (paste == NULL || (paste[strspn(paste, " \t\r\n")] == '\0' && !keep_empty))
+  if (paste == NULL ||
+      (paste[strspn(paste, HTS_BLANKS)] == '\0' && !keep_empty))
     PASTE_FAIL("nothing was pasted");
   len = strlen(paste);
   if (len >= PASTE_MAX)

@@ -680,6 +680,8 @@ static HTS_INLINE HTS_UNUSED hts_boolean hts_choplastchar(char *s) {
     caller yet, and is here so each class has one spelling as a set. */
 #define HTS_SPACES " \"\n\r\t\f\v'"
 #define HTS_REALSPACES " \n\r\t\f\v"
+/* The blanks that separate tokens in line formats: SPACE, TAB, CR, LF. */
+#define HTS_BLANKS " \t\r\n"
 #define HTS_TABORSPACES " \t"
 #define HTS_RETORSEP "\n\r\t"
 
