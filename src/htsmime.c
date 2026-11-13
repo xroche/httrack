@@ -361,9 +361,7 @@ static const char *hts_mime[][2] = {
 
     {"", ""}};
 
-/* Modern web formats (post-2010), kept in their own table: appending to the
-   legacy hts_mime[] above makes clang-format reflow its whole initializer.
-   Scanned after hts_mime[], so it never shadows a legacy mapping. */
+/* Post-2010 formats. Scanned after hts_mime[], so a legacy mapping wins. */
 static const char *hts_mime_modern[][2] = {
     {"image/webp", "webp"},
     {"image/avif", "avif"},
