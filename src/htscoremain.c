@@ -1198,20 +1198,17 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
 
   // Pas d'URL
   if (argv_url == 0) {
-    // Présence d'un cache, que faire?..
-    if ((fexist_utf8(hts_logpath(opt, "hts-cache/new.zip"))) ||
+    /* A previous cache exists: rename it. */
+    if (fexist_utf8(hts_logpath(opt, "hts-cache/new.zip")) ||
         (fexist_utf8(hts_logpath(opt, "hts-cache/new.dat")) &&
-         fexist_utf8(hts_logpath(
-             opt, "hts-cache/new.ndx")))) { // il existe déja un cache
-                                            // précédent.. renommer
-      if (fexist_utf8(
-              hts_logpath(opt, "hts-cache/doit.log"))) { // un cache est présent
+         fexist_utf8(hts_logpath(opt, "hts-cache/new.ndx")))) {
+      /* A cache is present. */
+      if (fexist_utf8(hts_logpath(opt, "hts-cache/doit.log"))) {
         if (x_cmd->tokens.chunks != NULL) {
           int m;
 
-          // établir mode - mode cache: 1 (cache valide) 2 (cache à vérifier)
-          if (fexist_utf8(hts_logpath(
-                  opt, "hts-in_progress.lock"))) { // cache prioritaire
+          // mode 1: valid cache (lock file exists), 2: cache to check
+          if (fexist_utf8(hts_logpath(opt, "hts-in_progress.lock"))) {
             m = 1;
           } else {
             m = 2;
@@ -1263,9 +1260,8 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
       return 0;
     }
   } else {                      // plus de 2 paramètres
-    // un fichier log existe?
-    if (fexist_utf8(
-            hts_logpath(opt, "hts-in_progress.lock"))) { // fichier lock?
+    // Does a lock file exist?
+    if (fexist_utf8(hts_logpath(opt, "hts-in_progress.lock"))) {
 
       opt->cache = HTS_CACHE_PRIORITY; // cache prioritaire
       if (opt->quiet == 0) {

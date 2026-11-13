@@ -1180,9 +1180,8 @@ void cache_init(cache_back * cache, httrackp * opt) {
       /* keep the cache dir 0700, not MKDIR's 0755. */
       mkdir(hts_logpath(opt, "hts-cache"), HTS_PROTECT_FOLDER);
 #endif
-      if ((fexist_utf8(hts_logpath(
-              opt,
-              "hts-cache/new.zip")))) { // a previous cache exists.. rename it
+      /* A previous cache exists: rename it. */
+      if (fexist_utf8(hts_logpath(opt, "hts-cache/new.zip"))) {
         if (!cache_new_generation_usable(opt)) {
           keep_old = HTS_TRUE;
           cache_set_aside_damaged(opt);
