@@ -198,6 +198,18 @@ const char *hts_dirty_attr_name(const char *quote, const char *tag_start,
   return a < *nend && a > tag_start + 1 ? a : NULL;
 }
 
+/* Attribute names that never hold a link. */
+const char *hts_nodetect[] = {
+    "accept-charset", "accesskey", "action",   "align",    "alt",     "axes",
+    "axis",           "char",      "charset",  "cite",     "class",   "classid",
+    "code",           "color",     "datetime", "dir",      "enctype", "face",
+    "height",         "id",        "lang",     "language", "media",   "method",
+    "name",           "prompt",    "scheme",   "size",     "style",   "target",
+    "title",          "type",      "valign",   "version",  "width",   ""};
+
+const char *hts_main_mime[] = {"application", "audio", "image", "message",
+                               "multipart",   "text",  "video", ""};
+
 /* Is this attribute a framework binding (Vue :x, v-x, @x, Angular [x], (x),
    Alpine x-bind:x)? Its value is a JavaScript expression, never a URL. */
 static hts_boolean hts_attr_is_js_binding(const char *name, const char *nend) {
