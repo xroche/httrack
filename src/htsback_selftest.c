@@ -1805,6 +1805,78 @@ static int st_hostban(httrackp *opt, int argc, char **argv) {
   return st_verdict("hostban self-test", err);
 }
 
+/* host_ban() cancels every link of the host, whatever its address length. */
+#define ST_HOSTBAN_LONG 1100
+
+static char *st_hostban_long(const char *prefix, char fill,
+                             const char *suffix) {
+  const size_t lp = strlen(prefix), ls = strlen(suffix);
+  char *const s = malloct(lp + ST_HOSTBAN_LONG + ls + 1);
+
+  assertf(s != NULL);
+  memcpy(s, prefix, lp);
+  memset(s + lp, fill, ST_HOSTBAN_LONG);
+  memcpy(s + lp + ST_HOSTBAN_LONG, suffix, ls + 1);
+  return s;
+}
+
+static int st_hostbanlinks(httrackp *opt, int argc, char **argv) {
+  enum {
+    LNK_SHORT = 0,
+    LNK_LONGLOGIN,
+    LNK_LONGHOST,
+    LNK_OTHER,
+    LNK_OTHERLONGHOST,
+    LINKS
+  };
+
+  static const int banned[LINKS] = {1, 1, 1, 0, 0};
+  FILE *const saved_log = opt->log;
+  struct_back *sback = NULL;
+  hash_struct hash;
+  cache_back cache;
+  char **filters = NULL;
+  int filptr = 0;
+  int err = 0;
+  int i;
+  char *login = st_hostban_long("user:", 'p', "@" ST_HOSTBAN_HOST);
+  char *longhost = st_hostban_long("", 'h', ".example.invalid");
+  char *otherlong = st_hostban_long("", 'o', ".example.invalid");
+  const char *const adr[LINKS] = {ST_HOSTBAN_HOST, login, longhost,
+                                  "other.example.invalid", otherlong};
+
+  opt->log = NULL;
+  memset(&cache, 0, sizeof(cache));
+  st_mirror_wiring(opt, &sback, &hash, HTS_TRUE);
+  opt->maxfilter = 128;
+  assertf(filters_init(&filters, opt->maxfilter, 0) != 0);
+  filters_bind(opt, &filters, &filptr);
+  for (i = 0; i < LINKS; i++)
+    assertf(hts_record_link(opt, adr[i], "/a.html", "/p/a.html", "", "", NULL));
+
+  host_ban(opt, 0, sback, ST_HOSTBAN_HOST);
+  /* a host of 1020+ bytes, banned by its own name */
+  host_ban(opt, 0, sback, longhost);
+
+  for (i = 0; i < LINKS; i++) {
+    if ((opt->liens[i]->pass2 == -1) != banned[i]) {
+      fprintf(stderr, "hostbanlinks: link %d (adr length %d) %s\n", i,
+              (int) strlen(adr[i]),
+              banned[i] ? "was left valid" : "was cancelled");
+      err++;
+    }
+  }
+
+  opt->log = saved_log;
+  freet(filters[0]);
+  freet(filters);
+  st_mirror_wiring_free(opt, &cache, &sback, &hash);
+  freet(otherlong);
+  freet(longhost);
+  freet(login);
+  return st_verdict("hostbanlinks self-test", err);
+}
+
 /* The clock starts just before a wall-clock second ends, so a whole-second
    -E count would stop 200ms in. */
 static int st_maxtime(httrackp *opt, int argc, char **argv) {
@@ -1926,5 +1998,8 @@ const struct selftest_entry selftests_back[] = {
     {"hostban", "",
      "a banned host's FTP slot is left to its worker, never ended here",
      st_hostban},
+    {"hostbanlinks", "",
+     "a banned host's links are cancelled, even with an address of 1020+ bytes",
+     st_hostbanlinks},
     {NULL, NULL, NULL, NULL},
 };
