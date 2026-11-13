@@ -107,13 +107,12 @@ static HTS_INLINE HTS_UNUSED hts_boolean hts_soc_selectable(T_SOC soc) {
 
 /* Engine-only: not exported, so the installed header must not offer them. */
 #ifdef HTS_INTERNAL_BYTECODE
-/** Close soc without reporting a failure. deletesoc() logs one, but is hidden
-    from the programs built beside the library. */
-static HTS_INLINE HTS_UNUSED void hts_closesocket(T_SOC soc) {
+/** Close soc. Did it succeed? On failure hts_socket_errno() says why. */
+static HTS_INLINE HTS_UNUSED hts_boolean hts_closesocket(T_SOC soc) {
 #ifdef _WIN32
-  closesocket(soc);
+  return closesocket(soc) == 0 ? HTS_TRUE : HTS_FALSE;
 #else
-  close(soc);
+  return close(soc) == 0 ? HTS_TRUE : HTS_FALSE;
 #endif
 }
 

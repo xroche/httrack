@@ -3219,26 +3219,16 @@ int deleteaddr(htsblk * r) {
   return 1;
 }
 
-// fermer une socket
+// Close a socket, logging a failure.
 void deletesoc(T_SOC soc) {
   if (soc != INVALID_SOCKET && soc != LOCAL_SOCKET_ID) {
-#ifdef _WIN32
-    if (closesocket(soc) != 0) {
-      const int err = WSAGetLastError();
+    if (!hts_closesocket(soc)) {
+      const int err = hts_socket_errno();
       char errbuf[HTS_STRERROR_SIZE];
 
       fprintf(stderr, "* error closing socket " T_SOCP ": %s\n", soc,
               hts_strerror(err, errbuf, sizeof(errbuf)));
     }
-#else
-    if (close(soc) != 0) {
-      const int err = errno;
-      char errbuf[HTS_STRERROR_SIZE];
-
-      fprintf(stderr, "* error closing socket " T_SOCP ": %s\n", soc,
-              hts_strerror(err, errbuf, sizeof(errbuf)));
-    }
-#endif
   }
 }
 
