@@ -467,19 +467,17 @@ static void back_launch_cmd(void *pP) {
   httrackp *const opt = global_opt;
 
   /* copy commandline */
-  if (commandReturnCmdl)
-    free(commandReturnCmdl);
-  commandReturnCmdl = strdup(cmd);
+  freet(commandReturnCmdl);
+  commandReturnCmdl = strdupt(cmd);
 
   argv = hts_split_webcmd(cmd, &argc);
   if (argv == NULL) {
-    if (commandReturnMsg)
-      free(commandReturnMsg);
-    commandReturnMsg = strdup("could not parse the command line");
+    freet(commandReturnMsg);
+    commandReturnMsg = strdupt("could not parse the command line");
     commandReturn = -1;
     back_launch_end(opt);
     back_launch_finished();
-    free(cmd);
+    freet(cmd);
     return;
   }
   /* drop the program name the posted command line carries */
@@ -488,16 +486,15 @@ static void back_launch_cmd(void *pP) {
   /* run */
   commandReturn = webhttrack_runmain(opt, argc, argv);
   if (commandReturn) {
-    if (commandReturnMsg)
-      free(commandReturnMsg);
-    commandReturnMsg = strdup(hts_errmsg(opt));
+    freet(commandReturnMsg);
+    commandReturnMsg = strdupt(hts_errmsg(opt));
   }
 
   back_launch_end(opt);
   back_launch_finished();
 
   /* free */
-  free(cmd);
+  freet(cmd);
   freet(argv[0]);
   freet(argv);
   return;
@@ -511,7 +508,7 @@ void webhttrack_main(char *cmd) {
   /* a previous run's flags would stop this one, or show its result */
   commandEnd = commandReturn = commandReturnSet = commandEndRequested = 0;
   hts_store_release_int(&commandRunning, 1);
-  if (hts_newthread(back_launch_cmd, (void *) strdup(cmd)) != 0) {
+  if (hts_newthread(back_launch_cmd, (void *) strdupt(cmd)) != 0) {
     httrackp *const opt = global_opt;
 
     /* back_launch_end() would retake the lock the caller holds */
