@@ -320,6 +320,13 @@ HTS_STATIC int cache_readable(cache_back * cache) {
 
 char *hts_cancel_file_pop(httrackp * opt);
 
+/* Path of NAME inside the mirror log dir, in the rotating concat buffer. */
+static HTS_INLINE HTS_UNUSED char *hts_logpath(httrackp *opt,
+                                               const char *name) {
+  return fconcat(OPT_GET_BUFF(opt), sizeof(opt->state.concat.buff[0]),
+                 StringBuff(opt->path_log), name);
+}
+
 /* Detach the pending hts_addurl() list and give the caller ownership; NULL
    when none is pending. Free it with hts_addurl_free(). */
 char **hts_addurl_take(httrackp *opt);
