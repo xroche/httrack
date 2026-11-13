@@ -607,11 +607,11 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
   time_t deadline = 0;
   hts_boolean cut;
   int buffer_size = 32768;
-  char *buffer = (char *) malloc(buffer_size);
+  char *buffer = (char *) malloct(buffer_size);
   int line1Size = 1024;
-  char *line1 = (char *) malloc(line1Size);
+  char *line1 = (char *) malloct(line1Size);
   int lineSize = 8192;
-  char *line = (char *) malloc(lineSize);
+  char *line = (char *) malloct(lineSize);
   int length = 0;
   int keepAlive = 1;
 
@@ -1075,11 +1075,11 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
   StringFree(davRequest);
 
   if (buffer)
-    free(buffer);
+    freet(buffer);
   if (line)
-    free(line);
+    freet(line);
   if (line1)
-    free(line1);
+    freet(line1);
 }
 
 /* Generic threaded function start */
@@ -1089,7 +1089,7 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
 static int startThread(void (*funct) (void *), void *param) {
   if (param != NULL) {
     if (_beginthread(funct, 0, param) == -1) {
-      free(param);
+      freet(param);
       return 0;
     }
     return 1;
@@ -1106,7 +1106,7 @@ static int startThread(void* (*funct) (void *), void *param) {
     pthread_t handle = 0;
     int retcode = pthread_create(&handle, NULL, funct, param);
     if (retcode != 0) {         /* error */
-      free(param);
+      freet(param);
       return 0;
     } else {
       /* detach the thread from the main process so that is can be independent */
@@ -1142,7 +1142,7 @@ static proxytrack_process_th_return_t proxytrack_process_th(void *param_) {
   PT_Indexes indexes = param->indexes;
   void (*process) (PT_Indexes indexes, T_SOC soc_c) = param->process;
 
-  free(param);
+  freet(param);
   process(indexes, soc_c);
   PROXYTRACK_PROCESS_TH_RETURN;
 }
@@ -1151,7 +1151,7 @@ static proxytrack_process_th_return_t proxytrack_process_th(void *param_) {
 static int
 proxytrack_process_generic(void (*process) (PT_Indexes indexes, T_SOC soc_c),
                            PT_Indexes indexes, T_SOC soc_c) {
-  proxytrack_process_th_p *param = calloc(sizeof(proxytrack_process_th_p), 1);
+  proxytrack_process_th_p *param = calloct(sizeof(proxytrack_process_th_p), 1);
 
   if (param != NULL) {
     param->soc_c = soc_c;
@@ -1238,7 +1238,7 @@ static int ICP_reply(struct sockaddr *clientAddr, int clientAddrLen, T_SOC soc,
   if (Message_Length == 0 && Message != NULL)
     Message_Length = (unsigned short) (strlen((char *) Message) + 1);
   BufferSize = 20 + Message_Length;
-  buffer = malloc(BufferSize);
+  buffer = malloct(BufferSize);
   if (buffer != NULL) {
     WRITE_NET8(&buffer[0], Opcode);
     WRITE_NET8(&buffer[1], Version);
@@ -1254,7 +1254,7 @@ static int ICP_reply(struct sockaddr *clientAddr, int clientAddrLen, T_SOC soc,
                                    clientAddrLen) == BufferSize) {
       ret = 1;
     }
-    free(buffer);
+    freet(buffer);
   }
   return ret;
 }
@@ -1263,7 +1263,7 @@ static int ICP_reply(struct sockaddr *clientAddr, int clientAddrLen, T_SOC soc,
 static int proxytrack_start_ICP(PT_Indexes indexes, T_SOC soc) {
   /* "ICP messages MUST not exceed 16,384 octets in length." (RFC2186) */
   int bufferSize = 16384;
-  unsigned char *buffer = (unsigned char *) malloc(bufferSize + 1);
+  unsigned char *buffer = (unsigned char *) malloct(bufferSize + 1);
 
   if (buffer == NULL) {
     proxytrack_print_log(CRITICAL, "proxytrack_start_ICP:memory exhausted");
@@ -1331,7 +1331,7 @@ static int proxytrack_start_ICP(PT_Indexes indexes, T_SOC soc) {
                     if (UrlRequestSize > 0
                         && UrlRequest[UrlRequestSize - 1] != '/'
                         && strchr((char*) UrlRequest, '?') == NULL) {
-                      char *UrlRedirect = malloc(UrlRequestSize + 1 + 1);
+                      char *UrlRedirect = malloct(UrlRequestSize + 1 + 1);
 
                       if (UrlRedirect != NULL) {
                         sprintf(UrlRedirect, "%s/", UrlRequest);
@@ -1340,10 +1340,10 @@ static int proxytrack_start_ICP(PT_Indexes indexes, T_SOC soc) {
                                     Version, 0, Request_Number, 0, 0, 0,
                                     UrlRequest);
                           LogReply = "ICP_OP_HIT";
-                          free(UrlRedirect);
+                          freet(UrlRedirect);
                           break;
                         }
-                        free(UrlRedirect);
+                        freet(UrlRedirect);
                       }
                     }
                     /* We won't retrive the cache MISS online, no way! */
@@ -1404,7 +1404,7 @@ static int proxytrack_start_ICP(PT_Indexes indexes, T_SOC soc) {
   if (soc != INVALID_SOCKET) {
     hts_closesocket(soc);
   }
-  free(buffer);
+  freet(buffer);
   return 1;
 }
 

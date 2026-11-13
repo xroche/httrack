@@ -237,7 +237,7 @@ struct _PT_Indexes {
 };
 
 PT_Indexes PT_New(void) {
-  PT_Indexes index = (PT_Indexes) calloc(sizeof(_PT_Indexes), 1);
+  PT_Indexes index = (PT_Indexes) calloct(sizeof(_PT_Indexes), 1);
 
   index->cil = coucal_new(0);
   coucal_set_name(index->cil, "index->cil");
@@ -254,9 +254,9 @@ void PT_Delete(PT_Indexes index) {
     for (i = 0; i < index->index_size; i++) {
       PT_Index_Delete(&index->index[i]);
     }
-    free(index->index);
+    freet(index->index);
     coucal_delete(&index->cil);
-    free(index);
+    freet(index);
   }
 }
 
@@ -336,7 +336,7 @@ void PT_Index_Delete(PT_Index * pindex) {
     if (SAFE_INDEX(index)) {
       _IndexFuncts[index->type].PT_Index_Delete(pindex);
     }
-    free(index);
+    freet(index);
     *pindex = NULL;
   }
 }
@@ -548,7 +548,7 @@ char **PT_Enumerate(PT_Indexes indexes, const char *url, int subtree) {
 
 void PT_Enumerate_Delete(char ***plist) {
   if (plist != NULL && *plist != NULL) {
-    free(*plist);
+    freet(*plist);
     *plist = NULL;
   }
 }
@@ -572,7 +572,7 @@ PT_Index PT_LoadCache(const char *filename) {
   int type = PT_GetType(filename);
 
   if (type != PT_CACHE_UNDEFINED) {
-    PT_Index index = calloc(sizeof(_PT_Index), 1);
+    PT_Index index = calloct(sizeof(_PT_Index), 1);
 
     if (index != NULL) {
       index->type = type;
@@ -747,7 +747,7 @@ int PT_IndexMerge(PT_Indexes indexes, PT_Index * pindex) {
     coucal_item *chain;
     /* index_size counts a slot only once the array holds it, so a failed
        realloc leaves neither a phantom entry nor a dropped array */
-    PT_Index *const grown = realloc(
+    PT_Index *const grown = realloct(
         indexes->index, sizeof(*indexes->index) * (indexes->index_size + 1));
     int index_id;
     int nMerged = 0;
@@ -791,18 +791,18 @@ void PT_Element_Delete(PT_Element * pentry) {
 
     if (entry != NULL) {
       if (entry->adr != NULL) {
-        free(entry->adr);
+        freet(entry->adr);
         entry->adr = NULL;
       }
       if (entry->headers != NULL) {
-        free(entry->headers);
+        freet(entry->headers);
         entry->headers = NULL;
       }
       if (entry->location != NULL) {
-        free(entry->location);
+        freet(entry->location);
         entry->location = NULL;
       }
-      free(entry);
+      freet(entry);
     }
     *pentry = NULL;
   }
@@ -811,7 +811,7 @@ void PT_Element_Delete(PT_Element * pentry) {
 /* Both consumers emit element->size bytes whatever the status code, so a
    partly-filled body would ship its uninitialised tail. */
 static void PT_Element_DropBody(PT_Element entry) {
-  free(entry->adr);
+  freet(entry->adr);
   entry->adr = NULL;
 }
 
@@ -883,7 +883,7 @@ PT_Index PT_GetIndex(PT_Indexes indexes, int indexId) {
 PT_Element PT_ElementNew(void) {
   PT_Element r = NULL;
 
-  if ((r = calloc(sizeof(_PT_Element), 1)) == NULL)
+  if ((r = calloct(sizeof(_PT_Element), 1)) == NULL)
     return NULL;
   r->statuscode = STATUSCODE_INVALID;
   r->indexId = -1;
@@ -1294,7 +1294,7 @@ static PT_Element PT_ReadCache__New(PT_Index index_, const char *url,
                                          "file shorter than X-Size");
                       fclose(fp);
                     } else if (fp != NULL) {
-                      r->adr = (char *) malloc(r->size + 1);
+                      r->adr = (char *) malloct(r->size + 1);
                       if (r->adr != NULL) {
                         if (r->size > 0 &&
                             !hts_fread_exact(r->adr, r->size, fp)) {
@@ -1359,7 +1359,7 @@ static PT_Element PT_ReadCache__New(PT_Index index_, const char *url,
     strcpybuff(r->msg, "File Cache Entry Not Found");
   }
   if (r->location[0] != '\0') {
-    r->location = strdup(r->location);
+    r->location = strdupt(r->location);
   } else {
     r->location = NULL;
   }
@@ -1974,7 +1974,7 @@ static PT_Element PT_ReadCache__Old(PT_Index index_, const char *url,
     strcpybuff(r->msg, "File Cache Entry Not Found");
   }
   if (r->location[0] != '\0') {
-    r->location = strdup(r->location);
+    r->location = strdupt(r->location);
   } else {
     r->location = NULL;
   }
@@ -2518,7 +2518,7 @@ static PT_Element PT_ReadCache__Arc(PT_Index index_, const char *url,
               }
               r->size = 0;
               if (r->statuscode != STATUSCODE_INVALID) {
-                r->adr = (char *) malloc((size_t) fetchSize);
+                r->adr = (char *) malloct((size_t) fetchSize);
                 if (r->adr != NULL) {
                   if (fetchSize > 0 &&
                       (r->size = fread(r->adr, 1, (size_t) fetchSize,
@@ -2557,7 +2557,7 @@ static PT_Element PT_ReadCache__Arc(PT_Index index_, const char *url,
     strcpybuff(r->msg, "File Cache Entry Not Found");
   }
   if (r->location[0] != '\0') {
-    r->location = strdup(r->location);
+    r->location = strdupt(r->location);
   } else {
     r->location = NULL;
   }

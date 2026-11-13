@@ -11,10 +11,10 @@ set -euo pipefail
 
 top="${abs_top_srcdir:-}"
 test -n "$top" || fail "not run under make check"
-files="htscharset.c htsserver.c htsweb.c"
+files="htscharset.c htsserver.c htsweb.c proxy/*.c proxy/*.h"
 
 raw() { # raw FILE -> the lines calling a raw libc allocator
-    LC_ALL=C grep -nE '(^|[^A-Za-z0-9_])(malloc|calloc|realloc|free|strdup)[[:space:]]*\(' "$1" || true
+    LC_ALL=C grep -nE '(^|[^[:alnum:]_.>])(malloc|calloc|realloc|free|strdup)[[:space:]]*\(' "$1" || true
 }
 
 # Control: the scan must fire on a raw call and stay quiet on a wrapped one.
@@ -25,10 +25,14 @@ test -n "$(raw "$work/dirty.c")" || fail "the scan cannot see a raw free"
 printf 'void f(void) {\n  freet(p);\n  q = strdupt(s);\n}\n' >"$work/clean.c"
 test -z "$(raw "$work/clean.c")" || fail "the scan flags a wrapped call"
 
+printf 'void f(void) {\n  t->free(p);\n  t.free(p);\n}\n' >"$work/member.c"
+test -z "$(raw "$work/member.c")" || fail "the scan flags a member call"
+
 for f in $files; do
-    src="$top/src/$f"
-    test -r "$src" || skip "sources not shipped"
-    found=$(raw "$src")
-    test -z "$found" || fail "raw allocator calls in $f: $found"
+    for src in "$top"/src/$f; do
+        test -r "$src" || skip "sources not shipped"
+        found=$(raw "$src")
+        test -z "$found" || fail "raw allocator calls in $src: $found"
+    done
 done
 echo "no raw allocator call in: $files"
