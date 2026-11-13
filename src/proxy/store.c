@@ -90,20 +90,6 @@ typedef struct OLD_htsblk {
   int http11;
 } OLD_htsblk;
 
-/* Unlocked functions */
-
-static int PT_LookupCache__New_u(PT_Index index, const char *url);
-static PT_Element PT_ReadCache__New_u(PT_Index index, const char *url,
-                                      int flags);
-
-static int PT_LookupCache__Old_u(PT_Index index, const char *url);
-static PT_Element PT_ReadCache__Old_u(PT_Index index, const char *url,
-                                      int flags);
-
-static int PT_LookupCache__Arc_u(PT_Index index, const char *url);
-static PT_Element PT_ReadCache__Arc_u(PT_Index index, const char *url,
-                                      int flags);
-
 /* Locking */
 
 #ifdef _WIN32
@@ -165,38 +151,33 @@ enum {
 static int PT_LoadCache__New(PT_Index index, const char *filename);
 static void PT_Index_Delete__New(PT_Index * pindex);
 static PT_Element PT_ReadCache__New(PT_Index index, const char *url, int flags);
-static int PT_LookupCache__New(PT_Index index, const char *url);
 static int PT_SaveCache__New(PT_Indexes indexes, const char *filename);
  /**/ static int PT_LoadCache__Old(PT_Index index, const char *filename);
 static void PT_Index_Delete__Old(PT_Index * pindex);
 static PT_Element PT_ReadCache__Old(PT_Index index, const char *url, int flags);
-static int PT_LookupCache__Old(PT_Index index, const char *url);
- /**/ static int PT_LoadCache__Arc(PT_Index index, const char *filename);
+/**/ static int PT_LoadCache__Arc(PT_Index index, const char *filename);
 static void PT_Index_Delete__Arc(PT_Index * pindex);
 static PT_Element PT_ReadCache__Arc(PT_Index index, const char *url, int flags);
-static int PT_LookupCache__Arc(PT_Index index, const char *url);
 static int PT_SaveCache__Arc(PT_Indexes indexes, const char *filename);
 
 struct _PT_Index_Functions {
   /* Mandatory services */
   int (*PT_LoadCache) (PT_Index index, const char *filename);
   void (*PT_Index_Delete) (PT_Index * pindex);
-    PT_Element(*PT_ReadCache) (PT_Index index, const char *url, int flags);
-  int (*PT_LookupCache) (PT_Index index, const char *url);
+  /* called with the index lock held */
+  PT_Element (*PT_ReadCache)(PT_Index index, const char *url, int flags);
 
   /* Optional services */
   int (*PT_SaveCache) (PT_Indexes indexes, const char *filename);
 };
 
 static _PT_Index_Functions _IndexFuncts[] = {
-  {PT_LoadCache__New, PT_Index_Delete__New, PT_ReadCache__New,
-   PT_LookupCache__New, PT_SaveCache__New},
-  {PT_LoadCache__Old, PT_Index_Delete__Old, PT_ReadCache__Old,
-   PT_LookupCache__Old, NULL},
-  {PT_LoadCache__Arc, PT_Index_Delete__Arc, PT_ReadCache__Arc,
-   PT_LookupCache__Arc, PT_SaveCache__Arc},
-  {NULL, NULL, NULL, NULL}
-};
+    {PT_LoadCache__New, PT_Index_Delete__New, PT_ReadCache__New,
+     PT_SaveCache__New},
+    {PT_LoadCache__Old, PT_Index_Delete__Old, PT_ReadCache__Old, NULL},
+    {PT_LoadCache__Arc, PT_Index_Delete__Arc, PT_ReadCache__Arc,
+     PT_SaveCache__Arc},
+    {NULL, NULL, NULL, NULL}};
 
 #define PT_INDEX_COMMON_STRUCTURE \
 	time_t timestamp;								\
@@ -330,6 +311,18 @@ static int PT_Index_Check__(PT_Index index, const char *file, int line) {
 }
 
 #define SAFE_INDEX(index) PT_Index_Check__(index, __FILE__, __LINE__)
+
+/* The mutex serializing reads of a checked index. */
+static PT_Mutex *PT_Index_Lock(PT_Index index) {
+  switch (index->type) {
+  case PT_CACHE__NEW:
+    return &index->slots.formatNew.zFileLock;
+  case PT_CACHE__OLD:
+    return &index->slots.formatOld.fileLock;
+  default:
+    return &index->slots.formatArc.fileLock;
+  }
+}
 
 /* ------------------------------------------------------------ */
 /* Generic cache dispatch                                       */
@@ -693,13 +686,6 @@ static char *read_zip_entry(unzFile z, size_t size, hts_boolean *short_read) {
   return buf;
 }
 
-int PT_LookupCache(PT_Index index, const char *url) {
-  if (index != NULL && SAFE_INDEX(index)) {
-    return _IndexFuncts[index->type].PT_LookupCache(index, url);
-  }
-  return 0;
-}
-
 int PT_SaveCache(PT_Indexes indexes, const char *filename) {
   int type = PT_GetType(filename);
 
@@ -750,34 +736,6 @@ int PT_EnumCache(PT_Indexes indexes,
 
 time_t PT_Index_Timestamp(PT_Index index) {
   return index->slots.common.timestamp;
-}
-
-static int PT_LookupCache__New(PT_Index index, const char *url) {
-  int retCode;
-
-  MutexLock(&index->slots.formatNew.zFileLock);
-  {
-    retCode = PT_LookupCache__New_u(index, url);
-  }
-  MutexUnlock(&index->slots.formatNew.zFileLock);
-  return retCode;
-}
-
-static int PT_LookupCache__New_u(PT_Index index_, const char *url) {
-  if (index_ != NULL) {
-    PT_Index__New index = &index_->slots.formatNew;
-
-    if (index->hash != NULL && index->zFile != NULL && url != NULL && *url != 0) {
-      int hash_pos_return;
-
-      if (strncmp(url, "http://", 7) == 0)
-        url += 7;
-      hash_pos_return = coucal_read(index->hash, url, NULL);
-      if (hash_pos_return)
-        return 1;
-    }
-  }
-  return 0;
 }
 
 int PT_IndexMerge(PT_Indexes indexes, PT_Index * pindex) {
@@ -937,20 +895,15 @@ PT_Element PT_ElementNew(void) {
 
 PT_Element PT_ReadCache(PT_Index index, const char *url, int flags) {
   if (index != NULL && SAFE_INDEX(index)) {
-    return _IndexFuncts[index->type].PT_ReadCache(index, url, flags);
+    PT_Mutex *const lock = PT_Index_Lock(index);
+    PT_Element r;
+
+    MutexLock(lock);
+    r = _IndexFuncts[index->type].PT_ReadCache(index, url, flags);
+    MutexUnlock(lock);
+    return r;
   }
   return NULL;
-}
-
-static PT_Element PT_ReadCache__New(PT_Index index, const char *url, int flags) {
-  PT_Element retCode;
-
-  MutexLock(&index->slots.formatNew.zFileLock);
-  {
-    retCode = PT_ReadCache__New_u(index, url, flags);
-  }
-  MutexUnlock(&index->slots.formatNew.zFileLock);
-  return retCode;
 }
 
 /* ------------------------------------------------------------ */
@@ -1202,8 +1155,8 @@ static void PT_AppendHeaderSink(void *arg, const char *name,
   PT_AppendHeader(sink->headers, sink->len, sink->cap, name, value);
 }
 
-static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
-                                      int flags) {
+static PT_Element PT_ReadCache__New(PT_Index index_, const char *url,
+                                    int flags) {
   PT_Index__New index = (PT_Index__New) & index_->slots.formatNew;
   char location_default[HTS_URLMAXSIZE * 2];
   char previous_save[HTS_URLMAXSIZE * 2];
@@ -1818,19 +1771,8 @@ static String DecodeUrl(const char *url) {
   return s;
 }
 
-static PT_Element PT_ReadCache__Old(PT_Index index, const char *url, int flags) {
-  PT_Element retCode;
-
-  MutexLock(&index->slots.formatOld.fileLock);
-  {
-    retCode = PT_ReadCache__Old_u(index, url, flags);
-  }
-  MutexUnlock(&index->slots.formatOld.fileLock);
-  return retCode;
-}
-
-static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
-                                      int flags) {
+static PT_Element PT_ReadCache__Old(PT_Index index_, const char *url,
+                                    int flags) {
   PT_Index__Old cache = (PT_Index__Old) & index_->slots.formatOld;
   intptr_t hash_pos;
   int hash_pos_return;
@@ -2036,31 +1978,6 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
     r->location = NULL;
   }
   return r;
-}
-
-static int PT_LookupCache__Old(PT_Index index, const char *url) {
-  int retCode;
-
-  MutexLock(&index->slots.formatOld.fileLock);
-  {
-    retCode = PT_LookupCache__Old_u(index, url);
-  }
-  MutexUnlock(&index->slots.formatOld.fileLock);
-  return retCode;
-}
-
-static int PT_LookupCache__Old_u(PT_Index index_, const char *url) {
-  if (index_ != NULL) {
-    PT_Index__New cache = (PT_Index__New) & index_->slots.formatNew;
-
-    if (cache == NULL || cache->hash == NULL || url == NULL || *url == 0)
-      return 0;
-    if (strncmp(url, "http://", 7) == 0)
-      url += 7;
-    if (coucal_read(cache->hash, url, NULL))
-      return 1;
-  }
-  return 0;
 }
 
 /* ------------------------------------------------------------ */
@@ -2486,19 +2403,8 @@ int PT_LoadCache__Arc(PT_Index index_, const char *filename) {
   return 0;
 }
 
-static PT_Element PT_ReadCache__Arc(PT_Index index, const char *url, int flags) {
-  PT_Element retCode;
-
-  MutexLock(&index->slots.formatArc.fileLock);
-  {
-    retCode = PT_ReadCache__Arc_u(index, url, flags);
-  }
-  MutexUnlock(&index->slots.formatArc.fileLock);
-  return retCode;
-}
-
-static PT_Element PT_ReadCache__Arc_u(PT_Index index_, const char *url,
-                                      int flags) {
+static PT_Element PT_ReadCache__Arc(PT_Index index_, const char *url,
+                                    int flags) {
   PT_Index__Arc index = (PT_Index__Arc) & index_->slots.formatArc;
   char location_default[HTS_URLMAXSIZE * 2];
   intptr_t hash_pos;
@@ -2655,31 +2561,6 @@ static PT_Element PT_ReadCache__Arc_u(PT_Index index_, const char *url,
     r->location = NULL;
   }
   return r;
-}
-
-static int PT_LookupCache__Arc(PT_Index index, const char *url) {
-  int retCode;
-
-  MutexLock(&index->slots.formatArc.fileLock);
-  {
-    retCode = PT_LookupCache__Arc_u(index, url);
-  }
-  MutexUnlock(&index->slots.formatArc.fileLock);
-  return retCode;
-}
-
-static int PT_LookupCache__Arc_u(PT_Index index_, const char *url) {
-  if (index_ != NULL) {
-    PT_Index__New cache = (PT_Index__New) & index_->slots.formatNew;
-
-    if (cache == NULL || cache->hash == NULL || url == NULL || *url == 0)
-      return 0;
-    if (strncmp(url, "http://", 7) == 0)
-      url += 7;
-    if (coucal_read(cache->hash, url, NULL))
-      return 1;
-  }
-  return 0;
 }
 
 typedef struct PT_SaveCache__Arc_t {
