@@ -2930,27 +2930,21 @@ static void duration_str(char *st, TStamp t, hts_boolean quick) {
   t -= ((TStamp) m) * 60;
   s = (int) t;
 
-  if (j > 0) {
-    if (quick == HTS_TRUE)
-      snprintf(st, 256, "%dd,%02dh,%02dmin%02ds", j, h, m, s);
-    else
-      snprintf(st, 256, "%d days, %d hours %d minutes %d seconds", j, h, m, s);
-  } else if (h > 0) {
-    if (quick == HTS_TRUE)
-      snprintf(st, 256, "%dh,%02dmin%02ds", h, m, s);
-    else
-      snprintf(st, 256, "%d hours %d minutes %d seconds", h, m, s);
-  } else if (m > 0) {
-    if (quick == HTS_TRUE)
-      snprintf(st, 256, "%dmin%02ds", m, s);
-    else
-      snprintf(st, 256, "%d minutes %d seconds", m, s);
-  } else {
-    if (quick == HTS_TRUE)
-      snprintf(st, 256, "%ds", s);
-    else
-      snprintf(st, 256, "%d seconds", s);
-  }
+  if (j > 0)
+    snprintf(st, 256,
+             quick == HTS_TRUE ? "%dd,%02dh,%02dmin%02ds"
+                               : "%d days, %d hours %d minutes %d seconds",
+             j, h, m, s);
+  else if (h > 0)
+    snprintf(st, 256,
+             quick == HTS_TRUE ? "%dh,%02dmin%02ds"
+                               : "%d hours %d minutes %d seconds",
+             h, m, s);
+  else if (m > 0)
+    snprintf(st, 256,
+             quick == HTS_TRUE ? "%dmin%02ds" : "%d minutes %d seconds", m, s);
+  else
+    snprintf(st, 256, quick == HTS_TRUE ? "%ds" : "%d seconds", s);
 }
 
 void sec2str(char *st, TStamp t) { duration_str(st, t, HTS_FALSE); }
