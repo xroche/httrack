@@ -140,6 +140,8 @@
     <ClCompile Include="htsconcat.c" />
     <ClCompile Include="htscookie_selftest.c" />
     <ClCompile Include="htscore.c" />
+    <ClCompile Include="htsusercmd.c" />
+    <ClCompile Include="htsmhtml.c" />
     <ClCompile Include="htscoremain.c" />
     <ClCompile Include="htscrashtest.c" />
     <ClCompile Include="htsdns_selftest.c" />
