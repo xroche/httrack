@@ -1,5 +1,5 @@
 #!/bin/bash
-# OSS-Fuzz build, run from the source root.
+# Run from the source root to build the OSS-Fuzz fuzzers.
 # fuzz/Makefile.am is the one list of harnesses and their extra sources.
 set -euo pipefail
 
@@ -11,7 +11,7 @@ ax_cv_check_cflags__Werror__fcf_protection=no \
     ./configure --enable-fuzzers --disable-shared --disable-https \
     AR=llvm-ar RANLIB=llvm-ranlib LDFLAGS="${LDFLAGS:-} -fuse-ld=lld"
 make -j"$(nproc)" -C src libhttrack.la
-# Link with the C++ driver and flags, as OSS-Fuzz requires of every engine.
+# OSS-Fuzz requires linking with $CXX and $CXXFLAGS for every engine.
 make -j"$(nproc)" -C fuzz CCLD="$CXX $CXXFLAGS"
 
 for c in fuzz/fuzz-*.c; do
