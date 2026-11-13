@@ -3303,3 +3303,12 @@ static hts_boolean cmdl_shortopt_named(const char *s, const char *opt) {
       return HTS_TRUE;
   return HTS_FALSE;
 }
+
+HTSEXT_API hts_boolean hts_rule_would_be_read_as_opt(const char *arg) {
+  if (arg == NULL || arg[0] != '-')
+    return HTS_FALSE;
+  // A dot means a host (-www.a.com), but any '%' keeps -%c0.5 an option.
+  if (strchr(arg, '.') != NULL && strchr(arg, '%') == NULL)
+    return HTS_FALSE;
+  return strchr(arg, '/') == NULL && strchr(arg, '*') == NULL;
+}
