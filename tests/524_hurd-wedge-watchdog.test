@@ -88,6 +88,7 @@ run() { # run NAME WANT-RC WANT-WEDGE(y|n)
     stub_probes=0
     # shellcheck disable=SC1090
     source "$block" >"$work/out.txt" 2>&1
+    test "$STEP_TIMEOUT" -eq 2400 || fail "$name: the suite budget leaked out of its subshell"
     test -z "${wedged:-}" || got_wedge=y
     # rc comes out of the sourced block.
     if test "${rc:-unset}" != "$want_rc" || test "$got_wedge" != "$want_wedge"; then
