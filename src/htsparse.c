@@ -4869,9 +4869,8 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
             int a = 0;
 
             *stre->last_info_shell_ = tl;
-            if (fexist_utf8(hts_logpath(
-                    opt, "hts-autopsy"))) { // débuggage: teste si le
-                                            // robot est vivant
+            // Debug hook: is the robot still alive?
+            if (fexist_utf8(hts_logpath(opt, "hts-autopsy"))) {
               // (oui je sais un robot vivant.. mais bon.. il a le droit de vivre lui aussi)
               // (libérons les robots esclaves de l'internet!)
               FILE *fpa;
