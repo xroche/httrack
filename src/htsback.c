@@ -2012,9 +2012,7 @@ int back_serialize_ref(httrackp * opt, const lien_back * src) {
     url_savename_refname_fullpath(opt, src->url_adr, src->url_fil);
   FILE *fp = FOPEN(filename, "wb");
 
-  if (fp == NULL &&
-      MKDIR(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                    StringBuff(opt->path_log), CACHE_REFNAME)) == 0) {
+  if (fp == NULL && MKDIR(hts_logpath(opt, CACHE_REFNAME)) == 0) {
     /* note: local filename */
     filename = url_savename_refname_fullpath(opt, src->url_adr, src->url_fil);
     fp = FOPEN(filename, "wb");

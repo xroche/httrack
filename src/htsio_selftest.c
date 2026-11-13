@@ -1615,10 +1615,8 @@ static int st_refetchbackup(httrackp *opt, int argc, char **argv) {
       fprintf(stderr, "refetchbackup: the restore kept the partial's ref\n");
       err++;
     }
-    (void) RMDIR(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                         StringBuff(opt->path_log), CACHE_REFNAME));
-    (void) RMDIR(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                         StringBuff(opt->path_log), "hts-cache"));
+    (void) RMDIR(hts_logpath(opt, CACHE_REFNAME));
+    (void) RMDIR(hts_logpath(opt, "hts-cache"));
     StringCopy(opt->path_log, StringBuff(saved));
     StringFree(saved);
   }

@@ -4454,11 +4454,8 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
 
 hts_boolean hts_take_lock_request(httrackp *opt, const char *name) {
   /* OPT_GET_BUFF rotates, so both paths stay valid at once. */
-  const char *const request = fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                                      StringBuff(opt->path_log), name);
-  const char *const progress =
-      fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-              StringBuff(opt->path_log), "hts-in_progress.lock");
+  const char *const request = hts_logpath(opt, name);
+  const char *const progress = hts_logpath(opt, "hts-in_progress.lock");
 
   if (!fexist_utf8(request))
     return HTS_FALSE;
@@ -4525,9 +4522,7 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
       }
       /* A stop during the drain must not pause either. */
       if (!hts_run_is_ending(opt)) {
-        FILE *fp = FOPEN(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                                 StringBuff(opt->path_log), "hts-paused.lock"),
-                         "wb");
+        FILE *fp = FOPEN(hts_logpath(opt, "hts-paused.lock"), "wb");
         if (fp) {
           fspc(NULL, fp, "info"); // timestamp
           fprintf(fp,
@@ -4540,11 +4535,8 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
         stat_fragment = HTS_STAT.stat_bytes;
         /* Info for wrappers */
         hts_log_print(opt, LOG_INFO, "engine: pause: %s",
-                      fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                              StringBuff(opt->path_log), "hts-paused.lock"));
-        RUN_CALLBACK1(opt, pause,
-                      fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                              StringBuff(opt->path_log), "hts-paused.lock"));
+                      hts_logpath(opt, "hts-paused.lock"));
+        RUN_CALLBACK1(opt, pause, hts_logpath(opt, "hts-paused.lock"));
       }
     }
     //
@@ -4877,19 +4869,14 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
             int a = 0;
 
             *stre->last_info_shell_ = tl;
-            if (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                                    StringBuff(opt->path_log),
-                                    "hts-autopsy"))) { // débuggage: teste si le
-                                                       // robot est vivant
+            // Debug hook: is the robot still alive?
+            if (fexist_utf8(hts_logpath(opt, "hts-autopsy"))) {
               // (oui je sais un robot vivant.. mais bon.. il a le droit de vivre lui aussi)
               // (libérons les robots esclaves de l'internet!)
               FILE *fpa;
 
-              UNLINK(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                             StringBuff(opt->path_log), "hts-autopsy"));
-              fpa = FOPEN(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                                  StringBuff(opt->path_log), "hts-isalive"),
-                          "wb");
+              UNLINK(hts_logpath(opt, "hts-autopsy"));
+              fpa = FOPEN(hts_logpath(opt, "hts-isalive"), "wb");
               /* on failure the dump stays on stdout, as when untriggered */
               if (fpa != NULL) {
                 fp = fpa;

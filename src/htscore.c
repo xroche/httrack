@@ -1373,9 +1373,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
   }
   // statistiques
   if (opt->makestat) {
-    makestat_fp = FOPEN(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                                StringBuff(opt->path_log), "hts-stats.txt"),
-                        "wb");
+    makestat_fp = FOPEN(hts_logpath(opt, "hts-stats.txt"), "wb");
     if (makestat_fp != NULL) {
       fprintf(makestat_fp, "HTTrack statistics report, every minutes" LF LF);
       fflush(makestat_fp);
@@ -1383,9 +1381,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
   }
   // tracking -- débuggage
   if (opt->maketrack) {
-    maketrack_fp = FOPEN(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                                 StringBuff(opt->path_log), "hts-track.txt"),
-                         "wb");
+    maketrack_fp = FOPEN(hts_logpath(opt, "hts-track.txt"), "wb");
     if (maketrack_fp != NULL) {
       fprintf(maketrack_fp, "HTTrack tracking report, every minutes" LF LF);
       fflush(maketrack_fp);
@@ -2182,10 +2178,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
       //
       opt->state._hts_in_html_parsing = 3;
       //
-      old_lst = readfile2_utf8(
-          fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                  StringBuff(opt->path_log), "hts-cache/old.lst"),
-          &old_sz);
+      old_lst = readfile2_utf8(hts_logpath(opt, "hts-cache/old.lst"), &old_sz);
       if (old_lst != NULL) {
         if (opt->delete_old && !purge_files) {
           hts_log_print(opt, LOG_WARNING,
@@ -2194,10 +2187,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
                         "files");
         }
         /* new.lst is NUL-terminated for the strstr() lookups below. */
-        new_lst = readfile2_utf8(
-            fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                    StringBuff(opt->path_log), "hts-cache/new.lst"),
-            NULL);
+        new_lst = readfile2_utf8(hts_logpath(opt, "hts-cache/new.lst"), NULL);
         if (new_lst != NULL) {
           const size_t root = StringLength(opt->path_html);
           const char *const old_end = old_lst + (size_t) old_sz;
