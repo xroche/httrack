@@ -775,12 +775,10 @@ int url_savename(lien_adrfilsave *const afs,
   /* clang-format on */
 
   /* Release adr */
-#define RELEASE_ADR() do {\
-  if (idna_adr != NULL) {\
-    free(idna_adr);\
-    idna_adr = NULL;\
-  }\
-} while(0)
+#define RELEASE_ADR()                                                          \
+  do {                                                                         \
+    freet(idna_adr);                                                           \
+  } while (0)
 
   // vérifier que le nom n'a pas déja été calculé (si oui le renvoyer tel que)
   // vérifier que le nom n'est pas déja pris...
@@ -1741,7 +1739,8 @@ int url_savename(lien_adrfilsave *const afs,
       HTS_MAX_PATH_LEN) {
     // convert to Unicode (much simpler)
     size_t wsaveLen;
-    hts_UCS4 *const wsave = hts_convertUTF8StringToUCS4(afs->save, strlen(afs->save), &wsaveLen);
+    hts_UCS4 *wsave =
+        hts_convertUTF8StringToUCS4(afs->save, strlen(afs->save), &wsaveLen);
     if (wsave != NULL) {
       const size_t parentLen =
         hts_stringLengthUTF8(StringBuff(opt->path_html_utf8));
@@ -1838,12 +1837,12 @@ int url_savename(lien_adrfilsave *const afs,
       saveFinal = hts_convertUCS4StringToUTF8(wsave, j);
       if (saveFinal != NULL) {
         strcpybuff(afs->save, saveFinal);
-        free(saveFinal);
+        freet(saveFinal);
       } else {
         hts_log_print(opt, LOG_ERROR, "Could not revert to UTF-8: %s%s",
                       adr_nologin(opt, adr_complete), fil_complete);
       }
-      free(wsave);
+      freet(wsave);
 
       // log in debug
       hts_log_print(opt, LOG_DEBUG, "Too long filename shortened: %s%s => %s",
