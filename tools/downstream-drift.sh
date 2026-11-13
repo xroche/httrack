@@ -30,6 +30,7 @@ acknowledged=(
     openbsd-bash-files # same
     openbsd-patch-configure_ac
     openbsd-patch-src_htslib_c
+    openbsd-patch-src_md5_h # applies with fuzz since #2092
     openbsd-patch-src_minizip_ioapi_h
     openbsd-patch-src_webhttrack
 )
