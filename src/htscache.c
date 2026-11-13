@@ -974,21 +974,15 @@ static htsblk cache_readex_new(httrackp *opt, cache_back *cache,
   return r;
 }
 
-/* Pathname of a file inside the mirror dir (rotating concat buffer). */
-static char *reconcile_path(httrackp *opt, const char *name) {
-  return fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                 StringBuff(opt->path_log), name);
-}
-
 /* Replace the new-generation file by the old one, when the old one exists. A
    failed hts_rename_over() always leaves one generation behind, since it parks
    the file in the way instead of deleting it. */
 static hts_boolean reconcile_promote(httrackp *opt, const char *oldname,
                                      const char *newname) {
-  if (!fexist_utf8(reconcile_path(opt, oldname)))
+  if (!fexist_utf8(hts_logpath(opt, oldname)))
     return HTS_TRUE;
-  return hts_rename_over(opt, reconcile_path(opt, oldname),
-                         reconcile_path(opt, newname));
+  return hts_rename_over(opt, hts_logpath(opt, oldname),
+                         hts_logpath(opt, newname));
 }
 
 /* Same, for a sidecar. A sidecar with no old counterpart is dropped rather than
@@ -996,8 +990,8 @@ static hts_boolean reconcile_promote(httrackp *opt, const char *oldname,
    it against the promoted cache. */
 static hts_boolean reconcile_promote_sidecar(httrackp *opt, const char *oldname,
                                              const char *newname) {
-  if (!fexist_utf8(reconcile_path(opt, oldname))) {
-    UNLINK(reconcile_path(opt, newname));
+  if (!fexist_utf8(hts_logpath(opt, oldname))) {
+    UNLINK(hts_logpath(opt, newname));
     return HTS_TRUE;
   }
   return reconcile_promote(opt, oldname, newname);
@@ -1011,7 +1005,7 @@ static LLint reconcile_entries(httrackp *opt, const char *name) {
   unzFile zip;
   LLint entries = -1;
 
-  if ((zip = hts_unzOpen_utf8(reconcile_path(opt, name))) == NULL)
+  if ((zip = hts_unzOpen_utf8(hts_logpath(opt, name))) == NULL)
     return -1;
   /* A damaged directory claiming a count that casts negative just loses the
      comparison below, which is the safe way to lose. */
@@ -1041,7 +1035,7 @@ void hts_cache_reconcile(httrackp *opt, hts_cache_reconcile_mode mode) {
   case CACHE_RECONCILE_PROMOTE:
     /* Previous run rotated new.* to old.* then died before writing: promote
        the old generation back, whichever format it uses. */
-    if (!fexist_utf8(reconcile_path(opt, "hts-cache/new.zip")) &&
+    if (!fexist_utf8(hts_logpath(opt, "hts-cache/new.zip")) &&
         !reconcile_promote(opt, "hts-cache/old.zip", "hts-cache/new.zip"))
       hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
                     "Cache: could not restore the previous generation");
@@ -1049,8 +1043,7 @@ void hts_cache_reconcile(httrackp *opt, hts_cache_reconcile_mode mode) {
   case CACHE_RECONCILE_INTERRUPTED:
     /* Aborted run: keep the generation reaching further, because the next run's
        rotation erases the other one. */
-    if (!opt->cache ||
-        !fexist_utf8(reconcile_path(opt, "hts-in_progress.lock")))
+    if (!opt->cache || !fexist_utf8(hts_logpath(opt, "hts-in_progress.lock")))
       break;
     {
       const LLint kept = reconcile_entries(opt, "hts-cache/new.zip");
@@ -1090,9 +1083,7 @@ const char *cache_repair(httrackp *opt, const char *name,
   if (!slprintfbuff(repairname, sizeof(repairname), "%s%s",
                     StringBuff(opt->path_log), "hts-cache/repair.zip"))
     return "the repair path is too long";
-  if (unzRepair(name, repairname,
-                fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                        StringBuff(opt->path_log), "hts-cache/repair.tmp"),
+  if (unzRepair(name, repairname, hts_logpath(opt, "hts-cache/repair.tmp"),
                 entries, bytes) != Z_OK)
     return "could not repair the cache";
   /* unzRepair writes an end-of-central-directory record whatever it found, so
@@ -1115,16 +1106,16 @@ static hts_boolean cache_new_generation_usable(httrackp *opt) {
   unsigned long entries = 0;
   unsigned long bytes = 0;
   const char *why;
-  unzFile zip = hts_unzOpen_utf8(reconcile_path(opt, "hts-cache/new.zip"));
+  unzFile zip = hts_unzOpen_utf8(hts_logpath(opt, "hts-cache/new.zip"));
 
   if (zip != NULL) {
     unzClose(zip);
     return HTS_TRUE;
   }
-  if (fsize_utf8(reconcile_path(opt, "hts-cache/old.zip")) <= 0)
+  if (fsize_utf8(hts_logpath(opt, "hts-cache/old.zip")) <= 0)
     return HTS_TRUE;
   hts_log_print(opt, LOG_WARNING, "Cache: damaged cache, trying to repair");
-  why = cache_repair(opt, reconcile_path(opt, "hts-cache/new.zip"), &entries,
+  why = cache_repair(opt, hts_logpath(opt, "hts-cache/new.zip"), &entries,
                      &bytes);
   if (why != NULL) {
     hts_log_print(opt, LOG_WARNING, "Cache: %s", why);
@@ -1146,9 +1137,9 @@ static void cache_set_aside_damaged(httrackp *opt) {
   size_t i;
 
   for (i = 0; i < sizeof(names) / sizeof(names[0]); i++) {
-    strcpybuff(dst, reconcile_path(opt, names[i][1]));
-    if (fexist_utf8(reconcile_path(opt, names[i][0])) &&
-        !hts_rename_over(opt, reconcile_path(opt, names[i][0]), dst))
+    strcpybuff(dst, hts_logpath(opt, names[i][1]));
+    if (fexist_utf8(hts_logpath(opt, names[i][0])) &&
+        !hts_rename_over(opt, hts_logpath(opt, names[i][0]), dst))
       hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
                     "Cache: could not set %s aside", names[i][0]);
   }
@@ -1178,35 +1169,24 @@ void cache_init(cache_back * cache, httrackp * opt) {
   // ---
   // utilisation du cache: renommer ancien éventuel et charger index
   hts_log_print(opt, LOG_DEBUG, "Cache: enabled=%d, base=%s, ro=%d",
-                (int) opt->cache, fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                                          StringBuff(opt->path_log),
-                                          "hts-cache/"), (int) cache->ro);
+                (int) opt->cache, hts_logpath(opt, "hts-cache/"),
+                (int) cache->ro);
   if (opt->cache) {
     if (!cache->ro) {
 #ifdef _WIN32
       /* Windows mkdir takes no mode; use the UTF-8 wrapper for #630. */
-      MKDIR(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                    StringBuff(opt->path_log), "hts-cache"));
+      MKDIR(hts_logpath(opt, "hts-cache"));
 #else
       /* keep the cache dir 0700, not MKDIR's 0755. */
-      mkdir(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                    StringBuff(opt->path_log), "hts-cache"),
-            HTS_PROTECT_FOLDER);
+      mkdir(hts_logpath(opt, "hts-cache"), HTS_PROTECT_FOLDER);
 #endif
-      if ((fexist_utf8(fconcat(
-              OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-              StringBuff(opt->path_log),
-              "hts-cache/new.zip")))) { // a previous cache exists.. rename it
+      /* A previous cache exists: rename it. */
+      if (fexist_utf8(hts_logpath(opt, "hts-cache/new.zip"))) {
         if (!cache_new_generation_usable(opt)) {
           keep_old = HTS_TRUE;
           cache_set_aside_damaged(opt);
-        } else if (!hts_rename_over(
-                       opt,
-                       fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                               StringBuff(opt->path_log), "hts-cache/new.zip"),
-                       fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                               StringBuff(opt->path_log),
-                               "hts-cache/old.zip"))) {
+        } else if (!hts_rename_over(opt, hts_logpath(opt, "hts-cache/new.zip"),
+                                    hts_logpath(opt, "hts-cache/old.zip"))) {
           hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
                         "Cache: error while moving previous cache");
         } else {
@@ -1217,27 +1197,17 @@ void cache_init(cache_back * cache, httrackp * opt) {
       hts_log_print(opt, LOG_DEBUG, "Cache: no cache found");
     }
     hts_log_print(opt, LOG_DEBUG, "Cache: size %d",
-                  (int) fsize_utf8(
-                      fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                              StringBuff(opt->path_log), "hts-cache/old.zip")));
+                  (int) fsize_utf8(hts_logpath(opt, "hts-cache/old.zip")));
 
     // charger index cache précédent
-    if ((!cache->ro &&
-         fsize_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                            StringBuff(opt->path_log), "hts-cache/old.zip")) >
-             0) ||
-        (cache->ro &&
-         fsize_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                            StringBuff(opt->path_log), "hts-cache/new.zip")) >
-             0)) {
+    if ((!cache->ro && fsize_utf8(hts_logpath(opt, "hts-cache/old.zip")) > 0) ||
+        (cache->ro && fsize_utf8(hts_logpath(opt, "hts-cache/new.zip")) > 0)) {
       if (!cache->ro) {
-        cache->zipInput = hts_unzOpen_utf8(
-            fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                    StringBuff(opt->path_log), "hts-cache/old.zip"));
+        cache->zipInput =
+            hts_unzOpen_utf8(hts_logpath(opt, "hts-cache/old.zip"));
       } else {
-        cache->zipInput = hts_unzOpen_utf8(
-            fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                    StringBuff(opt->path_log), "hts-cache/new.zip"));
+        cache->zipInput =
+            hts_unzOpen_utf8(hts_logpath(opt, "hts-cache/new.zip"));
       }
 
       // Corrupted ZIP file ? Try to repair!
@@ -1248,13 +1218,9 @@ void cache_init(cache_back * cache, httrackp * opt) {
         unsigned long repairedBytes = 0;
 
         if (!cache->ro) {
-          name =
-            fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                    "hts-cache/old.zip");
+          name = hts_logpath(opt, "hts-cache/old.zip");
         } else {
-          name =
-            fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                    "hts-cache/new.zip");
+          name = hts_logpath(opt, "hts-cache/new.zip");
         }
         hts_log_print(opt, LOG_WARNING,
                       "Cache: damaged cache, trying to repair");
@@ -1299,80 +1265,55 @@ void cache_init(cache_back * cache, httrackp * opt) {
                       "Cache: error trying to open the cache");
       }
 
-    } else if (fsize_utf8(reconcile_path(opt, "hts-cache/old.ndx")) > 0 ||
-               fsize_utf8(reconcile_path(opt, "hts-cache/new.ndx")) > 0) {
+    } else if (fsize_utf8(hts_logpath(opt, "hts-cache/old.ndx")) > 0 ||
+               fsize_utf8(hts_logpath(opt, "hts-cache/new.ndx")) > 0) {
       /* pre-3.31 (2003) .dat/.ndx cache: import support removed */
       hts_log_print(opt, LOG_ERROR,
                     "Cache: the pre-3.31 .dat/.ndx cache format is no longer "
                     "supported; ignoring it (the site will be re-crawled)");
     } else {
       hts_log_print(opt, LOG_DEBUG, "Cache: no cache found in %s",
-                    fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                            "hts-cache/"));
+                    hts_logpath(opt, "hts-cache/"));
     }
 
     if (!cache->ro) {
       // ouvrir caches actuels
-      structcheck_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                               StringBuff(opt->path_log), "hts-cache/"));
+      structcheck_utf8(hts_logpath(opt, "hts-cache/"));
 
       {
         /* owner-only before an entry names a URL: zip's "wb" keeps the mode */
-        FILE *const zfp = hts_fopen_private(
-            fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                    StringBuff(opt->path_log), "hts-cache/new.zip"),
-            "wb");
+        FILE *const zfp =
+            hts_fopen_private(hts_logpath(opt, "hts-cache/new.zip"), "wb");
 
         if (zfp != NULL)
           fclose(zfp);
-        cache->zipOutput = (void *) hts_zipOpen_utf8(
-            fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                    StringBuff(opt->path_log), "hts-cache/new.zip"),
-            0);
+        cache->zipOutput =
+            (void *) hts_zipOpen_utf8(hts_logpath(opt, "hts-cache/new.zip"), 0);
 
         if (cache->zipOutput != NULL) {
           // supprimer old.lst
-          if (!keep_old && fexist_utf8(fconcat(
-                               OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                               StringBuff(opt->path_log), "hts-cache/old.lst")))
-            UNLINK(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                           StringBuff(opt->path_log), "hts-cache/old.lst"));
+          if (!keep_old && fexist_utf8(hts_logpath(opt, "hts-cache/old.lst")))
+            UNLINK(hts_logpath(opt, "hts-cache/old.lst"));
           // renommer
-          if (!keep_old && fexist_utf8(fconcat(
-                               OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                               StringBuff(opt->path_log), "hts-cache/new.lst")))
-            RENAME(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                           StringBuff(opt->path_log), "hts-cache/new.lst"),
-                   fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                           StringBuff(opt->path_log), "hts-cache/old.lst"));
+          if (!keep_old && fexist_utf8(hts_logpath(opt, "hts-cache/new.lst")))
+            RENAME(hts_logpath(opt, "hts-cache/new.lst"),
+                   hts_logpath(opt, "hts-cache/old.lst"));
           // ouvrir
-          cache->lst =
-              FOPEN(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                            StringBuff(opt->path_log), "hts-cache/new.lst"),
-                    "wb");
+          cache->lst = FOPEN(hts_logpath(opt, "hts-cache/new.lst"), "wb");
           strcpybuff(opt->state.strc.path, StringBuff(opt->path_html));
           opt->state.strc.lst = cache->lst;
 
           // supprimer old.txt
-          if (!keep_old && fexist_utf8(fconcat(
-                               OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                               StringBuff(opt->path_log), "hts-cache/old.txt")))
-            UNLINK(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                           StringBuff(opt->path_log), "hts-cache/old.txt"));
+          if (!keep_old && fexist_utf8(hts_logpath(opt, "hts-cache/old.txt")))
+            UNLINK(hts_logpath(opt, "hts-cache/old.txt"));
           // renommer
-          if (!keep_old && fexist_utf8(fconcat(
-                               OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                               StringBuff(opt->path_log), "hts-cache/new.txt")))
-            RENAME(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                           StringBuff(opt->path_log), "hts-cache/new.txt"),
-                   fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                           StringBuff(opt->path_log), "hts-cache/old.txt"));
+          if (!keep_old && fexist_utf8(hts_logpath(opt, "hts-cache/new.txt")))
+            RENAME(hts_logpath(opt, "hts-cache/new.txt"),
+                   hts_logpath(opt, "hts-cache/old.txt"));
           // ouvrir
           /* owner-only: it lists URLs with their passwords */
-          cache->txt = hts_fopen_private(
-              fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                      StringBuff(opt->path_log), "hts-cache/new.txt"),
-              "wb");
+          cache->txt =
+              hts_fopen_private(hts_logpath(opt, "hts-cache/new.txt"), "wb");
           if (cache->txt) {
             fprintf(cache->txt,
                     "date\tsize'/'remotesize\tflags(request:Update,Range state:File response:Modified,Chunked,gZipped)\t");
