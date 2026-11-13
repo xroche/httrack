@@ -24,8 +24,7 @@ crawl --found 'sitemapdir/start.html' --log-not-found 'beyond FD_SETSIZE' \
     httrack 'BASEURL/sitemapdir/start.html' -r2
 
 # Fill every descriptor below 1103 so the crawl's sockets land above FD_SETSIZE.
-# A locked limit skips the test, and so does a host where the exec'd shell cannot
-# open one more file (GNU/Hurd, where bash failed to open local-crawl.sh).
+# A locked limit skips the test, and so does a shell that cannot open one more file.
 # shellcheck disable=SC2016 # the bash -c script expands its own arguments
 "$python" -c '
 import os, resource, sys
