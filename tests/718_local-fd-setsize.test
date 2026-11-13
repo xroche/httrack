@@ -24,7 +24,8 @@ crawl --found 'sitemapdir/start.html' --log-not-found 'beyond FD_SETSIZE' \
     httrack 'BASEURL/sitemapdir/start.html' -r2
 
 # Fill every descriptor below 1103 so the crawl's sockets land above FD_SETSIZE.
-# A locked limit skips the test.
+# A locked limit skips the test, and so does a shell that cannot open one more file.
+# shellcheck disable=SC2016 # the bash -c script expands its own arguments
 "$python" -c '
 import os, resource, sys
 soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
@@ -35,11 +36,16 @@ resource.setrlimit(resource.RLIMIT_NOFILE, (want, hard))
 for _ in range(1100):
     os.set_inheritable(os.open("/dev/null", os.O_RDONLY), True)
 os.execvp(sys.argv[1], sys.argv[1:])
-' bash "$top_srcdir/tests/local-crawl.sh" --no-host-root \
+' bash -c '
+n=$(ulimit -n)
+[ "$n" = unlimited ] || [ "$n" -ge 1300 ] || exit 77
+{ : <"$0"; } 2>/dev/null || exit 77
+exec bash "$0" "$@"
+' "$top_srcdir/tests/local-crawl.sh" --no-host-root \
     --log-found 'Socket (10[2-9][0-9]|1[1-9][0-9]{2}|[2-9][0-9]{3}|[0-9]{5,}) is beyond FD_SETSIZE' \
     httrack 'BASEURL/sitemapdir/start.html' -r2 ||
     {
         rc=$?
-        test "$rc" -ne 77 || skip "descriptor limit is locked"
+        test "$rc" -ne 77 || skip "cannot hold 1100 open descriptors here"
         exit "$rc"
     }

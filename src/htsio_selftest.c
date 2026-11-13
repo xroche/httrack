@@ -1207,6 +1207,11 @@ static int st_fullpath(httrackp *opt, int argc, char **argv) {
   assertf(canary[sizeof(canary) - 1] == 'X');
 
   if (!st_fill_path(path, HTS_URLMAXSIZE * 2 - 1, argv[0])) {
+#ifdef __GNU__
+    /* Hurd cuts a lookup at 1024 bytes, and the cut name does not exist */
+    if (errno == ENOENT)
+      return st_fullpath_skip();
+#endif
     return errno == ENAMETOOLONG ? st_fullpath_skip() : 1;
   }
   fp = filecreate(&opt->state.strc, path);
