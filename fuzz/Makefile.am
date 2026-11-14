@@ -7,6 +7,7 @@ noinst_PROGRAMS = fuzz-charset fuzz-codepage fuzz-meta fuzz-idna fuzz-entities \
 	fuzz-bundle \
 	fuzz-savename \
 	fuzz-warc \
+	fuzz-codec \
 	fuzz-response
 endif
 
@@ -62,6 +63,9 @@ fuzz_bundle_SOURCES = fuzz-bundle.c fuzz.h
 fuzz_savename_SOURCES = fuzz-savename.c fuzz.h
 
 fuzz_warc_SOURCES = fuzz-warc.c fuzz.h
+
+# The Content-Encoding unpackers: gzip, deflate, and br and zstd where built in.
+fuzz_codec_SOURCES = fuzz-codec.c fuzz.h
 
 # The HTTP receive path: back_wait() reading a response off a socketpair.
 fuzz_response_SOURCES = fuzz-response.c fuzz.h
