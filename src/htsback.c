@@ -4092,6 +4092,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                   int ptr = 0;
                   int adv = 0;
                   int noFreebuff = 0;
+                  LLint content_length = -1;
+                  hts_boolean length_conflict = HTS_FALSE;
 
                   /* Hack for zero-length headers */
                   if (back_status(&back[i]) != 0 && back[i].r.adr[0] != '<') {
@@ -4152,6 +4154,13 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                          }
                        */
 
+                      {
+                        const int cl = strfield(rcvd, "Content-length:");
+
+                        if (cl != 0 && !hts_content_length_agrees(
+                                           rcvd + cl, &content_length))
+                          length_conflict = HTS_TRUE;
+                      }
                       if (strnotempty(rcvd))
                         treathead_opt(opt, opt->cookie, back[i].url_adr,
                                       back[i].url_fil, &back[i].r, rcvd);
@@ -4177,8 +4186,17 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                     noFreebuff = 1;
                   }
 
-                  // Callback
-                  {
+                  /* RFC 9112 6.3: lengths that disagree leave the body's end
+                     unknown, so the response and its connection are dropped. */
+                  if (length_conflict) {
+                    hts_log_print(opt, LOG_WARNING,
+                                  "Conflicting Content-Length, response "
+                                  "dropped: %s%s",
+                                  adr_nologin(opt, back[i].url_adr),
+                                  back[i].url_fil);
+                    back_slot_close_fail(opt, sback, i, STATUSCODE_INVALID,
+                                         "Conflicting Content-Length");
+                  } else {
                     int test_head = RUN_CALLBACK6(opt, receivehead,
                                                   back[i].r.adr,
                                                   back[i].url_adr,

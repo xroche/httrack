@@ -1579,6 +1579,23 @@ static void keep_alive_param(const char *s, int *value) {
     *value = got == HTS_SCAN_OK ? (int) v : 0;
 }
 
+hts_boolean hts_content_length_agrees(const char *s, LLint *seen) {
+  for (;;) {
+    LLint v;
+
+    if (hts_scan_llint(&s, 0, INT64_MAX, &v) != HTS_SCAN_OK)
+      return HTS_TRUE;
+    if (*seen >= 0 && v != *seen)
+      return HTS_FALSE;
+    *seen = v;
+    while (is_realspace(*s))
+      s++;
+    if (*s != ',')
+      return HTS_TRUE;
+    s++;
+  }
+}
+
 /* RFC 6265 5.1.4 default-path of request path fil, as a length into fil below
    size, the destination capacity; 0 means "/". A directory too long backs off
    to an ancestor. */
