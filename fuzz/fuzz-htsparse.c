@@ -44,6 +44,32 @@ static const char *const charsets[] = {
     "iso-2022-jp", "big5", "koi8-r",
 };
 
+/* The second byte picks the declared type and a file name to match, since
+   compare_mime() guesses from the extension when the type is unknown. */
+static const struct {
+  const char *mime;
+  const char *file;
+} modes[] = {
+    {"text/html", "/index.html"},
+    {"application/javascript", "/s.js"},
+    {"text/css", "/s.css"},
+    {"audio/x-pn-realaudio", "/p.ram"},
+    {"audio/x-mpegurl", "/p.m3u"},
+    {"application/x-authorware-map", "/m.aam"},
+    {"text/xml", "/f.xml"},
+    {"application/xml", "/f.rss"},
+    {"image/svg+xml", "/i.svg"},
+    {"application/xhtml+xml", "/index.xhtml"},
+    {"application/octet-stream", "/s.js"},
+};
+
+/* The third byte holds option bits. All bits clear give the old fixed setup. */
+#define OPT_ROBOTS_MASK 0x03 /* opt->robots, 0 to 3 */
+#define OPT_URLMODE_SHIFT 2  /* 3 bits, added to the relative default */
+#define OPT_MIMEHTML 0x20
+#define OPT_MAKEINDEX 0x40 /* opt->depth matches the page's depth */
+#define OPT_NO_JAVASCRIPT 0x80
+
 /* htsparse ignores str.addLink on the internal parse; stub it. */
 static int fuzz_addlink(htsmoduleStruct *str, char *link) {
   (void) str;
@@ -55,6 +81,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   static int inited = 0;
 
   const char *charset;
+  unsigned mode, bits;
   httrackp *opt;
   cache_back cache;
   hash_struct hash;
@@ -76,10 +103,12 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   char codebase[HTS_URLMAXSIZE * 2] = "";
   char err_msg[1024] = "";
 
-  if (size == 0)
+  if (size < 3)
     return 0;
   charset = charsets[data[0] % (sizeof(charsets) / sizeof(charsets[0]))];
-  data++, size--;
+  mode = data[1] % (sizeof(modes) / sizeof(modes[0]));
+  bits = data[2];
+  data += 3, size -= 3;
 
   if (!inited) {
     hts_init();
@@ -88,7 +117,11 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
   opt = hts_create_opt();
   opt->log = opt->errlog = NULL;
-  opt->robots = 0;
+  opt->robots = (int) (bits & OPT_ROBOTS_MASK);
+  opt->urlmode = (HTS_URLMODE_RELATIVE + ((bits >> OPT_URLMODE_SHIFT) & 7)) % 6;
+  opt->mimehtml = (bits & OPT_MIMEHTML) != 0;
+  if (bits & OPT_NO_JAVASCRIPT)
+    opt->parsejava |= HTSPARSE_NO_JAVASCRIPT;
 
   memset(&cache, 0, sizeof(cache));
   cache.type = 0; /* no on-disk cache */
@@ -114,8 +147,14 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   /* ptr=1 (index 1 is the parsed page) selects full HTML parsing + the
      rewriter; urladr()/urlfil()/savename() alias heap(ptr), save=/dev/null. */
   hts_record_link(opt, "example.com", "/", "/dev/null", "", "", NULL);
-  hts_record_link(opt, "example.com", "/index.html", "/dev/null", "", "", NULL);
+  hts_record_link(opt, "example.com", modes[mode].file, "/dev/null", "", "",
+                  NULL);
   ptr = 1;
+  if (bits & OPT_MAKEINDEX) {
+    /* an index that is already open sends the index to /dev/null */
+    opt->depth = heap(ptr)->depth;
+    makeindex_fp = fopen("/dev/null", "wb");
+  }
 
   /* NUL-terminated in a size+1 alloc: htsparse one-past-reads onto the NUL. */
   hts_init_htsblk(&r);
@@ -125,7 +164,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   if (size)
     memcpy(r.adr, data, size);
   r.adr[size] = '\0';
-  strcpybuff(r.contenttype, "text/html");
+  strcpybuff(r.contenttype, modes[mode].mime);
 
   memset(&str, 0, sizeof(str));
   memset(&stre, 0, sizeof(stre));
@@ -170,6 +209,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
   (void) htsparse(&str, &stre);
 
+  if (makeindex_fp != NULL)
+    fclose(makeindex_fp);
   freet(r.adr);
   back_delete_all(opt, &cache, sback);
   back_free(&sback);
