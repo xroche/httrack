@@ -25,7 +25,8 @@ mkdir -p "$root/sub/j"
 
 cat >"$root/index.html" <<'EOF'
 <!DOCTYPE html><html><body><a href="sub/page.html">p</a>
-<a href="sub/dot.html">d</a></body></html>
+<a href="sub/dot.html">d</a><a href="sub/eofb.html">b</a>
+<a href="sub/eofa.html">a</a></body></html>
 EOF
 
 # The page carrying the base sits below the document root, so a base of "./"
@@ -54,6 +55,9 @@ cat >"$root/target.html" <<'EOF'
 <!DOCTYPE html><html><body>reached</body></html>
 EOF
 echo stub >"$root/sub/j/A.class"
+# A base or codebase value cut by the end of the file broke the parse.
+printf '<base href="http://x/' >"$root/sub/eofb.html"
+printf '<applet codebase="cb/' >"$root/sub/eofa.html"
 
 bash "$top_srcdir/tests/local-crawl.sh" --root "$root" \
     --errors 0 \
@@ -66,4 +70,5 @@ bash "$top_srcdir/tests/local-crawl.sh" --root "$root" \
     --file-matches sub/page.html 'href="#f"' \
     --file-matches sub/page.html 'codebase="j/"' \
     --file-not-matches sub/page.html 'applet href' \
+    --file-bytes sub/eofb.html 13 --file-bytes sub/eofa.html 8 \
     httrack BASEURL/index.html -q -%v0 -r4

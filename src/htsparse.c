@@ -3736,8 +3736,12 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
         // plus loin
         html++;                  // automate will be checked next loop
-        if (html > r->adr + r->size) // a link at EOF must not flush the NUL
+        // lastsaved <= html <= r->adr + r->size at the flush: never the NUL
+        if (html > r->adr + r->size) {
           html = r->adr + r->size;
+          if (lastsaved > html) // a skipped base href ends past the NUL
+            lastsaved = html;
+        }
 
         /* Otimization: if we are scanning in HTML data (not in tag or script), 
            then jump to the next starting tag */

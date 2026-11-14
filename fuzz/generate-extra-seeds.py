@@ -191,6 +191,10 @@ def gen_htsparse_modes():
             "<script>document.write(\"<img src='j.png'>\")</script>"
             "<a href=\"javascript:go('p.html')\">p</a>",
         ),
+        # a skipped base href or codebase running to the end of the buffer
+        ("eof-base-quoted.html", 0, 0, '<base href="http://x/'),
+        ("eof-base-bare.html", 0, 0, "<base href=http://x/"),
+        ("eof-applet-codebase.html", 0, 0, '<applet codebase="cb/'),
     ]
     for k in range(6):
         seeds.append(
