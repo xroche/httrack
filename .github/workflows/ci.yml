@@ -684,7 +684,6 @@ jobs:
     # the archive's lintian rejects), and sid's lintian carries the same
     # data-driven checks (embedded-lib fingerprints and the like) the buildds and
     # UDD apply -- so issues surface here instead of after upload.
-    # TODO: back to debian:sid once its libclone-perl is rebuilt for perl 5.44.
     container: debian:testing
     steps:
       - name: Install packaging toolchain
