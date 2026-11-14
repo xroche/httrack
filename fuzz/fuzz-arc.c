@@ -62,18 +62,13 @@ static void fuzz_arc_coucal_log(coucal_opaque arg, coucal_loglevel level,
 /* PT_GetType() picks the format from the extension, so the names end in .arc */
 static int fuzz_arc_setup(void) {
   if (arc_in[0] == '\0') {
-    const char *const tmp = getenv("TMPDIR");
-
     coucal_set_global_assert_handler(fuzz_arc_coucal_log, NULL);
 
-    snprintf(arc_dir, sizeof(arc_dir), "%s/fuzz-arc-XXXXXX",
-             tmp != NULL && *tmp != '\0' ? tmp : "/tmp");
-    if (mkdtemp(arc_dir) == NULL) {
+    if (!fuzz_tmpdir(arc_dir, sizeof(arc_dir), "fuzz-arc", fuzz_arc_cleanup)) {
       return -1;
     }
     snprintf(arc_out, sizeof(arc_out), "%s/out.arc", arc_dir);
     snprintf(arc_in, sizeof(arc_in), "%s/in.arc", arc_dir);
-    atexit(fuzz_arc_cleanup);
   }
   return 0;
 }

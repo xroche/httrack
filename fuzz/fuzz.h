@@ -33,6 +33,8 @@ Please visit our Website: http://www.httrack.com
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "htsbase.h"
@@ -44,6 +46,20 @@ HTS_UNUSED static char *fuzz_strdup(const uint8_t *data, size_t size) {
   memcpy(s, data, size);
   s[size] = '\0';
   return s;
+}
+
+/* Create <$TMPDIR or /tmp>/<prefix>-XXXXXX in dir, and run cleanup at exit.
+   Returns HTS_FALSE and registers nothing when mkdtemp fails. */
+HTS_UNUSED static hts_boolean
+fuzz_tmpdir(char *dir, size_t size, const char *prefix, void (*cleanup)(void)) {
+  const char *const tmp = getenv("TMPDIR");
+
+  snprintf(dir, size, "%s/%s-XXXXXX",
+           tmp != NULL && *tmp != '\0' ? tmp : "/tmp", prefix);
+  if (mkdtemp(dir) == NULL)
+    return HTS_FALSE;
+  atexit(cleanup);
+  return HTS_TRUE;
 }
 
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size);
