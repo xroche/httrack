@@ -810,19 +810,11 @@ static void st_backstop_slot(struct_back *sback, int p, int status,
                              const htsblk *r) {
   lien_back *const back = &sback->lnk[p];
 
-  back->r = *r;
-  back->r.location = back->location_buffer;
-  back->status = status;
-  back->timeout = -1; /* only the stop may end these slots */
-  back->rateout = -1;
+  /* no timeout, so only the stop may end these slots */
+  back_slot_attach(sback, p, status, r, ST_BACKSTOP_DEADHOST, "/stalled.html");
   /* poisoned, so the expected outcome cannot be the value the slot came with */
   back->r.statuscode = STATUSCODE_TIMEOUT;
   strcpybuff(back->r.msg, "untouched");
-  strcpybuff(back->url_adr, ST_BACKSTOP_DEADHOST);
-  strcpybuff(back->url_fil, "/stalled.html");
-  /* address list already probed, as it is for a live connect: re-probing it
-     would resolve, and the fd churn would spoil the closed-socket check */
-  sback->connect_fallback[p].addr_count = 1;
 }
 
 /* A network that rejects TEST-NET-1 instead of dropping it answers in ms. */
