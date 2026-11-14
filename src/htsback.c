@@ -2043,6 +2043,21 @@ void back_set_finished(httrackp *opt, struct_back *sback, const int p) {
   }
 }
 
+void back_slot_attach(struct_back *sback, const int p, const int status,
+                      const htsblk *r, const char *adr, const char *fil) {
+  lien_back *const back = &sback->lnk[p];
+
+  back->r = *r;
+  back->r.location = back->location_buffer;
+  back->status = status;
+  back->timeout = -1;
+  back->rateout = -1;
+  strcpybuff(back->url_adr, adr);
+  strcpybuff(back->url_fil, fil);
+  /* already probed: re-probing would resolve adr */
+  sback->connect_fallback[p].addr_count = 1;
+}
+
 void back_slot_fail(httrackp *opt, struct_back *sback, const int p,
                     const int statuscode, const char *msg) {
   htsblk *const r = &sback->lnk[p].r;

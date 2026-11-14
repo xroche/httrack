@@ -22,4 +22,6 @@ Run one target by hand: `fuzz/fuzz-url -max_total_time=300 corpusdir fuzz/corpus
 
 `fuzz-codec` drives `hts_codec_unpack_max()` through temp files. Its first input byte picks the codec: gzip/deflate, br, zstd, or one that is never decoded. The same byte sets the `-m` cap and whether the sniffer's prefix decoder also runs. Gzip and deflate output is checked against zlib itself. br and zstd decode only in a build that has them, so the corpus replays either way.
 
+`fuzz-response` drives `back_wait()` over a socketpair, so it covers the header block, chunked framing and the content decoders without a network. Its first byte is option bits (see `fuzz-response.c`), its second picks the file name and the size of a partial file to resume, and its third cuts the response into pieces that arrive one read at a time. Disk options use a temp dir under `$TMPDIR`.
+
 OSS-Fuzz builds these harnesses with `oss-fuzz-build.sh`, so a new harness needs only a `Makefile.am` entry and a `corpus/<target>/` directory. The script links each harness with `$LIB_FUZZING_ENGINE`. When it is set, `configure` uses it in place of `-fsanitize=fuzzer`.
