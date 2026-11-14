@@ -6,7 +6,8 @@ noinst_PROGRAMS = fuzz-charset fuzz-codepage fuzz-meta fuzz-idna fuzz-entities \
 	fuzz-robots \
 	fuzz-bundle \
 	fuzz-savename \
-	fuzz-warc
+	fuzz-warc \
+	fuzz-response
 endif
 
 AM_CPPFLAGS = \
@@ -61,6 +62,9 @@ fuzz_bundle_SOURCES = fuzz-bundle.c fuzz.h
 fuzz_savename_SOURCES = fuzz-savename.c fuzz.h
 
 fuzz_warc_SOURCES = fuzz-warc.c fuzz.h
+
+# The HTTP receive path: back_wait() reading a response off a socketpair.
+fuzz_response_SOURCES = fuzz-response.c fuzz.h
 
 # Corpus and dictionary lists come from configure: automake does not expand EXTRA_DIST globs.
 EXTRA_DIST = README.md run-fuzzers.sh check-corpus-list.sh oss-fuzz-build.sh ubsan-ignorelist.txt \

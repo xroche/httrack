@@ -2456,7 +2456,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       break;
                       /*case '<': */
                     case '#':
-                      if (*(eadr - 1) != '&')   // &#40;
+                      /* a playlist link can start the buffer (#EXTM3U) */
+                      if (eadr == r->adr || *(eadr - 1) != '&') // &#40;
                         ok = 0;
                       break;
                       // case '?': non!

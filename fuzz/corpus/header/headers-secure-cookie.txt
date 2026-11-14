@@ -1,0 +1,5 @@
+ HTTP/1.1 200 OK
+Set-Cookie: sid=x; Path=/
+Set-Cookie: n=1; Secure; Max-Age=60
+Set-Cookie: m=1; Expires=Wed, 21 Oct 1999 07:28:00 GMT
+
