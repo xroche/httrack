@@ -10,7 +10,8 @@ noinst_PROGRAMS = fuzz-charset fuzz-codepage fuzz-meta fuzz-idna fuzz-entities \
 	fuzz-codec \
 	fuzz-response \
 	fuzz-redirect \
-	fuzz-socks5
+	fuzz-socks5 \
+	fuzz-ftp
 endif
 
 AM_CPPFLAGS = \
@@ -77,6 +78,9 @@ fuzz_redirect_SOURCES = fuzz-redirect.c fuzz.h
 
 # The SOCKS5 client handshake against a scripted, hostile proxy reply.
 fuzz_socks5_SOURCES = fuzz-socks5.c fuzz.h
+
+# The FTP control channel: get_ftp_line() over a socketpair, then the reply parsers.
+fuzz_ftp_SOURCES = fuzz-ftp.c fuzz.h
 
 # Corpus and dictionary lists come from configure: automake does not expand EXTRA_DIST globs.
 EXTRA_DIST = README.md run-fuzzers.sh check-corpus-list.sh oss-fuzz-build.sh ubsan-ignorelist.txt \

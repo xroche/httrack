@@ -77,6 +77,9 @@ Please visit our Website: http://www.httrack.com
 #else
 #define HTS_INET_MPTCP_DARWIN 0
 #endif
+#if HTS_INET_MPTCP && !HTS_INET_MPTCP_DARWIN
+#include <sys/utsname.h>
+#endif
 
 /* Without this header Multipath TCP still works but goes unreported, which is
    also where macOS stands. */
@@ -2083,6 +2086,169 @@ hts_boolean hts_inmem_size_fits(LLint size) {
   return size >= 0 && size < INT32_MAX ? HTS_TRUE : HTS_FALSE;
 }
 
+/* A line-mode call reads at most this many bytes, CRs included. */
+#define HTS_XFREAD_LINE_CALL_MAX 256
+/* Returned by hts_peek() when it must not peek on this transport. */
+#define PEEK_UNSUPPORTED (-100)
+
+/* Set once an MPTCP socket exists on a kernel that may ignore MSG_PEEK. */
+static volatile int hts_peek_unsafe = 0;
+/* Set by the self-test hook. */
+static volatile int hts_peek_forced_off = 0;
+/* Line-mode calls that fell back to the bytewise loop, for the self-test. */
+static int hts_xfread_bytewise_calls = 0;
+
+#if HTS_INET_MPTCP && !HTS_INET_MPTCP_DARWIN
+/* Can MSG_PEEK on an MPTCP socket consume the data? Linux 5.6 to 5.12 ignore
+   the flag, and an unreadable version counts as one of them. */
+static hts_boolean hts_mptcp_peek_is_broken(void) {
+  struct utsname u;
+  int major = 0, minor = 0;
+
+  if (uname(&u) != 0 || sscanf(u.release, "%d.%d", &major, &minor) != 2)
+    return HTS_TRUE;
+  return major < 5 || (major == 5 && minor < 13) ? HTS_TRUE : HTS_FALSE;
+}
+#endif
+
+void hts_peek_force_off(hts_boolean off) {
+  hts_store_release_int(&hts_peek_forced_off, off ? 1 : 0);
+}
+
+int hts_xfread_bytewise_count(void) { return hts_xfread_bytewise_calls; }
+
+/* Copy up to size buffered bytes without consuming them. Returns the count, 0
+   when TLS has nothing decrypted yet, READ_EOF, READ_ERROR or PEEK_UNSUPPORTED.
+   Only call it when the transport has data, as for hts_read(). */
+static int hts_peek(htsblk *r, char *buff, int size) {
+  int ret;
+
+  if (r->is_file || hts_load_acquire_int(&hts_peek_unsafe) ||
+      hts_load_acquire_int(&hts_peek_forced_off))
+    return PEEK_UNSUPPORTED;
+#if HTS_USEOPENSSL
+  if (r->ssl) {
+    sigpipe_mask m;
+
+    sigpipe_hold(&m);
+    ret = SSL_peek(r->ssl_con, buff, size);
+    sigpipe_release(&m);
+    if (ret <= 0) {
+      const int err_code = SSL_get_error(r->ssl_con, ret);
+
+      if (err_code == SSL_ERROR_WANT_READ || err_code == SSL_ERROR_WANT_WRITE)
+        return 0;
+      return err_code == SSL_ERROR_ZERO_RETURN ? READ_EOF : READ_ERROR;
+    }
+    return ret;
+  }
+#endif
+  ret = recv(r->soc, buff, size, MSG_PEEK);
+  if (ret == 0)
+    return READ_EOF;
+  return ret < 0 ? READ_ERROR : ret;
+}
+
+typedef struct xfread_line_state {
+  hts_boolean lf_detected;
+  hts_boolean at_beginning;
+} xfread_line_state;
+
+/* Appends c at adr[*size] unless it is a CR, and advances *size. A NULL adr is
+   a dry run. Returns whether the call must stop after c: on a blank line, on an
+   LF opening the call, or on any LF when bufl is HTS_XFREAD_LINE. */
+static hts_boolean xfread_line_step(xfread_line_state *st, char *adr,
+                                    LLint *size, char c, int bufl) {
+  hts_boolean stop = HTS_FALSE;
+
+  if (c == 10) {
+    if (st->lf_detected || st->at_beginning || bufl < 0)
+      stop = HTS_TRUE;
+    st->lf_detected = HTS_TRUE;
+  }
+  if (c != 13) {
+    if (c != 10)
+      st->lf_detected = HTS_FALSE;
+    if (adr != NULL)
+      adr[*size] = c;
+    (*size)++;
+    st->at_beginning = HTS_FALSE;
+  }
+  if (adr != NULL)
+    adr[*size] = '\0';
+  return stop;
+}
+
+/* The bytewise line modes, the fallback when hts_peek() declines. */
+static int xfread_lines_bytewise(htsblk *r, int bufl) {
+  xfread_line_state st = {HTS_FALSE, HTS_TRUE};
+  int count = HTS_XFREAD_LINE_CALL_MAX;
+  int tot_nl = 0;
+  int nl;
+
+  do {
+    char c;
+
+    if (r->size >= HTS_LINE_BLOCK_SIZE - 2)
+      return READ_INTERNAL_ERROR;
+    nl = hts_read(r, &c, 1);
+    if (nl < 0)
+      return nl;
+    if (nl > 0 && xfread_line_step(&st, r->adr, &r->size, c, bufl))
+      count = 0;
+    tot_nl += nl;
+  } while (--count > 0 && check_readinput(r));
+  return tot_nl;
+}
+
+/* The line modes. Reads a peeked block in one go, consuming exactly what the
+   bytewise loop would, so the bytes left on the socket are the same. */
+static int xfread_lines(htsblk *r, int bufl) {
+  char buff[HTS_XFREAD_LINE_CALL_MAX];
+  xfread_line_state st = {HTS_FALSE, HTS_TRUE};
+  hts_boolean overflow = HTS_FALSE;
+  int avail, want, got, i;
+
+  if (r->adr == NULL) {
+    r->adr = (char *) malloct(HTS_LINE_BLOCK_SIZE);
+    r->size = 0;
+    if (r->adr == NULL)
+      return READ_INTERNAL_ERROR;
+  }
+  if (r->size >= HTS_LINE_BLOCK_SIZE - 2)
+    return READ_INTERNAL_ERROR;
+  avail = hts_peek(r, buff, sizeof(buff));
+  if (avail == PEEK_UNSUPPORTED) {
+    hts_xfread_bytewise_calls++;
+    return xfread_lines_bytewise(r, bufl);
+  }
+  if (avail <= 0)
+    return avail;
+  /* Dry run: where would the bytewise loop stop? */
+  {
+    xfread_line_state dry = st;
+    LLint size = r->size;
+
+    for (want = 0; want < avail;) {
+      if (size >= HTS_LINE_BLOCK_SIZE - 2) {
+        overflow = HTS_TRUE;
+        break;
+      }
+      if (xfread_line_step(&dry, NULL, &size, buff[want++], bufl))
+        break;
+    }
+  }
+  got = hts_read(r, buff, want);
+  if (got <= 0) /* peeked, so the read cannot fail */
+    return got;
+  for (i = 0; i < got; i++) {
+    if (xfread_line_step(&st, r->adr, &r->size, buff[i], bufl))
+      break;
+  }
+  /* The bytewise loop fails when it needs a byte past the line buffer. */
+  return overflow && got == want ? READ_INTERNAL_ERROR : got;
+}
+
 // Read one block: bufl is a byte count, or one of the HTS_XFREAD_* line modes.
 // Note: the +1 in the mallocs is the trailing NUL appended to the data.
 LLint http_xfread1(htsblk * r, int bufl) {
@@ -2194,54 +2360,8 @@ LLint http_xfread1(htsblk * r, int bufl) {
 
     }                           // stockage disque ou mémoire
 
-  } else { // line modes: byte by byte, CR dropped
-    int count = 256;
-    int tot_nl = 0;
-    int lf_detected = 0;
-    int at_beginning = 1;
-
-    do {
-      nl = READ_INTERNAL_ERROR;
-      count--;
-      if (r->adr == NULL) {
-        r->adr = (char *) malloct(HTS_LINE_BLOCK_SIZE);
-        r->size = 0;
-      }
-      if (r->adr != NULL) {
-        if (r->size < HTS_LINE_BLOCK_SIZE - 2) {
-          // lecture
-          nl = hts_read(r, r->adr + r->size, 1);
-          if (nl > 0) {
-            // exit on a blank line (LF seen twice, or LF as the first byte),
-            // or on the first LF in HTS_XFREAD_LINE mode
-            if (*(r->adr + r->size) == 10) {
-              if (lf_detected || (at_beginning) || (bufl < 0))
-                count = -1;
-              lf_detected = 1;
-            }
-            if (*(r->adr + r->size) != 13) {    // sauter caractères 13
-              if ((*(r->adr + r->size) != 10)
-                  && (*(r->adr + r->size) != 13)
-                ) {
-                // restart for new line
-                lf_detected = 0;
-              }
-              (r->size)++;
-              at_beginning = 0;
-            }
-            *(r->adr + r->size) = '\0'; // terminer par octet nul
-          }
-        }
-      }
-      if (nl >= 0) {
-        tot_nl += nl;
-        if (!check_readinput(r))
-          count = -1;
-      }
-    } while((nl >= 0) && (count > 0));
-    if (nl >= 0) {
-      nl = tot_nl;
-    }
+  } else {
+    nl = xfread_lines(r, bufl);
   }
   /* Ahead of the EOF test below: r->size is advanced above the fwrite that
      failed, so a body completed by that very read would report a clean EOF. */
@@ -2287,6 +2407,8 @@ void socket_set_nosigpipe(T_SOC soc) {
 /* Resolved by hts_init(), before any crawl thread reads them. */
 static hts_boolean hts_mptcp_usable = HTS_FALSE;
 static hts_boolean hts_mptcp_on_by_default = HTS_FALSE;
+/* macOS is left unverified, so its multipath sockets are never peeked. */
+static hts_boolean hts_mptcp_peek_broken = HTS_TRUE;
 
 #if HTS_INET_MPTCP && !HTS_INET_MPTCP_DARWIN
 /* Read one small integer sysctl, or -1 when the file cannot be read. */
@@ -2337,6 +2459,7 @@ static void hts_mptcp_probe(void) {
     close(soc);
     hts_mptcp_usable = HTS_TRUE;
     hts_mptcp_on_by_default = hts_mptcp_kernel_recovers();
+    hts_mptcp_peek_broken = hts_mptcp_peek_is_broken();
   }
 #endif
 }
@@ -2376,6 +2499,10 @@ T_SOC hts_socket_client(int family, const httrackp *opt,
 #else
   (void) opt;
   (void) will_bind;
+#endif
+#if HTS_INET_MPTCP
+  if (soc != INVALID_SOCKET && hts_mptcp_peek_broken)
+    hts_store_release_int(&hts_peek_unsafe, 1);
 #endif
   if (soc == INVALID_SOCKET)
     soc = (T_SOC) socket(family, SOCK_STREAM, 0);

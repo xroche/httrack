@@ -4091,6 +4091,78 @@ class Handler(SimpleHTTPRequestHandler):
         except OSError:
             pass
 
+    # Raw responses for the header reader, sent whole or one byte per write. A
+    # reader that takes bytes past the blank line corrupts the body.
+    FRAG_BODY = (
+        b"\r\n\r\nstart\r\nline\n\nlone\rCR\r\n" + bytes(range(256)) + b"\r\n\r\n"
+    )
+    FRAG_SHAPES = ("crlf", "lf", "chunked", "huge")
+    FRAG_MODES = ("whole", "bytes", "split")
+
+    def frag_response(self, shape):
+        body = self.FRAG_BODY
+        nl = b"\n" if shape == "lf" else b"\r\n"
+        head = [b"HTTP/1.1 200 OK", b"Content-Type: application/octet-stream"]
+        if shape == "huge":
+            head += [b"X-Pad-%03d: %s" % (i, b"p" * 60) for i in range(160)]
+        if shape == "chunked":
+            head.append(b"Transfer-Encoding: chunked")
+            chunks, off = b"", 0
+            for n in (1, 2, 3, 7, 64):
+                chunks += b"%X\r\n" % n + body[off : off + n] + b"\r\n"
+                off += n
+            rest = body[off:]
+            chunks += b"%x\r\n" % len(rest) + rest + b"\r\n"
+            body = chunks + b"0\r\nX-Trailer: t\r\n\r\n"
+        else:
+            head.append(b"Content-Length: %d" % len(body))
+        head.append(b"Connection: close")
+        raw = nl.join(head) + nl + nl
+        return (
+            (raw, len(raw) - len(nl))
+            if self.command == "HEAD"
+            else (raw + body, len(raw) - len(nl))
+        )
+
+    def route_frag(self):
+        name = urlsplit(self.path).path[len("/frag/") :]
+        if name == "index.html":
+            links = "".join(
+                '\t<a href="%s-%s.bin">x</a>\n' % (s, m)
+                for s in self.FRAG_SHAPES
+                for m in self.FRAG_MODES
+            )
+            self.send_html(links)
+            return
+        shape, _, mode = name.partition("-")
+        mode = mode[: -len(".bin")]
+        if shape not in self.FRAG_SHAPES or mode not in self.FRAG_MODES:
+            self.send_error(404)
+            return
+        raw, blank = self.frag_response(shape)
+        self.close_connection = True
+        try:
+            if mode == "whole":
+                self.wfile.write(raw)
+            elif mode == "split":
+                # the blank line's own newline arrives with the body
+                self.wfile.write(raw[:blank])
+                self.wfile.flush()
+                time.sleep(0.3)
+                self.wfile.write(raw[blank:])
+            else:
+                self.connection.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+                # At most ~400 pauses, because a Windows sleep lasts ~15 ms.
+                step = max(1, len(raw) // 400)
+                for i in range(len(raw)):
+                    self.wfile.write(raw[i : i + 1])
+                    self.wfile.flush()
+                    if i % step == 0:
+                        time.sleep(0.0005)
+            self.wfile.flush()
+        except OSError:
+            pass
+
     # A NUL inside a response header (RFC 9110 5.5) must drop the response.
     # Each file is (status line, header lines, body); a None status line sends
     # the body alone, as a server that answers without headers does.
@@ -4755,6 +4827,9 @@ class Handler(SimpleHTTPRequestHandler):
             return True
         if path.startswith("/titleenc/"):
             self.route_titleenc()
+            return True
+        if path.startswith("/frag/"):
+            self.route_frag()
             return True
         if path.startswith("/playlistmime/"):
             self.route_playlistmime()

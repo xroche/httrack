@@ -617,7 +617,7 @@ hts_boolean ftp_parse_size(const char *line, LLint *size) {
 }
 
 /* MDTM reply "213 YYYYMMDDHHMMSS[.frac]" (RFC 3659, UTC) into tm_time. */
-static hts_boolean ftp_parse_mdtm(const char *line, struct tm *tm_time) {
+hts_boolean ftp_parse_mdtm(const char *line, struct tm *tm_time) {
   int year, mon, mday, hour, min, sec;
 
   if (sscanf(line, "213 %4d%2d%2d%2d%2d%2d", &year, &mon, &mday, &hour, &min,

@@ -416,6 +416,11 @@ int hts_status_line_code(const char *line);
 #define HTS_XFREAD_LINE_BLOCK 0 /* lines up to a blank one (header/trailer) */
 #define HTS_XFREAD_LINE (-1)    /* one line, stopping at the first LF */
 LLint http_xfread1(htsblk * r, int bufl);
+/* Self-test hook: read the line modes bytewise, as on an MPTCP socket where
+   peeking is unsafe. */
+void hts_peek_force_off(hts_boolean off);
+/* Self-test hook: how many line-mode calls took the bytewise path? */
+int hts_xfread_bytewise_count(void);
 /* Does an in-memory body of this size fit? r->adr is indexed with an int
    downstream and its allocations add a trailing NUL, so every producer of
    r->size must refuse where http_xfread1() does. */
