@@ -2858,6 +2858,21 @@ class Handler(SimpleHTTPRequestHandler):
     def route_longloc_target(self):
         self.send_raw(b"<html><body>long-location target</body></html>\n", "text/html")
 
+    # A Location whose cid: form under -%M outgrows the redirect's own buffer:
+    # escape_in_url triples each '&'.
+    def route_cidloc_index(self):
+        self.send_html('\t<a href="go.html">go</a>')
+
+    def route_cidloc_go(self):
+        base = "http://127.0.0.1:%d/cidloc/" % self.server.server_address[1]
+        self.send_response(301, "Moved Permanently")
+        self.send_header("Location", base + "target.html?q=" + "&" * 950)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def route_cidloc_target(self):
+        self.send_html("cid target")
+
     # Serves a quoted CSS url() whose file name holds "(2)".
     def route_cssparen_index(self):
         self.send_html(
@@ -4435,6 +4450,9 @@ class Handler(SimpleHTTPRequestHandler):
         "/longloc/index.html": route_longloc_index,
         "/longloc/go.php": route_longloc_go,
         "/longloc/target.html": route_longloc_target,
+        "/cidloc/index.html": route_cidloc_index,
+        "/cidloc/go.html": route_cidloc_go,
+        "/cidloc/target.html": route_cidloc_target,
         "/shortloc/index.html": route_shortloc_index,
         "/shortloc/go.php": route_shortloc_go,
         "/shortloc/target.html": route_shortloc_target,
