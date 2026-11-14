@@ -4335,13 +4335,13 @@ static hts_boolean refwritten_read(httrackp *opt) {
 /* A log path past HTS_URLMAXSIZE still finds its ref directory. */
 static int refwritten_longpath(httrackp *opt, const char *dir) {
   char longdir[HTS_URLMAXSIZE * 2];
-  char seg[201];
+  char seg[101];
   int k, fail = 0;
 
   memset(seg, 'd', sizeof(seg) - 1);
   seg[sizeof(seg) - 1] = '\0';
   strcpybuff(longdir, dir);
-  for (k = 0; k < 6; k++) {
+  for (k = 0; k < 12; k++) {
     strcatbuff(longdir, "/");
     strcatbuff(longdir, seg);
     (void) MKDIR(longdir);

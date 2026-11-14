@@ -1578,9 +1578,9 @@ static int st_lockpoll(httrackp *opt, int argc, char **argv) {
     err = 1;
   }
 
-  opt->abort_lock_polled_at = 0;
+  opt->abort_lock_polled_at = mtime_monotonic() + 60000;
   if (!hts_poll_abort_request(opt)) {
-    fprintf(stderr, "lockpoll: the first poll missed the request\n");
+    fprintf(stderr, "lockpoll: a clock stepping back stopped the polls\n");
     err = 1;
   }
   /* the take deleted the lock, so put it back */
@@ -1590,6 +1590,11 @@ static int st_lockpoll(httrackp *opt, int argc, char **argv) {
   }
   if (hts_poll_abort_request(opt) || !fexist_utf8(lock)) {
     fprintf(stderr, "lockpoll: a poll right after the last one looked\n");
+    err = 1;
+  }
+  opt->abort_lock_polled_at = mtime_monotonic() - 200;
+  if (hts_poll_abort_request(opt)) {
+    fprintf(stderr, "lockpoll: a poll 200 ms after the last one looked\n");
     err = 1;
   }
   opt->abort_lock_polled_at = mtime_monotonic() - 300;

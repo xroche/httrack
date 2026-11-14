@@ -623,7 +623,8 @@ hts_boolean hts_take_lock_request(httrackp *opt, const char *name) {
 static hts_boolean lock_poll_due(TStamp *polled_at) {
   const TStamp now = mtime_monotonic();
 
-  if (*polled_at != 0 && now - *polled_at < HTS_LOCK_POLL_MS)
+  /* a clock stepping back, on the wall-clock fallback, makes it due */
+  if (now >= *polled_at && now - *polled_at < HTS_LOCK_POLL_MS)
     return HTS_FALSE;
   *polled_at = now;
   return HTS_TRUE;
