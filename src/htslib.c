@@ -4557,7 +4557,9 @@ HTSEXT_API size_t make_content_id(const char *const adr, const char *const fil,
                                   char *const dest, const size_t size) {
   char *a;
   size_t esc_size = escape_in_url(adr, dest, size);
-  esc_size += escape_in_url(fil, dest + esc_size, size - esc_size);
+  /* the append form takes a remainder the size check would misread */
+  if (esc_size < size)
+    esc_size += append_escape_in_url(fil, dest, size);
   RUNTIME_TIME_CHECK_SIZE(size);
   /* A '%' would be decoded again by whoever reads the cid: URL. The marker has
      to be a character escape_in_url() itself escapes, or two URLs can share one

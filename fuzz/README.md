@@ -24,6 +24,8 @@ Run one target by hand: `fuzz/fuzz-url -max_total_time=300 corpusdir fuzz/corpus
 
 `fuzz-response` drives `back_wait()` over a socketpair, so it covers the header block, chunked framing and the content decoders without a network. Its first byte is option bits (see `fuzz-response.c`), its second picks the file name and the size of a partial file to resume, and its third cuts the response into pieces that arrive one read at a time. Disk options use a temp dir under `$TMPDIR`.
 
+`fuzz-redirect` drives `hts_mirror_check_moved()`, which handles a redirect's `Location` and a 412 or 416 answer to a resume. Its first byte picks the status and the page, turns on MIME HTML, and can plant a partial file and a resume reference. Its second byte sets the URL hack and the error-page options, and can move the page to another host and port. The first line is the `Location`, and the bytes after it fill the planted files. Files go in a temp dir under `$TMPDIR`.
+
 `fuzz-socks5` replays a hostile proxy reply into the SOCKS5 client handshake. Its input is the origin address, a newline, the proxy URL, a newline, then the bytes the proxy sends back.
 
 `fuzz-ftp` feeds its input to `get_ftp_line()` over a socketpair and runs each reply line through the PASV, EPSV, SIZE and MDTM parsers. The same bytes, read as a URL, go through the user, host and command splitters. Its first byte sets the reply buffer size: odd is the 1024 bytes every caller passes, even is a short buffer.

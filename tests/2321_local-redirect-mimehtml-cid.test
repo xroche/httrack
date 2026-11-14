@@ -1,0 +1,11 @@
+#!/bin/bash
+# Under -%M a redirect stub links its target as a cid: URL. Escaping makes it up
+# to three times longer than the Location, so a long one aborted the crawl.
+# -%N0 skips the type probe, which would follow the redirect itself.
+set -e
+
+: "${top_srcdir:=..}"
+
+bash "$top_srcdir/tests/local-crawl.sh" \
+    --file-matches 'cidloc/go.html' 'URL=cid:127-2e0-2e0-2e1-3a' \
+    httrack -%M -%N0 'BASEURL/cidloc/index.html'

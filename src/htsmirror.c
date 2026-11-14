@@ -147,7 +147,8 @@ int hts_mirror_check_moved(htsmoduleStruct *str,
                     adr_nologin(opt, urladr()), urlfil());
 
       {
-        char BIGSTK mov_url[HTS_URLMAXSIZE * 2];
+        /* room for the -%M cid: form, which escaping makes longer */
+        char BIGSTK mov_url[HTS_URLMAXSIZE * 3 + sizeof("cid:")];
         lien_adrfilsave savedmoved;
         lien_adrfil *const moved = &savedmoved.af;
         int get_it =
