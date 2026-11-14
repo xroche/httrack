@@ -7,10 +7,12 @@ set -euo pipefail
 
 : "${top_srcdir:=..}"
 
-bash "$top_srcdir/tests/local-crawl.sh" --errors 2 \
+bash "$top_srcdir/tests/local-crawl.sh" --errors 4 \
     --file-bytes 'dupcl/same.bin' 16 \
     --file-bytes 'dupcl/list.bin' 16 \
     --not-found 'dupcl/differ.bin' --not-found 'dupcl/differ-list.bin' \
+    --not-found 'dupcl/gap.bin' --not-found 'dupcl/long.bin' \
     --log-found 'Conflicting Content-Length, response dropped: .*/dupcl/differ\.bin' \
     --log-found 'Conflicting Content-Length, response dropped: .*/dupcl/differ-list\.bin' \
-    httrack 'BASEURL/dupcl/index.html' --retries=0
+    --log-found 'Conflicting Content-Length, response dropped: .*/dupcl/long\.bin' \
+    httrack 'BASEURL/dupcl/index.html'

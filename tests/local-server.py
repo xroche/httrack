@@ -3404,6 +3404,8 @@ class Handler(SimpleHTTPRequestHandler):
         "list.bin": ("16, 16",),
         "differ.bin": ("16", "8"),
         "differ-list.bin": ("16, 8",),
+        "gap.bin": ("16,,8",),
+        "long.bin": ("16", "8" + " " * 2100),
     }
 
     def route_dupcl_index(self):
@@ -4362,6 +4364,8 @@ class Handler(SimpleHTTPRequestHandler):
         "/dupcl/list.bin": route_dupcl_file,
         "/dupcl/differ.bin": route_dupcl_file,
         "/dupcl/differ-list.bin": route_dupcl_file,
+        "/dupcl/gap.bin": route_dupcl_file,
+        "/dupcl/long.bin": route_dupcl_file,
         "/slowhead/index.html": route_bigfiles_index,
         "/slowhead/p0.bin": route_slowhead_page,
         "/slowhead/p1.bin": route_slowhead_page,

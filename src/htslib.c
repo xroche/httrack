@@ -1582,15 +1582,17 @@ static void keep_alive_param(const char *s, int *value) {
 hts_boolean hts_content_length_agrees(const char *s, LLint *seen) {
   for (;;) {
     LLint v;
+    const hts_scan_result got = hts_scan_llint(&s, 0, INT64_MAX, &v);
 
-    if (hts_scan_llint(&s, 0, INT64_MAX, &v) != HTS_SCAN_OK)
-      return HTS_TRUE;
-    if (*seen >= 0 && v != *seen)
-      return HTS_FALSE;
-    *seen = v;
-    while (is_realspace(*s))
-      s++;
-    if (*s != ',')
+    if (got != HTS_SCAN_NONE) {
+      if (got == HTS_SCAN_REFUSED)
+        v = -2;
+      if (*seen != -1 && (v < 0 || v != *seen))
+        return HTS_FALSE;
+      *seen = v;
+    }
+    s += strcspn(s, ",");
+    if (*s == '\0')
       return HTS_TRUE;
     s++;
   }

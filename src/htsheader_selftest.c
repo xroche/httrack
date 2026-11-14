@@ -191,8 +191,7 @@ static int st_retryafter(httrackp *opt, int argc, char **argv) {
   return st_verdict("retry-after", err);
 }
 
-/* Content-Length fields a response carries, in order, and whether they agree
-   (RFC 9112 6.3, RFC 9110 8.6). */
+/* Do repeated Content-Length fields agree? (RFC 9112 6.3, RFC 9110 8.6) */
 static int st_contentlength(httrackp *opt, int argc, char **argv) {
   int err = 0;
   size_t i;
@@ -203,23 +202,31 @@ static int st_contentlength(httrackp *opt, int argc, char **argv) {
     LLint length;
   } cases[] = {
       {"42", NULL, HTS_TRUE, 42},
-      {"0", NULL, HTS_TRUE, 0},
+      {"0", "0", HTS_TRUE, 0},
       {"42", "42", HTS_TRUE, 42},
       {"42, 42", NULL, HTS_TRUE, 42},
       {" 42 ,42 , 42", " 42", HTS_TRUE, 42},
-      {"0", "0", HTS_TRUE, 0},
       {"42", "43", HTS_FALSE, 42},
       {"0", "42", HTS_FALSE, 0},
       {"42", "0", HTS_FALSE, 42},
       {"42, 43", NULL, HTS_FALSE, 42},
+      {"42, 42, 43", NULL, HTS_FALSE, 42},
       {"42", "42, 43", HTS_FALSE, 42},
       {"9223372036854775807", "9223372036854775806", HTS_FALSE,
        9223372036854775807LL},
-      /* not a length: left to treathead, which reads what it can */
-      {"42 bytes", NULL, HTS_TRUE, 42},
-      {"42, x", NULL, HTS_TRUE, 42},
+      /* empty elements and text that is no number are skipped */
+      {"42,,43", NULL, HTS_FALSE, 42},
+      {", 43", "42", HTS_FALSE, 43},
+      {"42, x, 43", NULL, HTS_FALSE, 42},
+      {"42", "x, 43", HTS_FALSE, 42},
+      {"42,", NULL, HTS_TRUE, 42},
+      {"42 bytes", "42", HTS_TRUE, 42},
       {"x", "42", HTS_TRUE, 42},
-      {"-1", "42", HTS_TRUE, 42},
+      /* a signed or oversized length is a length of its own */
+      {"42", "-1", HTS_FALSE, 42},
+      {"42, 99999999999999999999", NULL, HTS_FALSE, 42},
+      {"99999999999999999999", "42", HTS_FALSE, -2},
+      {"-1", NULL, HTS_TRUE, -2},
   };
 
   (void) opt;

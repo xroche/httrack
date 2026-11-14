@@ -4136,6 +4136,10 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
                       ptr += adv;
                       if (cut) {
+                        /* a length we cannot read whole is one we cannot
+                           compare */
+                        if (strfield(rcvd, "Content-length:"))
+                          length_conflict = HTS_TRUE;
                         /* not what the server sent: parsing it would follow a
                            truncated Location, or read its tail as headers */
                         hts_log_print(
