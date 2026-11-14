@@ -124,6 +124,11 @@ int back_serialize_ref(httrackp * opt, const lien_back * src);
 int back_unserialize_ref(httrackp * opt, const char *adr, const char *fil,
                          lien_back ** dst);
 void back_set_finished(httrackp *opt, struct_back *sback, const int p);
+/* Put slot p in status over the open connection r, as back_add() and the
+   connect leave it, with no timeout: for drivers of back_wait() that have no
+   network. The slot takes ownership of r's socket and buffers. */
+void back_slot_attach(struct_back *sback, const int p, const int status,
+                      const htsblk *r, const char *adr, const char *fil);
 /* Fail slot p as statuscode and finish it. msg is clipped into r.msg, and NULL
    keeps the reason already there. The caller closes the connection. */
 void back_slot_fail(httrackp *opt, struct_back *sback, const int p,

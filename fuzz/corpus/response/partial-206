@@ -1,0 +1,6 @@
+„ŠHTTP/1.1 206 Partial Content
+Content-Type: application/octet-stream
+Content-Range: bytes 10-19/20
+Content-Length: 10
+
+0123456789

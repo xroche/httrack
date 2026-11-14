@@ -20,4 +20,6 @@ Run one target by hand: `fuzz/fuzz-url -max_total_time=300 corpusdir fuzz/corpus
 
 `fuzz-arc` is the odd one out: it drives proxytrack's `.arc` reader the way `--convert` does, through a temp file rather than a buffer, and it compiles `src/proxy/store.c` into the harness because proxytrack does not link libhttrack. Both readers and the writer print to stderr on malformed input, so pass `-close_fd_mask=2` for anything longer than a corpus replay.
 
+`fuzz-response` drives `back_wait()` over a socketpair whose peer holds the response, so it covers the header block, chunked framing and the content decoders without a network. Its first byte is option bits (see `fuzz-response.c`), and its second picks the file name and the size of a partial file to resume. Options that save to disk work in a `fuzz-response-*` directory under `$TMPDIR`, emptied after every input.
+
 OSS-Fuzz builds these harnesses with `oss-fuzz-build.sh`, so a new harness needs only a `Makefile.am` entry and a `corpus/<target>/` directory. The script links each harness with `$LIB_FUZZING_ENGINE`. When it is set, `configure` uses it in place of `-fsanitize=fuzzer`.
