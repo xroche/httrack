@@ -53,16 +53,12 @@ static void fuzz_codec_cleanup(void) {
 
 static int fuzz_codec_setup(void) {
   if (in_path[0] == '\0') {
-    const char *const tmp = getenv("TMPDIR");
-
-    snprintf(codec_dir, sizeof(codec_dir), "%s/fuzz-codec-XXXXXX",
-             tmp != NULL && *tmp != '\0' ? tmp : "/tmp");
-    if (mkdtemp(codec_dir) == NULL) {
+    if (!fuzz_tmpdir(codec_dir, sizeof(codec_dir), "fuzz-codec",
+                     fuzz_codec_cleanup)) {
       return -1;
     }
     snprintf(in_path, sizeof(in_path), "%s/in.bin", codec_dir);
     snprintf(out_path, sizeof(out_path), "%s/out.bin", codec_dir);
-    atexit(fuzz_codec_cleanup);
   }
   return 0;
 }
