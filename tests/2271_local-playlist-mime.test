@@ -1,0 +1,75 @@
+#!/bin/bash
+#
+# An m3u playlist is followed under every content type servers send for it,
+# with its # lines, blank lines and line ends kept byte for byte.
+
+set -euo pipefail
+export LC_ALL=C
+
+: "${top_srcdir:=..}"
+
+# shellcheck disable=SC2016 # the $ is sed's
+ere_quote() { printf '%s' "$1" | sed 's/[].?*+^$()[]/\\&/g'; }
+
+# name, line end, saved playlist name; see route_playlistmime.
+lists=(
+    "xmpegurl" $'\n' "xmpegurl.m3u"
+    "mpegurl" $'\n' "mpegurl.m3u"
+    "appxmpegurl" $'\n' "appxmpegurl.m3u"
+    "hls" $'\n' "hls.m3u8"
+    "crlf" $'\r\n' "crlf.m3u"
+    "cr" $'\r' "cr.m3u"
+    "ram" $'\r\n' "ram.ram"
+    "octet" $'\n' "octet.m3u8"
+)
+
+args=()
+i=0
+while test "$i" -lt "${#lists[@]}"; do
+    n=${lists[$i]}
+    eol=${lists[$((i + 1))]}
+    f=playlistmime/${lists[$((i + 2))]}
+    i=$((i + 3))
+    # The .cgi songs are saved as .mp3; ?a adds 0cc1, md5("a")'s first 4 hex.
+    lines=('#EXTM3U' '#EXTINF:1,x #y' "$n.mp3" '#EXT-X-FOO:BAR=1' ''
+        '#EXT-X-KEY:METHOD=AES-128,URI="key.bin"' '  ' '#c.cgi'
+        "${n}20cc1.mp3?a#b" "  ${n}3.mp3" $'\t#t.cgi' '#EXT-X-ENDLIST')
+    body=
+    for l in "${lines[@]}"; do body+=$l$eol; done
+    args+=(--found "playlistmime/$n.mp3" --found "playlistmime/${n}20cc1.mp3")
+    args+=(--found "playlistmime/${n}3.mp3")
+    args+=(--file-bytes "$f" "${#body}")
+    # grep sees a CR-only file as one line, so it is matched whole.
+    if test "$eol" = $'\r'; then
+        re=
+        for l in "${lines[@]}"; do re+=$(ere_quote "$l")$'\r'; done
+        args+=(--file-matches "$f" "^$re\$")
+        continue
+    fi
+    cr=${eol%$'\n'}
+    for l in "${lines[@]}"; do
+        args+=(--file-matches "$f" "^$(ere_quote "$l")$cr\$")
+    done
+    args+=(--file-not-matches "$f" 'EXTM3U\.html')
+done
+
+# No final line end: the last link is kept and no byte is added after it.
+args+=(--file-bytes playlistmime/noeolcr.m3u 40)
+args+=(--file-matches playlistmime/noeolcr.m3u $'^#EXTM3U\r#c4\\.cgi\rnoeolcr\\.mp3\rnoeolcr2\\.mp3$')
+args+=(--found playlistmime/noeolcr.mp3 --found playlistmime/noeolcr2.mp3)
+args+=(--file-bytes playlistmime/noeollf.m3u 32)
+args+=(--found playlistmime/noeollf.mp3 --found playlistmime/noeollf2.mp3)
+# A UTF-8 BOM stays in place and is no link.
+args+=(--file-bytes playlistmime/bom.m3u 19 --found playlistmime/bom.mp3)
+args+=(--file-matches playlistmime/bom.m3u $'^\xef\xbb\xbf#EXTM3U$')
+# A line is one link, blanks included.
+args+=(--found 'playlistmime/twotok.cgi twotok2.mp3' --not-found playlistmime/twotok2.mp3)
+args+=(--file-matches playlistmime/twotok.m3u '^twotok\.cgi twotok2\.mp3$')
+# Not a playlist: an octet stream with no playlist extension is not scanned.
+args+=(--file-bytes playlistmime/octet.bin 13 --not-found playlistmime/octetbin.mp3)
+
+# 13 playlists, their 30 songs and the index; a fetched # line or key.bin adds
+# a file or a 404.
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 44 "${args[@]}" \
+    --not-found 'playlistmime/c.mp3' --not-found 'playlistmime/c4.mp3' \
+    httrack 'BASEURL/playlistmime/index.html'

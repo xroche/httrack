@@ -20,7 +20,8 @@
 #       --file-matches PATH REGEX ... --file-not-matches PATH REGEX ... \
 #       --files-identical PATH PATH ... \
 #       --cache-found URLTAIL ... --cache-not-found URLTAIL ... \
-#       --file-min-bytes PATH N --file-mode PATH OCTAL --max-mirror-bytes N \
+#       --file-min-bytes PATH N --file-bytes PATH N --file-mode PATH OCTAL \
+#       --max-mirror-bytes N \
 #       httrack BASEURL/some/path [httrack-args...]
 # --errors counts every "Error:" log line; --errors-content drops transient
 # network failures (codes -2..-6) that flake on busy loopback under -c8.
@@ -36,7 +37,8 @@
 # being cached are separate outcomes (#840).
 # --files-identical compares two mirrored files byte for byte, e.g. a scanned
 # copy against one served under a type nothing scans.
-# --file-min-bytes asserts a mirrored file (PATH) is at least N bytes.
+# --file-min-bytes asserts a mirrored file (PATH) is at least N bytes, and
+# --file-bytes that it is exactly N bytes.
 # --file-mode asserts its octal permissions (e.g. 644); POSIX hosts only.
 # --rerun-args runs a second pass (same server and mirror dir) with the given
 # extra httrack args appended, e.g. an --update run under a cap.
@@ -242,7 +244,7 @@ while test "$pos" -lt "$nargs"; do
         audit+=("${args[$pos]}" "${args[$((pos + 1))]}")
         pos=$((pos + 1))
         ;;
-    --file-matches | --file-not-matches | --file-min-bytes | --file-mode | --files-identical)
+    --file-matches | --file-not-matches | --file-min-bytes | --file-bytes | --file-mode | --files-identical)
         audit+=("${args[$pos]}" "${args[$((pos + 1))]}" "${args[$((pos + 2))]}")
         pos=$((pos + 2))
         ;;
@@ -637,7 +639,7 @@ i=0
 while test "$i" -lt "${#audit[@]}"; do
     case "${audit[$i]}" in
     --found | --not-found | --directory | --max-mirror-bytes | --min-mirror-bytes | \
-        --file-matches | --file-not-matches | --files-identical | --file-min-bytes | --file-mode)
+        --file-matches | --file-not-matches | --files-identical | --file-min-bytes | --file-bytes | --file-mode)
         test -n "$hostroot" || find_hostroot
         ;;
     esac
@@ -801,6 +803,16 @@ while test "$i" -lt "${#audit[@]}"; do
         info "checking ${path} is byte-identical to ${audit[$i]}"
         if cmp -s "${hostroot}/${path}" "${hostroot}/${audit[$i]}"; then result "OK"; else
             result "differs"
+            exit 1
+        fi
+        ;;
+    --file-bytes)
+        path="${audit[$((i + 1))]}"
+        i=$((i + 2))
+        sz=$(wc -c <"${hostroot}/${path}" 2>/dev/null | tr -d '[:space:]')
+        info "checking ${path} size ${sz:-0} is ${audit[$i]} bytes"
+        if test -n "$sz" && test "$sz" -eq "${audit[$i]}"; then result "OK"; else
+            result "wrong size (or missing)"
             exit 1
         fi
         ;;

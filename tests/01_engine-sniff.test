@@ -84,6 +84,10 @@ for ws in 0B 1F 00; do
 done
 chk text/html 'plain text, no markup' "$no"
 chk text/xml '<?xml version="1.0"?>' "$yes"
+for m in audio/x-mpegurl audio/mpegurl application/x-mpegurl application/vnd.apple.mpegurl; do
+    chk "$m" $'#EXTM3U\n' "$yes"
+    chk "$m" 'song.mp3' "$no"
+done
 
 # no magic rule at all: never confirmed, never blocks the wire type
 chk text/css 'body { }' "$unk"

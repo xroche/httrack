@@ -26,6 +26,8 @@ mime '/x.gif' 'image/gif' '.gif'
 mime '/x.txt' 'text/plain' '.txt'
 mime '/x.xml' 'application/xml' '.xml'
 mime '/x.pdf' 'application/pdf' '.pdf'
+mime '/x.m3u' 'audio/x-mpegurl' '.m3u'
+mime '/x.m3u8' 'application/vnd.apple.mpegurl' '.m3u8'
 
 # no extension, or one not in the table: no second line to answer with
 unknown '/noext'
