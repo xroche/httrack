@@ -4092,9 +4092,24 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                   int ptr = 0;
                   int adv = 0;
                   int noFreebuff = 0;
+                  /* RFC 9110 5.5: a NUL ends a line early, so the fields after
+                     it are not the ones the server sent */
+                  const hts_boolean has_nul =
+                      back[i].r.adr[0] != '<' &&
+                      memchr(back[i].r.adr, '\0', (size_t) back[i].r.size) !=
+                          NULL;
 
-                  /* Hack for zero-length headers */
-                  if (back_status(&back[i]) != 0 && back[i].r.adr[0] != '<') {
+                  if (has_nul) {
+                    hts_log_print(opt, LOG_WARNING,
+                                  "NUL byte in response header, response "
+                                  "dropped: %s%s",
+                                  adr_nologin(opt, back[i].url_adr),
+                                  back[i].url_fil);
+                    back_slot_close_fail(opt, sback, i, STATUSCODE_INVALID,
+                                         "NUL byte in response header");
+                  } else if (back_status(&back[i]) != 0 &&
+                             back[i].r.adr[0] != '<') {
+                    /* Hack for zero-length headers */
 
                     // ----------------------------------------
                     // traiter en-tête!
@@ -4177,8 +4192,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                     noFreebuff = 1;
                   }
 
-                  // Callback
-                  {
+                  if (!has_nul) {
                     int test_head = RUN_CALLBACK6(opt, receivehead,
                                                   back[i].r.adr,
                                                   back[i].url_adr,

@@ -4038,7 +4038,38 @@ class Handler(SimpleHTTPRequestHandler):
         except OSError:
             pass
 
+    # A NUL inside a header (RFC 9110 5.5) must drop the response: each file
+    # sends NULHDR_BODY after the header lines listed.
+    NULHDR_BODY = b"0123456789abcdef"
+    NULHDR_FILES = {
+        "clean.bin": (b"Content-Length: 16",),
+        "in-list.bin": (b"Content-Length: 16\0, 8",),
+        "ends-block.bin": (b"Content-Length: 16\0", b"Content-Length: 8"),
+    }
+
+    def route_nulhdr_index(self):
+        self.send_html(
+            "".join('<a href="%s">%s</a>\n' % (n, n) for n in self.NULHDR_FILES)
+        )
+
+    def route_nulhdr_file(self):
+        lines = self.NULHDR_FILES[self.path.rsplit("/", 1)[1]]
+        self.close_connection = True
+        head = b"HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\n"
+        head += b"".join(line + b"\r\n" for line in lines)
+        try:
+            self.wfile.write(head + b"Connection: close\r\n\r\n")
+            if self.command != "HEAD":
+                self.wfile.write(self.NULHDR_BODY)
+            self.wfile.flush()
+        except OSError:
+            pass
+
     ROUTES = {
+        "/nulhdr/index.html": route_nulhdr_index,
+        "/nulhdr/clean.bin": route_nulhdr_file,
+        "/nulhdr/in-list.bin": route_nulhdr_file,
+        "/nulhdr/ends-block.bin": route_nulhdr_file,
         "/sfmark.html": route_singlefile_mark,
         "/warc100/index.html": route_warc100_index,
         "/warc100/interim.html": route_warc100_interim,
