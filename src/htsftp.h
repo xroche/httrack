@@ -130,6 +130,9 @@ hts_boolean ftp_parse_epsv(const char *line, int *port);
 /* Parse the byte count after a SIZE reply's first space into *size. A missing,
    signed or too big count returns HTS_FALSE and leaves *size alone. */
 hts_boolean ftp_parse_size(const char *line, LLint *size);
+/* Parse an MDTM reply "213 YYYYMMDDHHMMSS" (UTC) into *tm_time. Returns
+   HTS_FALSE for any other reply or an out-of-range field. */
+hts_boolean ftp_parse_mdtm(const char *line, struct tm *tm_time);
 T_SOC get_datasocket(char *to_send, size_t to_send_size);
 int stop_ftp(lien_back * back);
 char *linejmp(char *line);
