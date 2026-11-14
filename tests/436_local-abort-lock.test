@@ -92,6 +92,9 @@ wait "$crawlpid" 2>/dev/null || true
 crawlpid=
 test -n "$(find "${out}/hts-cache/ref" -name '*.ref' 2>/dev/null)" ||
     fail "the abort erased hts-cache/ref, so the cut transfers cannot resume"
+# Waiting for each link's type would download every file before stopping.
+test -z "$(find "$out" -name 'p7.bin*' 2>/dev/null)" ||
+    fail "the abort let the crawl go on to the last file"
 echo "OK"
 
 # The pause wait watches for it too, or a paused engine is unreachable.

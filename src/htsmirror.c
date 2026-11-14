@@ -1181,6 +1181,11 @@ int hts_wait_delayed(htsmoduleStruct *str, lien_adrfilsave *afs,
       /* Wait for an available slot */
       if (!hts_wait_available_socket(sback, opt, cache, ptr))
         return -1;
+      /* an exit leaves the link online rather than wait for every transfer */
+      if (hts_is_exiting(opt)) {
+        cancelled = HTS_TRUE;
+        break;
+      }
 
       /* We can lookup directly in the cache to speedup this mess */
       if (opt->delayed_cached) {
