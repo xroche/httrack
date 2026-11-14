@@ -3355,8 +3355,8 @@ hts_boolean hts_wait_available_socket(struct_back *sback, httrackp *opt,
   while (back_pluggable_sockets_strict(sback, opt) <= 0) {
     opt->state._hts_in_html_parsing = 6;
     back_wait(sback, opt, cache, 0);
-    /* time limit (-E) exceeded: stop waiting for a socket (#481) */
-    if (!back_checkmirror(opt))
+    /* time limit (-E) exceeded, or an exit: stop waiting for a socket (#481) */
+    if (!back_checkmirror(opt) || hts_is_exiting(opt))
       break;
     if (!hts_loop_tick(sback, opt, -1, ptr))
       return HTS_FALSE;

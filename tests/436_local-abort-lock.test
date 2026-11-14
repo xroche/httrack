@@ -94,6 +94,49 @@ test -n "$(find "${out}/hts-cache/ref" -name '*.ref' 2>/dev/null)" ||
     fail "the abort erased hts-cache/ref, so the cut transfers cannot resume"
 echo "OK"
 
+# Each 640 KB file takes over 3s at 200 KB/s on one socket, and the abort is
+# written about 1s in, so p0 is cut and p1 at most begun. An engine that waits
+# for every link's type downloads them all first.
+printf '[an abort stops before the next links] ..	'
+bigdir=$(find "$out" -type d -name bigfiles)
+test -n "$bigdir" || fail "the abort left no bigfiles directory"
+complete=0
+for f in "$bigdir"/* "$bigdir"/.[!.]*; do
+    test -e "$f" || continue
+    case ${f##*/} in
+    index.html) ;;
+    p0.bin | p1.bin)
+        test "$(wc -c <"$f")" -lt 655360 || complete=$((complete + 1))
+        ;;
+    *) fail "the abort let the crawl go on: ${f##*/} is in the mirror" ;;
+    esac
+done
+test "$complete" -le 1 || fail "the abort let ${complete} files finish"
+leftover=$(find "$out" -name '*.tmp' -o -name '*.delayed')
+test -z "$leftover" || fail "the abort left temporary files: ${leftover}"
+echo "OK"
+
+# The links the abort left online are what --continue fetches.
+printf '[a --continue after the abort finishes the mirror] ..	'
+local_crawl --log "$crawllog" -O "$out" "${common[@]}" --continue \
+    "${BASEURL}/bigfiles/index.html" || fail "the --continue crawl failed"
+for i in 0 1 2 3 4 5 6 7; do
+    test -f "${bigdir}/p${i}.bin" || fail "the --continue did not fetch p${i}.bin"
+    test "$(wc -c <"${bigdir}/p${i}.bin")" -eq 655360 ||
+        fail "the --continue left p${i}.bin at $(wc -c <"${bigdir}/p${i}.bin") bytes"
+done
+page=$(<"${bigdir}/index.html")
+for i in 0 1 2 3 4 5 6 7; do
+    case $page in
+    *"href=\"p${i}.bin\""*) ;;
+    *) fail_dump "the page does not link the local p${i}.bin" "${bigdir}/index.html" ;;
+    esac
+done
+case $page in
+*"${BASEURL}/bigfiles/p"*) fail_dump "the page still links the server" "${bigdir}/index.html" ;;
+esac
+echo "OK"
+
 # The pause wait watches for it too, or a paused engine is unreachable.
 printf '[a paused engine takes the request] ..\t'
 arm_paths paused

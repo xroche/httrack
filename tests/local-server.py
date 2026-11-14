@@ -3388,6 +3388,14 @@ class Handler(SimpleHTTPRequestHandler):
     def route_bigfile(self):
         self.send_raw(b"x" * self.BIGFILE_BYTES, "application/octet-stream")
 
+    # An abort during the -%N0 type probe (#436): every answer, HEAD included,
+    # takes a second, so probing all eight links outlasts a prompt stop.
+    SLOWHEAD_SECONDS = 1.0
+
+    def route_slowhead_page(self):
+        time.sleep(self.SLOWHEAD_SECONDS)
+        self.send_raw(b"s" * 4096, "application/octet-stream")
+
     # -M under a slow server (#77): p0 is a fast 640KB file that alone overruns
     # -M; p1..p3 trickle for a minute. The cap must abort those in-flight
     # transfers, not wait them out.
@@ -4320,6 +4328,15 @@ class Handler(SimpleHTTPRequestHandler):
         "/bigfiles/p5.bin": route_bigfile,
         "/bigfiles/p6.bin": route_bigfile,
         "/bigfiles/p7.bin": route_bigfile,
+        "/slowhead/index.html": route_bigfiles_index,
+        "/slowhead/p0.bin": route_slowhead_page,
+        "/slowhead/p1.bin": route_slowhead_page,
+        "/slowhead/p2.bin": route_slowhead_page,
+        "/slowhead/p3.bin": route_slowhead_page,
+        "/slowhead/p4.bin": route_slowhead_page,
+        "/slowhead/p5.bin": route_slowhead_page,
+        "/slowhead/p6.bin": route_slowhead_page,
+        "/slowhead/p7.bin": route_slowhead_page,
         "/bigtrickle/index.html": route_bigtrickle_index,
         "/bigtrickle/p0.bin": route_bigfile,
         "/bigtrickle/p1.bin": route_trickle_page,
