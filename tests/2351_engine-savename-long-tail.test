@@ -9,11 +9,23 @@ set -euo pipefail
 
 a() { printf "%0${1}d" 0 | tr 0 a; }
 host=/dev/null/www.example.com
+# The exact names assume a 4096-byte PATH_MAX; a smaller cap only proves no abort.
+path_max=$(getconf PATH_MAX / 2>/dev/null || true)
+exact=false
+if ! target_is_windows && [[ $path_max =~ ^[0-9]+$ ]] && ((path_max >= 4096)); then
+    exact=true
+fi
 # name_is WANT FIL CTYPE PAD [ARGS...]: filpad=PAD expands the '*' in FIL
 name_is() {
     local want=$1 fil=$2 ctype=$3 pad=$4
     shift 4
-    selftest_queue "savename: $want" savename "$fil" "$ctype" "filpad=$pad" "$@"
+    if $exact; then
+        selftest_queue "savename: $want" savename "$fil" "$ctype" \
+            "filpad=$pad" "$@"
+    else
+        selftest_queue_head "savename: /dev/null/" savename "$fil" "$ctype" \
+            "filpad=$pad" "$@"
+    fi
 }
 
 # Each appended tail survives: .delayed, .html, index.html, an -N type 99 ext.
