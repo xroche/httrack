@@ -267,7 +267,7 @@ def gen_header():
         "Link: <l.css>; rel=stylesheet\n"
         "Content-Range: bytes 0-9/100\n"
         "Transfer-Encoding: chunked\n"
-        "X-Long: " + "x" * 8000 + "\n\r\n",
+        "X-Long: " + "x" * 7500 + "\n\r\n",
     )
     write(
         "header",
@@ -317,6 +317,29 @@ def gen_header():
         "headers-overlong.txt",
         SEL0 + "HTTP/1.1 200 OK\r\nLocation: /" + "a" * 2100 + "\r\n"
         "Content-Length: 7\r\n\r\n",
+    )
+    # values around the copy bounds: contenttype[128] keeps < 126 chars,
+    # the cookie domain[256] < 255
+    write(
+        "header",
+        "headers-contenttype-bound.txt",
+        SEL0
+        + "HTTP/1.1 200 OK\r\n"
+        + "".join(
+            "Content-Type: text/" + "x" * (n - 5) + "\r\n" for n in range(125, 131)
+        )
+        + "\r\n",
+    )
+    write(
+        "header",
+        "headers-cookie-domain-bound.txt",
+        SEL0
+        + "HTTP/1.1 200 OK\r\n"
+        + "".join(
+            "Set-Cookie: c%d=1; Domain=" % n + "d" * (n - 12) + ".example.com\r\n"
+            for n in range(253, 261)
+        )
+        + "\r\n",
     )
 
 
