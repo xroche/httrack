@@ -54,6 +54,9 @@ int hts_mirror_check_moved(htsmoduleStruct *str, htsmoduleStructExtended *stre);
 */
 hts_boolean hts_take_lock_request(httrackp *opt, const char *name);
 
+/* Act on a pending abort request: log it, set exit_xh, and return true. */
+hts_boolean hts_poll_abort_request(httrackp *opt);
+
 /*
   Process user intercations: pause, add link, delete link..
 */
