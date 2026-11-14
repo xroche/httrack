@@ -496,6 +496,117 @@ static int st_socketpair(T_SOC sv[2]) {
   return 0;
 }
 
+static uint64_t st_fnv(uint64_t h, const void *p, size_t n) {
+  size_t i;
+
+  for (i = 0; i < n; i++)
+    h = (h ^ ((const unsigned char *) p)[i]) * 1099511628211ULL;
+  return h;
+}
+
+/* Reads stream from s as back_wait() does, calling http_xfread1() only while s
+   is readable. Returns a hash of the final call's result, the stored line
+   buffer and the bytes left on s. */
+static uint64_t st_xfread_digest(T_SOC sv[2], const char *stream, int len,
+                                 int bufl) {
+  uint64_t h = 1469598103934665603ULL;
+  htsblk r;
+  LLint ret = 0;
+  char rest[64];
+  int n;
+
+  assertf(send(sv[0], stream, len, 0) == len);
+  /* macOS loopback delivers asynchronously, and the reads below never wait */
+  if (len > 0) {
+    char *seen = malloct((size_t) len);
+    const time_t deadline = time(NULL) + 10;
+
+    assertf(seen != NULL);
+    while ((n = (int) recv(sv[1], seen, len, MSG_PEEK)) < len)
+      assertf(n > 0 && time(NULL) < deadline);
+    freet(seen);
+  }
+  hts_init_htsblk(&r);
+  r.soc = sv[1];
+  while (check_readinput(&r)) {
+    ret = http_xfread1(&r, bufl);
+    h = st_fnv(h, &ret, sizeof(ret));
+    if (ret < 0 || (r.size >= 1 && r.adr[r.size - 1] == '\n' &&
+                    (bufl < 0 || (r.size >= 2 && r.adr[r.size - 2] == '\n'))))
+      break;
+  }
+  if (r.adr != NULL) {
+    h = st_fnv(h, &r.size, sizeof(r.size));
+    h = st_fnv(h, r.adr, (size_t) r.size + 1);
+  }
+  while (check_readinput(&r) &&
+         (n = (int) recv(sv[1], rest, sizeof(rest), 0)) > 0)
+    h = st_fnv(h, rest, (size_t) n);
+  r.soc = INVALID_SOCKET;
+  freet(r.adr);
+  return h;
+}
+
+/* The line modes read a peeked block in one go, and must leave the same lines
+   and the same unread bytes as the bytewise fallback, over random streams. */
+static int st_xfread_lines(httrackp *opt, int argc, char **argv) {
+  static const char alphabet[] = "abc: \r\n\n\r\n";
+  T_SOC peek[2], bytewise[2];
+  char *stream = malloct(8600);
+  uint32_t seed = 2241;
+  int c, i;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  assertf(stream != NULL);
+  assertf(st_socketpair(peek) == 0 && st_socketpair(bytewise) == 0);
+  for (c = 0; c <= 2000; c++) {
+    /* one stream in eight runs past the 8 KB line buffer */
+    int len = c % 8 == 7 ? 8100 + c % 300 : c % 500;
+    int bufl = c % 3 == 0 ? HTS_XFREAD_LINE : HTS_XFREAD_LINE_BLOCK;
+    uint64_t a, b;
+
+    /* The last case stops a call with the buffer one byte short of full, so
+       the next call starts at the limit: 3 CRs and 8189 bytes fill 32 calls,
+       then an LF opens the 33rd. */
+    if (c == 2000) {
+      len = 8195;
+      bufl = HTS_XFREAD_LINE_BLOCK;
+      memset(stream, 'x', (size_t) len);
+      memset(stream, '\r', 3);
+      stream[8192] = '\n';
+      seed = 0;
+    }
+    for (i = 0; c < 2000 && i < len; i++) {
+      seed = seed * 1103515245 + 12345;
+      stream[i] = len > 8000 && (seed >> 16) % 64 != 0
+                      ? 'x'
+                      : alphabet[(seed >> 16) % (sizeof(alphabet) - 1)];
+      /* a line-mode stream must hold no LF to reach the limit */
+      if (len > 8000 && bufl == HTS_XFREAD_LINE && stream[i] == '\n')
+        stream[i] = 'x';
+    }
+    a = st_xfread_digest(peek, stream, len, bufl);
+    hts_peek_force_off(HTS_TRUE);
+    b = st_xfread_digest(bytewise, stream, len, bufl);
+    hts_peek_force_off(HTS_FALSE);
+    if (a != b) {
+      printf("xfread-lines: case %d (len %d, bufl %d) differs\n", c, len, bufl);
+      return 1;
+    }
+  }
+  /* each case reads at least once through the forced fallback */
+  assertf(hts_xfread_bytewise_count() >= 2001);
+  deletesoc(peek[0]);
+  deletesoc(peek[1]);
+  deletesoc(bytewise[0]);
+  deletesoc(bytewise[1]);
+  freet(stream);
+  printf("xfread-lines self-test OK\n");
+  return 0;
+}
+
 static void socwait_delayed_send(void *arg) {
   Sleep(300);
   (void) send(*(T_SOC *) arg, "x", 1, 0);
@@ -1566,6 +1677,9 @@ const struct selftest_entry selftests_net[] = {
      st_catchurl_bind},
     {"socwait", "", "the read and write waits each watch their own direction",
      st_socwait},
+    {"xfread-lines", "",
+     "peeked line reads match the bytewise fallback on random streams",
+     st_xfread_lines},
 #ifndef _WIN32
     {"selectable", "", "which socket numbers may go into an fd_set",
      st_selectable},
