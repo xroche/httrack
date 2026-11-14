@@ -1,14 +1,58 @@
 #!/bin/bash
 #
-# An m3u playlist is followed under every content type servers send for it.
+# An m3u playlist is followed under every content type servers send for it,
+# with its # lines, blank lines and line ends kept byte for byte.
 
 set -euo pipefail
+export LC_ALL=C
 
 : "${top_srcdir:=..}"
 
-bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 9 \
-    --found 'playlistmime/xmpegurl.mp3' \
-    --found 'playlistmime/mpegurl.mp3' \
-    --found 'playlistmime/appxmpegurl.mp3' \
-    --found 'playlistmime/hls.mp3' \
+# shellcheck disable=SC2016 # the $ is sed's
+ere_quote() { printf '%s' "$1" | sed 's/[].?*+^$()[]/\\&/g'; }
+
+# name, line end, saved playlist name; see route_playlistmime.
+lists=(
+    "xmpegurl" $'\n' "xmpegurl.m3u"
+    "mpegurl" $'\n' "mpegurl.m3u"
+    "appxmpegurl" $'\n' "appxmpegurl.m3u"
+    "hls" $'\n' "hls.m3u8"
+    "crlf" $'\r\n' "crlf.m3u"
+    "cr" $'\r' "cr.m3u"
+    "ram" $'\r\n' "ram.ram"
+)
+
+args=()
+i=0
+while test "$i" -lt "${#lists[@]}"; do
+    n=${lists[$i]}
+    eol=${lists[$((i + 1))]}
+    f=playlistmime/${lists[$((i + 2))]}
+    i=$((i + 3))
+    # The .cgi songs are saved as .mp3, and the query one gets a hash suffix.
+    lines=('#EXTM3U' '#EXTINF:1,x #y' "$n.mp3" '#EXT-X-FOO:BAR=1' ''
+        '#EXT-X-KEY:METHOD=AES-128,URI="key.bin"' '  ' '#c.cgi'
+        "${n}20cc1.mp3?a#b" '#EXT-X-ENDLIST')
+    body=
+    for l in "${lines[@]}"; do body+=$l$eol; done
+    args+=(--found "playlistmime/$n.mp3" --found "playlistmime/${n}20cc1.mp3")
+    args+=(--file-bytes "$f" "${#body}")
+    # grep sees a CR-only file as one line, so it is matched whole.
+    if test "$eol" = $'\r'; then
+        re=
+        for l in "${lines[@]}"; do re+=$(ere_quote "$l")$'\r'; done
+        args+=(--file-matches "$f" "^$re\$")
+        continue
+    fi
+    cr=${eol%$'\n'}
+    for l in "${lines[@]}"; do
+        args+=(--file-matches "$f" "^$(ere_quote "$l")$cr\$")
+    done
+    args+=(--file-not-matches "$f" 'EXTM3U\.html')
+done
+
+# 7 playlists, their 14 songs and the index; a fetched # line or key.bin adds
+# a file or a 404.
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 22 "${args[@]}" \
+    --not-found 'playlistmime/c.mp3' \
     httrack 'BASEURL/playlistmime/index.html'

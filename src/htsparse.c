@@ -1180,7 +1180,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
       int back_add_stats = opt->state.back_add_stats;
 
       const char *in_media = NULL;    // in other media type (real media and so..)
-      const char *lnk_comment_end = NULL; // end of a "#" line in a link list
       int intag = 0;            // on est dans un tag
       int incomment = 0;        // dans un <!--
       const char *comment_close = NULL;         // cached "-->" at or after html
@@ -1739,23 +1738,10 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
           int add_class_dots_to_patch = 0;      // number of '.' in code="x.y.z<realname>"
           const char *p_flush = NULL;
 
-          /* A playlist line starting with '#' is a comment or a directive. */
-          if (in_media != NULL && strcmp(in_media, "LNK") == 0 &&
-              *html == '#' &&
-              (html == r->adr || html[-1] == '\n' || html[-1] == '\r')) {
-            const char *const eol = strchr(html, '\n');
-
-            lnk_comment_end = eol != NULL ? eol : r->adr + r->size;
-          }
-
           // ------------------------------------------------------------
           // parsing évolé
           // ------------------------------------------------------------
-          if (lnk_comment_end != NULL && html < lnk_comment_end) {
-            // inside a playlist comment line: no link to look for
-          } else if (((isalpha((unsigned char) *html)) || (*html == '/') ||
-                      (inscript) || (in_media) ||
-                      (inscriptgen))) { // sinon pas la peine de tester..
+          if (((isalpha((unsigned char) *html)) || (*html == '/') || (inscript) || (in_media) || (inscriptgen))) {        // sinon pas la peine de tester..
 
             /* caractère de terminaison pour "miniparsing" javascript=.. ? 
                (ex: <a href="javascript:()" action="foo"> ) */
@@ -1786,8 +1772,22 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
             if (in_media) {
               if (strcmp(in_media, "LNK") == 0) {       // real media
-                p = 0;
-                valid_p = 1;
+                const char *bol = html;
+
+                while (bol > r->adr && (bol[-1] == ' ' || bol[-1] == '\t'))
+                  bol--;
+                if (is_realspace(*html) ||
+                    (bol != r->adr && bol[-1] != '\n' && bol[-1] != '\r')) {
+                  /* one link per line, at its first non-blank byte */
+                } else if (*html == '#') {
+                  /* a playlist # line is a comment or directive, not a link */
+                  while (html + 1 < r->adr + r->size && html[1] != '\n' &&
+                         html[1] != '\r')
+                    html++;
+                } else {
+                  p = 0;
+                  valid_p = 1;
+                }
               } else if (strcmp(in_media, "AAM") == 0) {        // AAM
                 if (is_space((unsigned char) html[0])
                     && !is_space((unsigned char) html[1])) {
@@ -2430,7 +2430,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   ok = -1;      // ne pas traiter ce lien
 
                 if (ok > 0) {
-                  if (is_space(*eadr)) {        // guillemets,CR, etc
+                  if (in_media != NULL && quote == '\n' && *eadr == '\r')
+                    ok = 0;                   // a playlist line may end in CR
+                  else if (is_space(*eadr)) { // guillemets,CR, etc
                     if ((*eadr == quote && (!quoteinscript || *(eadr - 1) == '\\'))     // end quote
                         || (noquote && (*eadr == '\"' || *eadr == '\''))        // end at any quote
                         || (!noquote && quote == '\0' && is_realspace(*eadr))   // unquoted href

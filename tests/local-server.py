@@ -2845,21 +2845,33 @@ class Handler(SimpleHTTPRequestHandler):
     def route_bigm3u_song(self):
         self.send_raw(b"ID3", "audio/mpeg")
 
-    # One playlist per m3u content type, each naming its own song.
+    # One playlist per m3u content type and line ending, each naming its own songs.
     PLAYLIST_MIMES = {
-        "xmpegurl.m3u": "audio/x-mpegurl",
-        "mpegurl.m3u": "audio/mpegurl",
-        "appxmpegurl.m3u": "application/x-mpegurl",
-        "hls.m3u8": "application/vnd.apple.mpegurl",
+        "xmpegurl.m3u": ("audio/x-mpegurl", b"\n"),
+        "mpegurl.m3u": ("audio/mpegurl", b"\n"),
+        "appxmpegurl.m3u": ("application/x-mpegurl", b"\n"),
+        "hls.m3u8": ("application/vnd.apple.mpegurl", b"\n"),
+        "crlf.m3u": ("audio/x-mpegurl", b"\r\n"),
+        "cr.m3u": ("audio/x-mpegurl", b"\r"),
+        "ram.ram": ("audio/x-pn-realaudio", b"\r\n"),
     }
 
-    def route_playlistmime_index(self):
-        self.send_html("".join('<a href="%s">p</a>\n' % n for n in self.PLAYLIST_MIMES))
-
-    def route_playlistmime_list(self):
+    def route_playlistmime(self):
         name = self.path.split("?")[0].rsplit("/", 1)[-1]
-        song = name.split(".")[0] + ".mp3"
-        self.send_raw(b"#EXTM3U\n" + song.encode() + b"\n", self.PLAYLIST_MIMES[name])
+        if name == "index.html":
+            links = "".join('<a href="%s">p</a>\n' % n for n in self.PLAYLIST_MIMES)
+            self.send_html(links)
+        elif name in self.PLAYLIST_MIMES:
+            mime, eol = self.PLAYLIST_MIMES[name]
+            song = name.split(".")[0].encode()
+            lines = [b"#EXTM3U", b"#EXTINF:1,x #y", song + b".cgi", b"#EXT-X-FOO:BAR=1"]
+            lines += [b"", b'#EXT-X-KEY:METHOD=AES-128,URI="key.bin"', b"  ", b"#c.cgi"]
+            lines += [song + b"2.cgi?a#b", b"#EXT-X-ENDLIST"]
+            self.send_raw(eol.join(lines) + eol, mime)
+        elif name.endswith(".cgi"):
+            self.route_bigm3u_song()
+        else:
+            self.send_error(404)
 
     # a long header httrack never parses, like the one algolia.com sends
     LONGCSP = ("Content-Security-Policy-Report-Only", "script-src " + "a" * 4800)
@@ -4301,15 +4313,6 @@ class Handler(SimpleHTTPRequestHandler):
         "/bigm3u/index.html": route_bigm3u_index,
         "/bigm3u/list.m3u": route_bigm3u_list,
         "/bigm3u/song.mp3": route_bigm3u_song,
-        "/playlistmime/index.html": route_playlistmime_index,
-        "/playlistmime/xmpegurl.m3u": route_playlistmime_list,
-        "/playlistmime/mpegurl.m3u": route_playlistmime_list,
-        "/playlistmime/appxmpegurl.m3u": route_playlistmime_list,
-        "/playlistmime/hls.m3u8": route_playlistmime_list,
-        "/playlistmime/xmpegurl.mp3": route_bigm3u_song,
-        "/playlistmime/mpegurl.mp3": route_bigm3u_song,
-        "/playlistmime/appxmpegurl.mp3": route_bigm3u_song,
-        "/playlistmime/hls.mp3": route_bigm3u_song,
         "/longcsp/index.html": route_longcsp_index,
         "/longcsp/page.html": route_longcsp_page,
         "/longloc/index.html": route_longloc_index,
@@ -4560,6 +4563,9 @@ class Handler(SimpleHTTPRequestHandler):
             return True
         if path.startswith("/titleenc/"):
             self.route_titleenc()
+            return True
+        if path.startswith("/playlistmime/"):
+            self.route_playlistmime()
             return True
         # Match percent-encoded paths (accented #157 route) by their decoded form.
         handler = self.ROUTES.get(path) or self.ROUTES.get(unquote(path))
