@@ -59,8 +59,9 @@ Please visit our Website: http://www.httrack.com
 #define ADD_STANDARD_NAME(shortname)                                           \
   { /* add name */                                                             \
     char BIGSTK buff[HTS_URLMAXSIZE * 2];                                      \
-    standard_name(buff, sizeof(buff), dot_pos, nom_pos, fil_complete,          \
-                  (shortname));                                                \
+    /* sized to what save[] has left, so a clipped name keeps its extension */ \
+    standard_name(buff, sizeof(afs->save) - strlen(afs->save), dot_pos,        \
+                  nom_pos, fil_complete, (shortname));                         \
     url_savename_addstr(afs->save, sizeof(afs->save), buff);                   \
   }
 
@@ -423,6 +424,18 @@ hts_boolean url_query_value(const char *url, const char *name, char *dst,
   memcpy(dst, f.val, len);
   dst[len] = '\0';
   return HTS_TRUE;
+}
+
+/* Append tail to save (capacity size), cutting save first so the tail fits:
+   the path cap below shortens the name anyway, and the tail must survive. */
+static void save_append_tail(char *save, size_t size, const char *tail) {
+  const size_t tail_len = strlen(tail);
+  const size_t room = size - 1 - tail_len;
+
+  assertf(tail_len < size);
+  if (strlen(save) > room)
+    save[room] = '\0';
+  strlcatbuff(save, tail, size);
 }
 
 /* The last dot of the name part, or NULL when the name carries no extension. */
@@ -1566,7 +1579,7 @@ int url_savename(lien_adrfilsave *const afs,
     while((a > afs->save) && (*a != '.') && (*a != '/'))
       a--;
     if (*a != '.') {                         // agh pas de point
-      strcatbuff(afs->save, ".html");        // préférable!
+      save_append_tail(afs->save, sizeof(afs->save), ".html");
       hts_log_print(opt, LOG_DEBUG, "Default HTML type set for %s%s => %s",
                     adr_nologin(opt, adr_complete), fil_complete, afs->save);
     }
@@ -1694,17 +1707,8 @@ int url_savename(lien_adrfilsave *const afs,
                 adr_nologin(opt, adr), fil, afs->save);
 
   /* Ensure that the MANDATORY "temporary" extension is set */
-  if (ext_chg_delayed) {
-    char *const lastDot = name_last_dot(afs->save);
-
-    if (lastDot == NULL) {
-      strcatbuff(afs->save, "." DELAYED_EXT);
-    } else if (!IS_DELAYED_EXT(afs->save)) {
-      /* lastDot points within afs->save; bound by the remaining capacity */
-      strlcatbuff(lastDot, "." DELAYED_EXT,
-                  sizeof(afs->save) - (size_t) (lastDot - afs->save));
-    }
-  }
+  if (ext_chg_delayed && !IS_DELAYED_EXT(afs->save))
+    save_append_tail(afs->save, sizeof(afs->save), "." DELAYED_EXT);
   // Cap the save path: the final parent+name is copied into a fixed buffer that
   // aborts() on overflow (htssafe.h), so clamp every ceiling to fit it.
 #define HTS_SAVE_BUFSIZE (HTS_URLMAXSIZE * 2) /* sizeof(afs->save) */
@@ -1968,28 +1972,31 @@ void standard_name(char *b, size_t bsize, const char *dot_pos,
                    const char *nom_pos, const char *fil, int short_ver) {
   char md5[32 + 2];
   htsbuff bb = htsbuff_ptr(b, bsize);
+  const size_t room = bsize - 1;
+  const size_t md5_len = strnlen(url_md5(md5, fil), 4);
+  const size_t ext_len = dot_pos == NULL ? 0
+                                         : (short_ver ? strnlen(dot_pos + 1, 3)
+                                                      : strlen(dot_pos + 1));
+  const size_t tail = md5_len + (dot_pos != NULL ? 1 + ext_len : 0);
+  size_t name_len;
 
-  /* Name */
-  if (dot_pos) {
-    if (!short_ver) // long names
-      htsbuff_catn(&bb, nom_pos, (size_t) (dot_pos - nom_pos));
-    else
-      htsbuff_catn(&bb, nom_pos, (size_t) min(dot_pos - nom_pos, 8));
-  } else {
-    if (!short_ver) // long names
-      htsbuff_cat(&bb, nom_pos);
-    else
-      htsbuff_catn(&bb, nom_pos, 8);
-  }
+  if (dot_pos != NULL)
+    name_len = short_ver ? (size_t) min(dot_pos - nom_pos, 8)
+                         : (size_t) (dot_pos - nom_pos);
+  else
+    name_len = short_ver ? strnlen(nom_pos, 8) : strlen(nom_pos);
+  /* a name off the wire is clipped so the md5 and extension still fit */
+  if (tail > room)
+    name_len = 0;
+  else if (name_len > room - tail)
+    name_len = room - tail;
+  htsbuff_catn(&bb, nom_pos, name_len);
   /* MD5 - 16 bits */
-  htsbuff_catn(&bb, url_md5(md5, fil), 4);
+  htsbuff_catn(&bb, md5, min(md5_len, room - bb.len));
   /* Ext */
-  if (dot_pos) {
+  if (dot_pos != NULL && bb.len < room) {
     htsbuff_catc(&bb, '.');
-    if (!short_ver) // long names
-      htsbuff_cat(&bb, dot_pos + 1);
-    else
-      htsbuff_catn(&bb, dot_pos + 1, 3);
+    htsbuff_catn(&bb, dot_pos + 1, min(ext_len, room - bb.len));
   }
 }
 

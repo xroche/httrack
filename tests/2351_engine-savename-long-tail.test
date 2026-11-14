@@ -1,0 +1,37 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# A link that nearly fills save[] keeps its ".delayed" or ".html" tail, the
+# name being clipped instead of aborting. filpad=N expands '*' into N bytes;
+# each pair spans the pads where the unclipped append aborted.
+tail_is() { # tail_is WANT PAD FIL [ARGS...]
+    local want=$1 pad=$2 fil=$3
+    shift 3
+    selftest_queue_tail "$want" savename "$fil" text/html "filpad=$pad" "$@"
+}
+
+# The mandatory delayed-type marker.
+for pad in 2018 2041; do
+    tail_is '.delayed' "$pad" '/*.php' statuscode=301
+done
+for pad in 2023 2035; do
+    tail_is '.delayed' "$pad" '/*/x.php' statuscode=301
+    tail_is '.delayed' "$pad" '/*/x' statuscode=301
+done
+# The ".html" forced onto an extensionless name.
+for pad in 2030 2040; do
+    tail_is '.html' "$pad" '/*/xyz' delayed=1
+done
+for pad in 2030 2038; do
+    tail_is '.html' "$pad" '/*/xyzxyz' delayed=0
+done
+# A query string's name, which used to lose its extension or abort.
+for pad in 2039 2041; do
+    tail_is '.html' "$pad" '/*?q=1'
+done
+
+selftest_run_queued
