@@ -87,15 +87,9 @@ static void wc_cleanup(void) {
 }
 
 static int wc_setup(void) {
-  if (wc_dir[0] == '\0') {
-    const char *const tmp = getenv("TMPDIR");
-
-    snprintf(wc_dir, sizeof(wc_dir), "%s/fuzz-warc-XXXXXX",
-             tmp != NULL && *tmp != '\0' ? tmp : "/tmp");
-    if (mkdtemp(wc_dir) == NULL) {
-      return -1;
-    }
-    atexit(wc_cleanup);
+  if (wc_dir[0] == '\0' &&
+      !fuzz_tmpdir(wc_dir, sizeof(wc_dir), "fuzz-warc", wc_cleanup)) {
+    return -1;
   }
   return 0;
 }

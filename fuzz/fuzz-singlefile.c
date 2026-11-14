@@ -125,18 +125,14 @@ static void sf_css(const char *name, const char *pre, const char *ref,
 static void sf_init(void) {
   static const char png[] = "\x89PNG\r\n\x1a\n";
   static const char big[4096] = "\x89PNG";
-  const char *tmp = getenv("TMPDIR");
   char path[700];
 
   hts_init();
   sf_opt = hts_create_opt();
   sf_opt->log = sf_opt->errlog = NULL;
   sf_opt->single_file_max_size = FUZZ_SF_CAP;
-  snprintf(sf_root, sizeof(sf_root), "%s/httrack-fuzz-sf-XXXXXX",
-           tmp != NULL && tmp[0] != '\0' ? tmp : "/tmp");
-  if (mkdtemp(sf_root) == NULL)
+  if (!fuzz_tmpdir(sf_root, sizeof(sf_root), "httrack-fuzz-sf", sf_cleanup))
     abort();
-  atexit(sf_cleanup);
   snprintf(sf_page, sizeof(sf_page), "%s/page.html", sf_root);
   snprintf(path, sizeof(path), "%s/sub", sf_root);
   if (mkdir(path, 0700) != 0)

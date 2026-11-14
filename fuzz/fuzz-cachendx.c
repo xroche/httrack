@@ -71,19 +71,15 @@ static void fuzz_ndx_coucal_log(coucal_opaque arg, coucal_loglevel level,
 /* PT_GetType() picks the format from the extension, so the names decide it */
 static int fuzz_ndx_setup(void) {
   if (ndx_in[0] == '\0') {
-    const char *const tmp = getenv("TMPDIR");
-
     coucal_set_global_assert_handler(fuzz_ndx_coucal_log, NULL);
 
-    snprintf(ndx_dir, sizeof(ndx_dir), "%s/fuzz-cachendx-XXXXXX",
-             tmp != NULL && *tmp != '\0' ? tmp : "/tmp");
-    if (mkdtemp(ndx_dir) == NULL) {
+    if (!fuzz_tmpdir(ndx_dir, sizeof(ndx_dir), "fuzz-cachendx",
+                     fuzz_ndx_cleanup)) {
       return -1;
     }
     snprintf(ndx_in, sizeof(ndx_in), "%s/in.ndx", ndx_dir);
     snprintf(ndx_dat, sizeof(ndx_dat), "%s/in.dat", ndx_dir);
     snprintf(ndx_out, sizeof(ndx_out), "%s/out.arc", ndx_dir);
-    atexit(fuzz_ndx_cleanup);
   }
   return 0;
 }
