@@ -63,12 +63,13 @@ typedef struct mock_host {
   int slow_ms; /* non-zero: block this long, as a black-hole resolver would */
 } mock_host;
 
-/* Long enough to outlast the 1s --timeout the bounded resolve is checked
-   against, short enough to keep the self-test quick. The elapsed bounds below
-   sit halfway between a prompt return and this, so they are measured on
-   mtime_monotonic(), because an NTP correction mid-test would otherwise eat
-   most of that margin. */
+/* How long a slow host takes to answer. Only lower bounds are checked
+   against it, because a loaded build host can stall a thread for seconds. */
 #define MOCK_SLOW_MS 3000
+/* A gated host answers only after mock_open_gate(), or after MOCK_GATE_MAX_MS
+   so that a resolve which fails to give up fails the test rather than hangs. */
+#define MOCK_GATED (-1)
+#define MOCK_GATE_MAX_MS 20000
 
 static mock_host mock_hosts[] = {
     {"v4only.test", 0, 1, {{AF_INET, {1, 2, 3, 4}}}, 0},
@@ -106,15 +107,15 @@ static mock_host mock_hosts[] = {
     {"dead.test", EAI_NONAME, 0, {{0}}, 0},
     /* the same outage, seen across a backward clock step */
     {"stepped.test", EAI_AGAIN, 1, {{AF_INET, {192, 0, 2, 8}}}, 0},
-    /* resolves, but only well after --timeout: the #606 wedge */
-    {"slow.test", 0, 1, {{AF_INET, {127, 0, 0, 9}}}, 0, MOCK_SLOW_MS},
+    /* resolves, but only once the test is done with it: the #606 wedge */
+    {"slow.test", 0, 1, {{AF_INET, {127, 0, 0, 9}}}, 0, MOCK_GATED},
     /* a second one, so a cancelled resolve cannot cache an answer the next
        case then reads instead of asking for */
     {"slow2.test", 0, 1, {{AF_INET, {127, 0, 0, 10}}}, 0, MOCK_SLOW_MS},
     /* two more for the cached entry point, checked with the mirror running and
        then stopped: neither case may read the other's cached answer */
     {"slow3.test", 0, 1, {{AF_INET, {127, 0, 0, 11}}}, 0, MOCK_SLOW_MS},
-    {"slow4.test", 0, 1, {{AF_INET, {127, 0, 0, 12}}}, 0, MOCK_SLOW_MS},
+    {"slow4.test", 0, 1, {{AF_INET, {127, 0, 0, 12}}}, 0, MOCK_GATED},
     /* answers at once, but the backend below never lets the worker say so */
     {"cut.test", 0, 1, {{AF_INET, {127, 0, 0, 13}}}, 0},
 };
@@ -127,6 +128,7 @@ static int mock_finished = 0; /* backend calls that have returned */
    again to free its answer, long after getaddrinfo() returned, so that is what
    a swap has to wait for. */
 static int mock_released = 0;
+static hts_boolean mock_gate_open = HTS_FALSE;
 
 static mock_host *mock_find(const char *name) {
   for (size_t i = 0; i < sizeof(mock_hosts) / sizeof(mock_hosts[0]); i++) {
@@ -142,6 +144,7 @@ static void mock_reset_calls(void) {
     mock_hosts[i].calls = 0;
   mock_finished = 0;
   mock_released = 0;
+  mock_gate_open = HTS_FALSE;
   hts_mutexrelease(&mock_lock);
 }
 
@@ -164,9 +167,34 @@ static int mock_read_finished(void) {
   return n;
 }
 
+static void mock_open_gate(void) {
+  hts_mutexlock(&mock_lock);
+  mock_gate_open = HTS_TRUE;
+  hts_mutexrelease(&mock_lock);
+}
+
+/* Block until mock_open_gate() or MOCK_GATE_MAX_MS, whichever comes first. */
+static void mock_wait_gate(void) {
+  const TStamp give_up = mtime_monotonic() + MOCK_GATE_MAX_MS;
+
+  for (;;) {
+    hts_boolean open;
+
+    hts_mutexlock(&mock_lock);
+    open = mock_gate_open;
+    hts_mutexrelease(&mock_lock);
+    if (open || mtime_monotonic() >= give_up)
+      break;
+    Sleep(10);
+  }
+}
+
 /* Wait for n uses of the backend to be over, ordering their writes against
-   ours: what makes installing another backend safe. */
-static void mock_wait_released(int n) {
+   ours: what makes installing another backend safe. False when they are not
+   over by MOCK_GATE_MAX_MS, which a failed check upstream can cause. */
+static hts_boolean mock_wait_released(int n) {
+  const TStamp give_up = mtime_monotonic() + MOCK_GATE_MAX_MS;
+
   for (;;) {
     hts_boolean done;
 
@@ -174,7 +202,9 @@ static void mock_wait_released(int n) {
     done = (mock_released >= n) ? HTS_TRUE : HTS_FALSE;
     hts_mutexrelease(&mock_lock);
     if (done)
-      break;
+      return HTS_TRUE;
+    if (mtime_monotonic() >= give_up)
+      return HTS_FALSE;
     Sleep(10);
   }
 }
@@ -217,7 +247,9 @@ static int HTS_RESOLVER_CALL mock_getaddrinfo_(const char *node,
   hts_mutexlock(&mock_lock);
   h->calls++; /* a real backend hit; a cached host skips this */
   hts_mutexrelease(&mock_lock);
-  if (h->slow_ms != 0)
+  if (h->slow_ms == MOCK_GATED)
+    mock_wait_gate();
+  else if (h->slow_ms != 0)
     Sleep(h->slow_ms);
   if (h->gai_err != 0)
     return h->gai_err;
@@ -603,27 +635,20 @@ static int dns_selftests(httrackp *opt) {
   return failures;
 }
 
-/* Probes how long acquiring opt->state.lock takes while a resolve is in
-   flight. hts_has_stopped() takes that same lock and mutates nothing, and the
+/* Takes opt->state.lock while a resolve is in flight, then cancels that
+   resolve. hts_has_stopped() takes that same lock and mutates nothing, and the
    API promises it stays callable from another thread during a mirror. */
 typedef struct lock_probe {
   httrackp *opt;
-  htsmutex lock;
-  hts_boolean done;
-  TStamp blocked_ms;
+  hts_boolean got_lock; /* the resolve's cancel flag */
 } lock_probe;
 
 static void lock_probe_thread(void *arg) {
   lock_probe *const p = (lock_probe *) arg;
-  TStamp start;
 
   Sleep(MOCK_SLOW_MS / 10); /* let the resolve get under way first */
-  start = mtime_monotonic();
   (void) hts_has_stopped(p->opt);
-  hts_mutexlock(&p->lock);
-  p->blocked_ms = mtime_monotonic() - start;
-  p->done = HTS_TRUE;
-  hts_mutexrelease(&p->lock);
+  hts_store_release_int(&p->got_lock, HTS_TRUE); /* p is not touched after */
 }
 
 /* Drive a deliberately slow (mock) resolver, asserting that a resolve is
@@ -643,43 +668,16 @@ static int dns_timeout_selftests(httrackp *opt) {
   mock_reset_calls();
   opt->timeout = 1; /* the bound under test */
 
-  memset(&probe, 0, sizeof(probe));
-  probe.opt = opt;
-  probe.lock = HTSMUTEX_INIT;
-  hts_mutexinit(&probe.lock);
-  CHECK(hts_newthread(lock_probe_thread, &probe) == 0);
-
   start = mtime_monotonic();
   count = hts_dns_resolve_all(opt, "slow.test", addrs, HTS_MAXADDRNUM, &err);
   elapsed = mtime_monotonic() - start;
   finished = mock_read_finished();
 
   /* the resolve returns on opt->timeout, not when the resolver deigns to
-     answer: this is what lets --max-time and --timeout fire (#606). A backend
-     that had not returned proves it, so the bound below need not be tight. */
+     answer: this is what lets --max-time and --timeout fire (#606) */
   CHECK(finished == 0);
-  /* midway to MOCK_SLOW_MS: the engine still deadlines on the wall clock, so a
-     step moves when it fires even though the measurement no longer moves. */
-  CHECK(elapsed < ((TStamp) opt->timeout * 1000 + MOCK_SLOW_MS) / 2);
+  CHECK(elapsed >= (TStamp) opt->timeout * 1000);
   CHECK(count == 0); /* a timeout is reported as "does not resolve" */
-
-  /* state.lock is not held across the resolve; a concurrent stop query, which
-     the mirror API promises stays live, is not blocked behind it */
-  for (;;) {
-    hts_boolean done;
-    TStamp blocked;
-
-    hts_mutexlock(&probe.lock);
-    done = probe.done;
-    blocked = probe.blocked_ms;
-    hts_mutexrelease(&probe.lock);
-    if (done) {
-      CHECK(blocked < 500);
-      break;
-    }
-    Sleep(20);
-  }
-  hts_mutexfree(&probe.lock);
 
   /* a timeout is not an answer, so it must not be negative-cached: the host is
      resolved again rather than written off for the rest of the crawl */
@@ -688,17 +686,24 @@ static int dns_timeout_selftests(httrackp *opt) {
   CHECK(count == 0);
   CHECK(mock_read_calls("slow.test") == 2); /* re-resolved, not cached */
 
+  /* state.lock is not held across the resolve: a concurrent stop query, which
+     the mirror API promises stays live, gets it and cancels this unbounded
+     resolve. Held, the gate's give-up answers instead. */
+  memset(&probe, 0, sizeof(probe));
+  probe.opt = opt;
+  CHECK(hts_newthread(lock_probe_thread, &probe) == 0);
+  count = hts_dns_resolve_all_bounded(opt, "slow.test", addrs, HTS_MAXADDRNUM,
+                                      0, &probe.got_lock, &err);
+  CHECK(count == 0);
+
   /* A raised cancel flag ends the wait where no deadline would, which is what
      lets a stopped FTP worker leave a black-holed resolver (#1059). */
   {
     hts_boolean cancel = HTS_TRUE;
 
-    start = mtime_monotonic();
     count = hts_dns_resolve_all_bounded(opt, "slow.test", addrs, HTS_MAXADDRNUM,
                                         0, &cancel, &err);
-    elapsed = mtime_monotonic() - start;
     CHECK(count == 0);
-    CHECK(elapsed < MOCK_SLOW_MS / 2);
   }
 
   /* And an unbounded resolve nobody cancels still waits for its answer: a
@@ -727,17 +732,17 @@ static int dns_timeout_selftests(httrackp *opt) {
     CHECK(elapsed >= MOCK_SLOW_MS / 2);
 
     opt->state.stop = 1; /* the flag, not hts_request_stop's log line */
-    start = mtime_monotonic();
     count = hts_dns_resolve_all(opt, "slow4.test", addrs, HTS_MAXADDRNUM, &err);
-    elapsed = mtime_monotonic() - start;
     opt->state.stop = 0;
     CHECK(count == 0);
-    CHECK(elapsed < MOCK_SLOW_MS / 2);
   }
 
-  /* Four of the six resolves were abandoned mid-backend; wait for their
+  /* Five of the seven resolves were abandoned mid-backend; wait for their
      workers to be out of it, freed answer included, before swapping it. */
-  mock_wait_released(6);
+  mock_open_gate();
+  CHECK(mock_wait_released(7));
+  if (failures != 0)
+    return failures; /* a worker may still be in the backend */
 
   /* A worker a recovered fault cut short hands its verdict back at once. Left
      to the caller, the wait runs to the deadline, and an unbounded one runs
@@ -750,15 +755,16 @@ static int dns_timeout_selftests(httrackp *opt) {
     CHECK(hts_set_thread_runner(dns_cut_runner) == NULL);
     start = mtime_monotonic();
     count = hts_dns_resolve_all_bounded(opt, "cut.test", addrs, HTS_MAXADDRNUM,
-                                        MOCK_SLOW_MS / 1000, &cancel, &err);
+                                        MOCK_GATE_MAX_MS / 1000, &cancel, &err);
     elapsed = mtime_monotonic() - start;
     hts_set_thread_runner(NULL);
     /* the cut worker longjmps out of the backend after freeing its answer, so
        it too has to be out before the swap below */
-    mock_wait_released(1);
+    CHECK(mock_wait_released(1));
     hts_dns_set_resolver_backend(&mock_backend);
     CHECK(count == 0);
-    CHECK(elapsed < MOCK_SLOW_MS / 2); /* the tail answered, not the deadline */
+    /* the tail answered, not the deadline */
+    CHECK(elapsed < MOCK_GATE_MAX_MS / 2);
     CHECK(mock_read_calls("cut.test") == 1);
     /* no answer was had, so nothing may be cached in its place */
     count = hts_dns_resolve_all_bounded(opt, "cut.test", addrs, HTS_MAXADDRNUM,
