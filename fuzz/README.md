@@ -20,6 +20,6 @@ Run one target by hand: `fuzz/fuzz-url -max_total_time=300 corpusdir fuzz/corpus
 
 `fuzz-arc` is the odd one out: it drives proxytrack's `.arc` reader the way `--convert` does, through a temp file rather than a buffer, and it compiles `src/proxy/store.c` into the harness because proxytrack does not link libhttrack. Both readers and the writer print to stderr on malformed input, so pass `-close_fd_mask=2` for anything longer than a corpus replay.
 
-`fuzz-codec` drives `hts_codec_unpack_max()` through temp files. Its first input byte picks the codec (gzip/deflate, br, zstd, or one that is never decoded), the `-m` cap and whether the sniffer's prefix decoder also runs. br and zstd decode only in a build that has them, so the corpus replays either way.
+`fuzz-codec` drives `hts_codec_unpack_max()` through temp files. Its first input byte picks the codec: gzip/deflate, br, zstd, or one that is never decoded. The same byte sets the `-m` cap and whether the sniffer's prefix decoder also runs. Gzip and deflate output is checked against zlib itself. br and zstd decode only in a build that has them, so the corpus replays either way.
 
 OSS-Fuzz builds these harnesses with `oss-fuzz-build.sh`, so a new harness needs only a `Makefile.am` entry and a `corpus/<target>/` directory. The script links each harness with `$LIB_FUZZING_ENGINE`. When it is set, `configure` uses it in place of `-fsanitize=fuzzer`.
