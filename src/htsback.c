@@ -4215,6 +4215,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                     back_slot_close_fail(opt, sback, i, STATUSCODE_INVALID,
                                          "Conflicting Content-Length");
                   } else if (!has_nul) {
+                    /* a plugin must not see the header of a dropped response */
                     int test_head = RUN_CALLBACK6(opt, receivehead,
                                                   back[i].r.adr,
                                                   back[i].url_adr,
