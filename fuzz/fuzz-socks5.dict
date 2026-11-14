@@ -1,0 +1,12 @@
+# SOCKS5 (RFC 1928) reply bytes and the proxy URL forms (htsproxy.c).
+ver_none="\x05\x00"
+ver_userpass="\x05\x02"
+ver_noaccept="\x05\xff"
+auth_ok="\x01\x00"
+rep_ok_v4="\x05\x00\x00\x01"
+rep_ok_dom="\x05\x00\x00\x03"
+rep_ok_v6="\x05\x00\x00\x04"
+scheme="socks5://"
+userinfo="user:pass@"
+pct="%3A"
+port=":1080"
