@@ -2074,22 +2074,24 @@ hts_boolean hts_inmem_size_fits(LLint size) {
 
 /* Set once an MPTCP socket exists on a kernel that may ignore MSG_PEEK. */
 static volatile int hts_peek_unsafe = 0;
+/* Set by the self-test hook. */
+static volatile int hts_peek_forced_off = 0;
 
 #if HTS_INET_MPTCP && !HTS_INET_MPTCP_DARWIN
-/* Does MSG_PEEK on an MPTCP socket leave the data queued? Linux 5.6 to 5.12
-   ignore the flag and read destructively. */
-static hts_boolean hts_mptcp_peek_is_safe(void) {
+/* Can MSG_PEEK on an MPTCP socket consume the data? Linux 5.6 to 5.12 ignore
+   the flag, and an unreadable version counts as one of them. */
+static hts_boolean hts_mptcp_peek_is_broken(void) {
   struct utsname u;
   int major = 0, minor = 0;
 
   if (uname(&u) != 0 || sscanf(u.release, "%d.%d", &major, &minor) != 2)
-    return HTS_FALSE;
-  return major > 5 || (major == 5 && minor >= 13) ? HTS_TRUE : HTS_FALSE;
+    return HTS_TRUE;
+  return major < 5 || (major == 5 && minor < 13) ? HTS_TRUE : HTS_FALSE;
 }
 #endif
 
 void hts_peek_force_off(hts_boolean off) {
-  hts_store_release_int(&hts_peek_unsafe, off ? 1 : 0);
+  hts_store_release_int(&hts_peek_forced_off, off ? 1 : 0);
 }
 
 /* Copy up to size buffered bytes without consuming them. Returns the count, 0
@@ -2098,7 +2100,8 @@ void hts_peek_force_off(hts_boolean off) {
 static int hts_peek(htsblk *r, char *buff, int size) {
   int ret;
 
-  if (r->is_file || hts_load_acquire_int(&hts_peek_unsafe))
+  if (r->is_file || hts_load_acquire_int(&hts_peek_unsafe) ||
+      hts_load_acquire_int(&hts_peek_forced_off))
     return PEEK_UNSUPPORTED;
 #if HTS_USEOPENSSL
   if (r->ssl) {
@@ -2153,7 +2156,7 @@ static hts_boolean xfread_line_step(xfread_line_state *st, char *adr,
   return stop;
 }
 
-/* The line modes, one byte per read: the fallback when hts_peek() declines. */
+/* The bytewise line modes, the fallback when hts_peek() declines. */
 static int xfread_lines_bytewise(htsblk *r, int bufl) {
   xfread_line_state st = {HTS_FALSE, HTS_TRUE};
   int count = HTS_XFREAD_LINE_CALL_MAX;
@@ -2211,7 +2214,7 @@ static int xfread_lines(htsblk *r, int bufl) {
     }
   }
   got = hts_read(r, buff, want);
-  if (got <= 0) /* defensive: a peek guarantees the read */
+  if (got <= 0) /* peeked, so the read cannot fail */
     return got;
   for (i = 0; i < got; i++) {
     if (xfread_line_step(&st, r->adr, &r->size, buff[i], bufl))
@@ -2380,7 +2383,7 @@ void socket_set_nosigpipe(T_SOC soc) {
 static hts_boolean hts_mptcp_usable = HTS_FALSE;
 static hts_boolean hts_mptcp_on_by_default = HTS_FALSE;
 /* macOS is left unverified, so its multipath sockets are never peeked. */
-static hts_boolean hts_mptcp_peek_safe = HTS_FALSE;
+static hts_boolean hts_mptcp_peek_broken = HTS_TRUE;
 
 #if HTS_INET_MPTCP && !HTS_INET_MPTCP_DARWIN
 /* Read one small integer sysctl, or -1 when the file cannot be read. */
@@ -2431,7 +2434,7 @@ static void hts_mptcp_probe(void) {
     close(soc);
     hts_mptcp_usable = HTS_TRUE;
     hts_mptcp_on_by_default = hts_mptcp_kernel_recovers();
-    hts_mptcp_peek_safe = hts_mptcp_peek_is_safe();
+    hts_mptcp_peek_broken = hts_mptcp_peek_is_broken();
   }
 #endif
 }
@@ -2473,7 +2476,7 @@ T_SOC hts_socket_client(int family, const httrackp *opt,
   (void) will_bind;
 #endif
 #if HTS_INET_MPTCP
-  if (soc != INVALID_SOCKET && !hts_mptcp_peek_safe)
+  if (soc != INVALID_SOCKET && hts_mptcp_peek_broken)
     hts_store_release_int(&hts_peek_unsafe, 1);
 #endif
   if (soc == INVALID_SOCKET)

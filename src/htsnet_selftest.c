@@ -496,6 +496,14 @@ static int st_socketpair(T_SOC sv[2]) {
   return 0;
 }
 
+static uint64_t st_fnv(uint64_t h, const void *p, size_t n) {
+  size_t i;
+
+  for (i = 0; i < n; i++)
+    h = (h ^ ((const unsigned char *) p)[i]) * 1099511628211ULL;
+  return h;
+}
+
 /* Reads stream from s as back_wait() does, calling http_xfread1() only while s
    is readable. Returns a hash of the final call's result, the stored line
    buffer and the bytes left on s. */
@@ -505,11 +513,8 @@ static uint64_t st_xfread_digest(T_SOC sv[2], const char *stream, int len,
   htsblk r;
   LLint ret = 0;
   char rest[64];
-  int n, i;
+  int n;
 
-#define ST_MIX(p, sz)                                                          \
-  for (i = 0; i < (int) (sz); i++)                                             \
-  h = (h ^ ((const unsigned char *) (p))[i]) * 1099511628211ULL
   assertf(send(sv[0], stream, len, 0) == len);
   hts_init_htsblk(&r);
   r.soc = sv[1];
@@ -519,15 +524,14 @@ static uint64_t st_xfread_digest(T_SOC sv[2], const char *stream, int len,
                     (bufl < 0 || (r.size >= 2 && r.adr[r.size - 2] == '\n'))))
       break;
   }
-  ST_MIX(&ret, sizeof(ret));
+  h = st_fnv(h, &ret, sizeof(ret));
   if (r.adr != NULL) {
-    ST_MIX(&r.size, sizeof(r.size));
-    ST_MIX(r.adr, r.size + 1);
+    h = st_fnv(h, &r.size, sizeof(r.size));
+    h = st_fnv(h, r.adr, (size_t) r.size + 1);
   }
   while (check_readinput(&r) &&
          (n = (int) recv(sv[1], rest, sizeof(rest), 0)) > 0)
-    ST_MIX(rest, n);
-#undef ST_MIX
+    h = st_fnv(h, rest, (size_t) n);
   r.soc = INVALID_SOCKET;
   freet(r.adr);
   return h;
@@ -558,6 +562,9 @@ static int st_xfread_lines(httrackp *opt, int argc, char **argv) {
       stream[i] = len > 8000 && (seed >> 16) % 64 != 0
                       ? 'x'
                       : alphabet[(seed >> 16) % (sizeof(alphabet) - 1)];
+      /* a line-mode stream must hold no LF to reach the limit */
+      if (len > 8000 && bufl == HTS_XFREAD_LINE && stream[i] == '\n')
+        stream[i] = 'x';
     }
     a = st_xfread_digest(peek, stream, len, bufl);
     hts_peek_force_off(HTS_TRUE);

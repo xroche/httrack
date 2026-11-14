@@ -4055,7 +4055,7 @@ class Handler(SimpleHTTPRequestHandler):
         if shape == "chunked":
             head.append(b"Transfer-Encoding: chunked")
             chunks, off = b"", 0
-            for n in (1, 2, 3, 7, 64):  # uppercase hex, then lowercase below
+            for n in (1, 2, 3, 7, 64):
                 chunks += b"%X\r\n" % n + body[off : off + n] + b"\r\n"
                 off += n
             rest = body[off:]
