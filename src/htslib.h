@@ -902,7 +902,8 @@ HTS_STATIC int strcmpnocase(const char *a, const char *b) {
    || (strfield2((a), "image/svg+xml") != 0) ||                                \
    (strfield2((a), "image/svg-xml") !=                                         \
     0) /*|| (strfield2((a),"audio/x-pn-realaudio")!=0) */                      \
-   || (strfield2((a), "application/x-authorware-map") != 0))
+   || (strfield2((a), "application/x-authorware-map") != 0) ||                 \
+   (strfield2((a), "application/rss+xml") != 0))
 #define may_be_hypertext_mime__(a) \
    (\
      (strfield2((a),"audio/x-pn-realaudio")!=0) \

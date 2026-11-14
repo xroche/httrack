@@ -859,6 +859,43 @@ class Handler(SimpleHTTPRequestHandler):
             return
         self.send_error(404)
 
+    # Feeds (#2229): each carries the same attribute links, and only the one
+    # served as a feed type may have them followed.
+    FEEDMIME_TYPES = {
+        "rss": "application/rss+xml",
+        "txt": "text/xml",
+        "app": "application/xml",
+    }
+
+    def feedmime_body(self, key):
+        return (
+            '<?xml version="1.0"?>\n'
+            '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">\n'
+            "<channel><title>%s</title><link>%s-text.html</link>\n"
+            '<atom:link rel="self" href="%s-href.html"/>\n'
+            "<item><title>i</title>"
+            '<enclosure url="%s-enc.mp3" type="audio/mpeg" length="4"/>'
+            "</item>\n</channel></rss>\n" % (key, key, key, key)
+        ).encode()
+
+    def route_feedmime(self):
+        rest = urlsplit(self.path).path[len("/feedmime/") :]
+        if rest in ("", "index.html"):
+            self.send_html(
+                "".join(
+                    '\t<a href="%s.feed">%s</a>\n' % (k, k) for k in self.FEEDMIME_TYPES
+                )
+            )
+        elif rest.endswith(".feed") and rest[:-5] in self.FEEDMIME_TYPES:
+            key = rest[:-5]
+            self.send_raw(self.feedmime_body(key), self.FEEDMIME_TYPES[key])
+        elif re.fullmatch(r"[a-z]{3}-(text|href)\.html", rest):
+            self.send_html("\tTarget %s reached from a feed.\n" % rest)
+        elif re.fullmatch(r"[a-z]{3}-enc\.mp3", rest):
+            self.send_raw(b"ID3\0", "audio/mpeg")
+        else:
+            self.send_error(404)
+
     # --- type/extension matrix (issue #267 family) -------------------------
 
     def send_raw(self, body, content_type, extra_headers=()):
@@ -4523,6 +4560,9 @@ class Handler(SimpleHTTPRequestHandler):
             return True
         if path.startswith("/jsmime/"):
             self.route_jsmime()
+            return True
+        if path.startswith("/feedmime/"):
+            self.route_feedmime()
             return True
         if path.startswith("/charset/"):
             self.route_charset()
