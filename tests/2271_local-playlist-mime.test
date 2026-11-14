@@ -32,10 +32,11 @@ while test "$i" -lt "${#lists[@]}"; do
     # The .cgi songs are saved as .mp3, and the query one gets a hash suffix.
     lines=('#EXTM3U' '#EXTINF:1,x #y' "$n.mp3" '#EXT-X-FOO:BAR=1' ''
         '#EXT-X-KEY:METHOD=AES-128,URI="key.bin"' '  ' '#c.cgi'
-        "${n}20cc1.mp3?a#b" '#EXT-X-ENDLIST')
+        "${n}20cc1.mp3?a#b" "  ${n}3.mp3" $'\t#t.cgi' '#EXT-X-ENDLIST')
     body=
     for l in "${lines[@]}"; do body+=$l$eol; done
     args+=(--found "playlistmime/$n.mp3" --found "playlistmime/${n}20cc1.mp3")
+    args+=(--found "playlistmime/${n}3.mp3")
     args+=(--file-bytes "$f" "${#body}")
     # grep sees a CR-only file as one line, so it is matched whole.
     if test "$eol" = $'\r'; then
@@ -51,8 +52,8 @@ while test "$i" -lt "${#lists[@]}"; do
     args+=(--file-not-matches "$f" 'EXTM3U\.html')
 done
 
-# 7 playlists, their 14 songs and the index; a fetched # line or key.bin adds
+# 7 playlists, their 21 songs and the index; a fetched # line or key.bin adds
 # a file or a 404.
-bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 22 "${args[@]}" \
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 29 "${args[@]}" \
     --not-found 'playlistmime/c.mp3' \
     httrack 'BASEURL/playlistmime/index.html'

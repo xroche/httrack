@@ -2866,7 +2866,8 @@ class Handler(SimpleHTTPRequestHandler):
             song = name.split(".")[0].encode()
             lines = [b"#EXTM3U", b"#EXTINF:1,x #y", song + b".cgi", b"#EXT-X-FOO:BAR=1"]
             lines += [b"", b'#EXT-X-KEY:METHOD=AES-128,URI="key.bin"', b"  ", b"#c.cgi"]
-            lines += [song + b"2.cgi?a#b", b"#EXT-X-ENDLIST"]
+            lines += [song + b"2.cgi?a#b", b"  " + song + b"3.cgi", b"\t#t.cgi"]
+            lines += [b"#EXT-X-ENDLIST"]
             self.send_raw(eol.join(lines) + eol, mime)
         elif name.endswith(".cgi"):
             self.route_bigm3u_song()

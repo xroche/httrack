@@ -1776,15 +1776,10 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
                 while (bol > r->adr && (bol[-1] == ' ' || bol[-1] == '\t'))
                   bol--;
-                if (is_realspace(*html) ||
-                    (bol != r->adr && bol[-1] != '\n' && bol[-1] != '\r')) {
-                  /* one link per line, at its first non-blank byte */
-                } else if (*html == '#') {
-                  /* a playlist # line is a comment or directive, not a link */
-                  while (html + 1 < r->adr + r->size && html[1] != '\n' &&
-                         html[1] != '\r')
-                    html++;
-                } else {
+                /* one link per line, at its first non-blank byte; a playlist
+                   # line is a comment or directive */
+                if (!is_realspace(*html) && *html != '#' &&
+                    (bol == r->adr || bol[-1] == '\n' || bol[-1] == '\r')) {
                   p = 0;
                   valid_p = 1;
                 }
