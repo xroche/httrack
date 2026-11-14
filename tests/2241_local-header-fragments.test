@@ -21,7 +21,10 @@ assert_eq "xfread-lines self-test OK" "$out" "the self-test's own verdict"
 # Equals FRAG_BODY in local-server.py.
 {
     printf '\r\n\r\nstart\r\nline\n\nlone\rCR\r\n'
-    python3 -c 'import sys; sys.stdout.buffer.write(bytes(range(256)))'
+    for i in $(seq 0 255); do
+        # shellcheck disable=SC2059 # the format is the byte
+        printf "\\$(printf '%03o' "$i")"
+    done
     printf '\r\n\r\n'
 } >"$tmpdir/expected"
 
