@@ -9,6 +9,7 @@ noinst_PROGRAMS = fuzz-charset fuzz-codepage fuzz-meta fuzz-idna fuzz-entities \
 	fuzz-warc \
 	fuzz-codec \
 	fuzz-response \
+	fuzz-redirect \
 	fuzz-socks5
 endif
 
@@ -70,6 +71,9 @@ fuzz_codec_SOURCES = fuzz-codec.c fuzz.h
 
 # The HTTP receive path: back_wait() reading a response off a socketpair.
 fuzz_response_SOURCES = fuzz-response.c fuzz.h
+
+# Redirect and 412/416 handling: hts_mirror_check_moved() over a fuzzed Location.
+fuzz_redirect_SOURCES = fuzz-redirect.c fuzz.h
 
 # The SOCKS5 client handshake against a scripted, hostile proxy reply.
 fuzz_socks5_SOURCES = fuzz-socks5.c fuzz.h

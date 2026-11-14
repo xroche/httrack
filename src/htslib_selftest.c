@@ -4222,6 +4222,37 @@ static int st_contentid(httrackp *opt, int argc, char **argv) {
   return failures != 0;
 }
 
+/* Every capacity from the host alone to the whole id: the file part gets the
+   remainder, and at sizeof(void *) the size check used to abort on it. */
+static int st_contentid_tail(httrackp *opt, int argc, char **argv) {
+  static const char host[] = "www.example.com";
+  static const char fil[] = "/abcdefghijklmnop";
+  char full[256];
+  char cid[256];
+  const size_t full_len = make_content_id(host, fil, full, sizeof(full));
+  int failures = 0;
+  size_t size;
+
+  for (size = 1; size <= full_len + 1; size++) {
+    size_t ret, len;
+
+    if (size == sizeof(void *))
+      continue; /* a caller passing that is the mistake the check is for */
+    memset(cid, 'X', sizeof(cid));
+    ret = make_content_id(host, fil, cid, size);
+    len = strnlen(cid, size);
+    if (len == size || ret > size || cid[size] != 'X' ||
+        strncmp(cid, full, len) != 0) {
+      printf("contentid-tail: size %d -> %d '%.*s'\n", (int) size, (int) ret,
+             (int) len, cid);
+      failures++;
+    }
+  }
+  if (failures == 0)
+    printf("contentid-tail: OK\n");
+  return failures != 0;
+}
+
 /* -#test=clienthints <user-agent>: the Sec-CH-UA* values it implies. */
 static int st_clienthints(httrackp *opt, int argc, char **argv) {
   hts_client_hints ch;
@@ -4444,6 +4475,9 @@ const struct selftest_entry selftests_lib[] = {
      st_statrecv},
     {"contentid", "", "every .mht Content-ID unescapes back to its own URL",
      st_contentid},
+    {"contentid-tail", "",
+     "a Content-ID clips at every capacity, sizeof(void *) remainder included",
+     st_contentid_tail},
     {"chainprev", "",
      "a plug-in that chains to an unset callback reaches the engine default",
      st_chainprev},
