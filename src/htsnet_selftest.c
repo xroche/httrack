@@ -520,11 +520,11 @@ static uint64_t st_xfread_digest(T_SOC sv[2], const char *stream, int len,
   r.soc = sv[1];
   while (check_readinput(&r)) {
     ret = http_xfread1(&r, bufl);
+    h = st_fnv(h, &ret, sizeof(ret));
     if (ret < 0 || (r.size >= 1 && r.adr[r.size - 1] == '\n' &&
                     (bufl < 0 || (r.size >= 2 && r.adr[r.size - 2] == '\n'))))
       break;
   }
-  h = st_fnv(h, &ret, sizeof(ret));
   if (r.adr != NULL) {
     h = st_fnv(h, &r.size, sizeof(r.size));
     h = st_fnv(h, r.adr, (size_t) r.size + 1);
@@ -551,13 +551,24 @@ static int st_xfread_lines(httrackp *opt, int argc, char **argv) {
   (void) argv;
   assertf(stream != NULL);
   assertf(st_socketpair(peek) == 0 && st_socketpair(bytewise) == 0);
-  for (c = 0; c < 2000; c++) {
+  for (c = 0; c <= 2000; c++) {
     /* one stream in eight runs past the 8 KB line buffer */
-    const int len = c % 8 == 7 ? 8100 + c % 300 : c % 500;
-    const int bufl = c % 3 == 0 ? HTS_XFREAD_LINE : HTS_XFREAD_LINE_BLOCK;
+    int len = c % 8 == 7 ? 8100 + c % 300 : c % 500;
+    int bufl = c % 3 == 0 ? HTS_XFREAD_LINE : HTS_XFREAD_LINE_BLOCK;
     uint64_t a, b;
 
-    for (i = 0; i < len; i++) {
+    /* The last case stops a call with the buffer one byte short of full, so
+       the next call starts at the limit: 3 CRs and 8189 bytes fill 32 calls,
+       then an LF opens the 33rd. */
+    if (c == 2000) {
+      len = 8195;
+      bufl = HTS_XFREAD_LINE_BLOCK;
+      memset(stream, 'x', (size_t) len);
+      memset(stream, '\r', 3);
+      stream[8192] = '\n';
+      seed = 0;
+    }
+    for (i = 0; c < 2000 && i < len; i++) {
       seed = seed * 1103515245 + 12345;
       stream[i] = len > 8000 && (seed >> 16) % 64 != 0
                       ? 'x'
@@ -575,6 +586,8 @@ static int st_xfread_lines(httrackp *opt, int argc, char **argv) {
       return 1;
     }
   }
+  /* each case reads at least once through the forced fallback */
+  assertf(hts_xfread_bytewise_count() >= 2001);
   deletesoc(peek[0]);
   deletesoc(peek[1]);
   deletesoc(bytewise[0]);

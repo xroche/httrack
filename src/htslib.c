@@ -2076,6 +2076,8 @@ hts_boolean hts_inmem_size_fits(LLint size) {
 static volatile int hts_peek_unsafe = 0;
 /* Set by the self-test hook. */
 static volatile int hts_peek_forced_off = 0;
+/* Line-mode calls that fell back to the bytewise loop, for the self-test. */
+static int hts_xfread_bytewise_calls = 0;
 
 #if HTS_INET_MPTCP && !HTS_INET_MPTCP_DARWIN
 /* Can MSG_PEEK on an MPTCP socket consume the data? Linux 5.6 to 5.12 ignore
@@ -2093,6 +2095,8 @@ static hts_boolean hts_mptcp_peek_is_broken(void) {
 void hts_peek_force_off(hts_boolean off) {
   hts_store_release_int(&hts_peek_forced_off, off ? 1 : 0);
 }
+
+int hts_xfread_bytewise_count(void) { return hts_xfread_bytewise_calls; }
 
 /* Copy up to size buffered bytes without consuming them. Returns the count, 0
    when TLS has nothing decrypted yet, READ_EOF, READ_ERROR or PEEK_UNSUPPORTED.
@@ -2195,8 +2199,10 @@ static int xfread_lines(htsblk *r, int bufl) {
   if (r->size >= HTS_LINE_BLOCK_SIZE - 2)
     return READ_INTERNAL_ERROR;
   avail = hts_peek(r, buff, sizeof(buff));
-  if (avail == PEEK_UNSUPPORTED)
+  if (avail == PEEK_UNSUPPORTED) {
+    hts_xfread_bytewise_calls++;
     return xfread_lines_bytewise(r, bufl);
+  }
   if (avail <= 0)
     return avail;
   /* Dry run: where would the bytewise loop stop? */
