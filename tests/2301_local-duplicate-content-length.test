@@ -10,6 +10,7 @@ set -euo pipefail
 bash "$top_srcdir/tests/local-crawl.sh" --errors 4 \
     --file-bytes 'dupcl/same.bin' 16 \
     --file-bytes 'dupcl/list.bin' 16 \
+    --file-bytes 'dupcl/continue.bin' 16 \
     --not-found 'dupcl/differ.bin' --not-found 'dupcl/differ-list.bin' \
     --not-found 'dupcl/gap.bin' --not-found 'dupcl/long.bin' \
     --log-found 'Conflicting Content-Length, response dropped: .*/dupcl/differ\.bin' \

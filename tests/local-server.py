@@ -3406,6 +3406,8 @@ class Handler(SimpleHTTPRequestHandler):
         "differ-list.bin": ("16, 8",),
         "gap.bin": ("16,,8",),
         "long.bin": ("16", "8" + " " * 2100),
+        # an interim 100 whose own lengths disagree frames nothing
+        "continue.bin": ("16",),
     }
 
     def route_dupcl_index(self):
@@ -3414,9 +3416,14 @@ class Handler(SimpleHTTPRequestHandler):
         )
 
     def route_dupcl_file(self):
-        lengths = self.DUPCL_FILES[self.path.rsplit("/", 1)[1]]
+        name = self.path.rsplit("/", 1)[1]
+        lengths = self.DUPCL_FILES[name]
         self.close_connection = True
-        head = b"HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\n"
+        head = b""
+        if name == "continue.bin":
+            head = b"HTTP/1.1 100 Continue\r\nContent-Length: 8\r\n"
+            head += b"Content-Length: 9\r\n\r\n"
+        head += b"HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\n"
         for value in lengths:
             head += b"Content-Length: %s\r\n" % value.encode()
         try:
@@ -4366,6 +4373,7 @@ class Handler(SimpleHTTPRequestHandler):
         "/dupcl/differ-list.bin": route_dupcl_file,
         "/dupcl/gap.bin": route_dupcl_file,
         "/dupcl/long.bin": route_dupcl_file,
+        "/dupcl/continue.bin": route_dupcl_file,
         "/slowhead/index.html": route_bigfiles_index,
         "/slowhead/p0.bin": route_slowhead_page,
         "/slowhead/p1.bin": route_slowhead_page,

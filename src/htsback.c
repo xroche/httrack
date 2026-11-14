@@ -4191,8 +4191,10 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                   }
 
                   /* RFC 9112 6.3: lengths that disagree leave the body's end
-                     unknown, so the response and its connection are dropped. */
-                  if (length_conflict) {
+                     unknown, so the response and its connection are dropped.
+                     An interim 100 has no body to frame. */
+                  if (length_conflict &&
+                      back[i].r.statuscode != HTTP_CONTINUE) {
                     hts_log_print(opt, LOG_WARNING,
                                   "Conflicting Content-Length, response "
                                   "dropped: %s%s",
