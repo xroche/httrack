@@ -616,6 +616,14 @@ hts_boolean hts_take_lock_request(httrackp *opt, const char *name) {
   return HTS_TRUE;
 }
 
+hts_boolean hts_poll_abort_request(httrackp *opt) {
+  if (!hts_take_lock_request(opt, HTS_ABORT_LOCKNAME))
+    return HTS_FALSE;
+  hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
+  hts_store_release_int(&opt->state.exit_xh, 1);
+  return HTS_TRUE;
+}
+
 /*
   Process pause, link adding..
 */
@@ -627,11 +635,8 @@ void hts_mirror_process_user_interaction(htsmoduleStruct *str,
   ENGINE_LOAD_CONTEXT();
 
   /* Windows has no cross-process SIGTERM: a stop request arrives as a file. */
-  if (hts_take_lock_request(opt, HTS_ABORT_LOCKNAME)) {
-    hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
-    hts_store_release_int(stre->exit_xh_, 1);
+  if (hts_poll_abort_request(opt))
     return;
-  }
 
   // pause/lock files
   {
@@ -785,10 +790,7 @@ void hts_mirror_process_user_interaction(htsmoduleStruct *str,
       }
       /* Read here as well, or a mirror down to its last socket sees no stop
          request until the transfer it waits on has ended. */
-      if (hts_take_lock_request(opt, HTS_ABORT_LOCKNAME)) {
-        hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
-        hts_store_release_int(stre->exit_xh_, 1);
-      }
+      (void) hts_poll_abort_request(opt);
       /* Same omission as the wait for the current link: with every slot busy
          the mirror parks here instead, and the exit never lands (#1096). */
       if (hts_load_acquire_int(stre->exit_xh_)) {

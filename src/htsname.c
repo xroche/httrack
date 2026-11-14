@@ -42,6 +42,7 @@ Please visit our Website: http://www.httrack.com
 #include "htssniff.h"
 #include "htscodec.h"
 #include "htszlib.h"
+#include "htsmirror.h"
 #include <ctype.h>
 #include <limits.h>
 
@@ -991,6 +992,7 @@ int url_savename(lien_adrfilsave *const afs,
                   if (ptr >= 0) {
                     back_fillmax(sback, opt, cache, ptr, numero_passe);
                   }
+                  (void) hts_poll_abort_request(opt);
                   if (!hts_loop_tick(sback, opt, b, ptr)) {
                     return -1;
                   } else if (opt->state._hts_cancel || !back_checkmirror(opt) ||

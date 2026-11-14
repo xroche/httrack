@@ -32,7 +32,7 @@ require_httrack
 
 assert_lockrule_selftest abortlock
 
-local_server_start
+local_server_start --env LOCAL_SERVER_VERBOSE=1
 common=(--quiet --disable-security-limits --robots=0 --timeout=30 --retries=0 -c1)
 # The crawl log only ever says "Mirror not completed (see log file)", so the
 # engine log it names is dumped beside it (#1680).
@@ -136,6 +136,29 @@ case $page in
 *"${BASEURL}/bigfiles/p"*) fail_dump "the page still links the server" "${bigdir}/index.html" ;;
 esac
 echo "OK"
+
+# Each /slowhead/ reply takes 1s, so an engine that polls only between links
+# probes all eight. A request sent before p0's probe is taken by another path.
+printf '[an abort stops the -%%N0 type probe] ..\t'
+arm_paths probe
+httrack -O "$out" "${common[@]}" -%N0 "${BASEURL}/slowhead/index.html" \
+    >"$crawllog" 2>&1 &
+crawlpid=$!
+wait_until_still_running \
+    "test \"\$(count_matching_lines 'HEAD /slowhead/p0' \"\$SRV_LOG\")\" -ge 1" \
+    "the crawl never probed p0.bin" "$crawlpid"
+# The clock starts after the write, because drvfs retries can take 3s (#1639).
+write_lock_request "$out" "$ABORTLOCK" "$crawlpid"
+started=$SECONDS
+rc=0
+wait_bounded "$crawlpid" 60 || rc=$?
+crawlpid=
+test "$rc" -ne 124 || fail "the crawl was still probing 60s after the request"
+elapsed=$((SECONDS - started))
+test "$elapsed" -lt 4 || fail "the abort took ${elapsed}s to stop the type probe"
+probed=$(count_matching_lines 'HEAD /slowhead/p' "$SRV_LOG")
+test "$probed" -le 2 || fail "the crawl probed ${probed} links after the abort"
+echo "OK (${elapsed}s)"
 
 # The pause wait watches for it too, or a paused engine is unreachable.
 printf '[a paused engine takes the request] ..\t'
