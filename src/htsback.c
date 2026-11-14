@@ -4092,8 +4092,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                   int ptr = 0;
                   int adv = 0;
                   int noFreebuff = 0;
-                  /* RFC 9110 5.5: a NUL ends a line early, so the fields after
-                     it are not the ones the server sent */
+                  /* binput_line stops at a NUL, hiding the fields after it */
                   const hts_boolean has_nul =
                       back[i].r.adr[0] != '<' &&
                       memchr(back[i].r.adr, '\0', (size_t) back[i].r.size) !=
@@ -4107,13 +4106,11 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                   back[i].url_fil);
                     back_slot_close_fail(opt, sback, i, STATUSCODE_INVALID,
                                          "NUL byte in response header");
+                    /* Hack for zero-length headers */
                   } else if (back_status(&back[i]) != 0 &&
                              back[i].r.adr[0] != '<') {
-                    /* Hack for zero-length headers */
-
                     // ----------------------------------------
-                    // traiter en-tête!
-                    // status-line à récupérer
+                    /* parse the header, status line first */
                     binput_line(back[i].r.adr + ptr,
                                 back[i].r.adr + back[i].r.size, rcvd, 2000,
                                 &adv);
