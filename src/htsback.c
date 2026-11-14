@@ -1786,8 +1786,10 @@ static hts_boolean ref_get_record(FILE *fp, lien_back *dst) {
 int back_serialize_ref(httrackp * opt, const lien_back * src) {
   const char *filename =
     url_savename_refname_fullpath(opt, src->url_adr, src->url_fil);
-  FILE *fp = FOPEN(filename, "wb");
+  FILE *fp;
 
+  url_savename_refname_note(opt, filename);
+  fp = FOPEN(filename, "wb");
   if (fp == NULL && MKDIR(hts_logpath(opt, CACHE_REFNAME)) == 0) {
     /* note: local filename */
     filename = url_savename_refname_fullpath(opt, src->url_adr, src->url_fil);
@@ -1807,11 +1809,16 @@ int back_serialize_ref(httrackp * opt, const lien_back * src) {
    blit included, and *dst stays NULL. */
 int back_unserialize_ref(httrackp * opt, const char *adr, const char *fil,
                          lien_back ** dst) {
-  const char *filename = url_savename_refname_fullpath(opt, adr, fil);
-  FILE *fp = FOPEN(filename, "rb");
+  const char *filename;
+  FILE *fp;
   lien_back *back;
 
   *dst = NULL;
+  filename = url_savename_refname_fullpath(opt, adr, fil);
+  /* Each new link asks, so spare the open when no ref can be there. */
+  if (!url_savename_refname_may_exist(opt, filename))
+    return 1;
+  fp = FOPEN(filename, "rb");
   if (fp == NULL)
     return 1;
   back = calloct(1, sizeof(lien_back));
