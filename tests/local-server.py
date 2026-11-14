@@ -2845,6 +2845,51 @@ class Handler(SimpleHTTPRequestHandler):
     def route_bigm3u_song(self):
         self.send_raw(b"ID3", "audio/mpeg")
 
+    # One playlist per m3u content type and line ending, each naming its own songs.
+    PLAYLIST_MIMES = {
+        "xmpegurl.m3u": ("audio/x-mpegurl", b"\n"),
+        "mpegurl.m3u": ("audio/mpegurl", b"\n"),
+        "appxmpegurl.m3u": ("application/x-mpegurl", b"\n"),
+        "hls.m3u8": ("application/vnd.apple.mpegurl", b"\n"),
+        "crlf.m3u": ("audio/x-mpegurl", b"\r\n"),
+        "cr.m3u": ("audio/x-mpegurl", b"\r"),
+        "ram.ram": ("audio/x-pn-realaudio", b"\r\n"),
+        "octet.m3u8": ("application/octet-stream", b"\n"),
+    }
+
+    # Playlists sent verbatim, for the shapes the fixed line list cannot take.
+    PLAYLIST_RAW = {
+        "noeolcr.m3u": (
+            "audio/x-mpegurl",
+            b"#EXTM3U\r#c4.cgi\rnoeolcr.cgi\rnoeolcr2.cgi",
+        ),
+        "noeollf.m3u": ("audio/x-mpegurl", b"#EXTM3U\nnoeollf.cgi\nnoeollf2.cgi"),
+        "bom.m3u": ("audio/x-mpegurl", b"\xef\xbb\xbf#EXTM3U\nbom.cgi\n"),
+        "twotok.m3u": ("audio/x-mpegurl", b"twotok.cgi twotok2.cgi\n"),
+        "octet.bin": ("application/octet-stream", b"octetbin.cgi\n"),
+    }
+
+    def route_playlistmime(self):
+        name = self.path.split("?")[0].rsplit("/", 1)[-1]
+        if name == "index.html":
+            names = list(self.PLAYLIST_MIMES) + list(self.PLAYLIST_RAW)
+            self.send_html("".join('<a href="%s">p</a>\n' % n for n in names))
+        elif name in self.PLAYLIST_RAW:
+            mime, body = self.PLAYLIST_RAW[name]
+            self.send_raw(body, mime)
+        elif name in self.PLAYLIST_MIMES:
+            mime, eol = self.PLAYLIST_MIMES[name]
+            song = name.split(".")[0].encode()
+            lines = [b"#EXTM3U", b"#EXTINF:1,x #y", song + b".cgi", b"#EXT-X-FOO:BAR=1"]
+            lines += [b"", b'#EXT-X-KEY:METHOD=AES-128,URI="key.bin"', b"  ", b"#c.cgi"]
+            lines += [song + b"2.cgi?a#b", b"  " + song + b"3.cgi", b"\t#t.cgi"]
+            lines += [b"#EXT-X-ENDLIST"]
+            self.send_raw(eol.join(lines) + eol, mime)
+        elif name.endswith(".cgi"):
+            self.route_bigm3u_song()
+        else:
+            self.send_error(404)
+
     # a long header httrack never parses, like the one algolia.com sends
     LONGCSP = ("Content-Security-Policy-Report-Only", "script-src " + "a" * 4800)
 
@@ -4535,6 +4580,9 @@ class Handler(SimpleHTTPRequestHandler):
             return True
         if path.startswith("/titleenc/"):
             self.route_titleenc()
+            return True
+        if path.startswith("/playlistmime/"):
+            self.route_playlistmime()
             return True
         # Match percent-encoded paths (accented #157 route) by their decoded form.
         handler = self.ROUTES.get(path) or self.ROUTES.get(unquote(path))

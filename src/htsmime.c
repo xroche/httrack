@@ -381,6 +381,7 @@ static const char *hts_mime_modern[][2] = {
     {"video/webm", "webm"},
     {"video/ogg", "ogv"},
     {"video/mp2t", "ts"},
+    {"application/vnd.apple.mpegurl", "m3u8"},
     {"audio/mp4", "m4a"},
     {"audio/aac", "aac"},
     {"audio/ogg", "oga"},
