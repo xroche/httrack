@@ -46,6 +46,7 @@ static const char *const charsets[] = {
 
 /* The second byte picks the declared type and a file name to match, since
    compare_mime() guesses from the extension when the type is unknown. */
+/* indexes pinned by generate-extra-seeds.py HP_*; append only */
 static const struct {
   const char *mime;
   const char *file;
@@ -60,14 +61,17 @@ static const struct {
     {"application/xml", "/f.rss"},
     {"image/svg+xml", "/i.svg"},
     {"application/xhtml+xml", "/index.xhtml"},
-    {"application/octet-stream", "/s.js"},
+    {"application/octet-stream", "/s.js"}, /* extension guessing */
 };
 
 /* The third byte holds option bits. All bits clear give the old fixed setup. */
 #define OPT_ROBOTS_MASK 0x03 /* opt->robots, 0 to 3 */
-#define OPT_URLMODE_SHIFT 2  /* 3 bits, added to the relative default */
+/* bits 2-4: urlmode, offset so 0 stays relative */
+#define OPT_URLMODE_SHIFT 2
+#define OPT_URLMODE_MASK 0x07
+#define URLMODE_COUNT 6 /* hts_urlmode values in htsopt.h */
 #define OPT_MIMEHTML 0x20
-#define OPT_MAKEINDEX 0x40 /* opt->depth matches the page's depth */
+#define OPT_MAKEINDEX 0x40 /* makeindex fires only at the page's depth */
 #define OPT_NO_JAVASCRIPT 0x80
 
 /* htsparse ignores str.addLink on the internal parse; stub it. */
@@ -118,7 +122,9 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   opt = hts_create_opt();
   opt->log = opt->errlog = NULL;
   opt->robots = (int) (bits & OPT_ROBOTS_MASK);
-  opt->urlmode = (HTS_URLMODE_RELATIVE + ((bits >> OPT_URLMODE_SHIFT) & 7)) % 6;
+  opt->urlmode = (HTS_URLMODE_RELATIVE +
+                  ((bits >> OPT_URLMODE_SHIFT) & OPT_URLMODE_MASK)) %
+                 URLMODE_COUNT;
   opt->mimehtml = (bits & OPT_MIMEHTML) != 0;
   if (bits & OPT_NO_JAVASCRIPT)
     opt->parsejava |= HTSPARSE_NO_JAVASCRIPT;
@@ -151,7 +157,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
                   NULL);
   ptr = 1;
   if (bits & OPT_MAKEINDEX) {
-    /* an index that is already open sends the index to /dev/null */
+    /* pre-opened index file, so output goes to /dev/null */
     opt->depth = heap(ptr)->depth;
     makeindex_fp = fopen("/dev/null", "wb");
   }

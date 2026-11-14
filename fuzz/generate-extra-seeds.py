@@ -74,12 +74,13 @@ def htsparse_seed(text, mode=0, bits=0, charset=0):
 # fuzz-htsparse's modes[] indexes and option bits.
 HP_JS, HP_CSS, HP_RAM, HP_M3U, HP_AAM = 1, 2, 3, 4, 5
 HP_TEXT_XML, HP_APP_XML, HP_SVG, HP_OCTET = 6, 7, 8, 10
-HP_ROBOTS, HP_MIMEHTML, HP_MAKEINDEX, HP_NOJS = 0x02, 0x20, 0x40, 0x80
+HP_URLMODE_RELATIVE = 2  # hts_urlmode value that option bits 0 select
+HP_ROBOTS_2, HP_MIMEHTML, HP_MAKEINDEX, HP_NOJS = 0x02, 0x20, 0x40, 0x80
 
 
 def hp_urlmode(k):
-    """The option bits that select urlmode k (-Kk)."""
-    return ((k - 2) % 6) << 2
+    """The option bits that select urlmode enum value k."""
+    return ((k - HP_URLMODE_RELATIVE) % 6) << 2
 
 
 def gen_htsparse_modes():
@@ -91,6 +92,13 @@ def gen_htsparse_modes():
             'import x from "./m.js"; import("./d.js").then(f);'
             "document.write('<a href=\"w.html\">w</a>');"
             'var u = "img/a.png"; location.href = "next.html";',
+        ),
+        (
+            # a quoted JS string still open at the end of the buffer
+            "js-unterminated.html",
+            0,
+            0,
+            '<script> location="abc',
         ),
         (
             "mode-octet-js.js",
@@ -134,7 +142,7 @@ def gen_htsparse_modes():
         ),
         (
             "mode-rss.xml",
-            HP_TEXT_XML,
+            HP_APP_XML,
             0,
             '<?xml version="1.0"?><rss version="2.0" xmlns:content='
             '"http://purl.org/rss/1.0/modules/content/"><channel>'
@@ -143,7 +151,7 @@ def gen_htsparse_modes():
         ),
         (
             "mode-xml-plain.xml",
-            HP_APP_XML,
+            HP_TEXT_XML,
             0,
             '<?xml version="1.0"?><root><a href="x.html"/></root>',
         ),
@@ -159,7 +167,7 @@ def gen_htsparse_modes():
         (
             "opt-robots-meta.html",
             0,
-            HP_ROBOTS,
+            HP_ROBOTS_2,
             '<meta name="robots" content="noindex,nofollow">' '<a href="a.html">a</a>',
         ),
         (
@@ -187,7 +195,7 @@ def gen_htsparse_modes():
     for k in range(6):
         seeds.append(
             (
-                "opt-urlmode-K%d.html" % k,
+                "opt-urlmode-%d.html" % k,
                 0,
                 hp_urlmode(k),
                 '<a href="http://example.com/a/b.html">a</a>'
