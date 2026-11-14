@@ -1772,14 +1772,20 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
             if (in_media) {
               if (strcmp(in_media, "LNK") == 0) {       // real media
+                // a UTF-8 BOM is kept as is, not read as a link
+                const char *const start =
+                    r->adr +
+                    (r->size >= 3 && memcmp(r->adr, "\xEF\xBB\xBF", 3) == 0
+                         ? 3
+                         : 0);
                 const char *bol = html;
 
-                while (bol > r->adr && (bol[-1] == ' ' || bol[-1] == '\t'))
+                while (bol > start && (bol[-1] == ' ' || bol[-1] == '\t'))
                   bol--;
-                /* one link per line, at its first non-blank byte; a playlist
-                   # line is a comment or directive */
-                if (!is_realspace(*html) && *html != '#' &&
-                    (bol == r->adr || bol[-1] == '\n' || bol[-1] == '\r')) {
+                // one link per line, starting at its first non-blank byte
+                // *html, not *bol: an indented # line is a comment too
+                if (html >= start && !is_realspace(*html) && *html != '#' &&
+                    (bol == start || bol[-1] == '\n' || bol[-1] == '\r')) {
                   p = 0;
                   valid_p = 1;
                 }
@@ -2425,7 +2431,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   ok = -1;      // ne pas traiter ce lien
 
                 if (ok > 0) {
-                  if (in_media != NULL && quote == '\n' && *eadr == '\r')
+                  if (quote == '\n' && *eadr == '\r' && in_media != NULL &&
+                      strcmp(in_media, "LNK") == 0)
                     ok = 0;                   // a playlist line may end in CR
                   else if (is_space(*eadr)) { // guillemets,CR, etc
                     if ((*eadr == quote && (!quoteinscript || *(eadr - 1) == '\\'))     // end quote
@@ -3729,6 +3736,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
         // plus loin
         html++;                  // automate will be checked next loop
+        if (html > r->adr + r->size) // a link at EOF must not flush the NUL
+          html = r->adr + r->size;
 
         /* Otimization: if we are scanning in HTML data (not in tag or script), 
            then jump to the next starting tag */

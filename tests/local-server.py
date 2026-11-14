@@ -2857,11 +2857,26 @@ class Handler(SimpleHTTPRequestHandler):
         "octet.m3u8": ("application/octet-stream", b"\n"),
     }
 
+    # Playlists sent verbatim, for the shapes the fixed line list cannot take.
+    PLAYLIST_RAW = {
+        "noeolcr.m3u": (
+            "audio/x-mpegurl",
+            b"#EXTM3U\r#c4.cgi\rnoeolcr.cgi\rnoeolcr2.cgi",
+        ),
+        "noeollf.m3u": ("audio/x-mpegurl", b"#EXTM3U\nnoeollf.cgi\nnoeollf2.cgi"),
+        "bom.m3u": ("audio/x-mpegurl", b"\xef\xbb\xbf#EXTM3U\nbom.cgi\n"),
+        "twotok.m3u": ("audio/x-mpegurl", b"twotok.cgi twotok2.cgi\n"),
+        "octet.bin": ("application/octet-stream", b"octetbin.cgi\n"),
+    }
+
     def route_playlistmime(self):
         name = self.path.split("?")[0].rsplit("/", 1)[-1]
         if name == "index.html":
-            links = "".join('<a href="%s">p</a>\n' % n for n in self.PLAYLIST_MIMES)
-            self.send_html(links)
+            names = list(self.PLAYLIST_MIMES) + list(self.PLAYLIST_RAW)
+            self.send_html("".join('<a href="%s">p</a>\n' % n for n in names))
+        elif name in self.PLAYLIST_RAW:
+            mime, body = self.PLAYLIST_RAW[name]
+            self.send_raw(body, mime)
         elif name in self.PLAYLIST_MIMES:
             mime, eol = self.PLAYLIST_MIMES[name]
             song = name.split(".")[0].encode()
