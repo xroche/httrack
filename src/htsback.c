@@ -1815,7 +1815,7 @@ int back_unserialize_ref(httrackp * opt, const char *adr, const char *fil,
 
   *dst = NULL;
   filename = url_savename_refname_fullpath(opt, adr, fil);
-  /* Each new link asks, and refs are rare. */
+  /* Skip the open when no ref can exist. */
   if (!url_savename_refname_may_exist(opt, filename))
     return 1;
   fp = FOPEN(filename, "rb");

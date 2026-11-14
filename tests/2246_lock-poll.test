@@ -6,8 +6,7 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-# The engine looks for hts-abort.lock at most every 250 ms rather than on every
-# loop turn.
+# The engine looks for hts-abort.lock at most every 250 ms.
 
 dir=$(mktemp -d)
 cleanup_push rm -rf "$dir"

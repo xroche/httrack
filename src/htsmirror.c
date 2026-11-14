@@ -616,7 +616,7 @@ hts_boolean hts_take_lock_request(httrackp *opt, const char *name) {
   return HTS_TRUE;
 }
 
-/* A lock request may wait this long before the engine sees it. */
+/* The engine looks for each lock file at most this often. */
 #define HTS_LOCK_POLL_MS 250
 
 /* Is it time to look for the lock file again? */

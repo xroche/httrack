@@ -125,13 +125,13 @@ char *url_savename_refname_fullpath(httrackp * opt, const char *adr,
 /* Remove the temp-ref for (adr,fil); HTS_TRUE if it was removed. */
 hts_boolean url_savename_refname_remove(httrackp *opt, const char *adr,
                                         const char *fil);
-/* Record that this mirror writes the ref at filename. Engine thread. */
+/* Note that this mirror wrote the ref at filename. Engine thread. */
 void url_savename_refname_written(httrackp *opt, const char *filename);
 /* Could the ref at filename exist? False only when hts-cache/ref was absent at
    mirror start and this mirror has not written that ref. */
 hts_boolean url_savename_refname_may_exist(httrackp *opt, const char *filename);
-/* Drop the record, then track written refs when hts-cache/ref is absent. Engine
-   thread, at mirror start. */
+/* Reset the record at mirror start. Written refs are tracked only when
+   hts-cache/ref is absent. Engine thread. */
 void url_savename_refnames_start(httrackp *opt);
 /* Drop the record, so every ref may exist again. */
 void url_savename_refnames_free(httrackp *opt);
