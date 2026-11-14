@@ -191,6 +191,65 @@ static int st_retryafter(httrackp *opt, int argc, char **argv) {
   return st_verdict("retry-after", err);
 }
 
+/* Do repeated Content-Length fields agree? (RFC 9112 6.3, RFC 9110 8.6) */
+static int st_contentlength(httrackp *opt, int argc, char **argv) {
+  int err = 0;
+  size_t i;
+
+  static const struct {
+    const char *first, *second;
+    hts_boolean agree;
+    LLint length;
+  } cases[] = {
+      {"42", NULL, HTS_TRUE, 42},
+      {"0", "0", HTS_TRUE, 0},
+      {"42", "42", HTS_TRUE, 42},
+      {"42, 42", NULL, HTS_TRUE, 42},
+      {" 42 ,42 , 42", " 42", HTS_TRUE, 42},
+      {"42", "43", HTS_FALSE, 42},
+      {"0", "42", HTS_FALSE, 0},
+      {"42", "0", HTS_FALSE, 42},
+      {"42, 43", NULL, HTS_FALSE, 42},
+      {"42, 42, 43", NULL, HTS_FALSE, 42},
+      {"42", "42, 43", HTS_FALSE, 42},
+      {"9223372036854775807", "9223372036854775806", HTS_FALSE,
+       9223372036854775807LL},
+      /* empty elements and text that is no number are skipped */
+      {"42,,43", NULL, HTS_FALSE, 42},
+      {", 43", "42", HTS_FALSE, 43},
+      {"42, x, 43", NULL, HTS_FALSE, 42},
+      {"42", "x, 43", HTS_FALSE, 42},
+      {"42,", NULL, HTS_TRUE, 42},
+      {"42 bytes", "42", HTS_TRUE, 42},
+      {"x", "42", HTS_TRUE, 42},
+      /* a signed or oversized length is a length of its own */
+      {"42", "-1", HTS_FALSE, 42},
+      {"42, 99999999999999999999", NULL, HTS_FALSE, 42},
+      {"99999999999999999999", "42", HTS_FALSE, -2},
+      {"-1", NULL, HTS_TRUE, -2},
+  };
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+    LLint seen = -1;
+    hts_boolean agree = hts_content_length_agrees(cases[i].first, &seen);
+
+    if (agree && cases[i].second != NULL)
+      agree = hts_content_length_agrees(cases[i].second, &seen);
+    if (agree != cases[i].agree || seen != cases[i].length) {
+      printf("content-length: \"%s\" then \"%s\" gave %s/" LLintP
+             ", expected %s/" LLintP "\n",
+             cases[i].first, cases[i].second ? cases[i].second : "(none)",
+             agree ? "agree" : "conflict", seen,
+             cases[i].agree ? "agree" : "conflict", cases[i].length);
+      err = 1;
+    }
+  }
+  return st_verdict("content-length", err);
+}
+
 /* Extra args are key=value: adr= cdispo= statuscode= status= strip= urlhack=
    no-www= no-slash= no-query= n83= type=, plus repeatable prior=adr|fil|sav
    registering an already-crawled link (dedup/collision paths). */
@@ -2191,6 +2250,9 @@ const struct selftest_entry selftests_header[] = {
      "layout of the installed structs configure's switches decide",
      st_pubheaders},
     {"retry-after", "", "Retry-After header parser self-test", st_retryafter},
+    {"content-length", "",
+     "repeated Content-Length values must agree (RFC 9112 6.3)",
+     st_contentlength},
     {"header", "<raw-header-line> ...", "response header-line parsing",
      st_header},
     {"statusline", "<status-line>", "status code of an HTTP status line",
