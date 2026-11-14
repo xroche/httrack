@@ -125,3 +125,17 @@ grep -q 'stopped by user' <<<"$htslog" ||
 ! grep -q 'Receive Error' <<<"$htslog" ||
     fail "the stop was reported as a socket error: ${htslog}"
 ok "^C ended the stalled transfer in ${elapsed}s, reported as a stop"
+
+# --- SIGTERM stops the -%N0 type probe at once ------------------------------
+# Every /slowhead/ answer takes 1s, HEAD probes included. An engine that probes
+# the remaining links after the signal takes 6s more, then fetches them.
+start_crawl "${BASEURL}/slowhead/index.html" --timeout=30 --max-time=0 -c1 -%N0
+await_requests 'HEAD /slowhead/p0.bin' 1
+started=$SECONDS
+kill -TERM "$crawlpid"
+await_exit 60 "the terminated crawl"
+elapsed=$((SECONDS - started))
+test "$elapsed" -lt 4 || fail "SIGTERM took ${elapsed}s to stop the type probe"
+probed=$(count_matching_lines 'HEAD /slowhead/p' "$SRV_LOG")
+test "$probed" -le 2 || fail "the crawl probed ${probed} links after SIGTERM"
+ok "SIGTERM stopped the type probe in ${elapsed}s"

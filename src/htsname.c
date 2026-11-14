@@ -969,9 +969,11 @@ int url_savename(lien_adrfilsave *const afs,
             strcpybuff(current.fil, fil_complete);
             // ajouter dans le backing le fichier en mode test
             // savename: rien car en mode test
-            if (back_add(sback, opt, cache, current.adr, current.fil,
-                         BACK_ADD_TEST, referer_adr, referer_fil, 1, HTS_FALSE,
-                         NULL) != -1) {
+            if (hts_is_exiting(opt)) {
+              /* an exit names the link untested rather than probe it */
+            } else if (back_add(sback, opt, cache, current.adr, current.fil,
+                                BACK_ADD_TEST, referer_adr, referer_fil, 1,
+                                HTS_FALSE, NULL) != -1) {
               int b;
 
               b = back_index(opt, sback, current.adr, current.fil, BACK_ADD_TEST);
@@ -991,9 +993,8 @@ int url_savename(lien_adrfilsave *const afs,
                   }
                   if (!hts_loop_tick(sback, opt, b, ptr)) {
                     return -1;
-                  } else if (opt->state._hts_cancel ||
-                             !back_checkmirror(
-                                 opt)) { // cancel level 2 or 1 (cancel parsing)
+                  } else if (opt->state._hts_cancel || !back_checkmirror(opt) ||
+                             hts_is_exiting(opt)) { // cancel parsing, or exit
                     back_delete(opt, cache, sback, b);  // cancel test
                     stop_looping = 1;
                   }
