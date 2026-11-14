@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# Response headers arriving whole or one byte per write, over HTTP and HTTPS:
-# the header reader must stop at the blank line, so each body lands intact,
-# and must refuse a header block larger than its 8 KB line buffer.
+# The header reader must stop at the blank line, even when bytes arrive one per
+# write, and must refuse a header block larger than its 8 KB buffer.
 
 set -euo pipefail
 
@@ -15,13 +14,12 @@ cleanup() {
 }
 cleanup_push cleanup
 
-# FRAG_BODY in local-server.py
+# Equals FRAG_BODY in local-server.py.
 {
     printf '\r\n\r\nstart\r\nline\n\nlone\rCR\r\n'
     python3 -c 'import sys; sys.stdout.buffer.write(bytes(range(256)))'
     printf '\r\n\r\n'
 } >"$tmpdir/expected"
-test "$(wc -c <"$tmpdir/expected")" -eq 286 || fail "expected body is not 286 bytes"
 
 # check SCHEME [local_server_start args]
 check() {
@@ -32,6 +30,7 @@ check() {
         "$scheme://127.0.0.1:$SRV_PORT/frag/index.html" -O "$tmpdir/$scheme" \
         -r2 -c4 --robots=0 --retries=0 --quiet || true
     dir="$tmpdir/$scheme/127.0.0.1_$SRV_PORT/frag"
+    # big: 3 KB of headers, continue: a 100 first, huge: over 8 KB
     for shape in crlf lf big continue chunked; do
         for mode in whole bytes; do
             test -f "$dir/$shape-$mode.bin" ||

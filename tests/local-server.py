@@ -4038,9 +4038,8 @@ class Handler(SimpleHTTPRequestHandler):
         except OSError:
             pass
 
-    # Raw responses for the engine's header reader, in one write or one byte
-    # per write. Each body must reach disk byte for byte, so a reader that
-    # consumes past the blank line corrupts it.
+    # Raw responses for the header reader, sent whole or one byte per write. A
+    # reader that takes bytes past the blank line corrupts the body.
     FRAG_BODY = (
         b"\r\n\r\nstart\r\nline\n\nlone\rCR\r\n" + bytes(range(256)) + b"\r\n\r\n"
     )
@@ -4055,8 +4054,8 @@ class Handler(SimpleHTTPRequestHandler):
             head += [b"X-Pad-%03d: %s" % (i, b"p" * 60) for i in range(pads)]
         if shape == "chunked":
             head.append(b"Transfer-Encoding: chunked")
-            sizes, chunks, off = (1, 2, 3, 7, 64), b"", 0
-            for n in sizes:
+            chunks, off = b"", 0
+            for n in (1, 2, 3, 7, 64):  # uppercase hex, then lowercase below
                 chunks += b"%X\r\n" % n + body[off : off + n] + b"\r\n"
                 off += n
             rest = body[off:]
@@ -4091,7 +4090,7 @@ class Handler(SimpleHTTPRequestHandler):
                 self.wfile.write(raw)
             else:
                 self.connection.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-                # about 400 pauses, whatever the size: a Windows sleep is ~15ms
+                # At most ~400 pauses, because a Windows sleep lasts ~15 ms.
                 step = max(1, len(raw) // 400)
                 for i in range(len(raw)):
                     self.wfile.write(raw[i : i + 1])
