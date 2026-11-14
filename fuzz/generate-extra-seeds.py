@@ -238,10 +238,13 @@ def gen_url():
 
 
 def gen_header():
+    # first byte of a header seed selects the harness state (fuzz-header.c)
+    SEL0 = "\x00"
+
     write(
         "header",
         "headers-basic.txt",
-        "HTTP/1.1 200 OK\r\n"
+        SEL0 + "HTTP/1.1 200 OK\r\n"
         "Content-Type: text/html; charset=utf-8\r\n"
         "Content-Length: 10\r\n"
         "Location: /redirected.html\r\n"
@@ -252,7 +255,7 @@ def gen_header():
     write(
         "header",
         "headers-odd.txt",
-        "HTTP/1.0 302 Moved Temporarily\n"
+        SEL0 + "HTTP/1.0 302 Moved Temporarily\n"
         "location:relative.html\n"
         "Location: \n"
         "Content-Type:\n"
@@ -264,13 +267,79 @@ def gen_header():
         "Link: <l.css>; rel=stylesheet\n"
         "Content-Range: bytes 0-9/100\n"
         "Transfer-Encoding: chunked\n"
-        "X-Long: " + "x" * 8000 + "\n\r\n",
+        "X-Long: " + "x" * 7500 + "\n\r\n",
     )
     write(
         "header",
         "headers-statuslines.txt",
-        "HTTP/1.1 100 Continue\r\nHTTP/1.1 204\r\nHTTP/9.9 999 X\r\n"
+        SEL0 + "HTTP/1.1 100 Continue\r\nHTTP/1.1 204\r\nHTTP/9.9 999 X\r\n"
         "garbage status line\r\nHTTP/1.1 200 OK (comment) x\r\n",
+    )
+    write(
+        "header",
+        "headers-keepalive.txt",
+        SEL0 + "HTTP/1.1 200 OK\r\nConnection: keep-alive\r\n"
+        "Keep-Alive: timeout=5, max=100\r\nTE: trailers\r\n"
+        "Trailer: Expires\r\nContent-Length: 5\r\n\r\n",
+    )
+    write(
+        "header",
+        "headers-keepalive-on.txt",
+        "\x08HTTP/1.1 200 OK\r\nConnection: close\r\n"
+        "Keep-Alive: timeout=0, max=1\r\n\r\n",
+    )
+    write(
+        "header",
+        "headers-retry-after.txt",
+        SEL0 + "HTTP/1.1 503 Busy\r\nRetry-After: 120\r\n"
+        "Retry-After: Wed, 21 Oct 2026 07:28:00 GMT\r\n"
+        "Retry-After: -5\r\n\r\n",
+    )
+    write(
+        "header",
+        "headers-encoding.txt",
+        SEL0 + "HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\n"
+        "Content-Encoding: br\r\nContent-Encoding: zstd\r\n"
+        "Content-Encoding: identity\r\nContent-Encoding: deflate, gzip\r\n"
+        'Etag: "abc"\r\nLast-Modified: Wed, 21 Oct 2026 07:28:00 GMT\r\n'
+        "Date: Wed, 21 Oct 2026 07:28:00 GMT\r\n"
+        "Content-Range: bytes */100\r\n\r\n",
+    )
+    write(
+        "header",
+        "headers-secure-cookie.txt",
+        "\x20HTTP/1.1 200 OK\r\nSet-Cookie: sid=x; Path=/\r\n"
+        "Set-Cookie: n=1; Secure; Max-Age=60\r\n"
+        "Set-Cookie: m=1; Expires=Wed, 21 Oct 1999 07:28:00 GMT\r\n\r\n",
+    )
+    write(
+        "header",
+        "headers-overlong.txt",
+        SEL0 + "HTTP/1.1 200 OK\r\nLocation: /" + "a" * 2100 + "\r\n"
+        "Content-Length: 7\r\n\r\n",
+    )
+    # values around the copy bounds: contenttype[128] keeps < 126 chars,
+    # the cookie domain[256] < 255
+    write(
+        "header",
+        "headers-contenttype-bound.txt",
+        SEL0
+        + "HTTP/1.1 200 OK\r\n"
+        + "".join(
+            "Content-Type: text/" + "x" * (n - 5) + "\r\n" for n in range(125, 131)
+        )
+        + "\r\n",
+    )
+    write(
+        "header",
+        "headers-cookie-domain-bound.txt",
+        SEL0
+        + "HTTP/1.1 200 OK\r\n"
+        + "".join(
+            "Set-Cookie: c%d=1; Domain=" % n + "d" * (n - 12) + ".example.com\r\n"
+            for n in range(253, 261)
+        )
+        + "\r\n",
     )
 
 
