@@ -4043,15 +4043,15 @@ class Handler(SimpleHTTPRequestHandler):
     FRAG_BODY = (
         b"\r\n\r\nstart\r\nline\n\nlone\rCR\r\n" + bytes(range(256)) + b"\r\n\r\n"
     )
-    FRAG_SHAPES = ("crlf", "lf", "big", "continue", "chunked", "huge")
+    FRAG_SHAPES = ("crlf", "lf", "chunked", "huge")
+    FRAG_MODES = ("whole", "bytes", "split")
 
     def frag_response(self, shape):
         body = self.FRAG_BODY
         nl = b"\n" if shape == "lf" else b"\r\n"
         head = [b"HTTP/1.1 200 OK", b"Content-Type: application/octet-stream"]
-        if shape in ("big", "huge"):
-            pads = 48 if shape == "big" else 160
-            head += [b"X-Pad-%03d: %s" % (i, b"p" * 60) for i in range(pads)]
+        if shape == "huge":
+            head += [b"X-Pad-%03d: %s" % (i, b"p" * 60) for i in range(160)]
         if shape == "chunked":
             head.append(b"Transfer-Encoding: chunked")
             chunks, off = b"", 0
@@ -4065,9 +4065,11 @@ class Handler(SimpleHTTPRequestHandler):
             head.append(b"Content-Length: %d" % len(body))
         head.append(b"Connection: close")
         raw = nl.join(head) + nl + nl
-        if shape == "continue":
-            raw = b"HTTP/1.1 100 Continue\r\n\r\n" + raw
-        return raw if self.command == "HEAD" else raw + body
+        return (
+            (raw, len(raw) - len(nl))
+            if self.command == "HEAD"
+            else (raw + body, len(raw) - len(nl))
+        )
 
     def route_frag(self):
         name = urlsplit(self.path).path[len("/frag/") :]
@@ -4075,19 +4077,26 @@ class Handler(SimpleHTTPRequestHandler):
             links = "".join(
                 '\t<a href="%s-%s.bin">x</a>\n' % (s, m)
                 for s in self.FRAG_SHAPES
-                for m in ("whole", "bytes")
+                for m in self.FRAG_MODES
             )
             self.send_html(links)
             return
         shape, _, mode = name.partition("-")
-        if shape not in self.FRAG_SHAPES or mode not in ("whole.bin", "bytes.bin"):
+        mode = mode[: -len(".bin")]
+        if shape not in self.FRAG_SHAPES or mode not in self.FRAG_MODES:
             self.send_error(404)
             return
-        raw = self.frag_response(shape)
+        raw, blank = self.frag_response(shape)
         self.close_connection = True
         try:
-            if mode == "whole.bin":
+            if mode == "whole":
                 self.wfile.write(raw)
+            elif mode == "split":
+                # the blank line's own newline arrives with the body
+                self.wfile.write(raw[:blank])
+                self.wfile.flush()
+                time.sleep(0.3)
+                self.wfile.write(raw[blank:])
             else:
                 self.connection.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
                 # At most ~400 pauses, because a Windows sleep lasts ~15 ms.

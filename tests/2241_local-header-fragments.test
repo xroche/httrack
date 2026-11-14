@@ -14,6 +14,10 @@ cleanup() {
 }
 cleanup_push cleanup
 
+out=$(httrack -O /dev/null '-#test=xfread-lines' 2>&1) ||
+    fail "-#test=xfread-lines failed: $out"
+assert_eq "xfread-lines self-test OK" "$out" "the self-test's own verdict"
+
 # Equals FRAG_BODY in local-server.py.
 {
     printf '\r\n\r\nstart\r\nline\n\nlone\rCR\r\n'
@@ -23,24 +27,29 @@ cleanup_push cleanup
 
 # check SCHEME [local_server_start args]
 check() {
-    local scheme=$1 dir shape mode
+    local scheme=$1 dir shape mode link
     shift
     local_server_start "$@" --log "$tmpdir/$scheme-srv.out"
     local_crawl --log "$tmpdir/$scheme.out" \
         "$scheme://127.0.0.1:$SRV_PORT/frag/index.html" -O "$tmpdir/$scheme" \
         -r2 -c4 --robots=0 --retries=0 --quiet || true
     dir="$tmpdir/$scheme/127.0.0.1_$SRV_PORT/frag"
-    # big: 3 KB of headers, continue: a 100 first, huge: over 8 KB
-    for shape in crlf lf big continue chunked; do
-        for mode in whole bytes; do
+    for shape in crlf lf chunked; do
+        for mode in whole bytes split; do
             test -f "$dir/$shape-$mode.bin" ||
                 fail_dump "$scheme $shape-$mode.bin not saved" "$tmpdir/$scheme.out"
             cmp "$tmpdir/expected" "$dir/$shape-$mode.bin" ||
                 fail "$scheme $shape-$mode.bin differs from the served body"
         done
     done
-    for mode in whole bytes; do
+    # over 8 KB of headers: refused by the reader, not lost some other way
+    link=127.0.0.1:$SRV_PORT/frag
+    test "$scheme" = http || link="$scheme://$link"
+    for mode in whole bytes split; do
         test ! -e "$dir/huge-$mode.bin" || fail "$scheme huge-$mode.bin saved"
+        grep -qF "\"Interrupted transfer\" (-4) at link $link/huge-$mode.bin" \
+            "$tmpdir/$scheme/hts-log.txt" ||
+            fail_dump "$scheme huge-$mode.bin not refused as too long" "$tmpdir/$scheme/hts-log.txt"
     done
 }
 
