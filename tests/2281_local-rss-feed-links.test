@@ -1,0 +1,22 @@
+#!/bin/bash
+#
+# A feed served as application/rss+xml has its attribute links followed: the
+# enclosure url and the atom:link href. The same feed served as text/xml or
+# application/xml is generic XML and must stay unscanned.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
+    --found 'feedmime/rss-enc.mp3' --found 'feedmime/rss-href.html' \
+    --not-found 'feedmime/txt-enc.mp3' --not-found 'feedmime/txt-href.html' \
+    --not-found 'feedmime/app-enc.mp3' --not-found 'feedmime/app-href.html' \
+    --files 6 \
+    --file-matches 'feedmime/rss.feed' '<atom:link rel="self" href="rss-href\.html"/>' \
+    --file-matches 'feedmime/rss.feed' '<enclosure url="rss-enc\.mp3" type="audio/mpeg" length="4"/>' \
+    --file-matches 'feedmime/rss.feed' '<link>rss-text\.html</link>' \
+    --file-matches 'feedmime/rss.feed' '^<\?xml version="1\.0"\?>' \
+    --file-matches 'feedmime/rss.feed' '^</channel></rss>$' \
+    --file-not-matches 'feedmime/rss.feed' '(href|url)="[^"]*(://|/)' \
+    httrack 'BASEURL/feedmime/index.html'
