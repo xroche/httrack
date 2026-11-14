@@ -20,6 +20,7 @@ lists=(
     "crlf" $'\r\n' "crlf.m3u"
     "cr" $'\r' "cr.m3u"
     "ram" $'\r\n' "ram.ram"
+    "octet" $'\n' "octet.m3u8"
 )
 
 args=()
@@ -52,8 +53,8 @@ while test "$i" -lt "${#lists[@]}"; do
     args+=(--file-not-matches "$f" 'EXTM3U\.html')
 done
 
-# 7 playlists, their 21 songs and the index; a fetched # line or key.bin adds
+# 8 playlists, their 24 songs and the index; a fetched # line or key.bin adds
 # a file or a 404.
-bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 29 "${args[@]}" \
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 33 "${args[@]}" \
     --not-found 'playlistmime/c.mp3' \
     httrack 'BASEURL/playlistmime/index.html'

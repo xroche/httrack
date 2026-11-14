@@ -2854,6 +2854,7 @@ class Handler(SimpleHTTPRequestHandler):
         "crlf.m3u": ("audio/x-mpegurl", b"\r\n"),
         "cr.m3u": ("audio/x-mpegurl", b"\r"),
         "ram.ram": ("audio/x-pn-realaudio", b"\r\n"),
+        "octet.m3u8": ("application/octet-stream", b"\n"),
     }
 
     def route_playlistmime(self):

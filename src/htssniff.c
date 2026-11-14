@@ -329,7 +329,7 @@ static hts_boolean sniff_eval(sniff_op op, const unsigned char *d, size_t n,
   if (mime_in(pem_mimes, mime)) {
     SNIFF_RULE(has_text_prefix(d, n, "-----BEGIN"));
   }
-  if (strfield2("audio/x-mpegurl", mime)) {
+  if (is_playlist_mime_type(mime)) {
     SNIFF_RULE(has_text_prefix(d, n, "#EXTM3U"));
   }
   if (strfield2("text/x-vcard", mime)) {
