@@ -4038,6 +4038,70 @@ class Handler(SimpleHTTPRequestHandler):
         except OSError:
             pass
 
+    # Raw responses for the engine's header reader, in one write or one byte
+    # per write. Each body must reach disk byte for byte, so a reader that
+    # consumes past the blank line corrupts it.
+    FRAG_BODY = (
+        b"\r\n\r\nstart\r\nline\n\nlone\rCR\r\n" + bytes(range(256)) + b"\r\n\r\n"
+    )
+    FRAG_SHAPES = ("crlf", "lf", "big", "continue", "chunked", "huge")
+
+    def frag_response(self, shape):
+        body = self.FRAG_BODY
+        nl = b"\n" if shape == "lf" else b"\r\n"
+        head = [b"HTTP/1.1 200 OK", b"Content-Type: application/octet-stream"]
+        if shape in ("big", "huge"):
+            pads = 48 if shape == "big" else 160
+            head += [b"X-Pad-%03d: %s" % (i, b"p" * 60) for i in range(pads)]
+        if shape == "chunked":
+            head.append(b"Transfer-Encoding: chunked")
+            sizes, chunks, off = (1, 2, 3, 7, 64), b"", 0
+            for n in sizes:
+                chunks += b"%X\r\n" % n + body[off : off + n] + b"\r\n"
+                off += n
+            rest = body[off:]
+            chunks += b"%x\r\n" % len(rest) + rest + b"\r\n"
+            body = chunks + b"0\r\nX-Trailer: t\r\n\r\n"
+        else:
+            head.append(b"Content-Length: %d" % len(body))
+        head.append(b"Connection: close")
+        raw = nl.join(head) + nl + nl
+        if shape == "continue":
+            raw = b"HTTP/1.1 100 Continue\r\n\r\n" + raw
+        return raw if self.command == "HEAD" else raw + body
+
+    def route_frag(self):
+        name = urlsplit(self.path).path[len("/frag/") :]
+        if name == "index.html":
+            links = "".join(
+                '\t<a href="%s-%s.bin">x</a>\n' % (s, m)
+                for s in self.FRAG_SHAPES
+                for m in ("whole", "bytes")
+            )
+            self.send_html(links)
+            return
+        shape, _, mode = name.partition("-")
+        if shape not in self.FRAG_SHAPES or mode not in ("whole.bin", "bytes.bin"):
+            self.send_error(404)
+            return
+        raw = self.frag_response(shape)
+        self.close_connection = True
+        try:
+            if mode == "whole.bin":
+                self.wfile.write(raw)
+            else:
+                self.connection.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+                # about 400 pauses, whatever the size: a Windows sleep is ~15ms
+                step = max(1, len(raw) // 400)
+                for i in range(len(raw)):
+                    self.wfile.write(raw[i : i + 1])
+                    self.wfile.flush()
+                    if i % step == 0:
+                        time.sleep(0.0005)
+            self.wfile.flush()
+        except OSError:
+            pass
+
     ROUTES = {
         "/sfmark.html": route_singlefile_mark,
         "/warc100/index.html": route_warc100_index,
@@ -4637,6 +4701,9 @@ class Handler(SimpleHTTPRequestHandler):
             return True
         if path.startswith("/titleenc/"):
             self.route_titleenc()
+            return True
+        if path.startswith("/frag/"):
+            self.route_frag()
             return True
         if path.startswith("/playlistmime/"):
             self.route_playlistmime()
