@@ -66,6 +66,148 @@ def gen_entities():
     )
 
 
+def htsparse_seed(text, mode=0, bits=0, charset=0):
+    """fuzz-htsparse reads a charset, a mode and an option byte first."""
+    return bytes([charset, mode, bits]) + text.encode("utf-8")
+
+
+# fuzz-htsparse's modes[] indexes and option bits.
+HP_JS, HP_CSS, HP_RAM, HP_M3U, HP_AAM = 1, 2, 3, 4, 5
+HP_TEXT_XML, HP_APP_XML, HP_SVG, HP_OCTET = 6, 7, 8, 10
+HP_URLMODE_RELATIVE = 2  # hts_urlmode value that option bits 0 select
+HP_ROBOTS_2, HP_MIMEHTML, HP_MAKEINDEX, HP_NOJS = 0x02, 0x20, 0x40, 0x80
+
+
+def hp_urlmode(k):
+    """The option bits that select urlmode enum value k."""
+    return ((k - HP_URLMODE_RELATIVE) % 6) << 2
+
+
+def gen_htsparse_modes():
+    seeds = [
+        (
+            "mode-js.js",
+            HP_JS,
+            0,
+            'import x from "./m.js"; import("./d.js").then(f);'
+            "document.write('<a href=\"w.html\">w</a>');"
+            'var u = "img/a.png"; location.href = "next.html";',
+        ),
+        (
+            # a quoted JS string still open at the end of the buffer
+            "js-unterminated.html",
+            0,
+            0,
+            '<script> location="abc',
+        ),
+        (
+            "mode-octet-js.js",
+            HP_OCTET,
+            0,
+            "export * from '../lib/e.js'; import {a} from \"/abs/b.js\";"
+            'window.open("pop.html");',
+        ),
+        (
+            "mode-css.css",
+            HP_CSS,
+            0,
+            "@import url(\"a.css\"); @import 'b.css'; body{background:"
+            'url(bg.png)} @font-face{src:url(f.woff2) format("woff2")}',
+        ),
+        (
+            "mode-ram.ram",
+            HP_RAM,
+            0,
+            "rtsp://example.com/a.rm\nhttp://example.com/b.ra\nrel.rm\n",
+        ),
+        (
+            "mode-m3u.m3u",
+            HP_M3U,
+            0,
+            "#EXTM3U\n#EXTINF:123,Artist - Title\nsong1.mp3\n"
+            "http://example.com/s2.mp3\n../up/s3.mp3\n",
+        ),
+        (
+            "mode-aam.aam",
+            HP_AAM,
+            0,
+            "[Segments]\n 1 seg1.gif \n 2 page.html \n 3 x.unknown \n",
+        ),
+        (
+            # the longest token the dot scan accepts, to fill tmp[] in the AAM branch
+            "mode-aam-long.aam",
+            HP_AAM,
+            0,
+            " a." + "h" * 509 + " \n b" + "." * 509 + " \n",
+        ),
+        (
+            "mode-rss.xml",
+            HP_APP_XML,
+            0,
+            '<?xml version="1.0"?><rss version="2.0" xmlns:content='
+            '"http://purl.org/rss/1.0/modules/content/"><channel>'
+            "<link>http://example.com/</link><item><link>a.html</link>"
+            '<enclosure url="e.mp3"/></item></channel></rss>',
+        ),
+        (
+            "mode-xml-plain.xml",
+            HP_TEXT_XML,
+            0,
+            '<?xml version="1.0"?><root><a href="x.html"/></root>',
+        ),
+        (
+            "mode-svg.svg",
+            HP_SVG,
+            0,
+            '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink='
+            '"http://www.w3.org/1999/xlink"><image xlink:href="i.png"/>'
+            '<a href="l.html"><text>t</text></a>'
+            "<style>@import url(s.css);</style></svg>",
+        ),
+        (
+            "opt-robots-meta.html",
+            0,
+            HP_ROBOTS_2,
+            '<meta name="robots" content="noindex,nofollow">' '<a href="a.html">a</a>',
+        ),
+        (
+            "opt-mimehtml.html",
+            0,
+            HP_MIMEHTML,
+            '<img src="i.png"><a href="b/c.html">c</a><a href="/">root</a>'
+            '<a href="http://example.com/index.html">self</a>',
+        ),
+        (
+            "opt-makeindex.html",
+            0,
+            HP_MAKEINDEX,
+            "<html><head><title>  Ma page  </title></head><body>"
+            '<a href="x.html">x</a></body></html>',
+        ),
+        (
+            "opt-nojs.html",
+            0,
+            HP_NOJS,
+            "<script>document.write(\"<img src='j.png'>\")</script>"
+            "<a href=\"javascript:go('p.html')\">p</a>",
+        ),
+    ]
+    for k in range(6):
+        seeds.append(
+            (
+                "opt-urlmode-%d.html" % k,
+                0,
+                hp_urlmode(k),
+                '<a href="http://example.com/a/b.html">a</a>'
+                '<a href="../up.html">u</a><img src="//cdn.example.org/i.png">'
+                # links to recorded pages, the only ones the harness accepts
+                '<a href="/">root</a><a href="index.html#top">self</a>',
+            )
+        )
+    for name, mode, bits, text in seeds:
+        write("htsparse", name, htsparse_seed(text, mode, bits))
+
+
 def gen_htsparse():
     html = [
         (
@@ -150,7 +292,7 @@ def gen_htsparse():
         ),
     ]
     for name, text in html:
-        write("htsparse", name, text)
+        write("htsparse", name, htsparse_seed(text))
     write("singlefile", "doctype-frames.html", html[0][1])
     write("singlefile", "svg-links.html", html[4][1])
     write(
@@ -409,6 +551,7 @@ def gen_sitemap():
 def main():
     gen_entities()
     gen_htsparse()
+    gen_htsparse_modes()
     gen_url()
     gen_header()
     gen_charset()
