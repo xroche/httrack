@@ -1309,22 +1309,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
         intag_start_valid = 0;
         in_media = "AAM";       // aam
       }
-      /* Or a RSS file */
-      else if (compare_mime(opt, r->contenttype, str->url_file, "text/xml") !=
-                   0 ||
-               compare_mime(opt, r->contenttype, str->url_file,
-                            "application/xml") != 0) {
-        if (strstr(html, "http://purl.org/rss/") != NULL)        // Hmm, this is a bit lame ; will have to cleanup
-        {                       /* RSS file */
-          inscript = intag = 0;
-          intag_start_valid = 0;
-          in_media = NULL;      // regular XML
-        } else {                // cancel: write all
-          html = r->adr + r->size;
-          HT_add_adr;
-          lastsaved = html;
-        }
-      }
 
       // Hack to prevent any problems with ram files of other files
       *(r->adr + r->size) = '\0';
