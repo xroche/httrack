@@ -60,14 +60,14 @@ typedef struct mock_host {
   int naddr;
   mock_addr addr[6];
   int calls;   /* times the backend resolved this host */
-  int slow_ms; /* non-zero: block this long, as a black-hole resolver would */
+  int slow_ms; /* block this long, or until the gate opens if MOCK_GATED */
 } mock_host;
 
-/* How long a slow host takes to answer. Only lower bounds are checked
-   against it, because a loaded build host can stall a thread for seconds. */
+/* A loaded build host can stall a thread for seconds, so this only bounds
+   waits from below. */
 #define MOCK_SLOW_MS 3000
-/* A gated host answers only after mock_open_gate(), or after MOCK_GATE_MAX_MS
-   so that a resolve which fails to give up fails the test rather than hangs. */
+/* A gated host answers on mock_open_gate(). It gives up after MOCK_GATE_MAX_MS,
+   so a resolve that never returns fails the test instead of hanging it. */
 #define MOCK_GATED (-1)
 #define MOCK_GATE_MAX_MS 20000
 
@@ -107,7 +107,7 @@ static mock_host mock_hosts[] = {
     {"dead.test", EAI_NONAME, 0, {{0}}, 0},
     /* the same outage, seen across a backward clock step */
     {"stepped.test", EAI_AGAIN, 1, {{AF_INET, {192, 0, 2, 8}}}, 0},
-    /* resolves, but only once the test is done with it: the #606 wedge */
+    /* answers only when the gate opens: the #606 wedge */
     {"slow.test", 0, 1, {{AF_INET, {127, 0, 0, 9}}}, 0, MOCK_GATED},
     /* a second one, so a cancelled resolve cannot cache an answer the next
        case then reads instead of asking for */
@@ -173,7 +173,6 @@ static void mock_open_gate(void) {
   hts_mutexrelease(&mock_lock);
 }
 
-/* Block until mock_open_gate() or MOCK_GATE_MAX_MS, whichever comes first. */
 static void mock_wait_gate(void) {
   const TStamp give_up = mtime_monotonic() + MOCK_GATE_MAX_MS;
 
@@ -190,8 +189,8 @@ static void mock_wait_gate(void) {
 }
 
 /* Wait for n uses of the backend to be over, ordering their writes against
-   ours: what makes installing another backend safe. False when they are not
-   over by MOCK_GATE_MAX_MS, which a failed check upstream can cause. */
+   ours: what makes installing another backend safe. Returns false after
+   MOCK_GATE_MAX_MS, which only a failed check can cause. */
 static hts_boolean mock_wait_released(int n) {
   const TStamp give_up = mtime_monotonic() + MOCK_GATE_MAX_MS;
 
@@ -648,17 +647,17 @@ static void lock_probe_thread(void *arg) {
 
   Sleep(MOCK_SLOW_MS / 10); /* let the resolve get under way first */
   (void) hts_has_stopped(p->opt);
-  hts_store_release_int(&p->got_lock, HTS_TRUE); /* p is not touched after */
+  hts_store_release_int(&p->got_lock, HTS_TRUE); /* last access to p */
 }
 
 /* Drive a deliberately slow (mock) resolver, asserting that a resolve is
    bounded by opt->timeout, does not hold opt->state.lock while it runs, and
-   does not cache a timeout as an answer (#606). Takes a few seconds.
+   does not cache a timeout as an answer (#606). Takes about 8 seconds.
    Returns the number of failed checks (0 == success). */
 static int dns_timeout_selftests(httrackp *opt) {
   SOCaddr addrs[HTS_MAXADDRNUM];
   const char *err = NULL;
-  lock_probe probe;
+  static lock_probe probe; /* outlives this call if the probe is late */
   TStamp start, elapsed;
   int count, finished;
 
@@ -686,15 +685,26 @@ static int dns_timeout_selftests(httrackp *opt) {
   CHECK(count == 0);
   CHECK(mock_read_calls("slow.test") == 2); /* re-resolved, not cached */
 
-  /* state.lock is not held across the resolve: a concurrent stop query, which
-     the mirror API promises stays live, gets it and cancels this unbounded
-     resolve. Held, the gate's give-up answers instead. */
+  /* A stop query, which the mirror API keeps live, takes state.lock and cancels
+     this unbounded resolve. If the resolve held the lock, the gate would answer
+     instead. */
   memset(&probe, 0, sizeof(probe));
   probe.opt = opt;
   CHECK(hts_newthread(lock_probe_thread, &probe) == 0);
   count = hts_dns_resolve_all_bounded(opt, "slow.test", addrs, HTS_MAXADDRNUM,
                                       0, &probe.got_lock, &err);
   CHECK(count == 0);
+  {
+    const TStamp give_up = mtime_monotonic() + MOCK_GATE_MAX_MS;
+
+    /* the probe reads opt->state.stop, which a later case writes */
+    while (!hts_load_acquire_int(&probe.got_lock) &&
+           mtime_monotonic() < give_up)
+      Sleep(10);
+    CHECK(hts_load_acquire_int(&probe.got_lock));
+    if (failures != 0)
+      return failures;
+  }
 
   /* A raised cancel flag ends the wait where no deadline would, which is what
      lets a stopped FTP worker leave a black-holed resolver (#1059). */
@@ -737,8 +747,8 @@ static int dns_timeout_selftests(httrackp *opt) {
     CHECK(count == 0);
   }
 
-  /* Five of the seven resolves were abandoned mid-backend; wait for their
-     workers to be out of it, freed answer included, before swapping it. */
+  /* Seven resolves reached the backend: slow.test four times, slow2-4 once
+     each. Wait for all of them to leave it before swapping it. */
   mock_open_gate();
   CHECK(mock_wait_released(7));
   if (failures != 0)
@@ -757,10 +767,12 @@ static int dns_timeout_selftests(httrackp *opt) {
     count = hts_dns_resolve_all_bounded(opt, "cut.test", addrs, HTS_MAXADDRNUM,
                                         MOCK_GATE_MAX_MS / 1000, &cancel, &err);
     elapsed = mtime_monotonic() - start;
-    hts_set_thread_runner(NULL);
     /* the cut worker longjmps out of the backend after freeing its answer, so
-       it too has to be out before the swap below */
+       it too has to be out before the swaps below */
     CHECK(mock_wait_released(1));
+    if (failures != 0)
+      return failures;
+    hts_set_thread_runner(NULL);
     hts_dns_set_resolver_backend(&mock_backend);
     CHECK(count == 0);
     /* the tail answered, not the deadline */
