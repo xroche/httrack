@@ -7,5 +7,5 @@ set -e
 : "${top_srcdir:=..}"
 
 bash "$top_srcdir/tests/local-crawl.sh" \
-    --log-found 'File has moved from .*/cidloc/go\.html' \
+    --file-matches 'cidloc/go.html' 'URL=cid:127-2e0-2e0-2e1-3a' \
     httrack -%M -%N0 'BASEURL/cidloc/index.html'

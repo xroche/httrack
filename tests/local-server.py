@@ -2866,7 +2866,7 @@ class Handler(SimpleHTTPRequestHandler):
     def route_cidloc_go(self):
         base = "http://127.0.0.1:%d/cidloc/" % self.server.server_address[1]
         self.send_response(301, "Moved Permanently")
-        self.send_header("Location", base + "target.html?q=" + "&" * 950)
+        self.send_header("Location", base + "target.html?q=" + "&" * 1100)
         self.send_header("Content-Length", "0")
         self.end_headers()
 

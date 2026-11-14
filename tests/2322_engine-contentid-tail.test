@@ -1,0 +1,9 @@
+#!/bin/bash
+# make_content_id() clips cleanly at every capacity, including a remainder of
+# sizeof(void *) for the file part, which the size check took for a bug.
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+assert_selftest 'contentid-tail: OK' contentid-tail
