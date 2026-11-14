@@ -131,14 +131,9 @@ static void resp_cleanup(void) {
 }
 
 static int resp_setup(void) {
-  const char *const tmp = getenv("TMPDIR");
-
-  snprintf(resp_dir, sizeof(resp_dir), "%s/fuzz-response-XXXXXX",
-           tmp != NULL && *tmp != '\0' ? tmp : "/tmp");
-  if (mkdtemp(resp_dir) == NULL)
-    return -1;
-  atexit(resp_cleanup);
-  return 0;
+  return fuzz_tmpdir(resp_dir, sizeof(resp_dir), "fuzz-response", resp_cleanup)
+             ? 0
+             : -1;
 }
 
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {

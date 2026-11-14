@@ -3396,6 +3396,44 @@ class Handler(SimpleHTTPRequestHandler):
         time.sleep(self.SLOWHEAD_SECONDS)
         self.send_raw(b"s" * 4096, "application/octet-stream")
 
+    # Repeated Content-Length fields: each file sends DUPCL_BODY under the
+    # header values listed. Values that disagree must drop the response.
+    DUPCL_BODY = b"0123456789abcdef"
+    DUPCL_FILES = {
+        "same.bin": ("16", "16"),
+        "list.bin": ("16, 16",),
+        "differ.bin": ("16", "8"),
+        "differ-list.bin": ("16, 8",),
+        "gap.bin": ("16,,8",),
+        "long.bin": ("16", "8" + " " * 2100),
+        # an interim 100 whose own lengths disagree frames nothing
+        "continue.bin": ("16",),
+    }
+
+    def route_dupcl_index(self):
+        self.send_html(
+            "".join('<a href="%s">%s</a>\n' % (n, n) for n in self.DUPCL_FILES)
+        )
+
+    def route_dupcl_file(self):
+        name = self.path.rsplit("/", 1)[1]
+        lengths = self.DUPCL_FILES[name]
+        self.close_connection = True
+        head = b""
+        if name == "continue.bin":
+            head = b"HTTP/1.1 100 Continue\r\nContent-Length: 8\r\n"
+            head += b"Content-Length: 9\r\n\r\n"
+        head += b"HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\n"
+        for value in lengths:
+            head += b"Content-Length: %s\r\n" % value.encode()
+        try:
+            self.wfile.write(head + b"Connection: close\r\n\r\n")
+            if self.command != "HEAD":
+                self.wfile.write(self.DUPCL_BODY)
+            self.wfile.flush()
+        except OSError:
+            pass
+
     # -M under a slow server (#77): p0 is a fast 640KB file that alone overruns
     # -M; p1..p3 trickle for a minute. The cap must abort those in-flight
     # transfers, not wait them out.
@@ -4110,7 +4148,61 @@ class Handler(SimpleHTTPRequestHandler):
         except OSError:
             pass
 
+    # A NUL inside a response header (RFC 9110 5.5) must drop the response.
+    # Each file is (status line, header lines, body); a None status line sends
+    # the body alone, as a server that answers without headers does.
+    NULHDR_BODY = b"0123456789abcdef"
+    NULHDR_OK = b"HTTP/1.1 200 OK"
+    NULHDR_FILES = {
+        "clean.bin": (NULHDR_OK, (b"Set-Cookie: good=1; Path=/",), NULHDR_BODY),
+        "body-nul.bin": (NULHDR_OK, (), b"\0" * 16),
+        "in-list.bin": (NULHDR_OK, (b"Content-Length: 16\0, 8",), NULHDR_BODY),
+        "ends-block.bin": (
+            NULHDR_OK,
+            (b"Content-Length: 16\0", b"Content-Length: 8"),
+            NULHDR_BODY,
+        ),
+        "cookie.bin": (
+            NULHDR_OK,
+            (b"Set-Cookie: nulcookie=1; Path=/", b"X-Pad: a\0b"),
+            NULHDR_BODY,
+        ),
+        "status.bin": (b"HTTP/1.1 200 OK\0junk", (), NULHDR_BODY),
+        "bare.html": (None, (), b"<html><body>bare-ok\0x</body></html>\n\n"),
+    }
+
+    def route_nulhdr_index(self):
+        self.send_html(
+            "".join('<a href="%s">%s</a>\n' % (n, n) for n in self.NULHDR_FILES)
+        )
+
+    def route_nulhdr_file(self):
+        status, lines, body = self.NULHDR_FILES[self.path.rsplit("/", 1)[1]]
+        self.close_connection = True
+        head = b""
+        if status is not None:
+            head = status + b"\r\nContent-Type: application/octet-stream\r\n"
+            if not any(line.startswith(b"Content-Length:") for line in lines):
+                head += b"Content-Length: %d\r\n" % len(body)
+            head += b"".join(line + b"\r\n" for line in lines)
+            head += b"Connection: close\r\n\r\n"
+        try:
+            self.wfile.write(head)
+            if self.command != "HEAD":
+                self.wfile.write(body)
+            self.wfile.flush()
+        except OSError:
+            pass
+
     ROUTES = {
+        "/nulhdr/index.html": route_nulhdr_index,
+        "/nulhdr/clean.bin": route_nulhdr_file,
+        "/nulhdr/in-list.bin": route_nulhdr_file,
+        "/nulhdr/ends-block.bin": route_nulhdr_file,
+        "/nulhdr/body-nul.bin": route_nulhdr_file,
+        "/nulhdr/cookie.bin": route_nulhdr_file,
+        "/nulhdr/status.bin": route_nulhdr_file,
+        "/nulhdr/bare.html": route_nulhdr_file,
         "/sfmark.html": route_singlefile_mark,
         "/warc100/index.html": route_warc100_index,
         "/warc100/interim.html": route_warc100_interim,
@@ -4400,6 +4492,14 @@ class Handler(SimpleHTTPRequestHandler):
         "/bigfiles/p5.bin": route_bigfile,
         "/bigfiles/p6.bin": route_bigfile,
         "/bigfiles/p7.bin": route_bigfile,
+        "/dupcl/index.html": route_dupcl_index,
+        "/dupcl/same.bin": route_dupcl_file,
+        "/dupcl/list.bin": route_dupcl_file,
+        "/dupcl/differ.bin": route_dupcl_file,
+        "/dupcl/differ-list.bin": route_dupcl_file,
+        "/dupcl/gap.bin": route_dupcl_file,
+        "/dupcl/long.bin": route_dupcl_file,
+        "/dupcl/continue.bin": route_dupcl_file,
         "/slowhead/index.html": route_bigfiles_index,
         "/slowhead/p0.bin": route_slowhead_page,
         "/slowhead/p1.bin": route_slowhead_page,

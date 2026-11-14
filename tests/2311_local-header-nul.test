@@ -1,0 +1,22 @@
+#!/bin/bash
+#
+# RFC 9110 5.5: a NUL byte in a response header drops the response.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+bash "$top_srcdir/tests/local-crawl.sh" \
+    --file-bytes 'nulhdr/clean.bin' 16 \
+    --file-bytes 'nulhdr/body-nul.bin' 16 \
+    --file-matches 'nulhdr/bare.html' 'bare-ok' \
+    --file-matches '../cookies.txt' 'good' \
+    --file-not-matches '../cookies.txt' 'nulcookie' \
+    --not-found 'nulhdr/in-list.bin' --not-found 'nulhdr/ends-block.bin' \
+    --not-found 'nulhdr/cookie.bin' --not-found 'nulhdr/status.bin' \
+    --log-found 'NUL byte in response header, response dropped: .*/nulhdr/in-list\.bin' \
+    --log-found 'NUL byte in response header, response dropped: .*/nulhdr/ends-block\.bin' \
+    --log-found 'NUL byte in response header, response dropped: .*/nulhdr/cookie\.bin' \
+    --log-found 'NUL byte in response header, response dropped: .*/nulhdr/status\.bin' \
+    --errors 4 \
+    httrack 'BASEURL/nulhdr/index.html'

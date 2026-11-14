@@ -393,6 +393,12 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
                    const char *fil, htsblk *retour, char *rcvd);
 void treatfirstline(htsblk * retour, const char *rcvd);
 
+/* Does Content-Length value s, a list such as "42, 42", agree with itself and
+   with *seen, the length an earlier field gave (-1 if none)? Stores the length
+   in *seen, or -2 for a signed or oversized one. Text that is no number is
+   skipped. */
+hts_boolean hts_content_length_agrees(const char *s, LLint *seen);
+
 /* The three-digit HTTP status code at s, or -1 when s does not start with
    exactly three digits. */
 int hts_status_code(const char *s);

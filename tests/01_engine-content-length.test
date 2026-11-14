@@ -1,0 +1,8 @@
+#!/bin/bash
+# Repeated Content-Length values must agree, or the response is dropped.
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+assert_selftest "content-length: OK" content-length
