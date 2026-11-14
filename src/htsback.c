@@ -4108,9 +4108,9 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                   back[i].url_fil);
                     back_slot_close_fail(opt, sback, i, STATUSCODE_INVALID,
                                          "NUL byte in response header");
-                    /* Hack for zero-length headers */
                   } else if (back_status(&back[i]) != 0 &&
                              back[i].r.adr[0] != '<') {
+                    /* Hack for zero-length headers */
                     // ----------------------------------------
                     /* parse the header, status line first */
                     binput_line(back[i].r.adr + ptr,
