@@ -1180,6 +1180,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
       int back_add_stats = opt->state.back_add_stats;
 
       const char *in_media = NULL;    // in other media type (real media and so..)
+      const char *lnk_comment_end = NULL; // end of a "#" line in a link list
       int intag = 0;            // on est dans un tag
       int incomment = 0;        // dans un <!--
       const char *comment_close = NULL;         // cached "-->" at or after html
@@ -1295,8 +1296,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
         in_media = "LNK";       // real media! -> links
       }
       /* Or a m3u playlist */
-      else if (compare_mime(opt, r->contenttype, str->url_file,
-                            "audio/x-mpegurl") != 0) { /* mp3 link file */
+      else if (is_playlist_mime(opt, r->contenttype, str->url_file) != 0) {
         inscript = intag = 0;
         inscript_name = "media";
         intag_start_valid = 0;
@@ -1739,10 +1739,23 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
           int add_class_dots_to_patch = 0;      // number of '.' in code="x.y.z<realname>"
           const char *p_flush = NULL;
 
+          /* A playlist line starting with '#' is a comment or a directive. */
+          if (in_media != NULL && strcmp(in_media, "LNK") == 0 &&
+              *html == '#' &&
+              (html == r->adr || html[-1] == '\n' || html[-1] == '\r')) {
+            const char *const eol = strchr(html, '\n');
+
+            lnk_comment_end = eol != NULL ? eol : r->adr + r->size;
+          }
+
           // ------------------------------------------------------------
           // parsing évolé
           // ------------------------------------------------------------
-          if (((isalpha((unsigned char) *html)) || (*html == '/') || (inscript) || (in_media) || (inscriptgen))) {        // sinon pas la peine de tester..
+          if (lnk_comment_end != NULL && html < lnk_comment_end) {
+            // inside a playlist comment line: no link to look for
+          } else if (((isalpha((unsigned char) *html)) || (*html == '/') ||
+                      (inscript) || (in_media) ||
+                      (inscriptgen))) { // sinon pas la peine de tester..
 
             /* caractère de terminaison pour "miniparsing" javascript=.. ? 
                (ex: <a href="javascript:()" action="foo"> ) */

@@ -1,0 +1,14 @@
+#!/bin/bash
+#
+# An m3u playlist is followed under every content type servers send for it.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 9 \
+    --found 'playlistmime/xmpegurl.mp3' \
+    --found 'playlistmime/mpegurl.mp3' \
+    --found 'playlistmime/appxmpegurl.mp3' \
+    --found 'playlistmime/hls.mp3' \
+    httrack 'BASEURL/playlistmime/index.html'

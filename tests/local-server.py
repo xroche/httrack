@@ -2845,6 +2845,22 @@ class Handler(SimpleHTTPRequestHandler):
     def route_bigm3u_song(self):
         self.send_raw(b"ID3", "audio/mpeg")
 
+    # One playlist per m3u content type, each naming its own song.
+    PLAYLIST_MIMES = {
+        "xmpegurl.m3u": "audio/x-mpegurl",
+        "mpegurl.m3u": "audio/mpegurl",
+        "appxmpegurl.m3u": "application/x-mpegurl",
+        "hls.m3u8": "application/vnd.apple.mpegurl",
+    }
+
+    def route_playlistmime_index(self):
+        self.send_html("".join('<a href="%s">p</a>\n' % n for n in self.PLAYLIST_MIMES))
+
+    def route_playlistmime_list(self):
+        name = self.path.split("?")[0].rsplit("/", 1)[-1]
+        song = name.split(".")[0] + ".mp3"
+        self.send_raw(b"#EXTM3U\n" + song.encode() + b"\n", self.PLAYLIST_MIMES[name])
+
     # a long header httrack never parses, like the one algolia.com sends
     LONGCSP = ("Content-Security-Policy-Report-Only", "script-src " + "a" * 4800)
 
@@ -4285,6 +4301,15 @@ class Handler(SimpleHTTPRequestHandler):
         "/bigm3u/index.html": route_bigm3u_index,
         "/bigm3u/list.m3u": route_bigm3u_list,
         "/bigm3u/song.mp3": route_bigm3u_song,
+        "/playlistmime/index.html": route_playlistmime_index,
+        "/playlistmime/xmpegurl.m3u": route_playlistmime_list,
+        "/playlistmime/mpegurl.m3u": route_playlistmime_list,
+        "/playlistmime/appxmpegurl.m3u": route_playlistmime_list,
+        "/playlistmime/hls.m3u8": route_playlistmime_list,
+        "/playlistmime/xmpegurl.mp3": route_bigm3u_song,
+        "/playlistmime/mpegurl.mp3": route_bigm3u_song,
+        "/playlistmime/appxmpegurl.mp3": route_bigm3u_song,
+        "/playlistmime/hls.mp3": route_bigm3u_song,
         "/longcsp/index.html": route_longcsp_index,
         "/longcsp/page.html": route_longcsp_page,
         "/longloc/index.html": route_longloc_index,

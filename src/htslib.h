@@ -903,12 +903,15 @@ HTS_STATIC int strcmpnocase(const char *a, const char *b) {
    (strfield2((a), "image/svg-xml") !=                                         \
     0) /*|| (strfield2((a),"audio/x-pn-realaudio")!=0) */                      \
    || (strfield2((a), "application/x-authorware-map") != 0))
-#define may_be_hypertext_mime__(a) \
-   (\
-     (strfield2((a),"audio/x-pn-realaudio")!=0) \
-     || (strfield2((a),"audio/x-mpegurl")!=0) \
-     /*|| (strfield2((a),"text/xml")!=0) || (strfield2((a),"application/xml")!=0) : TODO: content check */ \
-  )
+/* Every spelling servers use for an m3u playlist, HLS's included. */
+#define is_playlist_mime_type(a)                                               \
+  ((strfield2((a), "audio/x-mpegurl") != 0) ||                                 \
+   (strfield2((a), "audio/mpegurl") != 0) ||                                   \
+   (strfield2((a), "application/x-mpegurl") != 0) ||                           \
+   (strfield2((a), "application/vnd.apple.mpegurl") != 0))
+/* TODO: text/xml and application/xml, once their content is checked. */
+#define may_be_hypertext_mime__(a)                                             \
+  ((strfield2((a), "audio/x-pn-realaudio") != 0) || is_playlist_mime_type(a))
 
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
@@ -941,6 +944,22 @@ HTS_STATIC int is_javascript_mime(httrackp *opt, const char *mime,
     if (!guess_httptype_sized(opt, guessed, sizeof(guessed), file))
       return 0;
     return is_javascript_mime_type(guessed);
+  }
+  return 0;
+}
+
+// check if (mime, file) is an m3u playlist, guessing from the extension
+HTS_STATIC int is_playlist_mime(httrackp *opt, const char *mime,
+                                const char *file) {
+  if (is_playlist_mime_type(mime))
+    return 1;
+  if (file != NULL && file[0] != '\0' && may_unknown(opt, mime)) {
+    char guessed[256];
+
+    guessed[0] = '\0';
+    if (!guess_httptype_sized(opt, guessed, sizeof(guessed), file))
+      return 0;
+    return is_playlist_mime_type(guessed);
   }
   return 0;
 }
