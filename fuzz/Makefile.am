@@ -9,6 +9,7 @@ noinst_PROGRAMS = fuzz-charset fuzz-codepage fuzz-meta fuzz-idna fuzz-entities \
 	fuzz-warc \
 	fuzz-codec \
 	fuzz-response \
+	fuzz-socks5 \
 	fuzz-ftp
 endif
 
@@ -70,6 +71,9 @@ fuzz_codec_SOURCES = fuzz-codec.c fuzz.h
 
 # The HTTP receive path: back_wait() reading a response off a socketpair.
 fuzz_response_SOURCES = fuzz-response.c fuzz.h
+
+# The SOCKS5 client handshake against a scripted, hostile proxy reply.
+fuzz_socks5_SOURCES = fuzz-socks5.c fuzz.h
 
 # The FTP control channel: get_ftp_line() over a socketpair, then the reply parsers.
 fuzz_ftp_SOURCES = fuzz-ftp.c fuzz.h

@@ -24,6 +24,8 @@ Run one target by hand: `fuzz/fuzz-url -max_total_time=300 corpusdir fuzz/corpus
 
 `fuzz-response` drives `back_wait()` over a socketpair, so it covers the header block, chunked framing and the content decoders without a network. Its first byte is option bits (see `fuzz-response.c`), its second picks the file name and the size of a partial file to resume, and its third cuts the response into pieces that arrive one read at a time. Disk options use a temp dir under `$TMPDIR`.
 
+`fuzz-socks5` replays a hostile proxy reply into the SOCKS5 client handshake. Its input is the origin address, a newline, the proxy URL, a newline, then the bytes the proxy sends back.
+
 `fuzz-ftp` feeds its input to `get_ftp_line()` over a socketpair and runs each reply line through the PASV, EPSV, SIZE and MDTM parsers. The same bytes, read as a URL, go through the user, host and command splitters. Its first byte sets the reply buffer size: odd is the 1024 bytes every caller passes, even is a short buffer.
 
 OSS-Fuzz builds these harnesses with `oss-fuzz-build.sh`, so a new harness needs only a `Makefile.am` entry and a `corpus/<target>/` directory. The script links each harness with `$LIB_FUZZING_ENGINE`. When it is set, `configure` uses it in place of `-fsanitize=fuzzer`.

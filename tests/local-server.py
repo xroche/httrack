@@ -4076,7 +4076,61 @@ class Handler(SimpleHTTPRequestHandler):
         except OSError:
             pass
 
+    # A NUL inside a response header (RFC 9110 5.5) must drop the response.
+    # Each file is (status line, header lines, body); a None status line sends
+    # the body alone, as a server that answers without headers does.
+    NULHDR_BODY = b"0123456789abcdef"
+    NULHDR_OK = b"HTTP/1.1 200 OK"
+    NULHDR_FILES = {
+        "clean.bin": (NULHDR_OK, (b"Set-Cookie: good=1; Path=/",), NULHDR_BODY),
+        "body-nul.bin": (NULHDR_OK, (), b"\0" * 16),
+        "in-list.bin": (NULHDR_OK, (b"Content-Length: 16\0, 8",), NULHDR_BODY),
+        "ends-block.bin": (
+            NULHDR_OK,
+            (b"Content-Length: 16\0", b"Content-Length: 8"),
+            NULHDR_BODY,
+        ),
+        "cookie.bin": (
+            NULHDR_OK,
+            (b"Set-Cookie: nulcookie=1; Path=/", b"X-Pad: a\0b"),
+            NULHDR_BODY,
+        ),
+        "status.bin": (b"HTTP/1.1 200 OK\0junk", (), NULHDR_BODY),
+        "bare.html": (None, (), b"<html><body>bare-ok\0x</body></html>\n\n"),
+    }
+
+    def route_nulhdr_index(self):
+        self.send_html(
+            "".join('<a href="%s">%s</a>\n' % (n, n) for n in self.NULHDR_FILES)
+        )
+
+    def route_nulhdr_file(self):
+        status, lines, body = self.NULHDR_FILES[self.path.rsplit("/", 1)[1]]
+        self.close_connection = True
+        head = b""
+        if status is not None:
+            head = status + b"\r\nContent-Type: application/octet-stream\r\n"
+            if not any(line.startswith(b"Content-Length:") for line in lines):
+                head += b"Content-Length: %d\r\n" % len(body)
+            head += b"".join(line + b"\r\n" for line in lines)
+            head += b"Connection: close\r\n\r\n"
+        try:
+            self.wfile.write(head)
+            if self.command != "HEAD":
+                self.wfile.write(body)
+            self.wfile.flush()
+        except OSError:
+            pass
+
     ROUTES = {
+        "/nulhdr/index.html": route_nulhdr_index,
+        "/nulhdr/clean.bin": route_nulhdr_file,
+        "/nulhdr/in-list.bin": route_nulhdr_file,
+        "/nulhdr/ends-block.bin": route_nulhdr_file,
+        "/nulhdr/body-nul.bin": route_nulhdr_file,
+        "/nulhdr/cookie.bin": route_nulhdr_file,
+        "/nulhdr/status.bin": route_nulhdr_file,
+        "/nulhdr/bare.html": route_nulhdr_file,
         "/sfmark.html": route_singlefile_mark,
         "/warc100/index.html": route_warc100_index,
         "/warc100/interim.html": route_warc100_interim,
