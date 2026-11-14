@@ -275,7 +275,8 @@ wedge_leg >"$tmp/wedge.log" 2>&1 || fail_dump "the wedge leg failed" "$tmp/wedge
 
 # A sleep still holding the step's stdout keeps its reader waiting for EOF past the
 # trap that killed the heartbeat (#949); 171 shims sleep, forks nothing, is blind to it.
-fd_tick=15
+# The cap: a leaked sleep holds the pipe ~28s, and a starved host gets half for its EOF.
+fd_tick=30
 fd_kill=$tmp/fd-killed
 
 # Seconds between the producer's own kill and the reader seeing EOF.
@@ -311,7 +312,7 @@ test "$lat" -ge 3 || fail "EOF ${lat}s after a child kept the pipe: the reader c
 lat=$(eof_latency fd_leg)
 test ! -e "$tmp/fd-dead" ||
     fail "the heartbeat was already dead at the kill, so a prompt EOF proves nothing"
-test "$lat" -le 4 ||
+test "$lat" -lt $((fd_tick / 2)) ||
     fail "EOF ${lat}s after the heartbeat died: its sleep inherited the caller's stdout"
 
 # A driver that dies without running its EXIT trap orphans the watchdog, which
