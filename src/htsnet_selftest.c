@@ -516,6 +516,16 @@ static uint64_t st_xfread_digest(T_SOC sv[2], const char *stream, int len,
   int n;
 
   assertf(send(sv[0], stream, len, 0) == len);
+  /* macOS loopback delivers asynchronously, and the reads below never wait */
+  if (len > 0) {
+    char *seen = malloct((size_t) len);
+    const time_t deadline = time(NULL) + 10;
+
+    assertf(seen != NULL);
+    while ((n = (int) recv(sv[1], seen, len, MSG_PEEK)) < len)
+      assertf(n > 0 && time(NULL) < deadline);
+    freet(seen);
+  }
   hts_init_htsblk(&r);
   r.soc = sv[1];
   while (check_readinput(&r)) {
