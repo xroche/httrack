@@ -426,15 +426,73 @@ hts_boolean url_query_value(const char *url, const char *name, char *dst,
   return HTS_TRUE;
 }
 
-/* Append tail to save (capacity size), cutting save first so the tail fits:
-   the path cap below shortens the name anyway, and the tail must survive. */
-static void save_append_tail(char *save, size_t size, const char *tail) {
-  const size_t tail_len = strlen(tail);
-  const size_t room = size - 1 - tail_len;
+/* Drop excess bytes off the longest directory segments of save[0..dir_len). */
+static size_t save_trim_dirs(char *save, size_t dir_len, size_t excess) {
+  while (excess > 0) {
+    size_t i, start = 0, best = 0, best_len = 0, cut;
 
-  assertf(tail_len < size);
-  if (strlen(save) > room)
-    save[room] = '\0';
+    for (i = 0; i <= dir_len; i++) {
+      if (i == dir_len || save[i] == '/') {
+        if (i - start > best_len) {
+          best = start;
+          best_len = i - start;
+        }
+        start = i + 1;
+      }
+    }
+    if (best_len <= 1)
+      break;
+    cut = utf8_cut(save + best, best_len > excess ? best_len - excess : 1);
+    if (cut == 0)
+      cut = 1;
+    while (cut < best_len && ((unsigned char) save[best + cut] & 0xC0) == 0x80)
+      cut++;
+    if (cut >= best_len)
+      break;
+    memmove(save + best + cut, save + best + best_len,
+            strlen(save + best + best_len) + 1);
+    dir_len -= best_len - cut;
+    excess -= excess < best_len - cut ? excess : best_len - cut;
+  }
+  return dir_len;
+}
+
+/* Append tail to save (capacity size), shortening the name to make room. */
+static void save_append_tail(char *save, size_t size, const char *tail) {
+  size_t tail_len, room, len;
+
+  assertf(strlen(tail) < size);
+  tail_len = strlen(tail);
+  room = size - 1 - tail_len;
+  {
+    const char *const slash = strrchr(save, '/');
+
+    /* a nameless ".tail" would be a dotfile: give it the default page stem */
+    if (tail[0] == '.' && (slash != NULL ? slash[1] : save[0]) == '\0')
+      save_append_tail(save, size - tail_len, "index");
+  }
+  len = strlen(save);
+  if (len > room) {
+    const char *const slash = strrchr(save, '/');
+    const size_t dir_len = slash != NULL ? (size_t) (slash - save) + 1 : 0;
+    /* a tail starting with a dot needs one name byte, or it makes a dotfile */
+    size_t keep = tail[0] == '.' && len > dir_len ? 1 : 0;
+
+    while (keep > 0 && dir_len + keep < len &&
+           ((unsigned char) save[dir_len + keep] & 0xC0) == 0x80)
+      keep++;
+    if (dir_len + keep <= room && utf8_cut(save, room) >= dir_len + keep) {
+      save[utf8_cut(save, room)] = '\0';
+    } else {
+      /* the directory alone fills save[]: shorten its longest segments */
+      size_t new_dir;
+
+      save[dir_len + keep] = '\0';
+      new_dir = save_trim_dirs(save, dir_len, dir_len + keep - room);
+      if (new_dir + keep > room)
+        save[utf8_cut(save, room)] = '\0';
+    }
+  }
   strlcatbuff(save, tail, size);
 }
 
@@ -1512,8 +1570,8 @@ int url_savename(lien_adrfilsave *const afs,
           a--;
         if (*a != '.')
           strcatbuff(afs->save, "other");
-        else
-          strcatbuff(afs->save, a + 1);
+        else /* an extension off the wire, clipped to leave room for the "/" */
+          url_savename_addstr(afs->save, sizeof(afs->save) - 1, a + 1);
         strcatbuff(afs->save, "/");
       }
         /*strcatbuff(save,a); */
@@ -1552,7 +1610,7 @@ int url_savename(lien_adrfilsave *const afs,
         while((a > fil) && (*a != '/') && (*a != '.'))
           a--;
         if (*a == '.') {
-          strcatbuff(afs->save, a);  // ajouter
+          save_append_tail(afs->save, sizeof(afs->save), a);
         }
       }
       break;
@@ -1567,7 +1625,7 @@ int url_savename(lien_adrfilsave *const afs,
     hts_lowcase(afs->save);
 
     if (hts_lastchar(afs->save) == '/')
-      strcatbuff(afs->save, DEFAULT_HTML);   // nommer page par défaut!!
+      save_append_tail(afs->save, sizeof(afs->save), DEFAULT_HTML);
   }
 
   // Without an extension, force .html (not used for delayed types)
@@ -1578,7 +1636,7 @@ int url_savename(lien_adrfilsave *const afs,
 
     while((a > afs->save) && (*a != '.') && (*a != '/'))
       a--;
-    if (*a != '.') {                         // agh pas de point
+    if (*a != '.') { // no extension
       save_append_tail(afs->save, sizeof(afs->save), ".html");
       hts_log_print(opt, LOG_DEBUG, "Default HTML type set for %s%s => %s",
                     adr_nologin(opt, adr_complete), fil_complete, afs->save);
@@ -1973,30 +2031,43 @@ void standard_name(char *b, size_t bsize, const char *dot_pos,
   char md5[32 + 2];
   htsbuff bb = htsbuff_ptr(b, bsize);
   const size_t room = bsize - 1;
-  const size_t md5_len = strnlen(url_md5(md5, fil), 4);
-  const size_t ext_len = dot_pos == NULL ? 0
-                                         : (short_ver ? strnlen(dot_pos + 1, 3)
-                                                      : strlen(dot_pos + 1));
-  const size_t tail = md5_len + (dot_pos != NULL ? 1 + ext_len : 0);
+  size_t md5_len = strnlen(url_md5(md5, fil), 4);
+  size_t ext_len = dot_pos == NULL ? 0
+                                   : (short_ver ? strnlen(dot_pos + 1, 3)
+                                                : strlen(dot_pos + 1));
   size_t name_len;
+  hts_boolean has_ext = dot_pos != NULL ? HTS_TRUE : HTS_FALSE;
 
   if (dot_pos != NULL)
     name_len = short_ver ? (size_t) min(dot_pos - nom_pos, 8)
                          : (size_t) (dot_pos - nom_pos);
   else
     name_len = short_ver ? strnlen(nom_pos, 8) : strlen(nom_pos);
-  /* a name off the wire is clipped so the md5 and extension still fit */
-  if (tail > room)
-    name_len = 0;
-  else if (name_len > room - tail)
-    name_len = room - tail;
+  /* too long: drop the extension, then the md5, but keep one name byte */
+  if (name_len + md5_len + (has_ext ? 1 + ext_len : 0) > room) {
+    const size_t min_name = name_len > 0 ? 1 : 0;
+
+    if (has_ext && 1 + ext_len > room - min(room, min_name + md5_len)) {
+      has_ext = HTS_FALSE;
+      ext_len = 0;
+    }
+    if (md5_len + (has_ext ? 1 + ext_len : 0) > room - min(room, min_name))
+      md5_len = 0;
+    name_len =
+        min(name_len, room - min(room, md5_len + (has_ext ? 1 + ext_len : 0)));
+  }
+  if (name_len + md5_len == 0 && !has_ext && dot_pos != NULL) {
+    /* a bare ".ext" name: keep its bytes, never a dotfile */
+    htsbuff_catn(&bb, dot_pos + 1, room);
+    return;
+  }
   htsbuff_catn(&bb, nom_pos, name_len);
   /* MD5 - 16 bits */
-  htsbuff_catn(&bb, md5, min(md5_len, room - bb.len));
+  htsbuff_catn(&bb, md5, md5_len);
   /* Ext */
-  if (dot_pos != NULL && bb.len < room) {
+  if (has_ext) {
     htsbuff_catc(&bb, '.');
-    htsbuff_catn(&bb, dot_pos + 1, min(ext_len, room - bb.len));
+    htsbuff_catn(&bb, dot_pos + 1, ext_len);
   }
 }
 

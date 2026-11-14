@@ -5,33 +5,38 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-# A link that nearly fills save[] keeps its ".delayed" or ".html" tail, the
-# name being clipped instead of aborting. filpad=N expands '*' into N bytes;
-# each pair spans the pads where the unclipped append aborted.
-tail_is() { # tail_is WANT PAD FIL [ARGS...]
-    local want=$1 pad=$2 fil=$3
-    shift 3
-    selftest_queue_tail "$want" savename "$fil" text/html "filpad=$pad" "$@"
+# A save name that would overflow save[] is shortened, never aborted (#2246).
+
+a() { printf "%0${1}d" 0 | tr 0 a; }
+host=/dev/null/www.example.com
+# name_is WANT FIL CTYPE PAD [ARGS...]: filpad=PAD expands the '*' in FIL
+name_is() {
+    local want=$1 fil=$2 ctype=$3 pad=$4
+    shift 4
+    selftest_queue "savename: $want" savename "$fil" "$ctype" "filpad=$pad" "$@"
 }
 
-# The mandatory delayed-type marker.
-for pad in 2018 2041; do
-    tail_is '.delayed' "$pad" '/*.php' statuscode=301
+# Each appended tail survives: .delayed, .html, index.html, an -N type 99 ext.
+name_is "/dev/null/x/x/$(a 231).delayed" '/x/*.php' text/html 2030 \
+    'userdef=%p/%p/%n' statuscode=301
+name_is "$host/$(a 234).html" '/*' application/x-unknown 2030 delayed=1
+for pad in 2030 2035; do
+    name_is "$host/$(a 238)/index.html" '/x.*' application/x-unknown "$pad" \
+        type=105
 done
-for pad in 2023 2035; do
-    tail_is '.delayed' "$pad" '/*/x.php' statuscode=301
-    tail_is '.delayed' "$pad" '/*/x' statuscode=301
-done
-# The ".html" forced onto an extensionless name.
-for pad in 2030 2040; do
-    tail_is '.html' "$pad" '/*/xyz' delayed=1
-done
-for pad in 2030 2038; do
-    tail_is '.html' "$pad" '/*/xyzxyz' delayed=0
-done
-# A query string's name, which used to lose its extension or abort.
-for pad in 2039 2041; do
-    tail_is '.html' "$pad" '/*?q=1'
+name_is "/dev/null/web/_r8furq.$(a 231)" '/x.*' application/x-unknown 2035 \
+    type=99
+# The name gives up a cut extension, never its last byte nor its directory.
+name_is "$host/$(a 234).html" '/*' text/html 2030
+name_is "$host/$(a 238)/x" '/*/x.php' image/png 2026
+name_is "$host/$(a 238)/x.delayed" '/*/x.php' text/html 2026 statuscode=301
+name_is "$host/$(a 238)/index.delayed" '/*/x.php' text/html 2030 statuscode=301
+# A ".delayed" placeholder lands in the directory of the final name.
+for pad in 1015 1018; do
+    dir="/dev/null/$(a 239)/ab/$(a 238)/ab"
+    name_is "$dir/x" '/*/ab/x' text/html "$pad" 'userdef=%p/%p/%n'
+    name_is "$dir/x.delayed" '/*/ab/x' text/html "$pad" 'userdef=%p/%p/%n' \
+        statuscode=301
 done
 
 selftest_run_queued
