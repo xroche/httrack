@@ -524,7 +524,8 @@ static uint64_t st_xfread_digest(T_SOC sv[2], const char *stream, int len,
     ST_MIX(&r.size, sizeof(r.size));
     ST_MIX(r.adr, r.size + 1);
   }
-  while (check_readinput(&r) && (n = (int) recv(sv[1], rest, sizeof(rest), 0)) > 0)
+  while (check_readinput(&r) &&
+         (n = (int) recv(sv[1], rest, sizeof(rest), 0)) > 0)
     ST_MIX(rest, n);
 #undef ST_MIX
   r.soc = INVALID_SOCKET;
