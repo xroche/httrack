@@ -26,4 +26,6 @@ Run one target by hand: `fuzz/fuzz-url -max_total_time=300 corpusdir fuzz/corpus
 
 `fuzz-redirect` drives `hts_mirror_check_moved()`, which handles a redirect's `Location` and a 412 or 416 answer to a resume. Its first byte picks the status and the page, turns on MIME HTML, and can plant a partial file and a resume reference. Its second byte sets the URL hack and the error-page options, and can move the page to another host and port. The first line is the `Location`, and the bytes after it fill the planted files. Files go in a temp dir under `$TMPDIR`.
 
+`fuzz-socks5` replays a hostile proxy reply into the SOCKS5 client handshake. Its input is the origin address, a newline, the proxy URL, a newline, then the bytes the proxy sends back.
+
 OSS-Fuzz builds these harnesses with `oss-fuzz-build.sh`, so a new harness needs only a `Makefile.am` entry and a `corpus/<target>/` directory. The script links each harness with `$LIB_FUZZING_ENGINE`. When it is set, `configure` uses it in place of `-fsanitize=fuzzer`.

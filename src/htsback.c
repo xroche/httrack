@@ -4094,13 +4094,25 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                   int noFreebuff = 0;
                   LLint content_length = -1;
                   hts_boolean length_conflict = HTS_FALSE;
+                  /* binput_line stops at a NUL, hiding the fields after it */
+                  const hts_boolean has_nul =
+                      back[i].r.adr[0] != '<' &&
+                      memchr(back[i].r.adr, '\0', (size_t) back[i].r.size) !=
+                          NULL;
 
-                  /* Hack for zero-length headers */
-                  if (back_status(&back[i]) != 0 && back[i].r.adr[0] != '<') {
-
+                  if (has_nul) {
+                    hts_log_print(opt, LOG_WARNING,
+                                  "NUL byte in response header, response "
+                                  "dropped: %s%s",
+                                  adr_nologin(opt, back[i].url_adr),
+                                  back[i].url_fil);
+                    back_slot_close_fail(opt, sback, i, STATUSCODE_INVALID,
+                                         "NUL byte in response header");
+                  } else if (back_status(&back[i]) != 0 &&
+                             back[i].r.adr[0] != '<') {
+                    /* Hack for zero-length headers */
                     // ----------------------------------------
-                    // traiter en-tête!
-                    // status-line à récupérer
+                    /* parse the header, status line first */
                     binput_line(back[i].r.adr + ptr,
                                 back[i].r.adr + back[i].r.size, rcvd, 2000,
                                 &adv);
@@ -4202,7 +4214,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                   back[i].url_fil);
                     back_slot_close_fail(opt, sback, i, STATUSCODE_INVALID,
                                          "Conflicting Content-Length");
-                  } else {
+                  } else if (!has_nul) {
+                    /* a plugin must not see the header of a dropped response */
                     int test_head = RUN_CALLBACK6(opt, receivehead,
                                                   back[i].r.adr,
                                                   back[i].url_adr,
