@@ -22,9 +22,11 @@ Please visit our Website: http://www.httrack.com
 */
 
 /* Fuzz the HTTP receive path: one back_wait() slot waits for headers on a
-   socketpair whose peer holds the input and is closed, so every read ends in
-   data or EOF and nothing waits on a timer. Two leading bytes pick the request
-   and the options; the rest is the server's response, status line first. */
+   socketpair. The response reaches the peer in pieces, one per back_wait()
+   call once the last is read, then the peer closes, so every read ends in data
+   or EOF and nothing waits on a timer.
+   Byte 0 holds OPT_* flags, byte 1 the file name and resume length, byte 2 the
+   piece sizes; the rest is the server's response. */
 #include "fuzz.h"
 
 #include "httrack-library.h"
@@ -35,12 +37,13 @@ Please visit our Website: http://www.httrack.com
 #include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
-/* the peer write must fit the socket buffer, or it blocks */
-#define FUZZ_RESP_MAXSIZE (64 * 1024)
+/* past TAILLE_BUFFER, so an in-memory body takes more than one full read */
+#define FUZZ_RESP_MAXSIZE (160 * 1024)
 
 /* option byte */
 #define OPT_TEST 0x01     /* a test GET (the crawler probing a link) */
@@ -51,6 +54,17 @@ Please visit our Website: http://www.httrack.com
 #define OPT_UPDATE 0x20   /* an update of a file already mirrored */
 #define OPT_SIZEHACK 0x40 /* -%s */
 #define OPT_PARTIAL 0x80  /* a partial file on disk, resumed with Range */
+
+/* shape byte */
+#define SHAPE_BINARY 0x80    /* /file.bin, not /index.html */
+#define SHAPE_HAVE_MASK 0x7f /* bytes already on disk for OPT_PARTIAL */
+
+/* split byte: the largest piece, 0 for the whole response in one piece */
+#define SPLIT_SCALE 0x80 /* count the largest piece in 64-byte steps */
+#define SPLIT_MASK 0x7f
+
+/* back_wait() calls that change state without reading a byte */
+#define STUCK_SLACK 64
 
 static char resp_dir[256];
 
@@ -76,6 +90,37 @@ static void resp_wipe_dir(const char *dir) {
     }
   }
   closedir(d);
+}
+
+/* Write the next piece to the peer once the slot has read the last one, so
+   each read comes back short. Close the peer after the last piece. */
+static void resp_feed(int *peer, int soc, const uint8_t *data, size_t size,
+                      size_t *sent, unsigned int split, uint32_t *rng) {
+  size_t piece = size - *sent;
+  int pending = 0;
+
+  if (*peer < 0 ||
+      (soc >= 0 && ioctl(soc, FIONREAD, &pending) == 0 && pending > 0))
+    return;
+  if ((split & SPLIT_MASK) != 0) {
+    const size_t largest =
+        (split & SPLIT_MASK) * ((split & SPLIT_SCALE) ? 64 : 1);
+
+    *rng ^= *rng << 13, *rng ^= *rng >> 17, *rng ^= *rng << 5;
+    if (piece > 1 + *rng % largest)
+      piece = 1 + *rng % largest;
+  }
+  if (piece > 0) {
+    /* a full buffer takes part of the piece; a closed slot takes none */
+    const ssize_t n =
+        send(*peer, data + *sent, piece, MSG_NOSIGNAL | MSG_DONTWAIT);
+
+    *sent = n > 0 ? *sent + (size_t) n : size;
+  }
+  if (*sent == size) {
+    close(*peer);
+    *peer = -1;
+  }
 }
 
 static void resp_wipe(void) { resp_wipe_dir(resp_dir); }
@@ -105,18 +150,22 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   lien_back *back;
   htsblk r;
   int sv[2];
-  unsigned int flags, extra;
+  unsigned int flags, shape, split;
+  size_t sent = 0;
+  uint32_t rng;
   const char *fil;
   char save[sizeof(resp_dir) + 32];
   size_t waits;
   char **filters = NULL;
   int filptr = 0;
 
-  if (size < 2 || size > FUZZ_RESP_MAXSIZE)
+  if (size < 3 || size > FUZZ_RESP_MAXSIZE)
     return 0;
   flags = data[0];
-  extra = data[1];
-  data += 2, size -= 2;
+  shape = data[1];
+  split = data[2];
+  data += 3, size -= 3;
+  rng = 0x9e3779b9u ^ split ^ (uint32_t) size;
 
   if (!inited) {
     hts_init();
@@ -126,9 +175,6 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   }
   if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) != 0)
     abort();
-  if (size > 0 && write(sv[1], data, size) != (ssize_t) size)
-    abort();
-  close(sv[1]);
 
   opt = hts_create_opt();
   opt->log = opt->errlog = NULL;
@@ -159,7 +205,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   back = sback->lnk;
 
   /* the extension decides what is hypertext when the type does not */
-  fil = (extra & 0x80) ? "/file.bin" : "/index.html";
+  fil = (shape & SHAPE_BINARY) ? "/file.bin" : "/index.html";
   save[0] = '\0';
   if (flags & (OPT_DISK | OPT_PARTIAL))
     snprintf(save, sizeof(save), "%s/example.com%s", resp_dir, fil);
@@ -174,11 +220,12 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   back[0].http11 = (flags & OPT_HTTP10) ? 0 : 1;
   back[0].ka_time_start = time_local();
   back[0].testmode = (flags & (OPT_TEST | OPT_HEAD)) ? 1 : 0;
+  /* 1 HEAD, 2 test GET */
   back[0].head_request = (flags & OPT_HEAD) ? 1 : (flags & OPT_TEST) ? 2 : 0;
   back[0].is_update = (flags & OPT_UPDATE) ? 1 : 0;
-  if ((flags & OPT_PARTIAL) && save[0] != '\0') {
+  if (flags & OPT_PARTIAL) {
     /* what an interrupted run left: the range request resumes after it */
-    const size_t have = extra & 0x7f;
+    const size_t have = shape & SHAPE_HAVE_MASK;
     FILE *fp;
 
     if (structcheck_utf8(save) == 0 && (fp = fopen(save, "wb")) != NULL) {
@@ -191,19 +238,29 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     }
   }
 
-  /* each wait reads at least one byte or ends the slot */
+  /* the socket always holds data or EOF, so each wait reads at least one
+     byte or ends the slot */
   for (waits = 0; back_status(&back[0]) > STATUS_READY; waits++) {
-    if (waits > size + 64) {
+    if (waits > size + STUCK_SLACK) {
       fprintf(stderr, "fuzz-response: slot stuck in status %d\n",
               back_status(&back[0]));
       abort();
     }
+    resp_feed(&sv[1], back[0].r.soc == sv[0] ? sv[0] : -1, data, size, &sent,
+              split, &rng);
     back_wait(sback, opt, &cache, 0);
+    if (back[0].r.totalsize < -1) { /* -1 is unknown, nothing is below */
+      fprintf(stderr, "fuzz-response: totalsize " LLintP "\n",
+              (LLint) back[0].r.totalsize);
+      abort();
+    }
   }
   /* as the crawler does once it knows the type */
   if (back_status(&back[0]) == STATUS_READY && !back[0].finalized)
     back_finalize(opt, &cache, sback, 0);
 
+  if (sv[1] >= 0)
+    close(sv[1]);
   back_delete_all(opt, &cache, sback);
   back_free(&sback);
   coucal_delete(&cache.hashtable);
