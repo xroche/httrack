@@ -664,6 +664,14 @@ struct httrackp {
                            copy_htsopt must leave it alone. Tail: ABI */
   hts_tristate check_cert; /**< verify https certificates (--check-cert).
                                 HTS_DEFAULT: off. Tail: ABI */
+  void *refs_written;      /**< coucal of the refs written since a start with no
+                                hts-cache/ref, or NULL when every ref may exist.
+                                Live state, so copy_htsopt must leave it alone.
+                                Tail: ABI */
+  TStamp abort_lock_polled_at; /**< last look for hts-abort.lock, on
+                                    mtime_monotonic(). Live state. Tail: ABI */
+  TStamp pause_lock_polled_at; /**< last look for hts-stop.lock, on
+                                    mtime_monotonic(). Live state. Tail: ABI */
 };
 
 /** Running statistics for a mirror. */

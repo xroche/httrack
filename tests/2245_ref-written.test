@@ -1,0 +1,15 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# A mirror that started with no hts-cache/ref skips the open for a ref it never
+# wrote, and still reads back one it wrote for a retry to resume from.
+
+dir=$(mktemp -d)
+cleanup_push rm -rf "$dir"
+
+assert_selftest 'ref-written: OK' ref-written "$dir"

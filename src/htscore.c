@@ -925,6 +925,9 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
      carry the last run's verdict and never purge again */
   opt->links_unqueued = HTS_FALSE;
   opt->abort_left_partial = HTS_FALSE;
+  url_savename_refnames_start(opt);
+  opt->abort_lock_polled_at = 0;
+  opt->pause_lock_polled_at = 0;
   opt->transport_failures = 0;
   opt->mptcp_connections = 0;
   opt->mptcp_fallbacks = 0;
@@ -2366,6 +2369,7 @@ cleanup:
   else
     hts_changes_free_opt(opt);
   hts_sitemap_free(opt);
+  url_savename_refnames_free(opt);
 
   // désallocation mémoire & buffers
   freet(primary); /* NULL once the first link adopted it */

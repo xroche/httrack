@@ -4321,6 +4321,125 @@ static int st_ref_portable(httrackp *opt, int argc, char **argv) {
   return st_verdict("ref-portable", err);
 }
 
+/* Read the ref back. Was it accepted? */
+static hts_boolean refwritten_read(httrackp *opt) {
+  lien_back *back = NULL;
+
+  if (back_unserialize_ref(opt, REF_ST_ADR, REF_ST_FIL, &back) != 0)
+    return HTS_FALSE;
+  back_clear_entry(back);
+  freet(back);
+  return HTS_TRUE;
+}
+
+/* A log path past HTS_URLMAXSIZE still finds its ref directory. */
+static int refwritten_longpath(httrackp *opt, const char *dir) {
+  char longdir[HTS_URLMAXSIZE * 2];
+  char seg[101];
+  int k, fail = 0;
+
+  memset(seg, 'd', sizeof(seg) - 1);
+  seg[sizeof(seg) - 1] = '\0';
+  strcpybuff(longdir, dir);
+  for (k = 0; k < 12; k++) {
+    strcatbuff(longdir, "/");
+    strcatbuff(longdir, seg);
+    (void) MKDIR(longdir);
+  }
+  strcatbuff(longdir, "/");
+  StringCopy(opt->path_log, longdir);
+  (void) MKDIR(reconcile_st_path(opt, "hts-cache"));
+  (void) MKDIR(reconcile_st_path(opt, CACHE_REFNAME));
+  url_savename_refnames_start(opt);
+  if (opt->refs_written != NULL) {
+    fprintf(stderr, "%s: a ref directory under a long path was missed\n",
+            selftest_tag);
+    fail++;
+  }
+  url_savename_refnames_free(opt);
+  selftest_setup_dir(opt, dir);
+  return fail;
+}
+
+/* A mirror that started with no hts-cache/ref opens only the refs it wrote,
+   and a ref planted by hand stands for one it did not write. */
+static int refwritten_selftest(httrackp *opt, const char *dir) {
+  int fail = 0;
+  char path[HTS_URLMAXSIZE * 2];
+  unsigned char *golden;
+  const size_t size = ref_st_build(NULL);
+  lien_back *back = NULL;
+
+  selftest_tag = "ref-written";
+  selftest_setup_dir(opt, dir);
+  (void) MKDIR(reconcile_st_path(opt, "hts-cache"));
+  (void) MKDIR(reconcile_st_path(opt, CACHE_REFNAME));
+  ref_st_refpath(opt, path, sizeof(path));
+  golden = malloct(size);
+  assertf(golden != NULL);
+  (void) ref_st_build(golden);
+  st_put_file(path, golden, size);
+
+  /* an earlier run's ref, which --continue resumes from */
+  url_savename_refnames_start(opt);
+  if (!refwritten_read(opt)) {
+    fprintf(stderr, "%s: a ref left by an earlier run was refused\n",
+            selftest_tag);
+    fail++;
+  }
+  /* kept: written back below as this mirror's own ref */
+  assertf(back_unserialize_ref(opt, REF_ST_ADR, REF_ST_FIL, &back) == 0);
+
+  /* a mirror that started with no ref directory */
+  (void) UNLINK(path);
+  (void) RMDIR(reconcile_st_path(opt, CACHE_REFNAME));
+  url_savename_refnames_start(opt);
+  (void) MKDIR(reconcile_st_path(opt, CACHE_REFNAME));
+  st_put_file(path, golden, size);
+  if (refwritten_read(opt)) {
+    fprintf(stderr, "%s: a ref this mirror never wrote was opened\n",
+            selftest_tag);
+    fail++;
+  }
+  /* written by the mirror, so a retry resumes from it */
+  if (back_serialize_ref(opt, back) != 0) {
+    fprintf(stderr, "%s: cannot write the reference\n", selftest_tag);
+    fail++;
+  }
+  if (!refwritten_read(opt)) {
+    fprintf(stderr, "%s: a ref this mirror wrote was not read back\n",
+            selftest_tag);
+    fail++;
+  }
+  /* removed, then put back by hand */
+  if (!url_savename_refname_remove(opt, REF_ST_ADR, REF_ST_FIL)) {
+    fprintf(stderr, "%s: cannot remove the reference\n", selftest_tag);
+    fail++;
+  }
+  st_put_file(path, golden, size);
+  if (refwritten_read(opt)) {
+    fprintf(stderr, "%s: a removed ref was still tracked\n", selftest_tag);
+    fail++;
+  }
+  /* freeing the record makes every ref possible again */
+  url_savename_refnames_free(opt);
+  if (opt->refs_written != NULL || !refwritten_read(opt)) {
+    fprintf(stderr, "%s: freeing the record still skips refs\n", selftest_tag);
+    fail++;
+  }
+  back_clear_entry(back);
+  freet(back);
+  freet(golden);
+  return fail + refwritten_longpath(opt, dir);
+}
+
+static int st_ref_written(httrackp *opt, int argc, char **argv) {
+  int err;
+
+  err = refwritten_selftest(opt, argv[0]);
+  return st_verdict("ref-written", err);
+}
+
 static int st_reconcile(httrackp *opt, int argc, char **argv) {
   int err;
 
@@ -4519,6 +4638,9 @@ const struct selftest_entry selftests_cache[] = {
     {"ref-portable", "<dir>",
      "the .ref resume state is host-independent, and refuses a legacy one",
      st_ref_portable},
+    {"ref-written", "<dir>",
+     "a mirror that started with no ref directory opens only its own refs",
+     st_ref_written},
     {"cache-corrupt", "<dir>", "cache read-side corruption self-test",
      st_cache_corrupt},
     {"cache-readfail", "<dir>",

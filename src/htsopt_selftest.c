@@ -1549,6 +1549,70 @@ static int st_stoplock(httrackp *opt, int argc, char **argv) {
   return st_lockrule(opt, argc, argv, "stoplock", HTS_PAUSE_LOCKNAME);
 }
 
+// -#test=lockpoll <dir>: the engine looks for hts-abort.lock at most every
+// 250 ms.
+static int st_lockpoll(httrackp *opt, int argc, char **argv) {
+  char BIGSTK base[HTS_URLMAXSIZE];
+  char BIGSTK lock[HTS_URLMAXSIZE * 2];
+  char BIGSTK progress[HTS_URLMAXSIZE * 2];
+  char BIGSTK other[HTS_URLMAXSIZE * 2];
+  FILE *const saved_log = opt->log;
+  String saved = STRING_EMPTY;
+  const time_t now = time(NULL);
+  int err = 0;
+
+  if (argc < 1) {
+    fprintf(stderr, "usage: -#test=lockpoll <writable directory>\n");
+    return 1;
+  }
+  strcpybuff(base, argv[0]);
+  if (base[0] != '\0' && hts_lastchar(base) != '/')
+    strcatbuff(base, "/");
+  StringCopy(saved, StringBuff(opt->path_log));
+  StringCopy(opt->path_log, base);
+  opt->log = NULL; /* each take logs, and this output is exact */
+  if (!st_lockrule_setup(base, HTS_ABORT_LOCKNAME, lock, sizeof(lock), progress,
+                         sizeof(progress), other, sizeof(other), now) ||
+      !st_lockrule_stamp(progress, now - 10)) {
+    fprintf(stderr, "lockpoll: cannot set up %s\n", base);
+    err = 1;
+  }
+
+  opt->abort_lock_polled_at = mtime_monotonic() + 60000;
+  if (!hts_poll_abort_request(opt)) {
+    fprintf(stderr, "lockpoll: a clock stepping back stopped the polls\n");
+    err = 1;
+  }
+  /* the take deleted the lock, so put it back */
+  if (!st_lockrule_touch(lock) || !st_lockrule_stamp(lock, now)) {
+    fprintf(stderr, "lockpoll: cannot stamp %s\n", lock);
+    err = 1;
+  }
+  if (hts_poll_abort_request(opt) || !fexist_utf8(lock)) {
+    fprintf(stderr, "lockpoll: a poll right after the last one looked\n");
+    err = 1;
+  }
+  opt->abort_lock_polled_at = mtime_monotonic() - 200;
+  if (hts_poll_abort_request(opt)) {
+    fprintf(stderr, "lockpoll: a poll 200 ms after the last one looked\n");
+    err = 1;
+  }
+  opt->abort_lock_polled_at = mtime_monotonic() - 300;
+  if (!hts_poll_abort_request(opt)) {
+    fprintf(stderr, "lockpoll: a poll 300 ms later missed the request\n");
+    err = 1;
+  }
+
+  (void) UNLINK(progress);
+  (void) UNLINK(other);
+  opt->log = saved_log;
+  opt->abort_lock_polled_at = 0;
+  StringCopy(opt->path_log, StringBuff(saved));
+  StringFree(saved);
+  printf("lockpoll self-test: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 /* A cancel request whose URL cannot be copied is refused, not stored empty. */
 static int st_cancelpushoom(httrackp *opt, int argc, char **argv) {
   static const size_t huge = 64 * 1024 * 1024;
@@ -1874,6 +1938,8 @@ const struct selftest_entry selftests_opt[] = {
     {"stoplock", "<writable directory>",
      "a pause request pauses the mirror only if it is fresh and deletable",
      st_stoplock},
+    {"lockpoll", "<writable directory>",
+     "the engine looks for an abort request at most every 250 ms", st_lockpoll},
     {"cancelpushoom", "",
      "a cancel request that cannot be stored is refused, not stored empty",
      st_cancelpushoom},

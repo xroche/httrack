@@ -2053,5 +2053,38 @@ hts_boolean url_savename_refname_remove(httrackp *opt, const char *adr,
                                         const char *fil) {
   char *filename = url_savename_refname_fullpath(opt, adr, fil);
 
-  return UNLINK(filename) == 0 ? HTS_TRUE : HTS_FALSE;
+  if (UNLINK(filename) != 0)
+    return HTS_FALSE;
+  if (opt->refs_written != NULL)
+    (void) coucal_remove((coucal) opt->refs_written, filename);
+  return HTS_TRUE;
+}
+
+void url_savename_refname_written(httrackp *opt, const char *filename) {
+  if (opt->refs_written != NULL)
+    coucal_add((coucal) opt->refs_written, filename, 1);
+}
+
+hts_boolean url_savename_refname_may_exist(httrackp *opt,
+                                           const char *filename) {
+  return opt->refs_written == NULL ||
+         coucal_exists((coucal) opt->refs_written, filename);
+}
+
+void url_savename_refnames_start(httrackp *opt) {
+  STRUCT_STAT st;
+
+  url_savename_refnames_free(opt);
+  /* Only a certain absence counts: any other failure probes every ref. */
+  if (STAT(hts_logpath(opt, CACHE_REFNAME), &st) != 0 && errno == ENOENT)
+    opt->refs_written = coucal_new(0);
+}
+
+void url_savename_refnames_free(httrackp *opt) {
+  if (opt->refs_written != NULL) {
+    coucal table = (coucal) opt->refs_written;
+
+    coucal_delete(&table);
+    opt->refs_written = NULL;
+  }
 }
