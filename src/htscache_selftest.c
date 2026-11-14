@@ -4332,8 +4332,37 @@ static hts_boolean refwritten_read(httrackp *opt) {
   return HTS_TRUE;
 }
 
-/* A mirror that started with no hts-cache/ref opens only the refs it wrote. A
-   ref put there behind its back stands for one it never wrote. */
+/* A log path past HTS_URLMAXSIZE still finds its ref directory. */
+static int refwritten_longpath(httrackp *opt, const char *dir) {
+  char longdir[HTS_URLMAXSIZE * 2];
+  char seg[201];
+  int k, fail = 0;
+
+  memset(seg, 'd', sizeof(seg) - 1);
+  seg[sizeof(seg) - 1] = '\0';
+  strcpybuff(longdir, dir);
+  for (k = 0; k < 6; k++) {
+    strcatbuff(longdir, "/");
+    strcatbuff(longdir, seg);
+    (void) MKDIR(longdir);
+  }
+  strcatbuff(longdir, "/");
+  StringCopy(opt->path_log, longdir);
+  (void) MKDIR(reconcile_st_path(opt, "hts-cache"));
+  (void) MKDIR(reconcile_st_path(opt, CACHE_REFNAME));
+  url_savename_refnames_start(opt);
+  if (opt->refs_written != NULL) {
+    fprintf(stderr, "%s: a ref directory under a long path was missed\n",
+            selftest_tag);
+    fail++;
+  }
+  url_savename_refnames_free(opt);
+  selftest_setup_dir(opt, dir);
+  return fail;
+}
+
+/* A mirror that started with no hts-cache/ref opens only the refs it wrote,
+   and a ref planted by hand stands for one it did not write. */
 static int refwritten_selftest(httrackp *opt, const char *dir) {
   int fail = 0;
   char path[HTS_URLMAXSIZE * 2];
@@ -4343,13 +4372,8 @@ static int refwritten_selftest(httrackp *opt, const char *dir) {
 
   selftest_tag = "ref-written";
   selftest_setup_dir(opt, dir);
-#ifdef _WIN32
-  mkdir(reconcile_st_path(opt, "hts-cache"));
-  mkdir(reconcile_st_path(opt, CACHE_REFNAME));
-#else
-  mkdir(reconcile_st_path(opt, "hts-cache"), HTS_PROTECT_FOLDER);
-  mkdir(reconcile_st_path(opt, CACHE_REFNAME), HTS_PROTECT_FOLDER);
-#endif
+  (void) MKDIR(reconcile_st_path(opt, "hts-cache"));
+  (void) MKDIR(reconcile_st_path(opt, CACHE_REFNAME));
   ref_st_refpath(opt, path, sizeof(path));
   golden = malloct(size);
   assertf(golden != NULL);
@@ -4363,17 +4387,14 @@ static int refwritten_selftest(httrackp *opt, const char *dir) {
             selftest_tag);
     fail++;
   }
+  /* kept: written back below as this mirror's own ref */
   assertf(back_unserialize_ref(opt, REF_ST_ADR, REF_ST_FIL, &back) == 0);
 
   /* a mirror that started with no ref directory */
   (void) UNLINK(path);
   (void) RMDIR(reconcile_st_path(opt, CACHE_REFNAME));
   url_savename_refnames_start(opt);
-#ifdef _WIN32
-  mkdir(reconcile_st_path(opt, CACHE_REFNAME));
-#else
-  mkdir(reconcile_st_path(opt, CACHE_REFNAME), HTS_PROTECT_FOLDER);
-#endif
+  (void) MKDIR(reconcile_st_path(opt, CACHE_REFNAME));
   st_put_file(path, golden, size);
   if (refwritten_read(opt)) {
     fprintf(stderr, "%s: a ref this mirror never wrote was opened\n",
@@ -4390,7 +4411,7 @@ static int refwritten_selftest(httrackp *opt, const char *dir) {
             selftest_tag);
     fail++;
   }
-  /* removed, then put back behind the mirror's back */
+  /* removed, then put back by hand */
   if (!url_savename_refname_remove(opt, REF_ST_ADR, REF_ST_FIL)) {
     fprintf(stderr, "%s: cannot remove the reference\n", selftest_tag);
     fail++;
@@ -4402,15 +4423,14 @@ static int refwritten_selftest(httrackp *opt, const char *dir) {
   }
   /* freeing the record makes every ref possible again */
   url_savename_refnames_free(opt);
-  if (opt->ref_dir_was_absent || opt->refs_written != NULL ||
-      !refwritten_read(opt)) {
+  if (opt->refs_written != NULL || !refwritten_read(opt)) {
     fprintf(stderr, "%s: freeing the record still skips refs\n", selftest_tag);
     fail++;
   }
   back_clear_entry(back);
   freet(back);
   freet(golden);
-  return fail;
+  return fail + refwritten_longpath(opt, dir);
 }
 
 static int st_ref_written(httrackp *opt, int argc, char **argv) {

@@ -1549,16 +1549,8 @@ static int st_stoplock(httrackp *opt, int argc, char **argv) {
   return st_lockrule(opt, argc, argv, "stoplock", HTS_PAUSE_LOCKNAME);
 }
 
-/* Did the poll take a request? Clears the exit it sets. */
-static hts_boolean st_lockpoll_took(httrackp *opt) {
-  const hts_boolean took = hts_poll_abort_request(opt);
-
-  hts_store_release_int(&opt->state.exit_xh, 0);
-  return took;
-}
-
 // -#test=lockpoll <dir>: the engine looks for hts-abort.lock at most every
-// 250 ms, and a clock stepping back does not stop it looking.
+// 250 ms.
 static int st_lockpoll(httrackp *opt, int argc, char **argv) {
   char BIGSTK base[HTS_URLMAXSIZE];
   char BIGSTK lock[HTS_URLMAXSIZE * 2];
@@ -1586,39 +1578,30 @@ static int st_lockpoll(httrackp *opt, int argc, char **argv) {
     err = 1;
   }
 
-  opt->abort_lock_polled = 0;
-  if (!st_lockpoll_took(opt)) {
+  opt->abort_lock_polled_at = 0;
+  if (!hts_poll_abort_request(opt)) {
     fprintf(stderr, "lockpoll: the first poll missed the request\n");
     err = 1;
   }
+  /* the take deleted the lock, so put it back */
   if (!st_lockrule_touch(lock) || !st_lockrule_stamp(lock, now)) {
     fprintf(stderr, "lockpoll: cannot stamp %s\n", lock);
     err = 1;
   }
-  if (st_lockpoll_took(opt) || !fexist_utf8(lock)) {
+  if (hts_poll_abort_request(opt) || !fexist_utf8(lock)) {
     fprintf(stderr, "lockpoll: a poll right after the last one looked\n");
     err = 1;
   }
-  opt->abort_lock_polled = mtime_local() - 300;
-  if (!st_lockpoll_took(opt)) {
+  opt->abort_lock_polled_at = mtime_monotonic() - 300;
+  if (!hts_poll_abort_request(opt)) {
     fprintf(stderr, "lockpoll: a poll 300 ms later missed the request\n");
     err = 1;
   }
-  if (!st_lockrule_touch(lock) || !st_lockrule_stamp(lock, now)) {
-    fprintf(stderr, "lockpoll: cannot stamp %s\n", lock);
-    err = 1;
-  }
-  opt->abort_lock_polled = mtime_local() + 60000;
-  if (!st_lockpoll_took(opt)) {
-    fprintf(stderr, "lockpoll: a clock stepping back stopped the polls\n");
-    err = 1;
-  }
 
-  (void) UNLINK(lock);
   (void) UNLINK(progress);
   (void) UNLINK(other);
   opt->log = saved_log;
-  opt->abort_lock_polled = 0;
+  opt->abort_lock_polled_at = 0;
   StringCopy(opt->path_log, StringBuff(saved));
   StringFree(saved);
   printf("lockpoll self-test: %s\n", err ? "FAIL" : "OK");

@@ -2060,28 +2060,24 @@ hts_boolean url_savename_refname_remove(httrackp *opt, const char *adr,
   return HTS_TRUE;
 }
 
-void url_savename_refname_note(httrackp *opt, const char *filename) {
-  if (!opt->ref_dir_was_absent)
-    return;
-  if (opt->refs_written == NULL)
-    opt->refs_written = coucal_new(0);
-  /* Untracked, a ref would be invisible: probe them all instead. */
-  if (opt->refs_written == NULL)
-    opt->ref_dir_was_absent = HTS_FALSE;
-  else
+void url_savename_refname_written(httrackp *opt, const char *filename) {
+  if (opt->refs_written != NULL)
     coucal_add((coucal) opt->refs_written, filename, 1);
 }
 
 hts_boolean url_savename_refname_may_exist(httrackp *opt,
                                            const char *filename) {
-  return !opt->ref_dir_was_absent ||
-         (opt->refs_written != NULL &&
-          coucal_exists((coucal) opt->refs_written, filename));
+  return opt->refs_written == NULL ||
+         coucal_exists((coucal) opt->refs_written, filename);
 }
 
 void url_savename_refnames_start(httrackp *opt) {
+  STRUCT_STAT st;
+
   url_savename_refnames_free(opt);
-  opt->ref_dir_was_absent = !dir_exists(hts_logpath(opt, CACHE_REFNAME "/"));
+  /* Only a certain absence counts: any other failure probes every ref. */
+  if (STAT(hts_logpath(opt, CACHE_REFNAME), &st) != 0 && errno == ENOENT)
+    opt->refs_written = coucal_new(0);
 }
 
 void url_savename_refnames_free(httrackp *opt) {
@@ -2091,5 +2087,4 @@ void url_savename_refnames_free(httrackp *opt) {
     coucal_delete(&table);
     opt->refs_written = NULL;
   }
-  opt->ref_dir_was_absent = HTS_FALSE;
 }

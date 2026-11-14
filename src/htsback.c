@@ -1788,7 +1788,7 @@ int back_serialize_ref(httrackp * opt, const lien_back * src) {
     url_savename_refname_fullpath(opt, src->url_adr, src->url_fil);
   FILE *fp;
 
-  url_savename_refname_note(opt, filename);
+  url_savename_refname_written(opt, filename);
   fp = FOPEN(filename, "wb");
   if (fp == NULL && MKDIR(hts_logpath(opt, CACHE_REFNAME)) == 0) {
     /* note: local filename */
@@ -1815,7 +1815,7 @@ int back_unserialize_ref(httrackp * opt, const char *adr, const char *fil,
 
   *dst = NULL;
   filename = url_savename_refname_fullpath(opt, adr, fil);
-  /* Each new link asks, so spare the open when no ref can be there. */
+  /* Each new link asks, and refs are rare. */
   if (!url_savename_refname_may_exist(opt, filename))
     return 1;
   fp = FOPEN(filename, "rb");

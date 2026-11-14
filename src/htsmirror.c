@@ -619,18 +619,18 @@ hts_boolean hts_take_lock_request(httrackp *opt, const char *name) {
 /* A lock request may wait this long before the engine sees it. */
 #define HTS_LOCK_POLL_MS 250
 
-/* Is it time to look for the lock file again? Each look costs a stat. */
-static hts_boolean lock_poll_due(TStamp *polled) {
-  const TStamp now = mtime_local();
+/* Is it time to look for the lock file again? */
+static hts_boolean lock_poll_due(TStamp *polled_at) {
+  const TStamp now = mtime_monotonic();
 
-  if (*polled != 0 && now >= *polled && now - *polled < HTS_LOCK_POLL_MS)
+  if (*polled_at != 0 && now - *polled_at < HTS_LOCK_POLL_MS)
     return HTS_FALSE;
-  *polled = now;
+  *polled_at = now;
   return HTS_TRUE;
 }
 
 hts_boolean hts_poll_abort_request(httrackp *opt) {
-  if (!lock_poll_due(&opt->abort_lock_polled) ||
+  if (!lock_poll_due(&opt->abort_lock_polled_at) ||
       !hts_take_lock_request(opt, HTS_ABORT_LOCKNAME))
     return HTS_FALSE;
   hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
@@ -656,7 +656,7 @@ void hts_mirror_process_user_interaction(htsmoduleStruct *str,
   {
     int do_pause = 0;
 
-    if (lock_poll_due(&opt->pause_lock_polled) &&
+    if (lock_poll_due(&opt->pause_lock_polled_at) &&
         hts_take_lock_request(opt, HTS_PAUSE_LOCKNAME)) {
       do_pause = 1;
     }

@@ -926,8 +926,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
   opt->links_unqueued = HTS_FALSE;
   opt->abort_left_partial = HTS_FALSE;
   url_savename_refnames_start(opt);
-  opt->abort_lock_polled = 0;
-  opt->pause_lock_polled = 0;
+  opt->abort_lock_polled_at = 0;
+  opt->pause_lock_polled_at = 0;
   opt->transport_failures = 0;
   opt->mptcp_connections = 0;
   opt->mptcp_fallbacks = 0;
