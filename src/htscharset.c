@@ -743,19 +743,19 @@ size_t hts_stringLengthUTF8(const char *s) {
 
 size_t hts_copyStringUTF8(char *dest, const char *src, size_t size) {
   const unsigned char *const bytes = (const unsigned char *) src;
-  size_t i, mark;
+  size_t i;
 
-  for(i = 0, mark = 0; ( i == 0 || bytes[i + 1] != '\0' ) && i <= size; i++) {
-    const unsigned char c = bytes[i];
-
-    dest[i] = c;
-    if (HTS_IS_LEADING_UTF8(c)) {
-      mark = i;
-    }
+  for (i = 0; i < size && bytes[i] != '\0'; i++)
+    ;
+  // clipped: back off to the start of the cut sequence
+  if (bytes[i] != '\0') {
+    while (i > 0 && !HTS_IS_LEADING_UTF8(bytes[i]))
+      i--;
   }
-  dest[mark] = '\0';
+  memcpy(dest, src, i);
+  dest[i] = '\0';
 
-  return mark;
+  return i;
 }
 
 size_t hts_appendStringUTF8(char *dest, const char *src,  size_t nBytes) {

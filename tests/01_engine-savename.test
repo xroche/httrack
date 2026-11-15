@@ -121,7 +121,7 @@ name '/x.php' 'text/html' 'x.html' \
 full '/directory-long/verylongfilename.html' 'text/html' \
     '/dev/null/EXAMPLE/DIRECTOR/VERYLONG.HTM' n83=1
 full '/directory-long/verylongfilename.html' 'text/html' \
-    '/dev/null/EXAMPLE_C/DIRECTORY_LONG/VERYLONGFILENAME.HTM' n83=2
+    '/dev/null/EXAMPLE_COM/DIRECTORY_LONG/VERYLONGFILENAME.HTM' n83=2
 name '/verylongfilename.php' 'text/html' 'VERYLO-2.HTM' n83=1 \
     'prior=www.example.com|/other.html|/dev/null/EXAMPLE/VERYLONG.HTM'
 

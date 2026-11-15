@@ -649,10 +649,10 @@ static int st_savename_sequence(httrackp *opt, int argc, char **argv) {
         "EXAMPLE.com /a-0.html=example.com/a-1.html"}},
       /* the same in ISO9660 names */
       {2,
-       {"example.com /A-0.html=EXAMPLE_C/A_0.HTM",
-        "example.com /a-0.html=EXAMPLE_C/A_1.HTM",
-        "example.com /a-0.HTML=EXAMPLE_C/A_2.HTM",
-        "EXAMPLE.com /a-0.html=EXAMPLE_C/A_1.HTM"}},
+       {"example.com /A-0.html=EXAMPLE_COM/A_0.HTM",
+        "example.com /a-0.html=EXAMPLE_COM/A_1.HTM",
+        "example.com /a-0.HTML=EXAMPLE_COM/A_2.HTM",
+        "EXAMPLE.com /a-0.html=EXAMPLE_COM/A_1.HTM"}},
       /* links sharing a fingerprint with distinct names block jumps */
       {0,
        {"!Example.COM /a--3.htm example.com/a-10-3.gif",
@@ -664,7 +664,7 @@ static int st_savename_sequence(httrackp *opt, int argc, char **argv) {
       {0,
        {"x /ABCDEFGH.htm=x/ABCDEFGH.htm", "x /AbCdefgh.htm=x/AbCdefgh-2.htm",
         "x /ABcdefgh.htm=x/ABcdefgh-3.htm", "@1",
-        "x.y /abcdefgh.htm=X/ABCDEF-2.HTM"}},
+        "x /abcdefgh.htm=X/ABCDEF-2.HTM"}},
       /* a link recorded again keeps its first fingerprint owner */
       {0,
        {"EXAMPLE.com /A-01.HTML=example.com/A-01.HTML",
@@ -674,11 +674,11 @@ static int st_savename_sequence(httrackp *opt, int argc, char **argv) {
         "example.com /A-01.html=example.com/A-2.html"}},
       /* a walk reaching INT_MAX records no jump */
       {2,
-       {"example.com /a-2147483646.HTML=EXAMPLE_C/A_2147483646.HTM",
-        "Example.COM /a-2147483646.htm=EXAMPLE_C/A_2147483647.HTM",
-        "Example.COM /A-2147483646.HTML=EXAMPLE_C/A_2147483647_2.HTM",
-        "EXAMPLE.com /a-2147483646=EXAMPLE_C/A_2147483647_3.HTM",
-        "EXAMPLE.com /A-2147483646.HTML=EXAMPLE_C/A_2147483647_2.HTM"}},
+       {"example.com /a-2147483646.HTML=EXAMPLE_COM/A_2147483646.HTM",
+        "Example.COM /a-2147483646.htm=EXAMPLE_COM/A_2147483647.HTM",
+        "Example.COM /A-2147483646.HTML=EXAMPLE_COM/A_2147483647_2.HTM",
+        "EXAMPLE.com /a-2147483646=EXAMPLE_COM/A_2147483647_3.HTM",
+        "EXAMPLE.com /A-2147483646.HTML=EXAMPLE_COM/A_2147483647_2.HTM"}},
       /* an irregular walk restarts name by name */
       {0,
        {"example.com /a-2147483640.html=example.com/a-2147483640.html",
@@ -713,8 +713,8 @@ static int st_savename_sequence(httrackp *opt, int argc, char **argv) {
        {"!example.com /c example.com/c-27.html",
         "EXAMPLE.com /C=example.com/C.html",
         "example.com /c=example.com/c-27.html"}},
-      /* a stored 8-digit suffix cuts no further back than the name start */
-      {1, {"!X /foo X-99999999", "!x /bar FOO.HTM", "x /foo=FOO-2.HTM"}},
+      /* a stored 9-digit suffix cuts no further back than the name start */
+      {1, {"!X /foo X/X-999999999", "!x /bar X/FOO.HTM", "x /foo=X/FOO-2.HTM"}},
   };
 
   const hts_savename_83 mode = opt->savename_83;

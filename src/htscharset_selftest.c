@@ -287,6 +287,45 @@ static int st_host_ascii(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* One row: src, byte budget, expected copy. src sits in an exact-size block. */
+static int copy_utf8_case(const char *src, size_t size, const char *want) {
+  const size_t len = strlen(src);
+  char *heap = malloct(len + 1);
+  char dest[32];
+  size_t n;
+  int fail;
+
+  assertf(heap != NULL && size < sizeof(dest) - 1);
+  memcpy(heap, src, len + 1);
+  memset(dest, 'Z', sizeof(dest));
+  n = hts_copyStringUTF8(dest, heap, size);
+  fail = n != strlen(want) || strcmp(dest, want) != 0 || dest[n + 1] != 'Z';
+  if (fail) {
+    printf("copy-utf8: '%s' into %u gave '%s'\n", src, (unsigned) size, dest);
+  }
+  freet(heap);
+  return fail;
+}
+
+static int st_copy_utf8(httrackp *opt, int argc, char **argv) {
+  int fail = 0;
+
+  fail |= copy_utf8_case("", 8, "");
+  fail |= copy_utf8_case("a", 8, "a");
+  fail |= copy_utf8_case("abc", 8, "abc");
+  fail |= copy_utf8_case("abcdefgh", 8, "abcdefgh");
+  fail |= copy_utf8_case("abcdefghi", 8, "abcdefgh");
+  fail |= copy_utf8_case("abc", 0, "");
+  // a two-byte sequence straddling the budget is dropped whole
+  fail |= copy_utf8_case("abcdefg\xc3\xbc", 8, "abcdefg");
+  fail |= copy_utf8_case("abcdefg\xc3\xbc", 9, "abcdefg\xc3\xbc");
+  fail |= copy_utf8_case("m\xc3\xbcnchen", 2, "m");
+  if (fail)
+    return 1;
+  printf("copy-utf8 self-test OK\n");
+  return 0;
+}
+
 static int st_idna_decode(httrackp *opt, int argc, char **argv) {
   char *s;
 
@@ -867,6 +906,8 @@ const struct selftest_entry selftests_charset[] = {
      st_idna_decode},
     {"host-ascii", "", "hts_host_to_ascii() converts, bounds and refuses",
      st_host_ascii},
+    {"copy-utf8", "", "hts_copyStringUTF8() clips on a sequence boundary",
+     st_copy_utf8},
     {"entities", "<string> [encoding]", "unescape HTML entities", st_entities},
     {"entities-sweep", "<file>",
      "decode each 'name cp' line of <file> and its one-byte misses",
