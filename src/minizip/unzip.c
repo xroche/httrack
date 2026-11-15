@@ -866,9 +866,7 @@ local int unz64local_GetCurrentFileInfoInternal(unzFile file,
         lSeek += file_info.size_file_extra;
 
 
-    /* httrack addition: only an entry needing ZIP64 values parses its extra
-       field, so a repaired cache, whose central extra field is the raw header
-       text, still reads */
+    /* httrack addition: parse only for ZIP64, a repaired cache keeps raw header text here */
     if ((err==UNZ_OK) && (file_info.size_file_extra != 0) && (zip64_required != 0))
     {
                                 uLong acc = 0;

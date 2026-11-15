@@ -3965,7 +3965,7 @@ static int st_zip_repair_size(httrackp *opt, int argc, char **argv) {
       fails++;
     }
   }
-  /* A repaired entry keeps its header text as central extra field. */
+  /* A repaired entry reads back with raw header text in its extra field. */
   {
     char out[HTS_URLMAXSIZE];
     uLong nrec, bytes;
@@ -3985,6 +3985,43 @@ static int st_zip_repair_size(httrackp *opt, int argc, char **argv) {
       unzClose(zf);
     }
   }
+  /* A ZIP64 entry still takes its sizes from the central extra field. */
+  {
+    static const unsigned char z64[] = {
+        /* local header, sizes in the ZIP64 extra field */
+        0x50, 0x4b, 0x03, 0x04, 45, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x86, 0xa6, 0x10,
+        0x36, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 1, 0, 20, 0, 'a',
+        1, 0, 16, 0, 5, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 'h', 'e',
+        'l', 'l', 'o',
+        /* central directory entry, offset 56 */
+        0x50, 0x4b, 0x01, 0x02, 45, 0, 45, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x86,
+        0xa6, 0x10, 0x36, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 1, 0,
+        20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 'a', 1, 0, 16, 0, 5, 0,
+        0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0,
+        /* end of central directory: 67 bytes at offset 56 */
+        0x50, 0x4b, 0x05, 0x06, 0, 0, 0, 0, 1, 0, 1, 0, 67, 0, 0, 0, 56, 0, 0,
+        0, 0, 0};
+    char in[HTS_URLMAXSIZE];
+    unz_file_info64 info;
+    unzFile zf = NULL;
+
+    snprintf(in, sizeof(in), "%s/zip64.zip", argv[0]);
+    if ((fp = fopen(in, "wb")) != NULL) {
+      const hts_boolean ok = hts_fwrite_exact(z64, sizeof(z64), fp);
+
+      fclose(fp);
+      zf = ok ? unzOpen(in) : NULL;
+    }
+    if (zf == NULL || unzGoToFirstFile(zf) != UNZ_OK ||
+        unzGetCurrentFileInfo64(zf, &info, NULL, 0, NULL, 0, NULL, 0) !=
+            UNZ_OK ||
+        info.uncompressed_size != 5 || info.compressed_size != 5) {
+      printf("zip-repair-size: FAIL a ZIP64 entry lost its sizes\n");
+      fails++;
+    }
+    if (zf != NULL)
+      unzClose(zf);
+  }
 #ifndef _WIN32
   /* A temp file that cannot be read back must fail the repair. */
   {
@@ -4000,7 +4037,7 @@ static int st_zip_repair_size(httrackp *opt, int argc, char **argv) {
         printf("zip-repair-size: FAIL a failed reopen was not reported\n");
         fails++;
       }
-      if (fp != NULL) /* root reads it anyway */
+      if (fp != NULL) /* root can read it anyway */
         fclose(fp);
       (void) chmod(tmp, 0600);
     }
