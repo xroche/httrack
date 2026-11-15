@@ -41,12 +41,6 @@ static int st_refname(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-static int st_placeholder(httrackp *opt, int argc, char **argv) {
-  printf("placeholder=%s\n",
-         hts_is_delayed_placeholder(argv[0]) ? "yes" : "no");
-  return 0;
-}
-
 static int st_simplify(httrackp *opt, int argc, char **argv) {
   fil_simplifie(argv[0]);
   printf("simplified=%s\n", argv[0]);
@@ -1979,8 +1973,6 @@ const struct selftest_entry selftests_name[] = {
      st_urlbounds},
     {"simplify", "<path>", "collapse ./ and ../ in a path", st_simplify},
     {"refname", "<adr> <fil>", "cache ref file name of a URL", st_refname},
-    {"placeholder", "<save>", "is save a .<id>.delayed placeholder name?",
-     st_placeholder},
     {"expandhome", "<path>", "expand a leading ~/ into $HOME", st_expandhome},
     {"stripquery", "", "--strip-query pattern/key stripping self-test",
      st_stripquery},

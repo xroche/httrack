@@ -122,8 +122,6 @@ char *url_md5(char *digest_buffer, const char *fil_complete);
 void url_savename_refname(const char *adr, const char *fil, char *filename);
 char *url_savename_refname_fullpath(httrackp * opt, const char *adr,
                                     const char *fil);
-/* Is save an engine placeholder, "<name>.<hex id>.delayed"? */
-hts_boolean hts_is_delayed_placeholder(const char *save);
 /* Remove the temp-ref for (adr,fil); HTS_TRUE if it was removed. */
 hts_boolean url_savename_refname_remove(httrackp *opt, const char *adr,
                                         const char *fil);
