@@ -2647,6 +2647,174 @@ static int st_busyslots(httrackp *opt, int argc, char **argv) {
   return err ? 1 : 0;
 }
 
+/* Attach live slot p of the busyscans fixture, its file named after p. */
+static lien_back *st_busyscans_attach(struct_back *sback, int p, int status,
+                                      const htsblk *r) {
+  char fil[32];
+
+  snprintf(fil, sizeof(fil), "/s%d.html", p);
+  back_slot_attach(sback, p, status, r, "example.com", fil);
+  snprintf(sback->lnk[p].url_sav, sizeof(sback->lnk[p].url_sav),
+           "busyscans/s%d.html", p);
+  return &sback->lnk[p];
+}
+
+/* Free every slot and prune the bitmap. */
+static void st_busyscans_reset(httrackp *opt, cache_back *cache,
+                               struct_back *sback) {
+  int i;
+
+  for (i = 0; i < sback->count; i++)
+    (void) back_clear_entry(&sback->lnk[i]);
+  back_clean(opt, cache, sback);
+}
+
+/* -#test=busyscans <dir>: every scan the busy bitmap drives reaches each slot
+   in use, through the last slot and the last bitmap word. */
+static int st_busyscans(httrackp *opt, int argc, char **argv) {
+  enum { SLOTS = 130 };
+
+  static const int probe[] = {0, 1, 63, 64, 65, 127, 128, SLOTS - 1};
+  const int nprobe = (int) (sizeof(probe) / sizeof(probe[0]));
+  static char body[] = "x";
+  char base[HTS_URLMAXSIZE];
+  char host[32];
+  struct_back *sback;
+  cache_back cache;
+  hash_struct hash;
+  htsblk r;
+  LLint want = 0;
+  int err = 0;
+  int i, k;
+
+#define CHECK(cond) ST_CHECK(err, cond)
+  if (argc < 1)
+    return 1;
+  snprintf(base, sizeof(base), "%s/", argv[0]);
+  StringCopy(opt->path_html_utf8, base);
+  sback = back_new(opt, SLOTS);
+  if (sback == NULL)
+    return 77;
+  opt->maxtime = 0;
+  opt->maxsite = 0;
+  opt->timeout = 0;
+  opt->state.stop = 0;
+  memset(&cache, 0, sizeof(cache));
+  cache.hashtable = coucal_new(0);
+  memset(&r, 0, sizeof(r));
+  r.soc = INVALID_SOCKET;
+  hash_init(opt, &hash, opt->urlhack);
+  opt->hash = &hash;
+
+  /* back_done_incache(), back_incache() and back_transferred() add up every
+     slot, each weighted by its index so a missed one shows */
+  for (k = 0; k < nprobe; k++) {
+    lien_back *const slot =
+        st_busyscans_attach(sback, probe[k], STATUS_READY, &r);
+
+    slot->r.adr = body;
+    slot->r.size = probe[k] + 1;
+    want += probe[k] + 1;
+  }
+  CHECK(back_done_incache(sback) == nprobe);
+  CHECK(back_incache(sback) == want);
+  CHECK(back_transferred(0, sback) == 0);
+  for (k = 0; k < nprobe; k++)
+    sback->lnk[probe[k]].status = STATUS_TRANSFER;
+  CHECK(back_done_incache(sback) == 0);
+  CHECK(back_transferred(0, sback) == want);
+  for (k = 0; k < nprobe; k++)
+    sback->lnk[probe[k]].r.adr = NULL;
+  CHECK(back_incache(sback) == 0);
+  st_busyscans_reset(opt, &cache, sback);
+
+  /* back_searchlive() finds the keep-alive slot of each host */
+  for (k = 0; k < nprobe; k++) {
+    lien_back *const slot =
+        st_busyscans_attach(sback, probe[k], STATUS_ALIVE, &r);
+
+    snprintf(slot->url_adr, sizeof(slot->url_adr), "h%d.example", probe[k]);
+    slot->r.keep_alive_t = 1000;
+    slot->ka_time_start = time_local();
+  }
+  for (k = 0; k < nprobe; k++) {
+    snprintf(host, sizeof(host), "h%d.example", probe[k]);
+    CHECK(back_searchlive(opt, sback, host) == probe[k]);
+  }
+  CHECK(back_searchlive(opt, sback, "none.example") == -1);
+  st_busyscans_reset(opt, &cache, sback);
+
+  /* back_clean() spools every finished page it may not finalize */
+  for (k = 0; k < nprobe; k++) {
+    lien_back *const slot =
+        st_busyscans_attach(sback, probe[k], STATUS_READY, &r);
+
+    slot->r.statuscode = HTTP_OK;
+    strcpybuff(slot->r.contenttype, "text/html");
+  }
+  back_clean(opt, &cache, sback);
+  CHECK(coucal_nitems(sback->ready) == (size_t) nprobe);
+  CHECK(back_done_incache(sback) == nprobe);
+  CHECK(back_available(sback) == SLOTS);
+
+  /* With no free slot, loading one back takes the keep-alive slot, the last */
+  for (i = 0; i < SLOTS - 1; i++) {
+    CHECK(back_search_quick(sback) == i);
+    sback->lnk[i].status = STATUS_WAIT_HEADERS;
+  }
+  st_busyscans_attach(sback, SLOTS - 1, STATUS_ALIVE, &r);
+  CHECK(back_index(opt, sback, "example.com", "/s0.html",
+                   "busyscans/s0.html") == SLOTS - 1);
+  CHECK(sback->lnk[SLOTS - 1].status == STATUS_READY);
+  st_busyscans_reset(opt, &cache, sback);
+
+  /* a user stop aborts every transfer */
+  for (k = 0; k < nprobe; k++)
+    st_busyscans_attach(sback, probe[k], STATUS_TRANSFER, &r);
+  hts_request_stop(opt, 0);
+  back_wait(sback, opt, &cache, 0);
+  opt->state.stop = 0;
+  for (k = 0; k < nprobe; k++)
+    CHECK(strcmp(sback->lnk[probe[k]].r.msg, "mirror stopped by user") == 0);
+  st_busyscans_reset(opt, &cache, sback);
+
+  /* a size cap past its grace aborts every transfer */
+  {
+    const LLint recv_was = hts_stat_recv_get();
+
+    for (k = 0; k < nprobe; k++)
+      st_busyscans_attach(sback, probe[k], STATUS_TRANSFER, &r);
+    opt->maxsite = 1000;
+    hts_stat_recv_set(100000);
+    back_wait(sback, opt, &cache, 0);
+    opt->maxsite = 0;
+    hts_stat_recv_set(recv_was);
+    opt->state.stop = 0;
+    for (k = 0; k < nprobe; k++)
+      CHECK(strcmp(sback->lnk[probe[k]].r.msg, "Mirror Size Limit") == 0);
+    st_busyscans_reset(opt, &cache, sback);
+  }
+
+  /* back_delete_all() sees a partial still being written in the last slot */
+  {
+    lien_back *const slot =
+        st_busyscans_attach(sback, SLOTS - 1, STATUS_TRANSFER, &r);
+
+    slot->r.is_write = 1;
+    opt->abort_left_partial = HTS_FALSE;
+    back_delete_all(opt, &cache, sback);
+    CHECK(opt->abort_left_partial);
+    opt->abort_left_partial = HTS_FALSE;
+  }
+#undef CHECK
+  back_free(&sback);
+  hash_free(&hash);
+  opt->hash = NULL;
+  coucal_delete(&cache.hashtable);
+  printf("busyscans self-test: %s\n", err ? "FAILED" : "OK");
+  return err ? 1 : 0;
+}
+
 const struct selftest_entry selftests_back[] = {
     {"iofatal", "<logfile>",
      "a disk-full abort logs its line and stops the mirror", st_iofatal},
@@ -2684,6 +2852,9 @@ const struct selftest_entry selftests_back[] = {
      st_mutexlazyinit},
     {"backswap", "", "which backlog slots may be swapped to the ready table",
      st_backswap},
+    {"busyscans", "<dir>",
+     "each slot-table scan reaches every slot in use, up to the last one",
+     st_busyscans},
     {"busyslots", "",
      "slot scans see every slot in use, through each status change",
      st_busyslots},
