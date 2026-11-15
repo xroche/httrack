@@ -23,5 +23,7 @@ bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
     --file-matches 'xmlbase/page.html' '<base href=""><applet codebase=""></applet>' \
     --file-matches 'xmlbase/page.html' '<p xml:base="">u</p><base href="">b<p' \
     --file-matches 'xmlbase/feed.feed' '<entry xml:base="" id="q"/></feed>' \
-    --file-matches 'xmlbase/page.html' '<p xml:base="">f</p><base href="">g<base href="">h<applet +codebase="x/" code="A\.class">i</applet></body>' \
+    --file-matches 'xmlbase/page.html' '<p xml:base="">f</p><base href="">g<base href="">h<applet +codebase="x/" code="A\.class">i</applet><p' \
+    --file-matches 'xmlbase/page.html' '</applet><p xml:base="">a src=leak2\.gif</p><base href="">z src=y\.gif </p></body>' \
+    --not-found 'xmlbase/a/y.gif' --not-found 'xmlbase/a/y.html' \
     httrack 'BASEURL/xmlbase/index.html'

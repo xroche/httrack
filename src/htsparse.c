@@ -3164,15 +3164,21 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         if (quote != '\0') {
                           while (a < end && *a != quote)
                             a++;
+                          if (a < end)
+                            eadr = a + 1;
+                          else if (eadr < end)
+                            eadr = end;
+                          lastsaved = eadr;
                         } else {
                           while (a < end && !is_realspace(*a) && *a != '>' &&
-                                 *a != '"' && *a != '\'')
+                                 !(noquote && (*a == '"' || *a == '\'')))
                             a++;
+                          // the main loop reads the terminator, unless the scan
+                          // did
+                          if (a != eadr - 1)
+                            eadr = a;
+                          lastsaved = a;
                         }
-                        if (a < end)
-                          eadr = a + 1;
-                        // an unquoted value's terminator is kept
-                        lastsaved = quote != '\0' ? eadr : eadr - 1;
                       }
                     }
                     /* */

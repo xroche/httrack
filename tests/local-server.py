@@ -920,6 +920,8 @@ class Handler(SimpleHTTPRequestHandler):
                 b'<base href=""><applet codebase=""></applet><p xml:base=blog/>u</p>'
                 b'<base href=blog/>b<p xml:base="blog/#f">f</p><base href="x/#f">g'
                 b'<base href=x/#f>h<applet codebase="x/#f" code="A.class">i</applet>'
+                b"<p xml:base=zq7/#x>a src=leak2.gif</p>"
+                b"<base href=a/#x>z src=y.gif </p>"
                 b"</body></html>\n",
                 "text/html",
             )
