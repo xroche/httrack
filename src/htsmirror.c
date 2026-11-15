@@ -815,7 +815,7 @@ void hts_mirror_process_user_interaction(htsmoduleStruct *str,
       if (hts_load_acquire_int(stre->exit_xh_)) {
         return;
       }
-      /* no pause once back_wait() has freed a socket */
+      /* skip the pause once back_wait() has freed a socket */
       if (hts_must_wait_socket(opt, sback))
         Sleep(100);
     }
