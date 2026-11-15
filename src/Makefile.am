@@ -107,7 +107,8 @@ libhttrack_la_SOURCES =  htscore.c htsusercmd.c htsmhtml.c htsparse.c htsmirror.
 	htsentities.h htsentities.sh htsbasiccharsets.sh htscodepages.h \
 	winprofile-keys.h \
 	md5.h coucal/murmurhash3.h \
-	minizip/crypt.h minizip/ioapi.h minizip/mztools.h minizip/unzip.h minizip/zip.h
+	minizip/crypt.h minizip/ints.h minizip/ioapi.h minizip/mztools.h \
+	minizip/skipset.h minizip/unzip.h minizip/zip.h
 libhttrack_la_LIBADD = $(THREADS_LIBS) $(ZLIB_LIBS) $(BROTLI_LIBS) $(ZSTD_LIBS) $(OPENSSL_LIBS) $(DL_LIBS) $(SOCKET_LIBS) $(ICONV_LIBS)
 # HTS_INTERNAL_BYTECODE shows the engine-only half of the headers to the library.
 libhttrack_la_CFLAGS = $(AM_CFLAGS) -DLIBHTTRACK_EXPORTS -DZLIB_CONST -DHTS_INTERNAL_BYTECODE
@@ -141,9 +142,11 @@ EXTRA_DIST = htsstats.h webhttrack.in \
 		minizip/zip.c.diff \
 		minizip/zip.h.diff \
 		minizip/mztools.c.diff \
+		minizip/unzip.c.diff \
 		minizip/ioapi.c.orig \
 		minizip/ioapi.h.orig \
 		minizip/mztools.c.orig \
+		minizip/unzip.c.orig \
 		minizip/zip.c.orig \
 		minizip/zip.h.orig \
 		minizip/MiniZip64_Changes.txt \

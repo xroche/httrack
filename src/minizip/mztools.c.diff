@@ -1,6 +1,6 @@
---- mztools.c.orig	2026-11-08 00:52:55.753801407 +0100
-+++ mztools.c	2026-11-08 00:52:55.753801407 +0100
-@@ -10,10 +10,11 @@
+--- mztools.c.orig	2026-11-15 22:04:45.654393472 +0100
++++ mztools.c	2026-11-15 22:10:02.370542762 +0100
+@@ -13,6 +13,7 @@
  #include <string.h>
  #include "zlib.h"
  #include "unzip.h"
@@ -8,19 +8,7 @@
  
  #define READ_8(adr)  ((unsigned char)*(adr))
  #define READ_16(adr) ( READ_8(adr) | (READ_8(adr+1) << 8) )
--#define READ_32(adr) ( READ_16(adr) | (READ_16((adr)+2) << 16) )
-+#define READ_32(adr) ((uLong) READ_16(adr) | ((uLong) READ_16((adr) + 2) << 16))
- 
- #define WRITE_8(buff, n) do { \
-   *((unsigned char*)(buff)) = (unsigned char) ((n) & 0xff); \
-@@ -32,16 +33,16 @@
-   FILE* fpZip = fopen(file, "rb");
-   FILE* fpOut = fopen(fileOut, "wb");
-   FILE* fpOutCD = fopen(fileOutTmp, "wb");
--  if (fpZip != NULL &&  fpOut != NULL) {
-+  if (fpZip != NULL && fpOut != NULL && fpOutCD != NULL) {
-     int entries = 0;
-     uLong totalBytes = 0;
+@@ -41,10 +42,10 @@
      char header[30];
      char filename[1024];
      char extra[1024];
@@ -34,7 +22,7 @@
  
        /* File entry */
        if (READ_32(header) == 0x04034b50) {
-@@ -110,39 +111,34 @@
+@@ -113,39 +114,34 @@
  
          /* Data */
          {
@@ -83,15 +71,15 @@
  
          /* Central directory entry */
          {
-           char header[46];
+           char central[46];
 -          char* comment = "";
 -          int comsize = (int) strlen(comment);
 +          const char* comment = "";
 +          const size_t comsize = strlen(comment);
-           WRITE_32(header, 0x02014b50);
-           WRITE_16(header + 4, version);
-           WRITE_16(header + 6, version);
-@@ -189,7 +185,7 @@
+           WRITE_32(central, 0x02014b50);
+           WRITE_16(central + 4, version);
+           WRITE_16(central + 6, version);
+@@ -192,7 +188,7 @@
  
              /* Comment field */
              if (comsize > 0) {
@@ -100,18 +88,18 @@
                  offsetCD += comsize;
                } else {
                  err = Z_ERRNO;
-@@ -216,8 +212,8 @@
+@@ -219,8 +215,8 @@
      {
        int entriesZip = entries;
-       char header[22];
--      char* comment = ""; // "ZIP File recovered by zlib/minizip/mztools";
+       char end[22];
+-      char* comment = ""; /* "ZIP File recovered by zlib/minizip/mztools"; */
 -      int comsize = (int) strlen(comment);
-+      const char* comment = ""; // "ZIP File recovered by zlib/minizip/mztools";
++      const char* comment = ""; /* "ZIP File recovered by zlib/minizip/mztools"; */
 +      const size_t comsize = strlen(comment);
        if (entriesZip > 0xffff) {
          entriesZip = 0xffff;
        }
-@@ -235,7 +231,7 @@
+@@ -238,7 +234,7 @@
  
          /* Comment field */
          if (comsize > 0) {
@@ -120,7 +108,7 @@
              err = Z_ERRNO;
            }
          }
-@@ -246,7 +242,10 @@
+@@ -249,7 +245,10 @@
      }
  
      /* Final merge (file + central directory) */
@@ -132,7 +120,14 @@
      if (err == Z_OK) {
        fpOutCD = fopen(fileOutTmp, "rb");
        if (fpOutCD != NULL) {
-@@ -264,7 +263,9 @@
+@@ -262,12 +261,16 @@
+           }
+         }
+         fclose(fpOutCD);
++      } else {
++        err = Z_ERRNO;
+       }
+     }
  
      /* Close */
      fclose(fpZip);
@@ -143,21 +138,22 @@
  
      /* Wipe temporary file */
      (void)remove(fileOutTmp);
-@@ -279,6 +280,18 @@
+@@ -282,12 +285,17 @@
        }
      }
    } else {
-+    /* Close and drop whatever did open, so a failed open leaks nothing. */
-+    if (fpZip != NULL) {
-+      fclose(fpZip);
-+    }
-+    if (fpOut != NULL) {
-+      fclose(fpOut);
-+      (void) remove(fileOut);
-+    }
+-    if (fpOutCD != NULL)
++    /* Drop whatever did open, so a failed open leaves no file behind. */
 +    if (fpOutCD != NULL) {
-+      fclose(fpOutCD);
+       fclose(fpOutCD);
 +      (void) remove(fileOutTmp);
++    }
+     if (fpZip != NULL)
+       fclose(fpZip);
+-    if (fpOut != NULL)
++    if (fpOut != NULL) {
+       fclose(fpOut);
++      (void) remove(fileOut);
 +    }
      err = Z_STREAM_ERROR;
    }

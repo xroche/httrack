@@ -1,0 +1,12 @@
+--- unzip.c.orig	2026-11-15 22:11:34.061600805 +0100
++++ unzip.c	2026-11-15 22:28:25.519399283 +0100
+@@ -866,7 +866,8 @@
+         lSeek += file_info.size_file_extra;
+ 
+ 
+-    if ((err==UNZ_OK) && (file_info.size_file_extra != 0))
++    /* httrack addition: parse only for ZIP64, a repaired cache keeps raw header text here */
++    if ((err==UNZ_OK) && (file_info.size_file_extra != 0) && (zip64_required != 0))
+     {
+                                 uLong acc = 0;
+ 

@@ -1,6 +1,6 @@
---- zip.h.orig	2026-11-15 19:48:17.210681955 +0100
-+++ zip.h	2026-11-15 20:08:24.310341872 +0100
-@@ -75,6 +75,9 @@
+--- zip.h.orig	2026-11-15 22:04:45.643393173 +0100
++++ zip.h	2026-11-15 22:04:45.641333305 +0100
+@@ -76,6 +76,9 @@
  #define ZIP_PARAMERROR                  (-102)
  #define ZIP_BADZIPFILE                  (-103)
  #define ZIP_INTERNALERROR               (-104)
@@ -10,9 +10,9 @@
  
  #ifndef DEF_MEM_LEVEL
  #  if MAX_MEM_LEVEL >= 8
-@@ -313,11 +316,30 @@
+@@ -319,11 +322,30 @@
    Write data in the zipfile
- */
+  */
  
 +extern int ZEXPORT zipFlush (zipFile file);
 +/*
@@ -22,7 +22,7 @@
  extern int ZEXPORT zipCloseFileInZip(zipFile file);
  /*
    Close the current file in the zipfile
- */
+  */
  
 +extern uLong ZEXPORT zipDeflateAllocations(zipFile file);
 +/*
@@ -41,9 +41,9 @@
  extern int ZEXPORT zipCloseFileInZipRaw(zipFile file,
                                          uLong uncompressed_size,
                                          uLong crc32);
-@@ -338,25 +360,6 @@
+@@ -350,25 +372,6 @@
    Close the zipfile
- */
+  */
  
 -
 -extern int ZEXPORT zipRemoveExtraInfoBlock(char* pData, int* dataLen, short sHeader);
@@ -62,7 +62,7 @@
 -
 -                        Remove ZIP64 Extra information from a Local File Header extra field data
 -        zipRemoveExtraInfoBlock(pLocalHeaderExtraFieldData, &nLocalHeaderExtraFieldDataLen, 0x0001);
--*/
+- */
 -
  #ifdef __cplusplus
  }
