@@ -1,0 +1,15 @@
+#!/bin/bash
+#
+# The URL dedup key and compare, against frozen copies of the versions
+# without the no-rules fast paths (-#test=hashdiff in htsname_selftest.c).
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# The counts are exact, so a shrinking corpus shows.
+selftest_queue_lines "hashdiff: 794112 cases, 0 failures, 60548 equal, 47492 of them rewritten
+hashdiff: OK" hashdiff
+
+selftest_run_queued

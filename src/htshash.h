@@ -57,6 +57,10 @@ void hash_free(hash_struct *hash);
    flags. */
 hts_boolean hash_url_equals(httrackp *opt, const char *adra, const char *fila,
                             const char *adrb, const char *filb);
+/* Test helper: as hash_url_equals, under HASH's flags and rules. */
+hts_boolean hash_url_equals_in(hash_struct *hash, const char *adra,
+                               const char *fila, const char *adrb,
+                               const char *filb);
 /* Build the dedup key of ADR/FIL, the canonical host then the path, into DST
    (DSTSIZE bytes) and return it. Each half is clipped to fit, so DST is always
    NUL-terminated; it only feeds the hash, never a comparison. */

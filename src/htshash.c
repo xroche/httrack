@@ -96,18 +96,13 @@ static const char *key_host_alias(const hash_struct *hash, const char *adr,
   return canon != NULL ? canon : adr;
 }
 
-/* see htshash.h */
-const char *hash_url_key(hash_struct *hash, const char *adr, const char *fil,
-                         char *dst, size_t dstsize) {
-  char BIGSTK aliasbuf[HTS_URLMAXSIZE * 2];
-  const char *const adr_canon =
-      adr != NULL ? key_host_alias(hash, adr, aliasbuf, sizeof(aliasbuf))
-                  : NULL;
-  const char *const adr_norm =
-      adr_canon != NULL
-          ? (hash->norm_host ? jump_normalized_const(adr_canon)
-                             : jump_identification_const(adr_canon))
-          : NULL;
+/* hash_url_key() once the host alias and the strip keys are resolved */
+static const char *hash_url_key_(const hash_struct *hash, const char *adr_canon,
+                                 const char *fil, const char *keys, char *dst,
+                                 size_t dstsize) {
+  const char *const adr_norm = hash->norm_host
+                                   ? jump_normalized_const(adr_canon)
+                                   : jump_identification_const(adr_canon);
 
   // copy address
   assertf(adr_norm != NULL);
@@ -118,10 +113,6 @@ const char *hash_url_key(hash_struct *hash, const char *adr, const char *fil,
   // copy link
   assertf(fil != NULL);
   {
-    /* resolve the per-URL strip keys; strip applies even when urlhack is off */
-    char BIGSTK keybuf[HTS_URLMAXSIZE];
-    const char *const keys = hts_query_strip_keys(hash->strip_query, adr_canon,
-                                                  fil, keybuf, sizeof(keybuf));
     const size_t used = strlen(dst);
     char *const tail = &dst[used];
     const size_t avail = dstsize - used;
@@ -139,6 +130,30 @@ const char *hash_url_key(hash_struct *hash, const char *adr, const char *fil,
   return dst;
 }
 
+/* Without rules, skip the buffers the hardened build zero-fills on each call */
+static hts_boolean hash_has_rules(const hash_struct *hash) {
+  return hash->host_alias != NULL || hash->strip_query != NULL;
+}
+
+/* see htshash.h */
+const char *hash_url_key(hash_struct *hash, const char *adr, const char *fil,
+                         char *dst, size_t dstsize) {
+  assertf(adr != NULL);
+  if (!hash_has_rules(hash)) {
+    return hash_url_key_(hash, adr, fil, NULL, dst, dstsize);
+  } else {
+    char BIGSTK aliasbuf[HTS_URLMAXSIZE * 2];
+    char BIGSTK keybuf[HTS_URLMAXSIZE];
+    const char *const adr_canon =
+        key_host_alias(hash, adr, aliasbuf, sizeof(aliasbuf));
+    /* the per-URL strip keys apply even when urlhack is off */
+    const char *const keys = hts_query_strip_keys(hash->strip_query, adr_canon,
+                                                  fil, keybuf, sizeof(keybuf));
+
+    return hash_url_key_(hash, adr_canon, fil, keys, dst, dstsize);
+  }
+}
+
 /* Pseudo-key (lien_url structure) hash function */
 static coucal_hashkeys
 key_adrfil_hashes_generic(void *arg, coucal_key_const value, const int former) {
@@ -149,6 +164,36 @@ key_adrfil_hashes_generic(void *arg, coucal_key_const value, const int former) {
 
   return coucal_hash_string(
       hash_url_key(hash, adr, fil, hash->normfil, sizeof(hash->normfil)));
+}
+
+/* key_adrfil_equals_generic() once the host aliases and the strip keys are
+   resolved */
+static int key_adrfil_equals_(hash_struct *hash, const char *a_canon,
+                              const char *a_fil, const char *keysa,
+                              const char *b_canon, const char *b_fil,
+                              const char *keysb) {
+  // skip scheme and authentication to the domain (possibly without www.)
+  const char *const ja = hash->norm_host ? jump_normalized_const(a_canon)
+                                         : jump_identification_const(a_canon);
+  const char *const jb = hash->norm_host ? jump_normalized_const(b_canon)
+                                         : jump_identification_const(b_canon);
+
+  assertf(ja != NULL);
+  assertf(jb != NULL);
+  if (strcasecmp(ja, jb) != 0) {
+    return 0;
+  }
+
+  // now compare pathes
+  if (hash->norm_slash || hash->norm_query || keysa != NULL || keysb != NULL) {
+    fil_normalized_filtered_ex(a_fil, hash->normfil, keysa, hash->norm_slash,
+                               hash->norm_query);
+    fil_normalized_filtered_ex(b_fil, hash->normfil2, keysb, hash->norm_slash,
+                               hash->norm_query);
+    return strcmp(hash->normfil, hash->normfil2) == 0;
+  } else {
+    return strcmp(a_fil, b_fil) == 0;
+  }
 }
 
 /* Pseudo-key (lien_url structure) comparison function */
@@ -163,10 +208,6 @@ static int key_adrfil_equals_generic(void *arg,
   const char *const b_adr = !former ? b->adr : b->former_adr;
   const char *const a_fil = !former ? a->fil : a->former_fil;
   const char *const b_fil = !former ? b->fil : b->former_fil;
-  char BIGSTK a_aliasbuf[HTS_URLMAXSIZE * 2], b_aliasbuf[HTS_URLMAXSIZE * 2];
-  const char *a_canon, *b_canon;
-  const char *ja;
-  const char *jb;
 
   // safety
   assertf(a_adr != NULL);
@@ -174,38 +215,26 @@ static int key_adrfil_equals_generic(void *arg,
   assertf(a_fil != NULL);
   assertf(b_fil != NULL);
 
-  a_canon = key_host_alias(hash, a_adr, a_aliasbuf, sizeof(a_aliasbuf));
-  b_canon = key_host_alias(hash, b_adr, b_aliasbuf, sizeof(b_aliasbuf));
-
-  // skip scheme and authentication to the domain (possibly without www.)
-  ja = hash->norm_host ? jump_normalized_const(a_canon)
-                       : jump_identification_const(a_canon);
-  jb = hash->norm_host ? jump_normalized_const(b_canon)
-                       : jump_identification_const(b_canon);
-  assertf(ja != NULL);
-  assertf(jb != NULL);
-  if (strcasecmp(ja, jb) != 0) {
-    return 0;
+  /* the same bytes normalize the same way */
+  if (strcmp(a_fil, b_fil) == 0 && strcmp(a_adr, b_adr) == 0) {
+    return 1;
   }
-
-  // now compare pathes
-  {
+  if (!hash_has_rules(hash)) {
+    return key_adrfil_equals_(hash, a_adr, a_fil, NULL, b_adr, b_fil, NULL);
+  } else {
+    char BIGSTK a_aliasbuf[HTS_URLMAXSIZE * 2], b_aliasbuf[HTS_URLMAXSIZE * 2];
     char BIGSTK ka[HTS_URLMAXSIZE], kb[HTS_URLMAXSIZE];
+    const char *const a_canon =
+        key_host_alias(hash, a_adr, a_aliasbuf, sizeof(a_aliasbuf));
+    const char *const b_canon =
+        key_host_alias(hash, b_adr, b_aliasbuf, sizeof(b_aliasbuf));
     const char *const keysa =
         hts_query_strip_keys(hash->strip_query, a_canon, a_fil, ka, sizeof(ka));
     const char *const keysb =
         hts_query_strip_keys(hash->strip_query, b_canon, b_fil, kb, sizeof(kb));
 
-    if (hash->norm_slash || hash->norm_query || keysa != NULL ||
-        keysb != NULL) {
-      fil_normalized_filtered_ex(a_fil, hash->normfil, keysa, hash->norm_slash,
-                                 hash->norm_query);
-      fil_normalized_filtered_ex(b_fil, hash->normfil2, keysb, hash->norm_slash,
-                                 hash->norm_query);
-      return strcmp(hash->normfil, hash->normfil2) == 0;
-    } else {
-      return strcmp(a_fil, b_fil) == 0;
-    }
+    return key_adrfil_equals_(hash, a_canon, a_fil, keysa, b_canon, b_fil,
+                              keysb);
   }
 }
 
@@ -339,13 +368,11 @@ void hash_free(hash_struct *hash) {
   }
 }
 
-/* Test helper: do the two URLs dedupe to the same key under opt's urlhack
-   flags? Exercises the live hash compare (norm_host/slash/query resolution). */
-hts_boolean hash_url_equals(httrackp *opt, const char *adra, const char *fila,
-                            const char *adrb, const char *filb) {
-  hash_struct hash;
+/* see htshash.h */
+hts_boolean hash_url_equals_in(hash_struct *hash, const char *adra,
+                               const char *fila, const char *adrb,
+                               const char *filb) {
   lien_url la, lb;
-  hts_boolean eq;
 
   memset(&la, 0, sizeof(la));
   memset(&lb, 0, sizeof(lb));
@@ -353,8 +380,18 @@ hts_boolean hash_url_equals(httrackp *opt, const char *adra, const char *fila,
   la.fil = key_duphandler(NULL, fila);
   lb.adr = key_duphandler(NULL, adrb);
   lb.fil = key_duphandler(NULL, filb);
+  return key_adrfil_equals(hash, &la, &lb) ? HTS_TRUE : HTS_FALSE;
+}
+
+/* Test helper: do the two URLs dedupe to the same key under opt's urlhack
+   flags? Exercises the live hash compare (norm_host/slash/query resolution). */
+hts_boolean hash_url_equals(httrackp *opt, const char *adra, const char *fila,
+                            const char *adrb, const char *filb) {
+  hash_struct hash;
+  hts_boolean eq;
+
   hash_init(opt, &hash, opt->urlhack);
-  eq = key_adrfil_equals(&hash, &la, &lb);
+  eq = hash_url_equals_in(&hash, adra, fila, adrb, filb);
   hash_free(&hash);
   return eq;
 }
