@@ -218,10 +218,9 @@ int back_max_slots(int maxsoc) {
   return maxsoc * 32 + 1024;
 }
 
-/* The busy bitmap lets slot scans skip free slots. A free slot is taken only
-   through back_search_quick() or back_slot_attach(), which set its bit. Only
-   back_busy_prune() clears bits, so a slot freed and reused in place keeps it.
- */
+/* Slot scans skip slots whose busy bit is clear. back_search_quick() sets the
+   bit when it takes a free slot. back_busy_prune() clears it after the slot is
+   free again. */
 /* At least one word, so an empty table still allocates. */
 static size_t back_busy_words(int count) { return (size_t) count / 64 + 1; }
 
@@ -267,6 +266,11 @@ static int back_busy_after(const struct_back *sback, int start, int i) {
 #define BACK_FOR_EACH_BUSY(sback, i)                                           \
   for ((i) = back_busy_next((sback), 0, (sback)->count); (i) >= 0;             \
        (i) = back_busy_next((sback), (i) + 1, (sback)->count))
+
+/* Busy slots in rotated order from start, as back_busy_first() gives them. */
+#define BACK_FOR_EACH_BUSY_FROM(sback, start, i)                               \
+  for ((i) = back_busy_first((sback), (start)); (i) >= 0;                      \
+       (i) = back_busy_after((sback), (start), (i)))
 
 static void back_busy_prune(struct_back *sback) {
   int i;
@@ -3302,8 +3306,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
     nfds = INVALID_SOCKET;
 
     max_c = 1;
-    for (i = back_busy_first(sback, start); i >= 0;
-         i = back_busy_after(sback, start, i)) {
+    BACK_FOR_EACH_BUSY_FROM(sback, start, i) {
       // One status read serves every branch below.
       const int st = back_status(&back[i]);
 
@@ -3419,8 +3422,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
       busy_recv = 0;
 
     // recevoir les données arrivées
-    for (i = back_busy_first(sback, start); i >= 0;
-         i = back_busy_after(sback, start, i)) {
+    BACK_FOR_EACH_BUSY_FROM(sback, start, i) {
       // winsock flags a failed connect in the exception set only: leave a
       // connecting slot to the connect handler, which can still fall back
       if (back_status(&back[i]) > 0 &&
@@ -4902,8 +4904,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
       TStamp act;
 
       act = time_local();       // temps en secondes
-      for (i = back_busy_first(sback, start); i >= 0;
-           i = back_busy_after(sback, start, i)) {
+      BACK_FOR_EACH_BUSY_FROM(sback, start, i) {
         if (back_is_live(back_status(&back[i]))) { // receiving, connecting, ..
           if (back[i].timeout > 0) {
             // a stuck connect with a fallback address: retry the next one
