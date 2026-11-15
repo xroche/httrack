@@ -2334,7 +2334,7 @@ hts_boolean back_delayed_rename(httrackp *opt, lien_back *back,
   if (back->tmpfile != NULL && back->r.compressed)
     return HTS_TRUE; /* the body goes to tmpfile, not the placeholder */
   if (back->tmpfile != NULL) {
-    /* a backup of what an earlier run left under the placeholder name */
+    /* the backup of an earlier run's placeholder, never to be restored */
     if (UNLINK(back->tmpfile) == 0)
       hts_log_print(opt, LOG_DEBUG, "removed a stale placeholder %s",
                     back->url_sav);

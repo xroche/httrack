@@ -3441,10 +3441,8 @@ class Handler(SimpleHTTPRequestHandler):
                 time.sleep(0.15)  # several appends after the move
         except OSError:
             pass
-        if cut:
-            self.close_connection = True
 
-    # The same page, dropped halfway once its placeholder has moved.
+    # The same page, dropped halfway.
     def route_dmovecut_page(self):
         self.route_dmove_page(cut=True)
 

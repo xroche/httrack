@@ -17,13 +17,15 @@ crawl() {
     local_server_start --log "$tmpdir/server-$1.log"
     dir="$out/127.0.0.1_$SRV_PORT/$1"
     mkdir -p "$dir"
-    # The name 2364's fixture writes p0 under once -M has stopped the crawl.
+    # 2364's stop fixture writes p0 under this name.
     echo stale-leftover >"$dir/p0.bin.0.delayed"
     local_crawl --log "$tmpdir/crawl-$1.log" -O "$out" -M50000 -c2 -%N1 -Z \
         --quiet --timeout=30 --disable-security-limits --robots=0 \
-        "$BASEURL/$1/index.html" || true
+        "$BASEURL/$1/index.html"
     local_server_stop "$SRV_PID"
 
+    assert_logged "$out" "removed a stale placeholder .*p0\\.bin\\.0\\.delayed" \
+        "$1: no backup of the old placeholder was taken"
     assert_logged "$out" "moved placeholder .*p0\\.bin\\.0\\.delayed to " \
         "$1: p0 was not written under its placeholder"
     ! grep -qE 'was never created|could not restore' "$out/hts-log.txt" ||
@@ -31,7 +33,7 @@ crawl() {
     assert_file "$dir/p0.bin.html"
     ! grep -q stale-leftover "$dir/p0.bin.html" ||
         fail "$1: p0.bin.html holds the previous run's placeholder"
-    assert_eq "$2" "$(wc -c <"$dir/p0.bin.html" | tr -d ' ')" "$1: p0.bin.html bytes"
+    assert_eq "$2" "$(size_of "$dir/p0.bin.html")" "$1: p0.bin.html bytes"
     grep -q "^$3\$" "$dir/p0.bin.html" || fail "$1: p0.bin.html lacks line $3"
     test ! -e "$dir/p0.bin.0.delayed" || fail "$1: placeholder left behind"
     test ! -e "$dir/~hts-tmp" || fail "$1: backup left in ~hts-tmp"
