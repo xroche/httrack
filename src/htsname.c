@@ -522,6 +522,35 @@ static void save_append_name_head(char *save, size_t size, const char *name) {
   save_append_tail(save, size, head);
 }
 
+/* Byte offset of each character of s, plus strlen(s) last; *nChars gets the
+   count. A malformed byte is one character. NULL if out of memory. */
+static size_t *utf8_char_offsets(const char *s, size_t *nChars) {
+  const size_t size = strlen(s);
+  size_t *const pos = malloct((size + 1) * sizeof(size_t));
+  size_t i, n;
+
+  if (pos == NULL)
+    return NULL;
+  for (i = 0, n = 0; i < size; n++) {
+    const size_t len = hts_readUTF8(s + i, size - i, NULL);
+
+    pos[n] = i;
+    i += len != 0 ? len : 1;
+  }
+  pos[n] = size;
+  *nChars = n;
+  return pos;
+}
+
+/* Move character k of s down to byte *out. Characters must be kept in order,
+   so the move never overwrites one not yet read. */
+static void utf8_keep_char(char *s, const size_t *pos, size_t k, size_t *out) {
+  const size_t len = pos[k + 1] - pos[k];
+
+  memmove(s + *out, s + pos[k], len);
+  *out += len;
+}
+
 /* Where the tail a cut keeps starts: ".<hexid>.delayed" or a short ext. */
 static size_t save_tail_offset(const char *save) {
   const size_t len = strlen(save);
@@ -1860,11 +1889,11 @@ int url_savename(lien_adrfilsave *const afs,
   if (hts_stringLengthUTF8(afs->save) +
       hts_stringLengthUTF8(StringBuff(opt->path_html_utf8)) >=
       HTS_MAX_PATH_LEN) {
-    // convert to Unicode (much simpler)
+    // Count in characters, but keep the original bytes: a UCS-4 round trip
+    // makes each malformed byte a 3-byte U+FFFD, overflowing afs->save.
     size_t wsaveLen;
-    hts_UCS4 *wsave =
-        hts_convertUTF8StringToUCS4(afs->save, strlen(afs->save), &wsaveLen);
-    if (wsave != NULL) {
+    size_t *wpos = utf8_char_offsets(afs->save, &wsaveLen);
+    if (wpos != NULL) {
       const size_t parentLen =
         hts_stringLengthUTF8(StringBuff(opt->path_html_utf8));
       // parent path length is not insane (otherwise, ignore and pick 200 as
@@ -1873,12 +1902,13 @@ int url_savename(lien_adrfilsave *const afs,
         parentLen <
         HTS_MAX_PATH_LEN - HTS_MAX_PATH_LEN / 4
         ? HTS_MAX_PATH_LEN - parentLen : HTS_MAX_PATH_LEN;
-      size_t i, j, lastSeg, lastSegSize, dirSize;
-      char *saveFinal;
+      size_t i, j, lastSeg, lastSegSize, dirSize, out = 0;
+      // before the cut below starts moving bytes
+      const size_t markByte = save_tail_offset(afs->save);
 
       // pick up last segment
-      for(i = 0, lastSeg = 0; wsave[i] != '\0'; i++) {
-        if (wsave[i] == '/') {
+      for (i = 0, lastSeg = 0; i < wsaveLen; i++) {
+        if (afs->save[wpos[i]] == '/') {
           lastSeg = i + 1;
         }
       }
@@ -1890,67 +1920,59 @@ int url_savename(lien_adrfilsave *const afs,
         lastSegSize = MIN_LAST_SEG_RESERVE;
       }
 
-      // add as much pathes as we can.
-      // note: i is in bytes, iUtf in characters
+      // add as much pathes as we can (i and j count characters)
       for(i = 0, j = 0, dirSize = 0
         ; i + 1 < lastSeg && j + lastSegSize < maxLen; i++) {
           // reset segment counting
-          if (wsave[i] == '/') {
+          if (afs->save[wpos[i]] == '/') {
             dirSize = 0;
           }
 
           // copy if not too long
           if (dirSize < MAX_SEG_LEN) {
-            wsave[j++] = wsave[i];
+            utf8_keep_char(afs->save, wpos, i, &out);
+            j++;
             dirSize++;
           }
       }
 
-      // last segment. Skip the separator when the name has no directory part:
-      // the copy below would run ahead of its own source and overwrite it.
-      if (lastSeg > 0)
-        wsave[j++] = '/';
+      // last segment, after its separator if the name has a directory part
+      if (lastSeg > 0) {
+        utf8_keep_char(afs->save, wpos, lastSeg - 1, &out);
+        j++;
+      }
 #define MAX_UTF8_SEQ_CHARS 4
       {
         // #623: the ".delayed" placeholder marker sits at the tail; cutting
         // through it drops IS_DELAYED_EXT, so the file is never renamed to its
         // final name. Reserve the trailing ".<id>.delayed" across the cut.
-        const size_t markStart =
-            wsaveLen -
-            hts_stringLengthUTF8(afs->save + save_tail_offset(afs->save));
+        size_t markStart;
         // #852: clamp the name like any directory segment; it was bounded by
         // the whole path alone, so one component could run to maxLen.
-        const size_t tailLen = wsaveLen - markStart;
-        const size_t headLen =
-            tailLen < MAX_SEG_LEN ? MAX_SEG_LEN - tailLen : 0;
+        size_t tailLen, headLen;
+
+        for (markStart = wsaveLen;
+             markStart > 0 && wpos[markStart - 1] >= markByte; markStart--)
+          ;
+        tailLen = wsaveLen - markStart;
+        headLen = tailLen < MAX_SEG_LEN ? MAX_SEG_LEN - tailLen : 0;
 
         // head, bounded so the reserved tail still fits, then the tail itself
         for (i = lastSeg; i < markStart && i - lastSeg < headLen &&
                           j < maxLen && tailLen < maxLen - j;
-             i++)
-          wsave[j++] = wsave[i];
-        for (i = markStart; i < wsaveLen && j < maxLen; i++)
-          wsave[j++] = wsave[i];
+             i++, j++)
+          utf8_keep_char(afs->save, wpos, i, &out);
+        for (i = markStart; i < wsaveLen && j < maxLen; i++, j++)
+          utf8_keep_char(afs->save, wpos, i, &out);
       }
-      // terminating \0
-      wsave[j++] = '\0';
-
-      // copy final name and cleanup
-      saveFinal = hts_convertUCS4StringToUTF8(wsave, j);
-      if (saveFinal != NULL) {
-        strcpybuff(afs->save, saveFinal);
-        freet(saveFinal);
-      } else {
-        hts_log_print(opt, LOG_ERROR, "Could not revert to UTF-8: %s%s",
-                      adr_nologin(opt, adr_complete), fil_complete);
-      }
-      freet(wsave);
+      afs->save[out] = '\0';
+      freet(wpos);
 
       // log in debug
       hts_log_print(opt, LOG_DEBUG, "Too long filename shortened: %s%s => %s",
                     adr_nologin(opt, adr_complete), fil_complete, afs->save);
     } else {
-      hts_log_print(opt, LOG_ERROR, "Could not read UTF-8: %s", afs->save);
+      hts_log_print(opt, LOG_ERROR, "Out of memory shortening: %s", afs->save);
     }
 
     // Re-check again ending space or dot after cut (see bug #5)
