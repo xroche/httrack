@@ -2829,6 +2829,11 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
         freet(itemback);        /* delete item */
         itemback = NULL;
       }
+      /* placeholders are numbered per run, so this one is another run's */
+      else if (IS_DELAYED_EXT(save) && fexist_utf8(save)) {
+        hts_log_print(opt, LOG_DEBUG, "Removing a stale placeholder %s", save);
+        (void) UNLINK(save);
+      }
       /* Not in cache or temporary cache ; found on disk ? (hack)
          (skipped on a forced whole refetch, #581) */
       else if (!refetch_whole && fexist_utf8(save)) {

@@ -3439,6 +3439,32 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_raw(b"o" * 16, "text/plain")
         Handler.dmove_other_done.set()
 
+    # Honors any Range, so a resume onto a foreign placeholder splices its bytes.
+    STALEPART_BODY = b"".join(b"%07d\n" % k for k in range(400))
+
+    def route_stalepart_index(self):
+        self.send_html('<a href="blob.bin">blob</a>')
+
+    def route_stalepart_blob(self):
+        body = self.STALEPART_BODY
+        rng = self.headers.get("Range") or ""
+        start = (
+            int(rng[len("bytes=") :].split("-")[0]) if rng.startswith("bytes=") else 0
+        )
+        if 0 < start < len(body):
+            self.send_response(206, "Partial Content")
+            self.send_header(
+                "Content-Range", "bytes %d-%d/%d" % (start, len(body) - 1, len(body))
+            )
+            body = body[start:]
+        else:
+            self.send_response(200)
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(body)
+
     # 60 bytes under -M5000, so the cap trips while p0's headers trickle (#1854).
     DHARD_INDEX_BYTES = 5000 - 60
 
@@ -4568,6 +4594,8 @@ class Handler(SimpleHTTPRequestHandler):
         "/dmove/index.html": route_dmove_index,
         "/dmove/p0.bin": route_dmove_page,
         "/dmove/p1.txt": route_dmove_other,
+        "/stalepart/index.html": route_stalepart_index,
+        "/stalepart/blob.bin": route_stalepart_blob,
         "/dhard/index.html": route_dhard_index,
         "/dhard/p0.bin": route_dhard_page,
         "/dcap/p0.bin": route_dcancel_page,
