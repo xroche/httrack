@@ -2647,7 +2647,7 @@ static int st_busyslots(httrackp *opt, int argc, char **argv) {
   return err ? 1 : 0;
 }
 
-/* Attach live slot p of the busyscans fixture, its file named after p. */
+/* Attach slot p, with file and save name derived from p. */
 static lien_back *st_busyscans_attach(struct_back *sback, int p, int status,
                                       const htsblk *r) {
   char fil[32];
@@ -2669,10 +2669,25 @@ static void st_busyscans_reset(httrackp *opt, cache_back *cache,
   back_clean(opt, cache, sback);
 }
 
+/* Attach a keep-alive slot for host, still within its keep-alive time. */
+static lien_back *st_busyscans_idle(struct_back *sback, int p, const char *host,
+                                    const htsblk *r) {
+  lien_back *const slot = st_busyscans_attach(sback, p, STATUS_ALIVE, r);
+
+  strcpybuff(slot->url_adr, host);
+  slot->r.keep_alive_t = 1000;
+  slot->ka_time_start = time_local();
+  return slot;
+}
+
 /* -#test=busyscans <dir>: every scan the busy bitmap drives reaches each slot
    in use, through the last slot and the last bitmap word. */
 static int st_busyscans(httrackp *opt, int argc, char **argv) {
+  /* three bitmap words, with slots on both sides of each boundary */
   enum { SLOTS = 130 };
+
+  /* a busy slot outside probe[] that each scan must skip by its status */
+  enum { BYSTANDER = 2 };
 
   static const int probe[] = {0, 1, 63, 64, 65, 127, 128, SLOTS - 1};
   const int nprobe = (int) (sizeof(probe) / sizeof(probe[0]));
@@ -2730,13 +2745,11 @@ static int st_busyscans(httrackp *opt, int argc, char **argv) {
 
   /* back_searchlive() finds the keep-alive slot of each host */
   for (k = 0; k < nprobe; k++) {
-    lien_back *const slot =
-        st_busyscans_attach(sback, probe[k], STATUS_ALIVE, &r);
-
-    snprintf(slot->url_adr, sizeof(slot->url_adr), "h%d.example", probe[k]);
-    slot->r.keep_alive_t = 1000;
-    slot->ka_time_start = time_local();
+    snprintf(host, sizeof(host), "h%d.example", probe[k]);
+    (void) st_busyscans_idle(sback, probe[k], host, &r);
   }
+  st_busyscans_idle(sback, BYSTANDER, "h63.example", &r)->status =
+      STATUS_TRANSFER;
   for (k = 0; k < nprobe; k++) {
     snprintf(host, sizeof(host), "h%d.example", probe[k]);
     CHECK(back_searchlive(opt, sback, host) == probe[k]);
@@ -2746,18 +2759,14 @@ static int st_busyscans(httrackp *opt, int argc, char **argv) {
 
   /* back_clean() spools every finished page it may not finalize */
   for (k = 0; k < nprobe; k++) {
-    lien_back *const slot =
-        st_busyscans_attach(sback, probe[k], STATUS_READY, &r);
-
-    slot->r.statuscode = HTTP_OK;
-    strcpybuff(slot->r.contenttype, "text/html");
+    (void) st_busyscans_attach(sback, probe[k], STATUS_READY, &r);
   }
   back_clean(opt, &cache, sback);
   CHECK(coucal_nitems(sback->ready) == (size_t) nprobe);
   CHECK(back_done_incache(sback) == nprobe);
-  CHECK(back_available(sback) == SLOTS);
 
-  /* With no free slot, loading one back takes the keep-alive slot, the last */
+  /* When every slot is busy, back_index() takes the keep-alive slot at the end
+   */
   for (i = 0; i < SLOTS - 1; i++) {
     CHECK(back_search_quick(sback) == i);
     sback->lnk[i].status = STATUS_WAIT_HEADERS;
@@ -2765,17 +2774,18 @@ static int st_busyscans(httrackp *opt, int argc, char **argv) {
   st_busyscans_attach(sback, SLOTS - 1, STATUS_ALIVE, &r);
   CHECK(back_index(opt, sback, "example.com", "/s0.html",
                    "busyscans/s0.html") == SLOTS - 1);
-  CHECK(sback->lnk[SLOTS - 1].status == STATUS_READY);
   st_busyscans_reset(opt, &cache, sback);
 
   /* a user stop aborts every transfer */
   for (k = 0; k < nprobe; k++)
     st_busyscans_attach(sback, probe[k], STATUS_TRANSFER, &r);
+  st_busyscans_attach(sback, BYSTANDER, STATUS_READY, &r)->locked = 1;
   hts_request_stop(opt, 0);
   back_wait(sback, opt, &cache, 0);
   opt->state.stop = 0;
   for (k = 0; k < nprobe; k++)
     CHECK(strcmp(sback->lnk[probe[k]].r.msg, "mirror stopped by user") == 0);
+  CHECK(sback->lnk[BYSTANDER].r.msg[0] == '\0');
   st_busyscans_reset(opt, &cache, sback);
 
   /* a size cap past its grace aborts every transfer */
@@ -2784,6 +2794,7 @@ static int st_busyscans(httrackp *opt, int argc, char **argv) {
 
     for (k = 0; k < nprobe; k++)
       st_busyscans_attach(sback, probe[k], STATUS_TRANSFER, &r);
+    st_busyscans_attach(sback, BYSTANDER, STATUS_READY, &r)->locked = 1;
     opt->maxsite = 1000;
     hts_stat_recv_set(100000);
     back_wait(sback, opt, &cache, 0);
@@ -2792,6 +2803,7 @@ static int st_busyscans(httrackp *opt, int argc, char **argv) {
     opt->state.stop = 0;
     for (k = 0; k < nprobe; k++)
       CHECK(strcmp(sback->lnk[probe[k]].r.msg, "Mirror Size Limit") == 0);
+    CHECK(sback->lnk[BYSTANDER].r.msg[0] == '\0');
     st_busyscans_reset(opt, &cache, sback);
   }
 

@@ -678,7 +678,7 @@ LLint back_incache(const struct_back * sback) {
   return sum;
 }
 
-/* Finished results not taken yet, in slots or spooled. */
+/* Counts finished results not yet taken, in slots or spooled. */
 int back_done_incache(const struct_back * sback) {
   const lien_back *const back = sback->lnk;
   int i;
