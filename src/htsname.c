@@ -522,8 +522,9 @@ static void save_append_name_head(char *save, size_t size, const char *name) {
   save_append_tail(save, size, head);
 }
 
-/* Return the byte offset of each character of s, then strlen(s), and set
- *nChars. A malformed byte is one character. NULL if out of memory. */
+/* Return the byte offset of each character of s, then strlen(s), and store
+   their count in *nChars. A malformed byte is one character. NULL if out of
+   memory. */
 static size_t *utf8_char_offsets(const char *s, size_t *nChars) {
   const size_t size = strlen(s);
   size_t *const pos = malloct((size + 1) * sizeof(size_t));
