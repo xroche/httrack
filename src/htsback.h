@@ -202,6 +202,9 @@ unsigned long back_self_pid(void);
    failure. */
 hts_boolean back_spool_write(httrackp *opt, const char *filename,
                              const lien_back *back);
+/* Moves every finished, unlocked slot to the spool and returns how many. */
+int back_cleanup_background(httrackp *opt, cache_back *cache,
+                            struct_back *sback);
 /* Remove spool files whose process is gone or is this one. Call before this
    run spools anything. */
 void back_spool_sweep(httrackp *opt);
