@@ -747,11 +747,9 @@ size_t hts_copyStringUTF8(char *dest, const char *src, size_t size) {
 
   for (i = 0; i < size && bytes[i] != '\0'; i++)
     ;
-  // clipped: back off to the start of the cut sequence
-  if (bytes[i] != '\0') {
-    while (i > 0 && !HTS_IS_LEADING_UTF8(bytes[i]))
-      i--;
-  }
+  // never end inside a UTF-8 sequence (a NUL counts as a leading byte)
+  while (i > 0 && !HTS_IS_LEADING_UTF8(bytes[i]))
+    i--;
   memcpy(dest, src, i);
   dest[i] = '\0';
 

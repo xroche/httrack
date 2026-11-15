@@ -312,7 +312,6 @@ static int st_copy_utf8(httrackp *opt, int argc, char **argv) {
 
   fail |= copy_utf8_case("", 8, "");
   fail |= copy_utf8_case("a", 8, "a");
-  fail |= copy_utf8_case("abc", 8, "abc");
   fail |= copy_utf8_case("abcdefgh", 8, "abcdefgh");
   fail |= copy_utf8_case("abcdefghi", 8, "abcdefgh");
   fail |= copy_utf8_case("abc", 0, "");
@@ -320,6 +319,9 @@ static int st_copy_utf8(httrackp *opt, int argc, char **argv) {
   fail |= copy_utf8_case("abcdefg\xc3\xbc", 8, "abcdefg");
   fail |= copy_utf8_case("abcdefg\xc3\xbc", 9, "abcdefg\xc3\xbc");
   fail |= copy_utf8_case("m\xc3\xbcnchen", 2, "m");
+  fail |= copy_utf8_case("ab\xe2\x82\xac", 4, "ab");
+  fail |= copy_utf8_case("\xc3\xbc", 1, "");
+  fail |= copy_utf8_case("\xc3\xbc\xc3\xbc", 3, "\xc3\xbc");
   if (fail)
     return 1;
   printf("copy-utf8 self-test OK\n");
