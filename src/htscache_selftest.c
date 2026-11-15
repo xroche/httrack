@@ -4307,6 +4307,111 @@ static int st_zip_abandon_notrunc(httrackp *opt, int argc, char **argv) {
   return st_verdict("zip-abandon-notrunc", fail);
 }
 
+/* Fill buf with text compressible enough to use the whole deflate window. */
+static void zbuf_fill(char *buf, size_t len, unsigned seed) {
+  size_t i;
+
+  for (i = 0; i < len; i++) {
+    seed = seed * 1103515245u + 12345u;
+    buf[i] = (char) ('a' + (seed >> 16) % 7);
+  }
+}
+
+#define ZBUF_MEMBERS 24
+#define ZBUF_MAXLEN 70000
+
+static size_t zbuf_len(int i) { return 1000 + (size_t) i * 2851; }
+
+/* Members after the first allocate no deflate buffer, and each one reads back
+   byte-exact although it was compressed in buffers reused dirty. */
+static int cache_zbuf_selftest(httrackp *opt, const char *dir) {
+  static char data[ZBUF_MAXLEN], back[ZBUF_MAXLEN];
+  char path[HTS_URLMAXSIZE];
+  cache_back cache;
+  zip_fileinfo fi;
+  zipFile zf;
+  unzFile uf;
+  ZPOS64_T first = 0;
+  int failures = 0;
+  int i;
+
+  snprintf(path, sizeof(path), "%s/zbuf.zip", dir);
+  zf = hts_zipOpen_utf8(path, 0);
+  assertf(zf != NULL);
+  memset(&fi, 0, sizeof(fi));
+  for (i = 0; i < ZBUF_MEMBERS; i++) {
+    char name[32];
+    /* mixed levels share one buffer layout; a stored member allocates none */
+    const int method = i == 5 ? 0 : Z_DEFLATED;
+    const int level = i % 3 == 0 ? Z_DEFAULT_COMPRESSION : i % 3 == 1 ? 1 : 9;
+
+    snprintf(name, sizeof(name), "m%02d", i);
+    zbuf_fill(data, zbuf_len(i), (unsigned) i);
+    assertf(zipOpenNewFileInZip(zf, name, &fi, NULL, 0, NULL, 0, NULL, method,
+                                level) == ZIP_OK);
+    assertf(zipWriteInFileInZip(zf, data, (unsigned) zbuf_len(i)) == ZIP_OK);
+    assertf(zipCloseFileInZip(zf) == ZIP_OK);
+    if (i == 0)
+      first = zipDeflateAllocations(zf);
+  }
+  if (first == 0 || zipDeflateAllocations(zf) != first) {
+    fprintf(stderr,
+            "cache-zbuf: %d members made %d deflate allocations, "
+            "the first alone %d\n",
+            ZBUF_MEMBERS, (int) zipDeflateAllocations(zf), (int) first);
+    failures++;
+  }
+  assertf(zipClose(zf, NULL) == ZIP_OK);
+
+  uf = hts_unzOpen_utf8(path);
+  assertf(uf != NULL);
+  assertf(unzGoToFirstFile(uf) == UNZ_OK);
+  for (i = 0; i < ZBUF_MEMBERS; i++) {
+    const size_t len = zbuf_len(i);
+
+    assertf(unzOpenCurrentFile(uf) == UNZ_OK);
+    zbuf_fill(data, len, (unsigned) i);
+    if (unzReadCurrentFile(uf, back, ZBUF_MAXLEN) != (int) len ||
+        memcmp(back, data, len) != 0) {
+      fprintf(stderr, "cache-zbuf: member %d does not read back\n", i);
+      failures++;
+    }
+    assertf(unzCloseCurrentFile(uf) == UNZ_OK);
+    if (i + 1 < ZBUF_MEMBERS)
+      assertf(unzGoToNextFile(uf) == UNZ_OK);
+  }
+  unzClose(uf);
+
+  /* the cache writer goes through the same buffers */
+  selftest_tag = "cache-zbuf";
+  selftest_setup_dir(opt, dir);
+  selftest_open_for_write(&cache, opt);
+  assertf(cache.zipOutput != NULL);
+  for (i = 0; i < 8; i++) {
+    char fil[32];
+
+    snprintf(fil, sizeof(fil), "/p%d.html", i);
+    zbuf_fill(data, 20000, (unsigned) i);
+    store_entry(opt, &cache, "example.com", fil, "example.com/p.html", 200,
+                "OK", "text/html", "utf-8", "", "", "", "", data, 20000);
+    if (i == 0)
+      first = zipDeflateAllocations(cache.zipOutput);
+  }
+  if (first == 0 || zipDeflateAllocations(cache.zipOutput) != first) {
+    fprintf(stderr,
+            "cache-zbuf: 8 cache entries made %d deflate "
+            "allocations, the first alone %d\n",
+            (int) zipDeflateAllocations(cache.zipOutput), (int) first);
+    failures++;
+  }
+  selftest_close(&cache);
+  return failures;
+}
+
+static int st_cache_zbuf(httrackp *opt, int argc, char **argv) {
+  return st_verdict("cache-zbuf", cache_zbuf_selftest(opt, argv[0]));
+}
+
 static int st_cache_legacy(httrackp *opt, int argc, char **argv) {
   int err;
 
@@ -4633,6 +4738,8 @@ const struct selftest_entry selftests_cache[] = {
      st_cache_writefail},
     {"reconcile", "<dir>", "cache generation reconcile policy self-test",
      st_reconcile},
+    {"cache-zbuf", "<dir>", "deflate buffers reused across cache members",
+     st_cache_zbuf},
     {"cache-legacy", "<dir>", "pre-3.31 legacy cache refusal self-test",
      st_cache_legacy},
     {"ref-portable", "<dir>",

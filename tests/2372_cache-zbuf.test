@@ -1,0 +1,14 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# Cache members after the first reuse the deflate buffers and read back intact.
+
+dir=$(mktemp -d)
+cleanup_push rm -rf "$dir"
+
+assert_selftest 'cache-zbuf: OK' cache-zbuf "$dir"

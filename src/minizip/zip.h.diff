@@ -1,5 +1,5 @@
---- zip.h.orig	2026-09-03 22:29:36.862585755 +0200
-+++ zip.h	2026-09-03 22:38:26.836034035 +0200
+--- zip.h.orig	2026-11-15 19:48:17.210681955 +0100
++++ zip.h	2026-11-15 19:55:00.497317837 +0100
 @@ -75,6 +75,9 @@
  #define ZIP_PARAMERROR                  (-102)
  #define ZIP_BADZIPFILE                  (-103)
@@ -10,7 +10,7 @@
  
  #ifndef DEF_MEM_LEVEL
  #  if MAX_MEM_LEVEL >= 8
-@@ -313,11 +316,24 @@
+@@ -313,11 +316,29 @@
    Write data in the zipfile
  */
  
@@ -24,6 +24,11 @@
    Close the current file in the zipfile
  */
  
++extern ZPOS64_T ZEXPORT zipDeflateAllocations(zipFile file);
++/*
++  httrack addition: how many deflate buffers this zipfile allocated, for tests
++*/
++
 +extern int ZEXPORT zipAbandonFileInZip(zipFile file);
 +/*
 +  Roll back the current file in the zipfile: the write position returns to its
@@ -35,7 +40,7 @@
  extern int ZEXPORT zipCloseFileInZipRaw(zipFile file,
                                          uLong uncompressed_size,
                                          uLong crc32);
-@@ -338,25 +354,6 @@
+@@ -338,25 +359,6 @@
    Close the zipfile
  */
  
