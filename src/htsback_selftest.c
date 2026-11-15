@@ -2415,6 +2415,238 @@ static int st_iofatal(httrackp *opt, int argc, char **argv) {
   return st_verdict("iofatal self-test", err);
 }
 
+/* Make slot i one back_clean() finalizes and frees: READY, on disk, not HTML.
+ */
+static void st_busy_finalizable(lien_back *slot, int i) {
+  slot->status = STATUS_READY;
+  slot->finalized = 1;
+  slot->locked = 0;
+  slot->testmode = 0;
+  slot->early_add = 0;
+  slot->r.is_write = 1;
+  slot->r.statuscode = HTTP_OK;
+  slot->r.size = 0;
+  slot->r.keep_alive = 0;
+  strcpybuff(slot->r.contenttype, "image/png");
+  snprintf(slot->url_fil, sizeof(slot->url_fil), "/busy%d.png", i);
+  snprintf(slot->url_sav, sizeof(slot->url_sav), "busyslots-none/%d.png", i);
+}
+
+/* Which live slot holds adr/fil, found by a scan of every slot? */
+static int st_busy_rescan_index(const struct_back *sback, const char *adr,
+                                const char *fil) {
+  int i;
+
+  for (i = 0; i < sback->count; i++) {
+    const lien_back *const slot = &sback->lnk[i];
+
+    if (slot->status >= 0 && strcmp(slot->url_adr, adr) == 0 &&
+        strcmp(slot->url_fil, fil) == 0)
+      return i;
+  }
+  return -1;
+}
+
+/* The busy bitmap covers every slot in use through each status change, and
+   back_wait() still reaches a slot past a bitmap word boundary. */
+static int st_busyslots(httrackp *opt, int argc, char **argv) {
+  /* three bitmap words, with slots on both sides of each boundary */
+  enum { SLOTS = 130 };
+
+  static const int probe[] = {0, 1, 63, 64, 65, 127, 128, SLOTS - 1};
+  const int nprobe = (int) (sizeof(probe) / sizeof(probe[0]));
+  struct_back *sback = back_new(opt, SLOTS);
+  cache_back cache;
+  hash_struct hash;
+  htsblk r;
+  int err = 0;
+  int i, k, round;
+
+#define CHECK(cond) ST_CHECK(err, cond)
+  if (sback == NULL)
+    return 77;
+  opt->maxtime = 0;
+  opt->maxsite = 0;
+  opt->timeout = 0;
+  opt->state.stop = 0;
+  memset(&cache, 0, sizeof(cache));
+  cache.hashtable = coucal_new(0);
+  memset(&r, 0, sizeof(r));
+  r.soc = INVALID_SOCKET;
+  /* back_clean() looks a finalized slot up on the heap */
+  hash_init(opt, &hash, opt->urlhack);
+  opt->hash = &hash;
+
+  CHECK(back_busy_consistent(sback, HTS_FALSE));
+  back_clean(opt, &cache, sback);
+  CHECK(back_busy_consistent(sback, HTS_TRUE));
+  CHECK(back_available(sback) == SLOTS);
+
+  for (round = 0; round < 4 && !err; round++) {
+    /* take every slot, by search or by attach, then free the probes */
+    for (i = 0; i < SLOTS; i++) {
+      if ((i + round) % 2 == 0) {
+        const int p = back_search_quick(sback);
+
+        CHECK(p == i);
+        sback->lnk[p].status = STATUS_WAIT_HEADERS;
+      } else {
+        back_slot_attach(sback, i, STATUS_CONNECTING, &r, "example.com", "/");
+      }
+      CHECK(back_busy_consistent(sback, HTS_FALSE));
+    }
+    CHECK(back_search_quick(sback) == -1);
+    CHECK(back_available(sback) == 0);
+    for (i = 0; i < SLOTS; i++)
+      (void) back_clear_entry(&sback->lnk[i]);
+    /* freed slots keep their bit until the next prune, and count as free */
+    CHECK(back_available(sback) == SLOTS);
+    back_clean(opt, &cache, sback);
+    CHECK(back_busy_consistent(sback, HTS_TRUE));
+    CHECK(back_available(sback) == SLOTS);
+    CHECK(back_nsoc(sback) == 0);
+
+    /* receiving slots with no socket: back_wait() must end each one */
+    for (k = 0; k < nprobe; k++) {
+      back_slot_attach(sback, probe[k], STATUS_TRANSFER, &r, "example.com",
+                       "/");
+    }
+    CHECK(back_busy_consistent(sback, HTS_FALSE));
+    CHECK(back_nsoc(sback) == nprobe);
+    CHECK(back_available(sback) == SLOTS - nprobe);
+    back_wait(sback, opt, &cache, 0);
+    for (k = 0; k < nprobe; k++)
+      CHECK(sback->lnk[probe[k]].status == STATUS_READY);
+    CHECK(back_busy_consistent(sback, HTS_FALSE));
+    for (k = 0; k < nprobe; k++)
+      st_busy_finalizable(&sback->lnk[probe[k]], probe[k]);
+    back_clean(opt, &cache, sback);
+    CHECK(back_available(sback) == SLOTS);
+    CHECK(back_busy_consistent(sback, HTS_TRUE));
+
+    /* past an empty first word, the scan lands on the first slot of the next */
+    back_slot_attach(sback, 64, STATUS_TRANSFER, &r, "example.com", "/");
+    back_slot_attach(sback, 128, STATUS_TRANSFER, &r, "example.com", "/");
+    CHECK(back_nsoc(sback) == 2);
+    (void) back_clear_entry(&sback->lnk[64]);
+    (void) back_clear_entry(&sback->lnk[128]);
+    back_clean(opt, &cache, sback);
+  }
+
+  /* Each scan below must reach the last slot and the last bitmap word. */
+  if (!err) {
+    char fil[32];
+    const int maxsoc = opt->maxsoc;
+    const int background = HTS_STAT.stat_background;
+
+    /* back_index_peek() finds every live slot, as a full rescan does */
+    for (k = 0; k < nprobe; k++) {
+      snprintf(fil, sizeof(fil), "/p%d", probe[k]);
+      back_slot_attach(sback, probe[k], STATUS_TRANSFER, &r, "example.com",
+                       fil);
+    }
+    for (k = 0; k < nprobe; k++) {
+      snprintf(fil, sizeof(fil), "/p%d", probe[k]);
+      CHECK(back_index_peek(opt, sback, "example.com", fil, "") == probe[k]);
+      CHECK(st_busy_rescan_index(sback, "example.com", fil) == probe[k]);
+    }
+    CHECK(back_index_peek(opt, sback, "example.com", "/none", "") == -1);
+
+    /* back_wait() times out each expired connect, and arms that check from
+       the last slot alone */
+    for (k = 0; k < nprobe; k++) {
+      lien_back *const slot = &sback->lnk[probe[k]];
+
+      slot->status = STATUS_CONNECTING;
+      slot->timeout = probe[k] == SLOTS - 1 ? 1 : -1;
+      slot->timeout_refresh = time_local() - 10;
+    }
+    back_wait(sback, opt, &cache, 0);
+    for (k = 0; k < nprobe; k++) {
+      CHECK(sback->lnk[probe[k]].status ==
+            (probe[k] == SLOTS - 1 ? STATUS_READY : STATUS_CONNECTING));
+      sback->lnk[probe[k]].timeout = 1;
+    }
+    back_wait(sback, opt, &cache, 0);
+    for (k = 0; k < nprobe; k++) {
+      CHECK(sback->lnk[probe[k]].status == STATUS_READY);
+      CHECK(sback->lnk[probe[k]].r.statuscode == STATUSCODE_TIMEOUT);
+    }
+
+    /* back_clean() finalizes every finished slot */
+    for (k = 0; k < nprobe; k++)
+      st_busy_finalizable(&sback->lnk[probe[k]], probe[k]);
+    back_clean(opt, &cache, sback);
+    CHECK(HTS_STAT.stat_background == background + nprobe);
+    CHECK(back_available(sback) == SLOTS);
+    CHECK(back_busy_consistent(sback, HTS_TRUE));
+
+    /* back_clean() ends every keep-alive slot with no connection */
+    opt->maxsoc = 0;
+    for (k = 0; k < nprobe; k++) {
+      back_slot_attach(sback, probe[k], STATUS_ALIVE, &r, "example.com", "/");
+      sback->lnk[probe[k]].finalized = 1; /* nothing to store */
+    }
+    back_clean(opt, &cache, sback);
+    CHECK(back_available(sback) == SLOTS);
+
+    /* back_clean() closes the connection of every ready slot */
+    for (k = 0; k < nprobe; k++) {
+      htsblk live = r;
+
+      live.soc = (T_SOC) socket(AF_INET, SOCK_STREAM, 0);
+      CHECK(live.soc != INVALID_SOCKET);
+      back_slot_attach(sback, probe[k], STATUS_READY, &live, "example.com",
+                       "/");
+    }
+    back_clean(opt, &cache, sback);
+    for (k = 0; k < nprobe; k++) {
+      CHECK(sback->lnk[probe[k]].status == STATUS_READY);
+      CHECK(sback->lnk[probe[k]].r.soc == INVALID_SOCKET);
+      st_busy_finalizable(&sback->lnk[probe[k]], probe[k]);
+    }
+    back_clean(opt, &cache, sback);
+    CHECK(back_available(sback) == SLOTS);
+
+    /* Past -c2, back_clean() drops keep-alive slots, here only the last two,
+       until two connections are left: back_nsoc_overall() must count all
+       four, and the cull must reach the last slot. */
+    opt->maxsoc = 2;
+    back_slot_attach(sback, 0, STATUS_TRANSFER, &r, "example.com", "/");
+    back_slot_attach(sback, 64, STATUS_TRANSFER, &r, "example.com", "/");
+    for (i = SLOTS - 2; i < SLOTS; i++) {
+      htsblk live = r;
+      lien_back *const slot = &sback->lnk[i];
+
+      live.soc = (T_SOC) socket(AF_INET, SOCK_STREAM, 0);
+      CHECK(live.soc != INVALID_SOCKET);
+      live.keep_alive = 1;
+      live.keep_alive_max = 10;
+      live.keep_alive_t = 1000;
+      back_slot_attach(sback, i, STATUS_ALIVE, &live, "example.com", "/");
+      slot->ka_time_start = time_local();
+      slot->finalized = 1;
+    }
+    back_clean(opt, &cache, sback);
+    CHECK(sback->lnk[SLOTS - 2].status == STATUS_FREE);
+    CHECK(sback->lnk[SLOTS - 1].status == STATUS_FREE);
+    CHECK(back_nsoc(sback) == 2);
+    st_busy_finalizable(&sback->lnk[0], 0);
+    st_busy_finalizable(&sback->lnk[64], 64);
+    back_clean(opt, &cache, sback);
+    CHECK(back_available(sback) == SLOTS);
+    CHECK(back_busy_consistent(sback, HTS_TRUE));
+    opt->maxsoc = maxsoc;
+  }
+#undef CHECK
+  back_free(&sback);
+  hash_free(&hash);
+  opt->hash = NULL;
+  coucal_delete(&cache.hashtable);
+  printf("busyslots self-test: %s\n", err ? "FAILED" : "OK");
+  return err ? 1 : 0;
+}
+
 const struct selftest_entry selftests_back[] = {
     {"iofatal", "<logfile>",
      "a disk-full abort logs its line and stops the mirror", st_iofatal},
@@ -2452,6 +2684,9 @@ const struct selftest_entry selftests_back[] = {
      st_mutexlazyinit},
     {"backswap", "", "which backlog slots may be swapped to the ready table",
      st_backswap},
+    {"busyslots", "",
+     "slot scans see every slot in use, through each status change",
+     st_busyslots},
     {"spoolrecord", "",
      "a spooled slot keeps only its used bytes and refuses a bad length",
      st_spoolrecord},

@@ -281,12 +281,17 @@ static hts_boolean ftp_handoff_await(const int *flag, int value) {
   return HTS_TRUE;
 }
 
-/* Put a fresh worker on the slot and on the live list, not yet running. The
-   caller spawns it, because the second phase takes the list lock in between. */
-static FTPDownloadStruct *ftp_handoff_register(lien_back *slot) {
+/* Take slot 0, the only one, and put a fresh worker on it and on the live list,
+   not yet running. The caller spawns it, because the second phase takes the
+   list lock in between. */
+static FTPDownloadStruct *ftp_handoff_register(struct_back *sback) {
   FTPDownloadStruct *const worker = calloct(1, sizeof(*worker));
+  const int p = back_search_quick(sback);
+  lien_back *slot;
 
   assertf(worker != NULL);
+  assertf(p == 0);
+  slot = &sback->lnk[p];
   slot->status = STATUS_FTP_TRANSFER;
   worker->pBack = slot;
   ftp_handoff_at_tail = 0;
@@ -351,7 +356,7 @@ int ftp_handoff_selftests(httrackp *opt) {
   for (round = 0; round < FTP_HANDOFF_ROUNDS && err == 0; round++) {
     lien_back *const slot = &sback->lnk[0];
 
-    FTPDownloadStruct *const worker = ftp_handoff_register(slot);
+    FTPDownloadStruct *const worker = ftp_handoff_register(sback);
 
     if (!ftp_handoff_spawn(worker, ftp_handoff_tail)) {
       ftp_worker_release(worker, "Unable to launch FTP thread");
@@ -384,7 +389,7 @@ int ftp_handoff_selftests(httrackp *opt) {
      thread is free to recycle as soon as its status reads ready. */
   {
     lien_back *const slot = &sback->lnk[0];
-    FTPDownloadStruct *const worker = ftp_handoff_register(slot);
+    FTPDownloadStruct *const worker = ftp_handoff_register(sback);
 
     /* Held before the worker exists, so its publish has nowhere to slip in. */
     hts_mutexlock(&ftp_workers_mutex);

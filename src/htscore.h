@@ -42,6 +42,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsbase.h"
 /* Includes and definitions */
 #include <limits.h>
+#include <stdint.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #ifdef _WIN32
@@ -179,6 +180,8 @@ struct struct_back {
                                         this mirror's log (#1732) */
   TStamp retry_after_until; /**< Retry-After: no new launch before this local
                                  ms timestamp; 0 holds nothing */
+  uint64_t *busy; /**< one bit per slot, set for every slot not STATUS_FREE
+                       (may also hold free ones); see back_busy_mark() */
 };
 
 /** Open handle to the mirror cache (the read-from-old / write-to-new state

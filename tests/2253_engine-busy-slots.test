@@ -1,0 +1,8 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# Slot scans skip free slots through a bitmap, which must cover every slot in use.
+out=$(httrack -O /dev/null -#test=busyslots)
+grep -q "busyslots self-test: OK" <<<"$out"
