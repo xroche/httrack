@@ -41,6 +41,9 @@ Please visit our Website: http://www.httrack.com
 #include "htsselftest_int.h"
 
 #include <errno.h>
+#ifndef _WIN32
+#include <sys/stat.h>
+#endif
 #include <limits.h>
 #include <stdio.h>
 #include <string.h>
@@ -3878,10 +3881,11 @@ static int st_zip_repair_shift(httrackp *opt, int argc, char **argv) {
 }
 
 /* Repairs one local file header claiming CPSIZE, or UNCPSIZE when CPSIZE is 0,
-   followed by PAYLOAD bytes of data, writing to OUT_OVERRIDE if not NULL. */
+   carrying EXTRA if not NULL, followed by PAYLOAD bytes of data, writing to
+   OUT_OVERRIDE if not NULL. */
 static int zip_repair_size_case(const char *dir, const char *out_override,
-                                uLong cpsize, uLong uncpsize, size_t payload,
-                                uLong *nrec, uLong *bytes) {
+                                const char *extra, uLong cpsize, uLong uncpsize,
+                                size_t payload, uLong *nrec, uLong *bytes) {
   unsigned char header[31] = {0x50, 0x4b, 0x03, 0x04, 0x14};
   char in[HTS_URLMAXSIZE], out[HTS_URLMAXSIZE], tmp[HTS_URLMAXSIZE];
   hts_boolean ok;
@@ -3893,6 +3897,7 @@ static int zip_repair_size_case(const char *dir, const char *out_override,
     header[22 + i] = (unsigned char) (uncpsize >> (8 * i)); /* uncompressed */
   }
   header[26] = 1; /* filename length */
+  header[28] = (unsigned char) (extra != NULL ? strlen(extra) : 0);
   header[30] = 'a';
   snprintf(in, sizeof(in), "%s/damaged.zip", dir);
   snprintf(out, sizeof(out), "%s/repair.zip", dir);
@@ -3900,7 +3905,8 @@ static int zip_repair_size_case(const char *dir, const char *out_override,
   fp = fopen(in, "wb");
   if (fp == NULL)
     return Z_ERRNO;
-  ok = hts_fwrite_exact(header, sizeof(header), fp);
+  ok = hts_fwrite_exact(header, sizeof(header), fp) &&
+       (extra == NULL || hts_fwrite_exact(extra, strlen(extra), fp));
   for (i = 0; ok && i < payload; i++)
     ok = fputc('x', fp) != EOF;
   fclose(fp);
@@ -3936,9 +3942,9 @@ static int st_zip_repair_size(httrackp *opt, int argc, char **argv) {
 
   for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
     uLong nrec, bytes;
-    const int err =
-        zip_repair_size_case(argv[0], NULL, cases[i].cpsize, cases[i].uncpsize,
-                             cases[i].payload, &nrec, &bytes);
+    const int err = zip_repair_size_case(argv[0], NULL, NULL, cases[i].cpsize,
+                                         cases[i].uncpsize, cases[i].payload,
+                                         &nrec, &bytes);
 
     if (err != cases[i].err ||
         (err == Z_OK && (nrec != 1 || bytes != cases[i].bytes))) {
@@ -3953,12 +3959,53 @@ static int st_zip_repair_size(httrackp *opt, int argc, char **argv) {
     uLong nrec, bytes;
 
     fclose(fp);
-    if (zip_repair_size_case(argv[0], "/dev/full", 16, 0, 16, &nrec, &bytes) !=
-        Z_ERRNO) {
+    if (zip_repair_size_case(argv[0], "/dev/full", NULL, 16, 0, 16, &nrec,
+                             &bytes) != Z_ERRNO) {
       printf("zip-repair-size: FAIL a close error was not reported\n");
       fails++;
     }
   }
+  /* A repaired entry keeps its header text as central extra field. */
+  {
+    char out[HTS_URLMAXSIZE];
+    uLong nrec, bytes;
+    unzFile zf;
+
+    snprintf(out, sizeof(out), "%s/repair.zip", argv[0]);
+    if (zip_repair_size_case(argv[0], NULL, "X-In-Cache: 1\r\n", 16, 0, 16,
+                             &nrec, &bytes) != Z_OK ||
+        (zf = unzOpen(out)) == NULL) {
+      printf("zip-repair-size: FAIL the header-text repair\n");
+      fails++;
+    } else {
+      if (unzGoToFirstFile(zf) != UNZ_OK) {
+        printf("zip-repair-size: FAIL a repaired entry does not read\n");
+        fails++;
+      }
+      unzClose(zf);
+    }
+  }
+#ifndef _WIN32
+  /* A temp file that cannot be read back must fail the repair. */
+  {
+    char tmp[HTS_URLMAXSIZE];
+    uLong nrec, bytes;
+
+    snprintf(tmp, sizeof(tmp), "%s/repair.tmp", argv[0]);
+    if ((fp = fopen(tmp, "wb")) != NULL) {
+      fclose(fp);
+      if (chmod(tmp, 0200) == 0 && (fp = fopen(tmp, "rb")) == NULL &&
+          zip_repair_size_case(argv[0], NULL, NULL, 16, 0, 16, &nrec, &bytes) !=
+              Z_ERRNO) {
+        printf("zip-repair-size: FAIL a failed reopen was not reported\n");
+        fails++;
+      }
+      if (fp != NULL) /* root reads it anyway */
+        fclose(fp);
+      (void) chmod(tmp, 0600);
+    }
+  }
+#endif
   if (fails == 0)
     printf("zip-repair-size: OK\n");
   return fails != 0;

@@ -1,6 +1,6 @@
---- zip.c.orig	2026-11-15 19:48:17.209681928 +0100
-+++ zip.c	2026-11-15 20:08:24.310087037 +0100
-@@ -158,6 +158,9 @@
+--- zip.c.orig	2026-11-15 22:04:45.639031575 +0100
++++ zip.c	2026-11-15 22:04:45.635983635 +0100
+@@ -176,6 +176,9 @@
  #endif
  } curfile64_info;
  
@@ -10,14 +10,17 @@
  typedef struct
  {
      zlib_filefunc64_32_def z_filefunc;
-@@ -174,8 +177,67 @@
+@@ -192,12 +195,70 @@
      char *globalcomment;
  #endif
  
 +    /* httrack addition: idle deflate blocks, so no heap trim per member */
 +    voidpf zbuf_free[ZIP_ZBUF_SLOTS];
 +    uLong zbuf_allocs;
-+
+     /* Support for zipAlreadyThere(). */
+     set_t set;              /* set for detecting name collisions */
+     block_t block;          /* block for reading the central directory */
+ 
  } zip64_internal;
  
 +/* Prefix of each deflate buffer, aligned like malloc's result. */
@@ -78,18 +81,16 @@
  
  #ifndef NOCRYPT
  #define INCLUDECRYPTINGCODE_IFCRYPTALLOWED
-@@ -843,8 +905,8 @@
+@@ -1057,6 +1118,8 @@
      ziinit.number_entry = 0;
      ziinit.add_position_when_writing_offset = 0;
      init_linkedlist(&(ziinit.central_dir));
--
--
 +    memset(ziinit.zbuf_free, 0, sizeof(ziinit.zbuf_free));
 +    ziinit.zbuf_allocs = 0;
+     memset(&ziinit.set, 0, sizeof(set_t));  /* make sure set appears dormant */
  
-     zi = (zip64_internal*)ALLOC(sizeof(zip64_internal));
-     if (zi==NULL)
-@@ -1007,11 +1069,11 @@
+ 
+@@ -1266,11 +1329,11 @@
  
  /*
   NOTE.
@@ -105,7 +106,7 @@
   */
  extern int ZEXPORT zipOpenNewFileInZip4_64(zipFile file, const char* filename, const zip_fileinfo* zipfi,
                                             const void* extrafield_local, uInt size_extrafield_local,
-@@ -1182,9 +1244,9 @@
+@@ -1445,9 +1508,9 @@
      {
          if(zi->ci.method == Z_DEFLATED)
          {
@@ -118,7 +119,7 @@
  
            if (windowBits>0)
                windowBits = -windowBits;
-@@ -1230,6 +1292,19 @@
+@@ -1493,6 +1556,19 @@
  
      if (err==Z_OK)
          zi->in_opened_file_inzip = 1;
@@ -138,16 +139,7 @@
      return err;
  }
  
-@@ -1412,7 +1487,7 @@
-     else
- #endif
-     {
--      zi->ci.stream.next_in = (Bytef*)(uintptr_t)buf;
-+      zi->ci.stream.next_in = buf;
-       zi->ci.stream.avail_in = len;
- 
-       while ((err==ZIP_OK) && (zi->ci.stream.avail_in>0))
-@@ -1706,6 +1781,47 @@
+@@ -1980,6 +2056,47 @@
      return zipCloseFileInZipRaw (file,0,0);
  }
  
@@ -195,7 +187,7 @@
  local int Write_Zip64EndOfCentralDirectoryLocator(zip64_internal* zi, ZPOS64_T zip64eocd_pos_inzip) {
    int err = ZIP_OK;
    ZPOS64_T pos = zip64eocd_pos_inzip - zi->add_position_when_writing_offset;
-@@ -1830,6 +1946,18 @@
+@@ -2104,6 +2221,18 @@
    return err;
  }
  
@@ -214,7 +206,7 @@
  extern int ZEXPORT zipClose(zipFile file, const char* global_comment) {
      zip64_internal* zi;
      int err = 0;
-@@ -1893,64 +2021,8 @@
+@@ -2169,92 +2298,8 @@
  #ifndef NO_ADDFILEINEXISTINGZIP
      free(zi->globalcomment);
  #endif
@@ -227,48 +219,76 @@
 -extern int ZEXPORT zipRemoveExtraInfoBlock(char* pData, int* dataLen, short sHeader) {
 -  char* p = pData;
 -  int size = 0;
+-  int remaining;
 -  char* pNewHeader;
 -  char* pTmp;
--  short header;
--  short dataSize;
+-  unsigned header;
+-  unsigned dataSize;
+-  unsigned remove = (unsigned short)sHeader;
 -
 -  int retVal = ZIP_OK;
 -
 -  if(pData == NULL || dataLen == NULL || *dataLen < 4)
 -    return ZIP_PARAMERROR;
 -
+-  remaining = *dataLen;
 -  pNewHeader = (char*)ALLOC((unsigned)*dataLen);
+-  if (pNewHeader == NULL)
+-    return ZIP_INTERNALERROR;
+-
 -  pTmp = pNewHeader;
 -
--  while(p < (pData + *dataLen))
+-  while(remaining > 0)
 -  {
--    header = *(short*)p;
--    dataSize = *(((short*)p)+1);
--
--    if( header == sHeader ) // Header found.
+-    if(remaining < 4)
 -    {
--      p += dataSize + 4; // skip it. do not copy to temp buffer
+-      retVal = ZIP_BADZIPFILE;
+-      break;
+-    }
+-
+-    header = (unsigned)(unsigned char)p[0] |
+-             ((unsigned)(unsigned char)p[1] << 8);
+-    dataSize = (unsigned)(unsigned char)p[2] |
+-               ((unsigned)(unsigned char)p[3] << 8);
+-
+-    if((int)dataSize > remaining - 4)
+-    {
+-      retVal = ZIP_BADZIPFILE;
+-      break;
+-    }
+-
+-    if( header == remove ) /* Header found. */
+-    {
+-      p += dataSize + 4; /* skip it. do not copy to temp buffer */
 -    }
 -    else
 -    {
--      // Extra Info block should not be removed, So copy it to the temp buffer.
+-      /* Extra Info block should not be removed, So copy it to the temp buffer. */
 -      memcpy(pTmp, p, dataSize + 4);
+-      pTmp += dataSize + 4;
 -      p += dataSize + 4;
 -      size += dataSize + 4;
 -    }
 -
+-    remaining -= dataSize + 4;
+-  }
+-
+-  if(retVal != ZIP_OK)
+-  {
+-    free(pNewHeader);
+-    return retVal;
 -  }
 -
 -  if(size < *dataLen)
 -  {
--    // clean old extra info block.
+-    /* clean old extra info block. */
 -    memset(pData,0, *dataLen);
 -
--    // copy the new extra info block over the old
+-    /* copy the new extra info block over the old */
 -    if(size > 0)
 -      memcpy(pData, pNewHeader, size);
 -
--    // set the new extra info size
+-    /* set the new extra info size */
 -    *dataLen = size;
 -
 -    retVal = ZIP_OK;
