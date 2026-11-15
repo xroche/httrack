@@ -739,6 +739,10 @@ static HTS_INLINE HTS_UNUSED void sigpipe_release(sigpipe_mask *m) {
    process, which is how a library takes down whoever embedded it (#1689). */
 static HTS_INLINE HTS_UNUSED int hts_send_nosignal(T_SOC soc, const char *s,
                                                    int len) {
+#if defined(__linux__) && defined(MSG_NOSIGNAL)
+  /* Linux honours the flag, so the four mask syscalls would buy nothing. */
+  return (int) send(soc, s, len, HTS_MSG_NOSIGNAL);
+#else
   sigpipe_mask m;
   int n, err;
 
@@ -752,6 +756,7 @@ static HTS_INLINE HTS_UNUSED int hts_send_nosignal(T_SOC soc, const char *s,
   sigpipe_release(&m);
   errno = err;
   return n;
+#endif
 }
 
 void cut_path(char *fullpath, char *path, size_t path_size, char *pname,
