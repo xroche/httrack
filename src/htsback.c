@@ -1641,7 +1641,7 @@ int back_unserialize(FILE * fp, lien_back ** dst) {
     (*dst)->r.ssl_con = NULL;
 #endif
     (*dst)->r.headers = NULL;
-    /* the file is not trusted with pointers, and a ready slot sends nothing */
+    /* stored addresses are stale, and a ready slot sends no request */
     memset(&(*dst)->r.req, 0, sizeof((*dst)->r.req));
     {
       void *adr;

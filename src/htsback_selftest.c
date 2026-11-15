@@ -693,8 +693,7 @@ static int st_spoolrecord(httrackp *opt, int argc, char **argv) {
   back->r.totalsize = 98765;
   back->r.crange_end = 4321;
   back->r.retry_after = 17;
-  back->r.req.http11 = 1;
-  back->r.req.user_agent = back->r.req.proxy.name = back->info;
+  memset(&back->r.req, 0x5a, sizeof(back->r.req)); /* every byte must reset */
   back->http11 = 1;
   back->chunk_blocksize = 77;
   back->early_add = 1;
