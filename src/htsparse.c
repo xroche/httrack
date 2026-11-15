@@ -2860,7 +2860,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       // stocker base ou codebase?
                       switch (p_type) {
                       case 2: {
-                        strlcpybuff(base, lien, HTS_URLMAXSIZE * 2);
+                        // browsers ignore xml:base in HTML
+                        if (!p_xmlbase || !is_html_mime_type(r->contenttype))
+                          strlcpybuff(base, lien, HTS_URLMAXSIZE * 2);
                       } break; // base
                       case -2: {
                         strlcpybuff(codebase, lien, HTS_URLMAXSIZE * 2);

@@ -1,21 +1,21 @@
 #!/bin/bash
 #
-# xml:base sets the base of later relative links, as <base href> does, and is
+# xml:base sets the base of later relative links in a feed, as <base href>
+# does, but not in HTML, where browsers ignore it. It is never fetched, and is
 # written out empty so the saved file resolves its rewritten links against
-# itself. It was fetched as a page instead, and the base ignored. An empty base
-# is left as it is.
+# itself. An empty base is left as it is.
 
 set -euo pipefail
 
 : "${top_srcdir:=..}"
 
 bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
-    --found 'xmlbase/blog/p2.html' --found 'xmlbase/blog/p3.html' \
+    --found 'xmlbase/blog/p2.html' --found 'xmlbase/p3.html' \
     --not-found 'xmlbase/blog/index.html' \
-    --not-found 'xmlbase/p2.html' --not-found 'xmlbase/p3.html' \
+    --not-found 'xmlbase/p2.html' --not-found 'xmlbase/blog/p3.html' \
     --file-matches 'xmlbase/feed.feed' ' xml:base="">' \
     --file-matches 'xmlbase/feed.feed' 'href="blog/p2\.html"' \
     --file-matches 'xmlbase/page.html' 'xhtml" xml:base="">' \
-    --file-matches 'xmlbase/page.html' '<a href="blog/p3\.html">' \
+    --file-matches 'xmlbase/page.html' '<a href="p3\.html">' \
     --file-not-matches 'xmlbase/page.html' '#' \
     httrack 'BASEURL/xmlbase/index.html'

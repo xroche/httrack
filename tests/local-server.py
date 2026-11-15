@@ -896,8 +896,8 @@ class Handler(SimpleHTTPRequestHandler):
         else:
             self.send_error(404)
 
-    # xml:base is a base, not a link: a feed with an absolute one, and a page
-    # with a relative one and three empty bases.
+    # xml:base is a base, not a link: a feed with an absolute one, and an HTML
+    # page, which ignores it, with a relative one and three empty bases.
     def route_xmlbase(self):
         rest = urlsplit(self.path).path[len("/xmlbase/") :]
         base = "http://127.0.0.1:%d/xmlbase/blog/" % self.server.server_address[1]
