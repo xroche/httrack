@@ -3421,7 +3421,7 @@ class Handler(SimpleHTTPRequestHandler):
     def route_dmove_index(self):
         self.send_sized_bin_index(self.DCAP_INDEX_BYTES, ["p1.txt", "p0.bin"])
 
-    def route_dmove_page(self):
+    def route_dmove_page(self, cut=False):
         body = self.DMOVE_BODY
         Handler.dmove_other_asked.wait(60)
         self.send_response(200)
@@ -3435,12 +3435,16 @@ class Handler(SimpleHTTPRequestHandler):
             Handler.dmove_first_sent.set()
             Handler.dmove_other_done.wait(60)
             time.sleep(3.0)  # the move must land before the tail, even on qemu
-            for i in range(128, len(body), 128):
+            for i in range(128, len(body) // 2 if cut else len(body), 128):
                 self.wfile.write(body[i : i + 128])
                 self.wfile.flush()
                 time.sleep(0.15)  # several appends after the move
         except OSError:
             pass
+
+    # The same page, dropped halfway.
+    def route_dmovecut_page(self):
+        self.route_dmove_page(cut=True)
 
     def route_dmove_other(self):
         Handler.dmove_other_asked.set()
@@ -4604,6 +4608,9 @@ class Handler(SimpleHTTPRequestHandler):
         "/dmove/index.html": route_dmove_index,
         "/dmove/p0.bin": route_dmove_page,
         "/dmove/p1.txt": route_dmove_other,
+        "/dmovecut/index.html": route_dmove_index,
+        "/dmovecut/p0.bin": route_dmovecut_page,
+        "/dmovecut/p1.txt": route_dmove_other,
         "/stalepart/index.html": route_stalepart_index,
         "/stalepart/blob.bin": route_stalepart_blob,
         "/dhard/index.html": route_dhard_index,
