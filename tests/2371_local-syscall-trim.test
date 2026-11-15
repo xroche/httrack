@@ -24,7 +24,10 @@ host=127.0.0.1_$SRV_PORT
 
 trace=$tmpdir/trace
 # The / patterns also catch the i386 names (send via socketcall, _time64).
-run_with_timeout "$(crawl_deadline)" strace -f -qq -o "$trace" \
+# LeakSanitizer cannot run under ptrace, so the traced crawl turns it off.
+run_with_timeout "$(crawl_deadline)" \
+    env ASAN_OPTIONS="${ASAN_OPTIONS:+$ASAN_OPTIONS:}detect_leaks=0" \
+    strace -f -qq -o "$trace" \
     -e trace='openat,open,%%stat,/^send,socketcall,/^rt_sigtimedwait' \
     "$(httrack_path)" "$BASEURL/keepalive/index.html" -O "$tmpdir/m" -Z \
     --max-time=60 >"$tmpdir/out" 2>&1 ||
