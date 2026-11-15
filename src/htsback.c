@@ -562,6 +562,7 @@ static int back_index_ready(httrackp * opt, struct_back * sback, const char *adr
         back_set_locked(sback, q);                 /* locked */
         return q;
       }
+      coucal_remove(sback->ready, sav); /* its file is gone */
     }
   }
   return -1;

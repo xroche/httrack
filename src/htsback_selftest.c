@@ -1009,7 +1009,9 @@ static int st_spooldir(httrackp *opt, int argc, char **argv) {
 static int st_spoolfull(httrackp *opt, int argc, char **argv) {
   static const char body[] = "spooled page";
   char base[HTS_URLMAXSIZE];
+  FILE *const saved_log = opt->log;
   char sav[HTS_URLMAXSIZE * 2];
+  char savc[HTS_URLMAXSIZE * 2];
   struct_back *sback;
   cache_back cache;
   void *spooled = NULL;
@@ -1025,6 +1027,7 @@ static int st_spoolfull(httrackp *opt, int argc, char **argv) {
   snprintf(base, sizeof(base), "%s/", argv[0]);
   StringCopy(opt->path_html_utf8, base);
   snprintf(sav, sizeof(sav), "%s/a.html", argv[0]);
+  snprintf(savc, sizeof(savc), "%s/c.html", argv[0]);
   memset(&cache, 0, sizeof(cache));
   if ((sback = back_new(opt, 4)) == NULL)
     return 1;
@@ -1051,6 +1054,17 @@ static int st_spoolfull(httrackp *opt, int argc, char **argv) {
   CHECK(b == 1);
   CHECK(b >= 0 && sback->lnk[b].r.adr != NULL && sback->lnk[b].r.size == 100 &&
         strcmp(sback->lnk[b].r.adr, body) == 0);
+  /* an unreadable spool file drops its entry, so nothing waits on it */
+  back_clear_entry(&sback->lnk[3]);
+  CHECK(st_spooldir_slot(&sback->lnk[3], argv[0], "c.html"));
+  CHECK(back_cleanup_background(opt, &cache, sback) == 1);
+  CHECK(coucal_read_pvoid(sback->ready, savc, &again) && again != NULL);
+  if (again != NULL)
+    (void) UNLINK((const char *) again);
+  opt->log = NULL; /* the vanished file logs a warning */
+  CHECK(back_index(opt, sback, "example.com", "/c.html", savc) < 0);
+  opt->log = saved_log;
+  CHECK(coucal_nitems(sback->ready) == 0);
 
   for (i = 0; i < sback->count; i++)
     back_clear_entry(&sback->lnk[i]);
