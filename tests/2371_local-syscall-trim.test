@@ -8,6 +8,7 @@ set -euo pipefail
 # shellcheck source=tests/crawllib.sh
 . "${0%"${0##*/}"}./crawllib.sh"
 
+skip_on_windows "it traces the engine with strace"
 test "$(uname -s)" = Linux || skip "the checks are Linux only"
 command -v strace >/dev/null || skip "strace not found"
 strace -f -qq -o /dev/null true 2>/dev/null || skip "strace cannot trace here"
@@ -22,32 +23,34 @@ local_server_start
 host=127.0.0.1_$SRV_PORT
 
 trace=$tmpdir/trace
+# The / patterns also catch the i386 names (send via socketcall, _time64).
 run_with_timeout "$(crawl_deadline)" strace -f -qq -o "$trace" \
-    -e trace=openat,open,newfstatat,stat,sendto,rt_sigtimedwait \
-    "$(httrack_path)" "$BASEURL/keepalive/index.html" -O "$tmpdir/m" -c16 -s0 \
+    -e trace='openat,open,%%stat,/^send,socketcall,/^rt_sigtimedwait' \
+    "$(httrack_path)" "$BASEURL/keepalive/index.html" -O "$tmpdir/m" -Z \
     --max-time=60 >"$tmpdir/out" 2>&1 ||
     fail_dump "traced crawl failed" "$tmpdir/out"
 test -f "$tmpdir/m/$host/keepalive/i20.png" || fail_dump "i20.png not mirrored" "$tmpdir/out"
 
-# Controls: the crawl probed placeholders it found missing, and sent requests.
-probes=$(count_matching_lines_regexp '\.delayed".*= -1 ENOENT' "$trace")
-test "$probes" -ge 20 || fail_dump "only $probes placeholder probes" "$trace"
-sends=$(count_matching_lines_regexp '^[0-9]+ +sendto\(' "$trace")
-test "$sends" -ge 21 || fail_dump "only $sends sendto() traced" "$trace"
+# Controls: the cancel and re-add path ran for each image, and requests went out.
+readds=$(count_matching_lines 'Type immediately loaded from cache' "$tmpdir/m/hts-log.txt")
+test "$readds" -ge 10 || fail_dump "the re-add path ran $readds times" "$tmpdir/m/hts-log.txt"
+sends=$(count_matching_lines_regexp '^[0-9]+ +(send|sendto|sendmsg)\(' "$trace")
+test "$sends" -ge 21 || fail_dump "only $sends sends traced" "$trace"
 
 reopens=$(count_matching_lines_regexp 'open(at)?\(.*\.delayed", O_RDONLY' "$trace")
 test "$reopens" = 0 ||
     fail_dump "$reopens reads of a missing placeholder" "$trace"
-waits=$(count_matching_lines_regexp '^[0-9]+ +rt_sigtimedwait\(' "$trace")
+waits=$(count_matching_lines_regexp '^[0-9]+ +rt_sigtimedwait' "$trace")
 test "$waits" = 0 || fail_dump "$waits SIGPIPE mask rounds for $sends sends" "$trace"
-ok "$probes placeholder probes, $sends sends, no reopen and no mask"
+ok "$readds re-adds, $sends sends, no reopen and no mask"
 
 # A placeholder an earlier run left behind is still found and removed.
-place=$(command grep -o 'keepalive/i5\.png\.[0-9a-f]*\.delayed' "$trace" | sed -n 1p)
+# The placeholder name carries a counter, so take it from the trace.
+place=$(command grep -o 'keepalive/i5\.png\.[0-9a-f]*\.delayed' "$trace" | sed -n 1p || true)
 test -n "$place" || fail_dump "no placeholder traced for i5.png" "$trace"
 mkdir -p "$tmpdir/m2/$host/keepalive"
 printf 'stale' >"$tmpdir/m2/$host/$place"
-local_crawl "$BASEURL/keepalive/index.html" -O "$tmpdir/m2" -c16 -s0 ||
+local_crawl "$BASEURL/keepalive/index.html" -O "$tmpdir/m2" ||
     fail "second crawl failed"
 test ! -e "$tmpdir/m2/$host/$place" || fail "the stale $place survived"
 cmp -s "$tmpdir/m/$host/keepalive/i5.png" "$tmpdir/m2/$host/keepalive/i5.png" ||

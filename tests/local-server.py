@@ -957,12 +957,9 @@ class Handler(SimpleHTTPRequestHandler):
         if self.command != "HEAD":
             self.wfile.write(body)
 
-    # An index of 20 images, all over one persistent HTTP/1.1 connection: a
-    # reused socket is what sends the engine's delayed-type path through its
-    # cancel and re-add (2371).
+    # 20 images whose replies offer keep-alive, because only a reused socket
+    # reaches the delayed-type cancel and re-add (2371).
     def route_keepalive(self, path):
-        self.protocol_version = "HTTP/1.1"
-        self.close_connection = False
         ka = (("Connection", "keep-alive"),)
         if path.endswith(".png"):
             self.send_raw(self.FAKE_PNG, "image/png", ka)
