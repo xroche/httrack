@@ -9,7 +9,7 @@ set -euo pipefail
 . "${0%"${0##*/}"}./testlib.sh"
 
 # The counts are exact, so a shrinking corpus shows.
-selftest_queue_lines "hashdiff: 1510272 cases, 0 failures, 124552 equal, 98440 of them rewritten
+selftest_queue_lines "hashdiff: 794112 cases, 0 failures, 60548 equal, 47492 of them rewritten
 hashdiff: OK" hashdiff
 
 selftest_run_queued

@@ -3828,9 +3828,7 @@ char *fil_normalized_filtered_ex(const char *source, char *dest,
 
   /* Copy the path, re-emit kept query args, let fil_normalized() sort. Walk
      every field incl. empty/trailing ("a&","?&&") so the result is a fixpoint
-     (the read re-normalizes it; a dropped empty arg would miss dedup). The
-     buffer is declared here, past the fast path, which the hardened build
-     would otherwise zero-fill it for. */
+     (the read re-normalizes it; a dropped empty arg would miss dedup). */
   {
     char BIGSTK tmp[HTS_URLMAXSIZE * 2];
     htsbuff cb = htsbuff_ptr(tmp, sizeof(tmp));
@@ -3856,8 +3854,7 @@ char *fil_normalized_filtered(const char *source, char *dest,
   return fil_normalized_filtered_ex(source, dest, strip, 1, 1);
 }
 
-/* hts_query_strip_keys() past its no-rules check, which this keeps clear of
-   the buffers: the hardened build zero-fills them on every call. */
+/* hts_query_strip_keys() once some strip rules are known to exist */
 static const char *hts_query_strip_keys_match(const char *rules,
                                               const char *adr, const char *fil,
                                               char *dest, size_t destsize) {
@@ -4008,8 +4005,7 @@ static hts_boolean hts_host_alias_subject(const char *url, const char *host,
    arbitrary hop, which would depend on how often a link is named. */
 enum { HTS_HOST_ALIAS_MAXHOPS = 8 };
 
-/* hts_host_alias_resolve() past its no-rules checks, kept apart for the same
-   reason as hts_query_strip_keys_match(). */
+/* hts_host_alias_resolve() once some alias rules are known to exist */
 static const char *hts_host_alias_resolve_rules(const char *rules,
                                                 const char *adr,
                                                 hts_boolean collapse_www,

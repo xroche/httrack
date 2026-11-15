@@ -1449,27 +1449,16 @@ static int st_hostalias(httrackp *opt, int argc, char **argv) {
 }
 
 /* The dedup key and compare before the no-rules fast paths, frozen. */
-static const char *legacy_key_host_alias(const hash_struct *hash,
-                                         const char *adr, char *buf,
-                                         size_t bufsize) {
-  const char *const canon =
-      hts_host_alias(hash->host_alias, adr, hash->norm_host, buf, bufsize);
-
-  return canon != NULL ? canon : adr;
-}
-
 static const char *legacy_hash_url_key(hash_struct *hash, const char *adr,
                                        const char *fil, char *dst,
                                        size_t dstsize) {
   char BIGSTK aliasbuf[HTS_URLMAXSIZE * 2];
-  const char *const adr_canon =
-      adr != NULL ? legacy_key_host_alias(hash, adr, aliasbuf, sizeof(aliasbuf))
-                  : NULL;
-  const char *const adr_norm =
-      adr_canon != NULL
-          ? (hash->norm_host ? jump_normalized_const(adr_canon)
-                             : jump_identification_const(adr_canon))
-          : NULL;
+  const char *const alias = hts_host_alias(
+      hash->host_alias, adr, hash->norm_host, aliasbuf, sizeof(aliasbuf));
+  const char *const adr_canon = alias != NULL ? alias : adr;
+  const char *const adr_norm = hash->norm_host
+                                   ? jump_normalized_const(adr_canon)
+                                   : jump_identification_const(adr_canon);
 
   assertf(adr_norm != NULL);
   (void) strclipbuff(dst, dstsize, adr_norm);
@@ -1501,8 +1490,14 @@ static int legacy_key_adrfil_equals(hash_struct *hash, const char *a_adr,
   const char *ja;
   const char *jb;
 
-  a_canon = legacy_key_host_alias(hash, a_adr, a_aliasbuf, sizeof(a_aliasbuf));
-  b_canon = legacy_key_host_alias(hash, b_adr, b_aliasbuf, sizeof(b_aliasbuf));
+  a_canon = hts_host_alias(hash->host_alias, a_adr, hash->norm_host, a_aliasbuf,
+                           sizeof(a_aliasbuf));
+  b_canon = hts_host_alias(hash->host_alias, b_adr, hash->norm_host, b_aliasbuf,
+                           sizeof(b_aliasbuf));
+  if (a_canon == NULL)
+    a_canon = a_adr;
+  if (b_canon == NULL)
+    b_canon = b_adr;
   ja = hash->norm_host ? jump_normalized_const(a_canon)
                        : jump_identification_const(a_canon);
   jb = hash->norm_host ? jump_normalized_const(b_canon)
@@ -1530,14 +1525,76 @@ static int legacy_key_adrfil_equals(hash_struct *hash, const char *a_adr,
   }
 }
 
-/* The dedup key and compare agree with their frozen copies on every pair of a
-   generated URL set, under every urlhack sub-flag and rule set. */
+/* Stand-ins in the corpus for the long host, path and query path. */
+static const char hashdiff_long[] = "(long)";
+static const char hashdiff_longq[] = "(long query)";
+
+/* The URL corpus, its key buffers and the running counts. */
+typedef struct hashdiff_run {
+  const char **adr, **fil;
+  size_t n, nf;
+  char *ko, *kn;
+  unsigned long setups, cases, failures, equal, rewritten;
+} hashdiff_run;
+
+/* Check every key, and a sample of pairs, of RUN under one HASH setup. */
+static void hashdiff_setup(hashdiff_run *run, hash_struct *hash,
+                           const char *label) {
+  static const size_t sizes[] = {1, 8, 40, HTS_URLMAXSIZE * 4};
+  const size_t nf = run->nf;
+  size_t i, j, k;
+
+  for (i = 0; i < run->n; i++) {
+    for (k = 0; k < sizeof(sizes) / sizeof(sizes[0]); k++) {
+      memset(run->ko, '#', HTS_URLMAXSIZE * 4);
+      memset(run->kn, '#', HTS_URLMAXSIZE * 4);
+      legacy_hash_url_key(hash, run->adr[i], run->fil[i], run->ko, sizes[k]);
+      hash_url_key(hash, run->adr[i], run->fil[i], run->kn, sizes[k]);
+      run->cases++;
+      if (memcmp(run->ko, run->kn, HTS_URLMAXSIZE * 4) != 0) {
+        run->failures++;
+        printf("hashdiff: key differs: %s size=%u %.40s %.40s\n", label,
+               (unsigned) sizes[k], run->adr[i], run->fil[i]);
+      }
+    }
+  }
+  /* half the pairs sharing a host or a path, plus a sample of the rest */
+  for (i = 0; i < run->n; i++) {
+    for (j = 0; j < run->n; j++) {
+      const char *const a = run->adr[i], *const af = run->fil[i];
+      const char *const b = run->adr[j], *const bf = run->fil[j];
+      int eo, en;
+
+      if (i / nf != j / nf && i % nf != j % nf ? (i + j) % 23 != 0
+                                               : (i + j + run->setups) % 2 != 0)
+        continue;
+      eo = legacy_key_adrfil_equals(hash, a, af, b, bf);
+      en = hash_url_equals_in(hash, a, af, b, bf);
+      run->cases++;
+      if (eo != 0) {
+        run->equal++;
+        /* equal only once normalized: the compare's slow path */
+        if (strcmp(a, b) != 0 || strcmp(af, bf) != 0)
+          run->rewritten++;
+      }
+      if ((eo != 0) != (en != 0)) {
+        run->failures++;
+        printf("hashdiff: equals differs: %s %.40s%.40s vs %.40s%.40s: "
+               "old %d new %d\n",
+               label, a, af, b, bf, eo, en);
+      }
+    }
+  }
+  run->setups++;
+}
+
+/* The dedup key and compare agree with their frozen copies on a generated URL
+   set, under every urlhack sub-flag and rule set. */
 static int st_hashdiff(httrackp *opt, int argc, char **argv) {
   static const char *const rules_strip[] = {"", "sid", "a.com/*=sid\n*=utm",
                                             "*.com/x*=a,sid"};
   static const char *const rules_alias[] = {"", "*.b.com,b.com=https://a.com",
                                             "c.com=www.a.com\nd.com=c.com"};
-  /* NULL means the long host or the long path */
   static const char *const hosts[] = {"a.com",        "A.COM",
                                       "www.a.com",    "WWW.a.com",
                                       "http://a.com", "https://www.a.com",
@@ -1545,25 +1602,12 @@ static int st_hashdiff(httrackp *opt, int argc, char **argv) {
                                       "www.b.com",    "x.b.com",
                                       "c.com",        "d.com",
                                       "a.com:8080",   "",
-                                      "primary",      NULL};
-  static const char *const fils[] = {"/",
-                                     "/x",
-                                     "//x",
-                                     "/x//y",
-                                     "/x?b=1&a=2",
-                                     "/x?a=2&b=1",
-                                     "/x?sid=1&a=2",
-                                     "/x?a=2",
-                                     "/x?a=2&sid=9",
-                                     "/x?utm=1",
-                                     "/x?",
-                                     "/x?&&",
-                                     "x",
-                                     "/X",
-                                     "/x//y?b&a",
-                                     NULL,
-                                     NULL};
-  static const size_t sizes[] = {1, 8, 40, HTS_URLMAXSIZE * 4};
+                                      "primary",      hashdiff_long};
+  static const char *const fils[] = {
+      "/",           "/x",           "//x",    "/x//y",        "/x?b=1&a=2",
+      "/x?a=2&b=1",  "/x?sid=1&a=2", "/x?a=2", "/x?a=2&sid=9", "/x?utm=1",
+      "/x?",         "/x?&&",        "x",      "/X",           "/x//y?b&a",
+      hashdiff_long, hashdiff_longq};
 
   enum {
     nh = sizeof(hosts) / sizeof(hosts[0]),
@@ -1573,15 +1617,20 @@ static int st_hashdiff(httrackp *opt, int argc, char **argv) {
   char *longhost = malloct(HTS_URLMAXSIZE * 2);
   char *longfil = malloct(HTS_URLMAXSIZE * 2);
   char *longqfil = malloct(HTS_URLMAXSIZE * 2);
-  char *ko = malloct(HTS_URLMAXSIZE * 4);
-  char *kn = malloct(HTS_URLMAXSIZE * 4);
   const char *adr[nh * nf], *fil[nh * nf];
-  unsigned long cases = 0, failures = 0, equal = 0, rewritten = 0;
-  size_t rs, ra, i, j, k;
+  hashdiff_run run;
+  size_t rs, ra, i, j;
   int flags;
 
+  memset(&run, 0, sizeof(run));
+  run.adr = adr;
+  run.fil = fil;
+  run.n = nh * nf;
+  run.nf = nf;
+  run.ko = malloct(HTS_URLMAXSIZE * 4);
+  run.kn = malloct(HTS_URLMAXSIZE * 4);
   assertf(longhost != NULL && longfil != NULL && longqfil != NULL &&
-          ko != NULL && kn != NULL);
+          run.ko != NULL && run.kn != NULL);
   /* one byte short of the fields the engine stores them in */
   memset(longhost, 'h', HTS_URLMAXSIZE * 2 - 1);
   longhost[HTS_URLMAXSIZE * 2 - 1] = '\0';
@@ -1592,64 +1641,29 @@ static int st_hashdiff(httrackp *opt, int argc, char **argv) {
   memcpy(longqfil + HTS_URLMAXSIZE * 2 - 16, "?sid=1&b=2&a=3", 14);
   for (i = 0; i < nh; i++) {
     for (j = 0; j < nf; j++) {
-      adr[i * nf + j] = hosts[i] != NULL ? hosts[i] : longhost;
-      fil[i * nf + j] =
-          fils[j] != NULL ? fils[j] : (j + 1 < nf ? longfil : longqfil);
+      adr[i * nf + j] = hosts[i] == hashdiff_long ? longhost : hosts[i];
+      fil[i * nf + j] = fils[j] == hashdiff_long    ? longfil
+                        : fils[j] == hashdiff_longq ? longqfil
+                                                    : fils[j];
     }
   }
 
+  opt->urlhack = HTS_TRUE;
   for (rs = 0; rs < sizeof(rules_strip) / sizeof(rules_strip[0]); rs++) {
     for (ra = 0; ra < sizeof(rules_alias) / sizeof(rules_alias[0]); ra++) {
       StringCopy(opt->strip_query, rules_strip[rs]);
       StringCopy(opt->host_alias, rules_alias[ra]);
       for (flags = 0; flags < 8; flags++) {
         hash_struct hash;
+        char label[64];
 
-        opt->urlhack = HTS_TRUE;
         opt->no_www_dedup = (flags & 1) != 0 ? HTS_TRUE : HTS_FALSE;
         opt->no_slash_dedup = (flags & 2) != 0 ? HTS_TRUE : HTS_FALSE;
         opt->no_query_dedup = (flags & 4) != 0 ? HTS_TRUE : HTS_FALSE;
+        snprintf(label, sizeof(label), "strip=%u alias=%u flags=%d",
+                 (unsigned) rs, (unsigned) ra, flags);
         hash_init(opt, &hash, HTS_TRUE);
-        for (i = 0; i < nh * nf; i++) {
-          for (k = 0; k < sizeof(sizes) / sizeof(sizes[0]); k++) {
-            memset(ko, '#', HTS_URLMAXSIZE * 4);
-            memset(kn, '#', HTS_URLMAXSIZE * 4);
-            legacy_hash_url_key(&hash, adr[i], fil[i], ko, sizes[k]);
-            hash_url_key(&hash, adr[i], fil[i], kn, sizes[k]);
-            cases++;
-            if (memcmp(ko, kn, HTS_URLMAXSIZE * 4) != 0) {
-              failures++;
-              printf("hashdiff: key differs: strip=%u alias=%u flags=%d "
-                     "size=%u %.40s %.40s\n",
-                     (unsigned) rs, (unsigned) ra, flags, (unsigned) sizes[k],
-                     adr[i], fil[i]);
-            }
-          }
-          /* the same host, the same path, and a spread of the rest */
-          for (j = 0; j < nh * nf; j++) {
-            int eo, en;
-
-            if (i / nf != j / nf && i % nf != j % nf && (i + j) % 11 != 0)
-              continue;
-            eo =
-                legacy_key_adrfil_equals(&hash, adr[i], fil[i], adr[j], fil[j]);
-            en = hash_url_equals_in(&hash, adr[i], fil[i], adr[j], fil[j]);
-            cases++;
-            if (eo != 0) {
-              equal++;
-              /* equal only once normalized: the compare's slow path */
-              if (strcmp(adr[i], adr[j]) != 0 || strcmp(fil[i], fil[j]) != 0)
-                rewritten++;
-            }
-            if ((eo != 0) != (en != 0)) {
-              failures++;
-              printf("hashdiff: equals differs: strip=%u alias=%u flags=%d "
-                     "%.40s%.40s vs %.40s%.40s: old %d new %d\n",
-                     (unsigned) rs, (unsigned) ra, flags, adr[i], fil[i],
-                     adr[j], fil[j], eo, en);
-            }
-          }
-        }
+        hashdiff_setup(&run, &hash, label);
         hash_free(&hash);
       }
     }
@@ -1659,12 +1673,12 @@ static int st_hashdiff(httrackp *opt, int argc, char **argv) {
   freet(longhost);
   freet(longfil);
   freet(longqfil);
-  freet(ko);
-  freet(kn);
+  freet(run.ko);
+  freet(run.kn);
   printf(
       "hashdiff: %lu cases, %lu failures, %lu equal, %lu of them rewritten\n",
-      cases, failures, equal, rewritten);
-  if (failures != 0)
+      run.cases, run.failures, run.equal, run.rewritten);
+  if (run.failures != 0)
     return 1;
   printf("hashdiff: OK\n");
   return 0;

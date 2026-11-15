@@ -130,8 +130,7 @@ static const char *hash_url_key_(const hash_struct *hash, const char *adr_canon,
   return dst;
 }
 
-/* Do the --host-alias or --strip-query rules apply? Without them, the key
-   needs none of the large buffers the hardened build zero-fills per call. */
+/* Without rules, skip the buffers the hardened build zero-fills on each call */
 static hts_boolean hash_has_rules(const hash_struct *hash) {
   return hash->host_alias != NULL || hash->strip_query != NULL;
 }
