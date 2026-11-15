@@ -158,7 +158,7 @@ typedef struct
 #endif
 } curfile64_info;
 
-/* httrack addition: zlib's deflate makes five allocations per stream */
+/* httrack addition: deflate allocates five blocks per stream, 8 leaves room */
 #define ZIP_ZBUF_SLOTS 8
 
 typedef struct
@@ -177,17 +177,15 @@ typedef struct
     char *globalcomment;
 #endif
 
-    /* httrack addition: deflate buffers kept between members, so writing
-       one member does not grow and then trim the heap again */
-    voidpf zbuf[ZIP_ZBUF_SLOTS];
-    ZPOS64_T zbuf_allocs;
+    /* httrack addition: idle deflate blocks, so no heap trim per member */
+    voidpf zbuf_free[ZIP_ZBUF_SLOTS];
+    uLong zbuf_allocs;
 
 } zip64_internal;
 
 /* Prefix of each deflate buffer, aligned like malloc's result. */
 typedef union {
   size_t size;
-  long double align;
   unsigned char pad[16];
 } zip_zbuf_hdr;
 
@@ -201,9 +199,9 @@ static voidpf zip_zalloc(voidpf opaque, uInt items, uInt size) {
     return Z_NULL;
   n = (size_t) items * size;
   for (i = 0; i < ZIP_ZBUF_SLOTS; i++) {
-    h = (zip_zbuf_hdr *) zi->zbuf[i];
+    h = (zip_zbuf_hdr *) zi->zbuf_free[i];
     if (h != NULL && h->size == n) {
-      zi->zbuf[i] = NULL;
+      zi->zbuf_free[i] = NULL;
       return (voidpf) (h + 1);
     }
   }
@@ -219,11 +217,9 @@ static void zip_zfree(voidpf opaque, voidpf address) {
   zip64_internal *zi = (zip64_internal *) opaque;
   int i;
 
-  if (address == NULL)
-    return;
   for (i = 0; i < ZIP_ZBUF_SLOTS; i++) {
-    if (zi->zbuf[i] == NULL) {
-      zi->zbuf[i] = (voidpf) ((zip_zbuf_hdr *) address - 1);
+    if (zi->zbuf_free[i] == NULL) {
+      zi->zbuf_free[i] = (voidpf) ((zip_zbuf_hdr *) address - 1);
       return;
     }
   }
@@ -234,12 +230,12 @@ static void zip_zbuf_release(zip64_internal *zi) {
   int i;
 
   for (i = 0; i < ZIP_ZBUF_SLOTS; i++) {
-    free(zi->zbuf[i]);
-    zi->zbuf[i] = NULL;
+    free(zi->zbuf_free[i]);
+    zi->zbuf_free[i] = NULL;
   }
 }
 
-extern ZPOS64_T ZEXPORT zipDeflateAllocations(zipFile file) {
+extern uLong ZEXPORT zipDeflateAllocations(zipFile file) {
   return file != NULL ? ((zip64_internal *) file)->zbuf_allocs : 0;
 }
 
@@ -909,7 +905,7 @@ extern zipFile ZEXPORT zipOpen3(const void *pathname, int append, zipcharpc* glo
     ziinit.number_entry = 0;
     ziinit.add_position_when_writing_offset = 0;
     init_linkedlist(&(ziinit.central_dir));
-    memset(ziinit.zbuf, 0, sizeof(ziinit.zbuf));
+    memset(ziinit.zbuf_free, 0, sizeof(ziinit.zbuf_free));
     ziinit.zbuf_allocs = 0;
 
     zi = (zip64_internal*)ALLOC(sizeof(zip64_internal));

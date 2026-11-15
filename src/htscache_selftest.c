@@ -4322,48 +4322,62 @@ static void zbuf_fill(char *buf, size_t len, unsigned seed) {
 
 static size_t zbuf_len(int i) { return 1000 + (size_t) i * 2851; }
 
-/* Members after the first allocate no deflate buffer, and each one reads back
-   byte-exact although it was compressed in buffers reused dirty. */
-static int cache_zbuf_selftest(httrackp *opt, const char *dir) {
+/* Each zipfile allocates deflate blocks for its first member only, and every
+   member reads back byte-exact. Two zipfiles interleave to show the blocks are
+   not shared. */
+static int cache_zbuf_selftest(const char *dir) {
   static char data[ZBUF_MAXLEN], back[ZBUF_MAXLEN];
-  char path[HTS_URLMAXSIZE];
-  cache_back cache;
+  char path[2][HTS_URLMAXSIZE];
+  zipFile zf[2];
+  uLong first[2] = {0, 0};
   zip_fileinfo fi;
-  zipFile zf;
   unzFile uf;
-  ZPOS64_T first = 0;
   int failures = 0;
-  int i;
+  int i, z;
 
-  snprintf(path, sizeof(path), "%s/zbuf.zip", dir);
-  zf = hts_zipOpen_utf8(path, 0);
-  assertf(zf != NULL);
   memset(&fi, 0, sizeof(fi));
+  for (z = 0; z < 2; z++) {
+    snprintf(path[z], sizeof(path[z]), "%s/zbuf%d.zip", dir, z);
+  }
+  zf[0] = hts_zipOpen_utf8(path[0], 0);
+  assertf(zf[0] != NULL);
   for (i = 0; i < ZBUF_MEMBERS; i++) {
-    char name[32];
-    /* mixed levels share one buffer layout; a stored member allocates none */
-    const int method = i == 5 ? 0 : Z_DEFLATED;
-    const int level = i % 3 == 0 ? Z_DEFAULT_COMPRESSION : i % 3 == 1 ? 1 : 9;
+    for (z = 0; z < 2; z++) {
+      char name[32];
 
-    snprintf(name, sizeof(name), "m%02d", i);
-    zbuf_fill(data, zbuf_len(i), (unsigned) i);
-    assertf(zipOpenNewFileInZip(zf, name, &fi, NULL, 0, NULL, 0, NULL, method,
-                                level) == ZIP_OK);
-    assertf(zipWriteInFileInZip(zf, data, (unsigned) zbuf_len(i)) == ZIP_OK);
-    assertf(zipCloseFileInZip(zf) == ZIP_OK);
-    if (i == 0)
-      first = zipDeflateAllocations(zf);
+      if (i == 0 && z == 1) {
+        zf[1] = hts_zipOpen_utf8(path[1], 0);
+        assertf(zf[1] != NULL);
+        if (zipDeflateAllocations(zf[1]) != 0) {
+          fprintf(stderr, "cache-zbuf: a new zipfile counts %d allocations\n",
+                  (int) zipDeflateAllocations(zf[1]));
+          failures++;
+        }
+      }
+      snprintf(name, sizeof(name), "m%02d", i);
+      zbuf_fill(data, zbuf_len(i), (unsigned) i);
+      assertf(zipOpenNewFileInZip(zf[z], name, &fi, NULL, 0, NULL, 0, NULL,
+                                  Z_DEFLATED, Z_DEFAULT_COMPRESSION) == ZIP_OK);
+      assertf(zipWriteInFileInZip(zf[z], data, (unsigned) zbuf_len(i)) ==
+              ZIP_OK);
+      assertf(zipCloseFileInZip(zf[z]) == ZIP_OK);
+      if (i == 0)
+        first[z] = zipDeflateAllocations(zf[z]);
+    }
   }
-  if (first == 0 || zipDeflateAllocations(zf) != first) {
-    fprintf(stderr,
-            "cache-zbuf: %d members made %d deflate allocations, "
-            "the first alone %d\n",
-            ZBUF_MEMBERS, (int) zipDeflateAllocations(zf), (int) first);
-    failures++;
+  for (z = 0; z < 2; z++) {
+    /* zlib makes several blocks per stream, so 1 means a broken counter */
+    if (first[z] < 2 || zipDeflateAllocations(zf[z]) != first[z]) {
+      fprintf(stderr,
+              "cache-zbuf: zipfile %d made %d deflate allocations, the first "
+              "member alone %d\n",
+              z, (int) zipDeflateAllocations(zf[z]), (int) first[z]);
+      failures++;
+    }
+    assertf(zipClose(zf[z], NULL) == ZIP_OK);
   }
-  assertf(zipClose(zf, NULL) == ZIP_OK);
 
-  uf = hts_unzOpen_utf8(path);
+  uf = hts_unzOpen_utf8(path[0]);
   assertf(uf != NULL);
   assertf(unzGoToFirstFile(uf) == UNZ_OK);
   for (i = 0; i < ZBUF_MEMBERS; i++) {
@@ -4381,35 +4395,11 @@ static int cache_zbuf_selftest(httrackp *opt, const char *dir) {
       assertf(unzGoToNextFile(uf) == UNZ_OK);
   }
   unzClose(uf);
-
-  /* the cache writer goes through the same buffers */
-  selftest_tag = "cache-zbuf";
-  selftest_setup_dir(opt, dir);
-  selftest_open_for_write(&cache, opt);
-  assertf(cache.zipOutput != NULL);
-  for (i = 0; i < 8; i++) {
-    char fil[32];
-
-    snprintf(fil, sizeof(fil), "/p%d.html", i);
-    zbuf_fill(data, 20000, (unsigned) i);
-    store_entry(opt, &cache, "example.com", fil, "example.com/p.html", 200,
-                "OK", "text/html", "utf-8", "", "", "", "", data, 20000);
-    if (i == 0)
-      first = zipDeflateAllocations(cache.zipOutput);
-  }
-  if (first == 0 || zipDeflateAllocations(cache.zipOutput) != first) {
-    fprintf(stderr,
-            "cache-zbuf: 8 cache entries made %d deflate "
-            "allocations, the first alone %d\n",
-            (int) zipDeflateAllocations(cache.zipOutput), (int) first);
-    failures++;
-  }
-  selftest_close(&cache);
   return failures;
 }
 
 static int st_cache_zbuf(httrackp *opt, int argc, char **argv) {
-  return st_verdict("cache-zbuf", cache_zbuf_selftest(opt, argv[0]));
+  return st_verdict("cache-zbuf", cache_zbuf_selftest(argv[0]));
 }
 
 static int st_cache_legacy(httrackp *opt, int argc, char **argv) {

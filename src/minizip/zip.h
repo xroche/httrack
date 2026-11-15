@@ -326,9 +326,10 @@ extern int ZEXPORT zipCloseFileInZip(zipFile file);
   Close the current file in the zipfile
 */
 
-extern ZPOS64_T ZEXPORT zipDeflateAllocations(zipFile file);
+extern uLong ZEXPORT zipDeflateAllocations(zipFile file);
 /*
-  httrack addition: how many deflate buffers this zipfile allocated, for tests
+  Count the deflate blocks this zipfile allocated, for tests
+  (httrack addition, see zip.c.diff)
 */
 
 extern int ZEXPORT zipAbandonFileInZip(zipFile file);
