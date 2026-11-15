@@ -11,5 +11,8 @@ bash "$top_srcdir/tests/local-crawl.sh" \
     --log-not-found 'Write error on disk' \
     --file-bytes 'dmove/p0.bin.html' 2560 \
     --file-matches 'dmove/p0.bin.html' '^0000000$' \
+    --file-matches 'dmove/p0.bin.html' '^0000015$' \
+    --file-matches 'dmove/p0.bin.html' '^0000016$' \
     --file-matches 'dmove/p0.bin.html' '^0000319$' \
+    --file-not-matches 'dmove/p0.bin.html' '[^0-9]|^[0-9]{0,6}$|[0-9]{8}' \
     httrack 'BASEURL/dmove/index.html' -M50000 -c2 '-%N1' -Z
