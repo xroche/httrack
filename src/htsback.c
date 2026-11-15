@@ -204,8 +204,6 @@ static hts_boolean back_is_live(const int status);
 static int back_search(httrackp *opt, struct_back *sback);
 static void back_move(lien_back *src, lien_back *dst);
 static void back_connxfr(htsblk *src, htsblk *dst);
-static int back_searchlive(httrackp *opt, struct_back *sback,
-                           const char *search_addr);
 
 /* Slots for maxsoc connections, clamped to what back_new() can size: it builds
    two tables of back_max + 1, so INT_MAX itself is one too many. Total on
@@ -427,7 +425,7 @@ void back_delete_all(httrackp * opt, cache_back * cache, struct_back * sback) {
        hts-cache/ref must outlive the run (#1595). back_abort_slot() catches the
        ones a sweep took, and the link loop can end a capped mirror before that
        sweep ever runs (htscore.c, back_checkmirror). */
-    for (i = 0; i < sback->count; i++) {
+    BACK_FOR_EACH_BUSY(sback, i) {
       const lien_back *const back = &sback->lnk[i];
 
       if (back_is_live(back_status(back)) && back->r.is_write &&
@@ -586,11 +584,10 @@ int slot_can_be_cached_on_disk(const lien_back *back) {
 static int back_cleanup_background(httrackp *opt, cache_back *cache,
                                    struct_back *sback) {
   lien_back *const back = sback->lnk;
-  const int back_max = sback->count;
   int nclean = 0;
   int i;
 
-  for(i = 0; i < back_max; i++) {
+  BACK_FOR_EACH_BUSY(sback, i) {
     // ready, not locked and suitable
     if (slot_can_be_cached_on_disk(&back[i])) {
       /* Security check */
@@ -666,32 +663,31 @@ int back_available(const struct_back * sback) {
   return nb;
 }
 
-// retourne estimation de la taille des html et fichiers stockés en mémoire
+/* Estimated bytes of the pages and files held in memory. */
 LLint back_incache(const struct_back * sback) {
   const lien_back *const back = sback->lnk;
-  const int back_max = sback->count;
   int i;
   LLint sum = 0;
 
-  for(i = 0; i < back_max; i++)
-    if (back_status(&back[i]) != -1)
-      if (back[i].r.adr) // count only blocks held in memory
-        sum += max(hts_load_relaxed_llint(&back[i].r.size),
-                   hts_load_relaxed_llint(&back[i].r.totalsize));
-  // stored (ready) slots
+  BACK_FOR_EACH_BUSY(sback, i) {
+    if (back_status(&back[i]) != STATUS_FREE &&
+        back[i].r.adr != NULL) // count only blocks held in memory
+      sum += max(hts_load_relaxed_llint(&back[i].r.size),
+                 hts_load_relaxed_llint(&back[i].r.totalsize));
+  }
   return sum;
 }
 
-// retourne estimation de la taille des html et fichiers stockés en mémoire
+/* Counts finished results not yet taken, in slots or spooled. */
 int back_done_incache(const struct_back * sback) {
   const lien_back *const back = sback->lnk;
-  const int back_max = sback->count;
   int i;
   int n = 0;
 
-  for(i = 0; i < back_max; i++)
+  BACK_FOR_EACH_BUSY(sback, i) {
     if (back_status(&back[i]) == STATUS_READY)
       n++;
+  }
   // stored (ready) slots
   if (sback->ready != NULL) {
     n += (int) coucal_nitems(sback->ready);
@@ -2121,15 +2117,14 @@ static int back_trylive(httrackp *opt, cache_back *cache, struct_back *sback,
   return 0;
 }
 
-/* search for a live position, or, if not possible, try to return a new one */
-static int back_searchlive(httrackp *opt, struct_back *sback,
-                           const char *search_addr) {
+/* See htsback.h. */
+int back_searchlive(httrackp *opt, struct_back *sback,
+                    const char *search_addr) {
   lien_back *const back = sback->lnk;
-  const int back_max = sback->count;
   int i;
 
   /* search for a live socket */
-  for(i = 0; i < back_max; i++) {
+  BACK_FOR_EACH_BUSY(sback, i) {
     if (back_status(&back[i]) == STATUS_ALIVE) {
       if (strfield2(back[i].url_adr, search_addr)) {    /* same location (xxc: check also virtual hosts?) */
 #if HTS_USEOPENSSL
@@ -2166,7 +2161,6 @@ int back_search_quick(struct_back * sback) {
 
 static int back_search(httrackp *opt, struct_back *sback) {
   lien_back *const back = sback->lnk;
-  const int back_max = sback->count;
   int i;
 
   /* try to find an empty place */
@@ -2174,7 +2168,7 @@ static int back_search(httrackp *opt, struct_back *sback) {
     return i;
 
   /* couldn't find an empty place, try to requisition a keep-alive place */
-  for(i = 0; i < back_max; i++) {
+  BACK_FOR_EACH_BUSY(sback, i) {
     if (back_status(&back[i]) == STATUS_ALIVE) {
       lien_back *const back = sback->lnk;
 
@@ -3258,7 +3252,7 @@ static int back_abort_stopped(httrackp *opt, struct_back *sback) {
   int aborted = 0;
   int i;
 
-  for (i = 0; i < sback->count; i++) {
+  BACK_FOR_EACH_BUSY(sback, i) {
     const int status = back_status(&sback->lnk[i]);
 
     if (!back_is_live(status) || (grace && !back_is_preconnect(status)))
@@ -3280,7 +3274,7 @@ static int back_abort_limit(httrackp *opt, struct_back *sback,
   int aborted = 0;
   int i;
 
-  for (i = 0; i < sback->count; i++) {
+  BACK_FOR_EACH_BUSY(sback, i) {
     if (!back_is_live(back_status(&sback->lnk[i])))
       continue;
     back_abort_slot(opt, sback, i, STATUSCODE_TIMEOUT,
@@ -5155,11 +5149,10 @@ int back_checkmirror(httrackp *opt) {
 // octets transférés + add
 LLint back_transferred(LLint nb, struct_back * sback) {
   lien_back *const back = sback->lnk;
-  const int back_max = sback->count;
   int i;
 
-  // ajouter octets en instance
-  for (i = 0; i < back_max; i++) {
+  /* bytes of transfers in progress */
+  BACK_FOR_EACH_BUSY(sback, i) {
     const int st = back_status(&back[i]);
 
     if ((st > 0) && (st < 99 || st >= 1000))

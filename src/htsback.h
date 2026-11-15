@@ -104,6 +104,8 @@ int back_search_quick(struct_back * sback);
 /* Does the busy bitmap cover every slot not STATUS_FREE? With exact, does it
    also hold no free slot (true right after back_clean())? */
 hts_boolean back_busy_consistent(const struct_back *sback, hts_boolean exact);
+/* Finds a live keep-alive slot for search_addr, or returns -1. */
+int back_searchlive(httrackp *opt, struct_back *sback, const char *search_addr);
 void back_clean(httrackp *opt, cache_back *cache, struct_back *sback);
 void back_wait(struct_back *sback, httrackp *opt, cache_back *cache,
                TStamp stat_timestart);

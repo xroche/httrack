@@ -1,0 +1,14 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# Each slot-table scan driven by the busy bitmap reaches every slot in use.
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_busyscans.XXXXXX") || exit 1
+trap 'set +e; rm -rf "$tmpdir"' EXIT
+
+out=$(httrack -O /dev/null -#test=busyscans "$tmpdir")
+grep -q "busyscans self-test: OK" <<<"$out" || fail "busyscans: $out"
