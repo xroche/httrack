@@ -101,6 +101,7 @@ static void basic_selftests(void) {
     struct_back sb;
     int idx;
 
+    memset(&sb, 0, sizeof(sb));
     sb.lnk = slots;
     sb.count = n;
     sb.ready = NULL;

@@ -1,0 +1,29 @@
+#!/bin/bash
+#
+# xml:base sets the base of later relative links in a feed, as <base href>
+# does, but not in HTML, where browsers ignore it. It is never fetched, and is
+# written out empty so the saved file resolves its rewritten links against
+# itself. An empty base is left as it is, and an unquoted one keeps the '>',
+# and a fragment in the value is dropped with it.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
+    --found 'xmlbase/blog/p2.html' --found 'xmlbase/p3.html' \
+    --not-found 'xmlbase/blog/index.html' \
+    --not-found 'xmlbase/p2.html' --not-found 'xmlbase/blog/p3.html' \
+    --file-matches 'xmlbase/feed.feed' ' xml:base="">' \
+    --file-matches 'xmlbase/feed.feed' 'href="blog/p2\.html"' \
+    --file-matches 'xmlbase/page.html' 'xhtml" xml:base="">' \
+    --file-matches 'xmlbase/page.html' '<a href="p3\.html">' \
+    --file-matches 'xmlbase/feed.feed' '<entry xml:base=""><link href="blog/p2\.html"/>' \
+    --file-matches 'xmlbase/page.html' '<a href="#">a</a><p xml:base="">e</p>' \
+    --file-matches 'xmlbase/page.html' '<base href=""><applet codebase=""></applet>' \
+    --file-matches 'xmlbase/page.html' '<p xml:base="">u</p><base href="">b<p' \
+    --file-matches 'xmlbase/feed.feed' '<entry xml:base="" id="q"/></feed>' \
+    --file-matches 'xmlbase/page.html' '<p xml:base="">f</p><base href="">g<base href="">h<applet +codebase="x/" code="A\.class">i</applet><p' \
+    --file-matches 'xmlbase/page.html' '</applet><p xml:base="">a src=leak2\.gif</p><base href="">z src=y\.gif </p></body>' \
+    --not-found 'xmlbase/a/y.gif' --not-found 'xmlbase/a/y.html' \
+    httrack 'BASEURL/xmlbase/index.html'
