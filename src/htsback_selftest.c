@@ -605,7 +605,7 @@ static int st_spoolrecord(httrackp *opt, int argc, char **argv) {
   if (back == NULL)
     return 1;
 
-  /* Small slot: the record must stay far under the struct's size. */
+  /* A small slot must spool far under the struct size. */
   strcpybuff(back->url_adr, "example.com");
   strcpybuff(back->url_fil, "/a.html");
   strcpybuff(back->url_sav, "/tmp/mirror/a.html");
@@ -621,10 +621,50 @@ static int st_spoolrecord(httrackp *opt, int argc, char **argv) {
     err = 1;
   }
   freet(rec);
+  /* One more byte in any string field must cost exactly one byte. */
+  {
+#define ST_FIELD(f) {back->f, sizeof(back->f), #f}
+
+    const struct {
+      char *field;
+      size_t size;
+      const char *name;
+    } fields[] = {ST_FIELD(url_adr),        ST_FIELD(url_fil),
+                  ST_FIELD(url_sav),        ST_FIELD(referer_adr),
+                  ST_FIELD(referer_fil),    ST_FIELD(location_buffer),
+                  ST_FIELD(tmpfile_buffer), ST_FIELD(send_too),
+                  ST_FIELD(r.msg),          ST_FIELD(r.contenttype),
+                  ST_FIELD(r.charset),      ST_FIELD(r.contentencoding),
+                  ST_FIELD(r.lastmodified), ST_FIELD(r.etag),
+                  ST_FIELD(r.cdispo),       ST_FIELD(info)};
+
+#undef ST_FIELD
+    size_t i;
+
+    for (i = 0; i < sizeof(fields) / sizeof(fields[0]); i++) {
+      long shorter = 0, longer = 0;
+      char saved[64];
+
+      strlcpybuff(saved, fields[i].field, sizeof(saved));
+      strlcpybuff(fields[i].field, "x", fields[i].size);
+      freet(rec);
+      rec = st_spool_record(back, &shorter);
+      strlcpybuff(fields[i].field, "xx", fields[i].size);
+      freet(rec);
+      rec = st_spool_record(back, &longer);
+      strlcpybuff(fields[i].field, saved, fields[i].size);
+      if (shorter == 0 || longer != shorter + 1) {
+        fprintf(stderr, "spoolrecord: %s is not spooled by its length\n",
+                fields[i].name);
+        err = 1;
+      }
+    }
+    freet(rec);
+  }
   freet(back->r.adr);
 
-  /* Every string field full, the scalars set: the copy must match exactly.
-     Bytes past a terminator come back zero, so start from a zeroed slot. */
+  /* With every string field full, the copy must match exactly. Bytes past a
+     terminator come back zero, so the slot starts zeroed. */
   memset(back, 0, sizeof(lien_back));
   back->r.adr = strdupt(body);
   back->r.size = (LLint) sizeof(body) - 1;
@@ -699,9 +739,7 @@ static int st_spoolrecord(httrackp *opt, int argc, char **argv) {
     freet(copy);
   }
 
-  /* Hostile lengths for the first field, right after the leading size, each
-     followed by as many bytes as it claims so the rest of the record parses:
-     the room itself, one past it, and a wrapping one (no bytes follow). */
+  /* Forged first-field lengths: its room, one past it, and a wrapping one. */
   {
     const size_t room = sizeof(back->url_adr);
     const size_t head = 2 * sizeof(size_t);

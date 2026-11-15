@@ -1446,8 +1446,8 @@ static int back_string_unserialize(FILE * fp, char **str) {
   return err;
 }
 
-/* The fixed string fields, in struct order: only their used bytes go out,
-   because they are most of the 17 KB of a slot. */
+/* String fields in struct order. A record is sizeof(lien_back), then the
+   struct with each of these fields replaced by its length and used bytes. */
 #define BACK_SPOOL_STR(f) {offsetof(lien_back, f), sizeof(((lien_back *) 0)->f)}
 
 static const struct {
@@ -1508,8 +1508,8 @@ int back_serialize(FILE * fp, const lien_back * src) {
   return 1;
 }
 
-/* Reads one string field into its fixed slot; a length that leaves no room
-   for the terminator is refused rather than clipped. */
+/* Reads one string field into its fixed slot. A length with no room for the
+   terminator is refused, not clipped. */
 static hts_boolean back_field_unserialize(FILE *fp, char *dst, size_t size) {
   size_t len;
 

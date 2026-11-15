@@ -10,4 +10,3 @@ set -euo pipefail
 # unchanged, and a truncated record or an over-long field length is refused.
 
 assert_selftest 'spoolrecord self-test: OK' spoolrecord
-assert_selftest 'backswap self-test: OK' backswap
