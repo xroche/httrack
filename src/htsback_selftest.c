@@ -656,6 +656,102 @@ static int st_spoolwrite(httrackp *opt, int argc, char **argv) {
   return st_verdict("spoolwrite", err);
 }
 
+/* A finished slot holding a body of size bytes, or none when size < 0. */
+static hts_boolean st_spoolcap_slot(lien_back *back, const char *dir,
+                                    const char *name, int size) {
+  back->status = STATUS_READY;
+  back->r.location = back->location_buffer;
+  back->r.soc = INVALID_SOCKET;
+  strcpybuff(back->url_adr, "example.com");
+  snprintf(back->url_fil, sizeof(back->url_fil), "/%s", name);
+  snprintf(back->url_sav, sizeof(back->url_sav), "%s/%s", dir, name);
+  if (size < 0) {
+    back->r.size = 5000; /* written to url_sav, so not in the spool */
+    return HTS_TRUE;
+  }
+  back->r.adr = calloct(1, (size_t) size);
+  back->r.size = size;
+  return back->r.adr != NULL ? HTS_TRUE : HTS_FALSE;
+}
+
+// -#test=spoolcap <dir>: the spool counts what it holds, and a full one takes
+// no more pages fetched early.
+static int st_spoolcap(httrackp *opt, int argc, char **argv) {
+  const LLint entry = (LLint) sizeof(lien_back);
+  char base[HTS_URLMAXSIZE];
+  char tmpdir[HTS_URLMAXSIZE * 2];
+  struct_back *sback;
+  cache_back cache;
+  int err = 0;
+  int i;
+
+#define CHECK(cond) ST_CHECK(err, cond)
+  if (argc < 1) {
+    fprintf(stderr, "usage: -#test=spoolcap <writable directory>\n");
+    return 1;
+  }
+  snprintf(base, sizeof(base), "%s/", argv[0]);
+  /* dir_exists() tests the directory a name is in */
+  snprintf(tmpdir, sizeof(tmpdir), "%s/~hts-tmp/x", argv[0]);
+  StringCopy(opt->path_html_utf8, base);
+  opt->state.stop = 0;
+  memset(&cache, 0, sizeof(cache));
+  sback = back_new(opt, 4);
+  if (sback == NULL)
+    return 1;
+
+  sback->spool_bytes = HTS_SPOOL_MAX_BYTES - 1;
+  CHECK(!back_spool_full(sback));
+  sback->spool_bytes = HTS_SPOOL_MAX_BYTES;
+  CHECK(back_spool_full(sback));
+  {
+    lien_back page;
+
+    memset(&page, 0, sizeof(page));
+    page.r.statuscode = HTTP_OK;
+    CHECK(!back_spool_may_keep(sback, &page));
+    page.r.is_write = 1;
+    CHECK(back_spool_may_keep(sback, &page));
+    page.r.is_write = 0;
+    page.r.statuscode = 404;
+    CHECK(back_spool_may_keep(sback, &page));
+    page.r.statuscode = HTTP_OK;
+    sback->spool_bytes = HTS_SPOOL_MAX_BYTES - 1;
+    CHECK(back_spool_may_keep(sback, &page));
+  }
+  sback->spool_bytes = 0;
+
+  /* one slot with a body, one whose body went straight to disk */
+  if (!st_spoolcap_slot(&sback->lnk[0], argv[0], "a.html", 1000) ||
+      !st_spoolcap_slot(&sback->lnk[1], argv[0], "b.png", -1)) {
+    fprintf(stderr, "spoolcap: no memory\n");
+    err = 1;
+    goto done;
+  }
+  CHECK(back_cleanup_background(opt, &cache, sback) == 2);
+  CHECK(sback->spool_bytes == 2 * entry + 1000);
+  {
+    char sav[HTS_URLMAXSIZE * 2];
+
+    snprintf(sav, sizeof(sav), "%s/a.html", argv[0]);
+    CHECK(back_index(opt, sback, "example.com", "/a.html", sav) >= 0);
+    CHECK(sback->spool_bytes == entry);
+    CHECK(dir_exists(tmpdir));
+    snprintf(sav, sizeof(sav), "%s/b.png", argv[0]);
+    CHECK(back_index(opt, sback, "example.com", "/b.png", sav) >= 0);
+    CHECK(sback->spool_bytes == 0);
+    /* the last entry out removes the spool directory */
+    CHECK(!dir_exists(tmpdir));
+  }
+
+done:
+  for (i = 0; i < sback->count; i++)
+    back_clear_entry(&sback->lnk[i]);
+  back_free(&sback);
+#undef CHECK
+  return st_verdict("spoolcap", err);
+}
+
 static hts_boolean st_spool_plant(const char *path) {
   FILE *const fp = filecreate(NULL, path);
 
@@ -2200,6 +2296,9 @@ const struct selftest_entry selftests_back[] = {
      st_statsrows},
     {"spoolwrite", "<dir>", "a failed spool write leaves no partial file",
      st_spoolwrite},
+    {"spoolcap", "<dir>",
+     "the spool counts what it holds, and a full one takes no more pages",
+     st_spoolcap},
     {"spoolsweep", "<dir>", "startup removes the spool of a dead process only",
      st_spoolsweep},
     {"backstop", "",

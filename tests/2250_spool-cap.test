@@ -1,0 +1,14 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# The spool counts what it holds, and a full one takes no more pages.
+
+dir=$(mktemp -d)
+cleanup_push rm -rf "$dir"
+
+assert_selftest 'spoolcap: OK' spoolcap "$dir"

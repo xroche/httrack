@@ -813,7 +813,10 @@ void hts_mirror_process_user_interaction(htsmoduleStruct *str,
       if (hts_load_acquire_int(stre->exit_xh_)) {
         return;
       }
-      Sleep(100); // pause
+      /* no pause once back_wait() has freed a socket */
+      if (opt->state._hts_setpause ||
+          back_pluggable_sockets_strict(sback, opt) <= 0)
+        Sleep(100); // pause
     }
     opt->state._hts_in_html_parsing = prev;
   }
@@ -1518,6 +1521,14 @@ int hts_wait_delayed(htsmoduleStruct *str, lien_adrfilsave *afs,
               break; // exit loop
           }
 
+          /* past the spool cap, back_fill() fetches this page again */
+          if (b >= 0 && !back_spool_may_keep(sback, &back[b])) {
+            if (back_status(&back[b]) == STATUS_READY)
+              back_maydelete(opt, cache, sback, b);
+            else
+              back_delete(opt, cache, sback, b);
+            b = -1;
+          }
           /* Still have a back reference */
           if (b >= 0) {
             /* move a still-writing placeholder before the url_sav patch

@@ -3407,6 +3407,10 @@ int back_fill(struct_back * sback, httrackp * opt, cache_back * cache,
     while (p < opt->lien_tot && n > 0 && back_checkmirror(opt)) {
       int ok = 1;
 
+      /* a full spool takes only what the parser reaches soon */
+      if (p - ptr > sback->count && back_spool_full(sback))
+        break;
+
       // on ne met pas le fichier en backing si il doit être traité après ou s'il a déja été traité
       if (heap(p)->pass2) {    // 2è passe
         if (numero_passe != 1)

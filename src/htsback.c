@@ -248,6 +248,7 @@ struct_back *back_new(httrackp *opt, int back_max) {
   hts_set_hash_handler(sback->ready, opt);
   coucal_set_name(sback->ready, "back_new");
   sback->ready_size_bytes = 0;
+  sback->spool_bytes = 0;
   coucal_value_is_malloc(sback->ready, 1);
   // init
   for(i = 0; i < sback->count; i++) {
@@ -371,6 +372,7 @@ void back_delete_all(httrackp * opt, cache_back * cache, struct_back * sback) {
       /* delete hashtable & content */
       coucal_delete(&sback->ready);
       sback->ready_size_bytes = 0;
+      sback->spool_bytes = 0;
     }
   }
 }
@@ -420,6 +422,11 @@ static int back_index_fetch(httrackp * opt, struct_back * sback, const char *adr
   return index;
 }
 
+/* What one slot takes in the spool, as back_serialize() writes it. */
+static LLint back_spool_cost(const lien_back *back) {
+  return (LLint) sizeof(lien_back) + (back->r.adr != NULL ? back->r.size : 0);
+}
+
 /* resurrect stored entry */
 static int back_index_ready(httrackp * opt, struct_back * sback, const char *adr,
                             const char *fil, const char *sav, int getIndex) {
@@ -459,7 +466,9 @@ static int back_index_ready(httrackp * opt, struct_back * sback, const char *adr
                       adr_nologin(opt, adr), fil, sav);
       }
       (void) UNLINK(fileback);
-      back_tmpdir_drop(fileback);
+      /* the spool shares one directory, so only its last entry can empty it */
+      if (coucal_nitems(sback->ready) == 1)
+        back_tmpdir_drop(fileback);
       if (itemback != NULL) {
         // move from hashtable to fast repository
         int q = back_search(opt, sback);
@@ -472,6 +481,7 @@ static int back_index_ready(httrackp * opt, struct_back * sback, const char *adr
           itemback = NULL;
           coucal_remove(sback->ready, sav);    // delete item
           sback->ready_size_bytes -= back[q].r.size;    /* substract for stats */
+          sback->spool_bytes -= back_spool_cost(&back[q]);
           back_set_locked(sback, q);    /* locked */
           return q;
         } else {
@@ -500,9 +510,19 @@ int slot_can_be_cached_on_disk(const lien_back *back) {
   /* Note: not checking !IS_DELAYED_EXT(back->url_sav) or it will quickly cause the slots to be filled! */
 }
 
-/* Put all backing entries that are ready in the storage hashtable to spare space and CPU */
-static int back_cleanup_background(httrackp *opt, cache_back *cache,
-                                   struct_back *sback) {
+hts_boolean back_spool_full(const struct_back *sback) {
+  return sback->spool_bytes >= HTS_SPOOL_MAX_BYTES ? HTS_TRUE : HTS_FALSE;
+}
+
+hts_boolean back_spool_may_keep(const struct_back *sback,
+                                const lien_back *back) {
+  /* an error or a file on disk costs the spool no body */
+  return !back_spool_full(sback) || back->r.statuscode != HTTP_OK ||
+         back->r.is_write;
+}
+
+int back_cleanup_background(httrackp *opt, cache_back *cache,
+                            struct_back *sback) {
   lien_back *const back = sback->lnk;
   const int back_max = sback->count;
   int nclean = 0;
@@ -553,6 +573,7 @@ static int back_cleanup_background(httrackp *opt, cache_back *cache,
             coucal_add_pvoid(sback->ready, back[i].url_sav, filename);
             filename = NULL;
             sback->ready_size_bytes += back[i].r.size;
+            sback->spool_bytes += back_spool_cost(&back[i]);
             nclean++;
             back_clear_entry(&back[i]);
           }

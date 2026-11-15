@@ -197,6 +197,19 @@ unsigned long back_self_pid(void);
    failure. */
 hts_boolean back_spool_write(httrackp *opt, const char *filename,
                              const lien_back *back);
+/* Spool size at which the engine stops fetching ahead of the parser. Without
+   it, a large crawl spooled gigabytes and filled a tmpfs. */
+#define HTS_SPOOL_MAX_BYTES ((LLint) 128 * 1024 * 1024)
+/* Has the spool reached HTS_SPOOL_MAX_BYTES? */
+hts_boolean back_spool_full(const struct_back *sback);
+/* May a slot fetched early, only to learn its type, keep its body? Once the
+   spool is full a page held in memory may not: the parser fetches it again
+   when it gets there. */
+hts_boolean back_spool_may_keep(const struct_back *sback,
+                                const lien_back *back);
+/* Swap every finished, unlocked slot out to the spool. Returns how many. */
+int back_cleanup_background(httrackp *opt, cache_back *cache,
+                            struct_back *sback);
 /* Remove spool files whose process is gone or is this one. Call before this
    run spools anything. */
 void back_spool_sweep(httrackp *opt);
