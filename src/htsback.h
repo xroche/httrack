@@ -155,8 +155,8 @@ int back_delete(httrackp * opt, cache_back * cache, struct_back * sback,
                 const int p);
 /* Discard back's on-disk .delayed placeholder and its refname. */
 void back_delayed_discard(httrackp *opt, lien_back *back);
-/* Move back's .delayed placeholder (and open stream) to newname;
-   HTS_FALSE = file lost, slot flagged in error. */
+/* Move back's .delayed placeholder (and open stream) to newname, or remove
+   one this slot never wrote; HTS_FALSE = file lost, slot flagged in error. */
 hts_boolean back_delayed_rename(httrackp *opt, lien_back *back,
                                 const char *newname);
 int back_clear_entry(lien_back * back);

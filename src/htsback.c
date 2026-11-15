@@ -2322,9 +2322,17 @@ hts_boolean back_delayed_rename(httrackp *opt, lien_back *back,
                                 const char *newname) {
   hts_boolean renamed;
 
-  if (!back->r.is_write || back->tmpfile != NULL ||
-      !IS_DELAYED_EXT(back->url_sav) || strcmp(back->url_sav, newname) == 0)
+  if (!IS_DELAYED_EXT(back->url_sav) || strcmp(back->url_sav, newname) == 0)
     return HTS_TRUE; /* nothing bound to the placeholder name */
+  if (!back->r.is_write) {
+    /* this slot never wrote it: an earlier run left it */
+    if (UNLINK(back->url_sav) == 0)
+      hts_log_print(opt, LOG_DEBUG, "removed a stale placeholder %s",
+                    back->url_sav);
+    return HTS_TRUE;
+  }
+  if (back->tmpfile != NULL)
+    return HTS_TRUE; /* the body goes to tmpfile, not the placeholder */
   if (back->r.out != NULL) {
     fclose(back->r.out);
     back->r.out = NULL;
@@ -2831,8 +2839,9 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
         itemback = NULL;
       }
       /* Not in cache or temporary cache ; found on disk ? (hack)
-         (skipped on a forced whole refetch, #581) */
-      else if (!refetch_whole && fexist_utf8(save)) {
+         (skipped on a forced whole refetch, #581; a placeholder name is
+         numbered per run, so a file under it is another run's) */
+      else if (!refetch_whole && !IS_DELAYED_EXT(save) && fexist_utf8(save)) {
         const LLint sz = fsize_utf8(save);
 
         // Bon, là il est possible que le fichier ait été partiellement transféré
