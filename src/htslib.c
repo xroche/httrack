@@ -3818,11 +3818,7 @@ hts_boolean hts_query_key_stripped(const char *arg, size_t keylen,
 char *fil_normalized_filtered_ex(const char *source, char *dest,
                                  const char *strip, int do_slash,
                                  int do_query) {
-  const char *query, *cur;
-  hts_query_field f;
-  char BIGSTK tmp[HTS_URLMAXSIZE * 2];
-  htsbuff cb;
-  int wrote = 0;
+  const char *query;
 
   /* No strip list, or no query: plain normalization. */
   if (strip == NULL || *strip == '\0' ||
@@ -3832,17 +3828,26 @@ char *fil_normalized_filtered_ex(const char *source, char *dest,
 
   /* Copy the path, re-emit kept query args, let fil_normalized() sort. Walk
      every field incl. empty/trailing ("a&","?&&") so the result is a fixpoint
-     (the read re-normalizes it; a dropped empty arg would miss dedup). */
-  cb = htsbuff_ptr(tmp, sizeof(tmp));
-  htsbuff_catn(&cb, source, (size_t) (query - source));
-  for (cur = query + 1; hts_query_next(&cur, &f);) {
-    if (!hts_query_key_stripped(f.key, f.keylen, strip)) {
-      htsbuff_catc(&cb, wrote ? '&' : '?');
-      htsbuff_catn(&cb, f.key, f.len);
-      wrote = 1;
+     (the read re-normalizes it; a dropped empty arg would miss dedup). The
+     buffer is declared here, past the fast path, which the hardened build
+     would otherwise zero-fill it for. */
+  {
+    char BIGSTK tmp[HTS_URLMAXSIZE * 2];
+    htsbuff cb = htsbuff_ptr(tmp, sizeof(tmp));
+    hts_query_field f;
+    const char *cur;
+    int wrote = 0;
+
+    htsbuff_catn(&cb, source, (size_t) (query - source));
+    for (cur = query + 1; hts_query_next(&cur, &f);) {
+      if (!hts_query_key_stripped(f.key, f.keylen, strip)) {
+        htsbuff_catc(&cb, wrote ? '&' : '?');
+        htsbuff_catn(&cb, f.key, f.len);
+        wrote = 1;
+      }
     }
+    return fil_normalized_ex(tmp, dest, do_slash, do_query);
   }
-  return fil_normalized_ex(tmp, dest, do_slash, do_query);
 }
 
 /* see htscore.h */
@@ -3851,17 +3856,16 @@ char *fil_normalized_filtered(const char *source, char *dest,
   return fil_normalized_filtered_ex(source, dest, strip, 1, 1);
 }
 
-/* see htscore.h */
-const char *hts_query_strip_keys(const char *rules, const char *adr,
-                                 const char *fil, char *dest, size_t destsize) {
+/* hts_query_strip_keys() past its no-rules check, which this keeps clear of
+   the buffers: the hardened build zero-fills them on every call. */
+static const char *hts_query_strip_keys_match(const char *rules,
+                                              const char *adr, const char *fil,
+                                              char *dest, size_t destsize) {
   const char *cur, *end, *q;
   const char *result = NULL;
   hts_span all, line;
   /* holds a host and a path, each up to HTS_URLMAXSIZE * 2 */
   char BIGSTK url[HTS_URLMAXSIZE * 4];
-
-  if (rules == NULL || *rules == '\0' || destsize == 0)
-    return NULL;
 
   /* Match string = normalized host/path, query removed. jump_normalized_const
      collapses www+scheme/auth so read and write (double-normalized) agree;
@@ -3902,6 +3906,14 @@ const char *hts_query_strip_keys(const char *rules, const char *adr,
     }
   }
   return result;
+}
+
+/* see htscore.h */
+const char *hts_query_strip_keys(const char *rules, const char *adr,
+                                 const char *fil, char *dest, size_t destsize) {
+  if (rules == NULL || *rules == '\0' || destsize == 0)
+    return NULL;
+  return hts_query_strip_keys_match(rules, adr, fil, dest, destsize);
 }
 
 /* see htscore.h */
@@ -3996,24 +4008,19 @@ static hts_boolean hts_host_alias_subject(const char *url, const char *host,
    arbitrary hop, which would depend on how often a link is named. */
 enum { HTS_HOST_ALIAS_MAXHOPS = 8 };
 
-/* see htscore.h */
-const char *hts_host_alias_resolve(const char *rules, const char *adr,
-                                   hts_boolean collapse_www, char *dest,
-                                   size_t destsize, hts_boolean *settled) {
+/* hts_host_alias_resolve() past its no-rules checks, kept apart for the same
+   reason as hts_query_strip_keys_match(). */
+static const char *hts_host_alias_resolve_rules(const char *rules,
+                                                const char *adr,
+                                                hts_boolean collapse_www,
+                                                char *dest, size_t destsize,
+                                                hts_boolean *settled) {
   const char *proto, *host, *hostsubj, *canon;
   char BIGSTK fullsubj[HTS_URLMAXSIZE * 2];
   char schemebuf[32]; /* longest jump_protocol_const knows is "socks5h://" */
   size_t canonlen = 0, schemelen;
   int hop;
 
-  if (settled != NULL)
-    *settled = HTS_TRUE;
-  if (rules == NULL || *rules == '\0' || adr == NULL || destsize == 0)
-    return NULL;
-  /* engine pseudo-hosts: a "*=host" rule must not swallow them */
-  if (adr[0] == '\0' || strcmp(adr, "primary") == 0 ||
-      strcmp(adr, "file://") == 0)
-    return NULL;
   proto = jump_protocol_const(adr);      /* after the scheme */
   host = jump_identification_const(adr); /* after the credentials */
   schemelen = (size_t) (proto - adr);
@@ -4095,6 +4102,22 @@ const char *hts_host_alias_resolve(const char *rules, const char *adr,
 }
 
 /* see htscore.h */
+const char *hts_host_alias_resolve(const char *rules, const char *adr,
+                                   hts_boolean collapse_www, char *dest,
+                                   size_t destsize, hts_boolean *settled) {
+  if (settled != NULL)
+    *settled = HTS_TRUE;
+  if (rules == NULL || *rules == '\0' || adr == NULL || destsize == 0)
+    return NULL;
+  /* engine pseudo-hosts: a "*=host" rule must not swallow them */
+  if (adr[0] == '\0' || strcmp(adr, "primary") == 0 ||
+      strcmp(adr, "file://") == 0)
+    return NULL;
+  return hts_host_alias_resolve_rules(rules, adr, collapse_www, dest, destsize,
+                                      settled);
+}
+
+/* see htscore.h */
 const char *hts_host_alias(const char *rules, const char *adr,
                            hts_boolean collapse_www, char *dest,
                            size_t destsize) {
@@ -4108,13 +4131,16 @@ hts_boolean hts_host_alias_collapse_www(httrackp *opt) {
 
 /* see htscore.h */
 const char *hts_host_alias_fold(httrackp *opt, lien_adrfil *af) {
-  char BIGSTK canon[HTS_URLMAXSIZE * 2];
-  const char *const alias =
-      hts_host_alias(hts_host_alias_rules(opt), af->adr,
-                     hts_host_alias_collapse_www(opt), canon, sizeof(canon));
+  const char *const rules = hts_host_alias_rules(opt);
 
-  if (alias != NULL)
-    strcpybuff(af->adr, alias);
+  if (rules != NULL) {
+    char BIGSTK canon[HTS_URLMAXSIZE * 2];
+    const char *const alias = hts_host_alias(
+        rules, af->adr, hts_host_alias_collapse_www(opt), canon, sizeof(canon));
+
+    if (alias != NULL)
+      strcpybuff(af->adr, alias);
+  }
   return af->adr;
 }
 

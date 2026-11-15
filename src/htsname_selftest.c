@@ -1448,6 +1448,228 @@ static int st_hostalias(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* The dedup key and compare before the no-rules fast paths, frozen. */
+static const char *legacy_key_host_alias(const hash_struct *hash,
+                                         const char *adr, char *buf,
+                                         size_t bufsize) {
+  const char *const canon =
+      hts_host_alias(hash->host_alias, adr, hash->norm_host, buf, bufsize);
+
+  return canon != NULL ? canon : adr;
+}
+
+static const char *legacy_hash_url_key(hash_struct *hash, const char *adr,
+                                       const char *fil, char *dst,
+                                       size_t dstsize) {
+  char BIGSTK aliasbuf[HTS_URLMAXSIZE * 2];
+  const char *const adr_canon =
+      adr != NULL ? legacy_key_host_alias(hash, adr, aliasbuf, sizeof(aliasbuf))
+                  : NULL;
+  const char *const adr_norm =
+      adr_canon != NULL
+          ? (hash->norm_host ? jump_normalized_const(adr_canon)
+                             : jump_identification_const(adr_canon))
+          : NULL;
+
+  assertf(adr_norm != NULL);
+  (void) strclipbuff(dst, dstsize, adr_norm);
+  assertf(fil != NULL);
+  {
+    char BIGSTK keybuf[HTS_URLMAXSIZE];
+    const char *const keys = hts_query_strip_keys(hash->strip_query, adr_canon,
+                                                  fil, keybuf, sizeof(keybuf));
+    const size_t used = strlen(dst);
+    char *const tail = &dst[used];
+    const size_t avail = dstsize - used;
+
+    if ((hash->norm_slash || hash->norm_query || keys != NULL) &&
+        strlen(fil) < avail && strlen(fil) < HTS_URLMAXSIZE * 2) {
+      fil_normalized_filtered_ex(fil, tail, keys, hash->norm_slash,
+                                 hash->norm_query);
+    } else {
+      (void) strclipbuff(tail, avail, fil);
+    }
+  }
+  return dst;
+}
+
+static int legacy_key_adrfil_equals(hash_struct *hash, const char *a_adr,
+                                    const char *a_fil, const char *b_adr,
+                                    const char *b_fil) {
+  char BIGSTK a_aliasbuf[HTS_URLMAXSIZE * 2], b_aliasbuf[HTS_URLMAXSIZE * 2];
+  const char *a_canon, *b_canon;
+  const char *ja;
+  const char *jb;
+
+  a_canon = legacy_key_host_alias(hash, a_adr, a_aliasbuf, sizeof(a_aliasbuf));
+  b_canon = legacy_key_host_alias(hash, b_adr, b_aliasbuf, sizeof(b_aliasbuf));
+  ja = hash->norm_host ? jump_normalized_const(a_canon)
+                       : jump_identification_const(a_canon);
+  jb = hash->norm_host ? jump_normalized_const(b_canon)
+                       : jump_identification_const(b_canon);
+  if (strcasecmp(ja, jb) != 0) {
+    return 0;
+  }
+  {
+    char BIGSTK ka[HTS_URLMAXSIZE], kb[HTS_URLMAXSIZE];
+    const char *const keysa =
+        hts_query_strip_keys(hash->strip_query, a_canon, a_fil, ka, sizeof(ka));
+    const char *const keysb =
+        hts_query_strip_keys(hash->strip_query, b_canon, b_fil, kb, sizeof(kb));
+
+    if (hash->norm_slash || hash->norm_query || keysa != NULL ||
+        keysb != NULL) {
+      fil_normalized_filtered_ex(a_fil, hash->normfil, keysa, hash->norm_slash,
+                                 hash->norm_query);
+      fil_normalized_filtered_ex(b_fil, hash->normfil2, keysb, hash->norm_slash,
+                                 hash->norm_query);
+      return strcmp(hash->normfil, hash->normfil2) == 0;
+    } else {
+      return strcmp(a_fil, b_fil) == 0;
+    }
+  }
+}
+
+/* The dedup key and compare agree with their frozen copies on every pair of a
+   generated URL set, under every urlhack sub-flag and rule set. */
+static int st_hashdiff(httrackp *opt, int argc, char **argv) {
+  static const char *const rules_strip[] = {"", "sid", "a.com/*=sid\n*=utm",
+                                            "*.com/x*=a,sid"};
+  static const char *const rules_alias[] = {"", "*.b.com,b.com=https://a.com",
+                                            "c.com=www.a.com\nd.com=c.com"};
+  /* NULL means the long host or the long path */
+  static const char *const hosts[] = {"a.com",        "A.COM",
+                                      "www.a.com",    "WWW.a.com",
+                                      "http://a.com", "https://www.a.com",
+                                      "u:p@a.com",    "b.com",
+                                      "www.b.com",    "x.b.com",
+                                      "c.com",        "d.com",
+                                      "a.com:8080",   "",
+                                      "primary",      NULL};
+  static const char *const fils[] = {"/",
+                                     "/x",
+                                     "//x",
+                                     "/x//y",
+                                     "/x?b=1&a=2",
+                                     "/x?a=2&b=1",
+                                     "/x?sid=1&a=2",
+                                     "/x?a=2",
+                                     "/x?a=2&sid=9",
+                                     "/x?utm=1",
+                                     "/x?",
+                                     "/x?&&",
+                                     "x",
+                                     "/X",
+                                     "/x//y?b&a",
+                                     NULL,
+                                     NULL};
+  static const size_t sizes[] = {1, 8, 40, HTS_URLMAXSIZE * 4};
+
+  enum {
+    nh = sizeof(hosts) / sizeof(hosts[0]),
+    nf = sizeof(fils) / sizeof(fils[0])
+  };
+
+  char *longhost = malloct(HTS_URLMAXSIZE * 2);
+  char *longfil = malloct(HTS_URLMAXSIZE * 2);
+  char *longqfil = malloct(HTS_URLMAXSIZE * 2);
+  char *ko = malloct(HTS_URLMAXSIZE * 4);
+  char *kn = malloct(HTS_URLMAXSIZE * 4);
+  const char *adr[nh * nf], *fil[nh * nf];
+  unsigned long cases = 0, failures = 0, equal = 0, rewritten = 0;
+  size_t rs, ra, i, j, k;
+  int flags;
+
+  assertf(longhost != NULL && longfil != NULL && longqfil != NULL &&
+          ko != NULL && kn != NULL);
+  /* one byte short of the fields the engine stores them in */
+  memset(longhost, 'h', HTS_URLMAXSIZE * 2 - 1);
+  longhost[HTS_URLMAXSIZE * 2 - 1] = '\0';
+  memset(longfil, 'f', HTS_URLMAXSIZE * 2 - 1);
+  longfil[0] = '/';
+  longfil[HTS_URLMAXSIZE * 2 - 1] = '\0';
+  strlcpybuff(longqfil, longfil, HTS_URLMAXSIZE * 2);
+  memcpy(longqfil + HTS_URLMAXSIZE * 2 - 16, "?sid=1&b=2&a=3", 14);
+  for (i = 0; i < nh; i++) {
+    for (j = 0; j < nf; j++) {
+      adr[i * nf + j] = hosts[i] != NULL ? hosts[i] : longhost;
+      fil[i * nf + j] =
+          fils[j] != NULL ? fils[j] : (j + 1 < nf ? longfil : longqfil);
+    }
+  }
+
+  for (rs = 0; rs < sizeof(rules_strip) / sizeof(rules_strip[0]); rs++) {
+    for (ra = 0; ra < sizeof(rules_alias) / sizeof(rules_alias[0]); ra++) {
+      StringCopy(opt->strip_query, rules_strip[rs]);
+      StringCopy(opt->host_alias, rules_alias[ra]);
+      for (flags = 0; flags < 8; flags++) {
+        hash_struct hash;
+
+        opt->urlhack = HTS_TRUE;
+        opt->no_www_dedup = (flags & 1) != 0 ? HTS_TRUE : HTS_FALSE;
+        opt->no_slash_dedup = (flags & 2) != 0 ? HTS_TRUE : HTS_FALSE;
+        opt->no_query_dedup = (flags & 4) != 0 ? HTS_TRUE : HTS_FALSE;
+        hash_init(opt, &hash, HTS_TRUE);
+        for (i = 0; i < nh * nf; i++) {
+          for (k = 0; k < sizeof(sizes) / sizeof(sizes[0]); k++) {
+            memset(ko, '#', HTS_URLMAXSIZE * 4);
+            memset(kn, '#', HTS_URLMAXSIZE * 4);
+            legacy_hash_url_key(&hash, adr[i], fil[i], ko, sizes[k]);
+            hash_url_key(&hash, adr[i], fil[i], kn, sizes[k]);
+            cases++;
+            if (memcmp(ko, kn, HTS_URLMAXSIZE * 4) != 0) {
+              failures++;
+              printf("hashdiff: key differs: strip=%u alias=%u flags=%d "
+                     "size=%u %.40s %.40s\n",
+                     (unsigned) rs, (unsigned) ra, flags, (unsigned) sizes[k],
+                     adr[i], fil[i]);
+            }
+          }
+          /* the same host, the same path, and a spread of the rest */
+          for (j = 0; j < nh * nf; j++) {
+            int eo, en;
+
+            if (i / nf != j / nf && i % nf != j % nf && (i + j) % 11 != 0)
+              continue;
+            eo =
+                legacy_key_adrfil_equals(&hash, adr[i], fil[i], adr[j], fil[j]);
+            en = hash_url_equals_in(&hash, adr[i], fil[i], adr[j], fil[j]);
+            cases++;
+            if (eo != 0) {
+              equal++;
+              /* equal only once normalized: the compare's slow path */
+              if (strcmp(adr[i], adr[j]) != 0 || strcmp(fil[i], fil[j]) != 0)
+                rewritten++;
+            }
+            if ((eo != 0) != (en != 0)) {
+              failures++;
+              printf("hashdiff: equals differs: strip=%u alias=%u flags=%d "
+                     "%.40s%.40s vs %.40s%.40s: old %d new %d\n",
+                     (unsigned) rs, (unsigned) ra, flags, adr[i], fil[i],
+                     adr[j], fil[j], eo, en);
+            }
+          }
+        }
+        hash_free(&hash);
+      }
+    }
+  }
+  StringCopy(opt->strip_query, "");
+  StringCopy(opt->host_alias, "");
+  freet(longhost);
+  freet(longfil);
+  freet(longqfil);
+  freet(ko);
+  freet(kn);
+  printf(
+      "hashdiff: %lu cases, %lu failures, %lu equal, %lu of them rewritten\n",
+      cases, failures, equal, rewritten);
+  if (failures != 0)
+    return 1;
+  printf("hashdiff: OK\n");
+  return 0;
+}
+
 /* Build the key for ADR/FIL into ARENA, whose KEYSIZE bytes are followed by
    GUARD poisoned ones, and report whether those are still untouched. */
 static hts_boolean st_hashkey(httrackp *opt, const char *adr, const char *fil,
@@ -1745,6 +1967,8 @@ const struct selftest_entry selftests_name[] = {
     {"hostalias", "", "--host-alias hostname folding self-test", st_hostalias},
     {"hashkey-bounds", "", "dedup key holds a maximal host+path (#1160)",
      st_hashkey_bounds},
+    {"hashdiff", "", "dedup key and compare match their frozen copies",
+     st_hashdiff},
     {"redirect-samefile", "", "same-file redirect detection self-test (#159)",
      st_redirect_samefile},
     {"relative", "<link> <curr-file>", "relative link between two paths",
