@@ -863,11 +863,20 @@ class Handler(SimpleHTTPRequestHandler):
     # served as a feed type may have them followed.
     FEEDMIME_TYPES = {
         "rss": "application/rss+xml",
+        "atom": "application/atom+xml",
         "txt": "text/xml",
         "app": "application/xml",
     }
 
     def feedmime_body(self, key):
+        if key == "atom":
+            return (
+                '<?xml version="1.0"?>\n'
+                '<feed xmlns="http://www.w3.org/2005/Atom"><title>atom</title>\n'
+                '<link rel="self" href="atom-href.html"/>\n'
+                '<entry><link rel="enclosure" href="atom-enc.mp3"/></entry>\n'
+                "</feed>\n"
+            ).encode()
         return (
             '<?xml version="1.0"?>\n'
             '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">\n'
@@ -889,9 +898,9 @@ class Handler(SimpleHTTPRequestHandler):
         elif rest.endswith(".feed") and rest[:-5] in self.FEEDMIME_TYPES:
             key = rest[:-5]
             self.send_raw(self.feedmime_body(key), self.FEEDMIME_TYPES[key])
-        elif re.fullmatch(r"[a-z]{3}-(text|href)\.html", rest):
+        elif re.fullmatch(r"[a-z]+-(text|href)\.html", rest):
             self.send_html("\tTarget %s reached from a feed.\n" % rest)
-        elif re.fullmatch(r"[a-z]{3}-enc\.mp3", rest):
+        elif re.fullmatch(r"[a-z]+-enc\.mp3", rest):
             self.send_raw(b"ID3\0", "audio/mpeg")
         else:
             self.send_error(404)
