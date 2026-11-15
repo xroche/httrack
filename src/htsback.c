@@ -2334,8 +2334,8 @@ hts_boolean back_delayed_rename(httrackp *opt, lien_back *back,
   if (renamed && (back_status(back) == STATUS_READY ||
                   (back->r.out = FOPEN(newname, "ab")) != NULL)) {
     filenote(&opt->state.strc, newname, NULL);
-    hts_log_print(opt, LOG_DEBUG, "moved placeholder %s to %s", back->url_sav,
-                  newname);
+    hts_log_print(opt, LOG_DEBUG, "moved placeholder %s to %s%s", back->url_sav,
+                  newname, back->r.out != NULL ? " (still writing)" : "");
     return HTS_TRUE;
   }
   /* partial lost: drop only what we own (Windows rename won't overwrite) */
