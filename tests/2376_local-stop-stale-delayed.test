@@ -1,0 +1,42 @@
+#!/bin/bash
+#
+# A placeholder written during a stop never hands a previous run's bytes to the
+# final name, whether its transfer completes or is cut.
+
+set -euo pipefail
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_2376.XXXXXX")
+cleanup_push rm -rf "$tmpdir"
+require_httrack
+
+# crawl FIXTURE BYTES TAIL: a fresh server, since the fixture's events fire once.
+crawl() {
+    local out="$tmpdir/out-$1" dir
+    local_server_start --log "$tmpdir/server-$1.log"
+    dir="$out/127.0.0.1_$SRV_PORT/$1"
+    mkdir -p "$dir"
+    # The name 2364's fixture writes p0 under once -M has stopped the crawl.
+    echo stale-leftover >"$dir/p0.bin.0.delayed"
+    local_crawl --log "$tmpdir/crawl-$1.log" -O "$out" -M50000 -c2 -%N1 -Z \
+        --quiet --timeout=30 --disable-security-limits --robots=0 \
+        "$BASEURL/$1/index.html" || true
+    local_server_stop "$SRV_PID"
+
+    assert_logged "$out" "moved placeholder .*p0\\.bin\\.0\\.delayed to " \
+        "$1: p0 was not written under its placeholder"
+    ! grep -qE 'was never created|could not restore' "$out/hts-log.txt" ||
+        fail "$1: the backup of the old placeholder was restored: $(<"$out/hts-log.txt")"
+    assert_file "$dir/p0.bin.html"
+    ! grep -q stale-leftover "$dir/p0.bin.html" ||
+        fail "$1: p0.bin.html holds the previous run's placeholder"
+    assert_eq "$2" "$(wc -c <"$dir/p0.bin.html" | tr -d ' ')" "$1: p0.bin.html bytes"
+    grep -q "^$3\$" "$dir/p0.bin.html" || fail "$1: p0.bin.html lacks line $3"
+    test ! -e "$dir/p0.bin.0.delayed" || fail "$1: placeholder left behind"
+    test ! -e "$dir/~hts-tmp" || fail "$1: backup left in ~hts-tmp"
+}
+
+crawl dmove 2560 0000319
+# Cut halfway: the partial stays under the final name for a resume.
+crawl dmovecut 1280 0000159
