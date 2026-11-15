@@ -1716,6 +1716,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                    in_media) { // nous sommes dans un tag/commentaire, tester si
                                // on recoit un tag
           int p_type = 0;
+          hts_boolean p_xmlbase = HTS_FALSE; // p_type 2 came from xml:base=
           int p_nocatch = 0;
           int p_searchMETAURL = 0;      // chercher ..URL=<url>
           int add_class = 0;    // ajouter .class
@@ -1899,6 +1900,11 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         // ** note: base href et codebase ne font pas bon ménage..
                         p_type = 2;     // c'est un chemin
                       }
+                    }
+                    // XML Base, document-wide: later elements inherit it
+                    if (p == 0 && (p = rech_tageq(html, "xml:base")) != 0) {
+                      p_type = 2;
+                      p_xmlbase = HTS_TRUE;
                     }
 
                     /* The other attributes that may hold a link */
@@ -2476,7 +2482,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                 ok = -1;        // No
                 if (*html != '#') {      // Not empty+unique #
                   if (eadr - html == 1) {    // 1=link empty with delim (end_adr-start_adr)
-                    if (quote) {
+                    // "#" would land before an unflushed base's name
+                    if (quote && p_type != 2 && p_type != -2) {
                       HT_ADD("#"); // We add this for a <href="">
                     }
                   }
@@ -2853,7 +2860,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       // stocker base ou codebase?
                       switch (p_type) {
                       case 2: {
-                        strlcpybuff(base, lien, HTS_URLMAXSIZE * 2);
+                        // browsers ignore xml:base in HTML
+                        if (!p_xmlbase || !is_html_mime_type(r->contenttype))
+                          strlcpybuff(base, lien, HTS_URLMAXSIZE * 2);
                       } break; // base
                       case -2: {
                         strlcpybuff(codebase, lien, HTS_URLMAXSIZE * 2);
@@ -3146,8 +3155,30 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                          throws). An empty href keeps the document itself as the
                          base, so every reference resolves as it did. */
                       if (p_type == 2)
-                        HT_ADD("href=\"\"");
-                      lastsaved = eadr - 1 + 1; // sauter "
+                        HT_ADD(p_xmlbase ? "xml:base=\"\"" : "href=\"\"");
+                      // resume at the attribute's end, not at a '#' inside it
+                      {
+                        const char *const end = r->adr + r->size;
+                        const char *a = eadr - 1;
+
+                        if (quote != '\0') {
+                          while (a < end && *a != quote)
+                            a++;
+                          if (a < end)
+                            eadr = a + 1;
+                          else if (eadr < end)
+                            eadr = end;
+                          lastsaved = eadr;
+                        } else {
+                          while (a < end && !is_realspace(*a) && *a != '>' &&
+                                 !(noquote && (*a == '"' || *a == '\'')))
+                            a++;
+                          // leave the terminator to the main loop
+                          if (a != eadr - 1)
+                            eadr = a;
+                          lastsaved = a;
+                        }
+                      }
                     }
                     /* */
                     else if (opt->urlmode == HTS_URLMODE_ABSOLUTE) {
