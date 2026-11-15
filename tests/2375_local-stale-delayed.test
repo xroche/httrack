@@ -5,10 +5,22 @@
 set -euo pipefail
 
 : "${top_srcdir:=..}"
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# Only the engine's own "<name>.<hex id>.delayed" shape is a placeholder.
+selftest_queue 'placeholder=yes' placeholder 'a/blob.bin.1.delayed'
+selftest_queue 'placeholder=yes' placeholder 'a/x.1f2e.delayed'
+selftest_queue 'placeholder=no' placeholder 'a/keep.delayed'
+selftest_queue 'placeholder=no' placeholder 'a/keep.v2.delayed'
+selftest_queue 'placeholder=no' placeholder 'a/1.delayed'
+selftest_queue 'placeholder=no' placeholder 'a/blob.bin'
+selftest_run_queued
 
 # Pass 1 skips blob.bin, so pass 2 names it .1.delayed and has no copy to keep.
 bash "$top_srcdir/tests/local-crawl.sh" \
     --plant-file 'stalepart/blob.bin.1.delayed' \
+    --not-found 'stalepart/blob.bin.1.delayed' \
     --rerun-args '-C0 +*blob.bin' \
     --log-found 'Removing a stale placeholder .*stalepart/blob\.bin\.1\.delayed' \
     --log-not-found 'File partially present' \

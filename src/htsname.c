@@ -577,6 +577,11 @@ static size_t save_tail_offset(const char *save) {
                                                                        : len;
 }
 
+hts_boolean hts_is_delayed_placeholder(const char *save) {
+  return IS_DELAYED_EXT(save) &&
+         save_tail_offset(save) < strlen(save) - strlen("." DELAYED_EXT);
+}
+
 /* The last dot of the name part, or NULL when the name carries no extension. */
 static char *name_last_dot(char *path) {
   char *lastDot = NULL;

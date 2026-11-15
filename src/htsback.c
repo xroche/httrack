@@ -2830,7 +2830,7 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
         itemback = NULL;
       }
       /* placeholders are numbered per run, so this one is another run's */
-      else if (IS_DELAYED_EXT(save) && fexist_utf8(save)) {
+      else if (hts_is_delayed_placeholder(save) && fexist_utf8(save)) {
         hts_log_print(opt, LOG_DEBUG, "Removing a stale placeholder %s", save);
         (void) UNLINK(save);
       }
