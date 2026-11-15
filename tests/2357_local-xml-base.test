@@ -3,7 +3,7 @@
 # xml:base sets the base of later relative links in a feed, as <base href>
 # does, but not in HTML, where browsers ignore it. It is never fetched, and is
 # written out empty so the saved file resolves its rewritten links against
-# itself. An empty base is left as it is.
+# itself. An empty base is left as it is, and an unquoted one keeps the '>'.
 
 set -euo pipefail
 
@@ -17,5 +17,8 @@ bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
     --file-matches 'xmlbase/feed.feed' 'href="blog/p2\.html"' \
     --file-matches 'xmlbase/page.html' 'xhtml" xml:base="">' \
     --file-matches 'xmlbase/page.html' '<a href="p3\.html">' \
-    --file-not-matches 'xmlbase/page.html' '#' \
+    --file-matches 'xmlbase/feed.feed' '<entry xml:base=""><link href="blog/p2\.html"/>' \
+    --file-matches 'xmlbase/page.html' '<a href="#">a</a><p xml:base="">e</p>' \
+    --file-matches 'xmlbase/page.html' '<base href=""><applet codebase=""></applet>' \
+    --file-matches 'xmlbase/page.html' '<p xml:base="">u</p><base href="">b</body>' \
     httrack 'BASEURL/xmlbase/index.html'

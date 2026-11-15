@@ -897,7 +897,8 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_error(404)
 
     # xml:base is a base, not a link: a feed with an absolute one, and an HTML
-    # page, which ignores it, with a relative one and three empty bases.
+    # page, which ignores it, with a relative one. Unquoted and empty values
+    # too, and an empty link.
     def route_xmlbase(self):
         rest = urlsplit(self.path).path[len("/xmlbase/") :]
         base = "http://127.0.0.1:%d/xmlbase/blog/" % self.server.server_address[1]
@@ -907,14 +908,17 @@ class Handler(SimpleHTTPRequestHandler):
             body = (
                 '<?xml version="1.0"?>\n'
                 '<feed xmlns="http://www.w3.org/2005/Atom" xml:base="%s">\n'
-                '<link rel="alternate" href="p2.html"/></feed>\n' % base
+                '<link rel="alternate" href="p2.html"/>\n'
+                '<entry xml:base=%s><link href="p2.html"/></entry></feed>\n'
+                % (base, base)
             )
             self.send_raw(body.encode(), "application/rss+xml")
         elif rest == "page.html":
             self.send_raw(
                 b'<html xmlns="http://www.w3.org/1999/xhtml" xml:base="blog/">'
-                b'<body><a href="p3.html">p</a><p xml:base="">e</p>'
-                b'<base href=""><applet codebase=""></applet></body></html>\n',
+                b'<body><a href="p3.html">p</a><a href="">a</a><p xml:base="">e</p>'
+                b'<base href=""><applet codebase=""></applet><p xml:base=blog/>u</p>'
+                b"<base href=blog/>b</body></html>\n",
                 "text/html",
             )
         elif re.fullmatch(r"(blog/)?(p2\.html|p3\.html|index\.html)?", rest):

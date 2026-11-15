@@ -1901,7 +1901,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         p_type = 2;     // c'est un chemin
                       }
                     }
-                    // XML Base, applied to the whole document, not per element
+                    // XML Base, document-wide: later elements inherit it
                     if (p == 0 && (p = rech_tageq(html, "xml:base")) != 0) {
                       p_type = 2;
                       p_xmlbase = HTS_TRUE;
@@ -3156,7 +3156,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                          base, so every reference resolves as it did. */
                       if (p_type == 2)
                         HT_ADD(p_xmlbase ? "xml:base=\"\"" : "href=\"\"");
-                      lastsaved = eadr - 1 + 1; // sauter "
+                      // skip a closing quote, keep an unquoted value's '>'
+                      lastsaved =
+                          eadr[-1] == '"' || eadr[-1] == '\'' ? eadr : eadr - 1;
                     }
                     /* */
                     else if (opt->urlmode == HTS_URLMODE_ABSOLUTE) {
