@@ -4027,11 +4027,11 @@ static int st_zip_repair_size(httrackp *opt, int argc, char **argv) {
   {
     char tmp[HTS_URLMAXSIZE];
     uLong nrec, bytes;
+    FILE *wfp;
 
     snprintf(tmp, sizeof(tmp), "%s/repair.tmp", argv[0]);
-    if ((fp = fopen(tmp, "wb")) != NULL) {
-      fclose(fp);
-      if (chmod(tmp, 0200) == 0 && (fp = fopen(tmp, "rb")) == NULL &&
+    if ((wfp = fopen(tmp, "wb")) != NULL) {
+      if (fchmod(fileno(wfp), 0200) == 0 && (fp = fopen(tmp, "rb")) == NULL &&
           zip_repair_size_case(argv[0], NULL, NULL, 16, 0, 16, &nrec, &bytes) !=
               Z_ERRNO) {
         printf("zip-repair-size: FAIL a failed reopen was not reported\n");
@@ -4039,7 +4039,8 @@ static int st_zip_repair_size(httrackp *opt, int argc, char **argv) {
       }
       if (fp != NULL) /* root can read it anyway */
         fclose(fp);
-      (void) chmod(tmp, 0600);
+      (void) fchmod(fileno(wfp), 0600);
+      fclose(wfp);
     }
   }
 #endif
