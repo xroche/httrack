@@ -1,0 +1,14 @@
+#!/bin/bash
+#
+# A placeholder moved to its final name in another directory must not lose the
+# file (#2249): the template puts the type in the path, so the .delayed placeholder
+# sits in delayed/ and the page lands in html/. Setup as in test 39.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+bash "$top_srcdir/tests/local-crawl.sh" --log-found 'moved placeholder' \
+    --log-not-found 'Write error on disk' \
+    --found 'dcap/html/p0.bin.html' \
+    httrack 'BASEURL/dcap/index.html' -M50000 -c1 -Z -N '%h%p/%t/%n.%t'

@@ -2248,7 +2248,9 @@ hts_boolean back_delayed_rename(httrackp *opt, lien_back *back,
     fclose(back->r.out);
     back->r.out = NULL;
   }
-  renamed = RENAME(back->url_sav, newname) == 0 ? HTS_TRUE : HTS_FALSE;
+  /* the final name may sit in another directory (-N types, the length cap) */
+  renamed =
+      structcheck_utf8(newname) == 0 && RENAME(back->url_sav, newname) == 0;
   if (renamed && (back_status(back) == STATUS_READY ||
                   (back->r.out = FOPEN(newname, "ab")) != NULL)) {
     filenote(&opt->state.strc, newname, NULL);
