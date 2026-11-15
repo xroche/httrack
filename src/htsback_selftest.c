@@ -693,7 +693,7 @@ static int st_spoolrecord(httrackp *opt, int argc, char **argv) {
   back->r.totalsize = 98765;
   back->r.crange_end = 4321;
   back->r.retry_after = 17;
-  back->r.req.http11 = 1;
+  memset(&back->r.req, 0x5a, sizeof(back->r.req)); /* every byte must reset */
   back->http11 = 1;
   back->chunk_blocksize = 77;
   back->early_add = 1;
@@ -718,21 +718,35 @@ static int st_spoolrecord(httrackp *opt, int argc, char **argv) {
       fprintf(stderr, "spoolrecord: the in-process pointers were not reset\n");
       err = 1;
     }
+    {
+      htsrequest zero;
+
+      memset(&zero, 0, sizeof(zero));
+      if (memcmp(&copy->r.req, &zero, sizeof(zero)) != 0) {
+        fprintf(stderr, "spoolrecord: the request block was not reset\n");
+        err = 1;
+      }
+    }
     /* compare the rest byte for byte, the reset pointers aside */
     {
       char *const want_adr = back->r.adr;
       char *const want_headers = back->r.headers;
+      htsrequest want_req;
+
+      memcpy(&want_req, &back->r.req, sizeof(want_req));
 
       back->r.adr = copy->r.adr = NULL;
       back->r.headers = copy->r.headers = NULL;
       back->r.location = copy->r.location = NULL;
       back->r.soc = copy->r.soc;
+      memcpy(&back->r.req, &copy->r.req, sizeof(back->r.req));
       if (memcmp(back, copy, sizeof(lien_back)) != 0) {
         fprintf(stderr, "spoolrecord: the slot came back changed\n");
         err = 1;
       }
       back->r.adr = want_adr;
       back->r.headers = want_headers;
+      memcpy(&back->r.req, &want_req, sizeof(want_req));
     }
     freet(adr);
     freet(headers);

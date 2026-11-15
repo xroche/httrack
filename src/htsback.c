@@ -1641,6 +1641,8 @@ int back_unserialize(FILE * fp, lien_back ** dst) {
     (*dst)->r.ssl_con = NULL;
 #endif
     (*dst)->r.headers = NULL;
+    /* stored addresses are stale, and a ready slot sends no request */
+    memset(&(*dst)->r.req, 0, sizeof((*dst)->r.req));
     {
       void *adr;
       const int adr_err = back_data_unserialize(fp, &adr, &size);
