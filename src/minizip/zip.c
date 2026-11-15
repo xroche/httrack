@@ -158,6 +158,9 @@ typedef struct
 #endif
 } curfile64_info;
 
+/* httrack addition: deflate allocates five blocks per stream, 8 leaves room */
+#define ZIP_ZBUF_SLOTS 8
+
 typedef struct
 {
     zlib_filefunc64_32_def z_filefunc;
@@ -174,8 +177,67 @@ typedef struct
     char *globalcomment;
 #endif
 
+    /* httrack addition: idle deflate blocks, so no heap trim per member */
+    voidpf zbuf_free[ZIP_ZBUF_SLOTS];
+    uLong zbuf_allocs;
+
 } zip64_internal;
 
+/* Prefix of each deflate buffer, aligned like malloc's result. */
+typedef union {
+  size_t size;
+  unsigned char pad[16];
+} zip_zbuf_hdr;
+
+static voidpf zip_zalloc(voidpf opaque, uInt items, uInt size) {
+  zip64_internal *zi = (zip64_internal *) opaque;
+  zip_zbuf_hdr *h;
+  size_t n;
+  int i;
+
+  if (size != 0 && items > ((size_t) -1 - sizeof(zip_zbuf_hdr)) / size)
+    return Z_NULL;
+  n = (size_t) items * size;
+  for (i = 0; i < ZIP_ZBUF_SLOTS; i++) {
+    h = (zip_zbuf_hdr *) zi->zbuf_free[i];
+    if (h != NULL && h->size == n) {
+      zi->zbuf_free[i] = NULL;
+      return (voidpf) (h + 1);
+    }
+  }
+  h = (zip_zbuf_hdr *) ALLOC(sizeof(zip_zbuf_hdr) + n);
+  if (h == NULL)
+    return Z_NULL;
+  h->size = n;
+  zi->zbuf_allocs++;
+  return (voidpf) (h + 1);
+}
+
+static void zip_zfree(voidpf opaque, voidpf address) {
+  zip64_internal *zi = (zip64_internal *) opaque;
+  int i;
+
+  for (i = 0; i < ZIP_ZBUF_SLOTS; i++) {
+    if (zi->zbuf_free[i] == NULL) {
+      zi->zbuf_free[i] = (voidpf) ((zip_zbuf_hdr *) address - 1);
+      return;
+    }
+  }
+  free((zip_zbuf_hdr *) address - 1);
+}
+
+static void zip_zbuf_release(zip64_internal *zi) {
+  int i;
+
+  for (i = 0; i < ZIP_ZBUF_SLOTS; i++) {
+    free(zi->zbuf_free[i]);
+    zi->zbuf_free[i] = NULL;
+  }
+}
+
+extern uLong ZEXPORT zipDeflateAllocations(zipFile file) {
+  return file != NULL ? ((zip64_internal *) file)->zbuf_allocs : 0;
+}
 
 #ifndef NOCRYPT
 #define INCLUDECRYPTINGCODE_IFCRYPTALLOWED
@@ -843,8 +905,8 @@ extern zipFile ZEXPORT zipOpen3(const void *pathname, int append, zipcharpc* glo
     ziinit.number_entry = 0;
     ziinit.add_position_when_writing_offset = 0;
     init_linkedlist(&(ziinit.central_dir));
-
-
+    memset(ziinit.zbuf_free, 0, sizeof(ziinit.zbuf_free));
+    ziinit.zbuf_allocs = 0;
 
     zi = (zip64_internal*)ALLOC(sizeof(zip64_internal));
     if (zi==NULL)
@@ -1182,9 +1244,9 @@ extern int ZEXPORT zipOpenNewFileInZip4_64(zipFile file, const char* filename, c
     {
         if(zi->ci.method == Z_DEFLATED)
         {
-          zi->ci.stream.zalloc = (alloc_func)0;
-          zi->ci.stream.zfree = (free_func)0;
-          zi->ci.stream.opaque = (voidpf)0;
+          zi->ci.stream.zalloc = zip_zalloc;
+          zi->ci.stream.zfree = zip_zfree;
+          zi->ci.stream.opaque = (voidpf) zi;
 
           if (windowBits>0)
               windowBits = -windowBits;
@@ -1959,6 +2021,7 @@ extern int ZEXPORT zipClose(zipFile file, const char* global_comment) {
 #ifndef NO_ADDFILEINEXISTINGZIP
     free(zi->globalcomment);
 #endif
+    zip_zbuf_release(zi);
     free(zi);
 
     return err;

@@ -4307,6 +4307,101 @@ static int st_zip_abandon_notrunc(httrackp *opt, int argc, char **argv) {
   return st_verdict("zip-abandon-notrunc", fail);
 }
 
+/* Fill buf with text compressible enough to use the whole deflate window. */
+static void zbuf_fill(char *buf, size_t len, unsigned seed) {
+  size_t i;
+
+  for (i = 0; i < len; i++) {
+    seed = seed * 1103515245u + 12345u;
+    buf[i] = (char) ('a' + (seed >> 16) % 7);
+  }
+}
+
+#define ZBUF_MEMBERS 24
+#define ZBUF_MAXLEN 70000
+
+static size_t zbuf_len(int i) { return 1000 + (size_t) i * 2851; }
+
+/* Each zipfile allocates deflate blocks for its first member only, and every
+   member reads back byte-exact. Two zipfiles interleave to show the blocks are
+   not shared. */
+static int cache_zbuf_selftest(const char *dir) {
+  static char data[ZBUF_MAXLEN], back[ZBUF_MAXLEN];
+  char path[2][HTS_URLMAXSIZE];
+  zipFile zf[2];
+  uLong first[2] = {0, 0};
+  zip_fileinfo fi;
+  unzFile uf;
+  int failures = 0;
+  int i, z;
+
+  memset(&fi, 0, sizeof(fi));
+  for (z = 0; z < 2; z++) {
+    snprintf(path[z], sizeof(path[z]), "%s/zbuf%d.zip", dir, z);
+  }
+  zf[0] = hts_zipOpen_utf8(path[0], 0);
+  assertf(zf[0] != NULL);
+  for (i = 0; i < ZBUF_MEMBERS; i++) {
+    for (z = 0; z < 2; z++) {
+      char name[32];
+
+      if (i == 0 && z == 1) {
+        zf[1] = hts_zipOpen_utf8(path[1], 0);
+        assertf(zf[1] != NULL);
+        if (zipDeflateAllocations(zf[1]) != 0) {
+          fprintf(stderr, "cache-zbuf: a new zipfile counts %d allocations\n",
+                  (int) zipDeflateAllocations(zf[1]));
+          failures++;
+        }
+      }
+      snprintf(name, sizeof(name), "m%02d", i);
+      zbuf_fill(data, zbuf_len(i), (unsigned) i);
+      assertf(zipOpenNewFileInZip(zf[z], name, &fi, NULL, 0, NULL, 0, NULL,
+                                  Z_DEFLATED, Z_DEFAULT_COMPRESSION) == ZIP_OK);
+      assertf(zipWriteInFileInZip(zf[z], data, (unsigned) zbuf_len(i)) ==
+              ZIP_OK);
+      assertf(zipCloseFileInZip(zf[z]) == ZIP_OK);
+      if (i == 0)
+        first[z] = zipDeflateAllocations(zf[z]);
+    }
+  }
+  for (z = 0; z < 2; z++) {
+    /* zlib makes several blocks per stream, so 1 means a broken counter */
+    if (first[z] < 2 || zipDeflateAllocations(zf[z]) != first[z]) {
+      fprintf(stderr,
+              "cache-zbuf: zipfile %d made %d deflate allocations, the first "
+              "member alone %d\n",
+              z, (int) zipDeflateAllocations(zf[z]), (int) first[z]);
+      failures++;
+    }
+    assertf(zipClose(zf[z], NULL) == ZIP_OK);
+  }
+
+  uf = hts_unzOpen_utf8(path[0]);
+  assertf(uf != NULL);
+  assertf(unzGoToFirstFile(uf) == UNZ_OK);
+  for (i = 0; i < ZBUF_MEMBERS; i++) {
+    const size_t len = zbuf_len(i);
+
+    assertf(unzOpenCurrentFile(uf) == UNZ_OK);
+    zbuf_fill(data, len, (unsigned) i);
+    if (unzReadCurrentFile(uf, back, ZBUF_MAXLEN) != (int) len ||
+        memcmp(back, data, len) != 0) {
+      fprintf(stderr, "cache-zbuf: member %d does not read back\n", i);
+      failures++;
+    }
+    assertf(unzCloseCurrentFile(uf) == UNZ_OK);
+    if (i + 1 < ZBUF_MEMBERS)
+      assertf(unzGoToNextFile(uf) == UNZ_OK);
+  }
+  unzClose(uf);
+  return failures;
+}
+
+static int st_cache_zbuf(httrackp *opt, int argc, char **argv) {
+  return st_verdict("cache-zbuf", cache_zbuf_selftest(argv[0]));
+}
+
 static int st_cache_legacy(httrackp *opt, int argc, char **argv) {
   int err;
 
@@ -4633,6 +4728,8 @@ const struct selftest_entry selftests_cache[] = {
      st_cache_writefail},
     {"reconcile", "<dir>", "cache generation reconcile policy self-test",
      st_reconcile},
+    {"cache-zbuf", "<dir>", "deflate buffers reused across cache members",
+     st_cache_zbuf},
     {"cache-legacy", "<dir>", "pre-3.31 legacy cache refusal self-test",
      st_cache_legacy},
     {"ref-portable", "<dir>",
