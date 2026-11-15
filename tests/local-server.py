@@ -3402,9 +3402,7 @@ class Handler(SimpleHTTPRequestHandler):
     def route_dcap_index(self):
         self.send_sized_bin_index(self.DCAP_INDEX_BYTES)
 
-    # A placeholder moved mid-write (#483): p0's headers cross -M, so its namer
-    # waits for prefetched p1's socket and p0's first bytes reach the .delayed
-    # file. The rest of p0 waits for p1 to end, so the move comes mid-body.
+    # p0's namer waits on p1's socket, so p1's end moves p0's .delayed mid-body.
     DMOVE_BODY = b"".join(b"%07d\n" % k for k in range(320))
     dmove_other_asked = threading.Event()
     dmove_first_sent = threading.Event()
@@ -3426,18 +3424,18 @@ class Handler(SimpleHTTPRequestHandler):
             self.wfile.flush()
             Handler.dmove_first_sent.set()
             Handler.dmove_other_done.wait(60)
-            time.sleep(1.0)
+            time.sleep(3.0)  # the move must land before the tail, even on qemu
             for i in range(128, len(body), 128):
                 self.wfile.write(body[i : i + 128])
                 self.wfile.flush()
-                time.sleep(0.15)
+                time.sleep(0.15)  # several appends after the move
         except OSError:
             pass
 
     def route_dmove_other(self):
         Handler.dmove_other_asked.set()
         Handler.dmove_first_sent.wait(60)
-        time.sleep(0.5)
+        time.sleep(0.5)  # let httrack write p0's first bytes before the move
         self.send_raw(b"o" * 16, "text/plain")
         Handler.dmove_other_done.set()
 
@@ -3465,7 +3463,7 @@ class Handler(SimpleHTTPRequestHandler):
     # bytes on the wire.
     def send_sized_bin_index(self, total, names=None):
         names = names or ["p%d.bin" % i for i in range(8)]
-        links = "".join('<a href="%s">%s</a>\n' % (n, n) for n in names)
+        links = "".join('<a href="%s">%s</a>\n' % (n, n.split(".")[0]) for n in names)
         pad = 0
         for _ in range(4):  # two corrections settle the Content-Length digits
             body = ("<html><!--%s-->\n%s</html>\n" % ("x" * pad, links)).encode()
