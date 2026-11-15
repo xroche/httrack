@@ -3173,8 +3173,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                           while (a < end && !is_realspace(*a) && *a != '>' &&
                                  !(noquote && (*a == '"' || *a == '\'')))
                             a++;
-                          // the main loop reads the terminator, unless the scan
-                          // did
+                          // leave the terminator to the main loop
                           if (a != eadr - 1)
                             eadr = a;
                           lastsaved = a;
