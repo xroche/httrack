@@ -539,7 +539,9 @@ static int back_index_ready(httrackp * opt, struct_back * sback, const char *adr
                       adr_nologin(opt, adr), fil, sav);
       }
       (void) UNLINK(fileback);
-      back_tmpdir_drop(fileback);
+      /* the spool shares one directory, so only its last entry can empty it */
+      if (coucal_nitems(sback->ready) == 1)
+        back_tmpdir_drop(fileback);
       if (itemback != NULL) {
         // move from hashtable to fast repository
         int q = back_search(opt, sback);
@@ -580,9 +582,8 @@ int slot_can_be_cached_on_disk(const lien_back *back) {
   /* Note: not checking !IS_DELAYED_EXT(back->url_sav) or it will quickly cause the slots to be filled! */
 }
 
-/* Put all backing entries that are ready in the storage hashtable to spare space and CPU */
-static int back_cleanup_background(httrackp *opt, cache_back *cache,
-                                   struct_back *sback) {
+int back_cleanup_background(httrackp *opt, cache_back *cache,
+                            struct_back *sback) {
   lien_back *const back = sback->lnk;
   int nclean = 0;
   int i;

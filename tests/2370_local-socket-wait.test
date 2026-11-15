@@ -1,0 +1,60 @@
+#!/bin/bash
+#
+# The wait for a free socket must not sleep once it has one, and ~hts-tmp goes
+# with the last spool entry rather than with each one.
+
+set -euo pipefail
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_2370.XXXXXX")
+cleanup_push rm -rf "$tmpdir"
+require_httrack
+
+mkdir "$tmpdir/spool"
+assert_selftest 'spooldir: OK' spooldir "$tmpdir/spool"
+
+python=$(find_python) || skip "python3 not found"
+
+# A chain: each page links the next and a leaf, so the parser reaches every
+# page with its one socket busy fetching ahead.
+pages=30
+mkdir "$tmpdir/docroot"
+printf '<a href="p1.html">p1</a>\n' >"$tmpdir/docroot/index.html"
+for i in $(seq 1 "$pages"); do
+    next=''
+    test "$i" -eq "$pages" || next="<a href=\"p$((i + 1)).html\">next</a>"
+    printf '%s <a href="q%d.html">leaf</a>\n' "$next" "$i" \
+        >"$tmpdir/docroot/p$i.html"
+    printf 'leaf %d\n' "$i" >"$tmpdir/docroot/q$i.html"
+done
+local_server_start --root "$tmpdir/docroot"
+
+now() { "$python" -c 'import time; print(int(time.monotonic() * 1000))'; }
+
+# Crawl at -c$1 and set took to its duration in ms.
+timed_crawl() {
+    local out="$tmpdir/out-c$1" start got
+    rm -rf "$out"
+    start=$(now)
+    local_crawl --log "$tmpdir/log-c$1" -O "$out" -c"$1" -%c0 -A0 \
+        --disable-security-limits --quiet --robots=0 --timeout=30 \
+        --retries=0 "$BASEURL/index.html"
+    took=$(($(now) - start))
+    got=$(find "$out/127.0.0.1_$SRV_PORT" -name '[pq]*.html' | wc -l | tr -d ' ')
+    assert_eq $((2 * pages)) "$got" "files mirrored at -c$1"
+}
+
+# The old pause cost each page at least 100 ms at -c1. -c8 never fills its
+# sockets on a chain, so it times the same crawl with no pause on this host.
+# A loaded host may stall one run, never three, while the pause fails all three.
+for attempt in 1 2 3; do
+    timed_crawl 8
+    control=$took
+    timed_crawl 1
+    elapsed=$took
+    budget=$((control + pages * 50))
+    echo "attempt $attempt: -c1 ${elapsed} ms, budget ${budget} ms (-c8 ${control} ms)"
+    test "$elapsed" -ge "$budget" || exit 0
+done
+fail "-c1 took ${elapsed} ms against a ${budget} ms budget three times: the socket wait still pauses"

@@ -929,6 +929,74 @@ static int st_spoolwrite(httrackp *opt, int argc, char **argv) {
   return st_verdict("spoolwrite", err);
 }
 
+/* A finished slot whose page is held in memory, as the spool takes it. */
+static hts_boolean st_spooldir_slot(lien_back *back, const char *dir,
+                                    const char *name) {
+  back->status = STATUS_READY;
+  strcpybuff(back->url_adr, "example.com");
+  snprintf(back->url_fil, sizeof(back->url_fil), "/%s", name);
+  snprintf(back->url_sav, sizeof(back->url_sav), "%s/%s", dir, name);
+  back->r.adr = calloct(1, 100);
+  back->r.size = 100;
+  return back->r.adr != NULL ? HTS_TRUE : HTS_FALSE;
+}
+
+// -#test=spooldir <dir>: ~hts-tmp goes with the last spool entry, not before.
+static int st_spooldir(httrackp *opt, int argc, char **argv) {
+  char base[HTS_URLMAXSIZE];
+  char tmpdir[HTS_URLMAXSIZE * 2];
+  char sava[HTS_URLMAXSIZE * 2];
+  char savb[HTS_URLMAXSIZE * 2];
+  struct_back *sback;
+  cache_back cache;
+  FILE *const saved_log = opt->log;
+  void *spooled = NULL;
+  int err = 0;
+  int i;
+
+#define CHECK(cond) ST_CHECK(err, cond)
+  if (argc < 1) {
+    fprintf(stderr, "usage: -#test=spooldir <writable directory>\n");
+    return 1;
+  }
+  snprintf(base, sizeof(base), "%s/", argv[0]);
+  /* dir_exists() tests the directory a name is in */
+  snprintf(tmpdir, sizeof(tmpdir), "%s/~hts-tmp/x", argv[0]);
+  snprintf(sava, sizeof(sava), "%s/a.html", argv[0]);
+  snprintf(savb, sizeof(savb), "%s/b.html", argv[0]);
+  StringCopy(opt->path_html_utf8, base);
+  memset(&cache, 0, sizeof(cache));
+  sback = back_new(opt, 4);
+  if (sback == NULL)
+    return 1;
+  if (!st_spooldir_slot(&sback->lnk[0], argv[0], "a.html") ||
+      !st_spooldir_slot(&sback->lnk[1], argv[0], "b.html")) {
+    fprintf(stderr, "spooldir: no memory\n");
+    err = 1;
+    goto done;
+  }
+  CHECK(back_cleanup_background(opt, &cache, sback) == 2);
+  CHECK(dir_exists(tmpdir));
+  /* b's file vanishes, so taking a back empties the directory early */
+  CHECK(coucal_read_pvoid(sback->ready, savb, &spooled) && spooled != NULL);
+  if (spooled != NULL)
+    (void) UNLINK((const char *) spooled);
+  CHECK(back_index(opt, sback, "example.com", "/a.html", sava) >= 0);
+  CHECK(dir_exists(tmpdir));
+  /* b is the last entry, so its lookup removes the directory */
+  opt->log = NULL; /* the vanished file logs, and the output is exact */
+  CHECK(back_index(opt, sback, "example.com", "/b.html", savb) < 0);
+  opt->log = saved_log;
+  CHECK(!dir_exists(tmpdir));
+
+done:
+  for (i = 0; i < sback->count; i++)
+    back_clear_entry(&sback->lnk[i]);
+  back_free(&sback);
+#undef CHECK
+  return st_verdict("spooldir", err);
+}
+
 static hts_boolean st_spool_plant(const char *path) {
   FILE *const fp = filecreate(NULL, path);
 
@@ -2894,6 +2962,8 @@ const struct selftest_entry selftests_back[] = {
      st_statsrows},
     {"spoolwrite", "<dir>", "a failed spool write leaves no partial file",
      st_spoolwrite},
+    {"spooldir", "<dir>", "~hts-tmp goes with the last spool entry, not before",
+     st_spooldir},
     {"spoolsweep", "<dir>", "startup removes the spool of a dead process only",
      st_spoolsweep},
     {"backstop", "",

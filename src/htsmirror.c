@@ -640,6 +640,12 @@ hts_boolean hts_poll_abort_request(httrackp *opt) {
   return HTS_TRUE;
 }
 
+/* Must the parser wait, for a user pause or for a free socket? */
+static hts_boolean hts_must_wait_socket(httrackp *opt, struct_back *sback) {
+  return opt->state._hts_setpause ||
+         back_pluggable_sockets_strict(sback, opt) <= 0;
+}
+
 /*
   Process pause, link adding..
 */
@@ -780,18 +786,14 @@ void hts_mirror_process_user_interaction(htsmoduleStruct *str,
     hts_addurl_free(addurl);
   }
   hts_apply_live_filters(opt, sback, ptr);
-  // si une pause a été demandée
-  if (opt->state._hts_setpause ||
-      back_pluggable_sockets_strict(sback, opt) <= 0) {
-    // index du lien actuel
+  if (hts_must_wait_socket(opt, sback)) {
+    // slot of the current link
     int b = back_index(opt, sback, urladr(), urlfil(), savename());
     int prev = opt->state._hts_in_html_parsing;
 
     if (b < 0)
       b = 0; // forcer pour les stats
-    while (opt->state._hts_setpause ||
-           back_pluggable_sockets_strict(sback, opt) <=
-               0) { // on fait la pause..
+    while (hts_must_wait_socket(opt, sback)) {
       opt->state._hts_in_html_parsing = 6;
       /* a rule sent during a pause applies now, not on resume */
       hts_apply_live_filters(opt, sback, ptr);
@@ -813,7 +815,9 @@ void hts_mirror_process_user_interaction(htsmoduleStruct *str,
       if (hts_load_acquire_int(stre->exit_xh_)) {
         return;
       }
-      Sleep(100); // pause
+      /* no pause once back_wait() has freed a socket */
+      if (hts_must_wait_socket(opt, sback))
+        Sleep(100);
     }
     opt->state._hts_in_html_parsing = prev;
   }
