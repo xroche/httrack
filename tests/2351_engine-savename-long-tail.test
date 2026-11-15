@@ -8,6 +8,7 @@ set -euo pipefail
 # A save name that would overflow save[] is shortened, never aborted (#2246).
 
 a() { printf "%0${1}d" 0 | tr 0 a; }
+zh() { printf "%0${1}d" 0 | sed 's/0/中/g'; }
 host=/dev/null/www.example.com
 # The exact names assume a 4096-byte PATH_MAX; a smaller cap only proves no abort.
 path_max=$(getconf PATH_MAX / 2>/dev/null || true)
@@ -38,11 +39,11 @@ for pad in 2030 2035; do
 done
 name_is "/dev/null/web/_r8furq.$(a 231)" '/x.*' application/x-unknown 2035 \
     type=99
-# The name gives up a cut extension, never its last byte nor its directory.
+# The name keeps its extension, its last byte and its directory.
 name_is "$host/$(a 234).html" '/*' text/html 2030
-name_is "$host/$(a 238)/x" '/*/x.php' image/png 2026
-name_is "$host/$(a 238)/x.delayed" '/*/x.php' text/html 2026 statuscode=301
-name_is "$host/$(a 238)/index.delayed" '/*/x.php' text/html 2030 statuscode=301
+name_is "$host/$(a 238)/x.png" '/*/x.php' image/png 2026
+name_is "$host/$(a 238)/x.0.delayed" '/*/x.php' text/html 2026 statuscode=301
+name_is "$host/$(a 238)/x.0.delayed" '/*/x.php' text/html 2030 statuscode=301
 # A ".delayed" placeholder lands in the directory of the final name.
 for pad in 1015 1018; do
     dir="/dev/null/$(a 239)/ab/$(a 238)/ab"
@@ -50,5 +51,40 @@ for pad in 1015 1018; do
     name_is "$dir/x.delayed" '/*/ab/x' text/html "$pad" 'userdef=%p/%p/%n' \
         statuscode=301
 done
+# The byte cap and an all-hex extension keep the marker (#2248).
+name_is "$host/$(zh 297)/$(zh 276)/$(zh 75)/x.delayed" "/$(zh 300)/x.html" \
+    text/html 0 'userdef=%h%p/%p/%p/%n.%t' statuscode=301
+name_is "$host/x.$(a 227).0.delayed" '/x.*' text/html 2025 statuscode=301
+name_is "/dev/null/x.$(a 229).delayed" '/x.*.delayed' application/x-unknown \
+    2025 type=100
+# The placeholder and the final name share a directory, and keep a name (#2249).
+for n83 in 0 1; do
+    for code in 301 200; do
+        if ((n83)); then
+            dir=/dev/null/EXAMPLE/D1/D2/AAAAAAAA/D3
+            want=$dir/X_0.DEL.delayed
+            ((code == 301)) || want=$dir/X.CSS
+        else
+            dir=$host/d1/d2/$(a 238)/d3
+            want=$dir/x.0.delayed
+            ((code == 301)) || want=$dir/x.css
+        fi
+        name_is "$want" '/d1/d2/*/d3/x' text/css 2028 "n83=$n83" delayed=1 \
+            "statuscode=$code"
+    done
+done
+for pad in 2014 2016; do
+    dir=$host/d1/d2/$(a 238)/d3
+    name_is "$dir/x.delayed" '/d1/d2/*/d3/x.php' text/html "$pad" delayed=1 \
+        'userdef=%h%p/%n%q.%t' statuscode=302
+    name_is "$dir/x.html" '/d1/d2/*/d3/x.php' text/html "$pad" delayed=1 \
+        'userdef=%h%p/%n%q.%t'
+done
+z200=$(printf "%0200d" 0 | tr 0 z)
+name_is "/dev/null/$(a 239)/$z200.bin" '/*/x' application/pdf 1995 type=100 \
+    "cdispo=$z200.bin"
+name_is "/dev/null/$(a 239)/index.html" '/*/' text/html 2040 type=100
+name_is "/dev/null/$(a 239)/$(a 238)/i" '/*/' application/x-unknown 1088 \
+    'userdef=%p/%p/%n' statuscode=404
 
 selftest_run_queued
