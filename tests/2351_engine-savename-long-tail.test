@@ -29,13 +29,14 @@ name_is() {
     fi
 }
 
-# Each appended tail survives: .delayed, .html, index.html, an -N type 99 ext.
+# Each appended tail survives: .delayed, .html, an -N type 99 ext.
 name_is "/dev/null/x/x/$(a 231).delayed" '/x/*.php' text/html 2030 \
     'userdef=%p/%p/%n' statuscode=301
 name_is "$host/$(a 234).html" '/*' application/x-unknown 2030 delayed=1
+# A long extension is dropped, as when it fits, and the name keeps a byte.
+name_is "$host/$(a 1900)/x" '/x.*' application/x-unknown 1900 type=105
 for pad in 2030 2035; do
-    name_is "$host/$(a 238)/index.html" '/x.*' application/x-unknown "$pad" \
-        type=105
+    name_is "$host/$(a 238)/x" '/x.*' application/x-unknown "$pad" type=105
 done
 name_is "/dev/null/web/_r8furq.$(a 231)" '/x.*' application/x-unknown 2035 \
     type=99
@@ -86,5 +87,20 @@ name_is "/dev/null/$(a 239)/$z200.bin" '/*/x' application/pdf 1995 type=100 \
 name_is "/dev/null/$(a 239)/index.html" '/*/' text/html 2040 type=100
 name_is "/dev/null/$(a 239)/$(a 238)/i" '/*/' application/x-unknown 1088 \
     'userdef=%p/%p/%n' statuscode=404
+
+# The byte cap keeps a name that has no tail to keep.
+zdirs="$(zh 70)/$(zh 70)/$(zh 70)/$(zh 70)/$(zh 70)/$(zh 70)/$(zh 70)/$(zh 70)"
+name_is "$host/$(zh 48)/$zdirs/$(zh 40)/.php" "/$(zh 70)/$zdirs/$(zh 40)/.php" \
+    application/octet-stream 0 statuscode=200
+# A name that fits is unchanged, dotfiles included.
+name_is "$host/x/.html" /x/.php text/html 0
+name_is /dev/null/EXAMPLE/X/D58B.HTM '/x/.php?id=9256' text/html 0 n83=1
+name_is "$host/$(a 238)/.php.0.delayed" '/*/.php' text/html 2026 \
+    statuscode=301
+# A delayedId tag has at most 8 hex digits.
+name_is "/dev/null/x$(a 221).deadbeef.delayed" '/x*.deadbeef.delayed' \
+    application/x-unknown 2025 type=100
+name_is "/dev/null/x$(a 230).delayed" '/x*.deadbeef0.delayed' \
+    application/x-unknown 2025 type=100
 
 selftest_run_queued

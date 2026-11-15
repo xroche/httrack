@@ -46,6 +46,9 @@ Please visit our Website: http://www.httrack.com
 #include <ctype.h>
 #include <limits.h>
 
+#define MAX_EXT_LEN 12 /* longest tail kept across a cut, sans the dot */
+#define DELAYED_ID_MAX_DIGITS 8 /* a delayedId in hex */
+
 /* Clipped to the whole buffer: the length shortener downstream still has to
    see this name's extension to reserve it (#852). */
 #define ADD_STANDARD_PATH                                                      \
@@ -65,25 +68,23 @@ Please visit our Website: http://www.httrack.com
 #define ADD_STANDARD_NAME(shortname)                                           \
   { /* add name */                                                             \
     char BIGSTK buff[HTS_URLMAXSIZE * 2];                                      \
-    size_t off;                                                                \
+    char BIGSTK tail[HTS_URLMAXSIZE * 2];                                      \
+    size_t len, need;                                                          \
     standard_name(buff, sizeof(buff), dot_pos, nom_pos, fil_complete,          \
                   (shortname));                                                \
-    off = save_tail_offset(buff);                                              \
-    if (off != 0 && buff[off] != '\0') {                                       \
-      /* a short extension goes in as a tail, which a full save[] keeps */     \
-      char BIGSTK ext_tail[HTS_URLMAXSIZE * 2];                                \
-      strcpybuff(ext_tail, buff + off);                                        \
-      buff[off] = '\0';                                                        \
-      url_savename_addstr(afs->save, sizeof(afs->save), buff);                 \
-      if (hts_lastchar(afs->save) == '/')                                      \
-        save_append_name_head(afs->save, sizeof(afs->save), buff);             \
-      save_append_tail(afs->save, sizeof(afs->save), ext_tail);                \
-    } else {                                                                   \
-      /* sized to what save[] has left, so a clipped name keeps one byte */    \
+    strcpybuff(tail, buff + save_tail_offset(buff));                           \
+    len = strlen(afs->save);                                                   \
+    need = save_name_keep(buff) + strlen(tail) + 1;                            \
+    /* the name head a cut keeps and the tail must fit: shorten the dirs */    \
+    if (len + need > sizeof(afs->save))                                        \
+      save_trim_dirs(afs->save, len, len + need - sizeof(afs->save));          \
+    if (tail[0] != '\0')                                                       \
+      buff[strlen(buff) - strlen(tail)] = '\0';                                \
+    else /* sized: a long extension is dropped before the name */              \
       standard_name(buff, sizeof(afs->save) - strlen(afs->save), dot_pos,      \
                     nom_pos, fil_complete, (shortname));                       \
-      url_savename_addstr(afs->save, sizeof(afs->save), buff);                 \
-    }                                                                          \
+    url_savename_addstr(afs->save, sizeof(afs->save), buff);                   \
+    save_append_tail(afs->save, sizeof(afs->save), tail);                      \
   }
 
 /* Avoid stupid DOS system folders/file such as 'nul' */
@@ -394,8 +395,7 @@ static hts_boolean tmpl_catn(char *d, size_t dsize, const char *s, size_t n) {
 
   for (; *s != '\0' && n != 0 && i + 1 < dsize; n--)
     d[i++] = *s++;
-  if (i < dsize)
-    d[i] = '\0';
+  d[i] = '\0';
   return *s == '\0' || n == 0 ? HTS_TRUE : HTS_FALSE;
 }
 
@@ -415,10 +415,7 @@ static void tmpl_catc(char *d, size_t dsize, char c) {
 #define TMPL_FLUSH()                                                           \
   do {                                                                         \
     if (tmpltail[0] != '\0') {                                                 \
-      if (strlen(afs->save) + strlen(tmpltail) < sizeof(afs->save))            \
-        strcatbuff(afs->save, tmpltail);                                       \
-      else /* cut the name, never its directory */                             \
-        save_append_tail(afs->save, sizeof(afs->save), tmpltail);              \
+      save_append_tail(afs->save, sizeof(afs->save), tmpltail);                \
       tmpltail[0] = '\0';                                                      \
     }                                                                          \
   } while (0)
@@ -481,31 +478,32 @@ static void save_trim_dirs(char *save, size_t dir_len, size_t excess) {
   }
 }
 
-/* Append tail to save (capacity size), shortening the name to make room. */
+/* What a cut keeps of a name: a dotfile's ".stem", else one character. */
+static size_t save_name_keep(const char *name) {
+  size_t n = 0, i;
+
+  if (name[0] == '.')
+    while (n <= MAX_EXT_LEN && name[n + 1] != '\0' && name[n + 1] != '.')
+      n++;
+  if (name[n] != '\0')
+    n++;
+  for (i = 0; i < 3 && ((unsigned char) name[n] & 0xC0) == 0x80; i++)
+    n++;
+  return n;
+}
+
+/* Append tail to save (capacity size), cutting the name down to its head. */
 static void save_append_tail(char *save, size_t size, const char *tail) {
-  size_t tail_len, room, len;
+  const size_t len = strlen(save);
+  size_t room;
 
   assertf(strlen(tail) < size);
-  tail_len = strlen(tail);
-  room = size - 1 - tail_len;
-  {
-    const char *const slash = strrchr(save, '/');
-
-    /* a nameless ".tail" would be a dotfile: give it the default page stem */
-    if (tail[0] == '.' && (slash != NULL ? slash[1] : save[0]) == '\0' &&
-        size - tail_len > strlen("index"))
-      save_append_tail(save, size - tail_len, "index");
-  }
-  len = strlen(save);
+  room = size - 1 - strlen(tail);
   if (len > room) {
     const char *const slash = strrchr(save, '/');
     const size_t dir_len = slash != NULL ? (size_t) (slash - save) + 1 : 0;
-    /* a tail starting with a dot needs one name byte, or it makes a dotfile */
-    size_t keep = tail[0] == '.' && len > dir_len ? 1 : 0;
+    const size_t keep = save_name_keep(save + dir_len);
 
-    while (keep > 0 && dir_len + keep < len &&
-           ((unsigned char) save[dir_len + keep] & 0xC0) == 0x80)
-      keep++;
     if (dir_len + keep > room) {
       /* the directory alone fills save[]: shorten its longest segments */
       save[dir_len + keep] = '\0';
@@ -515,26 +513,16 @@ static void save_append_tail(char *save, size_t size, const char *tail) {
   url_savename_addtail(save, size, "", tail);
 }
 
-/* Append the first character of name, or "index" when that would make a
-   dotfile, so a cut that left no name byte still names the file. */
+/* Append the part of name a cut keeps, when a clip left no name byte. */
 static void save_append_name_head(char *save, size_t size, const char *name) {
-  char first[8];
+  char head[MAX_EXT_LEN + 8];
 
-  first[0] = '\0';
-  if (name[0] == '\0' || name[0] == '.') {
-    strcatbuff(first, "index");
-  } else {
-    size_t n = 1;
-
-    while (n < sizeof(first) - 1 && ((unsigned char) name[n] & 0xC0) == 0x80)
-      n++;
-    strncatbuff(first, name, n);
-  }
-  save_append_tail(save, size, first);
+  head[0] = '\0';
+  strncatbuff(head, name, save_name_keep(name));
+  save_append_tail(save, size, head);
 }
 
-/* Offset of the tail a cut must keep: ".<hexid>.delayed", or the last
-   segment's extension when it is short, else strlen(save). */
+/* Where the tail a cut keeps starts: ".<hexid>.delayed" or a short ext. */
 static size_t save_tail_offset(const char *save) {
   const size_t len = strlen(save);
   const char *const slash = strrchr(save, '/');
@@ -544,8 +532,7 @@ static size_t save_tail_offset(const char *save) {
   if (IS_DELAYED_EXT(save)) {
     const size_t dot = len - strlen("." DELAYED_EXT);
 
-    /* the tag is a delayedId in hex: at most 8 digits */
-    for (p = dot; p > last && dot - p < 8 &&
+    for (p = dot; p > last && dot - p < DELAYED_ID_MAX_DIGITS &&
                   ((save[p - 1] >= '0' && save[p - 1] <= '9') ||
                    (save[p - 1] >= 'a' && save[p - 1] <= 'f'));
          p--)
@@ -555,9 +542,9 @@ static size_t save_tail_offset(const char *save) {
   }
   for (p = len; p > last && save[p - 1] != '.'; p--)
     ;
-  /* #852: keep a plain extension, or the page loses the ".html" it is browsed
-     by */
-  return p > last + 1 && hts_stringLengthUTF8(save + p) <= 12 ? p - 1 : len;
+  /* #852: keep a short extension, like the ".html" the page is browsed by */
+  return p > last + 1 && hts_stringLengthUTF8(save + p) <= MAX_EXT_LEN ? p - 1
+                                                                       : len;
 }
 
 /* The last dot of the name part, or NULL when the name carries no extension. */
@@ -1360,13 +1347,10 @@ int url_savename(lien_adrfilsave *const afs,
       if (*a == '/')
         a++;
       *a = '\0';
-      if (strlen(fil) + strlen(ext) < sizeof(fil))
-        strcatbuff(fil, ext);
-      else /* cut the name, never its directory */
-        save_append_tail(fil, sizeof(fil), ext);
+      save_append_tail(fil, sizeof(fil), ext);
     }
   }
-  // Rechercher premier / et dernier .
+  // find the last / and the last .
   {
     const char *a = hts_lastcharptr(fil);
 
@@ -1468,7 +1452,7 @@ int url_savename(lien_adrfilsave *const afs,
             else
               TMPL_CATN(nom_pos, 8);
           }
-          /* the clip ate the whole name: keep its first character */
+          /* the clip ate the whole name: keep its head */
           if (tmpl_clipped && hts_lastchar(afs->save) == '/')
             save_append_name_head(afs->save, sizeof(afs->save), nom_pos);
           if (tok == 'n')
