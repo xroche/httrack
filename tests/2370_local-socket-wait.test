@@ -30,7 +30,8 @@ for i in $(seq 1 "$pages"); do
 done
 local_server_start --root "$tmpdir/docroot"
 
-now() { "$python" -c 'import time; print(int(time.monotonic() * 1000))'; }
+# No newline, because a Windows python ends print() with CRLF.
+now() { "$python" -c 'import sys, time; sys.stdout.write(str(int(time.monotonic() * 1000)))'; }
 
 # Crawl at -c$1 and set took to its duration in ms.
 timed_crawl() {
