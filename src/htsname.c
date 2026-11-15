@@ -522,8 +522,8 @@ static void save_append_name_head(char *save, size_t size, const char *name) {
   save_append_tail(save, size, head);
 }
 
-/* Byte offset of each character of s, plus strlen(s) last; *nChars gets the
-   count. A malformed byte is one character. NULL if out of memory. */
+/* Return the byte offset of each character of s, then strlen(s), and set
+ *nChars. A malformed byte is one character. NULL if out of memory. */
 static size_t *utf8_char_offsets(const char *s, size_t *nChars) {
   const size_t size = strlen(s);
   size_t *const pos = malloct((size + 1) * sizeof(size_t));
@@ -542,8 +542,8 @@ static size_t *utf8_char_offsets(const char *s, size_t *nChars) {
   return pos;
 }
 
-/* Move character k of s down to byte *out. Characters must be kept in order,
-   so the move never overwrites one not yet read. */
+/* Move character k of s to byte *out and advance *out. Callers keep k
+   increasing, so *out <= pos[k] and nothing unread is overwritten. */
 static void utf8_keep_char(char *s, const size_t *pos, size_t k, size_t *out) {
   const size_t len = pos[k + 1] - pos[k];
 
@@ -1889,11 +1889,10 @@ int url_savename(lien_adrfilsave *const afs,
   if (hts_stringLengthUTF8(afs->save) +
       hts_stringLengthUTF8(StringBuff(opt->path_html_utf8)) >=
       HTS_MAX_PATH_LEN) {
-    // Count in characters, but keep the original bytes: a UCS-4 round trip
-    // makes each malformed byte a 3-byte U+FFFD, overflowing afs->save.
-    size_t wsaveLen;
-    size_t *wpos = utf8_char_offsets(afs->save, &wsaveLen);
-    if (wpos != NULL) {
+    // Cut by character but keep the original bytes, so the name cannot grow.
+    size_t nChars;
+    size_t *charByte = utf8_char_offsets(afs->save, &nChars);
+    if (charByte != NULL) {
       const size_t parentLen =
         hts_stringLengthUTF8(StringBuff(opt->path_html_utf8));
       // parent path length is not insane (otherwise, ignore and pick 200 as
@@ -1902,17 +1901,18 @@ int url_savename(lien_adrfilsave *const afs,
         parentLen <
         HTS_MAX_PATH_LEN - HTS_MAX_PATH_LEN / 4
         ? HTS_MAX_PATH_LEN - parentLen : HTS_MAX_PATH_LEN;
-      size_t i, j, lastSeg, lastSegSize, dirSize, out = 0;
-      // before the cut below starts moving bytes
+      size_t i, j, lastSeg, lastSegSize, dirSize;
+      size_t outByte = 0;
+      // byte where the kept tail starts, read before the cut moves bytes
       const size_t markByte = save_tail_offset(afs->save);
 
       // pick up last segment
-      for (i = 0, lastSeg = 0; i < wsaveLen; i++) {
-        if (afs->save[wpos[i]] == '/') {
+      for (i = 0, lastSeg = 0; i < nChars; i++) {
+        if (afs->save[charByte[i]] == '/') {
           lastSeg = i + 1;
         }
       }
-      lastSegSize = wsaveLen - lastSeg;
+      lastSegSize = nChars - lastSeg;
       if (lastSegSize > MAX_LAST_SEG_RESERVE) {
         lastSegSize = MAX_LAST_SEG_RESERVE;
       }
@@ -1924,13 +1924,13 @@ int url_savename(lien_adrfilsave *const afs,
       for(i = 0, j = 0, dirSize = 0
         ; i + 1 < lastSeg && j + lastSegSize < maxLen; i++) {
           // reset segment counting
-          if (afs->save[wpos[i]] == '/') {
+          if (afs->save[charByte[i]] == '/') {
             dirSize = 0;
           }
 
           // copy if not too long
           if (dirSize < MAX_SEG_LEN) {
-            utf8_keep_char(afs->save, wpos, i, &out);
+            utf8_keep_char(afs->save, charByte, i, &outByte);
             j++;
             dirSize++;
           }
@@ -1938,7 +1938,7 @@ int url_savename(lien_adrfilsave *const afs,
 
       // last segment, after its separator if the name has a directory part
       if (lastSeg > 0) {
-        utf8_keep_char(afs->save, wpos, lastSeg - 1, &out);
+        utf8_keep_char(afs->save, charByte, lastSeg - 1, &outByte);
         j++;
       }
 #define MAX_UTF8_SEQ_CHARS 4
@@ -1951,22 +1951,23 @@ int url_savename(lien_adrfilsave *const afs,
         // the whole path alone, so one component could run to maxLen.
         size_t tailLen, headLen;
 
-        for (markStart = wsaveLen;
-             markStart > 0 && wpos[markStart - 1] >= markByte; markStart--)
+        // the same tail start as a character index
+        for (markStart = nChars;
+             markStart > 0 && charByte[markStart - 1] >= markByte; markStart--)
           ;
-        tailLen = wsaveLen - markStart;
+        tailLen = nChars - markStart;
         headLen = tailLen < MAX_SEG_LEN ? MAX_SEG_LEN - tailLen : 0;
 
         // head, bounded so the reserved tail still fits, then the tail itself
         for (i = lastSeg; i < markStart && i - lastSeg < headLen &&
                           j < maxLen && tailLen < maxLen - j;
              i++, j++)
-          utf8_keep_char(afs->save, wpos, i, &out);
-        for (i = markStart; i < wsaveLen && j < maxLen; i++, j++)
-          utf8_keep_char(afs->save, wpos, i, &out);
+          utf8_keep_char(afs->save, charByte, i, &outByte);
+        for (i = markStart; i < nChars && j < maxLen; i++, j++)
+          utf8_keep_char(afs->save, charByte, i, &outByte);
       }
-      afs->save[out] = '\0';
-      freet(wpos);
+      afs->save[outByte] = '\0';
+      freet(charByte);
 
       // log in debug
       hts_log_print(opt, LOG_DEBUG, "Too long filename shortened: %s%s => %s",

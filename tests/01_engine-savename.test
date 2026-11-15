@@ -166,13 +166,22 @@ if ! target_is_windows; then
     out=$("$HTTRACK_PATH" -O "$outdir" -#test=savename \
         "/d/$(rep . 300)a/$(rep a 400)/$(rep b 280)/x.html" 'text/html')
     assert_eq "/d/$(rep a 238)/$(rep b 238)/x.html" "${out#*www.example.com}" 'cut blanks a directory'
-    # OSS-Fuzz 586043913: the cut keeps non-UTF-8 bytes as they are, rather
-    # than as 3-byte U+FFFD that overflowed the save buffer and aborted.
+    # OSS-Fuzz 586043913: a non-UTF-8 name must not overflow the save buffer.
     outdir=/dev/null/$(rep p 200)/$(rep q 200)/$(rep r 200)/$(rep s 200)/$(rep t 200)
     out=$(LC_ALL=C "$HTTRACK_PATH" -O "$outdir" -#test=savename \
         "/$(rep '\351' 320)/$(rep '\351' 320)/$(rep '\351' 320)/x.html" 'text/html')
     assert_eq "/$(rep '\351' 238)/$(rep '\351' 238)/$(rep '\351' 238)/x.html" \
         "${out#*www.example.com}" 'cut keeps malformed UTF-8 bytes'
+    # Stray continuation bytes in the extension still count as characters.
+    out=$(LC_ALL=C "$HTTRACK_PATH" -O "$outdir" -#test=savename \
+        "/$(rep a 320)/$(rep b 320)/$(rep c 320).$(rep '\200' 3)h" 'application/octet-stream')
+    assert_eq "/$(rep a 238)/$(rep b 238)/$(rep c 234).$(rep '\200' 3)h" \
+        "${out#*www.example.com}" 'cut keeps a malformed extension'
+    # A 2-byte character counts once, not twice.
+    out=$(LC_ALL=C "$HTTRACK_PATH" -O "${outdir}tttttt" -#test=savename \
+        "/$(rep '\303\251' 70)$(rep a 200)/$(rep b 670)/x.html" 'text/html')
+    assert_eq "/$(rep '\303\251' 70)$(rep a 168)/$(rep b 238)/x.html" \
+        "${out#*www.example.com}" 'cut counts UTF-8 characters'
 fi
 full '/x.php' 'application/pdf' '/dev/null/www.example.com/evil.exe' 'cdispo=../../evil.exe'
 # Not queued: those spaces are htsmain()'s rewrite of the CR and TAB, which only
