@@ -114,7 +114,7 @@ extern size_t hts_stringLengthUTF8(const char *s);
 
 /**
  * Copy at most 'nBytes' bytes from src to dest, not truncating UTF-8
- * sequences.
+ * sequences. dest must hold nBytes + 1 bytes.
  * Returns the number of bytes copied, not including the terminating \0.
  **/
 extern size_t hts_copyStringUTF8(char *dest, const char *src, 
