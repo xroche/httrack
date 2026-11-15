@@ -1280,6 +1280,9 @@ int hts_wait_delayed(htsmoduleStruct *str, lien_adrfilsave *afs,
            * (#483) */
           if (fexist_utf8(delayed_back.url_sav)) {
             back_delayed_discard(opt, &delayed_back);
+          } else {
+            /* nothing on disk, so url_savename()'s sniff need not open it */
+            delayed_back.url_sav[0] = '\0';
           }
 
           /* Recompute filename with MIME type */

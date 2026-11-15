@@ -734,11 +734,14 @@ static HTS_INLINE HTS_UNUSED void sigpipe_release(sigpipe_mask *m) {
 }
 #endif
 
-/* A send() carrying whatever protection this platform actually applies. The
-   flag alone is not enough: GNU/Hurd defines MSG_NOSIGNAL and still kills the
-   process, which is how a library takes down whoever embedded it (#1689). */
+/* A send() that cannot raise SIGPIPE. Linux honours the flag alone, but
+   GNU/Hurd defines MSG_NOSIGNAL and still kills the process, which is how a
+   library takes down whoever embedded it (#1689). */
 static HTS_INLINE HTS_UNUSED int hts_send_nosignal(T_SOC soc, const char *s,
                                                    int len) {
+#if defined(__linux__) && defined(MSG_NOSIGNAL)
+  return (int) send(soc, s, len, HTS_MSG_NOSIGNAL);
+#else
   sigpipe_mask m;
   int n, err;
 
@@ -752,6 +755,7 @@ static HTS_INLINE HTS_UNUSED int hts_send_nosignal(T_SOC soc, const char *s,
   sigpipe_release(&m);
   errno = err;
   return n;
+#endif
 }
 
 void cut_path(char *fullpath, char *path, size_t path_size, char *pname,

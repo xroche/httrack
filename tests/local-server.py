@@ -957,6 +957,16 @@ class Handler(SimpleHTTPRequestHandler):
         if self.command != "HEAD":
             self.wfile.write(body)
 
+    # 20 images whose replies offer keep-alive, because only a reused socket
+    # reaches the delayed-type cancel and re-add (2371).
+    def route_keepalive(self, path):
+        ka = (("Connection", "keep-alive"),)
+        if path.endswith(".png"):
+            self.send_raw(self.FAKE_PNG, "image/png", ka)
+            return
+        imgs = "".join('<img src="i%d.png">\n' % i for i in range(1, 21))
+        self.send_raw(f"<html><body>\n{imgs}</body></html>\n".encode(), "text/html", ka)
+
     # Fake-binary blobs for the image/pdf/typeless cases.
     FAKE_PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
     FAKE_PDF = b"%PDF-1.4\n" + b"\x00" * 64
@@ -4888,6 +4898,9 @@ class Handler(SimpleHTTPRequestHandler):
             return True
         if path.startswith("/asset/"):
             self.route_asset()
+            return True
+        if path.startswith("/keepalive/"):
+            self.route_keepalive(path)
             return True
         if path.startswith("/fetchmeta/"):
             self.route_fetchmeta()
