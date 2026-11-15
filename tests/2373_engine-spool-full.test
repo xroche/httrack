@@ -1,0 +1,13 @@
+#!/bin/bash
+#
+# A spooled entry with no free slot to wake into keeps its spool file.
+
+set -euo pipefail
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_2373.XXXXXX")
+cleanup_push rm -rf "$tmpdir"
+require_httrack
+
+assert_selftest 'spoolfull: OK' spoolfull "$tmpdir"
