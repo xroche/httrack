@@ -372,6 +372,33 @@ static void basic_selftests(void) {
       assertf(strncmp(b, "indexpag", 8) == 0);
       assertf(strcmp(b + len - 4, ".htm") == 0);
     }
+    // a buffer too small for it all drops the extension, then the md5, but
+    // keeps a name byte: never a cut extension, never a new dotfile
+    {
+      const char *const q = "http://example.com/index.html?v=1";
+      const char *const nq = "http://example.com/index.html";
+      const char *const dotf = ".htaccess";
+      char sml[16];
+
+      standard_name(sml, 1, dot, nom, q, 0);
+      assertf(strcmp(sml, "") == 0);
+      standard_name(sml, 2, dot, nom, q, 0);
+      assertf(strcmp(sml, "i") == 0);
+      standard_name(sml, 6, dot, nom, q, 0);
+      assertf(strcmp(sml, "i3860") == 0); // md5("v=1") starts 3860
+      standard_name(sml, 6, dot, nom, nq, 0);
+      assertf(strcmp(sml, "index") == 0);
+      standard_name(sml, 7, dot, nom, nq, 0);
+      assertf(strcmp(sml, "i.html") == 0);
+      standard_name(sml, 5, dot, nom, nq, 1);
+      assertf(strcmp(sml, "inde") == 0);
+      standard_name(sml, 6, dot, nom, nq, 1);
+      assertf(strcmp(sml, "i.htm") == 0);
+      standard_name(sml, 4, dotf, dotf, dotf, 0);
+      assertf(strcmp(sml, "hta") == 0);
+      standard_name(sml, sizeof(sml), dotf, dotf, dotf, 0);
+      assertf(strcmp(sml, ".htaccess") == 0);
+    }
   }
   // longfile_to_83(): single-name 8-3 (mode 1) / ISO9660 (mode 2) conversion;
   // uppercases, clamps the name (8 / 31) and the extension (3). It rewrites
