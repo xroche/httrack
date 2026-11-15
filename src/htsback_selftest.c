@@ -437,7 +437,6 @@ static int st_backswap(httrackp *opt, int argc, char **argv) {
   {
     static const char body[] = "truncated body";
     static const char hdrs[] = "HTTP/1.1 200 OK\r\nX: 1\r\n";
-    const size_t head = sizeof(size_t);
     char *whole = NULL;
     long whole_len = 0;
     FILE *fp = tmpfile();
@@ -465,25 +464,14 @@ static int st_backswap(httrackp *opt, int argc, char **argv) {
       fclose(fp);
 
     if (whole_len > 0) {
-      /* Cuts at each boundary the reader stops on: the leading size, the
-         struct, the body's size and bytes, then the headers. */
-      const long cuts[] = {1,
-                           (long) head,
-                           (long) (head + sizeof(lien_back)) - 1,
-                           (long) (head + sizeof(lien_back)),
-                           (long) (head + sizeof(lien_back) + head) + 1,
-                           whole_len - 1,
-                           whole_len};
-      size_t c;
+      long cut;
 
-      for (c = 0; c < sizeof(cuts) / sizeof(cuts[0]); c++) {
-        const long cut = cuts[c];
+      /* every cut, since each field of the record is a boundary */
+      for (cut = 1; cut <= whole_len; cut++) {
         const hts_boolean complete = cut == whole_len;
         lien_back *copy = NULL;
         FILE *cfp;
 
-        if (cut <= 0 || cut > whole_len)
-          continue;
         cfp = tmpfile();
         if (cfp == NULL ||
             fwrite(whole, 1, (size_t) cut, cfp) != (size_t) cut ||
@@ -561,6 +549,277 @@ static int st_backswap(httrackp *opt, int argc, char **argv) {
   printf("backswap self-test: %s\n", err ? "FAIL" : "OK");
   return err;
 }
+
+/* Serialize a slot into a fresh buffer the caller frees, or NULL. */
+static char *st_spool_record(const lien_back *back, long *len) {
+  FILE *const fp = tmpfile();
+  char *buf = NULL;
+
+  *len = 0;
+  if (fp != NULL && back_serialize(fp, back) == 0 && (*len = ftell(fp)) > 0 &&
+      fseek(fp, 0, SEEK_SET) == 0 && (buf = malloct((size_t) *len)) != NULL &&
+      fread(buf, 1, (size_t) *len, fp) != (size_t) *len) {
+    freet(buf);
+  }
+  if (fp != NULL)
+    fclose(fp);
+  return buf;
+}
+
+static lien_back *st_spool_read(const char *buf, size_t len) {
+  FILE *const fp = tmpfile();
+  lien_back *copy = NULL;
+
+  if (fp != NULL && fwrite(buf, 1, len, fp) == len &&
+      fseek(fp, 0, SEEK_SET) == 0 && back_unserialize(fp, &copy) != 0 &&
+      copy != NULL) {
+    fprintf(stderr, "spoolrecord: a refused record kept a slot\n");
+    copy = NULL; /* leaked, but the test fails anyway */
+  }
+  if (fp != NULL)
+    fclose(fp);
+  return copy;
+}
+
+/* Fill a string field with a run of one letter, len bytes long. */
+#define ST_FILL(field, len, ch)                                                \
+  do {                                                                         \
+    memset((field), (ch), (len));                                              \
+    (field)[(len)] = '\0';                                                     \
+  } while (0)
+
+/* The spool record carries only the used part of each string field, and gives
+   back the slot byte for byte. */
+static int st_spoolrecord(httrackp *opt, int argc, char **argv) {
+  static const char body[] = "spooled body";
+  static const char hdrs[] = "HTTP/1.1 200 OK\r\n";
+  lien_back *back = calloct(1, sizeof(lien_back));
+  lien_back *copy;
+  char *rec = NULL;
+  long len = 0;
+  int err = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  if (back == NULL)
+    return 1;
+
+  /* A small slot must spool far under the struct size. */
+  strcpybuff(back->url_adr, "example.com");
+  strcpybuff(back->url_fil, "/a.html");
+  strcpybuff(back->url_sav, "/tmp/mirror/a.html");
+  back->r.adr = strdupt(body);
+  back->r.size = (LLint) sizeof(body) - 1;
+  rec = st_spool_record(back, &len);
+  if (rec == NULL) {
+    fprintf(stderr, "spoolrecord: a small slot did not serialize\n");
+    err = 1;
+  } else if ((size_t) len >= sizeof(lien_back) / 8) {
+    fprintf(stderr, "spoolrecord: a small slot took %ld bytes (struct: %lu)\n",
+            len, (unsigned long) sizeof(lien_back));
+    err = 1;
+  }
+  freet(rec);
+  /* One more byte in any string field must cost exactly one byte. */
+  {
+#define ST_FIELD(f) {back->f, sizeof(back->f), #f}
+
+    const struct {
+      char *field;
+      size_t size;
+      const char *name;
+    } fields[] = {ST_FIELD(url_adr),        ST_FIELD(url_fil),
+                  ST_FIELD(url_sav),        ST_FIELD(referer_adr),
+                  ST_FIELD(referer_fil),    ST_FIELD(location_buffer),
+                  ST_FIELD(tmpfile_buffer), ST_FIELD(send_too),
+                  ST_FIELD(r.msg),          ST_FIELD(r.contenttype),
+                  ST_FIELD(r.charset),      ST_FIELD(r.contentencoding),
+                  ST_FIELD(r.lastmodified), ST_FIELD(r.etag),
+                  ST_FIELD(r.cdispo),       ST_FIELD(info)};
+
+#undef ST_FIELD
+    size_t i;
+
+    for (i = 0; i < sizeof(fields) / sizeof(fields[0]); i++) {
+      long shorter = 0, longer = 0;
+      char saved[64];
+
+      strlcpybuff(saved, fields[i].field, sizeof(saved));
+      strlcpybuff(fields[i].field, "x", fields[i].size);
+      freet(rec);
+      rec = st_spool_record(back, &shorter);
+      strlcpybuff(fields[i].field, "xx", fields[i].size);
+      freet(rec);
+      rec = st_spool_record(back, &longer);
+      strlcpybuff(fields[i].field, saved, fields[i].size);
+      if (shorter == 0 || longer != shorter + 1) {
+        fprintf(stderr, "spoolrecord: %s is not spooled by its length\n",
+                fields[i].name);
+        err = 1;
+      }
+    }
+    freet(rec);
+  }
+  freet(back->r.adr);
+
+  /* With every string field full, the copy must match exactly. Bytes past a
+     terminator come back zero, so the slot starts zeroed. */
+  memset(back, 0, sizeof(lien_back));
+  back->r.adr = strdupt(body);
+  back->r.size = (LLint) sizeof(body) - 1;
+  ST_FILL(back->url_adr, sizeof(back->url_adr) - 1, 'a');
+  ST_FILL(back->url_fil, 1, 'b');
+  ST_FILL(back->url_sav, sizeof(back->url_sav) - 1, 'c');
+  ST_FILL(back->referer_adr, 7, 'd');
+  ST_FILL(back->referer_fil, sizeof(back->referer_fil) - 1, 'e');
+  ST_FILL(back->location_buffer, sizeof(back->location_buffer) - 1, 'f');
+  ST_FILL(back->tmpfile_buffer, 3, 'g');
+  ST_FILL(back->send_too, sizeof(back->send_too) - 1, 'h');
+  ST_FILL(back->r.msg, sizeof(back->r.msg) - 1, 'i');
+  ST_FILL(back->r.contenttype, 9, 'j');
+  ST_FILL(back->r.charset, sizeof(back->r.charset) - 1, 'k');
+  ST_FILL(back->r.contentencoding, 4, 'l');
+  ST_FILL(back->r.lastmodified, sizeof(back->r.lastmodified) - 1, 'm');
+  ST_FILL(back->r.etag, sizeof(back->r.etag) - 1, 'n');
+  ST_FILL(back->r.cdispo, 5, 'o');
+  ST_FILL(back->info, sizeof(back->info) - 1, 'p');
+  back->status = STATUS_READY;
+  back->locked = 2;
+  back->timeout = 31;
+  back->maxfile_html = 1234567;
+  back->r.statuscode = 206;
+  back->r.notmodified = 1;
+  back->r.totalsize = 98765;
+  back->r.crange_end = 4321;
+  back->r.retry_after = 17;
+  back->r.req.http11 = 1;
+  back->http11 = 1;
+  back->chunk_blocksize = 77;
+  back->early_add = 1;
+  back->r.headers = strdupt(hdrs);
+  rec = st_spool_record(back, &len);
+  copy = rec != NULL ? st_spool_read(rec, (size_t) len) : NULL;
+  if (copy == NULL) {
+    fprintf(stderr, "spoolrecord: a full slot did not round-trip\n");
+    err = 1;
+  } else {
+    char *adr = copy->r.adr;
+    char *headers = copy->r.headers;
+
+    if (adr == NULL || copy->r.size != back->r.size ||
+        memcmp(adr, body, sizeof(body) - 1) != 0 || headers == NULL ||
+        strcmp(headers, hdrs) != 0) {
+      fprintf(stderr, "spoolrecord: the body or headers came back wrong\n");
+      err = 1;
+    }
+    if (copy->r.location != copy->location_buffer ||
+        copy->r.soc != INVALID_SOCKET) {
+      fprintf(stderr, "spoolrecord: the in-process pointers were not reset\n");
+      err = 1;
+    }
+    /* compare the rest byte for byte, the reset pointers aside */
+    {
+      char *const want_adr = back->r.adr;
+      char *const want_headers = back->r.headers;
+
+      back->r.adr = copy->r.adr = NULL;
+      back->r.headers = copy->r.headers = NULL;
+      back->r.location = copy->r.location = NULL;
+      back->r.soc = copy->r.soc;
+      if (memcmp(back, copy, sizeof(lien_back)) != 0) {
+        fprintf(stderr, "spoolrecord: the slot came back changed\n");
+        err = 1;
+      }
+      back->r.adr = want_adr;
+      back->r.headers = want_headers;
+    }
+    freet(adr);
+    freet(headers);
+    freet(copy);
+  }
+
+  /* Forged first-field lengths: its room, one past it, and a wrapping one. */
+  {
+    const size_t room = sizeof(back->url_adr);
+    const size_t head = 2 * sizeof(size_t);
+    const size_t bad[] = {room, room + 1, (size_t) -1};
+    size_t c;
+
+    for (c = 0; rec != NULL && c < sizeof(bad) / sizeof(bad[0]); c++) {
+      const size_t claim = bad[c] <= room + 1 ? bad[c] : 0;
+      const size_t rest = (size_t) len - head - (room - 1);
+      const size_t size = head + claim + rest;
+      char *forged = malloct(size);
+
+      if (forged == NULL) {
+        err = 1;
+        continue;
+      }
+      memcpy(forged, rec, sizeof(size_t));
+      memcpy(forged + sizeof(size_t), &bad[c], sizeof(size_t));
+      memset(forged + head, 'a', claim);
+      memcpy(forged + head + claim, rec + head + (room - 1), rest);
+      copy = st_spool_read(forged, size);
+      if (copy != NULL) {
+        fprintf(stderr, "spoolrecord: a %lu-byte field length was read\n",
+                (unsigned long) bad[c]);
+        err = 1;
+        back_clear_entry(copy);
+        freet(copy);
+      }
+      freet(forged);
+    }
+    /* a struct size of another build, the record otherwise intact */
+    if (rec != NULL) {
+      const size_t other = sizeof(lien_back) - 1;
+      const size_t ours = sizeof(lien_back);
+
+      memcpy(rec, &other, sizeof(other));
+      copy = st_spool_read(rec, (size_t) len);
+      if (copy != NULL) {
+        fprintf(stderr, "spoolrecord: a foreign struct size was read\n");
+        err = 1;
+        back_clear_entry(copy);
+        freet(copy);
+      }
+      memcpy(rec, &ours, sizeof(ours));
+    }
+    /* the control: the record as written, at the longest legal length */
+    if (rec != NULL) {
+      copy = st_spool_read(rec, (size_t) len);
+      if (copy == NULL) {
+        fprintf(stderr, "spoolrecord: the unforged record was refused\n");
+        err = 1;
+      } else {
+        back_clear_entry(copy);
+        freet(copy);
+      }
+    }
+  }
+  freet(rec);
+
+  /* An unterminated field is refused on write, not read past. */
+  memset(back->r.etag, 'z', sizeof(back->r.etag));
+  {
+    FILE *const fp = tmpfile();
+
+    if (fp == NULL || back_serialize(fp, back) == 0 || ftell(fp) != 0) {
+      fprintf(stderr, "spoolrecord: an unterminated field was serialized\n");
+      err = 1;
+    }
+    if (fp != NULL)
+      fclose(fp);
+  }
+
+  freet(back->r.adr);
+  freet(back->r.headers);
+  freet(back);
+  printf("spoolrecord self-test: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
+#undef ST_FILL
 
 typedef enum { ST_CAP_FAIL, ST_CAP_OK, ST_CAP_SKIPPED } st_cap_result;
 
@@ -2193,6 +2452,9 @@ const struct selftest_entry selftests_back[] = {
      st_mutexlazyinit},
     {"backswap", "", "which backlog slots may be swapped to the ready table",
      st_backswap},
+    {"spoolrecord", "",
+     "a spooled slot keeps only its used bytes and refuses a bad length",
+     st_spoolrecord},
     {"slotfail", "", "a failed slot clips a reason too long for its message",
      st_slotfail},
     {"statsrows", "",
