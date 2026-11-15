@@ -2786,8 +2786,6 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
               /* this is an update of a file */
               if (strnotempty(back[p].send_too))
                 back[p].is_update = 1;
-              back[p].r.req.nocompression = 1;  /* Do not compress when updating! */
-
             }
           }
         }
