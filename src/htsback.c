@@ -41,6 +41,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsthread.h"
 #include <ctype.h>
 #include <limits.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <time.h>
 #ifndef _WIN32
@@ -1527,28 +1528,108 @@ static int back_string_unserialize(FILE * fp, char **str) {
   return err;
 }
 
+/* String fields in struct order. A record is sizeof(lien_back), then the
+   struct with each of these fields replaced by its length and used bytes. */
+#define BACK_SPOOL_STR(f) {offsetof(lien_back, f), sizeof(((lien_back *) 0)->f)}
+
+static const struct {
+  size_t offset;
+  size_t size;
+} back_spool_strings[] = {
+    BACK_SPOOL_STR(url_adr),        BACK_SPOOL_STR(url_fil),
+    BACK_SPOOL_STR(url_sav),        BACK_SPOOL_STR(referer_adr),
+    BACK_SPOOL_STR(referer_fil),    BACK_SPOOL_STR(location_buffer),
+    BACK_SPOOL_STR(tmpfile_buffer), BACK_SPOOL_STR(send_too),
+    BACK_SPOOL_STR(r.msg),          BACK_SPOOL_STR(r.contenttype),
+    BACK_SPOOL_STR(r.charset),      BACK_SPOOL_STR(r.contentencoding),
+    BACK_SPOOL_STR(r.lastmodified), BACK_SPOOL_STR(r.etag),
+    BACK_SPOOL_STR(r.cdispo),       BACK_SPOOL_STR(info)};
+
+#undef BACK_SPOOL_STR
+
+#define BACK_SPOOL_NSTR                                                        \
+  (sizeof(back_spool_strings) / sizeof(back_spool_strings[0]))
+
 /* Spools one slot for back_cleanup_background() to pick up later in the same
    run, so it may hold pointers and the host's own layout. The resume reference
    outlives the process and cannot: see back_serialize_ref() below. */
 int back_serialize(FILE * fp, const lien_back * src) {
-  if (back_data_serialize(fp, src, sizeof(lien_back)) == 0
-      && back_data_serialize(fp, src->r.adr,
-                             src->r.adr ? (size_t) src->r.size : 0) == 0
-      && back_string_serialize(fp, src->r.headers) == 0 && fflush(fp) == 0)
+  const char *const base = (const char *) src;
+  const size_t whole = sizeof(lien_back);
+  size_t lens[BACK_SPOOL_NSTR];
+  size_t at = 0;
+  size_t i;
+
+  /* an unterminated field is refused before anything is written */
+  for (i = 0; i < BACK_SPOOL_NSTR; i++) {
+    const char *const field = base + back_spool_strings[i].offset;
+    const char *const end = memchr(field, '\0', back_spool_strings[i].size);
+
+    if (end == NULL)
+      return 1;
+    lens[i] = (size_t) (end - field);
+  }
+  if (!hts_fwrite_exact(&whole, sizeof(whole), fp))
+    return 1;
+  for (i = 0; i < BACK_SPOOL_NSTR; i++) {
+    const size_t off = back_spool_strings[i].offset;
+
+    if (off < at) /* the table is out of struct order */
+      return 1;
+    if ((off != at && !hts_fwrite_exact(base + at, off - at, fp)) ||
+        back_data_serialize(fp, base + off, lens[i]) != 0)
+      return 1;
+    at = off + back_spool_strings[i].size;
+  }
+  if (!hts_fwrite_exact(base + at, whole - at, fp))
+    return 1;
+  if (back_data_serialize(fp, src->r.adr,
+                          src->r.adr ? (size_t) src->r.size : 0) == 0 &&
+      back_string_serialize(fp, src->r.headers) == 0 && fflush(fp) == 0)
     return 0;
   return 1;
 }
 
+/* Reads one string field into its fixed slot. A length with no room for the
+   terminator is refused, not clipped. */
+static hts_boolean back_field_unserialize(FILE *fp, char *dst, size_t size) {
+  size_t len;
+
+  if (!hts_fread_exact(&len, sizeof(len), fp) || len >= size)
+    return HTS_FALSE;
+  if (len != 0 && !hts_fread_exact(dst, len, fp))
+    return HTS_FALSE;
+  dst[len] = '\0';
+  return HTS_TRUE;
+}
+
+static hts_boolean back_record_unserialize(FILE *fp, lien_back *dst) {
+  char *const base = (char *) dst;
+  size_t at = 0;
+  size_t i;
+
+  for (i = 0; i < BACK_SPOOL_NSTR; i++) {
+    const size_t off = back_spool_strings[i].offset;
+
+    if ((off != at && !hts_fread_exact(base + at, off - at, fp)) ||
+        !back_field_unserialize(fp, base + off, back_spool_strings[i].size))
+      return HTS_FALSE;
+    at = off + back_spool_strings[i].size;
+  }
+  return hts_fread_exact(base + at, sizeof(lien_back) - at, fp);
+}
+
 int back_unserialize(FILE * fp, lien_back ** dst) {
   size_t size;
-  void *data;
-  int err;
 
   *dst = NULL;
   errno = 0;
-  err = back_data_unserialize(fp, &data, &size);
-  *dst = (lien_back *) data;
-  if (err == 0 && size == sizeof(lien_back)) {
+  if (!hts_fread_exact(&size, sizeof(size), fp) || size != sizeof(lien_back))
+    return 1;
+  *dst = calloct(1, sizeof(lien_back));
+  if (*dst == NULL)
+    return 1;
+  if (back_record_unserialize(fp, *dst)) {
     (*dst)->tmpfile = NULL;
     (*dst)->chunk_adr = NULL;
     (*dst)->r.adr = NULL;
@@ -1563,6 +1644,7 @@ int back_unserialize(FILE * fp, lien_back ** dst) {
 #if HTS_USEOPENSSL
     (*dst)->r.ssl_con = NULL;
 #endif
+    (*dst)->r.headers = NULL;
     {
       void *adr;
       const int adr_err = back_data_unserialize(fp, &adr, &size);
@@ -1573,7 +1655,6 @@ int back_unserialize(FILE * fp, lien_back ** dst) {
            disk); zeroing r.size makes the writer blank that file (#797). */
         if ((*dst)->r.adr != NULL)
           (*dst)->r.size = size;
-        (*dst)->r.headers = NULL;
         if (back_string_unserialize(fp, &(*dst)->r.headers) == 0)
           return 0; /* ok */
         if ((*dst)->r.headers != NULL)
@@ -1583,10 +1664,8 @@ int back_unserialize(FILE * fp, lien_back ** dst) {
     if ((*dst)->r.adr != NULL)
       freet((*dst)->r.adr);
   }
-  if (dst != NULL) {
-    freet(*dst);
-    *dst = NULL;
-  }
+  freet(*dst);
+  *dst = NULL;
   return 1;                     /* error */
 }
 
@@ -2253,7 +2332,9 @@ hts_boolean back_delayed_rename(httrackp *opt, lien_back *back,
     fclose(back->r.out);
     back->r.out = NULL;
   }
-  renamed = RENAME(back->url_sav, newname) == 0 ? HTS_TRUE : HTS_FALSE;
+  /* the final name may sit in another directory (-N types, the length cap) */
+  renamed =
+      structcheck_utf8(newname) == 0 && RENAME(back->url_sav, newname) == 0;
   if (renamed && (back_status(back) == STATUS_READY ||
                   (back->r.out = FOPEN(newname, "ab")) != NULL)) {
     filenote(&opt->state.strc, newname, NULL);

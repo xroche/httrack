@@ -130,3 +130,5 @@ utf8 'hex:f4908080' '0'   # above U+10FFFF
 utf8 'hex:f888808080' '0' # legacy 5-byte form
 
 selftest_run_queued
+
+assert_selftest "copy-utf8 self-test OK" copy-utf8

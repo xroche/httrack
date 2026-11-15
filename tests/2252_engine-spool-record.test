@@ -1,0 +1,12 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# A spooled slot keeps only the used part of its string fields, comes back
+# unchanged, and a truncated record or an over-long field length is refused.
+
+assert_selftest 'spoolrecord self-test: OK' spoolrecord
