@@ -1013,6 +1013,7 @@ static int st_spoolfull(httrackp *opt, int argc, char **argv) {
   struct_back *sback;
   cache_back cache;
   void *spooled = NULL;
+  void *again = NULL;
   int err = 0;
   int i, b;
 
@@ -1037,6 +1038,14 @@ static int st_spoolfull(httrackp *opt, int argc, char **argv) {
     sback->lnk[i].status = STATUS_CONNECTING;
   CHECK(back_index(opt, sback, "example.com", "/a.html", sav) < 0);
   CHECK(spooled != NULL && fexist_utf8((const char *) spooled));
+  /* a duplicate of it must stay in memory rather than replace it */
+  back_clear_entry(&sback->lnk[2]);
+  CHECK(st_spooldir_slot(&sback->lnk[2], argv[0], "a.html"));
+  CHECK(back_cleanup_background(opt, &cache, sback) == 0);
+  CHECK(coucal_nitems(sback->ready) == 1 &&
+        coucal_read_pvoid(sback->ready, sav, &again) && again == spooled);
+  back_clear_entry(&sback->lnk[2]);
+  sback->lnk[2].status = STATUS_CONNECTING;
   sback->lnk[1].status = STATUS_FREE;
   b = back_index(opt, sback, "example.com", "/a.html", sav);
   CHECK(b == 1);

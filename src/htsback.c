@@ -612,6 +612,9 @@ int back_cleanup_background(httrackp *opt, cache_back *cache,
           assertf(!duplicateEntryInBacklog);
         }
 #endif
+      } else if (back_index_ready(opt, sback, back[i].url_adr, back[i].url_fil,
+                                  back[i].url_sav, 0) != -1) {
+        continue; /* no slot to wake the duplicate: spooling would orphan it */
       }
       /* temporarily serialize the entry on disk */
       {
