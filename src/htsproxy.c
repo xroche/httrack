@@ -135,7 +135,7 @@ int http_proxy_tunnel(httrackp *opt, htsblk *retour, const char *adr,
     int stalls = 0;
 
     while (remain > 0) {
-      const int n = hts_send_nosignal(soc, p, (int) remain);
+      const int n = hts_send_nosignal(soc, p, remain);
 
       if (n > 0) {
         p += n;
@@ -265,7 +265,7 @@ static int socks5_write_all(socks5_stream *st, const unsigned char *buf,
   }
   while (remain > 0) {
     // Not sendc(): the socket is still plain here, and that would route to TLS
-    const int n = hts_send_nosignal(st->soc, (const char *) buf, (int) remain);
+    const int n = hts_send_nosignal(st->soc, (const char *) buf, remain);
 
     if (n > 0) {
       buf += n;

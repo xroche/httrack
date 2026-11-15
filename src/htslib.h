@@ -72,6 +72,7 @@ typedef struct lien_adrfilsave lien_adrfilsave;
 #include "htsdefines.h"
 
 #ifndef _WIN32
+#include <limits.h>
 #include <signal.h>
 #include <time.h>
 #if defined(THREADS)
@@ -736,17 +737,19 @@ static HTS_INLINE HTS_UNUSED void sigpipe_release(sigpipe_mask *m) {
 
 /* A send() that cannot raise SIGPIPE. Linux honours the flag alone, but
    GNU/Hurd defines MSG_NOSIGNAL and still kills the process, which is how a
-   library takes down whoever embedded it (#1689). */
+   library takes down whoever embedded it (#1689). A length past INT_MAX is
+   clipped, which the caller sees as a short write. */
 static HTS_INLINE HTS_UNUSED int hts_send_nosignal(T_SOC soc, const char *s,
-                                                   int len) {
+                                                   size_t len) {
+  const int ilen = len > INT_MAX ? INT_MAX : (int) len;
 #if defined(__linux__) && defined(MSG_NOSIGNAL)
-  return (int) send(soc, s, len, HTS_MSG_NOSIGNAL);
+  return (int) send(soc, s, ilen, HTS_MSG_NOSIGNAL);
 #else
   sigpipe_mask m;
   int n, err;
 
   sigpipe_hold(&m);
-  n = (int) send(soc, s, len, HTS_MSG_NOSIGNAL);
+  n = (int) send(soc, s, ilen, HTS_MSG_NOSIGNAL);
   /* Saved across the release, whose sigtimedwait() reports EAGAIN whenever
      nothing was pending. Callers read errno on the next line to tell a would
      block from a dead socket, and EAGAIN is the answer that means keep going.

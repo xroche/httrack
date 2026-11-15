@@ -1373,16 +1373,14 @@ int send_line(T_SOC soc, const char *data) {
   }
 #if FTP_DEBUG
   {
-    int r = (hts_send_nosignal(soc, line, (int) strlen(line)) ==
-             (int) strlen(line));
+    int r = hts_send_nosignal(soc, line, (size_t) n) == n;
 
     printf("%s\x0d\x0a", data);
     fflush(stdout);
     return r;
   }
 #else
-  return (hts_send_nosignal(soc, line, (int) strlen(line)) ==
-          (int) strlen(line));
+  return hts_send_nosignal(soc, line, (size_t) n) == n;
 #endif
 }
 

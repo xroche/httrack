@@ -3377,7 +3377,12 @@ HTSEXT_API char **int2bytes2(strc_int2bytes2 * strc, LLint n) {
 
 // envoi de texte (en têtes généralement) sur la socket soc
 int sendc(htsblk * r, const char *s) {
-  int n, ssz = (int) strlen(s);
+  const size_t len = strlen(s);
+  int n, ssz;
+
+  if (len > INT_MAX)
+    return -1;
+  ssz = (int) len;
 
 #if HTS_USEOPENSSL
   if (r->ssl) {
