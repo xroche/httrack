@@ -218,6 +218,80 @@ int back_max_slots(int maxsoc) {
   return maxsoc * 32 + 1024;
 }
 
+/* The busy bitmap lets slot scans skip free slots. A free slot is taken only
+   through back_search_quick() or back_slot_attach(), which set its bit. Only
+   back_busy_prune() clears bits, so a slot freed and reused in place keeps it.
+ */
+/* At least one word, so an empty table still allocates. */
+static size_t back_busy_words(int count) { return (size_t) count / 64 + 1; }
+
+static void back_busy_mark(struct_back *sback, int i) {
+  sback->busy[i / 64] |= (uint64_t) 1 << (i % 64);
+}
+
+/* Next slot in [from, to) whose busy bit is set, or -1. */
+static int back_busy_next(const struct_back *sback, int from, int to) {
+  while (from < to) {
+    uint64_t w = sback->busy[from / 64] >> (from % 64);
+
+    if (w == 0) {
+      from = (from / 64 + 1) * 64;
+      continue;
+    }
+    while ((w & 1) == 0) {
+      w >>= 1;
+      from++;
+    }
+    return from < to ? from : -1;
+  }
+  return -1;
+}
+
+/* First busy slot in rotated order start..count-1, 0..start-1, or -1. */
+static int back_busy_first(const struct_back *sback, int start) {
+  const int i = back_busy_next(sback, start, sback->count);
+
+  return i >= 0 ? i : back_busy_next(sback, 0, start);
+}
+
+/* Busy slot after i in the rotated order of back_busy_first(), or -1. */
+static int back_busy_after(const struct_back *sback, int start, int i) {
+  if (i >= start) {
+    const int j = back_busy_next(sback, i + 1, sback->count);
+
+    return j >= 0 ? j : back_busy_next(sback, 0, start);
+  }
+  return back_busy_next(sback, i + 1, start);
+}
+
+#define BACK_FOR_EACH_BUSY(sback, i)                                           \
+  for ((i) = back_busy_next((sback), 0, (sback)->count); (i) >= 0;             \
+       (i) = back_busy_next((sback), (i) + 1, (sback)->count))
+
+static void back_busy_prune(struct_back *sback) {
+  int i;
+
+  BACK_FOR_EACH_BUSY(sback, i) {
+    if (back_status(&sback->lnk[i]) == STATUS_FREE)
+      sback->busy[i / 64] &= ~((uint64_t) 1 << (i % 64));
+  }
+}
+
+hts_boolean back_busy_consistent(const struct_back *sback, hts_boolean exact) {
+  int i;
+
+  for (i = 0; i < sback->count; i++) {
+    const hts_boolean bit = (sback->busy[i / 64] >> (i % 64)) & 1;
+    const hts_boolean used = back_status(&sback->lnk[i]) != STATUS_FREE;
+
+    if (used && !bit)
+      return HTS_FALSE;
+    if (exact && bit && !used)
+      return HTS_FALSE;
+  }
+  return HTS_TRUE;
+}
+
 /* NULL when the slot table cannot be allocated, which httpmirror() already
    answers by aborting the mirror with a message. Failing here rather than
    aborting the process: back_max grows with -cN, so the size is the user's. */
@@ -240,8 +314,10 @@ struct_back *back_new(httrackp *opt, int back_max) {
   sback->fetch =
       (hts_fetch_meta *) calloct((back_max + 1), sizeof(hts_fetch_meta));
   sback->ready = coucal_new(0);
+  sback->busy =
+      (uint64_t *) calloct(back_busy_words(back_max), sizeof(uint64_t));
   if (sback->lnk == NULL || sback->connect_fallback == NULL ||
-      sback->fetch == NULL || sback->ready == NULL) {
+      sback->fetch == NULL || sback->ready == NULL || sback->busy == NULL) {
     back_free(&sback);
     return NULL;
   }
@@ -255,6 +331,7 @@ struct_back *back_new(httrackp *opt, int back_max) {
     sback->lnk[i].status = STATUS_FREE;
     sback->lnk[i].r.soc = INVALID_SOCKET;
     sback->connect_fallback[i].addr_count = -1; // not yet probed
+    back_busy_mark(sback, i);
   }
   return sback;
 }
@@ -267,6 +344,7 @@ void back_free(struct_back ** sback) {
     }
     freet((*sback)->connect_fallback);
     freet((*sback)->fetch);
+    freet((*sback)->busy);
     if ((*sback)->ready != NULL) {
       coucal_delete(&(*sback)->ready);
       (*sback)->ready_size_bytes = 0;
@@ -397,11 +475,10 @@ int back_index_peek(httrackp *opt, struct_back *sback, const char *adr,
 static int back_index_fetch(httrackp * opt, struct_back * sback, const char *adr,
                             const char *fil, const char *sav, int getIndex) {
   lien_back *const back = sback->lnk;
-  const int back_max = sback->count;
   int index = -1;
   int i;
 
-  for(i = 0; i < back_max; i++) {
+  BACK_FOR_EACH_BUSY(sback, i) {
     if (hts_load_acquire_int(&back[i].status) >= 0 /* not free or alive */
         && strfield2(back[i].url_adr, adr) &&
         strcmp(back[i].url_fil, fil) == 0) {
@@ -575,11 +652,12 @@ int back_available(const struct_back * sback) {
   const lien_back *const back = sback->lnk;
   const int back_max = sback->count;
   int i;
-  int nb = 0;
+  int nb = back_max;
 
-  for(i = 0; i < back_max; i++)
-    if (back_status(&back[i]) == STATUS_FREE) /* free */
-      nb++;
+  BACK_FOR_EACH_BUSY(sback, i) {
+    if (back_status(&back[i]) != STATUS_FREE)
+      nb--;
+  }
   return nb;
 }
 
@@ -625,26 +703,26 @@ HTS_INLINE int back_exist(struct_back * sback, httrackp * opt, const char *adr,
 // nombre de sockets en tâche de fond
 int back_nsoc(const struct_back * sback) {
   const lien_back *const back = sback->lnk;
-  const int back_max = sback->count;
   int n = 0;
   int i;
 
-  for(i = 0; i < back_max; i++)
+  BACK_FOR_EACH_BUSY(sback, i) {
     if (back_status(&back[i]) > 0) // only receive
       n++;
+  }
 
   return n;
 }
 
 static int back_nsoc_overall(const struct_back *sback) {
   const lien_back *const back = sback->lnk;
-  const int back_max = sback->count;
   int n = 0;
   int i;
 
-  for(i = 0; i < back_max; i++)
+  BACK_FOR_EACH_BUSY(sback, i) {
     if (back_status(&back[i]) > 0 || back_status(&back[i]) == STATUS_ALIVE)
       n++;
+  }
 
   return n;
 }
@@ -1994,6 +2072,7 @@ int back_search_quick(struct_back * sback) {
   /* try to find an empty place */
   for(i = 0; i < back_max; i++) {
     if (back_status(&back[i]) == STATUS_FREE) {
+      back_busy_mark(sback, i);
       return i;
     }
   }
@@ -2057,6 +2136,7 @@ void back_slot_attach(struct_back *sback, const int p, const int status,
   back->r = *r;
   back->r.location = back->location_buffer;
   back->status = status;
+  back_busy_mark(sback, p);
   back->timeout = -1;
   back->rateout = -1;
   strcpybuff(back->url_adr, adr);
@@ -2937,7 +3017,7 @@ void back_clean(httrackp * opt, cache_back * cache, struct_back * sback) {
   int oneMore = ((opt->state._hts_in_html_parsing == 2 && opt->maxsoc >= 2) || (opt->state._hts_in_html_parsing == 1 && opt->maxsoc >= 4)) ? 1 : 0;     // testing links
   int i;
 
-  for(i = 0; i < back_max; i++) {
+  BACK_FOR_EACH_BUSY(sback, i) {
     if (slot_can_be_cleaned(&back[i])) {
       if (slot_can_be_finalized(opt, &back[i])) {
         (void) back_flush_output(opt, cache, sback, i); // flush output buffers
@@ -2997,7 +3077,7 @@ void back_clean(httrackp * opt, cache_back * cache, struct_back * sback) {
     }
   }
   /* switch connections to live ones */
-  for(i = 0; i < back_max; i++) {
+  BACK_FOR_EACH_BUSY(sback, i) {
     if (back_status(&back[i]) == STATUS_READY) { // ready
       if (back[i].r.soc != INVALID_SOCKET) {
         back_maydeletehttp(opt, cache, sback, i);
@@ -3013,7 +3093,8 @@ void back_clean(httrackp * opt, cache_back * cache, struct_back * sback) {
       hts_log_print(opt, LOG_DEBUG, "(Keep-Alive): deleting #%d sockets",
                     curr - max);
     }
-    for(i = 0; i < back_max && curr > max; i++) {
+    for (i = back_busy_next(sback, 0, back_max); i >= 0 && curr > max;
+         i = back_busy_next(sback, i + 1, back_max)) {
       if (back_status(&back[i]) == STATUS_ALIVE) {
         back_delete(opt, cache, sback, i);      // delete backing entry
         curr--;
@@ -3029,6 +3110,7 @@ void back_clean(httrackp * opt, cache_back * cache, struct_back * sback) {
                     "(htsback): %d slots ready moved to background", nxfr);
     }
   }
+  back_busy_prune(sback);
 }
 
 /* Slot waiting for a connection to come up: nothing requested on it yet. */
@@ -3157,7 +3239,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
   char catbuff[CATBUFF_SIZE];
   lien_back *const back = sback->lnk;
   const int back_max = sback->count;
-  unsigned int i_mod;
+  int i;
   T_SOC nfds = INVALID_SOCKET;
   fd_set fds, fds_c, fds_e;     // fds pour lecture, connect (write), et erreur
   int nsockets;                 // nbre sockets
@@ -3169,7 +3251,9 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
   int busy_state = 0;           // pas de connexions
   int max_loop;                 // nombre de boucles max à parcourir..
   int max_loop_chk = 0;
-  unsigned int mod_random = (unsigned int) (time_local() + hts_stat_recv_get());
+  const unsigned int mod_random =
+      (unsigned int) (time_local() + hts_stat_recv_get());
+  const int start = back_max > 0 ? (int) (mod_random % back_max) : 0;
 
   // max. number of loops
   max_loop = 8;
@@ -3218,8 +3302,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
     nfds = INVALID_SOCKET;
 
     max_c = 1;
-    for (i_mod = 0; i_mod < (unsigned int) back_max; i_mod++) {
-      unsigned int i = (i_mod + mod_random) % (back_max);
+    for (i = back_busy_first(sback, start); i >= 0;
+         i = back_busy_after(sback, start, i)) {
       // One status read serves every branch below.
       const int st = back_status(&back[i]);
 
@@ -3335,9 +3419,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
       busy_recv = 0;
 
     // recevoir les données arrivées
-    for (i_mod = 0; i_mod < (unsigned int) back_max; i_mod++) {
-      unsigned int i = (i_mod + mod_random) % (back_max);
-
+    for (i = back_busy_first(sback, start); i >= 0;
+         i = back_busy_after(sback, start, i)) {
       // winsock flags a failed connect in the exception set only: leave a
       // connecting slot to the connect handler, which can still fall back
       if (back_status(&back[i]) > 0 &&
@@ -4819,9 +4902,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
       TStamp act;
 
       act = time_local();       // temps en secondes
-      for (i_mod = 0; i_mod < (unsigned int) back_max; i_mod++) {
-        unsigned int i = (i_mod + mod_random) % (back_max);
-
+      for (i = back_busy_first(sback, start); i >= 0;
+           i = back_busy_after(sback, start, i)) {
         if (back_is_live(back_status(&back[i]))) { // receiving, connecting, ..
           if (back[i].timeout > 0) {
             // a stuck connect with a fallback address: retry the next one

@@ -2156,6 +2156,93 @@ static int st_iofatal(httrackp *opt, int argc, char **argv) {
   return st_verdict("iofatal self-test", err);
 }
 
+/* The busy bitmap covers every slot in use through each status change, and
+   back_wait() still reaches a slot past a bitmap word boundary. */
+static int st_busyslots(httrackp *opt, int argc, char **argv) {
+  /* three bitmap words, with slots on both sides of each boundary */
+  enum { SLOTS = 130 };
+
+  static const int probe[] = {0, 1, 63, 64, 65, 127, 128, SLOTS - 1};
+  const int nprobe = (int) (sizeof(probe) / sizeof(probe[0]));
+  struct_back *sback = back_new(opt, SLOTS);
+  cache_back cache;
+  htsblk r;
+  int err = 0;
+  int i, k, round;
+
+#define CHECK(cond) ST_CHECK(err, cond)
+  if (sback == NULL)
+    return 77;
+  opt->maxtime = 0;
+  opt->maxsite = 0;
+  opt->timeout = 0;
+  opt->state.stop = 0;
+  memset(&cache, 0, sizeof(cache));
+  cache.hashtable = coucal_new(0);
+  memset(&r, 0, sizeof(r));
+  r.soc = INVALID_SOCKET;
+
+  CHECK(back_busy_consistent(sback, HTS_FALSE));
+  back_clean(opt, &cache, sback);
+  CHECK(back_busy_consistent(sback, HTS_TRUE));
+  CHECK(back_available(sback) == SLOTS);
+
+  for (round = 0; round < 4 && !err; round++) {
+    /* take every slot, by search or by attach, then free the probes */
+    for (i = 0; i < SLOTS; i++) {
+      if ((i + round) % 2 == 0) {
+        const int p = back_search_quick(sback);
+
+        CHECK(p == i);
+        sback->lnk[p].status = STATUS_WAIT_HEADERS;
+      } else {
+        back_slot_attach(sback, i, STATUS_CONNECTING, &r, "example.com", "/");
+      }
+      CHECK(back_busy_consistent(sback, HTS_FALSE));
+    }
+    CHECK(back_search_quick(sback) == -1);
+    CHECK(back_available(sback) == 0);
+    for (i = 0; i < SLOTS; i++)
+      (void) back_clear_entry(&sback->lnk[i]);
+    /* freed slots keep their bit until the next prune, and count as free */
+    CHECK(back_available(sback) == SLOTS);
+    back_clean(opt, &cache, sback);
+    CHECK(back_busy_consistent(sback, HTS_TRUE));
+    CHECK(back_available(sback) == SLOTS);
+    CHECK(back_nsoc(sback) == 0);
+
+    /* receiving slots with no socket: back_wait() must end each one */
+    for (k = 0; k < nprobe; k++) {
+      back_slot_attach(sback, probe[k], STATUS_TRANSFER, &r, "example.com",
+                       "/");
+    }
+    CHECK(back_busy_consistent(sback, HTS_FALSE));
+    CHECK(back_nsoc(sback) == nprobe);
+    CHECK(back_available(sback) == SLOTS - nprobe);
+    back_wait(sback, opt, &cache, 0);
+    for (k = 0; k < nprobe; k++)
+      CHECK(sback->lnk[probe[k]].status == STATUS_READY);
+    CHECK(back_busy_consistent(sback, HTS_FALSE));
+    for (k = 0; k < nprobe; k++)
+      (void) back_clear_entry(&sback->lnk[probe[k]]);
+    back_clean(opt, &cache, sback);
+    CHECK(back_busy_consistent(sback, HTS_TRUE));
+
+    /* past an empty first word, the scan lands on the first slot of the next */
+    back_slot_attach(sback, 64, STATUS_TRANSFER, &r, "example.com", "/");
+    back_slot_attach(sback, 128, STATUS_TRANSFER, &r, "example.com", "/");
+    CHECK(back_nsoc(sback) == 2);
+    (void) back_clear_entry(&sback->lnk[64]);
+    (void) back_clear_entry(&sback->lnk[128]);
+    back_clean(opt, &cache, sback);
+  }
+#undef CHECK
+  back_free(&sback);
+  coucal_delete(&cache.hashtable);
+  printf("busyslots self-test: %s\n", err ? "FAILED" : "OK");
+  return err ? 1 : 0;
+}
+
 const struct selftest_entry selftests_back[] = {
     {"iofatal", "<logfile>",
      "a disk-full abort logs its line and stops the mirror", st_iofatal},
@@ -2193,6 +2280,9 @@ const struct selftest_entry selftests_back[] = {
      st_mutexlazyinit},
     {"backswap", "", "which backlog slots may be swapped to the ready table",
      st_backswap},
+    {"busyslots", "",
+     "slot scans see every slot in use, through each status change",
+     st_busyslots},
     {"slotfail", "", "a failed slot clips a reason too long for its message",
      st_slotfail},
     {"statsrows", "",
