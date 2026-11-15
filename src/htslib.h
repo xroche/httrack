@@ -71,8 +71,8 @@ typedef struct lien_adrfilsave lien_adrfilsave;
 #include "htsnet.h"
 #include "htsdefines.h"
 
-#ifndef _WIN32
 #include <limits.h>
+#ifndef _WIN32
 #include <signal.h>
 #include <time.h>
 #if defined(THREADS)
