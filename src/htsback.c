@@ -519,7 +519,15 @@ static int back_index_ready(httrackp * opt, struct_back * sback, const char *adr
       FILE *fp;
       const char *fileback = (char *) ptr;
       char catbuff[CATBUFF_SIZE];
+      /* take the slot first: without one, the spool file must survive */
+      const int q = back_search(opt, sback);
 
+      if (q == -1) {
+        hts_log_print(opt, LOG_DEBUG,
+                      "engine: no free slot yet to wake up %s%s (%s)",
+                      adr_nologin(opt, adr), fil, sav);
+        return -1;
+      }
       if ((fp = FOPEN(fconv(catbuff, sizeof(catbuff), fileback), "rb")) != NULL) {
         if (back_unserialize(fp, &itemback) != 0) {
           if (itemback != NULL) {
@@ -544,24 +552,15 @@ static int back_index_ready(httrackp * opt, struct_back * sback, const char *adr
         back_tmpdir_drop(fileback);
       if (itemback != NULL) {
         // move from hashtable to fast repository
-        int q = back_search(opt, sback);
-
-        if (q != -1) {
-          deletehttp(&back[q].r);       // security check
-          back_move(itemback, &back[q]);
-          back_clear_entry(itemback);   /* delete entry content */
-          freet(itemback);      /* delete item */
-          itemback = NULL;
-          coucal_remove(sback->ready, sav);    // delete item
-          sback->ready_size_bytes -= back[q].r.size;    /* substract for stats */
-          back_set_locked(sback, q);    /* locked */
-          return q;
-        } else {
-          hts_log_print(opt, LOG_WARNING,
-                        "engine: warning: unserialize error for %s%s (%s): no "
-                        "more space to wakeup frozen slots",
-                        adr_nologin(opt, adr), fil, sav);
-        }
+        deletehttp(&back[q].r); // security check
+        back_move(itemback, &back[q]);
+        back_clear_entry(itemback); /* delete entry content */
+        freet(itemback);            /* delete item */
+        itemback = NULL;
+        coucal_remove(sback->ready, sav);          // delete item
+        sback->ready_size_bytes -= back[q].r.size; /* substract for stats */
+        back_set_locked(sback, q);                 /* locked */
+        return q;
       }
     }
   }
