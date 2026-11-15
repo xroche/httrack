@@ -3156,9 +3156,24 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                          base, so every reference resolves as it did. */
                       if (p_type == 2)
                         HT_ADD(p_xmlbase ? "xml:base=\"\"" : "href=\"\"");
-                      // skip a closing quote, keep an unquoted value's '>'
-                      lastsaved =
-                          eadr[-1] == '"' || eadr[-1] == '\'' ? eadr : eadr - 1;
+                      // resume at the attribute's end, not at a '#' inside it
+                      {
+                        const char *const end = r->adr + r->size;
+                        const char *a = eadr - 1;
+
+                        if (quote != '\0') {
+                          while (a < end && *a != quote)
+                            a++;
+                        } else {
+                          while (a < end && !is_realspace(*a) && *a != '>' &&
+                                 *a != '"' && *a != '\'')
+                            a++;
+                        }
+                        if (a < end)
+                          eadr = a + 1;
+                        // an unquoted value's terminator is kept
+                        lastsaved = quote != '\0' ? eadr : eadr - 1;
+                      }
                     }
                     /* */
                     else if (opt->urlmode == HTS_URLMODE_ABSOLUTE) {

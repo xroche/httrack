@@ -897,8 +897,8 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_error(404)
 
     # xml:base is a base, not a link: a feed with an absolute one, and an HTML
-    # page, which ignores it, with a relative one. Unquoted and empty values
-    # too, and an empty link.
+    # page, which ignores it, with a relative one. Unquoted, empty and
+    # fragment values too, and an empty link.
     def route_xmlbase(self):
         rest = urlsplit(self.path).path[len("/xmlbase/") :]
         base = "http://127.0.0.1:%d/xmlbase/blog/" % self.server.server_address[1]
@@ -909,8 +909,8 @@ class Handler(SimpleHTTPRequestHandler):
                 '<?xml version="1.0"?>\n'
                 '<feed xmlns="http://www.w3.org/2005/Atom" xml:base="%s">\n'
                 '<link rel="alternate" href="p2.html"/>\n'
-                '<entry xml:base=%s><link href="p2.html"/></entry></feed>\n'
-                % (base, base)
+                '<entry xml:base=%s><link href="p2.html"/></entry>\n'
+                '<entry xml:base="%s#f" id="q"/></feed>\n' % (base, base, base)
             )
             self.send_raw(body.encode(), "application/rss+xml")
         elif rest == "page.html":
@@ -918,9 +918,13 @@ class Handler(SimpleHTTPRequestHandler):
                 b'<html xmlns="http://www.w3.org/1999/xhtml" xml:base="blog/">'
                 b'<body><a href="p3.html">p</a><a href="">a</a><p xml:base="">e</p>'
                 b'<base href=""><applet codebase=""></applet><p xml:base=blog/>u</p>'
-                b"<base href=blog/>b</body></html>\n",
+                b'<base href=blog/>b<p xml:base="blog/#f">f</p><base href="x/#f">g'
+                b'<base href=x/#f>h<applet codebase="x/#f" code="A.class">i</applet>'
+                b"</body></html>\n",
                 "text/html",
             )
+        elif rest.endswith("A.class"):
+            self.send_raw(b"\xca\xfe\xba\xbe", "application/java-vm")
         elif re.fullmatch(r"(blog/)?(p2\.html|p3\.html|index\.html)?", rest):
             self.send_html("\tTarget %s reached.\n" % rest)
         else:
