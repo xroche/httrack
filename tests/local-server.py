@@ -23,6 +23,7 @@ import socket
 import socketserver
 import struct
 import sys
+import threading
 import time
 import zlib
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -3401,6 +3402,45 @@ class Handler(SimpleHTTPRequestHandler):
     def route_dcap_index(self):
         self.send_sized_bin_index(self.DCAP_INDEX_BYTES)
 
+    # A placeholder moved mid-write (#483): p0's headers cross -M, so its namer
+    # waits for prefetched p1's socket and p0's first bytes reach the .delayed
+    # file. The rest of p0 waits for p1 to end, so the move comes mid-body.
+    DMOVE_BODY = b"".join(b"%07d\n" % k for k in range(320))
+    dmove_other_asked = threading.Event()
+    dmove_first_sent = threading.Event()
+    dmove_other_done = threading.Event()
+
+    def route_dmove_index(self):
+        self.send_sized_bin_index(self.DCAP_INDEX_BYTES, ["p1.txt", "p0.bin"])
+
+    def route_dmove_page(self):
+        body = self.DMOVE_BODY
+        Handler.dmove_other_asked.wait(60)
+        self.send_response(200)
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        try:
+            time.sleep(1.0)  # past the type waiter, which keeps a body in memory
+            self.wfile.write(body[:128])
+            self.wfile.flush()
+            Handler.dmove_first_sent.set()
+            Handler.dmove_other_done.wait(60)
+            time.sleep(1.0)
+            for i in range(128, len(body), 128):
+                self.wfile.write(body[i : i + 128])
+                self.wfile.flush()
+                time.sleep(0.15)
+        except OSError:
+            pass
+
+    def route_dmove_other(self):
+        Handler.dmove_other_asked.set()
+        Handler.dmove_first_sent.wait(60)
+        time.sleep(0.5)
+        self.send_raw(b"o" * 16, "text/plain")
+        Handler.dmove_other_done.set()
+
     # 60 bytes under -M5000, so the cap trips while p0's headers trickle (#1854).
     DHARD_INDEX_BYTES = 5000 - 60
 
@@ -3421,9 +3461,11 @@ class Handler(SimpleHTTPRequestHandler):
         except OSError:
             pass
 
-    # An HTML page of 8 .bin links, padded to exactly total bytes on the wire.
-    def send_sized_bin_index(self, total):
-        links = "".join('<a href="p%d.bin">p%d</a>\n' % (i, i) for i in range(8))
+    # An HTML page of links (p0.bin..p7.bin by default), padded to exactly total
+    # bytes on the wire.
+    def send_sized_bin_index(self, total, names=None):
+        names = names or ["p%d.bin" % i for i in range(8)]
+        links = "".join('<a href="%s">%s</a>\n' % (n, n) for n in names)
         pad = 0
         for _ in range(4):  # two corrections settle the Content-Length digits
             body = ("<html><!--%s-->\n%s</html>\n" % ("x" * pad, links)).encode()
@@ -4525,6 +4567,9 @@ class Handler(SimpleHTTPRequestHandler):
         DEEPDIR + "/p1.bin": route_trickle_page,
         "/dcancel/index.html": route_dcancel_index,
         "/dcap/index.html": route_dcap_index,
+        "/dmove/index.html": route_dmove_index,
+        "/dmove/p0.bin": route_dmove_page,
+        "/dmove/p1.txt": route_dmove_other,
         "/dhard/index.html": route_dhard_index,
         "/dhard/p0.bin": route_dhard_page,
         "/dcap/p0.bin": route_dcancel_page,
