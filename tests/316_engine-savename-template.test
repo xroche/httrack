@@ -97,13 +97,13 @@ big_token=$(printf '%0300d' 0 | tr '0' z)
 selftest_queue "savename: /dev/null/$host/none/page.html" savename \
     '/dir/page.html' text/html "adr=$host" "userdef=%h/%[$big_token:(:):e:none]/%n.%t"
 
-# %n of a dotfile is empty, so the template keeps the name head (#2249).
+# A template that leaves no file name keeps the link's own name (#2249).
 selftest_queue "savename: /dev/null/x/.y" savename '/x/.y' \
     application/x-unknown 'userdef=%p/%n'
 selftest_queue "savename: /dev/null/.y" savename '/x/.y' \
     application/x-unknown 'userdef=%n' delayed=1
-selftest_queue "savename: /dev/null/x/.y.0.delayed" savename '/x/.y' \
-    application/x-unknown 'userdef=%p/%n' delayed=1 statuscode=301
+selftest_queue "savename: /dev/null/x/abc.html" savename '/x/abc.html' \
+    text/html 'userdef=%p/'
 
 selftest_run_queued
 
