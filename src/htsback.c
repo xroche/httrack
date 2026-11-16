@@ -67,6 +67,37 @@ Please visit our Website: http://www.httrack.com
    url_savename() maps '~' to '_', so no URL lands inside it (#774). */
 #define HTS_TMPDIR "~hts-tmp"
 
+/* A spooled slot in the ready table, followed in the same allocation by its
+   record, or by the name of the file holding it. */
+typedef struct back_spooled {
+  size_t len; /* record bytes, 0 when a file name follows */
+} back_spooled;
+
+#define BACK_SPOOLED_HEAD sizeof(back_spooled)
+#define BACK_SPOOLED_DATA(e) ((char *) ((e) + 1))
+#define BACK_SPOOLED_CDATA(e) ((const char *) ((e) + 1))
+
+/* Where a spool record goes: a file, or a growing buffer when fp is NULL. */
+typedef struct back_sink {
+  FILE *fp;
+  char *buf;
+  size_t len;
+  size_t cap;
+} back_sink;
+
+/* Where a spool record is read from: a file, or a buffer when fp is NULL. */
+typedef struct back_source {
+  FILE *fp;
+  const char *buf;
+  size_t len;
+  size_t pos;
+} back_source;
+
+static back_spooled *back_spool_record(const lien_back *back);
+static size_t back_spool_room(httrackp *opt, const struct_back *sback,
+                              const lien_back *self);
+static int back_record_read(back_source *s, lien_back **dst);
+
 /* Slot operations */
 static hts_boolean back_tmpname(char *dest, size_t size, const char *save,
                                 const char *ext);
@@ -157,8 +188,16 @@ void back_spool_sweep(httrackp *opt) {
   (void) RMDIR(dir); /* refused while the directory is not empty */
 }
 
-hts_boolean back_spool_write(httrackp *opt, const char *filename,
-                             const lien_back *back) {
+const char *back_spooled_file(const void *spooled) {
+  const back_spooled *const entry = (const back_spooled *) spooled;
+
+  return entry != NULL && entry->len == 0 ? BACK_SPOOLED_CDATA(entry) : NULL;
+}
+
+/* Writes rec, or serializes back when rec is NULL. */
+static hts_boolean back_spool_put(httrackp *opt, const char *filename,
+                                  const lien_back *back,
+                                  const back_spooled *rec) {
   FILE *const fp = filecreate(NULL, filename);
   hts_boolean written;
 
@@ -173,7 +212,10 @@ hts_boolean back_spool_write(httrackp *opt, const char *filename,
     back_tmpdir_drop(filename); /* filecreate() may have made the directory */
     return HTS_FALSE;
   }
-  written = back_serialize(fp, back) == 0 ? HTS_TRUE : HTS_FALSE;
+  if (rec != NULL)
+    written = hts_fwrite_exact(BACK_SPOOLED_CDATA(rec), rec->len, fp);
+  else
+    written = back_serialize(fp, back) == 0 ? HTS_TRUE : HTS_FALSE;
   if (fclose(fp) != 0)
     written = HTS_FALSE;
   if (!written) {
@@ -185,6 +227,11 @@ hts_boolean back_spool_write(httrackp *opt, const char *filename,
     back_tmpdir_drop(filename);
   }
   return written;
+}
+
+hts_boolean back_spool_write(httrackp *opt, const char *filename,
+                             const lien_back *back) {
+  return back_spool_put(opt, filename, back, NULL);
 }
 
 static int slot_can_be_cleaned(const lien_back * back);
@@ -327,6 +374,15 @@ struct_back *back_new(httrackp *opt, int back_max) {
   hts_set_hash_handler(sback->ready, opt);
   coucal_set_name(sback->ready, "back_new");
   sback->ready_size_bytes = 0;
+  sback->ready_mem_max = -1;
+  {
+    /* Debug/test hook: HTTRACK_DEBUG_SPOOL_MEM=N replaces opt->maxcache as the
+       spool's memory budget, and 0 forces the disk spool. */
+    const char *const max = getenv("HTTRACK_DEBUG_SPOOL_MEM");
+
+    if (max != NULL && isdigit((unsigned char) max[0]))
+      sback->ready_mem_max = (LLint) strtoul(max, NULL, 10);
+  }
   coucal_value_is_malloc(sback->ready, 1);
   // init
   for(i = 0; i < sback->count; i++) {
@@ -351,6 +407,8 @@ void back_free(struct_back ** sback) {
     if ((*sback)->ready != NULL) {
       coucal_delete(&(*sback)->ready);
       (*sback)->ready_size_bytes = 0;
+      (*sback)->ready_mem_bytes = 0;
+      (*sback)->ready_files = 0;
     }
     freet(*sback);
     *sback = NULL;
@@ -442,7 +500,7 @@ void back_delete_all(httrackp * opt, cache_back * cache, struct_back * sback) {
       coucal_item *item;
 
       while ((item = coucal_enum_next(&e))) {
-        const char *filename = (char *) item->value.ptr;
+        const char *const filename = back_spooled_file(item->value.ptr);
 
         if (filename != NULL) {
           (void) UNLINK(filename);
@@ -452,6 +510,8 @@ void back_delete_all(httrackp * opt, cache_back * cache, struct_back * sback) {
       /* delete hashtable & content */
       coucal_delete(&sback->ready);
       sback->ready_size_bytes = 0;
+      sback->ready_mem_bytes = 0;
+      sback->ready_files = 0;
     }
   }
 }
@@ -515,9 +575,9 @@ static int back_index_ready(httrackp * opt, struct_back * sback, const char *adr
       }
     } else if (ptr != NULL) {
       lien_back *itemback = NULL;
-
+      const back_spooled *const spooled = (const back_spooled *) ptr;
+      const char *const fileback = back_spooled_file(spooled);
       FILE *fp;
-      const char *fileback = (char *) ptr;
       char catbuff[CATBUFF_SIZE];
       /* take the slot first: without one, the spool file must survive */
       const int q = back_search(opt, sback);
@@ -528,7 +588,19 @@ static int back_index_ready(httrackp * opt, struct_back * sback, const char *adr
                       adr_nologin(opt, adr), fil, sav);
         return -1;
       }
-      if ((fp = FOPEN(fconv(catbuff, sizeof(catbuff), fileback), "rb")) != NULL) {
+      if (fileback == NULL) {
+        back_source src;
+
+        memset(&src, 0, sizeof(src));
+        src.buf = BACK_SPOOLED_CDATA(spooled);
+        src.len = spooled->len;
+        if (back_record_read(&src, &itemback) != 0)
+          hts_log_print(opt, LOG_WARNING,
+                        "engine: warning: unserialize error for %s%s (%s)",
+                        adr_nologin(opt, adr), fil, sav);
+        sback->ready_mem_bytes -= BACK_SPOOLED_HEAD + spooled->len;
+      } else if ((fp = FOPEN(fconv(catbuff, sizeof(catbuff), fileback),
+                             "rb")) != NULL) {
         if (back_unserialize(fp, &itemback) != 0) {
           if (itemback != NULL) {
             back_clear_entry(itemback);
@@ -546,10 +618,12 @@ static int back_index_ready(httrackp * opt, struct_back * sback, const char *adr
                       "disappeared",
                       adr_nologin(opt, adr), fil, sav);
       }
-      (void) UNLINK(fileback);
-      /* the spool shares one directory, so only its last entry can empty it */
-      if (coucal_nitems(sback->ready) == 1)
-        back_tmpdir_drop(fileback);
+      if (fileback != NULL) {
+        (void) UNLINK(fileback);
+        /* the spool shares one directory, so only its last file can empty it */
+        if (--sback->ready_files == 0)
+          back_tmpdir_drop(fileback);
+      }
       if (itemback != NULL) {
         // move from hashtable to fast repository
         deletehttp(&back[q].r); // security check
@@ -562,7 +636,7 @@ static int back_index_ready(httrackp * opt, struct_back * sback, const char *adr
         back_set_locked(sback, q);                 /* locked */
         return q;
       }
-      coucal_remove(sback->ready, sav); /* its file is gone */
+      coucal_remove(sback->ready, sav); /* it could not be read back */
     }
   }
   return -1;
@@ -617,36 +691,61 @@ int back_cleanup_background(httrackp *opt, cache_back *cache,
                                   back[i].url_sav, 0) != -1) {
         continue; /* no slot to wake the duplicate: spooling would orphan it */
       }
-      /* temporarily serialize the entry on disk */
       {
-        /* filecreate() aborts on a longer name */
-        char BIGSTK tmpname[HTS_URLMAXSIZE * 2];
-        char *filename;
-        const hts_boolean named = back_spoolname(opt, tmpname, sizeof(tmpname));
-        filename = named ? strdupt(tmpname) : NULL;
+        const size_t room = back_spool_room(opt, sback, &back[i]);
+        const size_t body = back[i].r.adr != NULL ? (size_t) back[i].r.size : 0;
+        /* a body alone past the room cannot fit, so it streams to disk */
+        back_spooled *rec = body < room ? back_spool_record(&back[i]) : NULL;
 
-        if (filename != NULL) {
-          /* Security check */
-          if (fexist_utf8(filename)) {
-            hts_log_print(opt, LOG_WARNING,
-                          "engine: warning: temporary file %s already exists",
-                          filename);
-          }
-          if (back_spool_write(opt, filename, &back[i])) {
-            coucal_add_pvoid(sback->ready, back[i].url_sav, filename);
-            filename = NULL;
-            sback->ready_size_bytes += back[i].r.size;
-            nclean++;
-            back_clear_entry(&back[i]);
-          }
-          if (filename != NULL)
-            freet(filename);
-        } else {
-          hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
-                        "engine: warning: serialize error for %s%s: %s",
-                        adr_nologin(opt, back[i].url_adr), back[i].url_fil,
-                        named ? "memory full" : "temporary filename too long");
+        if (rec != NULL && room >= BACK_SPOOLED_HEAD &&
+            rec->len <= room - BACK_SPOOLED_HEAD) {
+          coucal_add_pvoid(sback->ready, back[i].url_sav, rec);
+          sback->ready_mem_bytes += BACK_SPOOLED_HEAD + rec->len;
+          sback->ready_size_bytes += back[i].r.size;
+          nclean++;
+          back_clear_entry(&back[i]);
+          continue; /* rec now belongs to the table */
         }
+        {
+          /* filecreate() aborts on a longer name */
+          char BIGSTK tmpname[HTS_URLMAXSIZE * 2];
+          const hts_boolean named =
+              back_spoolname(opt, tmpname, sizeof(tmpname));
+          const size_t namelen = named ? strlen(tmpname) + 1 : 0;
+          back_spooled *ondisk =
+              named ? malloct(BACK_SPOOLED_HEAD + namelen) : NULL;
+
+          if (ondisk != NULL) {
+            ondisk->len = 0;
+            memcpy(BACK_SPOOLED_DATA(ondisk), tmpname, namelen);
+            /* Security check */
+            if (fexist_utf8(BACK_SPOOLED_DATA(ondisk))) {
+              hts_log_print(opt, LOG_WARNING,
+                            "engine: warning: temporary file %s already exists",
+                            BACK_SPOOLED_DATA(ondisk));
+            }
+            if (back_spool_put(opt, BACK_SPOOLED_DATA(ondisk), &back[i], rec)) {
+              hts_log_print(opt, LOG_DEBUG, "engine: spooled %s to %s",
+                            back[i].url_sav, BACK_SPOOLED_DATA(ondisk));
+              coucal_add_pvoid(sback->ready, back[i].url_sav, ondisk);
+              ondisk = NULL;
+              sback->ready_files++;
+              sback->ready_size_bytes += back[i].r.size;
+              nclean++;
+              back_clear_entry(&back[i]);
+            }
+            if (ondisk != NULL)
+              freet(ondisk);
+          } else {
+            hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
+                          "engine: warning: serialize error for %s%s: %s",
+                          adr_nologin(opt, back[i].url_adr), back[i].url_fil,
+                          named ? "memory full"
+                                : "temporary filename too long");
+          }
+        }
+        if (rec != NULL)
+          freet(rec);
       }
     }
   }
@@ -667,6 +766,14 @@ int back_available(const struct_back * sback) {
   return nb;
 }
 
+/* Bytes one slot holds in memory, as back_incache() counts them. */
+static LLint back_slot_incache(const lien_back *back) {
+  if (back->r.adr == NULL)
+    return 0;
+  return max(hts_load_relaxed_llint(&back->r.size),
+             hts_load_relaxed_llint(&back->r.totalsize));
+}
+
 /* Estimated bytes of the pages and files held in memory. */
 LLint back_incache(const struct_back * sback) {
   const lien_back *const back = sback->lnk;
@@ -674,12 +781,29 @@ LLint back_incache(const struct_back * sback) {
   LLint sum = 0;
 
   BACK_FOR_EACH_BUSY(sback, i) {
-    if (back_status(&back[i]) != STATUS_FREE &&
-        back[i].r.adr != NULL) // count only blocks held in memory
-      sum += max(hts_load_relaxed_llint(&back[i].r.size),
-                 hts_load_relaxed_llint(&back[i].r.totalsize));
+    if (back_status(&back[i]) != STATUS_FREE)
+      sum += back_slot_incache(&back[i]);
   }
   return sum;
+}
+
+/* Bytes left in the spool's memory budget for one more record. */
+static size_t back_spool_room(httrackp *opt, const struct_back *sback,
+                              const lien_back *self) {
+  const LLint budget =
+      sback->ready_mem_max >= 0 ? sback->ready_mem_max : (LLint) opt->maxcache;
+  LLint used = back_incache(sback) - back_slot_incache(self);
+  uint64_t left;
+
+  if (used < 0)
+    used = 0;
+  if (budget <= used)
+    return 0;
+  left = (uint64_t) (budget - used);
+  if (left <= (uint64_t) sback->ready_mem_bytes)
+    return 0;
+  left -= (uint64_t) sback->ready_mem_bytes;
+  return left > (uint64_t) SIZE_MAX ? SIZE_MAX : (size_t) left;
 }
 
 /* Counts finished results not yet taken, in slots or spooled. */
@@ -1486,43 +1610,76 @@ void back_copy_static(const lien_back * src, lien_back * dst) {
 #endif
 }
 
-static int back_data_serialize(FILE * fp, const void *data, size_t size) {
-  if (hts_fwrite_exact(&size, sizeof(size), fp) &&
-      (size == 0 || hts_fwrite_exact(data, size, fp)))
+static hts_boolean back_sink_put(back_sink *s, const void *data, size_t size) {
+  if (s->fp != NULL)
+    return hts_fwrite_exact(data, size, s->fp);
+  if (size > s->cap - s->len) {
+    size_t cap = s->cap <= SIZE_MAX / 2 ? s->cap * 2 : SIZE_MAX;
+    char *buf;
+
+    if (size > SIZE_MAX - s->len)
+      return HTS_FALSE;
+    if (cap - s->len < size)
+      cap = s->len + size;
+    if ((buf = realloct(s->buf, cap)) == NULL)
+      return HTS_FALSE;
+    s->buf = buf;
+    s->cap = cap;
+  }
+  if (size != 0)
+    memcpy(s->buf + s->len, data, size);
+  s->len += size;
+  return HTS_TRUE;
+}
+
+static hts_boolean back_source_get(back_source *s, void *dst, size_t size) {
+  if (s->fp != NULL)
+    return hts_fread_exact(dst, size, s->fp);
+  if (size > s->len - s->pos)
+    return HTS_FALSE;
+  if (size != 0)
+    memcpy(dst, s->buf + s->pos, size);
+  s->pos += size;
+  return HTS_TRUE;
+}
+
+static int back_data_serialize(back_sink *s, const void *data, size_t size) {
+  if (back_sink_put(s, &size, sizeof(size)) &&
+      (size == 0 || back_sink_put(s, data, size)))
     return 0;
   return 1;                     /* error */
 }
 
-static int back_string_serialize(FILE * fp, const char *str) {
+static int back_string_serialize(back_sink *s, const char *str) {
   size_t size = (str != NULL) ? (strlen(str) + 1) : 0;
 
-  return back_data_serialize(fp, str, size);
+  return back_data_serialize(s, str, size);
 }
 
 /* Stores the buffer through a void *, never the caller's own pointer type,
    and sets it on the error paths too so the caller can free it. */
-static int back_data_unserialize(FILE * fp, void **str, size_t * size) {
+static int back_data_unserialize(back_source *s, void **str, size_t *size) {
   *str = NULL;
-  if (hts_fread_exact(size, sizeof(*size), fp)) {
+  if (back_source_get(s, size, sizeof(*size))) {
     if (*size == 0)             /* serialized NULL ptr */
       return 0;
     /* Untrusted, and the guard byte's extra byte must not wrap the size. */
-    if (*size > SIZE_MAX - 1)
+    if (*size > SIZE_MAX - 1 || (s->fp == NULL && *size > s->len - s->pos))
       return 1; /* error */
     *str = malloct(*size + 1);
     if (*str == NULL)
       return 1;                 /* error */
     ((char *) *str)[*size] = 0; /* guard byte */
-    if (hts_fread_exact(*str, *size, fp))
+    if (back_source_get(s, *str, *size))
       return 0;
   }
   return 1;                     /* error */
 }
 
-static int back_string_unserialize(FILE * fp, char **str) {
+static int back_string_unserialize(back_source *s, char **str) {
   size_t dummy;
   void *data;
-  const int err = back_data_unserialize(fp, &data, &dummy);
+  const int err = back_data_unserialize(s, &data, &dummy);
 
   *str = (char *) data;
   return err;
@@ -1553,7 +1710,7 @@ static const struct {
 /* Spools one slot for back_cleanup_background() to pick up later in the same
    run, so it may hold pointers and the host's own layout. The resume reference
    outlives the process and cannot: see back_serialize_ref() below. */
-int back_serialize(FILE * fp, const lien_back * src) {
+static int back_record_write(back_sink *s, const lien_back *src) {
   const char *const base = (const char *) src;
   const size_t whole = sizeof(lien_back);
   size_t lens[BACK_SPOOL_NSTR];
@@ -1569,41 +1726,51 @@ int back_serialize(FILE * fp, const lien_back * src) {
       return 1;
     lens[i] = (size_t) (end - field);
   }
-  if (!hts_fwrite_exact(&whole, sizeof(whole), fp))
+  if (!back_sink_put(s, &whole, sizeof(whole)))
     return 1;
   for (i = 0; i < BACK_SPOOL_NSTR; i++) {
     const size_t off = back_spool_strings[i].offset;
 
     if (off < at) /* the table is out of struct order */
       return 1;
-    if ((off != at && !hts_fwrite_exact(base + at, off - at, fp)) ||
-        back_data_serialize(fp, base + off, lens[i]) != 0)
+    if ((off != at && !back_sink_put(s, base + at, off - at)) ||
+        back_data_serialize(s, base + off, lens[i]) != 0)
       return 1;
     at = off + back_spool_strings[i].size;
   }
-  if (!hts_fwrite_exact(base + at, whole - at, fp))
+  if (!back_sink_put(s, base + at, whole - at))
     return 1;
-  if (back_data_serialize(fp, src->r.adr,
+  if (back_data_serialize(s, src->r.adr,
                           src->r.adr ? (size_t) src->r.size : 0) == 0 &&
-      back_string_serialize(fp, src->r.headers) == 0 && fflush(fp) == 0)
+      back_string_serialize(s, src->r.headers) == 0 &&
+      (s->fp == NULL || fflush(s->fp) == 0))
     return 0;
   return 1;
 }
 
+int back_serialize(FILE *fp, const lien_back *src) {
+  back_sink s;
+
+  memset(&s, 0, sizeof(s));
+  s.fp = fp;
+  return back_record_write(&s, src);
+}
+
 /* Reads one string field into its fixed slot. A length with no room for the
    terminator is refused, not clipped. */
-static hts_boolean back_field_unserialize(FILE *fp, char *dst, size_t size) {
+static hts_boolean back_field_unserialize(back_source *s, char *dst,
+                                          size_t size) {
   size_t len;
 
-  if (!hts_fread_exact(&len, sizeof(len), fp) || len >= size)
+  if (!back_source_get(s, &len, sizeof(len)) || len >= size)
     return HTS_FALSE;
-  if (len != 0 && !hts_fread_exact(dst, len, fp))
+  if (len != 0 && !back_source_get(s, dst, len))
     return HTS_FALSE;
   dst[len] = '\0';
   return HTS_TRUE;
 }
 
-static hts_boolean back_record_unserialize(FILE *fp, lien_back *dst) {
+static hts_boolean back_record_unserialize(back_source *s, lien_back *dst) {
   char *const base = (char *) dst;
   size_t at = 0;
   size_t i;
@@ -1611,25 +1778,25 @@ static hts_boolean back_record_unserialize(FILE *fp, lien_back *dst) {
   for (i = 0; i < BACK_SPOOL_NSTR; i++) {
     const size_t off = back_spool_strings[i].offset;
 
-    if ((off != at && !hts_fread_exact(base + at, off - at, fp)) ||
-        !back_field_unserialize(fp, base + off, back_spool_strings[i].size))
+    if ((off != at && !back_source_get(s, base + at, off - at)) ||
+        !back_field_unserialize(s, base + off, back_spool_strings[i].size))
       return HTS_FALSE;
     at = off + back_spool_strings[i].size;
   }
-  return hts_fread_exact(base + at, sizeof(lien_back) - at, fp);
+  return back_source_get(s, base + at, sizeof(lien_back) - at);
 }
 
-int back_unserialize(FILE * fp, lien_back ** dst) {
+static int back_record_read(back_source *s, lien_back **dst) {
   size_t size;
 
   *dst = NULL;
   errno = 0;
-  if (!hts_fread_exact(&size, sizeof(size), fp) || size != sizeof(lien_back))
+  if (!back_source_get(s, &size, sizeof(size)) || size != sizeof(lien_back))
     return 1;
   *dst = calloct(1, sizeof(lien_back));
   if (*dst == NULL)
     return 1;
-  if (back_record_unserialize(fp, *dst)) {
+  if (back_record_unserialize(s, *dst)) {
     (*dst)->tmpfile = NULL;
     (*dst)->chunk_adr = NULL;
     (*dst)->r.adr = NULL;
@@ -1649,7 +1816,7 @@ int back_unserialize(FILE * fp, lien_back ** dst) {
     memset(&(*dst)->r.req, 0, sizeof((*dst)->r.req));
     {
       void *adr;
-      const int adr_err = back_data_unserialize(fp, &adr, &size);
+      const int adr_err = back_data_unserialize(s, &adr, &size);
 
       (*dst)->r.adr = (char *) adr;
       if (adr_err == 0) {
@@ -1657,7 +1824,7 @@ int back_unserialize(FILE * fp, lien_back ** dst) {
            disk); zeroing r.size makes the writer blank that file (#797). */
         if ((*dst)->r.adr != NULL)
           (*dst)->r.size = size;
-        if (back_string_unserialize(fp, &(*dst)->r.headers) == 0)
+        if (back_string_unserialize(s, &(*dst)->r.headers) == 0)
           return 0; /* ok */
         if ((*dst)->r.headers != NULL)
           freet((*dst)->r.headers);
@@ -1669,6 +1836,39 @@ int back_unserialize(FILE * fp, lien_back ** dst) {
   freet(*dst);
   *dst = NULL;
   return 1;                     /* error */
+}
+
+int back_unserialize(FILE *fp, lien_back **dst) {
+  back_source s;
+
+  memset(&s, 0, sizeof(s));
+  s.fp = fp;
+  return back_record_read(&s, dst);
+}
+
+/* Builds the slot's spool record in one allocation, which the caller frees
+   with freet(). Returns NULL on failure. */
+static back_spooled *back_spool_record(const lien_back *back) {
+  back_sink s;
+  char *buf;
+  void *mem;
+  back_spooled *rec;
+
+  memset(&s, 0, sizeof(s));
+  s.cap = BACK_SPOOLED_HEAD + 4096;
+  if ((s.buf = malloct(s.cap)) == NULL)
+    return NULL;
+  s.len = BACK_SPOOLED_HEAD;
+  if (back_record_write(&s, back) != 0) {
+    freet(s.buf);
+    return NULL;
+  }
+  if (s.len < s.cap && (buf = realloct(s.buf, s.len)) != NULL)
+    s.buf = buf;
+  mem = s.buf;
+  rec = mem;
+  rec->len = s.len - BACK_SPOOLED_HEAD;
+  return rec;
 }
 
 /* --- the .ref resume state -------------------------------------------------

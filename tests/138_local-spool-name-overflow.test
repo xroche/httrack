@@ -20,13 +20,14 @@ local_server_start
 require_httrack
 
 rc=0
-local_crawl --log "${tmpdir}/log" -O "${tmpdir}/out" --quiet --disable-security-limits --robots=0 --timeout=30 --retries=0 -Z -p0 -N '%n' -c4 "http://127.0.0.1:${SRV_PORT}/bakname/index.html" || rc=$?
+# 0 forces the disk spool
+HTTRACK_DEBUG_SPOOL_MEM=0 local_crawl --log "${tmpdir}/log" -O "${tmpdir}/out" --quiet --disable-security-limits --robots=0 --timeout=30 --retries=0 -Z -p0 -N '%n' -c4 "http://127.0.0.1:${SRV_PORT}/bakname/index.html" || rc=$?
 test "$rc" -eq 0 ||
     fail_dump "httrack exited $rc" "${tmpdir}/log"
 
 enginelog="${tmpdir}/out/hts-log.txt"
 test -r "$enginelog" || fail "no engine log at $enginelog"
-moved=$(count_matching_lines 'slots ready moved to background' "$enginelog")
+moved=$(count_matching_lines 'engine: spooled .* to ' "$enginelog")
 test "$moved" -gt 0 || fail "no slot was ever spooled, so the name was never built"
 serr=$(count_matching_lines 'serialize error' "$enginelog")
 test "$serr" -eq 0 || {

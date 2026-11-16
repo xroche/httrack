@@ -959,6 +959,7 @@ static int st_spooldir_round(httrackp *opt, const char *dir,
 #define CHECK(cond) ST_CHECK(err, cond)
   if (sback == NULL)
     return 1;
+  sback->ready_mem_max = 0; /* this test is about the disk spool */
   /* dir_exists() tests the directory a name is in */
   snprintf(tmpdir, sizeof(tmpdir), "%s/~hts-tmp/x", dir);
   snprintf(sava, sizeof(sava), "%s/a.html", dir);
@@ -970,8 +971,8 @@ static int st_spooldir_round(httrackp *opt, const char *dir,
   CHECK(dir_exists(tmpdir));
   if (vanish) {
     CHECK(coucal_read_pvoid(sback->ready, savb, &spooled) && spooled != NULL);
-    if (spooled != NULL)
-      (void) UNLINK((const char *) spooled);
+    if (back_spooled_file(spooled) != NULL)
+      (void) UNLINK(back_spooled_file(spooled));
   }
   CHECK(back_index(opt, sback, "example.com", "/a.html", sava) >= 0);
   CHECK(dir_exists(tmpdir));
@@ -1031,6 +1032,7 @@ static int st_spoolfull(httrackp *opt, int argc, char **argv) {
   memset(&cache, 0, sizeof(cache));
   if ((sback = back_new(opt, 4)) == NULL)
     return 1;
+  sback->ready_mem_max = 0; /* the wait must keep a spool file whole */
   CHECK(st_spooldir_slot(&sback->lnk[0], argv[0], "a.html"));
   if (sback->lnk[0].r.adr != NULL)
     memcpy(sback->lnk[0].r.adr, body, sizeof(body));
@@ -1040,7 +1042,8 @@ static int st_spoolfull(httrackp *opt, int argc, char **argv) {
   while ((i = back_search_quick(sback)) != -1)
     sback->lnk[i].status = STATUS_CONNECTING;
   CHECK(back_index(opt, sback, "example.com", "/a.html", sav) < 0);
-  CHECK(spooled != NULL && fexist_utf8((const char *) spooled));
+  CHECK(back_spooled_file(spooled) != NULL &&
+        fexist_utf8(back_spooled_file(spooled)));
   /* a duplicate of it must stay in memory rather than replace it */
   back_clear_entry(&sback->lnk[2]);
   CHECK(st_spooldir_slot(&sback->lnk[2], argv[0], "a.html"));
@@ -1059,8 +1062,8 @@ static int st_spoolfull(httrackp *opt, int argc, char **argv) {
   CHECK(st_spooldir_slot(&sback->lnk[3], argv[0], "c.html"));
   CHECK(back_cleanup_background(opt, &cache, sback) == 1);
   CHECK(coucal_read_pvoid(sback->ready, savc, &again) && again != NULL);
-  if (again != NULL)
-    (void) UNLINK((const char *) again);
+  if (back_spooled_file(again) != NULL)
+    (void) UNLINK(back_spooled_file(again));
   opt->log = NULL; /* the vanished file logs a warning */
   CHECK(back_index(opt, sback, "example.com", "/c.html", savc) < 0);
   opt->log = saved_log;
@@ -1071,6 +1074,243 @@ static int st_spoolfull(httrackp *opt, int argc, char **argv) {
   back_free(&sback);
 #undef CHECK
   return st_verdict("spoolfull", err);
+}
+
+/* A finished slot sK.html whose 100-byte body is all 'a' + k. */
+static hts_boolean st_spoolmem_slot(lien_back *back, const char *dir, int k) {
+  char name[32];
+
+  snprintf(name, sizeof(name), "s%d.html", k);
+  if (!st_spooldir_slot(back, dir, name))
+    return HTS_FALSE;
+  memset(back->r.adr, 'a' + k, 100);
+  back->r.statuscode = 200;
+  memset(&back->r.req, 0x5a, sizeof(back->r.req)); /* must come back zeroed */
+  back->r.headers = strdupt("HTTP/1.1 200 OK\r\n");
+  return back->r.headers != NULL ? HTS_TRUE : HTS_FALSE;
+}
+
+/* Wakes sK.html and checks it came back whole. Returns the failed checks. */
+static int st_spoolmem_wake(httrackp *opt, struct_back *sback, const char *dir,
+                            int k) {
+  char fil[32];
+  char sav[HTS_URLMAXSIZE * 2];
+  char body[100];
+  htsrequest zero;
+  int err = 0;
+  int q;
+
+#define CHECK(cond) ST_CHECK(err, cond)
+  snprintf(fil, sizeof(fil), "/s%d.html", k);
+  snprintf(sav, sizeof(sav), "%s%s", dir, fil);
+  memset(body, 'a' + k, sizeof(body));
+  memset(&zero, 0, sizeof(zero));
+  q = back_index(opt, sback, "example.com", fil, sav);
+  CHECK(q >= 0);
+  if (q >= 0) {
+    const lien_back *const b = &sback->lnk[q];
+
+    CHECK(strcmp(b->url_sav, sav) == 0 && b->r.statuscode == 200);
+    CHECK(b->r.adr != NULL && b->r.size == 100 &&
+          memcmp(b->r.adr, body, sizeof(body)) == 0);
+    CHECK(b->r.headers != NULL &&
+          strcmp(b->r.headers, "HTTP/1.1 200 OK\r\n") == 0);
+    CHECK(memcmp(&b->r.req, &zero, sizeof(zero)) == 0);
+    back_clear_entry(&sback->lnk[q]);
+  }
+#undef CHECK
+  return err;
+}
+
+/* Spools s0..s2 under a budget of max bytes, expecting in memory those whose
+   bit is set in in_memory. It then checks the wake, the reuse of freed room,
+   and back_delete_all. unit is one record's memory cost. */
+static int st_spoolmem_round(httrackp *opt, const char *dir, LLint max,
+                             int in_memory, size_t unit) {
+  char tmpdir[HTS_URLMAXSIZE * 2];
+  char sav[HTS_URLMAXSIZE * 2];
+  struct_back *sback = back_new(opt, 4);
+  cache_back cache;
+  const int held =
+      (in_memory & 1) + ((in_memory >> 1) & 1) + ((in_memory >> 2) & 1);
+  int err = 0;
+  int k;
+
+#define CHECK(cond) ST_CHECK(err, cond)
+#define IN_MEMORY(k) (((in_memory >> (k)) & 1) != 0)
+  if (sback == NULL)
+    return 1;
+  sback->ready_mem_max = max;
+  snprintf(tmpdir, sizeof(tmpdir), "%s/~hts-tmp/x", dir);
+  memset(&cache, 0, sizeof(cache));
+  for (k = 0; k < 3; k++)
+    CHECK(st_spoolmem_slot(&sback->lnk[k], dir, k));
+  CHECK(back_cleanup_background(opt, &cache, sback) == 3);
+  CHECK(coucal_nitems(sback->ready) == 3);
+  CHECK(sback->ready_mem_bytes == (size_t) held * unit);
+  CHECK(sback->ready_files == 3 - held);
+  CHECK(dir_exists(tmpdir) == (held < 3));
+  for (k = 0; k < 3; k++) {
+    void *spooled = NULL;
+
+    snprintf(sav, sizeof(sav), "%s/s%d.html", dir, k);
+    CHECK(coucal_read_pvoid(sback->ready, sav, &spooled) && spooled != NULL);
+    CHECK((back_spooled_file(spooled) == NULL) == IN_MEMORY(k));
+    CHECK(IN_MEMORY(k) || fexist_utf8(back_spooled_file(spooled)));
+  }
+  for (k = 0; k < 3; k++)
+    err += st_spoolmem_wake(opt, sback, dir, k);
+  CHECK(coucal_nitems(sback->ready) == 0);
+  CHECK(sback->ready_mem_bytes == 0 && sback->ready_files == 0);
+  CHECK(!dir_exists(tmpdir));
+  if (IN_MEMORY(0)) {
+    /* the room a woken entry left takes the next one */
+    for (k = 0; k < 3; k++)
+      CHECK(st_spoolmem_slot(&sback->lnk[k], dir, k));
+    CHECK(back_cleanup_background(opt, &cache, sback) == 3);
+    err += st_spoolmem_wake(opt, sback, dir, 0);
+    CHECK(st_spoolmem_slot(&sback->lnk[0], dir, 3));
+    CHECK(back_cleanup_background(opt, &cache, sback) == 1);
+    CHECK(sback->ready_mem_bytes == (size_t) held * unit);
+    CHECK(sback->ready_files == 3 - held);
+    /* the last file empties ~hts-tmp while entries wait in memory */
+    for (k = 1; k < 3; k++)
+      if (!IN_MEMORY(k))
+        err += st_spoolmem_wake(opt, sback, dir, k);
+    CHECK(coucal_nitems(sback->ready) == (size_t) held);
+    CHECK(!dir_exists(tmpdir));
+  }
+  /* the end of the mirror frees both kinds */
+  for (k = 1; k < 3; k++)
+    if (!IN_MEMORY(k) || !IN_MEMORY(0))
+      CHECK(st_spoolmem_slot(&sback->lnk[k], dir, k));
+  if (!IN_MEMORY(0))
+    CHECK(st_spoolmem_slot(&sback->lnk[0], dir, 0));
+  (void) back_cleanup_background(opt, &cache, sback);
+  CHECK(sback->ready_files > 0 || held == 3);
+  back_delete_all(opt, &cache, sback);
+  CHECK(sback->ready == NULL || coucal_nitems(sback->ready) == 0);
+  CHECK(sback->ready_mem_bytes == 0 && sback->ready_files == 0);
+  CHECK(!dir_exists(tmpdir));
+
+  for (k = 0; k < sback->count; k++)
+    back_clear_entry(&sback->lnk[k]);
+  back_free(&sback);
+#undef IN_MEMORY
+#undef CHECK
+  return err;
+}
+
+/* A bodyless slot spooled where only room bytes of the budget are left. */
+static int st_spoolmem_tiny(httrackp *opt, const char *dir, LLint room) {
+  struct_back *sback = back_new(opt, 4);
+  cache_back cache;
+  void *spooled = NULL;
+  char sav[HTS_URLMAXSIZE * 2];
+  int err = 0;
+
+#define CHECK(cond) ST_CHECK(err, cond)
+  if (sback == NULL)
+    return 1;
+  sback->ready_mem_max = room;
+  memset(&cache, 0, sizeof(cache));
+  CHECK(st_spoolmem_slot(&sback->lnk[0], dir, 0));
+  freet(sback->lnk[0].r.adr);
+  sback->lnk[0].r.size = 0;
+  CHECK(back_cleanup_background(opt, &cache, sback) == 1);
+  snprintf(sav, sizeof(sav), "%s/s0.html", dir);
+  CHECK(coucal_read_pvoid(sback->ready, sav, &spooled) &&
+        back_spooled_file(spooled) != NULL);
+  CHECK(sback->ready_mem_bytes == 0);
+  back_delete_all(opt, &cache, sback);
+  back_free(&sback);
+#undef CHECK
+  return err;
+}
+
+/* With s0 held in memory, a busy slot's body grows until the budget left is
+   below what is held, so s1 must go to disk. */
+static int st_spoolmem_grown(httrackp *opt, const char *dir, size_t unit) {
+  struct_back *sback = back_new(opt, 4);
+  cache_back cache;
+  int err = 0;
+  int k;
+
+#define CHECK(cond) ST_CHECK(err, cond)
+  if (sback == NULL)
+    return 1;
+  sback->ready_mem_max = (LLint) unit + 150;
+  memset(&cache, 0, sizeof(cache));
+  CHECK(st_spoolmem_slot(&sback->lnk[0], dir, 0));
+  CHECK(back_cleanup_background(opt, &cache, sback) == 1);
+  CHECK(sback->ready_mem_bytes == unit && sback->ready_files == 0);
+  CHECK(st_spoolmem_slot(&sback->lnk[1], dir, 1));
+  CHECK(st_spoolmem_slot(&sback->lnk[2], dir, 2));
+  sback->lnk[2].status = STATUS_TRANSFER;
+  sback->lnk[2].r.totalsize = 200;
+  CHECK(back_cleanup_background(opt, &cache, sback) == 1);
+  CHECK(sback->ready_mem_bytes == unit && sback->ready_files == 1);
+  back_clear_entry(&sback->lnk[2]);
+  back_delete_all(opt, &cache, sback);
+  for (k = 0; k < sback->count; k++)
+    back_clear_entry(&sback->lnk[k]);
+  back_free(&sback);
+#undef CHECK
+  return err;
+}
+
+// -#test=spoolmem <dir>: spooled slots stay in memory within the budget.
+static int st_spoolmem(httrackp *opt, int argc, char **argv) {
+  char base[HTS_URLMAXSIZE];
+  struct_back *sback;
+  cache_back cache;
+  size_t unit = 0;
+  LLint u;
+  int err = 0;
+
+#define CHECK(cond) ST_CHECK(err, cond)
+  if (argc < 1) {
+    fprintf(stderr, "usage: -#test=spoolmem <writable directory>\n");
+    return 1;
+  }
+  snprintf(base, sizeof(base), "%s/", argv[0]);
+  StringCopy(opt->path_html_utf8, base);
+  memset(&cache, 0, sizeof(cache));
+  /* one entry's cost, under opt->maxcache */
+  if ((sback = back_new(opt, 4)) == NULL)
+    return 1;
+  CHECK(st_spoolmem_slot(&sback->lnk[0], argv[0], 0));
+  CHECK(back_cleanup_background(opt, &cache, sback) == 1);
+  unit = sback->ready_mem_bytes;
+  CHECK(unit > 200 && sback->ready_files == 0);
+  err += st_spoolmem_wake(opt, sback, argv[0], 0);
+  back_free(&sback);
+  if (unit <= 200)
+    return st_verdict("spoolmem", err + 1);
+  u = (LLint) unit;
+  /* While sK spools, the bodies of the slots after it (100 bytes each) still
+     count against the budget, and its own does not. */
+  err += st_spoolmem_round(opt, argv[0], -1, 7, unit);
+  err += st_spoolmem_round(opt, argv[0], 2 * u + 100, 3, unit);
+  err += st_spoolmem_round(opt, argv[0], 2 * u + 99, 5, unit);
+  err += st_spoolmem_round(opt, argv[0], u + 150, 2, unit); /* s0 by bodies */
+  err += st_spoolmem_round(opt, argv[0], 0, 0, unit);
+  {
+    const int saved = opt->maxcache;
+
+    opt->maxcache = (int) (2 * u + 99); /* the default budget is maxcache */
+    err += st_spoolmem_round(opt, argv[0], -1, 5, unit);
+    opt->maxcache = saved;
+  }
+  err += st_spoolmem_grown(opt, argv[0], unit);
+  {
+    LLint room;
+
+    for (room = 1; room < (LLint) sizeof(size_t); room++)
+      err += st_spoolmem_tiny(opt, argv[0], room);
+  }
+#undef CHECK
+  return st_verdict("spoolmem", err);
 }
 
 static hts_boolean st_spool_plant(const char *path) {
@@ -3137,6 +3377,8 @@ const struct selftest_entry selftests_back[] = {
      st_spooldir},
     {"spoolfull", "<dir>", "a spooled entry waits for a free slot, kept whole",
      st_spoolfull},
+    {"spoolmem", "<dir>", "spooled slots stay in memory up to a byte cap",
+     st_spoolmem},
     {"spoolsweep", "<dir>", "startup removes the spool of a dead process only",
      st_spoolsweep},
     {"backstop", "",

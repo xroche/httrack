@@ -205,6 +205,8 @@ unsigned long back_self_pid(void);
    failure. */
 hts_boolean back_spool_write(httrackp *opt, const char *filename,
                              const lien_back *back);
+/* The spool file holding a ready-table entry, or NULL when it is in memory. */
+const char *back_spooled_file(const void *spooled);
 /* Moves every finished, unlocked slot to the spool and returns how many. */
 int back_cleanup_background(httrackp *opt, cache_back *cache,
                             struct_back *sback);
