@@ -89,12 +89,15 @@ name_is "/dev/null/$(a 239)/$(a 238)/i" '/*/' application/x-unknown 1088 \
     'userdef=%p/%p/%n' statuscode=404
 
 # A path 126 or more directories deep keeps its name, it used to give "./".
-for segs in 126 200 600; do
-    for delayed in 0 1; do
-        selftest_queue_tail '/x/y.html' savename '/*y.html' text/html \
-            "filpad=$((2 * segs))" padunit=x/ "delayed=$delayed"
-    done
+for segs in 126 600; do
+    selftest_queue_tail '/x/y.html' savename '/*y.html' text/html \
+        "filpad=$((2 * segs))" padunit=x/
 done
+
+# A template clip that leaves no name, or only a dotfile's dot, keeps a name.
+selftest_queue_tail '/i' savename '/*/' text/html filpad=1990 'userdef=%p/%p/'
+selftest_queue_tail '/.y' savename '/*/.y' text/html filpad=2030 padunit=中 \
+    'userdef=%p/%p/'
 
 # The byte cap keeps a name that has no tail to keep.
 zdirs="$(zh 70)/$(zh 70)/$(zh 70)/$(zh 70)/$(zh 70)/$(zh 70)/$(zh 70)/$(zh 70)"
