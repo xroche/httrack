@@ -1,0 +1,79 @@
+#!/bin/bash
+#
+# A reused keep-alive link is never re-added, but a cache hit with no file is.
+
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+out=$(httrack -O /dev/null -#test=delayedsettled 2>/dev/null)
+grep -q "delayedsettled self-test: OK" <<<"$out" || fail "self-test: $out"
+ok "self-test"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_2377.XXXXXX") || exit 1
+cleanup() {
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+local_server_start
+host=127.0.0.1_$SRV_PORT
+local_crawl "$BASEURL/keepalive/index.html" -O "$tmpdir/m" -Z ||
+    fail "crawl failed"
+log=$tmpdir/m/hts-log.txt
+
+# Control: most images went out on a reused socket.
+reused=$(count_matching_lines '(Keep-Alive): successfully linked' "$log")
+test "$reused" -ge 10 || fail_dump "only $reused reused sockets" "$log"
+readds=$(count_matching_lines 'Type immediately loaded from cache' "$log")
+test "$readds" = 0 || fail_dump "$readds links re-added" "$log"
+
+want=$(
+    echo keepalive/index.html
+    for i in $(seq 1 20); do echo "keepalive/i$i.png"; done
+)
+got=$(cd "$tmpdir/m/$host" && find . -type f | sed 's|^\./||')
+test "$(sort <<<"$got")" = "$(sort <<<"$want")" ||
+    fail "mirrored files: $got"
+ok "$reused reused sockets, no re-add, final names unchanged"
+
+# A negative X-Size makes the cache entry unreadable: the update names the link
+# .delayed, then the cache-priority run settles it with no file.
+local_crawl "$BASEURL/types/index.html" -O "$tmpdir/t" || fail "types crawl failed"
+"$SRV_PYTHON" - "$(nativepath "$tmpdir/t/hts-cache/new.zip")" <<'PY'
+import sys
+
+path = sys.argv[1]
+data = open(path, "rb").read()
+at = data.index(b"X-Size: ", data.index(b"types/wrongtype.jpg")) + len(b"X-Size: ")
+assert data[at : at + 1].isdigit()
+open(path, "wb").write(data[:at] + b"-" + data[at + 1 :])
+PY
+rm -f "$tmpdir/t/$host/types/wrongtype.jpg"
+
+run=("$(httrack_path)" "$BASEURL/types/index.html" -O "$tmpdir/t" -C1 -Z --max-time=60)
+trace=''
+if test "$(uname -s)" = Linux && command -v strace >/dev/null &&
+    strace -f -qq -o /dev/null true 2>/dev/null; then
+    trace=$tmpdir/trace
+    # LeakSanitizer cannot run under ptrace.
+    run=(env ASAN_OPTIONS="${ASAN_OPTIONS:+$ASAN_OPTIONS:}detect_leaks=0"
+        strace -f -qq -o "$trace" -e trace='openat,open,%%stat' "${run[@]}")
+fi
+run_with_timeout "$(crawl_deadline)" "${run[@]}" >"$tmpdir/out" 2>&1 ||
+    fail_dump "update crawl failed" "$tmpdir/out"
+log=$tmpdir/t/hts-log.txt
+readds=$(count_matching_lines 'Type immediately loaded from cache' "$log")
+test "$readds" -ge 1 || fail_dump "the cache hit was not re-added" "$log"
+test -s "$tmpdir/t/$host/types/wrongtype.jpg" ||
+    fail_dump "wrongtype.jpg not mirrored" "$log"
+ok "$readds cache hits re-added"
+
+test -n "$trace" || exit 0
+# The re-add must not read the placeholder it found missing.
+reopens=$(awk -F'"' '/\.delayed"/ && /ENOENT/ && !/open/ { gone[$2] = 1 }
+    /open(at)?\(/ && /O_RDONLY/ && ($2 in gone) { n++ }
+    END { print n + 0 }' "$trace")
+test "$reopens" = 0 || fail_dump "$reopens reads of a missing placeholder" "$trace"
+ok "no read of a missing placeholder"

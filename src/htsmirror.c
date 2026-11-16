@@ -1265,11 +1265,8 @@ int hts_wait_delayed(htsmoduleStruct *str, lien_adrfilsave *afs,
          * download MUST NOT clean silently this entry! (Petr Gajdusek) */
         back[b].early_add = 1;
 
-        /* Cache read failed because file does not exist (bad delayed name!)
-           Just re-add with the correct name, as we know the MIME now!
-         */
-        if (back[b].r.statuscode == STATUSCODE_INVALID &&
-            back[b].r.adr == NULL) {
+        /* Settled as a cache hit with no file: re-add under the real name. */
+        if (back_delayed_settled_empty(&back[b])) {
           lien_back delayed_back;
 
           back_copy_static(&back[b], &delayed_back);

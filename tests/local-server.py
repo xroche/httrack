@@ -957,8 +957,8 @@ class Handler(SimpleHTTPRequestHandler):
         if self.command != "HEAD":
             self.wfile.write(body)
 
-    # 20 images whose replies offer keep-alive, because only a reused socket
-    # reaches the delayed-type cancel and re-add (2371).
+    # 20 images whose replies offer keep-alive, so most go out on a reused
+    # socket (2371, 2377).
     def route_keepalive(self, path):
         ka = (("Connection", "keep-alive"),)
         if path.endswith(".png"):
