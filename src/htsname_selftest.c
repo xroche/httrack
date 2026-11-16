@@ -2100,7 +2100,7 @@ static int st_reserved(httrackp *opt, int argc, char **argv) {
     snprintf(want, sizeof(want), "d/%s_", names[i]);
     failures += rs_check(in, RS_ROOM, want) ? 0 : 1;
     strcpybuff(want, in);
-    want[strlen(want) - 1] = '_';
+    *hts_lastcharptr(want) = '_';
     failures += rs_check(in, strlen(in) + 1, want) ? 0 : 1;
     cases += 2;
   }
