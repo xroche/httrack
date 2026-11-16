@@ -1,0 +1,18 @@
+#!/bin/bash
+#
+# DOS device and engine directory names in a save path get a '_'
+# (-#test=reserved in htsname_selftest.c).
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# The count is exact, so a shrinking table shows.
+selftest_queue_lines "reserved: 104 cases, 0 failures
+reserved: OK" reserved
+
+# A device name in a full save name loses its last byte.
+selftest_queue_tail '/co_.html' savename '/*/con' text/html filpad=2022
+
+selftest_run_queued

@@ -107,6 +107,11 @@ hts_boolean url_query_value(const char *url, const char *name, char *dst,
 /* Append s to d (mapping '\' to '/'), clipped to dsize bytes including the NUL.
    Clips rather than aborts: s is a crawled link, hostile by construction. */
 void url_savename_addstr(char *d, size_t dsize, const char *s);
+/* Escape in place each path component of save that is a DOS device or engine
+   directory name, ignoring case and any extension: con.txt becomes con_.txt.
+   Only a trailing ' ' or '.' run ends the first component (aux.example.com).
+   size counts the NUL. A full buffer gets co_.txt, and nothing aborts. */
+void url_savename_escape_reserved(char *save, size_t size);
 /* Append sep+s to d whole, cutting d's tail (never inside a UTF-8 character)
    for room, so the suffix always survives; nothing happens if it alone fills
    dsize. */

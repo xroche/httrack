@@ -113,51 +113,72 @@ static hts_boolean strippedToComponentEnd(const char *s) {
   return *s == '\0' || *s == '/' ? HTS_TRUE : HTS_FALSE;
 }
 
+/* Return the length of the name in names that the component at c is, or 0. */
+static size_t reservedNameAt(const char *save, const char *c,
+                             const char *const *names) {
+  int i;
+
+  for (i = 0; names[i][0] != '\0'; i++) {
+    const size_t len = (size_t) strfield(c, names[i]);
+
+    if (len == 0)
+      continue;
+    if (c == save) {
+      /* save has had its leading '/' stripped above, so the table's anchor
+         never reached the first component (#842). It usually holds the
+         hostname, so only a trailing run may end it here: '.' would rename
+         aux.example.com. */
+      if (strippedToComponentEnd(c + len))
+        return len;
+    } else {
+      switch ((int) c[len]) {
+      case '\0':
+      case '/':
+      case '.':
+        return len;
+      case ' ':
+        /* cleanEndingSpaceOrDot() runs after us and hands the name back */
+        if (strippedToComponentEnd(c + len))
+          return len;
+        break;
+      }
+    }
+  }
+  return 0;
+}
+
 /* Replace foo/<reserved>/bar by foo/<reserved>_/bar, matching a whole path
    component only (case-insensitively: the filesystem may be too). */
 static void escapeReservedNames(char *save, size_t size,
                                 const char *const *names) {
-  int i;
+  char *c = save;
 
-  for (i = 0; names[i][0] != '\0'; i++) {
-    const char *a = save;
-    const size_t len = strlen(names[i]);
+  if (size == 0)
+    return;
+  for (;;) {
+    const size_t len = reservedNameAt(save, c, names);
 
-    while ((a = strstrcase(a, names[i]))) {
-      hts_boolean reserved = HTS_FALSE;
+    if (len != 0) {
+      const size_t total = strlen(save);
 
-      if (a == save) {
-        /* save has had its leading '/' stripped above, so the table's anchor
-           never reached the first component (#842). It usually holds the
-           hostname, so only a trailing run may end it here: '.' would rename
-           aux.example.com. */
-        reserved = strippedToComponentEnd(a + len);
-      } else if (a[-1] == '/') {
-        switch ((int) a[len]) {
-        case '\0':
-        case '/':
-        case '.':
-          reserved = HTS_TRUE;
-          break;
-        case ' ':
-          /* cleanEndingSpaceOrDot() runs after us and hands the name back */
-          reserved = strippedToComponentEnd(a + len);
-          break;
-        }
+      /* a full buffer loses the name's last byte, never the path's tail */
+      if (total < size - 1) {
+        memmove(c + len + 1, c + len, total - (size_t) (c - save) - len + 1);
+        c[len] = '_';
+      } else {
+        c[len - 1] = '_';
       }
-      if (reserved) {
-        char BIGSTK tempo[HTS_URLMAXSIZE * 2];
-
-        tempo[0] = '\0';
-        strncatbuff(tempo, save, (int) (a - save) + (int) len);
-        strcatbuff(tempo, "_");
-        strcatbuff(tempo, a + len);
-        /* clip rather than abort: the name comes from the wire */
-        (void) strclipbuff(save, size, tempo);
-      }
-      a += len;
     }
+    c = strchr(c, '/');
+    if (c == NULL)
+      break;
+    c++;
   }
+}
+
+void url_savename_escape_reserved(char *save, size_t size) {
+  escapeReservedNames(save, size, hts_tbreserved);
+  escapeReservedNames(save, size, hts_tbdev);
 }
 
 /* Strip all // */
@@ -1785,11 +1806,9 @@ int url_savename(lien_adrfilsave *const afs,
   // éliminer les // (comme ftp://)
   cleanDoubleSlash(afs->save);
 
-  /* Runs on every platform, and before path_html is prepended below, so the
-     user's own output directory is never renamed. */
-  escapeReservedNames(afs->save, sizeof(afs->save), hts_tbreserved);
-
-  escapeReservedNames(afs->save, sizeof(afs->save), hts_tbdev);
+  /* Before path_html is prepended, so the user's own output directory keeps
+     its name. */
+  url_savename_escape_reserved(afs->save, sizeof(afs->save));
 
   /* Strip ending . or ' ' forbidden on windoz */
   cleanEndingSpaceOrDot(afs->save);

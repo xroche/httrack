@@ -2004,6 +2004,124 @@ static int st_urlbounds(httrackp *opt, int argc, char **argv) {
 /* Registry: this module's tests, in the order -#test lists them. */
 /* ------------------------------------------------------------ */
 
+enum { RS_ROOM = 64, RS_GUARD = 8 };
+
+/* Does escaping in, in a size-byte buffer poisoned past its end, give want? */
+static hts_boolean rs_check(const char *in, size_t size, const char *want) {
+  char buf[RS_ROOM + RS_GUARD];
+  size_t i;
+  hts_boolean ok;
+
+  memset(buf, '#', sizeof(buf));
+  strlcpybuff(buf, in, sizeof(buf));
+  url_savename_escape_reserved(buf, size);
+  ok = strcmp(buf, want) == 0 ? HTS_TRUE : HTS_FALSE;
+  for (i = size > strlen(in) ? size : strlen(in) + 1; i < sizeof(buf); i++) {
+    if (buf[i] != '#')
+      ok = HTS_FALSE;
+  }
+  if (!ok)
+    printf("reserved: '%s' size %lu gave '%s', want '%s'\n", in,
+           (unsigned long) size, buf, want);
+  return ok;
+}
+
+static int st_reserved(httrackp *opt, int argc, char **argv) {
+  /* clang-format off */
+  static const char *const names[] = {
+    "prn", "con", "aux", "nul",
+    "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9",
+    "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9",
+    "conin$", "conout$", "clock$",
+    "emmxxxx0", "xmsxxxx0", "setverxx",
+    "hts-cache", "hts-tmp"
+  };
+  /* clang-format on */
+
+  /* A size of 0 means room to spare. */
+  static const struct {
+    size_t size;
+    const char *in, *want;
+  } rows[] = {
+      {0, "D/CoN", "D/CoN_"},
+      {0, "d/x/con", "d/x/con_"},
+      {0, "d/con/d", "d/con_/d"},
+      {0, "d/con/", "d/con_/"},
+      {0, "a//con", "a//con_"},
+      {0, "con", "con_"},
+      {0, "con/d", "con_/d"},
+      {0, "aux.example.com", "aux.example.com"},
+      {0, "con.", "con_."},
+      {0, "con ", "con_ "},
+      {0, "con .x/d", "con .x/d"},
+      {0, "d/con.txt", "d/con_.txt"},
+      {0, "d/com1.tar.gz", "d/com1_.tar.gz"},
+      {0, "d/con.", "d/con_."},
+      {0, "d/con..", "d/con_.."},
+      {0, "d/con ", "d/con_ "},
+      {0, "d/con . ", "d/con_ . "},
+      {0, "d/con x", "d/con x"},
+      {0, "d/con .x", "d/con .x"},
+      {0, "d/cons", "d/cons"},
+      {0, "d/com10", "d/com10"},
+      {0, "d/com0", "d/com0"},
+      {0, "d/com\xc2\xb9", "d/com\xc2\xb9"},
+      {0, "d/xcon", "d/xcon"},
+      {0, "d/lpt", "d/lpt"},
+      {0, "d/auxx", "d/auxx"},
+      {0, "d/conin", "d/conin"},
+      {0, "d/conin$", "d/conin$_"},
+      {0, "d/hts-cachex", "d/hts-cachex"},
+      {0, "d\\con", "d\\con"},
+      {0, "nul/con.x/aux", "nul_/con_.x/aux_"},
+      /* A full buffer overwrites the name's last byte instead. */
+      {6, "d/con", "d/co_"},
+      {7, "d/con", "d/con_"},
+      {4, "con", "co_"},
+      {8, "aux/con", "au_/co_"},
+      {9, "aux/con", "aux_/co_"},
+      {9, "aux/conx", "au_/conx"},
+      {9, "nul/con.", "nu_/co_."},
+      {10, "d/con.txt", "d/co_.txt"},
+      {10, "hts-cache", "hts-cach_"},
+      {7, "d/lpt1", "d/lpt_"},
+      {10, "d/con   x", "d/con   x"},
+      {9, "d/con . ", "d/co_ . "},
+  };
+
+  char in[RS_ROOM], want[RS_ROOM];
+  unsigned long cases = 0, failures = 0;
+  size_t i;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  for (i = 0; i < sizeof(names) / sizeof(names[0]); i++) {
+    snprintf(in, sizeof(in), "d/%s", names[i]);
+    snprintf(want, sizeof(want), "d/%s_", names[i]);
+    failures += rs_check(in, RS_ROOM, want) ? 0 : 1;
+    strcpybuff(want, in);
+    *hts_lastcharptr(want) = '_';
+    failures += rs_check(in, strlen(in) + 1, want) ? 0 : 1;
+    cases += 2;
+  }
+  for (i = 0; i < sizeof(rows) / sizeof(rows[0]); i++) {
+    failures += rs_check(rows[i].in, rows[i].size != 0 ? rows[i].size : RS_ROOM,
+                         rows[i].want)
+                    ? 0
+                    : 1;
+    cases++;
+  }
+  /* The caller may pass size 0, and nothing is written then. */
+  failures += rs_check("con", 0, "con") ? 0 : 1;
+  cases++;
+  printf("reserved: %lu cases, %lu failures\n", cases, failures);
+  if (failures != 0)
+    return 1;
+  printf("reserved: OK\n");
+  return 0;
+}
+
 const struct selftest_entry selftests_name[] = {
     {"urlbounds", "",
      "an over-long path is refused by the wizard and auth consumers",
@@ -2052,5 +2170,7 @@ const struct selftest_entry selftests_name[] = {
     {"savename-addtail", "",
      "default name and extension arrive whole on a full buffer (#1269)",
      st_savename_addtail},
+    {"reserved", "", "DOS device and engine directory names are escaped",
+     st_reserved},
     {NULL, NULL, NULL, NULL},
 };
