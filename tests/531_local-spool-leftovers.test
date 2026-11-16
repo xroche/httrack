@@ -48,12 +48,13 @@ fi
 
 crawl() {
     local rc=0
-    local_crawl --log "${tmpdir}/log" -O "${tmpdir}/out" --quiet --disable-security-limits --robots=0 --timeout=30 --retries=0 -Z -p0 -N '%n' -c4 "http://127.0.0.1:${SRV_PORT}/bakname/index.html" || rc=$?
+    # a zero cap sends the spool to disk rather than memory
+    HTTRACK_DEBUG_SPOOL_MEM=0 local_crawl --log "${tmpdir}/log" -O "${tmpdir}/out" --quiet --disable-security-limits --robots=0 --timeout=30 --retries=0 -Z -p0 -N '%n' -c4 "http://127.0.0.1:${SRV_PORT}/bakname/index.html" || rc=$?
     test "$rc" -eq 0 || fail_dump "httrack exited $rc" "${tmpdir}/log"
 }
 
 crawl
-moved=$(count_matching_lines 'slots ready moved to background' "${tmpdir}/out/hts-log.txt")
+moved=$(count_matching_lines 'engine: spooled .* to ' "${tmpdir}/out/hts-log.txt")
 test "$moved" -gt 0 || fail "no slot was spooled, so the run never used ~hts-tmp"
 test ! -e "$dead" || fail "a dead run's spool file survived"
 test -e "$live" || fail "a live run's spool file was removed"

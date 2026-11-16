@@ -174,6 +174,10 @@ struct struct_back {
   int count;              /**< number of usable slots (back_max) */
   coucal ready;           /**< index of slots whose transfer completed */
   LLint ready_size_bytes; /**< total bytes buffered in completed slots */
+  size_t ready_mem_bytes; /**< bytes of the ready entries held in memory */
+  size_t ready_mem_max;   /**< cap on ready_mem_bytes; past it, entries go to
+                               ~hts-tmp files */
+  int ready_files;        /**< ready entries held in ~hts-tmp files */
   hts_connect_fallback *connect_fallback; /**< per-slot, count+1 entries */
   hts_fetch_meta *fetch; /**< per-slot Sec-Fetch-* values, count+1 entries */
   hts_boolean bot_challenge_noted; /**< the bot-protection note is already in
