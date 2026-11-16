@@ -3456,14 +3456,6 @@ class Handler(SimpleHTTPRequestHandler):
     # Honors any Range, so a resume onto a foreign placeholder splices its bytes.
     STALEPART_BODY = b"".join(b"%07d\n" % k for k in range(400))
 
-    # e.jpg has no body to sniff, so a contested name must follow the wire.
-    def route_emptysniff_index(self):
-        self.send_html('<img src="e.jpg">\n<img src="f.jpg">\n')
-
-    def route_emptysniff_image(self):
-        empty = urlsplit(self.path).path.endswith("/e.jpg")
-        self.send_raw(b"" if empty else self.FAKE_JPEG, "image/png")
-
     def route_stalepart_index(self):
         self.send_html('<a href="blob.bin">blob</a>')
 
@@ -3486,6 +3478,14 @@ class Handler(SimpleHTTPRequestHandler):
         self.end_headers()
         if self.command != "HEAD":
             self.wfile.write(body)
+
+    # e.jpg is empty, so its name must come from the wire type.
+    def route_emptysniff_index(self):
+        self.send_html('<img src="e.jpg">\n<img src="f.jpg">\n')
+
+    def route_emptysniff_image(self):
+        empty = urlsplit(self.path).path.endswith("/e.jpg")
+        self.send_raw(b"" if empty else self.FAKE_JPEG, "image/png")
 
     # 60 bytes under -M5000, so the cap trips while p0's headers trickle (#1854).
     DHARD_INDEX_BYTES = 5000 - 60
@@ -4620,10 +4620,10 @@ class Handler(SimpleHTTPRequestHandler):
         "/dmovecut/p0.bin": route_dmovecut_page,
         "/dmovecut/p1.txt": route_dmove_other,
         "/stalepart/index.html": route_stalepart_index,
+        "/stalepart/blob.bin": route_stalepart_blob,
         "/emptysniff/index.html": route_emptysniff_index,
         "/emptysniff/e.jpg": route_emptysniff_image,
         "/emptysniff/f.jpg": route_emptysniff_image,
-        "/stalepart/blob.bin": route_stalepart_blob,
         "/dhard/index.html": route_dhard_index,
         "/dhard/p0.bin": route_dhard_page,
         "/dcap/p0.bin": route_dcancel_page,

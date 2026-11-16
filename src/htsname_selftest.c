@@ -360,6 +360,22 @@ static int st_getext(httrackp *opt, int argc, char **argv) {
   return rc;
 }
 
+/* Write the bytes a body= style argument decodes to into path. */
+static hts_boolean st_savename_write_body(const char *path, const char *arg) {
+  char BIGSTK data[1024];
+  const size_t n = st_decode_body(arg, data, sizeof(data));
+  FILE *const fp = fopen(path, "wb");
+
+  if (fp == NULL || !hts_fwrite_exact(data, n, fp)) {
+    fprintf(stderr, "savename: can not write %s\n", path);
+    if (fp != NULL)
+      fclose(fp);
+    return HTS_FALSE;
+  }
+  fclose(fp);
+  return HTS_TRUE;
+}
+
 static int st_savename(httrackp *opt, int argc, char **argv) {
   struct {
     lien_adrfilsave afs;
@@ -382,7 +398,10 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
   const char *cdispo = NULL;
   const char *body = NULL;
   const char *cached = NULL;
+  const char *tmpbody = NULL;
+  const char *coding = NULL;
   const char *bodyfile = "st-savename-body.tmp";
+  const char *tmpbodyfile = "st-savename-tmpfile.tmp";
   int statuscode = HTTP_OK, status = 0;
   int filpad = 0;
   int nosback = 0;
@@ -417,6 +436,10 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
       opt->savename_type = atoi(a + 5);
     else if (strncmp(a, "body=", 5) == 0)
       body = a + 5;
+    else if (strncmp(a, "tmpbody=", 8) == 0) /* the slot's tmpfile */
+      tmpbody = a + 8;
+    else if (strncmp(a, "coding=", 7) == 0) /* Content-Encoding */
+      coding = a + 7;
     else if (strncmp(a, "cached=", 7) == 0)
       cached = a + 7;
     else if (strncmp(a, "filpad=", 7) == 0)
@@ -534,27 +557,34 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
   if (cdispo != NULL)
     strcpybuff(headers.r.cdispo, cdispo);
   strcpybuff(headers.url_fil, afs->af.fil);
+  if (coding != NULL) {
+    strcpybuff(headers.r.contentencoding, coding);
+    headers.r.compressed = 1;
+  }
   if (body != NULL) { /* leading body bytes, read via url_sav */
-    char BIGSTK data[1024];
-    const size_t n = st_decode_body(body, data, sizeof(data));
-    FILE *const fp = fopen(bodyfile, "wb");
-
-    if (fp == NULL || !hts_fwrite_exact(data, n, fp)) {
-      fprintf(stderr, "savename: can not write %s\n", bodyfile);
-      if (fp != NULL)
-        fclose(fp);
+    if (!st_savename_write_body(bodyfile, body)) {
       rc = 1;
       goto cleanup;
     }
-    fclose(fp);
     strcpybuff(headers.url_sav, bodyfile);
-    headers.r.is_write = HTS_TRUE; /* the slot wrote it */
+    /* the sniff reads only files the slot wrote */
+    headers.r.is_write = HTS_TRUE;
+  }
+  if (tmpbody != NULL) {
+    if (!st_savename_write_body(tmpbodyfile, tmpbody)) {
+      rc = 1;
+      goto cleanup;
+    }
+    strcpybuff(headers.tmpfile_buffer, tmpbodyfile);
+    headers.tmpfile = headers.tmpfile_buffer;
   }
 
   url_savename(afs, NULL, NULL, NULL, opt, sback, &cache, &hash, 0, 0,
                &headers);
   if (body != NULL)
     (void) UNLINK(bodyfile);
+  if (tmpbody != NULL)
+    (void) UNLINK(tmpbodyfile);
   if (!st_poison_intact("savename: save[]", probe.canary, 0,
                         sizeof(probe.canary)))
     rc = 1;
