@@ -1178,6 +1178,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
       time_t user_interact_timestamp = 0;
       int detect_title = 0;     // détection  du title
       int back_add_stats = opt->state.back_add_stats;
+      unsigned int stats_calls = 0;
 
       const char *in_media = NULL;    // in other media type (real media and so..)
       int intag = 0;            // on est dans un tag
@@ -3834,7 +3835,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
           }
         }
         // refresh the backing system each 2 seconds
-        if (engine_stats()) {
+        if (engine_stats_tick(&stats_calls)) {
           back_wait(sback, opt, cache, HTS_STAT.stat_timestart);
           back_fillmax(sback, opt, cache, ptr, numero_passe);
         }

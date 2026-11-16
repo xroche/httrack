@@ -1,0 +1,12 @@
+#!/bin/bash
+#
+# Pins the engine_stats_tick throttle: a full engine_stats() every 256 calls.
+
+set -euo pipefail
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+require_httrack
+
+# 770 calls is 3 * HTS_STATS_TICK + 2, so changing the tick alone fails here.
+assert_selftest 'statstick self-test OK (770 calls)' statstick

@@ -227,12 +227,12 @@ int hts_read(htsblk * r, char *buff, int size);
    low, and -M gives up on that total (back_maxsize_reached()). A lock, not a
    64-bit atomic add, which needs libatomic where the target has no 8-byte
    compare-and-swap. hts_stat_recv_publish() copies the total to the
-   HTS_STAT.HTS_TOTAL_RECV a front end reads, on the crawl thread beside every
-   other field engine_stats() refreshes there. */
+   HTS_STAT.HTS_TOTAL_RECV a front end reads and returns it, on the crawl thread
+   beside every other field engine_stats() refreshes there. */
 void hts_stat_recv_add(LLint bytes);
 LLint hts_stat_recv_get(void);
 void hts_stat_recv_set(LLint bytes);
-void hts_stat_recv_publish(void);
+LLint hts_stat_recv_publish(void);
 
 LLint check_downloadable_bytes(int rate);
 

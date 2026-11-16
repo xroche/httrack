@@ -4971,8 +4971,8 @@ void hts_stat_recv_set(LLint bytes) {
   hts_mutexrelease(&stat_recv_lock);
 }
 
-void hts_stat_recv_publish(void) {
-  HTS_STAT.HTS_TOTAL_RECV = hts_stat_recv_get();
+LLint hts_stat_recv_publish(void) {
+  return HTS_STAT.HTS_TOTAL_RECV = hts_stat_recv_get();
 }
 
 //
