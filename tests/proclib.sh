@@ -160,6 +160,9 @@ list_engine_pids() {
             NR > 1 && $3 == pg { if (basen($(6 + qemushift())) ~ eng) print $1 }'
 }
 
+# How long a SIGABRT'd engine gets to print its stack and exit.
+ABRT_GRACE=${ABRT_GRACE:-30}
+
 # Ask the wedged test's engine processes for a stack. What is obtainable differs
 # per platform, and each branch says which one it took: a dump that silently
 # produces nothing reads as coverage when it is not.
@@ -175,7 +178,7 @@ list_engine_pids() {
 # gdb -p is not an option on either: it is EPERM from a sibling under yama
 # ptrace_scope=1, which is how a harness watchdog necessarily invokes it.
 request_engine_backtraces() {
-    local p os
+    local p os start
     local sent='' abrt=''
     os=$(uname -s 2>/dev/null || echo unknown)
     for p in $(list_engine_pids "$1"); do
@@ -184,7 +187,7 @@ request_engine_backtraces() {
             printf 'pid %s blocked in: %s\n' "$p" "$(cat "/proc/$p/wchan")"
         case "$os" in
         Linux)
-            kill -ABRT "$p" 2>/dev/null && abrt=1
+            kill -ABRT "$p" 2>/dev/null && abrt="$abrt $p"
             ;;
         Darwin)
             if test -x /usr/bin/sample; then
@@ -203,7 +206,18 @@ request_engine_backtraces() {
         esac
     done
     test -n "$sent" || printf 'no engine process left to ask (see the list above)\n'
-    test -z "$abrt" || sleep 3 # let the handlers symbolize and print
+    # sig_fatal prints before abort(), so an engine that has exited is done
+    # printing. Dying can take seconds under load, when the kernel dumps core (#1841).
+    start=$SECONDS
+    for p in $abrt; do
+        while kill -0 "$p" 2>/dev/null && ! pid_is_zombie "$p"; do
+            if test "$((SECONDS - start))" -ge "$ABRT_GRACE"; then
+                printf 'pid %s: still running %ss after SIGABRT\n' "$p" "$ABRT_GRACE"
+                break
+            fi
+            sleep 0.1
+        done
+    done
 }
 
 # Stack of every native engine process, through cdb. Windows has neither half of
