@@ -4531,8 +4531,11 @@ static int refwritten_longpath(httrackp *opt, const char *dir) {
   StringCopy(opt->path_log, longdir);
   (void) MKDIR(reconcile_st_path(opt, "hts-cache"));
   (void) MKDIR(reconcile_st_path(opt, CACHE_REFNAME));
-  /* GNU/Hurd cannot look up a path this long */
-  if (STAT(reconcile_st_path(opt, CACHE_REFNAME), &st) != 0) {
+  if (strlen(reconcile_st_path(opt, CACHE_REFNAME)) <= HTS_URLMAXSIZE) {
+    fprintf(stderr, "%s: the long log path was cut\n", selftest_tag);
+    fail++;
+  } else if (STAT(reconcile_st_path(opt, CACHE_REFNAME), &st) != 0) {
+    /* GNU/Hurd cannot look up a path this long */
     fprintf(stderr, "%s: no long ref directory here, case skipped\n",
             selftest_tag);
     selftest_setup_dir(opt, dir);
