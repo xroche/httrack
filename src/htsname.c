@@ -1583,6 +1583,9 @@ int url_savename(lien_adrfilsave *const afs,
         TMPL_TAILC(*a++);
     }
     TMPL_FLUSH();
+    /* %n of a dotfile like ".y" is empty: keep a file name (#2249) */
+    if (afs->save[0] == '\0' || hts_lastchar(afs->save) == '/')
+      save_append_name_head(afs->save, sizeof(afs->save), nom_pos);
     //
     // predefined types
     //
