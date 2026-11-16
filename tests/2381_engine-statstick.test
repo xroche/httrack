@@ -1,0 +1,18 @@
+#!/bin/bash
+#
+# Pins the parse loop's stats throttle: a full engine_stats() every N calls.
+
+set -euo pipefail
+
+out=$(httrack -#test=statstick) || {
+    echo "httrack -#test=statstick exited non-zero: $out" >&2
+    exit 1
+}
+
+case "$out" in
+"statstick self-test OK (770 calls)"*) ;;
+*)
+    echo "expected 'statstick self-test OK (770 calls)', got: $out" >&2
+    exit 1
+    ;;
+esac

@@ -1349,6 +1349,71 @@ static int st_sink(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* The parse loop's stats throttle: a full engine_stats() on calls 0, N, 2N...,
+   and the counter resets a front end can see on every call. */
+static int st_statstick(httrackp *opt, int argc, char **argv) {
+  const hts_stat_struct saved = HTS_STAT;
+  const LLint saved_recv = hts_stat_recv_get();
+  unsigned int tick = 0, i;
+  int refreshes = 0, err = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  /* Below 2048 bytes received, so only the publish shows a full refresh. */
+  for (i = 0; i < 3 * HTS_STATS_TICK; i++) {
+    const hts_boolean full = i % HTS_STATS_TICK == 0;
+
+    hts_stat_recv_set(1000 + i);
+    HTS_STAT.HTS_TOTAL_RECV = -1;
+    HTS_STAT.stat_nsocket = HTS_STAT.stat_errors = HTS_STAT.nbk = 7;
+    HTS_STAT.nb = 7;
+    if (engine_stats_tick(&tick) != 0) {
+      fprintf(stderr, "statstick call %u: rate refresh below 2048 bytes\n", i);
+      err = 1;
+    }
+    if ((HTS_STAT.HTS_TOTAL_RECV == (LLint) (1000 + i)) != full) {
+      fprintf(stderr, "statstick call %u: published " LLintP ", full=%d\n", i,
+              HTS_STAT.HTS_TOTAL_RECV, (int) full);
+      err = 1;
+    }
+    refreshes += HTS_STAT.HTS_TOTAL_RECV != -1;
+    if (HTS_STAT.stat_nsocket != 0 || HTS_STAT.stat_errors != 0 ||
+        HTS_STAT.nbk != 0 || HTS_STAT.nb != 0) {
+      fprintf(stderr, "statstick call %u: counters not reset\n", i);
+      err = 1;
+    }
+  }
+  if (refreshes != 3) {
+    fprintf(stderr, "statstick: %d full refreshes, wanted 3\n", refreshes);
+    err = 1;
+  }
+
+  /* A rate window 5s old: the next full refresh returns 1, an off-tick 0. */
+  hts_stat_recv_set(100000);
+  HTS_STAT.istat_timestart[0] = HTS_STAT.istat_timestart[1] =
+      mtime_monotonic() - 5000;
+  tick = 1;
+  if (engine_stats_tick(&tick) != 0) {
+    fprintf(stderr, "statstick: off-tick refreshed the rate\n");
+    err = 1;
+  }
+  tick = HTS_STATS_TICK;
+  if (engine_stats_tick(&tick) != 1 || HTS_STAT.rate <= 0) {
+    fprintf(stderr, "statstick: full tick did not refresh the rate\n");
+    err = 1;
+  }
+
+  HTS_STAT = saved;
+  hts_stat_recv_set(saved_recv);
+  if (err) {
+    printf("statstick self-test FAILED\n");
+    return 1;
+  }
+  printf("statstick self-test OK (%d calls)\n", 3 * HTS_STATS_TICK + 2);
+  return 0;
+}
+
 /* Each call parses `txt` under a fresh host, then checkrobots() for `path`. */
 static int rb_decide(robots_wizard *r, const char *txt, const char *path) {
   static int n = 0;
@@ -1983,6 +2048,10 @@ const struct selftest_entry selftests_parse[] = {
      "the parser's output writers: escaping per script state, and nothing "
      "buffered for a page not saved as HTML",
      st_sink},
+    {"statstick", "",
+     "the parse loop's stats throttle: a full engine_stats() every N calls, "
+     "the counter resets on each",
+     st_statstick},
     {"robots", "", "robots.txt RFC 9309 Allow/Disallow precedence self-test",
      st_robots},
     {"sitemap", "",

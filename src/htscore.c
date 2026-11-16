@@ -2400,12 +2400,16 @@ cleanup:
   Therefore, each seconds, we resync the transfer rate with 2-seconds
 
 */
+static void engine_stats_reset_counters(void) {
+  HTS_STAT.stat_nsocket = HTS_STAT.stat_errors = HTS_STAT.nbk = 0;
+  HTS_STAT.nb = 0;
+}
+
 int engine_stats(void) {
   const LLint recv = hts_stat_recv_get();
 
   hts_stat_recv_publish();
-  HTS_STAT.stat_nsocket = HTS_STAT.stat_errors = HTS_STAT.nbk = 0;
-  HTS_STAT.nb = 0;
+  engine_stats_reset_counters();
   if (recv > 2048) {
     TStamp cdif = mtime_monotonic();
     int i;
@@ -2438,6 +2442,13 @@ int engine_stats(void) {
       }
     }
   }
+  return 0;
+}
+
+int engine_stats_tick(unsigned int *tick) {
+  if ((*tick)++ % HTS_STATS_TICK == 0)
+    return engine_stats();
+  engine_stats_reset_counters();
   return 0;
 }
 

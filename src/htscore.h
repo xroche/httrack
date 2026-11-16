@@ -407,6 +407,13 @@ void hts_io_fatal_abort(httrackp *opt);
 
 int engine_stats(void);
 
+/* Calls between two full engine_stats() refreshes in engine_stats_tick(). */
+#define HTS_STATS_TICK 256
+
+/* engine_stats() for a per-byte loop, which counts its calls in tick: the full
+   refresh on calls 0, N, 2N..., only the counter resets on the others. */
+int engine_stats_tick(unsigned int *tick);
+
 void host_ban(httrackp * opt, int ptr, struct_back * sback, const char *host);
 
 /* Open local file s for writing (filecreate, truncate) or appending
