@@ -4451,8 +4451,8 @@ static int cache_zbuf_selftest(const char *dir) {
     }
   }
   for (z = 0; z < 2; z++) {
-    /* zlib makes several blocks per stream, so 1 means a broken counter */
-    if (first[z] < 2 || zipDeflateAllocations(zf[z]) != first[z]) {
+    /* zlib-ng makes one block per stream, zlib several, so 0 means broken */
+    if (first[z] < 1 || zipDeflateAllocations(zf[z]) != first[z]) {
       fprintf(stderr,
               "cache-zbuf: zipfile %d made %d deflate allocations, the first "
               "member alone %d\n",
@@ -4516,6 +4516,7 @@ static hts_boolean refwritten_read(httrackp *opt) {
 static int refwritten_longpath(httrackp *opt, const char *dir) {
   char longdir[HTS_URLMAXSIZE * 2];
   char seg[101];
+  STRUCT_STAT st;
   int k, fail = 0;
 
   memset(seg, 'd', sizeof(seg) - 1);
@@ -4530,6 +4531,16 @@ static int refwritten_longpath(httrackp *opt, const char *dir) {
   StringCopy(opt->path_log, longdir);
   (void) MKDIR(reconcile_st_path(opt, "hts-cache"));
   (void) MKDIR(reconcile_st_path(opt, CACHE_REFNAME));
+  if (strlen(reconcile_st_path(opt, CACHE_REFNAME)) <= HTS_URLMAXSIZE) {
+    fprintf(stderr, "%s: the long log path was cut\n", selftest_tag);
+    fail++;
+  } else if (STAT(reconcile_st_path(opt, CACHE_REFNAME), &st) != 0) {
+    /* GNU/Hurd cannot look up a path this long */
+    fprintf(stderr, "%s: no long ref directory here, case skipped\n",
+            selftest_tag);
+    selftest_setup_dir(opt, dir);
+    return 0;
+  }
   url_savename_refnames_start(opt);
   if (opt->refs_written != NULL) {
     fprintf(stderr, "%s: a ref directory under a long path was missed\n",
