@@ -524,6 +524,17 @@ static void save_append_name_head(char *save, size_t size, const char *name) {
   save_append_tail(save, size, head);
 }
 
+/* Give save a file name when a clip left it none, or only a dotfile's dot. */
+static void save_keep_clipped_name(char *save, size_t size, const char *name) {
+  char *const slash = strrchr(save, '/');
+  char *const last = slash != NULL ? slash + 1 : save;
+
+  if (strcmp(last, ".") == 0)
+    *last = '\0';
+  if (*last == '\0')
+    save_append_name_head(save, size, name);
+}
+
 /* Return the byte offset of each character of s, then strlen(s), and store
    their count in *nChars. A malformed byte is one character. NULL if out of
    memory. */
@@ -1484,9 +1495,8 @@ int url_savename(lien_adrfilsave *const afs,
             else
               TMPL_CATN(nom_pos, 8);
           }
-          /* the clip ate the whole name: keep its head */
-          if (tmpl_clipped && hts_lastchar(afs->save) == '/')
-            save_append_name_head(afs->save, sizeof(afs->save), nom_pos);
+          if (tmpl_clipped)
+            save_keep_clipped_name(afs->save, sizeof(afs->save), nom_pos);
           if (tok == 'n')
             break;
           TMPL_TAILC('.');
@@ -1585,6 +1595,13 @@ int url_savename(lien_adrfilsave *const afs,
         TMPL_TAILC(*a++);
     }
     TMPL_FLUSH();
+    /* %n of a dotfile like ".y" is empty: keep a file name (#2249) */
+    if (afs->save[0] == '\0' || hts_lastchar(afs->save) == '/') {
+      tmpl_clipped = HTS_FALSE;
+      TMPL_CAT(nom_pos);
+      if (tmpl_clipped)
+        save_keep_clipped_name(afs->save, sizeof(afs->save), nom_pos);
+    }
     //
     // predefined types
     //
