@@ -2985,17 +2985,21 @@ static int st_busyscans(httrackp *opt, int argc, char **argv) {
   return err ? 1 : 0;
 }
 
-/* -#test=delayedsettled: a link linked to a reused keep-alive socket is not
-   taken for a cache hit whose .delayed file is missing. */
+/* -#test=delayedsettled: only a finished, empty slot counts as settled. */
 static int st_delayedsettled(httrackp *opt, int argc, char **argv) {
   enum { SLOTS = 8, LIVE = 5 };
 
+  static const int busy[] = {
+      STATUS_ALIVE,        STATUS_FREE,       STATUS_TRANSFER,
+      STATUS_CHUNK_CR,     STATUS_CHUNK_WAIT, STATUS_WAIT_HEADERS,
+      STATUS_CONNECTING,   STATUS_WAIT_DNS,   STATUS_SSL_WAIT_HANDSHAKE,
+      STATUS_FTP_TRANSFER, STATUS_FTP_READY};
   struct_back *sback;
   cache_back cache;
   hash_struct hash;
   htsblk live;
   lien_back *slot;
-  int b;
+  int b, k;
   int err = 0;
 
 #define CHECK(cond) ST_CHECK(err, cond)
@@ -3051,13 +3055,17 @@ static int st_delayedsettled(httrackp *opt, int argc, char **argv) {
     CHECK(slot->status == STATUS_READY);
     CHECK(back_delayed_settled_empty(slot));
 
-    /* a reply or a body is not empty */
     slot->r.adr = body;
     CHECK(!back_delayed_settled_empty(slot));
     slot->r.adr = NULL;
     slot->r.statuscode = HTTP_OK;
     CHECK(!back_delayed_settled_empty(slot));
     slot->r.statuscode = STATUSCODE_INVALID;
+    for (k = 0; k < (int) (sizeof(busy) / sizeof(busy[0])); k++) {
+      slot->status = busy[k];
+      CHECK(!back_delayed_settled_empty(slot));
+    }
+    slot->status = STATUS_READY;
     back_delete(opt, &cache, sback, b);
   }
 #undef CHECK
