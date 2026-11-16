@@ -2406,9 +2406,8 @@ static void engine_stats_reset_counters(void) {
 }
 
 int engine_stats(void) {
-  const LLint recv = hts_stat_recv_get();
+  const LLint recv = hts_stat_recv_publish();
 
-  hts_stat_recv_publish();
   engine_stats_reset_counters();
   if (recv > 2048) {
     TStamp cdif = mtime_monotonic();
@@ -2445,8 +2444,8 @@ int engine_stats(void) {
   return 0;
 }
 
-int engine_stats_tick(unsigned int *tick) {
-  if ((*tick)++ % HTS_STATS_TICK == 0)
+int engine_stats_tick(unsigned int *calls) {
+  if ((*calls)++ % HTS_STATS_TICK == 0)
     return engine_stats();
   engine_stats_reset_counters();
   return 0;

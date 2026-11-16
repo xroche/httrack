@@ -1349,8 +1349,7 @@ static int st_sink(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* The parse loop's stats throttle: a full engine_stats() on calls 0, N, 2N...,
-   and the counter resets a front end can see on every call. */
+/* engine_stats_tick() refreshes in full every HTS_STATS_TICK calls only. */
 static int st_statstick(httrackp *opt, int argc, char **argv) {
   const hts_stat_struct saved = HTS_STAT;
   const LLint saved_recv = hts_stat_recv_get();
@@ -1360,7 +1359,7 @@ static int st_statstick(httrackp *opt, int argc, char **argv) {
   (void) opt;
   (void) argc;
   (void) argv;
-  /* Below 2048 bytes received, so only the publish shows a full refresh. */
+  /* Below 2048 bytes received, only the published total shows a refresh. */
   for (i = 0; i < 3 * HTS_STATS_TICK; i++) {
     const hts_boolean full = i % HTS_STATS_TICK == 0;
 
@@ -1389,7 +1388,7 @@ static int st_statstick(httrackp *opt, int argc, char **argv) {
     err = 1;
   }
 
-  /* A rate window 5s old: the next full refresh returns 1, an off-tick 0. */
+  /* A 5s old rate window makes a full refresh return 1 and an off-tick 0. */
   hts_stat_recv_set(100000);
   HTS_STAT.istat_timestart[0] = HTS_STAT.istat_timestart[1] =
       mtime_monotonic() - 5000;
@@ -2049,8 +2048,8 @@ const struct selftest_entry selftests_parse[] = {
      "buffered for a page not saved as HTML",
      st_sink},
     {"statstick", "",
-     "the parse loop's stats throttle: a full engine_stats() every N calls, "
-     "the counter resets on each",
+     "engine_stats_tick throttle: a full engine_stats() every "
+     "HTS_STATS_TICK calls, the counter resets on each",
      st_statstick},
     {"robots", "", "robots.txt RFC 9309 Allow/Disallow precedence self-test",
      st_robots},

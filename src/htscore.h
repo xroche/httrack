@@ -414,9 +414,10 @@ int engine_stats(void);
 /* Calls between two full engine_stats() refreshes in engine_stats_tick(). */
 #define HTS_STATS_TICK 256
 
-/* engine_stats() for a per-byte loop, which counts its calls in tick: the full
-   refresh on calls 0, N, 2N..., only the counter resets on the others. */
-int engine_stats_tick(unsigned int *tick);
+/* Throttled engine_stats() for a hot loop, which counts its calls in *calls.
+   Calls 0, HTS_STATS_TICK, 2*HTS_STATS_TICK... run engine_stats() and return
+   its result. The others only reset the counters it resets, and return 0. */
+int engine_stats_tick(unsigned int *calls);
 
 void host_ban(httrackp * opt, int ptr, struct_back * sback, const char *host);
 

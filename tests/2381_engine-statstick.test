@@ -1,18 +1,12 @@
 #!/bin/bash
 #
-# Pins the parse loop's stats throttle: a full engine_stats() every N calls.
+# Pins the engine_stats_tick throttle: a full engine_stats() every 256 calls.
 
 set -euo pipefail
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
 
-out=$(httrack -#test=statstick) || {
-    echo "httrack -#test=statstick exited non-zero: $out" >&2
-    exit 1
-}
+require_httrack
 
-case "$out" in
-"statstick self-test OK (770 calls)"*) ;;
-*)
-    echo "expected 'statstick self-test OK (770 calls)', got: $out" >&2
-    exit 1
-    ;;
-esac
+# 770 calls is 3 * HTS_STATS_TICK + 2, so changing the tick alone fails here.
+assert_selftest 'statstick self-test OK (770 calls)' statstick
