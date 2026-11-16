@@ -67,10 +67,6 @@ Please visit our Website: http://www.httrack.com
    url_savename() maps '~' to '_', so no URL lands inside it (#774). */
 #define HTS_TMPDIR "~hts-tmp"
 
-/* Spooled slots held in memory before the rest go to ~hts-tmp files: a 30k-page
-   crawl's whole frontier fits, and a larger one spills only its excess. */
-#define HTS_SPOOL_MEM_MAX ((size_t) 64 * 1024 * 1024)
-
 /* A spooled slot in the ready table, followed in the same allocation by its
    record, or by the name of the file holding it. */
 typedef struct back_spooled {
@@ -98,6 +94,8 @@ typedef struct back_source {
 } back_source;
 
 static back_spooled *back_spool_record(const lien_back *back);
+static size_t back_spool_room(httrackp *opt, const struct_back *sback,
+                              const lien_back *self);
 static int back_record_read(back_source *s, lien_back **dst);
 
 /* Slot operations */
@@ -376,13 +374,14 @@ struct_back *back_new(httrackp *opt, int back_max) {
   hts_set_hash_handler(sback->ready, opt);
   coucal_set_name(sback->ready, "back_new");
   sback->ready_size_bytes = 0;
-  sback->ready_mem_max = HTS_SPOOL_MEM_MAX;
+  sback->ready_mem_max = -1;
   {
-    /* a test forces the disk spool with 0 */
+    /* Debug/test hook: HTTRACK_DEBUG_SPOOL_MEM=N replaces opt->maxcache as the
+       spool's memory budget, and 0 forces the disk spool. */
     const char *const max = getenv("HTTRACK_DEBUG_SPOOL_MEM");
 
     if (max != NULL && isdigit((unsigned char) max[0]))
-      sback->ready_mem_max = (size_t) strtoul(max, NULL, 10);
+      sback->ready_mem_max = (LLint) strtoul(max, NULL, 10);
   }
   coucal_value_is_malloc(sback->ready, 1);
   // init
@@ -637,7 +636,7 @@ static int back_index_ready(httrackp * opt, struct_back * sback, const char *adr
         back_set_locked(sback, q);                 /* locked */
         return q;
       }
-      coucal_remove(sback->ready, sav); /* its file is gone */
+      coucal_remove(sback->ready, sav); /* it could not be read back */
     }
   }
   return -1;
@@ -692,9 +691,8 @@ int back_cleanup_background(httrackp *opt, cache_back *cache,
                                   back[i].url_sav, 0) != -1) {
         continue; /* no slot to wake the duplicate: spooling would orphan it */
       }
-      /* spool the entry, in memory up to the cap and in ~hts-tmp past it */
       {
-        const size_t room = sback->ready_mem_max - sback->ready_mem_bytes;
+        const size_t room = back_spool_room(opt, sback, &back[i]);
         const size_t body = back[i].r.adr != NULL ? (size_t) back[i].r.size : 0;
         /* a body alone past the room cannot fit, so it streams to disk */
         back_spooled *rec = body < room ? back_spool_record(&back[i]) : NULL;
@@ -706,7 +704,7 @@ int back_cleanup_background(httrackp *opt, cache_back *cache,
           sback->ready_size_bytes += back[i].r.size;
           nclean++;
           back_clear_entry(&back[i]);
-          continue;
+          continue; /* rec now belongs to the table */
         }
         {
           /* filecreate() aborts on a longer name */
@@ -714,30 +712,30 @@ int back_cleanup_background(httrackp *opt, cache_back *cache,
           const hts_boolean named =
               back_spoolname(opt, tmpname, sizeof(tmpname));
           const size_t namelen = named ? strlen(tmpname) + 1 : 0;
-          back_spooled *file =
+          back_spooled *ondisk =
               named ? malloct(BACK_SPOOLED_HEAD + namelen) : NULL;
 
-          if (file != NULL) {
-            file->len = 0;
-            memcpy(BACK_SPOOLED_DATA(file), tmpname, namelen);
+          if (ondisk != NULL) {
+            ondisk->len = 0;
+            memcpy(BACK_SPOOLED_DATA(ondisk), tmpname, namelen);
             /* Security check */
-            if (fexist_utf8(BACK_SPOOLED_DATA(file))) {
+            if (fexist_utf8(BACK_SPOOLED_DATA(ondisk))) {
               hts_log_print(opt, LOG_WARNING,
                             "engine: warning: temporary file %s already exists",
-                            BACK_SPOOLED_DATA(file));
+                            BACK_SPOOLED_DATA(ondisk));
             }
-            if (back_spool_put(opt, BACK_SPOOLED_DATA(file), &back[i], rec)) {
+            if (back_spool_put(opt, BACK_SPOOLED_DATA(ondisk), &back[i], rec)) {
               hts_log_print(opt, LOG_DEBUG, "engine: spooled %s to %s",
-                            back[i].url_sav, BACK_SPOOLED_DATA(file));
-              coucal_add_pvoid(sback->ready, back[i].url_sav, file);
-              file = NULL;
+                            back[i].url_sav, BACK_SPOOLED_DATA(ondisk));
+              coucal_add_pvoid(sback->ready, back[i].url_sav, ondisk);
+              ondisk = NULL;
               sback->ready_files++;
               sback->ready_size_bytes += back[i].r.size;
               nclean++;
               back_clear_entry(&back[i]);
             }
-            if (file != NULL)
-              freet(file);
+            if (ondisk != NULL)
+              freet(ondisk);
           } else {
             hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
                           "engine: warning: serialize error for %s%s: %s",
@@ -769,18 +767,44 @@ int back_available(const struct_back * sback) {
 }
 
 /* Estimated bytes of the pages and files held in memory. */
+/* Bytes one slot holds in memory, as back_incache() counts them. */
+static LLint back_slot_incache(const lien_back *back) {
+  if (back->r.adr == NULL)
+    return 0;
+  return max(hts_load_relaxed_llint(&back->r.size),
+             hts_load_relaxed_llint(&back->r.totalsize));
+}
+
 LLint back_incache(const struct_back * sback) {
   const lien_back *const back = sback->lnk;
   int i;
   LLint sum = 0;
 
   BACK_FOR_EACH_BUSY(sback, i) {
-    if (back_status(&back[i]) != STATUS_FREE &&
-        back[i].r.adr != NULL) // count only blocks held in memory
-      sum += max(hts_load_relaxed_llint(&back[i].r.size),
-                 hts_load_relaxed_llint(&back[i].r.totalsize));
+    if (back_status(&back[i]) != STATUS_FREE)
+      sum += back_slot_incache(&back[i]);
   }
   return sum;
+}
+
+/* Bytes left in opt->maxcache for one more in-memory spool record, once the
+   other slots' bodies and the records already held are counted. */
+static size_t back_spool_room(httrackp *opt, const struct_back *sback,
+                              const lien_back *self) {
+  const LLint budget =
+      sback->ready_mem_max >= 0 ? sback->ready_mem_max : (LLint) opt->maxcache;
+  LLint used = back_incache(sback) - back_slot_incache(self);
+  uint64_t left;
+
+  if (used < 0)
+    used = 0;
+  if (budget <= used)
+    return 0;
+  left = (uint64_t) (budget - used);
+  if (left <= (uint64_t) sback->ready_mem_bytes)
+    return 0;
+  left -= (uint64_t) sback->ready_mem_bytes;
+  return left > (uint64_t) SIZE_MAX ? SIZE_MAX : (size_t) left;
 }
 
 /* Counts finished results not yet taken, in slots or spooled. */
@@ -1823,10 +1847,13 @@ int back_unserialize(FILE *fp, lien_back **dst) {
   return back_record_read(&s, dst);
 }
 
-/* Builds the slot's spool record in one allocation; NULL on failure. */
+/* Builds the slot's spool record in one allocation, which the caller frees
+   with freet(). Returns NULL on failure. */
 static back_spooled *back_spool_record(const lien_back *back) {
   back_sink s;
   char *buf;
+  void *mem;
+  back_spooled *rec;
 
   memset(&s, 0, sizeof(s));
   s.cap = BACK_SPOOLED_HEAD + 4096;
@@ -1839,8 +1866,10 @@ static back_spooled *back_spool_record(const lien_back *back) {
   }
   if (s.len < s.cap && (buf = realloct(s.buf, s.len)) != NULL)
     s.buf = buf;
-  ((back_spooled *) s.buf)->len = s.len - BACK_SPOOLED_HEAD;
-  return (back_spooled *) s.buf;
+  mem = s.buf;
+  rec = mem;
+  rec->len = s.len - BACK_SPOOLED_HEAD;
+  return rec;
 }
 
 /* --- the .ref resume state -------------------------------------------------

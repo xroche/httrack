@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # A completed FTP transfer used to end as a 0-byte file when its ready backlog
-# slot was swapped to the on-disk table (#797): the FTP worker writes url_sav
+# slot was swapped out to the spool (#797): the FTP worker writes url_sav
 # itself and leaves no in-memory body, and the swap round-trip zeroed the slot's
 # size, so the link writer then created an empty file over the bytes.
 
@@ -17,8 +17,7 @@ tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ftp.XXXXXX")
 cleanup_push rm -rf "$tmpdir"
 
 root="${tmpdir}/root"
-out="${tmpdir}/crawl"
-mkdir -p "$root" "$out"
+mkdir -p "$root"
 
 # Distinct bodies and lengths, so a mirror that mixed two of them up cannot
 # compare equal.
@@ -42,24 +41,31 @@ done
 # parser from picking it up. -Z because the swap only logs at debug level, and
 # the run below proves nothing unless it happened. Bounded like every crawl
 # pass: a wedge must fail the test, not hang the job until CI discards the log.
-# a zero cap sends the spool to disk rather than memory
-HTTRACK_DEBUG_SPOOL_MEM=0 run_with_timeout 300 httrack "${urls[@]}" -O "$out" --quiet -Z -c8 \
-    --disable-security-limits --robots=0 --timeout=20 --max-time=120 --retries=1 \
-    >"${tmpdir}/log" 2>&1
+# $1 names the run and $2 is HTTRACK_DEBUG_SPOOL_MEM: 0 forces the disk spool,
+# '' keeps the default memory budget. $3 is the debug line proving the swap.
+crawl() {
+    local out="${tmpdir}/$1" swapped errors
+    HTTRACK_DEBUG_SPOOL_MEM=$2 run_with_timeout 300 httrack "${urls[@]}" -O "$out" --quiet -Z -c8 \
+        --disable-security-limits --robots=0 --timeout=20 --max-time=120 --retries=1 \
+        >"${tmpdir}/$1.log" 2>&1
 
-swapped=$(count_matching_lines 'engine: spooled .* to ' "${out}/hts-log.txt")
-test "${swapped:-0}" -gt 0 ||
-    fail "no ready slot was swapped to disk; this run never reached the bug"
-ok "the crawl swapped ready slots to the on-disk table ${swapped} times"
+    swapped=$(count_matching_lines "$3" "${out}/hts-log.txt")
+    test "${swapped:-0}" -gt 0 ||
+        fail "$1: no ready slot was swapped out; this run never reached the bug"
+    ok "$1: the crawl swapped ready slots out ${swapped} times"
 
-for name in $names; do
-    test -f "${out}/${host}/${name}.bin" || fail "${name}.bin was not mirrored"
-    cmp -s "${out}/${host}/${name}.bin" "${root}/${name}.bin" ||
-        fail "${name}.bin has $(size_of "${out}/${host}/${name}.bin") of the" \
-            "$(size_of "${root}/${name}.bin") bytes served"
-done
-ok "every FTP transfer landed on disk intact"
+    for name in $names; do
+        test -f "${out}/${host}/${name}.bin" || fail "$1: ${name}.bin was not mirrored"
+        cmp -s "${out}/${host}/${name}.bin" "${root}/${name}.bin" ||
+            fail "$1: ${name}.bin has $(size_of "${out}/${host}/${name}.bin") of the" \
+                "$(size_of "${root}/${name}.bin") bytes served"
+    done
+    ok "$1: every FTP transfer landed on disk intact"
 
-errors=$(grep -a 'Error:' "${out}/hts-log.txt" || true)
-test -z "$errors" || fail "the crawl reported errors: ${errors}"
-ok "no transfer was reported failed"
+    errors=$(grep -a 'Error:' "${out}/hts-log.txt" || true)
+    test -z "$errors" || fail "$1: the crawl reported errors: ${errors}"
+    ok "$1: no transfer was reported failed"
+}
+
+crawl disk 0 'engine: spooled .* to '
+crawl memory '' 'slots ready moved to background'

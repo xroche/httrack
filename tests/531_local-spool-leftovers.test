@@ -48,7 +48,7 @@ fi
 
 crawl() {
     local rc=0
-    # a zero cap sends the spool to disk rather than memory
+    # 0 forces the disk spool
     HTTRACK_DEBUG_SPOOL_MEM=0 local_crawl --log "${tmpdir}/log" -O "${tmpdir}/out" --quiet --disable-security-limits --robots=0 --timeout=30 --retries=0 -Z -p0 -N '%n' -c4 "http://127.0.0.1:${SRV_PORT}/bakname/index.html" || rc=$?
     test "$rc" -eq 0 || fail_dump "httrack exited $rc" "${tmpdir}/log"
 }

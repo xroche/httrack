@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# Spooled slots stay in memory up to a byte cap and go to ~hts-tmp past it. The
-# mirror must not depend on where they waited.
+# Spooled slots stay in memory within the budget and go to ~hts-tmp past it.
+# The mirror must not depend on where they waited.
 
 set -euo pipefail
 # shellcheck source=tests/crawllib.sh
@@ -16,8 +16,8 @@ assert_selftest 'spoolmem: OK' spoolmem "$tmpdir/st"
 
 local_server_start
 
-# $1 names the run, $2 is the cap: unset (the default, all in memory), 0 (all on
-# disk), or small enough to send part of the frontier to disk.
+# $1 names the run, $2 is the budget: '' (the default, all in memory), 0 (all
+# on disk), or small enough to send part of the frontier to disk.
 crawl() {
     local rc=0
     HTTRACK_DEBUG_SPOOL_MEM=$2 local_crawl --log "$tmpdir/$1.log" \
@@ -25,19 +25,20 @@ crawl() {
         --timeout=30 --retries=0 -Z -c8 -%c0 -%F '' \
         "http://127.0.0.1:${SRV_PORT}/big/index.html" || rc=$?
     test "$rc" -eq 0 || fail_dump "$1: httrack exited $rc" "$tmpdir/$1.log"
-    moved=$(count_matching_lines 'slots ready moved to background' \
-        "$tmpdir/$1/hts-log.txt")
+    moved=$(sed -n 's/.* \([0-9][0-9]*\) slots ready moved to background.*/\1/p' \
+        "$tmpdir/$1/hts-log.txt" | awk '{n += $1} END {print n + 0}')
     test "$moved" -gt 0 || fail "$1: no slot was spooled"
     test ! -e "$tmpdir/$1/~hts-tmp" || fail "$1: ~hts-tmp was left behind"
     files=$(count_matching_lines 'engine: spooled .* to ' "$tmpdir/$1/hts-log.txt")
 }
 
 crawl mem ''
-test "$files" -eq 0 || fail "the default cap sent $files slots to disk"
+test "$files" -eq 0 || fail "the default budget sent $files slots to disk"
 crawl disk 0
-test "$files" -gt 0 || fail "a zero cap kept every slot in memory"
+test "$files" -eq "$moved" || fail "a zero budget kept a slot in memory"
 crawl mixed 4096
-test "$files" -gt 0 || fail "a 4 KB cap kept every slot in memory"
+test "$files" -gt 0 || fail "a 4 KB budget kept every slot in memory"
+test "$files" -lt "$moved" || fail "a 4 KB budget kept no slot in memory"
 for run in disk mixed; do
     diff -r -x hts-cache -x hts-log.txt "$tmpdir/mem" "$tmpdir/$run" >"$tmpdir/diff" ||
         fail_dump "the $run mirror differs from the in-memory one" "$tmpdir/diff"
