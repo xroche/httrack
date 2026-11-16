@@ -113,80 +113,67 @@ static hts_boolean strippedToComponentEnd(const char *s) {
   return *s == '\0' || *s == '/' ? HTS_TRUE : HTS_FALSE;
 }
 
-/* Does a component of save start with one of names, ignoring case? */
-static hts_boolean hasReservedPrefix(const char *save,
-                                     const char *const *names) {
-  const char *c = save;
+/* Length of the name in names that a reserved component of save starts with
+   at c, or 0. */
+static size_t reservedNameAt(const char *save, const char *c,
+                             const char *const *names) {
+  int i;
 
-  for (;;) {
-    int i;
+  for (i = 0; names[i][0] != '\0'; i++) {
+    const size_t len = (size_t) strfield(c, names[i]);
 
-    for (i = 0; names[i][0] != '\0'; i++) {
-      if (strfield(c, names[i]) != 0)
-        return HTS_TRUE;
+    if (len == 0)
+      continue;
+    if (c == save) {
+      /* save has had its leading '/' stripped above, so the table's anchor
+         never reached the first component (#842). It usually holds the
+         hostname, so only a trailing run may end it here: '.' would rename
+         aux.example.com. */
+      if (strippedToComponentEnd(c + len))
+        return len;
+    } else {
+      switch ((int) c[len]) {
+      case '\0':
+      case '/':
+      case '.':
+        return len;
+      case ' ':
+        /* cleanEndingSpaceOrDot() runs after us and hands the name back */
+        if (strippedToComponentEnd(c + len))
+          return len;
+        break;
+      }
     }
-    c = strchr(c, '/');
-    if (c == NULL)
-      return HTS_FALSE;
-    c++;
   }
+  return 0;
 }
 
 /* Replace foo/<reserved>/bar by foo/<reserved>_/bar, matching a whole path
    component only (case-insensitively: the filesystem may be too). */
 static void escapeReservedNames(char *save, size_t size,
                                 const char *const *names) {
-  int i;
+  char *c = save;
 
-  /* one walk settles almost every path */
-  if (!hasReservedPrefix(save, names))
+  if (size == 0)
     return;
-  /* name by name, as a clip can change what a later component holds */
-  for (i = 0; names[i][0] != '\0'; i++) {
-    const size_t len = strlen(names[i]);
-    char *a = save;
+  for (;;) {
+    const size_t len = reservedNameAt(save, c, names);
 
-    for (;;) {
-      const hts_boolean named = strfield(a, names[i]) != 0;
-      hts_boolean reserved = HTS_FALSE;
+    if (len != 0) {
+      const size_t total = strlen(save);
 
-      if (named && a == save) {
-        /* save has had its leading '/' stripped above, so the table's anchor
-           never reached the first component (#842). It usually holds the
-           hostname, so only a trailing run may end it here: '.' would rename
-           aux.example.com. */
-        reserved = strippedToComponentEnd(a + len);
-      } else if (named) {
-        switch ((int) a[len]) {
-        case '\0':
-        case '/':
-        case '.':
-          reserved = HTS_TRUE;
-          break;
-        case ' ':
-          /* cleanEndingSpaceOrDot() runs after us and hands the name back */
-          reserved = strippedToComponentEnd(a + len);
-          break;
-        }
+      /* a full buffer loses the name's last byte, never the path's tail */
+      if (total < size - 1) {
+        memmove(c + len + 1, c + len, total - (size_t) (c - save) - len + 1);
+        c[len] = '_';
+      } else {
+        c[len - 1] = '_';
       }
-      if (reserved) {
-        const size_t at = (size_t) (a - save) + len;
-        const size_t total = strlen(save);
-
-        /* clip rather than abort: the name comes from the wire */
-        if (at < size - 1) {
-          const size_t keep = total < size - 1 ? total - at : size - 2 - at;
-
-          memmove(save + at + 1, save + at, keep);
-          save[at] = '_';
-          save[at + 1 + keep] = '\0';
-        }
-      }
-      a = strchr(a, '/');
-      if (a == NULL)
-        break;
-      a++;
     }
+    c = strchr(c, '/');
+    if (c == NULL)
+      break;
+    c++;
   }
 }
 
