@@ -9,10 +9,10 @@ set -euo pipefail
 . "${0%"${0##*/}"}./testlib.sh"
 
 # The count is exact, so a shrinking table shows.
-selftest_queue_lines "reserved: 103 cases, 0 failures
+selftest_queue_lines "reserved: 104 cases, 0 failures
 reserved: OK" reserved
 
-# A device name in a full save name loses its last byte, it used to abort.
+# A device name in a full save name loses its last byte.
 selftest_queue_tail '/co_.html' savename '/*/con' text/html filpad=2022
 
 selftest_run_queued

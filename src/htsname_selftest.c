@@ -2082,6 +2082,7 @@ static int st_reserved(httrackp *opt, int argc, char **argv) {
       {9, "aux/con", "aux_/co_"},
       {9, "aux/conx", "au_/conx"},
       {9, "nul/con.", "nu_/co_."},
+      {10, "d/con.txt", "d/co_.txt"},
       {10, "hts-cache", "hts-cach_"},
       {7, "d/lpt1", "d/lpt_"},
       {10, "d/con   x", "d/con   x"},

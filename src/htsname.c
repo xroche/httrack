@@ -113,8 +113,7 @@ static hts_boolean strippedToComponentEnd(const char *s) {
   return *s == '\0' || *s == '/' ? HTS_TRUE : HTS_FALSE;
 }
 
-/* Length of the name in names that a reserved component of save starts with
-   at c, or 0. */
+/* Return the length of the name in names that the component at c is, or 0. */
 static size_t reservedNameAt(const char *save, const char *c,
                              const char *const *names) {
   int i;
@@ -178,8 +177,6 @@ static void escapeReservedNames(char *save, size_t size,
 }
 
 void url_savename_escape_reserved(char *save, size_t size) {
-  /* Runs on every platform, and before path_html is prepended, so the user's
-     own output directory is never renamed. */
   escapeReservedNames(save, size, hts_tbreserved);
   escapeReservedNames(save, size, hts_tbdev);
 }
@@ -1809,6 +1806,8 @@ int url_savename(lien_adrfilsave *const afs,
   // éliminer les // (comme ftp://)
   cleanDoubleSlash(afs->save);
 
+  /* Before path_html is prepended, so the user's own output directory keeps
+     its name. */
   url_savename_escape_reserved(afs->save, sizeof(afs->save));
 
   /* Strip ending . or ' ' forbidden on windoz */
