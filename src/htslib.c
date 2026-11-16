@@ -2849,8 +2849,6 @@ int ident_url_absolute(const char *url, lien_adrfil *adrfil) {
 /* simplify ../ and ./ */
 void fil_simplifie(char *f) {
   char *a, *b;
-  char *rollback[128];
-  int rollid = 0;
   char lc = '/';
   int query = 0;
   int wasAbsolute = (*f == '/');
@@ -2865,24 +2863,15 @@ void fil_simplifie(char *f) {
         a += 2;
       else
         a += 3;
-      if (rollid > 1) {
-        rollid--;
-        b = rollback[rollid - 1];
-      } else {                  /* too many ../ */
-        rollid = 0;
-        b = f;
-        if (wasAbsolute)
-          b++;                  /* after the / */
-      }
+      /* drop the last segment written, never past the root */
+      if (b > f)
+        b--;
+      while (b > f && b[-1] != '/')
+        b--;
+      if (wasAbsolute && b == f)
+        b++;
     } else {
       *b++ = lc = *a;
-      if (*a == '/') {
-        rollback[rollid++] = b;
-        if (rollid >= 127) {
-          *f = '\0';            /* ERROR */
-          break;
-        }
-      }
       a++;
     }
   }

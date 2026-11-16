@@ -385,6 +385,7 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
   const char *bodyfile = "st-savename-body.tmp";
   int statuscode = HTTP_OK, status = 0;
   int filpad = 0;
+  const char *padunit = "a"; /* the bytes filpad repeats */
   int nosback = 0;
   int rc = 0;
   int i;
@@ -421,6 +422,8 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
       cached = a + 7;
     else if (strncmp(a, "filpad=", 7) == 0)
       filpad = atoi(a + 7);
+    else if (strncmp(a, "padunit=", 8) == 0 && a[8] != '\0')
+      padunit = a + 8;
     else if (strncmp(a, "delayed=", 8) == 0) /* -%N */
       opt->savename_delayed = (hts_savename_delayed) atoi(a + 8);
     else if (strncmp(a, "nosback=", 8) == 0) /* as -#C: no backing at all */
@@ -447,6 +450,8 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
        being capped at HTS_CDLMAXSIZE (htscoremain.c) */
     const char *const star = strchr(argv[0], '*');
     char BIGSTK pad[HTS_URLMAXSIZE * 2];
+    const size_t unit = strlen(padunit);
+    size_t j;
 
     /* refuse rather than let the harness itself abort in strcatbuff */
     if (star == NULL ||
@@ -454,7 +459,8 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
       fprintf(stderr, "savename: filpad needs a '*' in the fil, and room\n");
       return 1;
     }
-    memset(pad, 'a', (size_t) filpad);
+    for (j = 0; j < (size_t) filpad; j++)
+      pad[j] = padunit[j % unit];
     pad[filpad] = '\0';
     strncatbuff(afs->af.fil, argv[0], star - argv[0]);
     strcatbuff(afs->af.fil, pad);
