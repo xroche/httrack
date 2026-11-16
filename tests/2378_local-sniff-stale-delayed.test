@@ -1,0 +1,38 @@
+#!/bin/bash
+#
+# An empty body is named from its wire type, never by sniffing a previous run's
+# .delayed placeholder left under the same name.
+
+set -euo pipefail
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_2378.XXXXXX")
+cleanup_push rm -rf "$tmpdir"
+require_httrack
+
+# crawl NAME [STALE]: STALE plants JPEG magic under e.jpg's placeholder names.
+crawl() {
+    local out="$tmpdir/$1" dir i
+    local_server_start --log "$tmpdir/server-$1.log"
+    dir="$out/127.0.0.1_$SRV_PORT/emptysniff"
+    mkdir -p "$dir"
+    if [ $# -gt 1 ]; then
+        for i in 0 1 2 3; do
+            printf '\377\330\377\340stale' >"$dir/e.jpg.$i.delayed"
+        done
+    fi
+    local_crawl --log "$tmpdir/crawl-$1.log" -O "$out" -%N2 -c1 -Z \
+        --quiet --timeout=30 --robots=0 "$BASEURL/emptysniff/index.html"
+    local_server_stop "$SRV_PID"
+
+    assert_file "$dir/e.png"
+    test ! -e "$dir/e.jpg" || fail "$1: e.jpg was named from a stale placeholder"
+    # f.jpg holds JPEG magic served as image/png: the sniff keeps .jpg.
+    assert_file "$dir/f.jpg"
+}
+
+crawl fresh
+crawl stale 1
+assert_logged "$tmpdir/stale" "removed a stale placeholder .*e\\.jpg\\.[0-9]\\.delayed" \
+    "the stale placeholder was not under e.jpg's name"
