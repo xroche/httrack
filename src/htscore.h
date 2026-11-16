@@ -172,8 +172,8 @@ struct struct_back {
                                See struct lien_back in htsopt.h and the
                                STATUS_* codes in htsbasenet.h. */
   int count;              /**< number of usable slots (back_max) */
-  coucal ready;           /**< slots whose transfer completed, by save name:
-                               each a record, in memory or in a ~hts-tmp file */
+  coucal ready;           /**< completed slots by save name, each a record in
+                               memory or in ~hts-tmp */
   LLint ready_size_bytes; /**< total bytes buffered in completed slots */
   size_t ready_mem_bytes; /**< bytes of the ready entries held in memory */
   LLint ready_mem_max;    /**< memory budget override; -1 uses opt->maxcache */

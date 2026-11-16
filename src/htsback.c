@@ -766,7 +766,6 @@ int back_available(const struct_back * sback) {
   return nb;
 }
 
-/* Estimated bytes of the pages and files held in memory. */
 /* Bytes one slot holds in memory, as back_incache() counts them. */
 static LLint back_slot_incache(const lien_back *back) {
   if (back->r.adr == NULL)
@@ -775,6 +774,7 @@ static LLint back_slot_incache(const lien_back *back) {
              hts_load_relaxed_llint(&back->r.totalsize));
 }
 
+/* Estimated bytes of the pages and files held in memory. */
 LLint back_incache(const struct_back * sback) {
   const lien_back *const back = sback->lnk;
   int i;
@@ -787,8 +787,7 @@ LLint back_incache(const struct_back * sback) {
   return sum;
 }
 
-/* Bytes left in opt->maxcache for one more in-memory spool record, once the
-   other slots' bodies and the records already held are counted. */
+/* Bytes left in the spool's memory budget for one more record. */
 static size_t back_spool_room(httrackp *opt, const struct_back *sback,
                               const lien_back *self) {
   const LLint budget =

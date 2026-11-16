@@ -1228,6 +1228,37 @@ static int st_spoolmem_tiny(httrackp *opt, const char *dir, LLint room) {
   return err;
 }
 
+/* With s0 held in memory, a busy slot's body grows until the budget left is
+   below what is held, so s1 must go to disk. */
+static int st_spoolmem_grown(httrackp *opt, const char *dir, size_t unit) {
+  struct_back *sback = back_new(opt, 4);
+  cache_back cache;
+  int err = 0;
+  int k;
+
+#define CHECK(cond) ST_CHECK(err, cond)
+  if (sback == NULL)
+    return 1;
+  sback->ready_mem_max = (LLint) unit + 150;
+  memset(&cache, 0, sizeof(cache));
+  CHECK(st_spoolmem_slot(&sback->lnk[0], dir, 0));
+  CHECK(back_cleanup_background(opt, &cache, sback) == 1);
+  CHECK(sback->ready_mem_bytes == unit && sback->ready_files == 0);
+  CHECK(st_spoolmem_slot(&sback->lnk[1], dir, 1));
+  CHECK(st_spoolmem_slot(&sback->lnk[2], dir, 2));
+  sback->lnk[2].status = STATUS_TRANSFER;
+  sback->lnk[2].r.totalsize = 200;
+  CHECK(back_cleanup_background(opt, &cache, sback) == 1);
+  CHECK(sback->ready_mem_bytes == unit && sback->ready_files == 1);
+  back_clear_entry(&sback->lnk[2]);
+  back_delete_all(opt, &cache, sback);
+  for (k = 0; k < sback->count; k++)
+    back_clear_entry(&sback->lnk[k]);
+  back_free(&sback);
+#undef CHECK
+  return err;
+}
+
 // -#test=spoolmem <dir>: spooled slots stay in memory within the budget.
 static int st_spoolmem(httrackp *opt, int argc, char **argv) {
   char base[HTS_URLMAXSIZE];
@@ -1262,9 +1293,16 @@ static int st_spoolmem(httrackp *opt, int argc, char **argv) {
   err += st_spoolmem_round(opt, argv[0], -1, 7, unit);
   err += st_spoolmem_round(opt, argv[0], 2 * u + 100, 3, unit);
   err += st_spoolmem_round(opt, argv[0], 2 * u + 99, 5, unit);
-  err +=
-      st_spoolmem_round(opt, argv[0], 150, 0, unit); /* bodies alone exceed */
+  err += st_spoolmem_round(opt, argv[0], u + 150, 2, unit); /* s0 by bodies */
   err += st_spoolmem_round(opt, argv[0], 0, 0, unit);
+  {
+    const int saved = opt->maxcache;
+
+    opt->maxcache = (int) (2 * u + 99); /* the default budget is maxcache */
+    err += st_spoolmem_round(opt, argv[0], -1, 5, unit);
+    opt->maxcache = saved;
+  }
+  err += st_spoolmem_grown(opt, argv[0], unit);
   {
     LLint room;
 

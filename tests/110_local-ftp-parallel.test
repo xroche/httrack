@@ -69,3 +69,6 @@ crawl() {
 
 crawl disk 0 'engine: spooled .* to '
 crawl memory '' 'slots ready moved to background'
+files=$(count_matching_lines 'engine: spooled .* to ' "${tmpdir}/memory/hts-log.txt")
+test "${files:-0}" -eq 0 || fail "memory: the default budget sent ${files} slots to disk"
+ok "memory: every ready slot stayed in memory"
