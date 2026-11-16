@@ -1052,7 +1052,7 @@ dump_crawl_logs() {
     local d f
     for d in "${TMPDIR:-/tmp}"/httrack_local.*; do
         test -d "$d" || continue
-        for f in "$d/crawl/hts-log.txt" "$d/log" "$d/log.2"; do
+        for f in "$d/crawl/hts-log.txt" "$d/console" "$d/console.2" "$d/console.dead"; do
             test -f "$f" || continue
             # Leading newline: the killed test's last line has no terminator.
             printf '\n--- %s (last 200 lines)\n' "$f"

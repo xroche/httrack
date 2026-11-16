@@ -23,7 +23,13 @@ test -z "$(dump_crawl_logs)" || fail "dumped something with no crawl tmpdir"
 d="${TMPDIR}/httrack_local.probe"
 mkdir -p "$d/crawl"
 echo "$verdict" >"$d/crawl/hts-log.txt"
-echo "httrack stdout marker" >"$d/log"
+echo "httrack stdout marker" >"$d/console"
+echo "httrack retry marker" >"$d/console.2"
+echo "httrack dead marker" >"$d/console.dead"
+# The name local-crawl.sh captures the engine's output under.
+# shellcheck disable=SC2016 # a literal line of that script
+grep -qF 'console="${tmpdir}/console"' "${0%"${0##*/}"}./local-crawl.sh" ||
+    fail "local-crawl.sh no longer writes the console file dump_crawl_logs reads"
 
 # Append to an unterminated line, as a killed test's own log always ends.
 art="${TMPDIR}/artifact.log"
@@ -32,6 +38,8 @@ dump_crawl_logs >>"$art"
 
 grep -qF "$verdict" "$art" || fail "hts-log.txt verdict not salvaged"
 grep -qF "httrack stdout marker" "$art" || fail "httrack stdout not salvaged"
+grep -qF "httrack retry marker" "$art" || fail "console.2 not salvaged"
+grep -qF "httrack dead marker" "$art" || fail "console.dead not salvaged"
 grep -q '^--- .*hts-log.txt' "$art" || fail "dump glued its header onto the unterminated line"
 
 # Cleared, so the next timing-out test cannot re-report this crawl as its own.
