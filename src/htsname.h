@@ -107,6 +107,9 @@ hts_boolean url_query_value(const char *url, const char *name, char *dst,
 /* Append s to d (mapping '\' to '/'), clipped to dsize bytes including the NUL.
    Clips rather than aborts: s is a crawled link, hostile by construction. */
 void url_savename_addstr(char *d, size_t dsize, const char *s);
+/* Append '_' to each component of save (size bytes) that names a DOS device
+   or an engine directory, clipping at size. */
+void url_savename_escape_reserved(char *save, size_t size);
 /* Append sep+s to d whole, cutting d's tail (never inside a UTF-8 character)
    for room, so the suffix always survives; nothing happens if it alone fills
    dsize. */

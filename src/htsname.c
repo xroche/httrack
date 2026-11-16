@@ -113,26 +113,50 @@ static hts_boolean strippedToComponentEnd(const char *s) {
   return *s == '\0' || *s == '/' ? HTS_TRUE : HTS_FALSE;
 }
 
+/* Does a component of save start with one of names, ignoring case? */
+static hts_boolean hasReservedPrefix(const char *save,
+                                     const char *const *names) {
+  const char *c = save;
+
+  for (;;) {
+    int i;
+
+    for (i = 0; names[i][0] != '\0'; i++) {
+      if (strfield(c, names[i]) != 0)
+        return HTS_TRUE;
+    }
+    c = strchr(c, '/');
+    if (c == NULL)
+      return HTS_FALSE;
+    c++;
+  }
+}
+
 /* Replace foo/<reserved>/bar by foo/<reserved>_/bar, matching a whole path
    component only (case-insensitively: the filesystem may be too). */
 static void escapeReservedNames(char *save, size_t size,
                                 const char *const *names) {
   int i;
 
+  /* one walk settles almost every path */
+  if (!hasReservedPrefix(save, names))
+    return;
+  /* name by name, as a clip can change what a later component holds */
   for (i = 0; names[i][0] != '\0'; i++) {
-    const char *a = save;
     const size_t len = strlen(names[i]);
+    char *a = save;
 
-    while ((a = strstrcase(a, names[i]))) {
+    for (;;) {
+      const hts_boolean named = strfield(a, names[i]) != 0;
       hts_boolean reserved = HTS_FALSE;
 
-      if (a == save) {
+      if (named && a == save) {
         /* save has had its leading '/' stripped above, so the table's anchor
            never reached the first component (#842). It usually holds the
            hostname, so only a trailing run may end it here: '.' would rename
            aux.example.com. */
         reserved = strippedToComponentEnd(a + len);
-      } else if (a[-1] == '/') {
+      } else if (named) {
         switch ((int) a[len]) {
         case '\0':
         case '/':
@@ -146,18 +170,31 @@ static void escapeReservedNames(char *save, size_t size,
         }
       }
       if (reserved) {
-        char BIGSTK tempo[HTS_URLMAXSIZE * 2];
+        const size_t at = (size_t) (a - save) + len;
+        const size_t total = strlen(save);
 
-        tempo[0] = '\0';
-        strncatbuff(tempo, save, (int) (a - save) + (int) len);
-        strcatbuff(tempo, "_");
-        strcatbuff(tempo, a + len);
         /* clip rather than abort: the name comes from the wire */
-        (void) strclipbuff(save, size, tempo);
+        if (at < size - 1) {
+          const size_t keep = total < size - 1 ? total - at : size - 2 - at;
+
+          memmove(save + at + 1, save + at, keep);
+          save[at] = '_';
+          save[at + 1 + keep] = '\0';
+        }
       }
-      a += len;
+      a = strchr(a, '/');
+      if (a == NULL)
+        break;
+      a++;
     }
   }
+}
+
+void url_savename_escape_reserved(char *save, size_t size) {
+  /* Runs on every platform, and before path_html is prepended, so the user's
+     own output directory is never renamed. */
+  escapeReservedNames(save, size, hts_tbreserved);
+  escapeReservedNames(save, size, hts_tbdev);
 }
 
 /* Strip all // */
@@ -1785,11 +1822,7 @@ int url_savename(lien_adrfilsave *const afs,
   // éliminer les // (comme ftp://)
   cleanDoubleSlash(afs->save);
 
-  /* Runs on every platform, and before path_html is prepended below, so the
-     user's own output directory is never renamed. */
-  escapeReservedNames(afs->save, sizeof(afs->save), hts_tbreserved);
-
-  escapeReservedNames(afs->save, sizeof(afs->save), hts_tbdev);
+  url_savename_escape_reserved(afs->save, sizeof(afs->save));
 
   /* Strip ending . or ' ' forbidden on windoz */
   cleanEndingSpaceOrDot(afs->save);

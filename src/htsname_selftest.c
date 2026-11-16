@@ -2004,6 +2004,265 @@ static int st_urlbounds(httrackp *opt, int argc, char **argv) {
 /* Registry: this module's tests, in the order -#test lists them. */
 /* ------------------------------------------------------------ */
 
+/* Frozen copy of escapeReservedNames() as it was before the one-walk
+   precheck: one strstrcase() scan of the whole path per name. */
+/* clang-format off */
+static const char *const rd_tbdev[] = {
+  "prn", "con", "aux", "nul",
+  "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9",
+  "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9",
+  "conin$", "conout$", "clock$",
+  "emmxxxx0", "xmsxxxx0", "setverxx",
+  ""
+};
+/* clang-format on */
+static const char *const rd_tbreserved[] = {"hts-cache", "hts-tmp", ""};
+
+static hts_boolean rd_stripped(const char *s) {
+  while (*s == ' ' || *s == '.')
+    s++;
+  return *s == '\0' || *s == '/' ? HTS_TRUE : HTS_FALSE;
+}
+
+static void rd_escape_old(char *save, size_t size, const char *const *names) {
+  int i;
+
+  for (i = 0; names[i][0] != '\0'; i++) {
+    const char *a = save;
+    const size_t len = strlen(names[i]);
+
+    while ((a = strstrcase(a, names[i]))) {
+      hts_boolean reserved = HTS_FALSE;
+
+      if (a == save) {
+        reserved = rd_stripped(a + len);
+      } else if (a[-1] == '/') {
+        switch ((int) a[len]) {
+        case '\0':
+        case '/':
+        case '.':
+          reserved = HTS_TRUE;
+          break;
+        case ' ':
+          reserved = rd_stripped(a + len);
+          break;
+        }
+      }
+      if (reserved) {
+        /* one byte more than the original, which aborted on a full save */
+        char BIGSTK tempo[HTS_URLMAXSIZE * 2 + 1];
+
+        tempo[0] = '\0';
+        strncatbuff(tempo, save, (int) (a - save) + (int) len);
+        strcatbuff(tempo, "_");
+        strcatbuff(tempo, a + len);
+        (void) strclipbuff(save, size, tempo);
+      }
+      a += len;
+    }
+  }
+}
+
+enum { RD_GUARD = 8, RD_BIG = HTS_URLMAXSIZE * 2 };
+
+typedef struct rd_run {
+  char *a, *b;
+  unsigned long cases, failures, rewritten;
+} rd_run;
+
+/* Is the guard past the buffer still untouched? */
+static hts_boolean rd_poisoned(const char *guard) {
+  size_t i;
+
+  for (i = 0; i < RD_GUARD; i++) {
+    if (guard[i] != '#')
+      return HTS_FALSE;
+  }
+  return HTS_TRUE;
+}
+
+/* Run old and new on path in a size-byte buffer, poisoned past its end. */
+static void rd_case(rd_run *run, const char *path, size_t size) {
+  const size_t len = strlen(path);
+
+  if (len >= size || size > RD_BIG)
+    return;
+  memset(run->a, '#', size + RD_GUARD);
+  memcpy(run->a, path, len + 1);
+  memcpy(run->b, run->a, size + RD_GUARD);
+  rd_escape_old(run->a, size, rd_tbreserved);
+  rd_escape_old(run->a, size, rd_tbdev);
+  url_savename_escape_reserved(run->b, size);
+  run->cases++;
+  if (strcmp(run->a, path) != 0)
+    run->rewritten++;
+  if (strcmp(run->a, run->b) != 0 || !rd_poisoned(run->a + size) ||
+      !rd_poisoned(run->b + size)) {
+    if (run->failures++ < 10)
+      printf("reservediff: '%s' size %lu: old '%s', new '%s'\n", path,
+             (unsigned long) size, run->a, run->b);
+  }
+}
+
+/* The three sizes: room to spare, an exact fit, and one spare byte. */
+static void rd_sizes(rd_run *run, const char *path) {
+  rd_case(run, path, RD_BIG);
+  rd_case(run, path, strlen(path) + 1);
+  rd_case(run, path, strlen(path) + 2);
+}
+
+/* Write name into dst in case variant k (0 to 4). */
+static void rd_case_variant(char *dst, const char *name, int k) {
+  size_t i;
+
+  for (i = 0; name[i] != '\0'; i++) {
+    const unsigned char c = (unsigned char) name[i];
+    const hts_boolean up = k == 1 || (k == 2 && i == 0) ||
+                           (k == 3 && i % 2 == 0) || (k == 4 && i % 2 == 1);
+
+    dst[i] = up && c >= 'a' && c <= 'z' ? (char) (c - 'a' + 'A') : (char) c;
+  }
+  dst[i] = '\0';
+}
+
+/* Replace each '@' of tmpl by comp. */
+static void rd_expand(char *dst, size_t size, const char *tmpl,
+                      const char *comp) {
+  dst[0] = '\0';
+  for (; *tmpl != '\0'; tmpl++) {
+    if (*tmpl == '@')
+      strlcatbuff(dst, comp, size);
+    else
+      strlncatbuff(dst, tmpl, size, 1);
+  }
+}
+
+static int st_reservediff(httrackp *opt, int argc, char **argv) {
+  static const char *const near[] = {
+      "cons",    "com10",    "com0",     "lpt",     "auxx",
+      "co",      "nu",       "lpt0",     "conin",   "conout",
+      "clock",   "hts-cach", "hts-tmpx", "xcon",    "com\xc2\xb9",
+      "lpt\xb9", "nul\xe9",  "setver",   "emmxxxx", "xmsxxxx00"};
+  static const char *const suffixes[] = {
+      "",  ".", "..", " ", "  ", " .",  ". ", ".txt", ".tar.gz", "x",
+      "s", "1", "$",  "_", " x", ". x", "\\", ".con", "  .  "};
+  static const char *const tmpls[] = {"@",   "d/@",          "@/d",  "d/@/d",
+                                      "/@",  "@/",           "d//@", "d\\@",
+                                      "@/@", "a.b/@/e.f/@.g"};
+  static const char *const pairs[] = {
+      "nul",    "con   x", "CON  ", "aux.", "prn x",   "com1 . y", "hts-cache",
+      "conin$", "lpt1.",   "nulx",  "x",    "clock$ ", "con",      "Aux .z"};
+  static const char rnd_alpha[] = "aAcCoOnNuUlLxXpPrRtT19$-. ./";
+  const char *names[64];
+  size_t nn = 0, i, j, s, t;
+  int k;
+  rd_run run;
+  char comp[64], path[512];
+  char *big = malloct(RD_BIG);
+  uint32_t seed = 2382;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  memset(&run, 0, sizeof(run));
+  run.a = malloct(RD_BIG + RD_GUARD);
+  run.b = malloct(RD_BIG + RD_GUARD);
+  for (i = 0; rd_tbdev[i][0] != '\0'; i++)
+    names[nn++] = rd_tbdev[i];
+  for (i = 0; rd_tbreserved[i][0] != '\0'; i++)
+    names[nn++] = rd_tbreserved[i];
+  for (i = 0; i < sizeof(near) / sizeof(near[0]); i++)
+    names[nn++] = near[i];
+
+  /* every name, case variant, suffix and position */
+  for (i = 0; i < nn; i++) {
+    for (k = 0; k < 5; k++) {
+      for (s = 0; s < sizeof(suffixes) / sizeof(suffixes[0]); s++) {
+        rd_case_variant(comp, names[i], k);
+        strlcatbuff(comp, suffixes[s], sizeof(comp));
+        for (t = 0; t < sizeof(tmpls) / sizeof(tmpls[0]); t++) {
+          rd_expand(path, sizeof(path), tmpls[t], comp);
+          rd_sizes(&run, path);
+        }
+      }
+    }
+  }
+
+  /* two and three components, where one escape clips the next */
+  for (i = 0; i < sizeof(pairs) / sizeof(pairs[0]); i++) {
+    for (j = 0; j < sizeof(pairs) / sizeof(pairs[0]); j++) {
+      snprintf(path, sizeof(path), "%s/%s", pairs[i], pairs[j]);
+      rd_sizes(&run, path);
+      snprintf(path, sizeof(path), "d/%s/%s", pairs[i], pairs[j]);
+      rd_sizes(&run, path);
+      snprintf(path, sizeof(path), "%s/%s/%s", pairs[j], pairs[i], pairs[j]);
+      rd_sizes(&run, path);
+    }
+  }
+
+  /* the naming path's own buffer, filled to its last byte */
+  for (i = 0; i < nn; i++) {
+    for (s = 0; s < sizeof(suffixes) / sizeof(suffixes[0]); s++) {
+      for (t = 0; t < 3; t++) {
+        static const char *const tails[] = {"", "/d", "/nul"};
+        size_t pad, len;
+
+        snprintf(comp, sizeof(comp), "%s%s%s", names[i], suffixes[s], tails[t]);
+        len = strlen(comp) + 1;
+        pad = RD_BIG - 1 - len;
+        for (j = 0; j < pad; j++)
+          big[j] = j % 2 == 1 ? '/' : 'a';
+        big[pad - 1] = 'a';
+        big[pad] = '/';
+        memcpy(big + pad + 1, comp, len);
+        rd_case(&run, big, RD_BIG);
+      }
+    }
+  }
+
+  /* random paths over the letters the names are made of */
+  for (i = 0; i < 40000; i++) {
+    const size_t ncomp = 1 + (seed >> 8) % 6;
+    size_t c;
+
+    path[0] = '\0';
+    for (c = 0; c < ncomp; c++) {
+      seed = seed * 1103515245u + 12345u;
+      if (c != 0)
+        strlcatbuff(path, (seed >> 12) % 8 == 0 ? "//" : "/", sizeof(path));
+      if ((seed >> 16) % 2 == 0) {
+        rd_case_variant(comp, names[(seed >> 4) % nn],
+                        (int) ((seed >> 20) % 5));
+        strlcatbuff(path, comp, sizeof(path));
+        strlcatbuff(
+            path,
+            suffixes[(seed >> 24) % (sizeof(suffixes) / sizeof(suffixes[0]))],
+            sizeof(path));
+      } else {
+        const size_t n = (seed >> 20) % 7;
+
+        for (j = 0; j < n; j++) {
+          seed = seed * 1103515245u + 12345u;
+          strlncatbuff(path, &rnd_alpha[(seed >> 16) % (sizeof(rnd_alpha) - 1)],
+                       sizeof(path), 1);
+        }
+      }
+    }
+    seed = seed * 1103515245u + 12345u;
+    rd_sizes(&run, path);
+  }
+
+  freet(big);
+  freet(run.a);
+  freet(run.b);
+  printf("reservediff: %lu cases, %lu failures, %lu rewritten\n", run.cases,
+         run.failures, run.rewritten);
+  if (run.failures != 0)
+    return 1;
+  printf("reservediff: OK\n");
+  return 0;
+}
+
 const struct selftest_entry selftests_name[] = {
     {"urlbounds", "",
      "an over-long path is refused by the wizard and auth consumers",
@@ -2052,5 +2311,7 @@ const struct selftest_entry selftests_name[] = {
     {"savename-addtail", "",
      "default name and extension arrive whole on a full buffer (#1269)",
      st_savename_addtail},
+    {"reservediff", "",
+     "reserved-name escaping matches its frozen per-name copy", st_reservediff},
     {NULL, NULL, NULL, NULL},
 };

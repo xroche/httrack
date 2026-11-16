@@ -1,0 +1,18 @@
+#!/bin/bash
+#
+# Reserved-name escaping against a frozen copy of its per-name scan
+# (-#test=reservediff in htsname_selftest.c).
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# The counts are exact, so a shrinking corpus shows.
+selftest_queue_lines "reservediff: 267114 cases, 0 failures, 99963 rewritten
+reservediff: OK" reservediff
+
+# A device name in a full save name is clipped, it used to abort.
+selftest_queue_tail '/con_.htm' savename '/*/con' text/html filpad=2022
+
+selftest_run_queued
