@@ -2368,6 +2368,12 @@ hts_boolean back_delayed_rename(httrackp *opt, lien_back *back,
   return HTS_FALSE;
 }
 
+/* See htsback.h. */
+hts_boolean back_delayed_settled_empty(const lien_back *back) {
+  return back_status(back) == STATUS_READY &&
+         back->r.statuscode == STATUSCODE_INVALID && back->r.adr == NULL;
+}
+
 // effacer entrée
 /* Discard a cancelled mid-write .delayed placeholder (unusable across runs). */
 void back_delayed_discard(httrackp *opt, lien_back *back) {

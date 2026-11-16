@@ -1268,8 +1268,7 @@ int hts_wait_delayed(htsmoduleStruct *str, lien_adrfilsave *afs,
         /* Cache read failed because file does not exist (bad delayed name!)
            Just re-add with the correct name, as we know the MIME now!
          */
-        if (back[b].r.statuscode == STATUSCODE_INVALID &&
-            back[b].r.adr == NULL) {
+        if (back_delayed_settled_empty(&back[b])) {
           lien_back delayed_back;
 
           back_copy_static(&back[b], &delayed_back);

@@ -34,23 +34,26 @@ run_with_timeout "$(crawl_deadline)" \
     fail_dump "traced crawl failed" "$tmpdir/out"
 test -f "$tmpdir/m/$host/keepalive/i20.png" || fail_dump "i20.png not mirrored" "$tmpdir/out"
 
-# Controls: the cancel and re-add path ran for each image, and requests went out.
-readds=$(count_matching_lines 'Type immediately loaded from cache' "$tmpdir/m/hts-log.txt")
-test "$readds" -ge 10 || fail_dump "the re-add path ran $readds times" "$tmpdir/m/hts-log.txt"
+# Controls: most images went out on a reused socket, and requests went out.
+reused=$(count_matching_lines '(Keep-Alive): successfully linked' "$tmpdir/m/hts-log.txt")
+test "$reused" -ge 10 || fail_dump "only $reused reused sockets" "$tmpdir/m/hts-log.txt"
 sends=$(count_matching_lines_regexp '^[0-9]+ +(send|sendto|sendmsg)\(' "$trace")
 test "$sends" -ge 21 || fail_dump "only $sends sends traced" "$trace"
 
-reopens=$(count_matching_lines_regexp 'open(at)?\(.*\.delayed", O_RDONLY' "$trace")
+# A read with no failed stat before it is the type sniff, which may run first.
+reopens=$(awk -F'"' '/\.delayed"/ && /ENOENT/ && !/open/ { gone[$2] = 1 }
+    /open(at)?\(/ && /O_RDONLY/ && ($2 in gone) { n++ }
+    END { print n + 0 }' "$trace")
 test "$reopens" = 0 ||
     fail_dump "$reopens reads of a missing placeholder" "$trace"
 waits=$(count_matching_lines_regexp '^[0-9]+ +rt_sigtimedwait' "$trace")
 test "$waits" = 0 || fail_dump "$waits SIGPIPE mask rounds for $sends sends" "$trace"
-ok "$readds re-adds, $sends sends, no reopen and no mask"
+ok "$reused reused sockets, $sends sends, no reopen and no mask"
 
 # A placeholder an earlier run left behind is still found and removed.
-# The placeholder name carries a counter, so take it from the trace.
-place=$(command grep -o 'keepalive/i5\.png\.[0-9a-f]*\.delayed' "$trace" | sed -n 1p || true)
-test -n "$place" || fail_dump "no placeholder traced for i5.png" "$trace"
+# The placeholder name carries a counter, so take it from the log.
+place=$(command grep -o 'keepalive/i5\.png\.[0-9a-f]*\.delayed' "$tmpdir/m/hts-log.txt" | sed -n 1p || true)
+test -n "$place" || fail_dump "no placeholder logged for i5.png" "$tmpdir/m/hts-log.txt"
 mkdir -p "$tmpdir/m2/$host/keepalive"
 printf 'stale' >"$tmpdir/m2/$host/$place"
 local_crawl "$BASEURL/keepalive/index.html" -O "$tmpdir/m2" ||

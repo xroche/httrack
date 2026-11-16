@@ -2985,6 +2985,90 @@ static int st_busyscans(httrackp *opt, int argc, char **argv) {
   return err ? 1 : 0;
 }
 
+/* -#test=delayedsettled: a link linked to a reused keep-alive socket is not
+   taken for a cache hit whose .delayed file is missing. */
+static int st_delayedsettled(httrackp *opt, int argc, char **argv) {
+  enum { SLOTS = 8, LIVE = 5 };
+
+  struct_back *sback;
+  cache_back cache;
+  hash_struct hash;
+  htsblk live;
+  lien_back *slot;
+  int b;
+  int err = 0;
+
+#define CHECK(cond) ST_CHECK(err, cond)
+  (void) argc;
+  (void) argv;
+  sback = back_new(opt, SLOTS);
+  if (sback == NULL)
+    return 77;
+  opt->maxsoc = SLOTS;
+  opt->timeout = 0;
+  opt->rateout = 0;
+  opt->state.stop = 0;
+  memset(&cache, 0, sizeof(cache));
+  cache.hashtable = coucal_new(0);
+  hash_init(opt, &hash, opt->urlhack);
+  opt->hash = &hash;
+
+  /* a reused socket: the slot waits for its reply, which is no cache hit */
+  memset(&live, 0, sizeof(live));
+  live.soc = (T_SOC) socket(AF_INET, SOCK_STREAM, 0);
+  CHECK(live.soc != INVALID_SOCKET);
+  live.keep_alive = 1;
+  live.keep_alive_max = 10;
+  live.keep_alive_t = 1000;
+  back_slot_attach(sback, LIVE, STATUS_ALIVE, &live, "example.com", "/");
+  sback->lnk[LIVE].ka_time_start = time_local();
+  sback->lnk[LIVE].finalized = 1;
+  CHECK(back_add(sback, opt, &cache, "example.com", "/ka.png",
+                 "ka.png.1.delayed", NULL, NULL, 0, HTS_FALSE, NULL) == 0);
+  b = back_index(opt, sback, "example.com", "/ka.png", "ka.png.1.delayed");
+  CHECK(b >= 0 && b != LIVE);
+  if (b >= 0) {
+    slot = &sback->lnk[b];
+    CHECK(back_status(&sback->lnk[LIVE]) == STATUS_FREE);
+    CHECK(slot->status == STATUS_CONNECTING);
+    CHECK(slot->r.soc != INVALID_SOCKET);
+    CHECK(slot->r.statuscode == STATUSCODE_INVALID);
+    CHECK(!back_delayed_settled_empty(slot));
+    back_delete(opt, &cache, sback, b);
+  }
+
+  /* a slot back_add() settled with no reply and no body */
+  hts_request_stop(opt, 0);
+  CHECK(back_add(sback, opt, &cache, "example.com", "/st.png",
+                 "st.png.2.delayed", NULL, NULL, 0, HTS_FALSE, NULL) == 0);
+  opt->state.stop = 0;
+  b = back_index(opt, sback, "example.com", "/st.png", "st.png.2.delayed");
+  CHECK(b >= 0);
+  if (b >= 0) {
+    static char body[] = "x";
+
+    slot = &sback->lnk[b];
+    CHECK(slot->status == STATUS_READY);
+    CHECK(back_delayed_settled_empty(slot));
+
+    /* a reply or a body is not empty */
+    slot->r.adr = body;
+    CHECK(!back_delayed_settled_empty(slot));
+    slot->r.adr = NULL;
+    slot->r.statuscode = HTTP_OK;
+    CHECK(!back_delayed_settled_empty(slot));
+    slot->r.statuscode = STATUSCODE_INVALID;
+    back_delete(opt, &cache, sback, b);
+  }
+#undef CHECK
+  back_free(&sback);
+  hash_free(&hash);
+  opt->hash = NULL;
+  coucal_delete(&cache.hashtable);
+  printf("delayedsettled self-test: %s\n", err ? "FAILED" : "OK");
+  return err ? 1 : 0;
+}
+
 const struct selftest_entry selftests_back[] = {
     {"iofatal", "<logfile>",
      "a disk-full abort logs its line and stops the mirror", st_iofatal},
@@ -3022,6 +3106,9 @@ const struct selftest_entry selftests_back[] = {
      st_mutexlazyinit},
     {"backswap", "", "which backlog slots may be swapped to the ready table",
      st_backswap},
+    {"delayedsettled", "",
+     "a link on a reused keep-alive socket is not re-added as a cache hit",
+     st_delayedsettled},
     {"busyscans", "<dir>",
      "each slot-table scan reaches every slot in use, up to the last one",
      st_busyscans},

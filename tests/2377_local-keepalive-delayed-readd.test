@@ -1,0 +1,40 @@
+#!/bin/bash
+#
+# A link sent on a reused keep-alive socket keeps its .delayed name until its
+# type is known, rather than being cancelled and re-added under a guessed one.
+
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+out=$(httrack -O /dev/null -#test=delayedsettled 2>/dev/null)
+grep -q "delayedsettled self-test: OK" <<<"$out" || fail "self-test: $out"
+ok "self-test"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_2377.XXXXXX") || exit 1
+cleanup() {
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+local_server_start
+host=127.0.0.1_$SRV_PORT
+local_crawl "$BASEURL/keepalive/index.html" -O "$tmpdir/m" -Z ||
+    fail "crawl failed"
+log=$tmpdir/m/hts-log.txt
+
+# Control: most images went out on a reused socket.
+reused=$(count_matching_lines '(Keep-Alive): successfully linked' "$log")
+test "$reused" -ge 10 || fail_dump "only $reused reused sockets" "$log"
+readds=$(count_matching_lines 'Type immediately loaded from cache' "$log")
+test "$readds" = 0 || fail_dump "$readds links re-added" "$log"
+
+want=$(
+    echo keepalive/index.html
+    for i in $(seq 1 20); do echo "keepalive/i$i.png"; done
+)
+got=$(cd "$tmpdir/m/$host" && find . -type f | sed 's|^\./||')
+test "$(sort <<<"$got")" = "$(sort <<<"$want")" ||
+    fail "mirrored files: $got"
+ok "$reused reused sockets, no re-add, final names unchanged"

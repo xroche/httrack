@@ -155,6 +155,9 @@ int back_delete(httrackp * opt, cache_back * cache, struct_back * sback,
                 const int p);
 /* Discard back's on-disk .delayed placeholder and its refname. */
 void back_delayed_discard(httrackp *opt, lien_back *back);
+/* Did back_add() settle this slot without a reply or a body, as a cache hit
+   whose .delayed file is missing does? A reused socket still waiting is not. */
+hts_boolean back_delayed_settled_empty(const lien_back *back);
 /* Move back's .delayed placeholder (and open stream) to newname, or remove
    one this slot never wrote; HTS_FALSE = file lost, slot flagged in error. */
 hts_boolean back_delayed_rename(httrackp *opt, lien_back *back,
