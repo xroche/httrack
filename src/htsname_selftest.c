@@ -548,6 +548,7 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
     }
     fclose(fp);
     strcpybuff(headers.url_sav, bodyfile);
+    headers.r.is_write = HTS_TRUE; /* the slot wrote it */
   }
 
   url_savename(afs, NULL, NULL, NULL, opt, sback, &cache, &hash, 0, 0,

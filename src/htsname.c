@@ -260,8 +260,8 @@ size_t hts_read_file_head(const char *path, void *buf, size_t len) {
   return n;
 }
 
-/* Body head of one slot: memory, else its flushed on-disk file (url_sav, or
-   tmpfile for a compressed stream); inflated so the sniff sees the final body.
+/* Body head of one slot: memory, else the file it writes (url_sav, or tmpfile
+   for a compressed stream); inflated so the sniff sees the final body.
  */
 static size_t sniff_slot_head(const lien_back *slot, void *buf, size_t len) {
   const htsblk *const r = &slot->r;
@@ -270,13 +270,15 @@ static size_t sniff_slot_head(const lien_back *slot, void *buf, size_t len) {
   if (r->adr != NULL && r->size > 0) {
     n = (size_t) r->size < len ? (size_t) r->size : len;
     memcpy(buf, r->adr, n);
-  } else {
+  } else if (r->is_write) {
+    /* tmpfile of an uncompressed slot is a backup of an earlier copy */
+    const char *const path =
+        r->compressed && slot->tmpfile != NULL ? slot->tmpfile : slot->url_sav;
+
     if (r->out != NULL)
       fflush(r->out);
-    if (slot->url_sav[0] != '\0')
-      n = hts_read_file_head(slot->url_sav, buf, len);
-    if (n == 0 && slot->tmpfile != NULL && slot->tmpfile[0] != '\0')
-      n = hts_read_file_head(slot->tmpfile, buf, len);
+    if (path[0] != '\0')
+      n = hts_read_file_head(path, buf, len);
   }
   if (n > 0 && r->compressed) {
     unsigned char raw[HTS_SNIFF_LEN];
