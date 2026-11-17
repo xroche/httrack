@@ -66,7 +66,7 @@ hts_boolean hash_url_equals_in(hash_struct *hash, const char *adra,
    NUL-terminated; it only feeds the hash, never a comparison. */
 const char *hash_url_key(hash_struct *hash, const char *adr, const char *fil,
                          char *dst, size_t dstsize);
-int hash_read(const hash_struct * hash, const char *nom1, const char *nom2,
+int hash_read(hash_struct *hash, const char *nom1, const char *nom2,
               hash_struct_type type);
 void hash_write(hash_struct * hash, size_t lpos);
 /* The suffix the collision walk from the taken save-name NAME reached, every

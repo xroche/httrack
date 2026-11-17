@@ -220,6 +220,15 @@ struct cache_back {
   int zipWriteFailures; /**< consecutive entry write failures; reset on store */
 };
 
+/* One remembered lookup: KEY, whose host is its first HOSTLEN bytes, read
+   VALUE. */
+typedef struct hash_memo {
+  hts_boolean valid;
+  int value;
+  size_t hostlen;
+  char key[HTS_URLMAXSIZE * 4];
+} hash_memo;
+
 /** Lookup indexes over the link heap: map save-name / URL back to a link, so a
     URL seen twice resolves to one entry. The coucal tables index into liens;
     they do not own the links. */
@@ -250,6 +259,12 @@ struct hash_struct {
   char normfil[HTS_URLMAXSIZE * 4];
   char normfil2[HTS_URLMAXSIZE * 2];
   char catbuff[CATBUFF_SIZE];
+  /* the last sav and adrfil lookups, which hash_write() forgets */
+  hash_memo memo_sav;
+  hash_memo memo_adrfil;
+  char memo_scratch[HTS_URLMAXSIZE * 4];
+  /* lookups a memo answered; a self-test reads it */
+  size_t memo_hits;
 };
 
 /** Parameters threaded through file-creation callbacks (filenote). */

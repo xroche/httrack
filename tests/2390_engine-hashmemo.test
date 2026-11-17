@@ -1,0 +1,15 @@
+#!/bin/bash
+#
+# hash_read() remembers its last lookup, and must answer as a fresh read
+# (-#test=hashmemo in htsname_selftest.c).
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# The count is exact, so a shrinking table shows.
+selftest_queue_lines "hashmemo: 121 pairs
+hashmemo: OK" hashmemo
+
+selftest_run_queued

@@ -2122,6 +2122,116 @@ static int st_reserved(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Read ADR+FIL (FILENAME when FIL is NULL) with no remembered lookup. */
+static int st_hashmemo_fresh(hash_struct *hash, const char *adr,
+                             const char *fil) {
+  hash->memo_sav.valid = hash->memo_adrfil.valid = HTS_FALSE;
+  return hash_read(hash, adr, fil,
+                   fil != NULL ? HASH_STRUCT_ADR_PATH : HASH_STRUCT_FILENAME);
+}
+
+/* hash_read() remembers its last lookup: every second read must answer as a
+   fresh one, and a write must void it. */
+static int st_hashmemo(httrackp *opt, int argc, char **argv) {
+  enum { field = HTS_URLMAXSIZE * 2 };
+
+  /* a host this long clips the key, so two paths share it */
+  char *longhost = malloct(field + 64);
+  char *longfil1 = malloct(field);
+  char *longfil2 = malloct(field);
+  const char *spell[][2] = {
+      {"www.example.com", "/a//b"},
+      {"https://example.com", "/a/b"},
+      {"EXAMPLE.com", "/a/b"},
+      {"example.co", "m/a/b"},
+      {"example.com", "/q?y=2&x=1"},
+      {"example.com", "/q?x=1&y=2"},
+      {NULL, "/l1"},
+      {NULL, "/l2"},
+      {"example.com/a/b.html", NULL},
+      {"EXAMPLE.COM/A/B.HTML", NULL},
+      {"example.com/none.html", NULL},
+  };
+  const size_t nspell = sizeof(spell) / sizeof(spell[0]);
+  const hts_boolean urlhack = opt->urlhack;
+  cache_back cache;
+  struct_back *sback = NULL;
+  hash_struct hash;
+  size_t a, b, pairs = 0;
+  int i;
+
+  assertf(longhost != NULL && longfil1 != NULL && longfil2 != NULL);
+  memset(longhost, 'h', field + 63);
+  longhost[field + 63] = '\0';
+  longfil1[0] = longfil2[0] = '/';
+  memset(longfil1 + 1, 'f', field - 64);
+  memcpy(longfil2, longfil1, field - 63);
+  longfil1[field - 63] = '1';
+  longfil2[field - 63] = '2';
+  longfil1[field - 62] = longfil2[field - 62] = '\0';
+  for (a = 0; a < nspell; a++) {
+    if (spell[a][0] == NULL) {
+      spell[a][0] = longhost;
+      spell[a][1] = strcmp(spell[a][1], "/l1") == 0 ? longfil1 : longfil2;
+    }
+  }
+
+  memset(&cache, 0, sizeof(cache));
+  opt->urlhack = HTS_TRUE;
+  opt->no_www_dedup = opt->no_slash_dedup = opt->no_query_dedup = HTS_FALSE;
+  st_mirror_wiring(opt, &sback, &hash, HTS_FALSE);
+  assertf(hts_record_link(opt, "www.example.com", "/a//b",
+                          "example.com/a/b.html", "", "", NULL));
+  assertf(hts_record_link(opt, "example.com", "/q?x=1&y=2",
+                          "example.com/q.html", "", "", NULL));
+  assertf(hts_record_link(opt, longhost, longfil1, "long.html", "", "", NULL));
+
+  /* the second read of each pair may come from the memo */
+  for (a = 0; a < nspell; a++) {
+    for (b = 0; b < nspell; b++) {
+      const int want = st_hashmemo_fresh(&hash, spell[b][0], spell[b][1]);
+
+      (void) st_hashmemo_fresh(&hash, spell[a][0], spell[a][1]);
+      i = hash_read(&hash, spell[b][0], spell[b][1],
+                    spell[b][1] != NULL ? HASH_STRUCT_ADR_PATH
+                                        : HASH_STRUCT_FILENAME);
+      if (i != want) {
+        fprintf(stderr,
+                "hashmemo: %.40s%.40s then %.40s%.40s read %d, not %d\n",
+                spell[a][0], spell[a][1] != NULL ? spell[a][1] : "",
+                spell[b][0], spell[b][1] != NULL ? spell[b][1] : "", i, want);
+        return 1;
+      }
+      pairs++;
+    }
+  }
+
+  /* the parser reads a link as written, then as url_savename() spells it */
+  hash.memo_hits = 0;
+  assertf(st_hashmemo_fresh(&hash, "https://www.example.com", "/a//b") >= 0);
+  assertf(hash_read(&hash, "example.com", "/a/b", HASH_STRUCT_ADR_PATH) >= 0);
+  assertf(hash.memo_hits == 1);
+
+  /* a write voids both memos */
+  assertf(st_hashmemo_fresh(&hash, "example.com", "/new") == -1);
+  assertf(hash_read(&hash, "example.com/new.html", NULL,
+                    HASH_STRUCT_FILENAME) == -1);
+  assertf(hts_record_link(opt, "example.com", "/new", "example.com/new.html",
+                          "", "", NULL));
+  i = (int) heap_top_index();
+  assertf(hash_read(&hash, "example.com/new.html", NULL,
+                    HASH_STRUCT_FILENAME) == i);
+  assertf(hash_read(&hash, "example.com", "/new", HASH_STRUCT_ADR_PATH) == i);
+
+  st_mirror_wiring_free(opt, &cache, &sback, &hash);
+  opt->urlhack = urlhack;
+  freet(longhost);
+  freet(longfil1);
+  freet(longfil2);
+  printf("hashmemo: %u pairs\nhashmemo: OK\n", (unsigned) pairs);
+  return 0;
+}
+
 const struct selftest_entry selftests_name[] = {
     {"urlbounds", "",
      "an over-long path is refused by the wizard and auth consumers",
@@ -2138,6 +2248,8 @@ const struct selftest_entry selftests_name[] = {
      st_hashkey_bounds},
     {"hashdiff", "", "dedup key and compare match their frozen copies",
      st_hashdiff},
+    {"hashmemo", "", "a remembered dedup lookup answers as a fresh one",
+     st_hashmemo},
     {"redirect-samefile", "", "same-file redirect detection self-test (#159)",
      st_redirect_samefile},
     {"relative", "<link> <curr-file>", "relative link between two paths",

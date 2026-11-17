@@ -541,8 +541,8 @@ void hts_sitemap_ingest(httrackp *opt, htsmoduleStruct *str, const char *adr,
   /* str->ptr_ is a scratch int owned by the caller, so nothing else moves. */
   anchor = *str->ptr_;
   if (st != NULL && st->anchor_adr[0] != '\0' && opt->hash != NULL) {
-    const int i = hash_read((const hash_struct *) opt->hash, st->anchor_adr,
-                            st->anchor_fil, 1);
+    const int i =
+        hash_read((hash_struct *) opt->hash, st->anchor_adr, st->anchor_fil, 1);
 
     if (i >= 0)
       anchor = i;

@@ -99,7 +99,7 @@ static const char *key_host_alias(const hash_struct *hash, const char *adr,
 /* hash_url_key() once the host alias and the strip keys are resolved */
 static const char *hash_url_key_(const hash_struct *hash, const char *adr_canon,
                                  const char *fil, const char *keys, char *dst,
-                                 size_t dstsize) {
+                                 size_t dstsize, size_t *hostlen) {
   const char *const adr_norm = hash->norm_host
                                    ? jump_normalized_const(adr_canon)
                                    : jump_identification_const(adr_canon);
@@ -116,6 +116,9 @@ static const char *hash_url_key_(const hash_struct *hash, const char *adr_canon,
     const size_t used = strlen(dst);
     char *const tail = &dst[used];
     const size_t avail = dstsize - used;
+
+    if (hostlen != NULL)
+      *hostlen = used;
 
     /* normalizing never expands, and it takes a path of at most its own
        HTS_URLMAXSIZE * 2, so bound on both */
@@ -140,7 +143,7 @@ const char *hash_url_key(hash_struct *hash, const char *adr, const char *fil,
                          char *dst, size_t dstsize) {
   assertf(adr != NULL);
   if (!hash_has_rules(hash)) {
-    return hash_url_key_(hash, adr, fil, NULL, dst, dstsize);
+    return hash_url_key_(hash, adr, fil, NULL, dst, dstsize, NULL);
   } else {
     char BIGSTK aliasbuf[HTS_URLMAXSIZE * 2];
     char BIGSTK keybuf[HTS_URLMAXSIZE];
@@ -150,7 +153,7 @@ const char *hash_url_key(hash_struct *hash, const char *adr, const char *fil,
     const char *const keys = hts_query_strip_keys(hash->strip_query, adr_canon,
                                                   fil, keybuf, sizeof(keybuf));
 
-    return hash_url_key_(hash, adr_canon, fil, keys, dst, dstsize);
+    return hash_url_key_(hash, adr_canon, fil, keys, dst, dstsize, NULL);
   }
 }
 
@@ -315,6 +318,9 @@ void hash_init(httrackp *opt, hash_struct *hash, hts_boolean normalized) {
   hash->savename_next = coucal_new(0);
   hash->savename_owner = coucal_new(0);
   hash->savename_probes = 0;
+  hash->memo_sav.valid = HTS_FALSE;
+  hash->memo_adrfil.valid = HTS_FALSE;
+  hash->memo_hits = 0;
   hts_set_hash_handler(hash->savename_next, opt);
   hts_set_hash_handler(hash->savename_owner, opt);
   coucal_set_name(hash->savename_next, "hash->savename_next");
@@ -396,25 +402,72 @@ hts_boolean hash_url_equals(httrackp *opt, const char *adra, const char *fila,
   return eq;
 }
 
+/* Does MEMO hold KEY with a host of HOSTLEN bytes? Then set *VALUE. */
+static hts_boolean hash_memo_get(hash_struct *hash, const hash_memo *memo,
+                                 const char *key, size_t hostlen, int *value) {
+  if (!memo->valid || memo->hostlen != hostlen || strcmp(memo->key, key) != 0)
+    return HTS_FALSE;
+  hash->memo_hits++;
+  *value = memo->value;
+  return HTS_TRUE;
+}
+
+/* Remember that KEY (LEN bytes, host HOSTLEN bytes) read VALUE. */
+static void hash_memo_set(hash_memo *memo, const char *key, size_t len,
+                          size_t hostlen, int value) {
+  assertf(len < sizeof(memo->key));
+  memcpy(memo->key, key, len + 1);
+  memo->hostlen = hostlen;
+  memo->value = value;
+  memo->valid = HTS_TRUE;
+}
+
 // retour: position ou -1 si non trouvé
-int hash_read(const hash_struct * hash, const char *nom1, const char *nom2,
+int hash_read(hash_struct *hash, const char *nom1, const char *nom2,
               hash_struct_type type) {
   intptr_t intvalue;
   lien_url lien;
 
   /* read */
   switch(type) {
-  case HASH_STRUCT_FILENAME:
-    if (coucal_read(hash->sav, nom1, &intvalue)) {
-      return (int) intvalue;
-    } else {
-      return -1;
+  case HASH_STRUCT_FILENAME: {
+    const size_t len = strlen(nom1);
+    int i;
+
+    if (len >= sizeof(hash->memo_sav.key)) {
+      return coucal_read(hash->sav, nom1, &intvalue) ? (int) intvalue : -1;
     }
-    break;
+    if (hash_memo_get(hash, &hash->memo_sav, nom1, 0, &i)) {
+      return i;
+    }
+    i = coucal_read(hash->sav, nom1, &intvalue) ? (int) intvalue : -1;
+    hash_memo_set(&hash->memo_sav, nom1, len, 0, i);
+    return i;
+  }
   case HASH_STRUCT_ADR_PATH:
     memset(&lien, 0, sizeof(lien));
     lien.adr = key_duphandler(NULL, nom1);
     lien.fil = key_duphandler(NULL, nom2);
+    /* without rules, an unclipped key holds all that the compare reads */
+    if (!hash_has_rules(hash) && strlen(nom2) < HTS_URLMAXSIZE * 2 &&
+        strlen(nom1) < sizeof(hash->memo_scratch) - strlen(nom2)) {
+      size_t hostlen;
+      int i;
+      const char *const key =
+          hash_url_key_(hash, nom1, nom2, NULL, hash->memo_scratch,
+                        sizeof(hash->memo_scratch), &hostlen);
+      coucal_hashkeys hashes;
+      const coucal_value *value;
+
+      if (hash_memo_get(hash, &hash->memo_adrfil, key, hostlen, &i)) {
+        return i;
+      }
+      hashes = coucal_hash_string(key);
+      value = coucal_fetch_value_hashes(hash->adrfil, (char *) &lien, &hashes);
+      i = value != NULL ? (int) value->intg : -1;
+      hash_memo_set(&hash->memo_adrfil, key, strlen(key), hostlen, i);
+      return i;
+    }
     if (coucal_read(hash->adrfil, (char*) &lien, &intvalue)) {
       return (int) intvalue;
     } else {
@@ -494,6 +547,9 @@ void hash_savename_next_set(hash_struct *hash, char kind, const char *name,
 // record link lpos in this hash's tables
 void hash_write(hash_struct * hash, size_t lpos) {
   const lien_url *const link = (*hash->liens)[lpos];
+
+  hash->memo_sav.valid = HTS_FALSE;
+  hash->memo_adrfil.valid = HTS_FALSE;
 
   /* several links one url_savename() call could match: remember if their
      names differ */
