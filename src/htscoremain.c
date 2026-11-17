@@ -1053,6 +1053,9 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
     }
   }
 
+  /* before anything creates it */
+  opt->html_tree_new = back_html_tree_absent(StringBuff(opt->path_html));
+
   // No new cache but an old one? promote it
   hts_cache_reconcile(opt, CACHE_RECONCILE_PROMOTE);
 

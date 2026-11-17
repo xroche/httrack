@@ -2370,6 +2370,7 @@ cleanup:
     hts_changes_free_opt(opt);
   hts_sitemap_free(opt);
   url_savename_refnames_free(opt);
+  opt->html_tree_new = HTS_FALSE;
 
   // désallocation mémoire & buffers
   freet(primary); /* NULL once the first link adopted it */
@@ -2893,6 +2894,8 @@ static int structcheck_impl(const char *path, hts_boolean utf8) {
   char BIGSTK tmpbuf[HTS_URLMAXSIZE * 2];
   char BIGSTK file[HTS_URLMAXSIZE * 2];
   int i = 0;
+  size_t end;
+  hts_boolean exists;
 
   if (strnotempty(path) == 0)
     return 0;
@@ -2948,6 +2951,31 @@ static int structcheck_impl(const char *path, hts_boolean utf8) {
     }
   }
 #endif
+
+  /* Climb to the deepest component that exists, rather than probing from the
+     root: the walk below then starts there. */
+  for (end = strlen(file);;) {
+    size_t cut = end;
+
+    while (cut > (size_t) i && file[cut - 1] != PATH_SEPARATOR)
+      cut--;
+    while (cut > (size_t) i && file[cut - 1] == PATH_SEPARATOR)
+      cut--;
+    if (cut <= (size_t) i)
+      break;
+    file[cut] = '\0';
+    exists = structcheck_stat(file, utf8, &mode);
+    file[cut] = PATH_SEPARATOR;
+    if (exists) {
+      /* a non-directory is walked again, to be moved aside */
+      if (!S_ISDIR(mode))
+        while (cut > (size_t) i && file[cut - 1] != PATH_SEPARATOR)
+          cut--;
+      i = (int) cut;
+      break;
+    }
+    end = cut;
+  }
 
   /* Check paths */
   for (;;) {

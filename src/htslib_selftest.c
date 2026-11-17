@@ -1562,6 +1562,21 @@ static int st_structcheck(httrackp *opt, int argc, char **argv) {
   snprintf(target, sizeof(target), "%s/u8.txt", argv[0]);
   assertf(fexist_utf8(target));
 
+  /* a deep path, and a file two levels under its deepest directory */
+  snprintf(path, sizeof(path), "%s/d1/d2/d3/d4/", argv[0]);
+  assertf(structcheck_utf8(path) == 0);
+  assertf(dir_exists(path));
+  snprintf(path, sizeof(path), "%s/d1/f", argv[0]);
+  fp = FOPEN(path, "wb");
+  assertf(fp != NULL);
+  fclose(fp);
+  snprintf(path, sizeof(path), "%s/d1/f/x/y/z", argv[0]);
+  assertf(structcheck_utf8(path) == 0);
+  snprintf(path, sizeof(path), "%s/d1/f/x/y/", argv[0]);
+  assertf(dir_exists(path));
+  snprintf(target, sizeof(target), "%s/d1/f.txt", argv[0]);
+  assertf(fexist_utf8(target));
+
   /* an existing <name>.txt is never replaced */
   for (int u8 = 0; u8 < 2; u8++) {
     const char *const nm = u8 ? "k8" : "kp";

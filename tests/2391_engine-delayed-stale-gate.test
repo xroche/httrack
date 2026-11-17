@@ -1,0 +1,13 @@
+#!/bin/bash
+#
+# A placeholder an earlier run may have left is still removed; only a mirror
+# whose tree was absent at start skips that unlink.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+dir=$(mktemp -d)
+cleanup_push rm -rf "$dir"
+
+assert_selftest "delayedstale self-test: OK" delayedstale "$dir"
