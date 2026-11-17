@@ -1539,6 +1539,9 @@ static int st_structcheck(httrackp *opt, int argc, char **argv) {
   assertf(!dir_exists("a/"));
   assertf(structcheck_utf8("xyz.zip") == 0);
   assertf(!dir_exists("x/"));
+  /* a relative path with no existing ancestor is created whole */
+  assertf(structcheck_utf8("nx/a/b/c") == 0);
+  assertf(dir_exists("nx/a/b/"));
 
   /* a regular file where a directory belongs is renamed to <name>.txt */
   snprintf(path, sizeof(path), "%s/sc", argv[0]);
@@ -1562,7 +1565,7 @@ static int st_structcheck(httrackp *opt, int argc, char **argv) {
   snprintf(target, sizeof(target), "%s/u8.txt", argv[0]);
   assertf(fexist_utf8(target));
 
-  /* a deep path, and a file two levels under its deepest directory */
+  /* A deep path is created, and a file in its way is moved aside. */
   snprintf(path, sizeof(path), "%s/d1/d2/d3/d4/", argv[0]);
   assertf(structcheck_utf8(path) == 0);
   assertf(dir_exists(path));

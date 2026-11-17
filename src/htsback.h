@@ -158,9 +158,6 @@ void back_delayed_discard(httrackp *opt, lien_back *back);
 /* Did back_add() settle this slot without a reply or a body, as a cache hit
    whose .delayed file is missing does? A reused socket still waiting is not. */
 hts_boolean back_delayed_settled_empty(const lien_back *back);
-/* Is the mirror's html tree certain to be missing, so that no earlier run
-   left a placeholder in it? Any doubt answers HTS_FALSE. */
-hts_boolean back_html_tree_absent(const char *path_html);
 /* Move back's .delayed placeholder (and open stream) to newname, or remove
    one an earlier run may have left; HTS_FALSE = file lost, slot flagged in
    error. */

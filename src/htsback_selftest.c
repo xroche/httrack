@@ -3243,16 +3243,27 @@ static hts_boolean stale_removed(httrackp *opt, lien_back *back,
 static int st_delayedstale(httrackp *opt, int argc, char **argv) {
   char path[HTS_URLMAXSIZE];
   lien_back *back = calloct(1, sizeof(lien_back));
+  FILE *fp;
   int err = 0;
 
 #define CHECK(cond) ST_CHECK(err, cond)
   assertf(argc >= 1 && back != NULL);
-  CHECK(!back_html_tree_absent(argv[0]));
-  CHECK(!back_html_tree_absent(""));
+  errno = ENOENT;
+  CHECK(!hts_path_absent(argv[0]));
+  snprintf(path, sizeof(path), "%s/", argv[0]);
+  CHECK(!hts_path_absent(path));
+  CHECK(!hts_path_absent(""));
   snprintf(path, sizeof(path), "%s/none/", argv[0]);
-  CHECK(back_html_tree_absent(path));
+  CHECK(hts_path_absent(path));
   snprintf(path, sizeof(path), "%s/none", argv[0]);
-  CHECK(back_html_tree_absent(path));
+  CHECK(hts_path_absent(path));
+  /* ENOTDIR is a doubt, not an absence */
+  snprintf(path, sizeof(path), "%s/reg", argv[0]);
+  fp = FOPEN(path, "wb");
+  assertf(fp != NULL);
+  (void) fclose(fp);
+  snprintf(path, sizeof(path), "%s/reg/sub", argv[0]);
+  CHECK(!hts_path_absent(path));
 
   snprintf(back->url_sav, sizeof(back->url_sav), "%s/p.html.3.delayed",
            argv[0]);
