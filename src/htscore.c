@@ -2893,6 +2893,7 @@ static int structcheck_impl(const char *path, hts_boolean utf8) {
   char BIGSTK tmpbuf[HTS_URLMAXSIZE * 2];
   char BIGSTK file[HTS_URLMAXSIZE * 2];
   int i = 0;
+  size_t top;
 
   if (strnotempty(path) == 0)
     return 0;
@@ -2948,6 +2949,31 @@ static int structcheck_impl(const char *path, hts_boolean utf8) {
     }
   }
 #endif
+
+  /* Start the walk at the deepest existing component, not the root. */
+  for (top = strlen(file);;) {
+    size_t cut = top;
+    hts_boolean exists;
+
+    while (cut > (size_t) i && file[cut - 1] != PATH_SEPARATOR)
+      cut--;
+    while (cut > (size_t) i && file[cut - 1] == PATH_SEPARATOR)
+      cut--;
+    if (cut <= (size_t) i)
+      break;
+    file[cut] = '\0';
+    exists = structcheck_stat(file, utf8, &mode);
+    file[cut] = PATH_SEPARATOR;
+    if (exists) {
+      /* walk a file again so it gets moved aside */
+      if (!S_ISDIR(mode))
+        while (cut > (size_t) i && file[cut - 1] != PATH_SEPARATOR)
+          cut--;
+      i = (int) cut;
+      break;
+    }
+    top = cut;
+  }
 
   /* Check paths */
   for (;;) {

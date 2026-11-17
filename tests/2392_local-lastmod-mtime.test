@@ -1,0 +1,31 @@
+#!/bin/bash
+#
+# A file written straight to disk takes the server's Last-Modified as its mtime.
+
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+require_httrack
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_lastmod.XXXXXX")
+cleanup_push rm -rf "$tmpdir"
+
+root="${tmpdir}/root"
+mkdir -p "$root"
+printf '<html><a href="data.bin">d</a></html>\n' >"${root}/index.html"
+head -c 4096 /dev/zero >"${root}/data.bin"
+# 981173106 is 2001-02-03 04:05:06 UTC.
+TZ=UTC touch -t 200102030405.06 "${root}/data.bin"
+local_server_start --root "$(nativepath "$root")" --log "${tmpdir}/server.log"
+
+mirror="${tmpdir}/mirror"
+local_crawl --log "${tmpdir}/crawl.log" --quiet --robots=0 --retries=1 -c1 \
+    --timeout=20 -O "$mirror" "${BASEURL}/index.html"
+
+got=$(find "$mirror" -name data.bin)
+test -n "$got" || fail "data.bin was not mirrored"
+test "$(mtime "$got")" = 981173106 ||
+    fail "data.bin has mtime $(mtime "$got"), not the server's Last-Modified"
+ok "a file written to disk keeps the server's Last-Modified"

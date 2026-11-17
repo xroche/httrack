@@ -2258,11 +2258,9 @@ hts_boolean url_savename_refname_may_exist(httrackp *opt,
 }
 
 void url_savename_refnames_start(httrackp *opt) {
-  STRUCT_STAT st;
-
   url_savename_refnames_free(opt);
   /* Only a certain absence counts: any other failure probes every ref. */
-  if (STAT(hts_logpath(opt, CACHE_REFNAME), &st) != 0 && errno == ENOENT)
+  if (hts_path_absent(hts_logpath(opt, CACHE_REFNAME)))
     opt->refs_written = coucal_new(0);
 }
 

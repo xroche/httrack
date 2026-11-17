@@ -2503,14 +2503,10 @@ int back_flush_output(httrackp * opt, cache_back * cache, struct_back * sback,
         back_report_write_failure(opt, &back[p]);
     }
     /* set file time */
-    if (back[p].r.is_write) {   // ecriture directe
-      /* écrire date "remote" */
-      if (strnotempty(back[p].url_sav)
-          && strnotempty(back[p].r.lastmodified)
-          && fexist_utf8(back[p].url_sav))      // normalement existe si on a un fichier de sortie
-      {
-        set_filetime_rfc822(back[p].url_sav, back[p].r.lastmodified);
-      }
+    if (back[p].r.is_write) {
+      /* the server's date; a missing file only fails the call */
+      if (strnotempty(back[p].url_sav) && strnotempty(back[p].r.lastmodified))
+        (void) set_filetime_rfc822(back[p].url_sav, back[p].r.lastmodified);
       /* executer commande utilisateur après chargement du fichier */
       //xx usercommand(opt,0,NULL,back[p].url_sav, back[p].url_adr, back[p].url_fil);
       back[p].r.is_write = 0;
@@ -2528,8 +2524,9 @@ hts_boolean back_delayed_rename(httrackp *opt, lien_back *back,
   if (!IS_DELAYED_EXT(back->url_sav) || strcmp(back->url_sav, newname) == 0)
     return HTS_TRUE; /* nothing bound to the placeholder name */
   if (!back->r.is_write) {
-    /* this slot never wrote it: an earlier run left it */
-    if (UNLINK(back->url_sav) == 0)
+    /* an earlier run may have left it */
+    /* finalized: back_finalize reloaded a small page this run wrote */
+    if ((!opt->html_tree_new || back->finalized) && UNLINK(back->url_sav) == 0)
       hts_log_print(opt, LOG_DEBUG, "removed a stale placeholder %s",
                     back->url_sav);
     return HTS_TRUE;

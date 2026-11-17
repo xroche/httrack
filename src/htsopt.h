@@ -672,6 +672,8 @@ struct httrackp {
                                     mtime_monotonic(). Live state. Tail: ABI */
   TStamp pause_lock_polled_at; /**< last look for hts-stop.lock, on
                                     mtime_monotonic(). Live state. Tail: ABI */
+  hts_boolean html_tree_new;   /**< path_html did not exist at start. Live
+                                    state. Tail: ABI */
 };
 
 /** Running statistics for a mirror. */

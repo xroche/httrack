@@ -4891,6 +4891,22 @@ int fexist_utf8(const char *s) {
   return 0;
 }
 
+/* See htslib.h. */
+hts_boolean hts_path_absent(const char *path) {
+  char BIGSTK buf[HTS_URLMAXSIZE * 2];
+  size_t len = strlen(path);
+  STRUCT_STAT st;
+
+  if (len == 0 || len >= sizeof(buf))
+    return HTS_FALSE;
+  /* MSVC's stat fails on a directory named with a trailing separator */
+  while (len > 1 && (path[len - 1] == '/' || path[len - 1] == PATH_SEPARATOR))
+    len--;
+  memcpy(buf, path, len);
+  buf[len] = '\0';
+  return STAT(buf, &st) != 0 && errno == ENOENT;
+}
+
 /* File size, -1 if absent */
 /* Note: utf-8 */
 LLint fsize_utf8(const char *s) {

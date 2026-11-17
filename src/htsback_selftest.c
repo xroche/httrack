@@ -3225,6 +3225,64 @@ static int st_busyscans(httrackp *opt, int argc, char **argv) {
   return err ? 1 : 0;
 }
 
+/* Plant a placeholder, rename the slot over it, and report whether it went. */
+static hts_boolean stale_removed(httrackp *opt, lien_back *back,
+                                 const char *dir) {
+  char final[HTS_URLMAXSIZE];
+  FILE *const fp = FOPEN(back->url_sav, "wb");
+
+  assertf(fp != NULL);
+  (void) fclose(fp);
+  snprintf(final, sizeof(final), "%s/p.html", dir);
+  assertf(back_delayed_rename(opt, back, final));
+  return !fexist_utf8(back->url_sav);
+}
+
+/* -#test=delayedstale <dir>: a placeholder an earlier run may have left is
+   removed, and only a new tree with an unfinalized slot skips the unlink. */
+static int st_delayedstale(httrackp *opt, int argc, char **argv) {
+  char path[HTS_URLMAXSIZE];
+  lien_back *back = calloct(1, sizeof(lien_back));
+  int err = 0;
+
+#define CHECK(cond) ST_CHECK(err, cond)
+  assertf(argc >= 1 && back != NULL);
+  errno = ENOENT;
+  CHECK(!hts_path_absent(argv[0]));
+  snprintf(path, sizeof(path), "%s/", argv[0]);
+  CHECK(!hts_path_absent(path));
+  CHECK(!hts_path_absent(""));
+  snprintf(path, sizeof(path), "%s/none/", argv[0]);
+  CHECK(hts_path_absent(path));
+  snprintf(path, sizeof(path), "%s/none", argv[0]);
+  CHECK(hts_path_absent(path));
+#ifndef _WIN32
+  /* ENOTDIR is a doubt, not an absence (Windows answers ENOENT) */
+  snprintf(path, sizeof(path), "%s/reg", argv[0]);
+  FILE *const fp = FOPEN(path, "wb");
+  assertf(fp != NULL);
+  (void) fclose(fp);
+  snprintf(path, sizeof(path), "%s/reg/sub", argv[0]);
+  CHECK(!hts_path_absent(path));
+#endif
+
+  snprintf(back->url_sav, sizeof(back->url_sav), "%s/p.html.3.delayed",
+           argv[0]);
+  opt->html_tree_new = HTS_FALSE;
+  CHECK(stale_removed(opt, back, argv[0]));
+  back->finalized = 1;
+  opt->html_tree_new = HTS_TRUE;
+  CHECK(stale_removed(opt, back, argv[0]));
+  back->finalized = 0;
+  CHECK(!stale_removed(opt, back, argv[0]));
+  opt->html_tree_new = HTS_FALSE;
+  (void) UNLINK(back->url_sav);
+#undef CHECK
+  freet(back);
+  printf("delayedstale self-test: %s\n", err ? "FAILED" : "OK");
+  return err ? 1 : 0;
+}
+
 /* -#test=delayedsettled: only a finished, empty slot counts as settled. */
 static int st_delayedsettled(httrackp *opt, int argc, char **argv) {
   enum { SLOTS = 8, LIVE = 5 };
@@ -3354,6 +3412,9 @@ const struct selftest_entry selftests_back[] = {
      st_mutexlazyinit},
     {"backswap", "", "which backlog slots may be swapped to the ready table",
      st_backswap},
+    {"delayedstale", "<dir>",
+     "an earlier run's placeholder is removed unless the tree is new",
+     st_delayedstale},
     {"delayedsettled", "",
      "a link on a reused keep-alive socket is not re-added as a cache hit",
      st_delayedsettled},

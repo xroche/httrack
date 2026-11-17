@@ -196,6 +196,10 @@ hts_boolean hts_file_backdate(const char *file, int seconds);
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
 
+/* Is path certainly missing? Any doubt answers HTS_FALSE. Utf-8; trailing
+   separators are ignored. */
+hts_boolean hts_path_absent(const char *path);
+
 /* Record a loaded module in opt->libHandles, copying its name. HTS_FALSE when
    out of memory, and opt->libHandles is then unchanged. */
 hts_boolean hts_libhandles_add(httrackp *opt, void *handle,
