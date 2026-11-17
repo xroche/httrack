@@ -30,7 +30,7 @@ jobs:
       # Pinned to a sha, not to v1.5.5: the repository allow-list accepts any
       # version of this action and the publisher moves its tags.
       - name: Build and test inside a FreeBSD VM
-        uses: vmactions/freebsd-vm@c46abacb49f09938ca4e1702d15d836285d694cc # v1.5.9
+        uses: vmactions/freebsd-vm@811efaaac0668df8bfb8308c3ec997b5ab50037b # v1.6.0
         with:
           release: "14.3"
           # Nothing downstream of the VM reads the build tree.
