@@ -30,4 +30,6 @@ Run one target by hand: `fuzz/fuzz-url -max_total_time=300 corpusdir fuzz/corpus
 
 `fuzz-ftp` feeds its input to `get_ftp_line()` over a socketpair and runs each reply line through the PASV, EPSV, SIZE and MDTM parsers. The same bytes, read as a URL, go through the user, host and command splitters. Its first byte sets the reply buffer size: odd is the 1024 bytes every caller passes, even is a short buffer.
 
+`fuzz-sniff` drives the MIME magic-byte check in `htssniff.c`. Its input is the MIME type the server claims, a NUL, then the body. The dict holds the MIME names the rules know, so a new rule needs a dict entry but no harness change.
+
 OSS-Fuzz builds these harnesses with `oss-fuzz-build.sh`, so a new harness needs only a `Makefile.am` entry and a `corpus/<target>/` directory. The script links each harness with `$LIB_FUZZING_ENGINE`. When it is set, `configure` uses it in place of `-fsanitize=fuzzer`.
