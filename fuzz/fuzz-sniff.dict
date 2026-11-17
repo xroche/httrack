@@ -1,0 +1,13 @@
+# Magic bytes the sniff rules know (htssniff.c).
+"GIF89a"
+"GIF87a"
+"\x89PNG\r\n\x1a\n"
+"\xff\xd8\xff"
+"%PDF-"
+"\x1f\x8b"
+"PK\x03\x04"
+"ID3"
+"\x00\x00\x00\x18ftyp"
+"<html"
+"<HTML"
+"<!DOCTYPE"
