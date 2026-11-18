@@ -994,7 +994,7 @@ int url_savename(lien_adrfilsave *const afs,
 
       strcpybuff(fil_complete_patche, normfil);
       if (!hts_striplastchar(fil_complete_patche, '/')) {
-        // no stored link can match a full-length path plus a /
+        // a full-length path has no room for the /
         if (strlen(fil_complete_patche) < sizeof(fil_complete_patche) - 1)
           strcatbuff(fil_complete_patche, "/");
         else
