@@ -99,6 +99,10 @@ selftest_queue_tail '/i' savename '/*/' text/html filpad=1990 'userdef=%p/%p/'
 selftest_queue_tail '/.y' savename '/*/.y' text/html filpad=2030 padunit=中 \
     'userdef=%p/%p/'
 
+# OSS-Fuzz 587368760: a full-length fil leaves no room to try it with a '/'.
+selftest_queue_head 'savename: /dev/null/' savename '/*' text/html filpad=2046 \
+    'prior=www.example.com|/x|/dev/null/www.example.com/x.html'
+
 # The byte cap keeps a name that has no tail to keep.
 zdirs="$(zh 70)/$(zh 70)/$(zh 70)/$(zh 70)/$(zh 70)/$(zh 70)/$(zh 70)/$(zh 70)"
 name_is "$host/$(zh 48)/$zdirs/$(zh 40)/.php" "/$(zh 70)/$zdirs/$(zh 40)/.php" \

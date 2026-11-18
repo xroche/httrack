@@ -154,6 +154,12 @@ full '/page.php?id=3&sid=42' 'text/html' '/dev/null/www.example.com/page475b.htm
 full '/page.php?id=3&sid=42' 'text/html' '/dev/null/www.example.com/page475b.html' \
     strip=sid 'prior=www.example.com|/page.php?id=4|/dev/null/www.example.com/PAGE-PRIOR.html'
 
+# A link that moved is found by its former fil, with or without the trailing /.
+moved='prior=www.example.com|/new.html|/dev/null/www.example.com/MOVED.html|www.example.com'
+full /x text/html /dev/null/www.example.com/MOVED.html "$moved|/x/"
+full /x/ text/html /dev/null/www.example.com/MOVED.html "$moved|/x"
+full /y text/html /dev/null/www.example.com/y.html "$moved|/x/"
+
 # Hostile fils stay rooted under the mirror: ../ (raw or %2e-encoded) drops out,
 # control characters become spaces.
 full '/../../etc/passwd' 'text/html' '/dev/null/www.example.com/etc/passwd.html'
