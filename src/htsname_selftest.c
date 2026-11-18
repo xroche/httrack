@@ -539,15 +539,21 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
       char *dup = strdupt(argv[i] + 6);
       char *const p1 = strchr(dup, '|');
       char *const p2 = p1 != NULL ? strchr(p1 + 1, '|') : NULL;
+      /* optional former (pre-redirect) adr|fil */
+      char *const p3 = p2 != NULL ? strchr(p2 + 1, '|') : NULL;
+      char *const p4 = p3 != NULL ? strchr(p3 + 1, '|') : NULL;
 
-      if (p2 == NULL) {
-        fprintf(stderr, "savename: prior needs adr|fil|sav\n");
+      if (p2 == NULL || (p3 != NULL && p4 == NULL)) {
+        fprintf(stderr, "savename: prior needs adr|fil|sav[|adr|fil]\n");
         freet(dup);
         rc = 1;
         goto cleanup;
       }
       *p1 = *p2 = '\0';
-      if (!hts_record_link(opt, dup, p1 + 1, p2 + 1, "", "", NULL)) {
+      if (p3 != NULL)
+        *p3 = *p4 = '\0';
+      if (!hts_record_link(opt, dup, p1 + 1, p2 + 1, p3 != NULL ? p3 + 1 : "",
+                           p3 != NULL ? p4 + 1 : "", NULL)) {
         freet(dup);
         rc = 1;
         goto cleanup;
