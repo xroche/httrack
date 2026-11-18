@@ -987,15 +987,22 @@ int url_savename(lien_adrfilsave *const afs,
       strcpybuff(afs->save, heap(i)->sav);  // copier (formé à partir du nouveau lien!)
       return 0;
     }
-    // chercher sans / ou avec / dans former
+    // look up the other form, with or without the trailing /, in former
     {
       char BIGSTK fil_complete_patche[HTS_URLMAXSIZE * 2];
+      hts_boolean probe = HTS_TRUE;
 
       strcpybuff(fil_complete_patche, normfil);
-      // Version avec ou sans /
-      if (!hts_striplastchar(fil_complete_patche, '/'))
-        strcatbuff(fil_complete_patche, "/");
-      i = hash_read(hash, normadr, fil_complete_patche, HASH_STRUCT_ORIGINAL_ADR_PATH);       // recherche table 2 (former->adr+former->fil)
+      if (!hts_striplastchar(fil_complete_patche, '/')) {
+        // no stored link can match a full-length path plus a /
+        if (strlen(fil_complete_patche) < sizeof(fil_complete_patche) - 1)
+          strcatbuff(fil_complete_patche, "/");
+        else
+          probe = HTS_FALSE;
+      }
+      i = probe ? hash_read(hash, normadr, fil_complete_patche,
+                            HASH_STRUCT_ORIGINAL_ADR_PATH)
+                : -1; // table 2: former->adr+former->fil
       if (i >= 0) {
         // écraser fil et adr (pas former->fil?????)
         strcpybuff(afs->af.adr, heap(i)->adr);

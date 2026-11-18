@@ -478,7 +478,7 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
 
     /* refuse rather than let the harness itself abort in strcatbuff */
     if (star == NULL ||
-        (size_t) filpad + strlen(argv[0]) >= sizeof(afs->af.fil)) {
+        (size_t) filpad > sizeof(afs->af.fil) - strlen(argv[0])) {
       fprintf(stderr, "savename: filpad needs a '*' in the fil, and room\n");
       return 1;
     }
