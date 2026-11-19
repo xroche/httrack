@@ -115,8 +115,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
     if (fp != NULL) {
       cmdl_argv argv;
-      const hts_boolean written =
-          fwrite(cfg, 1, cfg_size, fp) == cfg_size ? HTS_TRUE : HTS_FALSE;
+      const hts_boolean written = fwrite(cfg, 1, cfg_size, fp) == cfg_size;
 
       if (fclose(fp) == 0 && written && cmdl_init(&argv, 8)) {
         if (cmdl_add(&argv, "httrack"))
