@@ -1,5 +1,4 @@
 # Option alias and command-line splitter (htsalias.c, htscmdline.c).
-"--recurse"
 "--sockets"
 "--sockets="
 "--proxy"
@@ -20,5 +19,4 @@
 "-%v"
 "-#C"
 "http://"
-"filter"
-"setx"
+"set "
