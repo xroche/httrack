@@ -1,6 +1,16 @@
---- unzip.c.orig	2026-11-15 22:11:34.061600805 +0100
-+++ unzip.c	2026-11-15 22:28:25.519399283 +0100
-@@ -866,7 +866,8 @@
+--- unzip.c.orig	2026-11-19 18:11:29.943748964 +0100
++++ unzip.c	2026-11-19 18:17:49.936713423 +0100
+@@ -710,7 +710,8 @@
+     ZPOS64_T uDate;
+     uDate = (ZPOS64_T)(ulDosDate>>16);
+     ptm->tm_mday = (int)(uDate&0x1f) ;
+-    ptm->tm_mon =  (int)((((uDate)&0x1E0)/0x20)-1) ;
++    /* httrack addition: subtract in int, a month of 0 must not wrap (madler/zlib#1413) */
++    ptm->tm_mon =  (int)(((uDate)&0x1E0)/0x20)-1 ;
+     ptm->tm_year = (int)(((uDate&0x0FE00)/0x0200)+1980) ;
+ 
+     ptm->tm_hour = (int) ((ulDosDate &0xF800)/0x800);
+@@ -866,7 +867,8 @@
          lSeek += file_info.size_file_extra;
  
  
