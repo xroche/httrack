@@ -51,7 +51,7 @@ static void fuzz_alias_cleanup(void) {
 
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   static int inited = 0;
-  const int flags = size > 0 ? (data[0] & 7) : 0;
+  int flags;
   const uint8_t *nul;
   char *cmd;
   char **args;
@@ -68,6 +68,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     snprintf(alias_conf, sizeof(alias_conf), "%s/fuzz-alias.conf", alias_dir);
     inited = 1;
   }
+  flags = data[0] &
+          (HTS_SPLIT_FOLD_WS | HTS_SPLIT_STRIP_QUOTES | HTS_SPLIT_DROP_EMPTY);
   data++, size--;
   nul = (const uint8_t *) memchr(data, 0, size);
   cmd = fuzz_strdup(data, nul != NULL ? (size_t) (nul - data) : size);
@@ -108,14 +110,15 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
   if (nul != NULL && (size_t) (nul + 1 - data) < size) {
     const uint8_t *cfg = nul + 1;
+    const size_t cfg_size = size - (size_t) (cfg - data);
     FILE *fp = fopen(alias_conf, "wb");
 
     if (fp != NULL) {
       cmdl_argv argv;
+      const hts_boolean written =
+          fwrite(cfg, 1, cfg_size, fp) == cfg_size ? HTS_TRUE : HTS_FALSE;
 
-      fwrite(cfg, 1, size - (size_t) (cfg - data), fp);
-      fclose(fp);
-      if (cmdl_init(&argv, 8)) {
+      if (fclose(fp) == 0 && written && cmdl_init(&argv, 8)) {
         if (cmdl_add(&argv, "httrack"))
           (void) optinclude_file(alias_conf, &argv);
         cmdl_free(&argv);
