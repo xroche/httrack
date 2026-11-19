@@ -44,6 +44,8 @@ Please visit our Website: http://www.httrack.com
 
 #define FUZZ_CACHE_MAXENTRIES 8
 #define FUZZ_CACHE_NAME_MAX 512
+/* u16 name len, u16 header len, u32 body len */
+#define FUZZ_CACHE_RECORD_HDR 8
 /* past the reader's buffer, so a header block can be clipped */
 #define FUZZ_CACHE_HEADER_MAX (CACHE_HEADERS_SIZE + 64)
 #define FUZZ_CACHE_BODY_MAX 16384
@@ -61,8 +63,8 @@ static void fuzz_cache_cleanup(void) {
   (void) rmdir(cache_dir);
 }
 
-static unsigned int rd16(const uint8_t *p) {
-  return (unsigned int) p[0] | ((unsigned int) p[1] << 8);
+static uint16_t rd16(const uint8_t *p) {
+  return (uint16_t) (p[0] | (p[1] << 8));
 }
 
 static uint32_t rd32(const uint8_t *p) {
@@ -79,15 +81,15 @@ static void fuzz_cache_write_zip(const char *path, const uint8_t *data,
 
   if (zf == NULL)
     return;
-  for (n = 0; n < FUZZ_CACHE_MAXENTRIES && size >= 8; n++) {
-    const unsigned int name_len = rd16(data);
-    const unsigned int header_len = rd16(data + 2);
+  for (n = 0; n < FUZZ_CACHE_MAXENTRIES && size >= FUZZ_CACHE_RECORD_HDR; n++) {
+    const uint32_t name_len = rd16(data);
+    const uint32_t header_len = rd16(data + 2);
     const uint32_t body_len = rd32(data + 4);
     char name[FUZZ_CACHE_NAME_MAX];
     size_t i, used = 0;
     zip_fileinfo fi;
 
-    data += 8, size -= 8;
+    data += FUZZ_CACHE_RECORD_HDR, size -= FUZZ_CACHE_RECORD_HDR;
     if (name_len >= sizeof(name) || header_len > FUZZ_CACHE_HEADER_MAX ||
         body_len > FUZZ_CACHE_BODY_MAX ||
         size < (size_t) name_len + header_len + body_len)
@@ -131,7 +133,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   static int inited = 0;
   httrackp *opt;
   cache_back cache;
-  int raw;
+  hts_boolean raw;
 
   if (size == 0)
     return 0;
@@ -149,15 +151,18 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   (void) unlink(cache_zip);
   (void) unlink(cache_salvage);
 
-  raw = data[0] & 1;
+  raw = (data[0] & 1) != 0;
   data++, size--;
   if (raw) {
     FILE *const fp = fopen(cache_zip, "wb");
+    const size_t len = size < FUZZ_CACHE_RAW_MAX ? size : FUZZ_CACHE_RAW_MAX;
+    hts_boolean written;
 
     if (fp == NULL)
       return 0;
-    fwrite(data, 1, size < FUZZ_CACHE_RAW_MAX ? size : FUZZ_CACHE_RAW_MAX, fp);
-    fclose(fp);
+    written = fwrite(data, 1, len, fp) == len;
+    if (fclose(fp) != 0 || !written)
+      return 0;
   } else {
     fuzz_cache_write_zip(cache_zip, data, size);
   }
@@ -182,8 +187,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     const coucal_item *item;
     int n = 0;
 
-    while ((item = coucal_enum_next(&e)) != NULL &&
-           n++ < 2 * FUZZ_CACHE_MAXENTRIES)
+    /* a raw zip can index any number of entries, so cap the per-input work */
+    while ((item = coucal_enum_next(&e)) != NULL && n++ < FUZZ_CACHE_MAXENTRIES)
       fuzz_cache_read_entry(opt, &cache, item->name);
     unzClose(cache.zipInput);
   }
