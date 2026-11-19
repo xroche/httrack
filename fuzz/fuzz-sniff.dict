@@ -1,4 +1,4 @@
-# Magic bytes the sniff rules know (htssniff.c).
+# A sample of the magic bytes the sniff rules check (htssniff.c).
 "GIF89a"
 "GIF87a"
 "\x89PNG\x0d\x0a\x1a\x0a"
@@ -35,6 +35,7 @@
 "audio/aac"
 "video/mpeg"
 "video/x-sgi-movie"
+"x-world/x-vrml"
 "application/x-gzip"
 "multipart/x-gzip"
 "application/x-compressed"
