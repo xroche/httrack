@@ -30,4 +30,6 @@ Run one target by hand: `fuzz/fuzz-url -max_total_time=300 corpusdir fuzz/corpus
 
 `fuzz-ftp` feeds its input to `get_ftp_line()` over a socketpair and runs each reply line through the PASV, EPSV, SIZE and MDTM parsers. The same bytes, read as a URL, go through the user, host and command splitters. Its first byte sets the reply buffer size: odd is the 1024 bytes every caller passes, even is a short buffer.
 
+`fuzz-cache` drives the ZIP cache reader the way `--continue` does, since a copied project folder brings its own `hts-cache/new.zip`. Its first byte picks the mode. When it is odd, the rest is written as the cache file itself, and when it is even, the rest is a list of name, header and body records that the harness zips first, so the input gets past the CRC check. Each indexed entry is then read back through the cache readers, and `cache_repair()` runs on the file. Files go in a temp dir under `$TMPDIR`.
+
 OSS-Fuzz builds these harnesses with `oss-fuzz-build.sh`, so a new harness needs only a `Makefile.am` entry and a `corpus/<target>/` directory. The script links each harness with `$LIB_FUZZING_ENGINE`. When it is set, `configure` uses it in place of `-fsanitize=fuzzer`.

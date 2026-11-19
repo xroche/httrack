@@ -13,8 +13,6 @@
 "Location:"
 "Content-Disposition:"
 "X-Save:"
-"X-Addr:"
-"X-Fil:"
 "HTTP/1.1 200 OK"
 "HTTP/1.1 302 Found"
 "text/html"
