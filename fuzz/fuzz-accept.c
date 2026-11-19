@@ -26,16 +26,15 @@ Please visit our Website: http://www.httrack.com
 */
 
 /* Fuzz the link-acceptance wizard (htswizard.c): hts_acceptlink() decides
-   whether the engine mirrors the (adr, fil) a parsed page named, against the
-   command-line filter rules, the wizard block and the robots level; the
-   wizard-answer helpers build and record the filters an answer implies.
-   The input is NUL-separated fields: knobs, adr, fil, tag, attribute, mime,
-   reply, then up to six filter rules. */
+   whether the engine mirrors the (adr, fil) a page links to, against the
+   referer's depth, the travel scope and the command-line filter rules. Then
+   the wizard records the filters a reply implies.
+   The input is a knob byte, then NUL-separated fields: adr, fil, mime, reply,
+   then up to six filter rules. */
 #include "fuzz.h"
 
 #include <stdio.h>
 #include <string.h>
-#include <unistd.h>
 
 #include "htscore.h"
 #include "htshash.h"
@@ -70,49 +69,24 @@ static hts_boolean fuzz_field(const uint8_t **data, size_t *size, char *dst,
   return HTS_TRUE;
 }
 
-/* The wizard-answer helpers over one reply: the parse, the scope, the two
-   filter slots it implies, the block it records and the verdict it carries. */
-static void fuzz_wizard_answer(httrackp *opt, const char *reply,
-                               const char *adr, const char *fil,
-                               hts_boolean seeker_up) {
-  const int n = hts_wizard_parse_reply(reply);
-  int slot;
-
-  (void) hts_wizard_scope_answer(n);
-  for (slot = 0; slot < HTS_WIZARD_MAX_FILTERS; slot++) {
-    char buf[HTS_FILTER_SLOT_SIZE];
-    htsbuff f = htsbuff_array(buf);
-
-    hts_wizard_answer_filter(&f, slot, n, adr, fil, seeker_up);
-  }
-  {
-    const int inserted = hts_wizard_insert_filters(opt, n, adr, fil, seeker_up);
-    int forbidden_url = -1;
-    int set_prio_to = 0;
-
-    (void) inserted;
-    hts_wizard_apply_verdict(opt, n, adr, fil, &forbidden_url, &set_prio_to);
-  }
-}
-
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+  static const int travels[4] = {HTS_TRAVEL_SAME_ADDRESS,
+                                 HTS_TRAVEL_SAME_DOMAIN, HTS_TRAVEL_SAME_TLD,
+                                 HTS_TRAVEL_EVERYWHERE};
   static int inited = 0;
   httrackp *opt;
+  struct hash_struct hash;
+  char **filters = NULL;
+  int filptr = 0;
   char adr[HTS_URLMAXSIZE];
   char fil[HTS_URLMAXSIZE];
-  char tag[64];
-  char attribute[64];
   char mime[64];
   char reply[64];
   char rule[FUZZ_ACCEPT_RULE_MAX];
-  char note[HTS_URLMAXSIZE];
   uint8_t knobs;
   hts_boolean seeker_up;
-  hts_boolean in_css_file;
   int set_prio_to = 0;
   int just_test_it = 0;
-  const char *tag_arg;
-  const char *attr_arg;
   int i;
 
   if (size == 0)
@@ -123,86 +97,67 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   }
   knobs = data[0];
   seeker_up = (knobs & 1) ? HTS_TRUE : HTS_FALSE;
-  in_css_file = (knobs & 2) ? HTS_TRUE : HTS_FALSE;
-  tag_arg = (knobs & 4) ? tag : NULL;
-  attr_arg = (knobs & 4) ? attribute : NULL;
   data++, size--;
 
   if (!fuzz_field(&data, &size, adr, sizeof(adr)))
     return 0;
   if (!fuzz_field(&data, &size, fil, sizeof(fil)))
     snprintf(fil, sizeof(fil), "/");
-  if (!fuzz_field(&data, &size, tag, sizeof(tag)))
-    tag[0] = '\0';
-  if (!fuzz_field(&data, &size, attribute, sizeof(attribute)))
-    attribute[0] = '\0';
   if (!fuzz_field(&data, &size, mime, sizeof(mime)))
     snprintf(mime, sizeof(mime), "text/html");
   if (!fuzz_field(&data, &size, reply, sizeof(reply)))
     snprintf(reply, sizeof(reply), "1");
 
-  /* Every decision is relative to the link's referer: urladr() is
-     heap(ptr)->adr, so a link must be on the heap first, and opt->hash must
-     outlive the calls that read it. */
-  struct hash_struct hash;
-
   memset(&hash, 0, sizeof(hash));
   opt = hts_create_opt();
+  opt->log = opt->errlog = NULL;
   opt->hash = &hash;
-  (void) hts_record_init(opt);
   hash_init(opt, &hash, opt->urlhack);
   hash.liens = (const lien_url *const *const *) &opt->liens;
-  (void) hts_record_link(opt, "fuzz.example", "/", "/dev/null", "", "",
-                         NULL);
   opt->wizard = (knobs & 8) ? HTS_WIZARD_AUTO : HTS_WIZARD_NONE;
   opt->seeker = seeker_up ? (HTS_SEEKER_UP | HTS_SEEKER_DOWN) : HTS_SEEKER_DOWN;
-  opt->robots = (hts_robots) ((knobs >> 5) & 3);
+  opt->travel = travels[(knobs >> 5) & 3];
+  opt->maxfilter = opt->maxfilter < 128 ? 128 : opt->maxfilter;
 
-  /* The crawl's filter array, then the rules the input carries; the engine
-     inserts a command-line rule at 0, so the last one read wins. */
-  {
-    char **filters = NULL;
-    int filptr = 0;
-
-    opt->maxfilter = opt->maxfilter < 128 ? 128 : opt->maxfilter;
-    if (filters_init(&filters, opt->maxfilter, 0) != 0) {
-      filters_bind(opt, &filters, &filptr);
-      for (i = 0; i < FUZZ_ACCEPT_MAXRULES; i++) {
-        if (!fuzz_field(&data, &size, rule, sizeof(rule)))
-          break;
-        (void) filters_insert(opt, 0, rule);
-      }
-
-      /* The decision the engine makes for every parsed link. */
-      {
-        const int forbidden =
-            hts_acceptlink(opt, 0, adr, fil, tag_arg, attr_arg, in_css_file,
-                           &set_prio_to, &just_test_it);
-
-        (void) forbidden;
-      }
-      (void) hts_acceptmime(opt, 0, adr, fil, mime);
-      {
-        static const LLint sizes[4] = {0, 1024, (LLint) 1 << 20, -1};
-        int k;
-
-        for (k = 0; k < 4; k++)
-          (void) hts_testlinksize(opt, adr, fil, sizes[k]);
-      }
-
-      /* The interactive answer layer over the same link. */
-      (void) hts_wizard_parse_reply("");
-      (void) hts_wizard_parse_reply("*");
-      (void) hts_wizard_parse_reply("!");
-      (void) hts_wizard_parse_reply("999999999999999");
-      fuzz_wizard_answer(opt, reply, adr, fil, seeker_up);
-      if (hts_upper_links_note(opt, note, sizeof(note)))
-        (void) note[0];
+  /* Link 0 is the start URL, link 1 the page holding the fuzzed link. */
+  if (hts_record_init(opt) &&
+      hts_record_link(opt, "fuzz.example", "/", "/dev/null", "", "", NULL) &&
+      hts_record_link(opt, "fuzz.example", "/dir/page.html", "/dev/null", "",
+                      "", NULL) &&
+      filters_init(&filters, opt->maxfilter, 0) != 0) {
+    /* depth 1 is the last level, whose links are refused */
+    opt->liens[1]->depth = (knobs & 2) ? 1 : 2;
+    filters_bind(opt, &filters, &filptr);
+    /* appended like command-line rules, so the last match wins */
+    for (i = 0; i < FUZZ_ACCEPT_MAXRULES; i++) {
+      if (!fuzz_field(&data, &size, rule, sizeof(rule)))
+        break;
+      (void) filters_insert(opt, filptr, rule);
     }
-    /* opt owns the bound array; free_opt does not release it (the engine
-       does at XH_extuninit), so release the slot block then the index. */
-    if (filters[0] != NULL)
-      freet(filters[0]);
+
+    (void) hts_acceptlink(opt, 1, adr, fil, NULL, NULL, HTS_FALSE, &set_prio_to,
+                          &just_test_it);
+    (void) hts_acceptmime(opt, 1, adr, fil, mime);
+    {
+      static const LLint sizes[4] = {0, 1024, (LLint) 1 << 20, -1};
+      int k;
+
+      for (k = 0; k < 4; k++)
+        (void) hts_testlinksize(opt, adr, fil, sizes[k]);
+    }
+
+    /* The wizard's answer to a reply about the same link. */
+    {
+      const int n = hts_wizard_parse_reply(reply);
+      int forbidden_url = -1;
+
+      (void) hts_wizard_insert_filters(opt, n, adr, fil, seeker_up);
+      hts_wizard_apply_verdict(opt, n, adr, fil, &forbidden_url, &set_prio_to);
+    }
+  }
+  /* free_opt leaves the bound filter array to its owner */
+  if (filters != NULL) {
+    freet(filters[0]);
     freet(filters);
   }
   hash_free(&hash);
