@@ -30,6 +30,6 @@ Run one target by hand: `fuzz/fuzz-url -max_total_time=300 corpusdir fuzz/corpus
 
 `fuzz-ftp` feeds its input to `get_ftp_line()` over a socketpair and runs each reply line through the PASV, EPSV, SIZE and MDTM parsers. The same bytes, read as a URL, go through the user, host and command splitters. Its first byte sets the reply buffer size: odd is the 1024 bytes every caller passes, even is a short buffer.
 
-`fuzz-accept` asks `hts_acceptlink()` whether to follow a link found on `/dir/page.html`, a page the start URL `/` links to. Its first byte sets the travel scope, the wizard mode and whether the crawl may go up a directory. It can also put that page at the last depth level. The NUL-separated fields after it are the link's host and path, a MIME type, a wizard reply, then up to six filter rules.
+`fuzz-accept` asks `hts_acceptlink()` whether to follow a link found on `/dir/page.html`, a page the start URL `/` links to. Its first byte sets the travel scope, the wizard mode and whether the crawl may go up a directory. It can also put that page at the last depth level. The NUL-separated fields after it are the link's host and path, a MIME type, a wizard reply, then up to six filter rules. The filter rules apply only when the wizard bit is set.
 
 OSS-Fuzz builds these harnesses with `oss-fuzz-build.sh`, so a new harness needs only a `Makefile.am` entry and a `corpus/<target>/` directory. The script links each harness with `$LIB_FUZZING_ENGINE`. When it is set, `configure` uses it in place of `-fsanitize=fuzzer`.

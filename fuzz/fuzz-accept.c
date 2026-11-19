@@ -45,6 +45,13 @@ Please visit our Website: http://www.httrack.com
 #define FUZZ_ACCEPT_MAXRULES 6
 #define FUZZ_ACCEPT_RULE_MAX 256
 
+/* Knob byte bits. Bits 2, 4 and 7 are unused. */
+#define KNOB_SEEKER_UP 0x01  /* the crawl may go up a directory */
+#define KNOB_LAST_LEVEL 0x02 /* the linking page sits at the last depth */
+#define KNOB_WIZARD 0x08     /* run the wizard, which applies the rules */
+#define KNOB_TRAVEL_SHIFT 5  /* two bits: index into travels[] */
+#define KNOB_TRAVEL_MASK 0x03
+
 /* Copy the next NUL-separated field into dst (bounded), and advance past
    it. Returns HTS_FALSE at the end of the input. */
 static hts_boolean fuzz_field(const uint8_t **data, size_t *size, char *dst,
@@ -96,7 +103,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     inited = 1;
   }
   knobs = data[0];
-  seeker_up = (knobs & 1) ? HTS_TRUE : HTS_FALSE;
+  seeker_up = (knobs & KNOB_SEEKER_UP) ? HTS_TRUE : HTS_FALSE;
   data++, size--;
 
   if (!fuzz_field(&data, &size, adr, sizeof(adr)))
@@ -114,9 +121,9 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   opt->hash = &hash;
   hash_init(opt, &hash, opt->urlhack);
   hash.liens = (const lien_url *const *const *) &opt->liens;
-  opt->wizard = (knobs & 8) ? HTS_WIZARD_AUTO : HTS_WIZARD_NONE;
+  opt->wizard = (knobs & KNOB_WIZARD) ? HTS_WIZARD_AUTO : HTS_WIZARD_NONE;
   opt->seeker = seeker_up ? (HTS_SEEKER_UP | HTS_SEEKER_DOWN) : HTS_SEEKER_DOWN;
-  opt->travel = travels[(knobs >> 5) & 3];
+  opt->travel = travels[(knobs >> KNOB_TRAVEL_SHIFT) & KNOB_TRAVEL_MASK];
   opt->maxfilter = opt->maxfilter < 128 ? 128 : opt->maxfilter;
 
   /* Link 0 is the start URL, link 1 the page holding the fuzzed link. */
@@ -126,7 +133,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
                       "", NULL) &&
       filters_init(&filters, opt->maxfilter, 0) != 0) {
     /* depth 1 is the last level, whose links are refused */
-    opt->liens[1]->depth = (knobs & 2) ? 1 : 2;
+    opt->liens[1]->depth = (knobs & KNOB_LAST_LEVEL) ? 1 : 2;
     filters_bind(opt, &filters, &filptr);
     /* appended like command-line rules, so the last match wins */
     for (i = 0; i < FUZZ_ACCEPT_MAXRULES; i++) {
