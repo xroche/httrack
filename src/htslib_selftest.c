@@ -2283,8 +2283,8 @@ static int st_y2038(httrackp *opt, int argc, char **argv) {
   return st_verdict("y2038", err);
 }
 
-/* Tests the x[strlen(x) - 1] class (#770, #781, #821). The byte below the
-   string holds '#' because a stray NUL would look untouched. */
+/* The x[strlen(x) - 1] class is tested here (#770, #781, #821). The byte
+   below the string holds '#' because a stray NUL would look untouched. */
 static int st_lastchar(httrackp *opt, int argc, char **argv) {
   enum { off = 8 };
 
