@@ -93,10 +93,8 @@ HTSEXT_API T_SOC catch_url_init(int *port, /* 128 bytes */ char *adr) {
   return soc;
 }
 
-/* Accumulate the request headers into "data" (CATCH_URL_DATA_SIZE bytes, on
-   entry holding the request line) and feed them to treathead(). A line or
-   block that does not fit fails the capture, because a clipped block is not
-   the request the browser sent. Every iteration charges "used". */
+/* Accumulate the request headers into "data" (CATCH_URL_DATA_SIZE bytes) and
+   feed them to treathead(). A line or block that does not fit fails. */
 static catch_url_status catch_url_headers(T_SOC soc, char *data,
                                           htsblk *blkretour) {
   char BIGSTK line[CATCH_URL_LINE_SIZE];
@@ -105,9 +103,7 @@ static catch_url_status catch_url_headers(T_SOC soc, char *data,
   do {
     size_t need;
 
-    /* A clipped line is not the header the browser sent, and skipping it
-       charges "used" nothing, so a peer sending only such lines would hold
-       this loop open for free. */
+    /* Skipping a clipped line would let a peer hold this loop open for free. */
     if (socinput(soc, line, (int) sizeof(line)))
       return CATCH_URL_ERR_HEADER;
     treathead(NULL, NULL, NULL, blkretour, line); // traiter
@@ -117,8 +113,7 @@ static catch_url_status catch_url_headers(T_SOC soc, char *data,
     strlcatbuff(data, line, CATCH_URL_DATA_SIZE);
     strlcatbuff(data, "\r\n", CATCH_URL_DATA_SIZE);
     used += need;
-    /* the empty line ending the block is already appended, so no final CRLF
-       follows */
+    /* the empty line ending the block is already appended */
   } while (strnotempty(line));
   return CATCH_URL_OK;
 }

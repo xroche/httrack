@@ -161,8 +161,7 @@ static void cache_zip_write_failed(httrackp *opt, cache_back *cache,
   }
 }
 
-/* Fail r with "<what>: <message for err>". It is bounded, because msg is 80
-   bytes in an installed-header struct and the message is locale-sized. */
+/* Fail r with "<what>: <message for err>", clipped to r->msg's 80 bytes. */
 void cache_read_failed(htsblk *r, const char *what, int err) {
   char errbuf[HTS_STRERROR_SIZE];
 
@@ -170,9 +169,8 @@ void cache_read_failed(htsblk *r, const char *what, int err) {
   htsblk_failf(r, "%s: %s", what, hts_strerror(err, errbuf, sizeof(errbuf)));
 }
 
-/* Stream fp into the cache entry already opened on zf. Returns Z_OK, the zip
-   error, or CACHE_ZIP_READ_ERROR. A failed read must abandon the entry,
-   because a short read looks like EOF and would commit a truncated body. */
+/* Stream fp into the cache entry opened on zf. Returns Z_OK, the zip error,
+   or CACHE_ZIP_READ_ERROR, which must abandon the truncated entry. */
 int cache_zip_store_stream(zipFile zf, FILE *fp) {
   char BIGSTK buff[32768];
   size_t nl;
@@ -228,8 +226,7 @@ void cache_keep_previous(httrackp *opt, cache_back *cache, const char *url_adr,
   }
 }
 
-/* Store an entry. A kept one holds headers only, and is marked so only the
-   naming path reads it back (#1421). */
+/* Store an entry. A kept one holds headers only (#1421). */
 static void cache_add_ex(httrackp *opt, cache_back *cache, const htsblk *r,
                          const char *url_adr, const char *url_fil,
                          const char *url_save, int all_in_cache,
@@ -626,7 +623,6 @@ static htsblk cache_readex_new(httrackp *opt, cache_back *cache,
             strcpybuff(r.msg, "Cache Read Error : NUL In Header");
           }
 
-          /* An older engine or a hand edit can leave these in a cache */
           if (!hts_location_is_safe(r.location)) {
             hts_log_print(opt, LOG_WARNING,
                           "cached Location naming a post token, dropped: %s%s",
@@ -634,8 +630,7 @@ static htsblk cache_readex_new(httrackp *opt, cache_back *cache,
             r.location[0] = '\0';
           }
 
-          /* cache_add() stores X-Save relative to path_html_utf8, so the read
-             re-prepends the current one, which may have grown since. */
+          /* X-Save is stored relative to path_html_utf8. */
           if (previous_save_[0] != '\0') {
             const char *const path_html = StringBuff(opt->path_html_utf8);
             const size_t pathLen = strlen(path_html);
@@ -646,11 +641,8 @@ static htsblk cache_readex_new(httrackp *opt, cache_back *cache,
             const char *const prefix = carries_path ? "" : path_html;
             size_t used = 0;
 
-            /* A forged X-Save must not steer the later fexist, read or rename
-               out of the mirror. An absolute name, the pre-3.40 shape, is only
-               accepted under the root, and only what follows the root is
-               untrusted. Anything else must be relative, because with no -O
-               the root is "" and an absolute name would be used verbatim. */
+            /* A forged X-Save must not escape the mirror. An absolute name
+               (pre-3.40) is accepted only under a non-empty root. */
             if (carries_path
                     ? !hts_path_is_contained(previous_save_ + pathLen)
                     : !hts_path_is_relative_contained(previous_save_)) {
@@ -684,9 +676,7 @@ static htsblk cache_readex_new(httrackp *opt, cache_back *cache,
             strcpybuff(r.msg, "Cache Entry Kept For Naming Only");
           }
 
-          /* A negative X-Size is corrupt, and so is one >= INT_MAX when the
-             data is in the zip. A headers-only entry may exceed INT_MAX, and
-             dropping it would re-fetch the file on every update. */
+          /* A headers-only entry may exceed INT_MAX, but zipped data cannot. */
           if (r.size < 0 || (dataincache && r.size >= INT_MAX)) {
             r.statuscode = STATUSCODE_INVALID;
             strcpybuff(r.msg, "Cache Read Error : Bad Size");
@@ -992,9 +982,7 @@ static hts_boolean reconcile_promote_sidecar(httrackp *opt, const char *oldname,
   return reconcile_promote(opt, oldname, newname);
 }
 
-/* Count the entries of a cache generation, or return -1 when it is absent or
-   will not open. Coverage decides which generation to keep, and a file size
-   only measures its bodies. */
+/* Count the entries of a cache generation, or -1 if it will not open. */
 static LLint reconcile_entries(httrackp *opt, const char *name) {
   unz_global_info64 gi;
   unzFile zip;
@@ -1262,7 +1250,6 @@ void cache_init(cache_back * cache, httrackp * opt) {
 
     } else if (fsize_utf8(hts_logpath(opt, "hts-cache/old.ndx")) > 0 ||
                fsize_utf8(hts_logpath(opt, "hts-cache/new.ndx")) > 0) {
-      /* a pre-3.31 (2003) .dat/.ndx cache cannot be imported */
       hts_log_print(opt, LOG_ERROR,
                     "Cache: the pre-3.31 .dat/.ndx cache format is no longer "
                     "supported; ignoring it (the site will be re-crawled)");
@@ -1341,9 +1328,8 @@ static char *readfile_gen(const char *fil, LLint *size, hts_boolean inmem,
   char catbuff[CATBUFF_SIZE];
   const LLint len = utf8 ? fsize_utf8(fil) : fsize(fil);
 
-  /* A size too large for size_t (32-bit) must fail closed, or malloct() would
-     wrap short while fread() reads the full len. This one stat also sets the
-     in-memory bound, so nothing appended after a caller's check can pass it. */
+  /* Fail closed past size_t, or malloct() would wrap short of fread()'s len.
+     One stat also sets the in-memory bound, so later appends cannot pass. */
   const size_t buflen = len >= 0 && (!inmem || hts_inmem_size_fits(len))
                             ? llint_to_size_t(len)
                             : (size_t) -1;

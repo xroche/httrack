@@ -59,9 +59,8 @@ const char *hts_strerror(int err, char *buf, size_t size) {
   (void) strerror_s(buf, size, err);
 #elif defined(__USE_GNU)
   {
-    /* The GNU variant returns the message and may leave buf untouched. The
-       XSI one returns a status. Only __USE_GNU tells them apart, because
-       configure's probe sets _GNU_SOURCE and this tree does not. */
+    /* Only __USE_GNU tells the GNU variant from the XSI one, because only
+       configure's probe sets _GNU_SOURCE. */
     const char *const msg = strerror_r(err, buf, size);
 
     if (msg != NULL && msg != buf)

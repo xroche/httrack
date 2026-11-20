@@ -55,8 +55,7 @@ Please visit our Website: http://www.httrack.com
 
 typedef struct hts_changes hts_changes;
 
-/* One mirrored file, keyed by its mirror-relative path. A redirect and its
-   target can share a save name, and keying by URL would count it twice. */
+/* One mirrored file, keyed by path because a redirect shares its save name. */
 typedef struct {
   char *url;               /* absolute URL, "" for an engine-generated file */
   char *file;              /* mirror-relative path, as listed in new.lst */
@@ -156,8 +155,8 @@ static intptr_t changes_slot(hts_changes *changes, const char *file,
   return slot;
 }
 
-/* MD5 of the file at `path`, not a security boundary. HTS_FALSE if unreadable.
-   Never call it holding changes_mutex, because hashing would stall others. */
+/* MD5 of the file at `path`, HTS_FALSE if unreadable. Never call it holding
+   changes_mutex. */
 static hts_boolean digest_file(const char *path,
                                unsigned char digest[DIGEST_SIZE]) {
   struct MD5Context ctx;
@@ -251,8 +250,7 @@ void hts_changes_notify(httrackp *opt, const char *adr, const char *fil,
     if (slot >= 0 && !is_new) {
       changes_entry *const entry = &TypedArrayNth(changes->entries, slot);
 
-      /* A retry or a second call site keeps the first sample, because the
-         copy on disk may no longer be the pre-run state. */
+      /* Keep the first sample, because only it saw the pre-run copy. */
       entry->rewritten = entry->rewritten || rewritten;
     }
   }
@@ -266,8 +264,7 @@ void hts_changes_notify(httrackp *opt, const char *adr, const char *fil,
   strlcatbuff(url, adr, sizeof(url));
   strlcatbuff(url, fil, sizeof(url));
 
-  /* Hash unlocked, because a large file would stall every other connection.
-     Hash it just before it is overwritten, the last moment it exists. */
+  /* Hash unlocked, because a large file would stall every other connection. */
   prev_size = fsize_utf8(save);
   if (prev_size >= 0 && rewritten)
     has_prev = digest_file(save, prev_digest);
@@ -305,14 +302,12 @@ void hts_changes_html(httrackp *opt, cache_back *cache, const htsblk *r,
   intptr_t slot;
   htsblk prev;
 
-  /* Return early, so --changes off costs nothing. */
   if (!opt->changes)
     return;
   if (r->adr == NULL || r->size < 0 || save == NULL || !strnotempty(save))
     return;
 
-  /* On disk the page carries rewritten links and a crawl-dated footer, so
-     compare payloads against the body the cache kept. */
+  /* The page on disk has rewritten links, so compare against the cache. */
   digest_mem(r->adr, (size_t) r->size, new_digest);
   prev = cache_read_ro(opt, cache, adr, fil, "", location);
   if (HTTP_IS_OK(prev.statuscode) && prev.adr != NULL && prev.size >= 0) {
@@ -321,8 +316,7 @@ void hts_changes_html(httrackp *opt, cache_back *cache, const htsblk *r,
   }
   freet(prev.adr);
 
-  /* Lock only now, because cache_read_ro() can reach file_notify(), which
-     would move the entries array. */
+  /* Lock only now, because cache_read_ro() can move the entries array. */
   hts_mutexlock(&changes_mutex);
   changes = changes_get(opt);
   /* file_notify() records the entry; this call only refines it. */
@@ -415,17 +409,15 @@ static void changes_resolve(hts_changes *changes, httrackp *opt) {
     if (entry->bucket == HTS_CHANGE_GONE)
       continue;
 
-    /* The previous mirror's index decides what existed, because a partial
-       from this crawl's failed attempt is on disk but was never mirrored.
-       Without an index, use what the first notify saw on disk. */
+    /* The previous index decides what existed, because a failed attempt's
+       partial is on disk but was never mirrored. */
     entry->existed = changes->old_index ? entry->listed_prev : entry->on_disk;
     path = fconcat(catbuff, sizeof(catbuff), StringBuff(opt->path_html),
                    entry->file);
     entry->size = fsize_utf8(path);
     if (entry->rewritten && entry->existed) {
-      /* The size shortcut holds only when both digests describe the file on
-         disk. has_new means payload digests, and a parsed page's size moves
-         with its links and footer. */
+      /* The size shortcut holds only for on-disk digests, because a parsed
+         page's size moves with its links. */
       if (!entry->has_new && entry->size >= 0 && entry->prev_size >= 0 &&
           entry->size != entry->prev_size) {
         have_digests = HTS_TRUE; /* different lengths: no need to hash */
@@ -544,8 +536,7 @@ void hts_changes_close_opt(httrackp *opt) {
 
   hts_mutexlock(&changes_mutex);
   {
-    /* A crawl that mirrored nothing still owes a report, which replaces the
-       previous run's stale one. */
+    /* An empty crawl still replaces the previous run's report. */
     hts_changes *const changes = changes_get(opt);
     size_t i;
 

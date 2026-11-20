@@ -94,9 +94,8 @@ void expand_home(String * str);
    and every pointer a caller kept into one, valid. */
 typedef struct {
   char **argv; /* argc slots used out of capacity allocated */
-  /* per slot: the token is an option's parameter, checked by whoever put it
-     here, so the parser takes it as a value even when it starts with '-'
-     (#1425). Set by cmdl_mark_param(). */
+  /* per slot: a checked parameter, taken as a value even if it starts with
+     '-' (#1425). Set by cmdl_mark_param(). */
   hts_boolean *param;
   /* per slot: 1 + the parameter count of an option the parser read, or 0 */
   int *span;

@@ -252,10 +252,8 @@ static int back_search(httrackp *opt, struct_back *sback);
 static void back_move(lien_back *src, lien_back *dst);
 static void back_connxfr(htsblk *src, htsblk *dst);
 
-/* Slots for maxsoc connections, clamped to what back_new() can size. It builds
-   two tables of back_max + 1, so INT_MAX itself is one too many. It is total
-   so a self-test can check it without allocating, because -cN is unclamped
-   under --bypass-limits. */
+/* Slots for maxsoc connections, clamped to what back_new() can size, because
+   -cN is unclamped under --bypass-limits. */
 int back_max_slots(int maxsoc) {
   if (maxsoc <= 0)
     return 1024;
@@ -264,8 +262,7 @@ int back_max_slots(int maxsoc) {
   return maxsoc * 32 + 1024;
 }
 
-/* Slot scans skip slots whose busy bit is clear. back_search_quick() sets it
-   and back_busy_prune() clears it. */
+/* Slot scans skip slots whose busy bit is clear. */
 /* At least one word, so an empty table still allocates. */
 static size_t back_busy_words(int count) { return (size_t) count / 64 + 1; }
 
@@ -414,9 +411,8 @@ void back_free(struct_back ** sback) {
   }
 }
 
-/* Per-candidate connect deadline in seconds. A connecting slot with another
-   address to try falls back after this long, which ends a dead-IPv6 stall
-   well above a normal handshake. The last candidate gets the full timeout. */
+/* Seconds before a connect falls back to the next address (dead IPv6). The
+   last candidate gets the full timeout. */
 #define HTS_CONNECT_FALLBACK_TIMEOUT 10
 
 int back_connect_fallback_due(int addr_index, int addr_count, int elapsed,
@@ -477,9 +473,8 @@ void back_delete_all(httrackp * opt, cache_back * cache, struct_back * sback) {
     /* An FTP worker writes through its slot until it returns, so nothing here
        may wipe or free one under it. */
     ftp_stop_workers();
-    /* A slot still writing when the mirror ends leaves its partial on disk, so
-       hts-cache/ref must outlive the run (#1595). A capped mirror can end
-       before the sweep that reaches back_abort_slot(). */
+    /* A slot still writing leaves its partial on disk, so hts-cache/ref must
+       outlive the run (#1595). */
     BACK_FOR_EACH_BUSY(sback, i) {
       const lien_back *const back = &sback->lnk[i];
 
@@ -853,9 +848,8 @@ static int back_nsoc_overall(const struct_back *sback) {
   return n;
 }
 
-/* Build save's UTF-8 temporary as <dir>/<HTS_TMPDIR>/<name>.<ext>, outside
-   the mirror, so a site's own <path>.bak is never taken as the backup (#774).
-   HTS_FALSE (dest emptied) if it would not fit. */
+/* Build save's temporary outside the mirror, so a site's own <path>.bak is
+   never taken as the backup (#774). HTS_FALSE (dest emptied) if too long. */
 static hts_boolean back_tmpname(char *dest, size_t size, const char *save,
                                 const char *ext) {
   const char *const slash = strrchr(save, '/');
@@ -975,8 +969,7 @@ hts_boolean back_finalize_backup(httrackp *opt, lien_back *const back,
 
   if (back->tmpfile == NULL || back->r.compressed)
     return HTS_TRUE;
-  /* filecreate() can fail after the backup was taken, and dropping the
-     backup then loses both copies (#775). */
+  /* Keep the backup if filecreate() failed, or both copies are lost (#775). */
   if (commit && !fexist_utf8(back->url_sav)) {
     hts_log_print(opt, LOG_WARNING, "%s was never created; restoring %s",
                   back->url_sav, back->tmpfile);
@@ -1248,8 +1241,7 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                   UNLINK(unpacked);
                 } else {
                   back[p].r.statuscode = STATUSCODE_INVALID;
-                  /* errno is set only when our own write failed. A bad
-                     stream leaves 0. */
+                  /* errno is 0 for a bad stream, set for a failed write. */
                   if (errno != 0)
                     back_report_write_failure(opt, &back[p]);
                   htsblk_failf(&back[p].r,
@@ -1263,8 +1255,7 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                     deleteaddr(&back[p].r);
                   UNLINK(unpacked);
                 }
-                /* A failed decode keeps the previously-mirrored copy. Note it,
-                   or the update purge would delete what we kept. */
+                /* Note the kept copy, or the update purge would delete it. */
                 if (back[p].r.statuscode == STATUSCODE_INVALID &&
                     fexist_utf8(back[p].url_sav))
                   filenote(&opt->state.strc, back[p].url_sav, NULL);
@@ -1702,9 +1693,7 @@ static const struct {
 #define BACK_SPOOL_NSTR                                                        \
   (sizeof(back_spool_strings) / sizeof(back_spool_strings[0]))
 
-/* Spools one slot for back_cleanup_background() later in the same run, so it
-   may hold pointers and host layout. The resume reference cannot, because it
-   outlives the process. */
+/* Spools one slot for this run only, so it may hold pointers. */
 static int back_record_write(back_sink *s, const lien_back *src) {
   const char *const base = (const char *) src;
   const size_t whole = sizeof(lien_back);
@@ -1868,16 +1857,12 @@ static back_spooled *back_spool_record(const lien_back *back) {
 
 /* --- the .ref resume state -------------------------------------------------
 
-   What an interrupted transfer resumes from: where its partial bytes landed,
-   and the validators the Range request must carry. Fields are written one by
-   one in little-endian fixed widths, because another build or machine may
-   resume the mirror. Sockets, file handles, request options and scheduling
-   state are not written, and come back zeroed.
+   Fields are little-endian fixed widths, because another machine may resume
+   the mirror. Unwritten fields come back zeroed.
  */
 
-/* A pre-3.50.2 file, a raw lien_back blit, opens with a host-native size_t
-   holding sizeof(lien_back). It has a zero byte in its first eight on every
-   host, and the magic has none. */
+/* A pre-3.50.2 file opens with a size_t sizeof(lien_back), which has a zero
+   byte in its first eight on every host. The magic has none. */
 HTS_STATIC_ASSERT(sizeof(lien_back) < 0x10000, ref_magic_unambiguous);
 
 static hts_boolean ref_put_u32(FILE *fp, uint32_t v) {
@@ -1921,8 +1906,7 @@ static hts_boolean ref_get_u64(FILE *fp, uint64_t *v) {
   return HTS_TRUE;
 }
 
-/* Converts two's complement by hand, because a cast back is
-   implementation-defined above the signed maximum. */
+/* A cast back is implementation-defined above the signed maximum. */
 static hts_boolean ref_put_int(FILE *fp, int v) {
   return ref_put_u32(fp, (uint32_t) v);
 }
@@ -2441,9 +2425,8 @@ void back_slot_fail_nonfatal(httrackp *opt, struct_back *sback, const int p,
                        strnotempty(sback->lnk[p].r.msg) ? NULL : fallback);
 }
 
-/* Refuse a transfer for its size. back_transfer_failed() keeps TOO_BIG out of
-   the retry queue. Close the socket first, or the chunk end path relabels it
-   "Invalid chunk". */
+/* Refuse a transfer for its size. Close the socket first, or the chunk end
+   path relabels it "Invalid chunk". */
 static void back_set_too_big(httrackp *opt, struct_back *sback, const int p) {
   back_slot_close_fail(opt, sback, p, STATUSCODE_TOO_BIG,
                        sback->lnk[p].testmode ? "Test: File too big"
@@ -2579,8 +2562,7 @@ int back_delete(httrackp * opt, cache_back * cache, struct_back * sback,
 
   assertf(p >= 0 && p < back_max);
   if (p >= 0 && p < sback->count) {     // on sait jamais..
-    /* On a mid-write cancel, drop a .delayed placeholder. A real-named partial
-       stays for --continue. */
+    /* Drop a .delayed placeholder, but keep a real partial for --continue. */
     if (back[p].r.is_write && IS_DELAYED_EXT(back[p].url_sav) &&
         (back_status(&back[p]) != STATUS_READY || back[p].r.statuscode <= 0)) {
       back_delayed_discard(opt, &back[p]);
@@ -2829,7 +2811,7 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
                                  1);
                 /* Is supposed to be on disk only */
                 if (r.is_write && previous_save[0] != '\0') {
-                  /* The file is on disk under an older name, so rename it */
+                  /* rename a file saved under an older name */
                   if (strcmp(previous_save, save) != 0 &&
                       fexist_utf8(
                           fconv(catbuff, sizeof(catbuff), previous_save))) {
@@ -3430,8 +3412,7 @@ static void back_abort_slot(httrackp *opt, struct_back *sback, const int p,
                             const int trunc) {
   lien_back *const back = &sback->lnk[p];
 
-  /* Archive a cap-truncated body with WARC-Truncated before the abort
-     overwrites the slot's 2xx status. The slot still counts as incomplete. */
+  /* Archive a truncated body before the abort overwrites its 2xx status. */
   if (trunc != WARC_TRUNC_NONE && StringNotEmpty(opt->warc_file) &&
       back->r.statuscode > 0 && back->r.warc_resphdr != NULL &&
       back->r.size > 0 &&
@@ -3454,8 +3435,7 @@ static void back_abort_slot(httrackp *opt, struct_back *sback, const int p,
 }
 
 /* Drop what a user stop must not leave running, and return the count. A cap
-   lets running transfers finish until back_abort_limit() ends them (#77,
-   #481). A slot still connecting would hold the drain (#1073). */
+   lets transfers finish (#77, #481), but not a connect (#1073). */
 static int back_abort_stopped(httrackp *opt, struct_back *sback) {
   const hts_boolean grace = back_mirror_capped(opt);
   int aborted = 0;
@@ -3475,7 +3455,7 @@ static int back_abort_stopped(httrackp *opt, struct_back *sback) {
 }
 
 /* Abort every live slot once a cap has overrun its grace, and return the
-   count. Partial bodies are archived and their resume data kept. */
+   count. Partial bodies keep their resume data. */
 static int back_abort_limit(httrackp *opt, struct_back *sback,
                             const hts_mirror_limit limit) {
   const hts_boolean size = limit == HTS_MIRROR_LIMIT_SIZE;
@@ -3737,9 +3717,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
         hts_connect_fallback *const cf = &sback->connect_fallback[i];
         int dispo = 0;
 
-        // Probe the resolved address list once per fresh connect, from the
-        // DNS cache. Skip it under a proxy, because resolving the origin would
-        // leak its DNS and let a proxy failure fall back to direct.
+        // Skip under a proxy, because resolving the origin would leak its DNS.
+        // A proxy failure must not fall back to direct.
         if (cf->addr_count < 0 && back[i].r.soc != INVALID_SOCKET &&
             !back[i].r.is_file && !back[i].r.req.proxy.active) {
           SOCaddr scratch[HTS_MAXADDRNUM];
@@ -4165,13 +4144,11 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
             /*KA back[i].r.soc=INVALID_SOCKET; */
             if (retour_fread < 0 && retour_fread != READ_EOF) {
               if (statuscode_is_write_error(back[i].r.statuscode)) {
-                /* keep the write error rather than blame the transfer for
-                   what we could not store */
+                /* keep the write error rather than blame the transfer */
                 hts_log_print(opt, LOG_ERROR, "Unable to write file %s",
                               back[i].url_sav);
                 if (back[i].r.statuscode == STATUSCODE_IO_FATAL) {
-                  /* With a full disk a retry writes nothing, and the purge
-                     would measure a truncated mirror. */
+                  /* A retry cannot write to a full disk. */
                   hts_io_fatal_abort(opt);
                 }
               } else {
@@ -4201,8 +4178,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               back_finalize(opt, cache, sback, i);
             }
 
-            /* Same for an unterminated chunked stream. Its byte count matches
-               the chunks that arrived, but its framing is cut. */
+            /* Same for an unterminated chunked stream. */
             if (back[i].r.statuscode > 0 &&
                 back_chunked_unterminated(&back[i])) {
               if (!opt->tolerant) {
@@ -4255,8 +4231,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                 back_status(&back[i]) == STATUS_CHUNK_CR) {
               const hts_boolean in_trailers = back_in_chunk_trailers(&back[i]);
 
-              /* A chunk line ends at its first LF, the trailer at a blank
-                 line. The reader drops every CR, so a blank line is two LFs. */
+              /* The reader drops every CR, so a blank line is two LFs. */
               if (back[i].chunk_size > 0 &&
                   back[i].chunk_adr[back[i].chunk_size - 1] == 10 &&
                   (!in_trailers || back[i].chunk_size == 1 ||
@@ -4286,9 +4261,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                   if (back[i].r.totalsize < 0)
                     back[i].r.totalsize = 0;    // initialiser à 0 (-1 == unknown)
                   if (back_status(&back[i]) == STATUS_CHUNK_WAIT) {
-                    /* The chunk-size line is hostile input. Parse it wide and
-                       unsigned, and drop what an int cannot hold, because
-                       sscanf "%x" maps 80000000 to INT_MIN. */
+                    /* Parse the hostile chunk size wide, because sscanf "%x"
+                       maps 80000000 to INT_MIN. */
                     char *chunk_end = NULL;
                     const unsigned long long chunk_value =
                         strtoull(chunk_data, &chunk_end, 16);
@@ -4298,13 +4272,11 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                       chunk_size = (int) chunk_value;
                       if (chunk_size > 0)
                         back[i].chunk_blocksize = chunk_size;   /* the data block chunk size */
-                      /* Only 0 ends the stream. The bound above keeps a
-                         negative from claiming the sentinel (#840). */
+                      /* Only 0 ends the stream (#840). */
                       else if (chunk_size == 0)
                         back[i].chunk_blocksize = -1;   /* ending */
                       back[i].r.totalsize += chunk_size;        // noter taille
-                      /* The header -m check saw no length (#1708).
-                         back_checksize() costs a filter match per chunk. */
+                      /* The header -m check saw no length (#1708). */
                       if (istoobig(
                               opt, back[i].r.totalsize, back[i].maxfile_html,
                               back[i].maxfile_nonhtml, back[i].r.contenttype)) {
@@ -4320,8 +4292,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                         chunk_size = -1;
                       } else if (back[i].r.adr != NULL ||
                                  !back[i].r.is_write) { // Not to disk
-                        /* A wider bound only buys a realloc the next read
-                           refuses. An invalid chunk ends the transfer. */
+                        /* The next read would refuse a wider bound. */
                         if (!hts_inmem_size_fits(back[i].r.totalsize)) {
                           hts_log_print(opt, LOG_WARNING,
                                         "Chunked resource too large for %s%s",
@@ -4520,8 +4491,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                            compare */
                         if (strfield(rcvd, "Content-length:"))
                           length_conflict = HTS_TRUE;
-                        /* Parsing a cut header would follow a truncated
-                           Location, or read its tail as headers. */
+                        /* A cut header could carry a truncated Location. */
                         hts_log_print(
                             opt,
                             hts_header_is_read(rcvd) ? LOG_WARNING : LOG_DEBUG,
@@ -4616,8 +4586,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                   if (StringNotEmpty(opt->warc_file))
                     warc_stash_response(&back[i].r, back[i].r.headers);
 
-                  /* Name the bot challenge, or its 4xx and the rollback
-                     read as our defect (#1732). */
+                  /* Say a bot challenge caused the 4xx (#1732). */
                   if (!sback->bot_challenge_noted &&
                       HTTP_IS_ERROR(back[i].r.statuscode) &&
                       http_headers_have_field(back[i].r.headers,
@@ -4661,8 +4630,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                     continue;
                   }
 
-                  // The server sent 304 here. The *-hacks below force
-                  // NOT_MODIFIED only after confirming the file is complete.
+                  // The *-hacks below force 304 only on a complete file.
                   const hts_boolean server_sent_304 =
                       (back[i].r.statuscode == HTTP_NOT_MODIFIED);
 
@@ -4864,8 +4832,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
                       memset(&tmp, 0, sizeof(tmp));
                       back_connxfr(&back[i].r, &tmp);
-                      /* A server-sent 304's headers belong to the revisit
-                         record (#826). A forced 304 has none. */
+                      /* Only a server-sent 304 has revisit headers (#826). */
                       if (server_sent_304)
                         warc_move_request(&back[i].r, &tmp);
                       /* the cache entry overwrites the whole struct, so drop
@@ -4947,9 +4914,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                     // xxc SI CHUNK VERIFIER QUE CA MARCHE??
                     if (back[i].r.statuscode == 206) {  // on nous envoie un morceau (la fin) coz une partie sur disque!
                       LLint sz = fsize_utf8(back[i].url_sav);
-                      /* RFC 7233: resume at the server's Content-Range start.
-                         A server may resume earlier than asked, and appending
-                         the overlap duplicates bytes (#198). */
+                      /* Resume at the server's Content-Range start, which
+                         may be earlier than asked (#198). */
                       const LLint resume = back[i].r.crange_start;
                       const hts_boolean range_ok =
                           back[i].r.crange > 0 && resume >= 0 &&
@@ -4976,8 +4942,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                               back[i].r.statuscode = HTTP_OK; // force 'OK'
                               if (back[i].r.totalsize >= 0)
                                 back[i].r.totalsize += resume; // -> full size
-                              // drop bytes past the resume point. On error,
-                              // drop the partial and refetch the whole file.
+                              // on error, refetch the whole file
                               /* (off_t) is 32-bit on MSVC and wraps past 2GB */
                               if (HTS_FTRUNCATE(back[i].r.out, resume) != 0) {
                                 fclose(back[i].r.out);
@@ -5016,9 +4981,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                           if (fp) {
                             LLint alloc_mem = resume + 1;
 
-                            // Bound the in-memory buffer to a 32-bit size. A
-                            // hostile Content-Length that would overflow it is
-                            // dropped and refetched.
+                            // Refetch when a hostile Content-Length would
+                            // overflow the 32-bit in-memory buffer.
                             if (back[i].r.totalsize > INT32_MAX - alloc_mem) {
                               /* Windows refuses to unlink a file still open */
                               fclose(fp);
@@ -5178,9 +5142,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
       BACK_FOR_EACH_BUSY_FROM(sback, start, i) {
         if (back_is_live(back_status(&back[i]))) { // receiving, connecting, ..
           if (back[i].timeout > 0) {
-            // A stuck connect with a fallback address retries the next one
-            // (dead IPv6 on a dual-stack host). It runs before the timeout
-            // below, so it wins the tie at a short timeout.
+            // The fallback to the next address runs before the timeout below,
+            // so it wins the tie.
             if (back_status(&back[i]) == STATUS_CONNECTING) {
               const hts_connect_fallback *const cf =
                   &sback->connect_fallback[i];
@@ -5191,8 +5154,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                 if (back_connect_next(opt, sback, i)) {
                   continue; // reconnected to the next candidate
                 }
-                // the fallback was due but no socket could be opened, so stop
-                // rather than spin on an invalid fd
+                // no socket could be opened, so stop rather than spin
                 back[i].r.soc = INVALID_SOCKET;
                 back_slot_fail(opt, sback, i, STATUSCODE_CONNERROR,
                                "Connect Error");
@@ -5269,13 +5231,11 @@ static int back_maxtime_grace(const int maxtime) {
   return maximum(5, minimum(30, maxtime / 10));
 }
 
-/* Bytes the smooth stop may overrun before in-flight transfers are aborted.
-   It has no floor, because a size overrun should abort promptly. */
+/* Bytes the smooth stop may overrun before in-flight transfers are aborted. */
 static LLint back_maxsize_grace(const LLint maxsite) { return maxsite / 10; }
 
-/* Which cap has overrun its grace and must hard-stop the mirror (#77, #481).
-   -M counts received bytes (HTS_TOTAL_RECV), because the saved 200-only
-   stat_bytes undercount redirect-heavy crawls (#520). */
+/* Which cap must hard-stop the mirror (#77, #481)? -M counts received bytes,
+   because saved bytes undercount redirect-heavy crawls (#520). */
 static hts_boolean back_maxsize_reached(const httrackp *opt) {
   return opt->maxsite > 0 && hts_stat_recv_get() >= opt->maxsite;
 }
@@ -5285,8 +5245,7 @@ static hts_boolean back_maxtime_reached(const httrackp *opt) {
          hts_mirror_elapsed_ms() >= (TStamp) opt->maxtime * 1000;
 }
 
-/* Has a cap been reached? Then the stop the mirror is under is the engine's,
-   raised by back_checkmirror(). */
+/* Has a cap, rather than the user, stopped the mirror? */
 static hts_boolean back_mirror_capped(const httrackp *opt) {
   return back_maxsize_reached(opt) || back_maxtime_reached(opt);
 }
@@ -5309,8 +5268,7 @@ static hts_mirror_limit back_mirror_limit(httrackp *opt) {
 
 /* See htsback.h. */
 void back_check_worker_fault(httrackp *opt) {
-  /* -1 means already aborted. It outranks a user stop and a rolled-back
-     session, which both exit 0. */
+  /* -1 means already aborted. It outranks a user stop, which exits 0. */
   if (!hts_worker_faulted() || hts_load_acquire_int(&opt->state.exit_xh) == -1)
     return;
   hts_log_print(opt, LOG_ERROR,
@@ -5368,9 +5326,8 @@ void back_info(struct_back * sback, int i, int j, FILE * fp) {
 
   assertf(i >= 0 && i < back_max);
   if (back_status(&back[i]) >= 0) {
-    // Holds the status tag plus the full URL. url_adr and url_fil are each
-    // HTS_URLMAXSIZE*2, so reserve both (*4) plus framing, or back_infostr's
-    // bounded appends abort on a long URL.
+    // url_adr and url_fil are each HTS_URLMAXSIZE*2, plus framing, or
+    // back_infostr's bounded appends abort on a long URL.
     char BIGSTK s[HTS_URLMAXSIZE * 4 + 1024];
 
     s[0] = '\0';
@@ -5446,7 +5403,6 @@ void back_infostr(struct_back *sback, int i, int j, char *s, size_t size) {
           strlcatbuff(s, "/", size);
         snprintf(s2, sizeof(s2), "%s\" ", back[i].url_fil);
         strlcatbuff(s, s2, size);
-        // build the size/totalsize trailer in s2, then append it
         snprintf(s2, sizeof(s2), LLintP " " LLintP " ",
                  hts_load_relaxed_llint(&back[i].r.size),
                  hts_load_relaxed_llint(&back[i].r.totalsize));

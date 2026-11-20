@@ -169,11 +169,8 @@ static HTS_INLINE HTS_UNUSED hts_boolean statuscode_is_write_error(int code) {
                                                                     : HTS_FALSE;
 }
 
-/** Connection state of a backing slot, the 'status' member of lien_back. The
-    engine tests ranges: above zero is a slot in flight, and 1000 or more an
-    FTP one. A transfer ends at STATUS_READY, and the slot returns to
-    STATUS_FREE once the crawler takes the result. An HTTPS slot reaches
-    STATUS_CONNECTING twice, for connect() and after the handshake. */
+/** Connection state of a backing slot. The engine tests ranges: above zero is
+    in flight, and 1000 or more is FTP. */
 typedef enum HTTrackStatus {
   STATUS_ALIVE = -103,             /**< keep-alive socket, no request on it */
   STATUS_FREE = -1,                /**< slot unused, and free to take */

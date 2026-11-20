@@ -43,10 +43,8 @@ Please visit our Website: http://www.httrack.com
 // Capacity contract for the catch_url() 'data' buffer (32 Kb).
 #define CATCH_URL_DATA_SIZE 32768
 
-/* Longest request header line the catcher keeps. It clears Apache's
-   LimitRequestFieldSize (8190) and sits a byte under nginx's 8k header buffer,
-   so a Cookie: or Bearer those servers accept fits. The buffer stays a
-   quarter of the block above, which bounds the header loop. */
+/* Longest request header line kept, above Apache's 8190 and under nginx's 8k.
+   It stays a quarter of the block above, which bounds the header loop. */
 #define CATCH_URL_LINE_MAX 8191
 #define CATCH_URL_LINE_SIZE (CATCH_URL_LINE_MAX + 1)
 

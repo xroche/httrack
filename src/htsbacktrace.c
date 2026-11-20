@@ -95,9 +95,8 @@ static hts_boolean symbolize_crash = HTS_TRUE;
 static posix_spawn_file_actions_t spawn_actions;
 static posix_spawn_file_actions_t *spawn_redirect = NULL;
 
-/* dladdr() names the main program after argv[0], which the symbolizer cannot
-   open when the binary came off PATH. /proc/self/exe always names the file.
-   hts_self_path() is hidden from this side by -fvisibility=hidden (#997). */
+/* dladdr() names the main program after argv[0], which fails off PATH, but
+   /proc/self/exe always names the file (#997). */
 static char main_path[BT_PATH_SIZE];
 /* Main program's mapped range, and the bias to subtract for addr2line (0 on an
    ET_EXEC). */
@@ -157,9 +156,8 @@ static void find_main_object(void) {
      names another file, and the symbolizer would happily open that one. */
   if (len > 0 && (size_t) len < sizeof(main_path)) {
     main_path[len] = '\0';
-    /* Started through the loader, /proc/self/exe is ld.so, which the link map
-       carries under its own name (#996). Match by identity, because dladdr()
-       gives argv[0] and a renamed or symlinked program would lose it. */
+    /* Started through the loader, /proc/self/exe is ld.so (#996). Match by
+       identity, because a renamed program would lose a match by name. */
     if (stat(main_path, &self) == 0 &&
         dl_iterate_phdr(names_a_shared_object, &self) == 0)
       return;
@@ -199,10 +197,8 @@ static hts_boolean copy_bounded(char *dest, size_t size, const char *src) {
   return src[i] == '\0' ? HTS_TRUE : HTS_FALSE;
 }
 
-/* Run the symbolizer on argv within *budget ticks. Returns HTS_FALSE only if
-   none could run. fork() runs the pthread_atfork handlers, and glibc's malloc
-   registers one that takes the arena locks a signal in malloc holds (#968).
-   posix_spawn() is async-signal-safe as of POSIX.1-2024. */
+/* Run the symbolizer on argv within *budget ticks. HTS_FALSE if none ran.
+   fork() would deadlock on glibc's malloc atfork handler (#968). */
 static hts_boolean spawn_symbolizer(char **argv, int *budget) {
   static char llvm_prog[] = "llvm-symbolizer";
   static char llvm_opts[] = "-p";
@@ -227,9 +223,7 @@ static hts_boolean spawn_symbolizer(char **argv, int *budget) {
   return HTS_TRUE;
 }
 
-/* Name the frames backtrace_symbols_fd() leaves as module+offset. They are
-   hidden from .dynsym, but DWARF has them. dladdr() is not async-signal-safe,
-   which is fine because this path is already fatal. */
+/* Name the frames backtrace_symbols_fd() leaves as module+offset. */
 static void symbolize_backtrace(void *const *stack, int size) {
   static char prog[] = "addr2line";
   static char opts[] = "-Cfipa";

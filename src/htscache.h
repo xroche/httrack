@@ -71,20 +71,15 @@ void cache_add(httrackp * opt, cache_back * cache, const htsblk * r,
                int all_in_cache, const char *path_prefix);
 htsblk cache_read(httrackp * opt, cache_back * cache, const char *adr,
                   const char *fil, const char *save, char *location);
-/* Re-store the previous run's entry for a link this run failed to fetch, so
-   the next run recomputes the same save name, which nothing else maps the URL
-   to (#1421). `url_save` is the surviving copy, checked on disk by the caller.
-   The entry is marked kept, and only cache_read_including_broken() reads it. */
+/* Re-store the previous entry of a link this run failed to fetch, so the next
+   run keeps its save name (#1421). `url_save` is the copy on disk. */
 void cache_keep_previous(httrackp *opt, cache_back *cache, const char *url_adr,
                          const char *url_fil, const char *url_save);
 htsblk cache_read_ro(httrackp * opt, cache_back * cache, const char *adr,
                      const char *fil, const char *save, char *location);
-/* Like cache_read, but also yields entries whose transfer broke. return_save
-   (optional, HTS_URLMAXSIZE*2) receives the recorded save name, and
-   return_location (optional, HTS_LOCATION_SIZE) the Location, which outlives
-   the status of an entry naming no local file. adr and headers come back NULL.
-   Read return_location rather than r.location. This is the one reader that
-   sees a kept entry (#1421). */
+/* Like cache_read, but also yields broken and kept entries (#1421). Optional
+   return_save (HTS_URLMAXSIZE*2) and return_location (HTS_LOCATION_SIZE) get
+   the save name and Location. Read return_location, not r.location. */
 htsblk cache_read_including_broken(httrackp *opt, cache_back *cache,
                                    const char *adr, const char *fil,
                                    char *return_save, char *return_location);
