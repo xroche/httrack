@@ -1,7 +1,8 @@
 #!/bin/bash
 #
 # A mirror the engine gave up on must not say "Done.", and shell mode (-#S)
-# must stay silent. Only the disk and ^C arms skip on Windows.
+# must stay silent. Only the /dev/full (disk) arm and the ^C arm skip on
+# Windows.
 
 set -euo pipefail
 

@@ -96,8 +96,9 @@ layout 2col/page.html --structure 2col/%n.%t
 layout 2col/page.html --structure=2col/%n.%t
 layout 2col/page.html -N 2col/%n.%t
 
-# The engine bounds a glued digit run. Past INT_MAX, sscanf("%d") crashes
-# url_savename on LP64 and flattens the mirror on ILP32, which INT_MAX pins.
+# The engine bounds a glued digit run itself. Past INT_MAX, sscanf("%d") would
+# crash url_savename on LP64 and flatten the mirror on ILP32. INT_MAX alone
+# pins the ILP32 case.
 layout "${default_layout}" -N4294967295
 layout "${default_layout}" -N99999999999999999999
 layout "${default_layout}" -N2147483648
