@@ -5,9 +5,8 @@ set -euo pipefail
 
 repo=xroche/httrack
 since=
-# GitHub drops a job's step records after about a week, and the wedge signature
-# lives in them. Past that age a kill is recognised by its runtime instead: the
-# runner lease reaps a lost job at ~45 min, where a real failure ends in ~15.
+# GitHub drops step records after about a week. Past that, a kill is a job the
+# runner lease reaped at ~45 min, where a real failure ends in ~15.
 reaped_minutes=40
 
 usage() {
@@ -31,10 +30,9 @@ done
 [ -n "$since" ] || since=$(python3 -c \
     'import datetime; print(datetime.date.today() - datetime.timedelta(days=7))')
 
-# filter=all, or a rerun hides the killed attempt and the census reads ~40% low
-# (#1228). A killed job keeps no log and no artifact, so what survives is the job
-# record: an unfinished step, or no steps at all once they age out, or a job the
-# run left behind with no conclusion.
+# filter=all, or a rerun hides the killed attempt (#1228). A killed job keeps
+# only its record, with an unfinished step, no steps once they age out, or no
+# conclusion.
 census() {
     local wf=$1 runs id total
     total=$(gh api -X GET "repos/$repo/actions/workflows/$wf/runs" \
@@ -62,9 +60,8 @@ census() {
 }
 
 # Columns: job name, conclusion, unfinished steps, step count, runtime in
-# minutes. A cancelled job is censored exposure and counts in neither column.
-# Wilson, not the normal approximation: at a handful of kills in a few dozen jobs
-# the latter puts the bound below zero and reads as certainty.
+# minutes. A cancelled job is censored and counts in neither column. Wilson,
+# because with few kills the normal approximation puts the bound below zero.
 report() {
     awk -F'\t' -v reaped="$reaped_minutes" '
         $2 == "cancelled" { censored[$1]++; next }

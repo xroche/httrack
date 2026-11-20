@@ -70,8 +70,7 @@ cleanup() {
 }
 trap 'set +e; cleanup' EXIT
 
-# Provisioning runs as root, the build and the suite do not. A second ssh login
-# rather than su, which wants a terminal the ssh channel does not give it.
+# The build and the suite run as a user. su wants a terminal, so log in again.
 as_user() {
     timeout "$STEP_TIMEOUT" ssh -p "$SSH_PORT" -i "$key" \
         -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
@@ -93,9 +92,8 @@ screendump() {
         timeout 30 socat - "unix-connect:$work/monitor" >/dev/null 2>&1 || true
 }
 
-# The boot probe only. ConnectTimeout covers the TCP connect, and qemu's slirp
-# accepts that immediately, so a guest whose sshd never sends a banner would
-# block here until the job's own cap.
+# Boot probe. slirp accepts the TCP connect at once, so ConnectTimeout cannot
+# catch an sshd that never sends a banner.
 ssh_probe() {
     timeout 30 ssh -p "$SSH_PORT" -i "$key" \
         -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
@@ -112,9 +110,8 @@ if ! test -r "$cache/$IMG_NAME"; then
 fi
 echo "$IMG_SHA512  $cache/$IMG_NAME" | sha512sum -c -
 rm -f "$img"
-# Extracted, not piped: the tarball stores the holes and tar only recreates them
-# when it writes a file, so -O would cost the full ten gigabytes after the
-# resize below.
+# tar recreates the holes only when it writes a file. With -O the image would
+# cost its full ten gigabytes after the resize below.
 tar -xJf "$cache/$IMG_NAME" -C "$work"
 extracted=$(echo "$work"/debian-hurd-*.img)
 test -s "$extracted" || fail "no image came out of $IMG_NAME"
@@ -122,9 +119,8 @@ mv "$extracted" "$img"
 echo "::endgroup::"
 
 echo "::group::Install an ssh key"
-# The image's README names partitions 2 and 5, which is the i386 layout. The
-# amd64 image has two primaries and no extended partition, so ask the image
-# rather than trust the document.
+# The README's partitions 2 and 5 are the i386 layout. The amd64 image has two
+# primaries and no extended partition, so read its table.
 root_part=$(sfdisk -J "$img" | python3 -c '
 import json, re, sys
 
@@ -163,8 +159,8 @@ sudo cp "$key.pub" "$mnt$VM_HOME/.ssh/authorized_keys"
 sudo chmod 700 "$mnt$VM_HOME/.ssh"
 sudo chmod 600 "$mnt$VM_HOME/.ssh/authorized_keys"
 sudo chown -R "$ids" "$mnt$VM_HOME/.ssh"
-# A drop-in rather than an append, because sshd keeps the FIRST value it reads
-# and Debian's sshd_config includes this directory on its opening line.
+# sshd keeps the FIRST value it reads, and Debian's sshd_config includes this
+# directory on its opening line.
 sudo grep -q '^Include /etc/ssh/sshd_config.d/' "$mnt/etc/ssh/sshd_config" ||
     fail "this image's sshd_config includes no drop-in directory"
 sudo mkdir -p "$mnt/etc/ssh/sshd_config.d"
@@ -184,8 +180,7 @@ qemu-system-x86_64 -enable-kvm -m "$VM_MEM" -smp "$VM_CPUS" \
     -monitor "unix:$work/monitor,server,nowait" &
 qemu_pid=$!
 
-# Elapsed, not a count of sleeps: a probe that hangs to its own timeout would
-# otherwise let the loop run several times the budget.
+# Time the loop in seconds, because a hung probe makes each try long.
 start=$SECONDS
 until ssh_probe 2>/dev/null; do
     kill -0 "$qemu_pid" 2>/dev/null || fail "qemu exited during boot"
@@ -271,9 +266,8 @@ suite_pid=$!
 tail -f --pid="$suite_pid" "$check_log" 2>/dev/null &
 tail_pid=$!
 
-# Hurd's ext2fs translator can assert under the suite and take the VM with it.
-# Waiting STEP_TIMEOUT out then burns half an hour on a VM already gone, and
-# calls it a test failure when no test failed.
+# Hurd's ext2fs translator can assert and kill the VM, so detect that instead of
+# waiting out STEP_TIMEOUT.
 misses=0
 while ! test -e "$status_file"; do
     sleep "$SUITE_TICK"
@@ -331,9 +325,8 @@ test "$rc" -eq 0 || {
     exit "$rc"
 }
 
-# automake counts a SKIP as success, so a suite that skipped everything exits 0
-# and would report a pass here. That is the vacuous result this whole job exists
-# to avoid, and the buildds prove a Hurd runs nearly all of these tests.
+# automake counts a SKIP as success, so an all-skipped suite exits 0. The
+# buildds prove a Hurd runs nearly all of these tests.
 banner=$(command grep -E '^# (TOTAL|PASS|SKIP|FAIL|ERROR):' "$work/out/test-suite.log") ||
     fail "no result banner in the suite log, so nothing proves the suite ran"
 echo "$banner"

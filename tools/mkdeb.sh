@@ -175,9 +175,9 @@ main() {
         die "Debian revision $rev needs --orig FILE (the orig is frozen from revision 1)"
     fi
 
-    # A quilt patch is written against the orig it is applied to. Once the fix is
-    # upstream, HEAD already carries it, so a regenerated orig makes the patch fail
-    # or, worse, apply with fuzz. Unsigned too: this one breaks the build, not policy.
+    # A quilt patch targets the archive's orig. An orig built from HEAD already
+    # carries the fix, so the patch fails or applies with fuzz. Unsigned builds
+    # check it too, because it breaks the build.
     if [[ -z $orig_in && -s $export_dir/debian/patches/series ]]; then
         die "debian/patches is not empty, so --orig FILE is required: the orig built from HEAD already carries the patches"
     fi
@@ -186,10 +186,8 @@ main() {
         info "reusing upstream tarball $orig_in"
         cp -- "$orig_in" "$scratch/$orig"
     else
-        # Refresh build system and man page, then build the tarball. We build
-        # here only because regen-man needs the compiled binaries; the test
-        # suite is not run in this pass. debuild (below) runs it once, so a
-        # check here would just repeat it.
+        # Build only because regen-man needs the binaries. debuild below runs
+        # the test suite.
         info "regenerating build system and man page"
         (
             cd "$export_dir"
@@ -248,13 +246,10 @@ main() {
     shopt -u nullglob
     [[ ${#changes[@]} -ge 1 ]] || die "debuild produced no .changes file"
 
-    # The real lintian gate (debuild only reports, it does not fail on tags).
-    # --profile debian: CI runners are Ubuntu, whose vendor data would wrongly
-    # reject the Debian "unstable" distribution. Suppressed tags are stale-local-
-    # lintian skew, not package defects: newer-standards-version, and
-    # recommended-field (old lintian still wants the Priority field the sid
-    # lintian in CI accepts dropping). set -e turns any error/warning tag into
-    # a failure.
+    # The lintian gate, because debuild only reports tags. --profile debian
+    # because Ubuntu's vendor data rejects "unstable". An older local lintian
+    # raises the suppressed tags: newer-standards-version, and recommended-field
+    # for the Priority field that sid's lintian lets us drop.
     info "running lintian gate (--fail-on=error,warning)"
     lintian --profile debian -I -i --fail-on=error,warning \
         --suppress-tags newer-standards-version,recommended-field \
@@ -262,11 +257,8 @@ main() {
 
     dcmd cp -- "${changes[@]}" "$outdir/"
 
-    # Clean-room build gate: rebuild the source package in a minimal chroot that
-    # holds only the declared Build-Depends, the same way the buildds will. An
-    # undeclared dependency or any FTBFS aborts the release here instead of
-    # surfacing after a source-only upload. Logs and clean-built debs land in
-    # $outdir/sbuild for inspection.
+    # Rebuild in a chroot holding only the Build-Depends, as the buildds do, so an
+    # undeclared dependency fails before upload. Logs and debs go to $outdir/sbuild.
     if [[ $sbuild -eq 1 ]]; then
         local -a dscs
         shopt -s nullglob

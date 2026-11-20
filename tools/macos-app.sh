@@ -1,7 +1,7 @@
 #!/bin/sh
-# Assemble HTTrack.app from an installed prefix, then verify it. POSIX sh on purpose: a
-# bashism then fails shellcheck, not CI. Payload in Contents/Resources, where webhttrack
-# resolves htsserver and its data relative to its own path.
+# Assemble HTTrack.app from an installed prefix, then verify it. It is POSIX sh so
+# shellcheck catches a bashism. webhttrack finds htsserver and its data relative to
+# its own path in Contents/Resources.
 set -eu
 
 # shellcheck source=tools/macos-bundle.sh
@@ -93,13 +93,13 @@ sysdep() {
     return 1
 }
 
-# Every file, not a prefilter: this list drives the copy, the relink and the audit alike.
+# This list drives the copy, the relink and the audit, so it holds every file.
 machos() {
     machos_into "$app/Contents" "$mach"
 }
 
-# Only the indented lines are dependencies; a universal binary heads each slice.
-# A dylib's first entry is its own LC_ID_DYLIB, skipped like any satisfied dependency.
+# Indented lines are dependencies, and the others head a slice. A dylib's first
+# entry is its own LC_ID_DYLIB, skipped like any satisfied dependency.
 deps() {
     otool -L "$1" >"$otmp" || fail "otool -L failed on $1"
     awk '/^[[:space:]]/ {print $1}' "$otmp"
@@ -182,7 +182,7 @@ relink() {
     done <"$mach"
 }
 
-# Unconditional: shipping an unchecked bundle is worse than refusing to build one.
+# Every check needs these tools, so a missing one stops the build.
 for t in cc otool install_name_tool codesign file; do
     command -v "$t" >/dev/null 2>&1 ||
         fail "$t not found -- macOS bundling needs the Xcode command line tools"
@@ -275,8 +275,7 @@ iconsize=$(wc -c <"$iconfile")
 test "$((0x$iconlen))" -eq "$iconsize" ||
     fail "$iconfile declares $((0x$iconlen)) bytes but holds $iconsize"
 
-# The plist version is a separate spot from the engine's, so drift is silent unless
-# something compares them (#884 is what that looks like when nobody does).
+# The plist version is a separate spot from the engine's, so compare them (#884).
 plistver=$(plist_value "$app/Contents/Info.plist" CFBundleShortVersionString)
 binver=$("$app/Contents/Resources/bin/httrack" --version 2>/dev/null |
     sed -n 's/.*[Vv]ersion \([0-9][0-9.]*[-.][0-9][0-9]*\).*/\1/p' | head -1 | tr '-' '.')
@@ -286,8 +285,8 @@ test "$plistver" = "$binver" ||
 bundlever=$(plist_value "$app/Contents/Info.plist" CFBundleVersion)
 test "$bundlever" = "$binver" ||
     fail "CFBundleVersion says $bundlever, httrack says $binver"
-# A bottled dylib's floor can exceed what the plist declares, and Finder only reads the
-# plist. The mismatch fails the build rather than being reconciled behind our backs.
+# A bottled dylib's floor can exceed what the plist declares, and Finder reads only
+# the plist, so a mismatch fails the build.
 minos=$(macho_floor "$mach") || fail "could not read a minimum macOS out of the payload"
 test -n "$minos" || fail "no Mach-O in the bundle declares a minimum macOS"
 plistmin=$(plist_value "$app/Contents/Info.plist" LSMinimumSystemVersion)
