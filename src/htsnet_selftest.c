@@ -367,7 +367,7 @@ static int st_socks5(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* Is the non-zero poison guard intact, so that a stray NUL shows? */
+/* Is the poison guard (non-zero, so a stray NUL shows) intact? */
 static hts_boolean st_addrport_intact(const char *p, size_t n) {
   size_t i;
 
@@ -1530,7 +1530,8 @@ static int st_mptcp(httrackp *opt, int argc, char **argv) {
   }
 
 #ifdef IPPROTO_MPTCP
-  /* Compare with a hand-made socket, as the kernel decides if MPTCP works. */
+  /* Compare with a hand-made socket, because two MPTCP sockets may fall back
+     to TCP on an emulated runner. */
   if (hts_mptcp_reports()) {
     const int reference = st_mptcp_reference();
 
