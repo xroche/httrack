@@ -85,8 +85,7 @@ static CRASH_NOINLINE void crash_trap(void) {
 #endif
 }
 
-/* Reading the frame *after* the call keeps it live across it: returning
-   frame[0] + f(...) instead lets gcc accumulate and loop, never overflowing. */
+/* Read the frame after the call, or gcc turns the recursion into a loop. */
 static CRASH_NOINLINE char blow_the_stack(size_t depth) {
   volatile char frame[4096];
   char deeper;
@@ -175,8 +174,7 @@ static void crash_fork_prepare(void) { pthread_mutex_lock(&crash_fork_lock); }
 static void crash_fork_parent(void) { pthread_mutex_unlock(&crash_fork_lock); }
 #endif
 
-/* Faults holding a lock a pthread_atfork prepare handler wants (#968). Plain
-   segv where there is no atfork. */
+/* Fault holding a lock a pthread_atfork prepare handler wants (#968). */
 static CRASH_NOINLINE void crash_atfork(void) {
 #ifdef CRASH_HAS_ATFORK
   pthread_atfork(crash_fork_prepare, crash_fork_parent, NULL);

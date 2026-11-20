@@ -9,20 +9,15 @@
 # ambiguous job where this one must refuse to act on it.
 set -euo pipefail
 
-# The runner goes away mid-step, so the live step and the ones after it stay
-# unfinished and none is marked failed. A real failure names the step it failed.
-# A job with no steps at all never started one, which is the same wedge.
-#
-# "failure" is not the only way a job ends badly, so $bad collects every job that
-# did not succeed and is not still running. A run holding one of the others, such
-# as timed_out, is a human's to read even when a sibling leg was killed.
+# A lost runner leaves steps unfinished and none failed, or no steps at all.
+# A timed_out job needs a human even when a sibling leg was killed.
 verdict=$(jq -r '
     def ended_badly: .conclusion != null and .conclusion != "success"
         and .conclusion != "skipped" and .conclusion != "cancelled";
     def failed_steps: [(.steps // [])[]
         | select(.conclusion == "failure" or .conclusion == "timed_out")];
     def names_a_step: failed_steps | length > 0;
-    # This step fails only when the runner VM cannot update WSL, never on our code.
+    # This step fails only when the runner VM cannot update WSL.
     def no_update: failed_steps
         | length > 0 and all(.name == "Stop when wsl --update failed"
                               and .conclusion == "failure");

@@ -1,0 +1,123 @@
+#!/bin/bash
+#
+# check-comments.py flags banned comment phrasing, and --base limits it to added lines.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+srcdir="${abs_top_srcdir:?not run under make check}"
+lint="${srcdir}/tools/check-comments.py"
+python=$(find_python) || skip "python3 not found"
+test -r "${lint}" || fail "missing ${lint}"
+command -v git >/dev/null 2>&1 || skip "no git"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/cmtlint.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "${work}"
+
+cat >"${work}/dirty.c" <<'C'
+/* Measured, not assumed: the SDK lacks it. */
+int a; // this guard is load-bearing
+/* A long block whose second line
+   holds the phrase by construction. */
+const char *u = "http://x"; // the whole point
+C
+cat >"${work}/dirty.py" <<'PY'
+x = 1  # Worth noting, maybe
+PY
+cat >"${work}/more.c" <<'C'
+/* Proved, not guessed. */
+/* a // b
+   Load-bearing */
+int n = 1'000; // in practice
+const char *s = "a\
+b";
+// worth noting
+// a continued line \
+   by construction
+C
+cat >"${work}/raw.cpp" <<'C'
+const char *r = R"x(
+// the whole point
+)x"; // is the tell
+C
+# Every listed phrase, capitalised as a comment opener would be.
+"${python}" -c 'import runpy, sys
+for p in runpy.run_path(sys.argv[1])["BANNED"]:
+    print("/* " + p.capitalize() + " here. */")' "${lint}" >"${work}/all.c"
+nbanned=$(wc -l <"${work}/all.c")
+test "${nbanned}" -ge 12 || fail "BANNED shrank to ${nbanned}"
+out=$("${python}" "${lint}" "${work}/all.c") && fail "all.c passed"
+test "$(wc -l <<<"${out}")" -eq "${nbanned}" || fail "not every phrase fired: ${out}"
+printf '# %s\n' 'Captured, not piped: grep -q exits early.' >"${work}/dirty.sh"
+cat >"${work}/clean.c" <<'C'
+/* The SDK lacks AF_MULTIPATH, so name it. */
+const char *u = "http://load-bearing.example/";
+const char *s = "// in practice", *o = "/*", c = '"';
+const char *m = "by construction", *e = "q\" // load-bearing";
+/* The point isn't here. Fine, not broken: yes. */
+/* neither, not quite: lowercase */
+C
+printf '%s\n' "DOC = '''" '# the whole point' "'''" >"${work}/clean.py"
+printf '%s\n' 'var t = `a' '// in practice`;' >"${work}/clean.js"
+cat >"${work}/clean.css" <<'CSS'
+a { background: url(//example.com/load-bearing.png); }
+CSS
+
+out=$("${python}" "${lint}" "${work}/dirty.c" "${work}/dirty.sh" "${work}/dirty.py" \
+    "${work}/more.c" "${work}/raw.cpp") &&
+    fail "dirty files passed"
+grep -qF 'raw.cpp:2' <<<"${out}" && fail "read a raw string as a comment: ${out}"
+for want in 'dirty.c:1: slogan' "dirty.c:2: 'load-bearing'" "dirty.c:4: 'by construction'" \
+    "dirty.c:5: 'the whole point'" 'dirty.sh:1: slogan' "dirty.py:1: 'worth noting'" \
+    'more.c:1: slogan' "more.c:3: 'load-bearing'" "more.c:4: 'in practice'" \
+    "more.c:7: 'worth noting'" "more.c:9: 'by construction'" "raw.cpp:3: 'is the tell'"; do
+    grep -qF "${want}" <<<"${out}" || fail "missed ${want}: ${out}"
+done
+printf '%s\n' 'x = """' '# a comment' >"${work}/broken.py"
+"${python}" "${lint}" "${work}/broken.py" >/dev/null 2>&1 && fail "an untokenizable file passed"
+out=$("${python}" "${lint}" "${work}/clean.c" "${work}/clean.py" "${work}/clean.css" \
+    "${work}/clean.js") ||
+    fail "clean file flagged: ${out}"
+
+# --base reports what the change adds, and not what was already there.
+repo="${work}/repo"
+mkdir "${repo}"
+cd "${repo}"
+git init -q
+export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.com
+export GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.com
+printf '%s\n' '/* Old, not new: kept as it was.' '   first line */' 'int x;' >f.c
+git add f.c
+git commit -qm base
+printf '%s\n' '/* Old, not new: kept as it was.' '   first line' \
+    '   and an added line, load-bearing. */' 'int x;' '// the whole point' >f.c
+printf '%s\n' '/* in practice */' >'sp é.c'
+git add 'sp é.c'
+out=$("${python}" "${lint}" --base HEAD) && fail "added phrases passed"
+grep -qF "sp é.c:1: 'in practice'" <<<"${out}" || fail "missed a quoted path: ${out}"
+grep -qF "f.c:3: 'load-bearing'" <<<"${out}" || fail "missed a continuation line: ${out}"
+grep -qF "f.c:5: 'the whole point'" <<<"${out}" || fail "missed a // comment: ${out}"
+grep -qF 'f.c:1:' <<<"${out}" && fail "reported an unchanged line: ${out}"
+mkdir sub
+out2=$(cd sub && "${python}" "${lint}" --base HEAD) && fail "a run from a subdirectory passed"
+test "${out2}" = "${out}" || fail "a subdirectory run differs: ${out2}"
+git checkout -q f.c
+git rm -qf 'sp é.c'
+git mv f.c g.c
+printf '%s\n' '// in practice' >>g.c
+git add g.c
+out=$("${python}" "${lint}" --base HEAD) && fail "an edited rename passed"
+test "${out}" = "g.c:4: 'in practice': drop it" || fail "a rename reported old lines: ${out}"
+git reset -q --hard
+sub="${work}/sub"
+git init -q "${sub}"
+git -C "${sub}" commit -q --allow-empty -m one
+git -C "${sub}" commit -q --allow-empty -m two
+git -c protocol.file.allow=always submodule -q add "${sub}" mod.c
+git commit -qm sub
+git -C mod.c checkout -q HEAD~1
+git add mod.c
+out=$("${python}" "${lint}" --base HEAD) || fail "a submodule bump failed: ${out}"
+out=$("${python}" "${lint}" --base HEAD) || fail "an empty change failed: ${out}"

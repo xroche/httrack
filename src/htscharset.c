@@ -286,9 +286,8 @@ LPWSTR hts_convertUTF8StringToUCS2(const char *s, int size, int *pwsize) {
   return hts_convertStringToUCS2(s, size, CP_UTF8, pwsize);
 }
 
-/* WideCharToMultiByte rejects lpUsedDefaultChar, and any non-zero dwFlags, on
-   the Unicode, ISO-2022, HZ, GB18030 and ISCII codepages, where a substitution
-   stays invisible. */
+/* WideCharToMultiByte rejects lpUsedDefaultChar and dwFlags on the Unicode,
+   ISO-2022, HZ, GB18030 and ISCII codepages, so substitutions go unseen. */
 static hts_boolean cp_reports_default_char(UINT cp) {
   if (cp == 42 /* CP_SYMBOL */ || cp == CP_UTF7 || cp == CP_UTF8 ||
       cp == 52936 || cp == 54936 || (cp >= 50220 && cp <= 50229) ||
@@ -326,7 +325,7 @@ static char *hts_convertUCS2StringToCPEx(LPWSTR woutput, int wsize, UINT cp,
       const int n = WideCharToMultiByte(cp, flags, woutput, wsize, uoutput,
                                         usize, NULL, pUsedDefault);
 
-      /* usize only bounds the result; the written length is what n reports */
+      /* usize only bounds the result, and n is the length written */
       if (n > 0 && n <= usize) {
         uoutput[n] = '\0';
         if (plossy != NULL && usedDefault) {
@@ -714,7 +713,7 @@ char *hts_convertStringFromUTF8Strict(const char *s, size_t size,
 #define strncasecmp(a,b,n) strnicmp(a,b,n)
 #endif
 
-/* WHATWG prescan whitespace: SPACE, TAB, CR, LF, FF, but not VT. */
+/* WHATWG prescan whitespace excludes VT. */
 static int is_html_space(char c) {
   return c == ' ' || c == '\t' || c == '\r' || c == '\n' || c == '\f';
 }
@@ -875,7 +874,7 @@ char *hts_getCharsetFromMeta(const char *html, size_t size) {
 
 /* UTF-8 helpers */
 
-/* Length of the strict RFC 3629 sequence that lead starts, or 0. */
+/* Return the strict RFC 3629 length lead starts, or 0. */
 static size_t utf8_lead_length(unsigned char lead) {
   if (lead < 0x80)
     return 1;

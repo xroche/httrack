@@ -11,8 +11,7 @@ set -euo pipefail
 
 match() { selftest_queue "$2 does match $1" filter "$1" "$2"; }
 nomatch() { selftest_queue "$2 does NOT match $1" filter "$1" "$2"; }
-# single-arg call means an empty subject (unreachable as a CLI arg); '*(' used
-# to force max=1 and over-read past it.
+# a single-arg call means an empty subject, which '*(' must not over-read.
 nomatch_empty() { selftest_queue " does NOT match $1" filter "$1"; }
 
 # bare star matches everything
@@ -85,8 +84,7 @@ match '*[\[,\],a]' '['
 match '*[\[,\],a]' ']'
 match '*[\[,\],a]' 'a'
 
-# A truncated range '*[a-' is the literal members {a,-}; the parser must not
-# read past the end decoding it (was a 1-byte heap over-read in the range arm).
+# A truncated range '*[a-' means {a,-} and must not read past the end.
 match '*[a-' 'a'
 nomatch '*[a-' 'b'
 

@@ -1,29 +1,13 @@
 #!/bin/bash
 #
-# Differential for src/htsparse.c. --help says how to run it, and what follows
-# is what the comparison keeps and why.
+# Differential for src/htsparse.c. --help says how to run it.
 #
-# Three signals are compared, each normalized only where two runs of one binary
-# disagree:
-#   - every mirrored file, byte for byte. The page footer is off (-%F '')
-#     because its {date} is the only wall-clock value a mirrored page carries,
-#     and the footer leg uses a template without it. The -%M archive keeps its
-#     parts but drops its Date, Message-ID and boundary, and sorts the parts.
-#   - hts-changes.json, written by --changes. It names each URL the parser
-#     found, the file it went to and its size, so a link gained or lost shows
-#     up even when no page body changed. Compared sorted, because the file
-#     records completion order and adjacent fetches race.
-#   - hts-log.txt, the only place a scanned-but-filtered candidate appears. The
-#     corpus carries off-host <loc> entries that are never fetched and never
-#     mirrored, so without this a change to the <loc> scanner would be invisible.
+# It compares three signals, normalized where two runs of one binary differ:
+#   - every mirrored file. The footer is off because its {date} is a clock.
+#   - hts-changes.json, sorted because adjacent fetches race.
+#   - hts-log.txt, the only record of a scanned but filtered link.
 #
-# Each binary crawls the corpus once per leg, an option set that reaches a
-# writer the default crawl never runs. The legs run in parallel.
-#
-# Dropped: the hts-cache directory, because new.zip and new.lst store mtimes
-# and doit.log carries its own timestamp. Stripped from the two kept text
-# files: the per-line clock, the generator version, the build path, and the run
-# duration and transfer rate.
+# hts-cache is dropped because it stores mtimes.
 
 set -euo pipefail
 
@@ -126,9 +110,7 @@ newest_tag() {
         tail -1
 }
 
-# Copy the tree at $1 into $2, .git aside. Never build in the real checkout,
-# because bootstrap writes some sixty gitignored files there and config.status
-# can re-run under another session's live build directory.
+# Copy $1 to $2 without .git, so no build touches the real checkout.
 copy_tree() {
     mkdir -p "$2"
     (cd "$1" && tar --exclude=.git -cf - .) | (cd "$2" && tar -xf -)
@@ -174,11 +156,7 @@ build_tree() {
     echo "$bld/src/httrack"
 }
 
-# Sets server_pid and server_port. Not a command substitution, because the pid
-# has to land in the caller's shell for cleanup to reach it. tests/testlib.sh
-# has a hardened discover_server_port, but reaching it would pull in the whole
-# TAP harness, so this waits longer than its 200 ticks suggest and strips the CR
-# a Windows python under wsl2 leaves behind.
+# This sets server_pid and server_port in the caller's shell, for cleanup.
 start_server() {
     local root=$1 tries=0
     server_port=
@@ -446,13 +424,9 @@ release)
     exit "$rc"
     ;;
 self-check)
-    # Each mutant edits one hts_attrs row, the table deciding whether an
-    # attribute is read as a link. make check stays green on both, so only the
-    # corpus sees them: no test names "cite", and the one data-srcset under
-    # tests/ (local-server.py, for test 36) carries the same two URLs in a
-    # plain srcset on the preceding img, which satisfies that test either way.
-    # The corpus spells the data-srcset value with a "1x" descriptor, so the
-    # dirty-attribute fallback cannot take it for a path and rescue it.
+    # Each mutant edits one hts_attrs link row: widen adds cite, narrow drops
+    # data-srcset. make check misses both. The corpus's "1x" descriptor
+    # keeps the dirty-attribute fallback from rescuing data-srcset.
     mutant_file=src/htsparse.c
 
     crawl "$tree_httrack" reference
@@ -513,9 +487,7 @@ self-check)
                 echo "MISSED on$mutant_missed")"
     done
 
-    # A bumped version must read as no change at all. The two mutants above
-    # only prove the diff can see a loss and a gain, never that it stays quiet
-    # on the one edit every release branch opens with.
+    # Every release branch bumps the version, so a bump must read as no change.
     echo
     echo "parser-diff: planting a version bump in a copy of the tree"
     bumped="$workdir/src-version"

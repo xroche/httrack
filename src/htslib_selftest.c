@@ -79,10 +79,7 @@ static void basic_selftests(void) {
     assertf(strcmp(cookie_get(cbuf, "a\t\tc", 1), "") == 0);  // empty field
     assertf(strcmp(cookie_get(cbuf, "a\tb\tc", 9), "") == 0); // beyond last
   }
-  // back_infostr() status-line formatting (no sockets: pure formatting over
-  // in-memory slots). Stresses a few thousand entries across every status-code
-  // arm. Regression for a clobber bug where the size/totalsize trailer was
-  // written straight into the destination, wiping the URL it had just built.
+  // back_infostr()'s size trailer must not clobber the URL written before it.
   {
     static const struct {
       int code;
@@ -120,9 +117,7 @@ static void basic_selftests(void) {
     for (idx = 0; idx < n; idx++) {
       line[0] = '\0';
       back_infostr(&sb, idx, 3, line, sizeof(line));
-      // Exact match (not substring): pins tag/URL/trailer order and rejects a
-      // partial clobber, duplication, or truncation that a presence check would
-      // let through. The expected format is stated here independently.
+      // Match exactly, because a presence check lets a partial clobber through.
       snprintf(expect, sizeof(expect),
                "%s\"http://h%d.example/p/%d.html\" " LLintP " " LLintP " ",
                cases[idx % ncases].tag, idx, idx, (LLint) idx,
@@ -167,12 +162,7 @@ static void basic_selftests(void) {
     assertf(slots[0].locked == BACK_PINNED);
     back_set_unlocked(&sb, 0);
     assertf(slots[0].locked == 0);
-    // Near-maximal URL, driven through back_info() (which owns the status
-    // buffer internally and prints to a FILE*). url_adr + url_fil together
-    // overrun the old HTS_URLMAXSIZE*2+1024 buffer, so the bounded appends
-    // would abort unless that buffer is sized to hold both fields. Regression
-    // for that sizing -- exercising back_infostr() directly would miss it,
-    // since the caller's buffer is what matters.
+    // back_info()'s own status buffer must hold url_adr and url_fil together.
     {
       lien_back *const slot = &slots[0];
       const size_t adrlen = sizeof(slot->url_adr) - 8;
@@ -202,10 +192,7 @@ static void basic_selftests(void) {
     }
     freet(slots);
   }
-  // fil_normalized(): canonicalizes a URL path. Query arguments are sorted
-  // alphabetically (by the text after each '?'/'&') and the query is rebuilt
-  // through a bounded builder; outside the query, "//" collapses to "/".
-  // Regression for that builder.
+  // fil_normalized() sorts the query and collapses "//" outside it.
   {
     char norm[256];
 
@@ -269,10 +256,7 @@ static void basic_selftests(void) {
       assertf(path[0] == '\0' && pname[0] == '\0');
     }
   }
-  // get_httptype_sized(): a long MIME type (Office OOXML reaches 73 chars) is
-  // written whole into a contenttype-sized buffer; returns 1 on a match, 0 when
-  // flag==0 and nothing matched. Regression for the old contenttype[64]
-  // overflow.
+  // get_httptype_sized() writes a long MIME type (73 chars for OOXML) whole.
   {
     httrackp *opt = hts_create_opt();
     htsblk r; // write into the real struct field, not a stand-in
@@ -509,10 +493,8 @@ static int string_safety_selftests(void) {
       return 1;
   }
 
-  /* strcpybuff into a pointer destination: routes through the unchecked
-     strcpybuff_ptr_ fallback (the path the overflow warning flags). The warning
-     is intentional here; we only verify the fallback still copies correctly.
-     No fallback exists in C11 mode. */
+  /* strcpybuff's unchecked pointer-destination fallback must still copy.
+     C11 mode has no fallback. */
 #ifndef HTS_BUFF_C11_
 #if defined(__GNUC__)
 #pragma GCC diagnostic push
@@ -614,9 +596,7 @@ static int string_safety_selftests(void) {
       return 1;
   }
 
-  /* slcatprintfbuff_clip: append, clip, advance the cursor. Same canary shape,
-     and the destination is reset before every case so an implementation that
-     writes nothing cannot pass on the previous one's bytes (#1685). */
+  /* Each case resets the destination so a no-op cannot pass (#1685). */
   {
     struct {
       char dst[8];
@@ -696,9 +676,7 @@ static int string_safety_selftests(void) {
         strcmp(s.dst, "1234567") != 0)
       return 1;
 
-    /* one over, then far over: clipped, terminated, reported. The expected
-       bytes differ from the case above, so a write-nothing implementation
-       cannot pass on the leftovers. */
+    /* These expected bytes differ from the case above, so leftovers fail. */
     POISON_DST();
     if (strclipbuff(s.dst, sizeof(s.dst), "abcdefgh") ||
         strcmp(s.dst, "abcdefg") != 0)
@@ -740,9 +718,7 @@ static int string_safety_selftests(void) {
     char expect[sizeof(r.msg)];
     char big[4 * sizeof(r.msg)];
 
-    /* contenttype abuts msg, so a one-past-the-end store lands in it rather
-       than in padding. Poison it: a stray NUL is invisible against zeroes,
-       and a stray NUL is exactly what an off-by-one terminator writes. */
+    /* contenttype abuts msg and is poisoned to catch an off-by-one NUL. */
 #define NEIGHBOURS_INTACT() (r.contenttype[0] == '#' && r.statuscode == 1234)
 
     memset(&r, 0, sizeof(r));
@@ -1002,13 +978,9 @@ static int st_hashtable(httrackp *opt, int argc, char **argv) {
 
 static int st_strsafe(httrackp *opt, int argc, char **argv) {
   if (argc >= 1 && strncmp(argv[0], "overflow", 8) == 0) {
-    /* Deliberately exceed a sized buffer: the bounded op must abort. The source
-       comes from argv so its length is opaque to the compiler (no static
-       -Wstringop-overflow, genuine runtime check). "overflow-buff" exercises
-       htsbuff. */
-    /* Not sizeof(char*): on ILP32 a char[4] equals the pointer size, and the
-       MSVC array-vs-pointer heuristic (sizeof(A) != sizeof(char*)) then reads
-       it as a pointer and silently skips the bound. */
+    /* The source comes from argv so the compiler cannot see its length. */
+    /* Not sizeof(char*), because MSVC's array-vs-pointer check reads an ILP32
+       char[4] as a pointer and skips the bound. */
     char small[6];
     const char *const src = (argc >= 2) ? argv[1] : "overflowing";
 
@@ -1042,10 +1014,7 @@ typedef struct {
   char pad[4096];
 } arrays_wide_t;
 
-/* Self-tests for the htsarrays.h growth macros.
-   Returns 0 if growth always reached the requested room, 1 otherwise.
-   The abort on an unsatisfiable request is checked by the "overflow-capa" and
-   "overflow-loop" sub-modes (they abort the process by design). */
+/* Returns 0 when htsarrays.h growth always reached the requested room. */
 static int array_growth_selftests(void) {
   TypedArray(char) a = EMPTY_TYPED_ARRAY;
   TypedArray(arrays_wide_t) w = EMPTY_TYPED_ARRAY;
@@ -1067,9 +1036,8 @@ static int array_growth_selftests(void) {
              TypedArrayRoom(w) < 3 ||
                  TypedArrayCapa(w) > ((size_t) -1) / sizeof(arrays_wide_t));
 
-  /* Asking for exactly the room left must not reach the allocator, which on a
-     borrowed store aborts. That abort is the assertion, because no field
-     EnsureRoom writes differs afterwards (OSS-Fuzz 5622506602692608). */
+  /* Asking for the room left must not reach the allocator, which aborts on a
+     borrowed store. That abort is the assertion (OSS-Fuzz 5622506602692608). */
   {
     char borrowed[64];
     TypedArray(char) b = EMPTY_TYPED_ARRAY;
@@ -1080,9 +1048,8 @@ static int array_growth_selftests(void) {
     TypedArrayEnsureRoom(b, TypedArrayRoom(b));
   } /* No TypedArrayFree: the store is not the allocator's. */
 
-  /* Walk a zero-count append on an array that never grew, which must not take
-     the address of its missing store. Clang's UBSan is the only oracle for it,
-     so this case asserts nothing and no leg of the suite can go red on it. */
+  /* A zero-count append on a never-grown array must not take the address of
+     its missing store. Only Clang's UBSan can fail this case. */
   {
     TypedArray(char) z = EMPTY_TYPED_ARRAY;
 
@@ -1145,9 +1112,7 @@ static int st_arena(httrackp *opt, int argc, char **argv) {
   }
   /* A size no allocation could hold is refused, not truncated. */
   assertf(hts_arena_alloc(&arena, (size_t) -1) == NULL);
-  /* Strings are packed: alignment is charged where it is needed, not to every
-     allocation, which would cost several bytes on each link a mirror records.
-   */
+  /* Strings are packed, because aligning each costs bytes on every link. */
   {
     hts_arena packed = {NULL, 0, 0};
     const char *const a = hts_arena_strdup(&packed, "abc");
@@ -1195,9 +1160,7 @@ static int ucs2_check(const unsigned short *units, size_t count,
    from a starved run says the refusal was not caught. */
 static int st_ucs4_oom(httrackp *opt, int argc, char **argv) {
 #if defined(__GNU__)
-  /* GNU/Hurd does not come back from a starved process. The run dies on
-     SIGSEGV before the abort it grades, and the assert's own message never
-     reaches stderr. */
+  /* GNU/Hurd kills a starved process with SIGSEGV before the tested abort. */
   printf("ucs4: a capped process does not survive here, skipped\n");
   return 0;
 #elif !defined(_WIN32)
@@ -1308,8 +1271,7 @@ static int st_ucs2(httrackp *opt, int argc, char **argv) {
     (void) setrlimit(RLIMIT_AS, &saved);
     freet(src);
     if (out != NULL) {
-      /* The cap did not bite (a host where RLIMIT_AS is advisory), so this run
-         proves nothing either way. */
+      /* RLIMIT_AS is advisory on this host, so the run cannot grade. */
       freet(out);
       printf("ucs2: cap did not bite, skipped\n");
       return 0;
@@ -1409,19 +1371,16 @@ static int st_arrays(httrackp *opt, int argc, char **argv) {
   volatile size_t room;
 
   if (argc >= 1 && strcmp(argv[0], "overflow-capa") == 0) {
-    /* Room whose byte size cannot fit a size_t: capa*width used to wrap and
-       hand back a short allocation. */
+    /* Room whose byte size overflows a size_t must abort. */
     TypedArray(arrays_wide_t) w = EMPTY_TYPED_ARRAY;
 
     room = ((size_t) -1) / sizeof(arrays_wide_t) + 1;
     TypedArrayEnsureRoom(w, room);
-    /* Unreachable, and printing the pointer is what keeps it so: an allocation
-       reaching nobody is removable, and its "== NULL" folds away with it. */
+    /* Printing the pointer keeps the compiler from folding this away. */
     printf("arrays: NOT aborted (%p)\n", TypedArrayPtr(w));
     return 1;
   } else if (argc >= 1 && strcmp(argv[0], "overflow-loop") == 0) {
-    /* Doubling past SIZE_MAX used to wrap capa to 0 and spin forever, and the
-       allocation it ends on used to abort the process. */
+    /* Doubling past SIZE_MAX must neither spin nor abort the process. */
     TypedArray(char) a = EMPTY_TYPED_ARRAY;
     int err = 0;
 
@@ -1429,8 +1388,7 @@ static int st_arrays(httrackp *opt, int argc, char **argv) {
     room = (size_t) -1 - TypedArraySize(a);
     TypedArrayEnsureRoom(a, room);
     ST_FAIL_IF(err, TypedArrayHasRoom(a, room));
-    /* The bytes already there survive, and the append that cannot fit is a
-       no-op rather than a smash. */
+    /* An append that cannot fit is a no-op, so existing bytes survive. */
     TypedArrayAppend(a, "lost", room);
     ST_FAIL_IF(err, TypedArraySize(a) != 4 ||
                         memcmp(TypedArrayElts(a), "kept", 4) != 0);
@@ -1454,8 +1412,7 @@ static int st_random(httrackp *opt, int argc, char **argv) {
   memset(touched, 0, sizeof(touched));
   memset(varies, 0, sizeof(varies));
   for (r = 0; r < rounds; r++) {
-    /* A fresh non-zero filler each round: a byte the fill skips keeps every one
-       of them, which a single canary value cannot tell from a written byte. */
+    /* A fixed canary cannot tell a skipped byte from one the fill wrote. */
     const unsigned char filler = (unsigned char) (0xa5 + r);
 
     memset(buf, filler, sizeof(buf));
@@ -1482,8 +1439,7 @@ static int st_random(httrackp *opt, int argc, char **argv) {
     ST_FAIL_IF(err, !touched[i]);
     live += varies[i];
   }
-  /* Over 8 draws a live source moves all 64 bytes; half is a floor no real one
-     misses, and a source stuck on one byte or a constant cannot reach it. */
+  /* A stuck or constant source cannot move half the bytes over 8 draws. */
   ST_FAIL_IF(err, live < want / 2);
   /* a zero-length ask succeeds and writes nothing */
   memset(buf, 0x5a, sizeof(buf));
@@ -1623,9 +1579,7 @@ static int st_structcheck(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* #794: hts_gmtime() must own its output. The table is an independent oracle;
-   the threaded phase is what corrupts if it ever goes back to gmtime()'s
-   shared static. */
+/* hts_gmtime() must not share gmtime()'s static buffer (#794). */
 #define GMTIME_THREADS 8
 #define GMTIME_ROUNDS 50000
 
@@ -1689,10 +1643,7 @@ static int st_gmtime(httrackp *opt, int argc, char **argv) {
     }
   }
 
-  /* the return is the only failure signal the callers have, so a helper that
-     always claims success leaves them formatting an uninitialised struct tm.
-     Out of range for a 64-bit time_t: NULL from gmtime_r, EINVAL from
-     _gmtime64_s. */
+  /* Callers detect failure only from the return value. */
   if (sizeof(time_t) >= 8) {
     const time_t beyond = (time_t) INT64_MAX;
     struct tm tmv;
@@ -2335,10 +2286,8 @@ static int st_y2038(httrackp *opt, int argc, char **argv) {
   return st_verdict("y2038", err);
 }
 
-/* The x[strlen(x) - 1] class (#770), its pointer spelling x + strlen(x) - 1
-   (#781) and its size_t index spelling (#821). The string starts mid-arena so
-   the byte it must not touch is a real neighbour; poisoned with '#', not 0, or
-   a stray NUL terminator would read as untouched. */
+/* The x[strlen(x) - 1] class is tested here (#770, #781, #821). The byte
+   below the string holds '#' because a stray NUL would look untouched. */
 static int st_lastchar(httrackp *opt, int argc, char **argv) {
   enum { off = 8 };
 
@@ -2367,8 +2316,7 @@ static int st_lastchar(httrackp *opt, int argc, char **argv) {
   CHECK(arena[guard] == '#');
   CHECK(s[0] == '\0');
 
-  /* a '/' sitting where the underflow would land must not be mistaken for the
-     string's own last byte -- this is the #768 shape */
+  /* a '/' at the underflow spot must not pass for the last byte (#768) */
   REPOISON("");
   arena[guard] = '/';
   CHECK(hts_lastchar(s) == '\0');
@@ -2463,8 +2411,7 @@ static int st_lastchar(httrackp *opt, int argc, char **argv) {
     CHECK(arena[guard] == '#');
   }
 
-  /* control: the canary must be able to fail, or the checks above prove
-     nothing. Clobber it exactly as the unguarded idiom would. */
+  /* control: the canary must catch the unguarded idiom's write */
   REPOISON("");
   s[-1] = '\0';
   CHECK(arena[guard] != '#');
@@ -2619,9 +2566,7 @@ static int st_uninit(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* hts_rtrim() and the sets it is called with. The string starts mid-arena, and
-   the byte below it is poisoned with '#' rather than 0, or the stray NUL the
-   old loop wrote there would read as untouched. */
+/* The byte below the string holds '#' because a stray NUL looks untouched. */
 static int st_rtrim(httrackp *opt, int argc, char **argv) {
   enum { off = 8 };
 
@@ -2645,8 +2590,7 @@ static int st_rtrim(httrackp *opt, int argc, char **argv) {
   CHECK(s[0] == '\0');
   CHECK(arena[guard] == '#');
 
-  /* a space sitting below the string must not be eaten as if it were part of
-     it, which is exactly what the old loop did */
+  /* a space below the string must not be trimmed as part of it */
   REPOISON("   ");
   arena[guard] = ' ';
   hts_rtrim(s, HTS_REALSPACES);
@@ -2689,9 +2633,8 @@ static int st_rtrim(httrackp *opt, int argc, char **argv) {
     }
   }
 
-  /* A skip lands where its loop did. Three bytes covers every shorter string
-     too, because the terminator is one of the three letters, and the first
-     letter runs over every byte so no disagreement can hide outside the set. */
+  /* A skip lands where its loop did. Three letters cover shorter strings
+     because the terminator is one, and the first takes every byte value. */
   for (cls = 0; cls < sizeof(cc_classes) / sizeof(cc_classes[0]); cls++) {
     /* 'x' is in no class, so the alphabet always holds a non-member */
     CHECK(!cc_classes[cls].pred((unsigned char) 'x'));
@@ -2738,10 +2681,7 @@ static int strsprintf_case(String *s, const char *expected, size_t len,
          StringBuff(*s)[len] == '\0';
 }
 
-/* StringSprintf_ stores the terminator at buffer[ret], so its `ret < capacity`
-   guard is off by one byte at the exact fill: an output whose length equals the
-   capacity writes past the allocation (#836). The lengths that reach it are the
-   capacities themselves, floored at 256 and doubling from there. */
+/* An output as long as the capacity (256, doubling) must fit its NUL (#836). */
 static int st_strsprintf(httrackp *opt, int argc, char **argv) {
   static const size_t caps[] = {256, 512, 1024, 2048};
 
@@ -2798,10 +2738,8 @@ static int st_strsprintf(httrackp *opt, int argc, char **argv) {
   }
   StringFree(reused);
 
-  /* The give-up path: an argument libc cannot convert fails at every capacity,
-     so the retry loop climbs to STRING_SPRINTF_MAX and then empties the
-     String. Probe libc first -- a platform that formats an unpaired surrogate
-     without faulting never reaches the path. */
+  /* An argument libc cannot convert empties the String. Probe libc first,
+     because some platforms format an unpaired surrogate. */
   {
     static const wchar_t bad[] = {(wchar_t) 0xd800, 0};
     char probe[32];
@@ -2824,9 +2762,8 @@ static int st_strsprintf(httrackp *opt, int argc, char **argv) {
     }
   }
 
-  /* StringSprintf empties the String when it gives up, and the WebDAV
-     enumeration pops the trailing '/' right after: on an empty String an
-     unguarded pop would wrap the unsigned length and write off the end. */
+  /* WebDAV pops a trailing '/', so a give-up that empties the String must
+     not underflow its length. */
   {
     String never = STRING_EMPTY;
     String cleared = STRING_EMPTY;
@@ -3005,10 +2942,8 @@ static void sigterm_atexit_marker(void) {
   (void) (write(sigterm_atexit_fd, &c, 1) == 1);
 }
 
-/* The ^C that terminates must not run the atexit chain: OpenSSL registers its
-   teardown there, and freeing thousands of objects in handler context can
-   deadlock on the malloc lock the interrupted thread holds. Each case forks,
-   because the handler it exercises ends the process. */
+/* The ^C that terminates must skip atexit, where OpenSSL's teardown can
+   deadlock on the malloc lock the interrupted thread holds. */
 static int st_sigterm(httrackp *opt, int argc, char **argv) {
   static const struct {
     const char *name;
@@ -3939,8 +3874,7 @@ static int st_span(httrackp *opt, int argc, char **argv) {
 /* ------------------------------------------------------------ */
 
 static int st_pathcontained(httrackp *opt, int argc, char **argv) {
-  /* A ".." COMPONENT escapes; ".." inside a name does not. A plain strstr()
-     would reject all of the "contained" rows below. */
+  /* A ".." component escapes, but ".." inside a name does not. */
   static const char *const escaping[] = {
       "..",       "../x",      "a/../b", "a/..",    "/..", "..\\x",
       "a\\..\\b", "x/../../y", "./../x", "a//../b", NULL};
@@ -4271,8 +4205,7 @@ static int st_contentid(httrackp *opt, int argc, char **argv) {
   return failures != 0;
 }
 
-/* Every capacity from the host alone to the whole id: the file part gets the
-   remainder, and at sizeof(void *) the size check used to abort on it. */
+/* No capacity up to the whole id may abort, sizeof(void *) included. */
 static int st_contentid_tail(httrackp *opt, int argc, char **argv) {
   static const char host[] = "www.example.com";
   static const char fil[] = "/abcdefghijklmnop";

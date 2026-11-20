@@ -146,10 +146,7 @@ static int st_wizardfilter(httrackp *opt, int argc, char **argv) {
   EMITS(5, "foo.com", "page.html", HTS_FALSE, "");
   EMITS(7, "foo.com", "page.html", HTS_FALSE, "");
 
-  /* A long link must emit the same pattern a short one does, byte for byte:
-     clipping it would widen the rule (a cut "*[file]" becomes "*"), and the
-     lengths come from the wire. Sweeps the old 2048-byte slot, then the real
-     worst case, both link buffers full. */
+  /* A long link must emit its full pattern, because clipping would widen it. */
   {
     const size_t urlmax = HTS_URLMAXSIZE * 2 - 1; /* the engine's adr and fil */
     char *adr = malloct(urlmax + 1);
@@ -163,8 +160,7 @@ static int st_wizardfilter(httrackp *opt, int argc, char **argv) {
       wizardfilter_link(adr, adrlen, fil, fillen, HTS_TRUE);
       wizardfilter_emits(&f, expect, adr, fil);
     }
-    /* the real maximum: both buffers full, and no leading slash on fil to
-       spare the separator. It fills the slot exactly, NUL included */
+    /* the maximum fills both buffers and the slot, NUL included */
     wizardfilter_link(adr, urlmax, fil, urlmax, HTS_FALSE);
     assertf(wizardfilter_emits(&f, expect, adr, fil) ==
             HTS_FILTER_SLOT_SIZE - 1);
@@ -365,8 +361,7 @@ static int st_wizardverdict(httrackp *opt, int argc, char **argv) {
     return 0;
   }
   opt->log = NULL; /* the battery walks the answers that warn */
-/* answer `n` over a link the crawl had left at `in`: the verdict it must leave,
-   whether it stops the questions, and the recursion cap it must set. */
+/* APPLIES answers `n` over a link left at `in`, then checks the verdict. */
 #define APPLIES(n, in, forbidden, stop, prio)                                  \
   do {                                                                         \
     url = (in);                                                                \
@@ -500,8 +495,7 @@ static int st_wizardprompt(httrackp *opt, int argc, char **argv) {
   ASKS("foo.com", "", "foo.com/");
 #undef ASKS
 
-  /* #1251: a link too long for the prompt is clipped, not fatal, and what is
-     left still names the host it came from */
+  /* #1251: a clipped link still names its host in the prompt */
   memset(adr, 'a', sizeof(adr) - 1);
   adr[sizeof(adr) - 1] = '\0';
   memset(fil, 'b', sizeof(fil) - 1);
@@ -588,7 +582,7 @@ static int st_wizardinsert(httrackp *opt, int argc, char **argv) {
     wz_seed(opt, filters, &filptr, cmd);                                       \
   } while (0)
 #define RESET() wz_seed(opt, filters, &filptr, NULL)
-/* what the array as it stands decides for `url` */
+/* asks the array as it stands about `url` */
 #define VERDICT(url) fa_strjoker(0, filters, filptr, (url), NULL, NULL, NULL)
 
   if (argc >= 2) {
@@ -629,7 +623,7 @@ static int st_wizardinsert(httrackp *opt, int argc, char **argv) {
   INSERT(6, "h", "/dir/two.html");
   assertf(opt->wizard_filters <= filptr);
 
-  /* the correction case: "ignore this link", then "mirror the whole host" */
+  /* the user corrects "ignore this link" to "mirror the whole host" */
   RESET();
   assertf(INSERT(0, "h", "/dir/one.html") == 1);
   HOLDS("-h/dir/one.html");

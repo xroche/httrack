@@ -1,9 +1,7 @@
 #!/bin/bash
 #
-# The capture proxy must bind loopback. Its header block is unbounded input, and
-# one over 32 KB of it aborted the process. #1561 stops one producer of an
-# over-long path, so the wizard and basic-auth consumers of one are bounded here
-# as well.
+# The capture proxy must bind loopback and survive a header block over 32 KB.
+# The wizard and basic-auth readers of a long path are bounded too (#1561).
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh

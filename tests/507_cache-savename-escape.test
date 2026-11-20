@@ -1,10 +1,7 @@
 #!/bin/bash
 #
-# X-Save is a filename read back out of a cache the process did not write. It is
-# joined to a root and then opened, renamed, and for ProxyTrack served to a
-# client, so a name that walks out of that root reaches other files. The engine
-# half is driven by htscache_selftest.c's cache-corrupt cases; this file covers
-# ProxyTrack, whose archive no self-test builds.
+# ProxyTrack must keep a cache's X-Save filename inside its root, because the
+# cache is untrusted. The engine half has its own self-test.
 
 set -euo pipefail
 
@@ -46,8 +43,7 @@ poke() {
         dd of="$file" bs=1 seek="${offs%%:*}" conv=notrunc 2>/dev/null
 }
 
-# The parser keeps the last X-Save seen, so the forged line replaces the Etag;
-# the colon-free pad after it is skipped, restoring the block's length.
+# The parser keeps the last X-Save, and the colon-free pad restores the length.
 forge_line() { # forge_line FILE ETAGLINE VALUE
     local line pad
     line="X-Save: $3"$'\r\n'
@@ -115,8 +111,8 @@ forge_two() { # forge_two OUT FIRST SECOND
     forge_line "$1" "$etagline2" "$3"
 }
 
-# Records are read in hash order, not archive order, so each case forges both
-# assignments and expects the verdict from the one that runs the setter first.
+# Records are read in hash order, so each case forges both assignments and
+# expects the verdict of the one whose setter runs first.
 refusals() { # refusals FIRST SECOND: how many of the two orders were refused
     local n=0
     forge_two "$dir/st.zip" "$1" "$2"

@@ -21,8 +21,7 @@ exp() { selftest_queue "expanded=$2" expandhome "$1"; }
 home=$(ask '~')
 home=${home#expanded=}
 
-# or every case below is vacuous: '~' means expansion never fired, '.' means it
-# fell back to the default without ever reading $HOME
+# Every case below depends on HOME having expanded.
 test "$home" != '~' || fail "expansion never fired"
 test "$home" != '.' || fail "expansion fell back to the default without reading HOME"
 
@@ -44,10 +43,7 @@ exp 'foo~bar' 'foo~bar'
 # an unset or empty $HOME must not turn ~/foo into the absolute /foo
 unset_home=$(env -u HOME httrack -O /dev/null -#test=expandhome '~/foo')
 if test "$(suite_backend)" = wsl2; then
-    # The engine reads the Windows environment block, which the distro cannot
-    # unset, so HOME still resolves and ./foo is not what comes back. Pin the
-    # shape instead of the value, because an inequality alone also passes on an
-    # empty answer and on an unexpanded ~/foo.
+    # Windows still supplies HOME. Pin the shape, which an empty answer fails.
     case $unset_home in
     expanded=/foo) fail "unset HOME: expanded to the absolute /foo" ;;
     expanded=?*/foo) ;;

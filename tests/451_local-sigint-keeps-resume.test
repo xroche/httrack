@@ -1,8 +1,6 @@
 #!/bin/bash
 #
-# One ^C tore down the transfer in flight and left its half-written file on
-# disk, then erased the hts-cache/ref entry describing it. The --continue that
-# followed refetched the whole body from byte zero (#1595).
+# One ^C must keep the partial file and its cache entry for --continue (#1595).
 
 set -euo pipefail
 

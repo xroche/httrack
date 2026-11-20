@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# Degenerate delayed-type paths (#5/#107 family): redirects that never resolve
-# a name must drop cleanly -- no .delayed leftovers (audited by local-crawl.sh),
-# no "not cached" warnings, resolvable links still land correctly.
+# A redirect that never resolves a name must leave no .delayed file and no
+# "not cached" warning (#5, #107), and resolvable links must still land.
 
 set -euo pipefail
 

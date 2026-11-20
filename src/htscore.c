@@ -375,8 +375,7 @@ void hts_finish_makeindex(httrackp *opt, int *makeindex_done,
                           const char *fil) {
   if (!*makeindex_done) {
     if (*makeindex_fp) {
-      /* sized off link_escaped below: at the old flat 1024 a long first link
-         produced a redirect to a clipped URL */
+      /* sized off link_escaped below, so a long first link is not clipped */
       char BIGSTK tempo[HTS_URLMAXSIZE * 2 + 64];
       if (makeindex_links == 1) {
         char BIGSTK link_escaped[HTS_URLMAXSIZE * 2];
@@ -541,8 +540,7 @@ char *hts_ucs2_to_utf8(const unsigned char *src, size_t size, hts_boolean swap,
   size_t offs = 0;
   char *dest;
 
-  /* Sized exactly, because one output byte per code unit does not hold: a
-     UTF-16 BOM alone is three UTF-8 bytes. */
+  /* Sized exactly, because one UTF-16 unit can take three UTF-8 bytes. */
   for (i = 0; i < size;) {
     char seq[8];
 
@@ -683,9 +681,8 @@ hts_urllist_status hts_urllist_next(const char *buff, size_t size, size_t *pos,
   return cut ? HTS_URLLIST_LONG : HTS_URLLIST_LINE;
 }
 
-/* Reads old.lst's next "[path]" line. Returns HTS_FALSE when it is cut,
-   malformed, absolute, escaping or too long. Only a corrupt or foreign old.lst
-   holds such a line, because filenote() writes relative paths that fit. */
+/* Read old.lst's next "[path]" line. Return HTS_FALSE when it is cut,
+   malformed, absolute, escaping or too long, which filenote() never writes. */
 static hts_boolean old_lst_entry(httrackp *opt, const char *lst,
                                  const char *end, size_t *pos, char *line,
                                  size_t linesize, char *file, size_t filesize) {
@@ -1064,8 +1061,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
     const LLint list_sz = StringNotEmpty(opt->filelist)
                               ? fsize_utf8(StringBuff(opt->filelist))
                               : 0;
-    /* a one-byte token is emitted as "http://a\n", so the reserve is five
-       bytes per input byte, not two; -1 refuses a size it would overflow */
+    /* A one-byte token becomes "http://a\n", so reserve five bytes per input
+       byte. -1 refuses a size that would overflow. */
     const LLint list_room =
         list_sz > 0 ? (list_sz <= INT64_MAX / 5 ? list_sz * 5 : -1) : 0;
     const size_t url_room = url_len <= (((size_t) -2) - 8192) / 5
@@ -1097,8 +1094,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
         joker = 1;
 
       if (joker) { // a filter rule
-        /* sized off the rule cap, so the decode refuses exactly what the array
-           and the matcher would (#1288) */
+        /* sized off the rule cap, as the array and matcher are (#1288) */
         char BIGSTK tempo[HTS_FILTER_MAXLEN + 1];
         char BIGSTK raw[HTS_FILTER_MAXLEN * 3 + 1];
         int type;
@@ -1713,8 +1709,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
                                    (size_t) r.size, ucs2_swap, &new_size);
 
               if (new_adr == NULL) {
-                /* Fail the page, not the crawl: http_xfread1() answers the
-                   same NULL the same way. */
+                /* Fail only the page, as http_xfread1() does on this NULL. */
                 hts_log_print(
                     opt, LOG_ERROR,
                     "Not enough memory to convert %s%s from UTF-16 to UTF-8",
@@ -1732,10 +1727,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
                 r.adr = new_adr;
                 r.size = (LLint) new_size;
               }
-              /* NULs count too where the wire declared nothing: the body is
-                 the only evidence there is, and the blanking below would
-                 corrupt what the server left untyped (#1415). Same ratio and
-                 floor as above, so a stray NUL in a page stays a page. */
+              /* NULs also count with no server type, or the blanking below
+                 corrupts an untyped binary (#1415). */
             } else if (((nspec > r.size / 100) && (nspec > 10)) ||
                        ((map[0] > r.size / 100) && (map[0] > 10) &&
                         strfield2(r.contenttype, HTS_UNKNOWN_MIME))) {
@@ -1796,9 +1789,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
       /* Load file and decode if necessary, after redirect check. */
       LOAD_IN_MEMORY_IF_NECESSARY();
 
-      /* Sitemap document: turn its <loc> URLs into top-level seeds. They go
-         through htsAddLink, so the wizard's filters and scope rules decide, and
-         this link's max depth leaves them the full budget. */
+      /* Seed a sitemap's <loc> URLs at top level with a full depth budget. */
       if (opt->sitemap_state != NULL &&
           hts_sitemap_pending(opt, urladr(), urlfil())) {
         htsmoduleStruct BIGSTK smstr;
@@ -1950,9 +1941,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
                               adr_nologin(opt, urladr()), infobuff);
               }
             }
-            /* After robots_parse, so the rules this very body carries already
-               gate the sitemap fetch. Runs even on a failed probe, which is
-               what falls back to the well-known location. */
+            /* robots_parse ran, so this body's rules gate the sitemap fetch.
+               A failed probe still falls back to the well-known location. */
             hts_sitemap_robots(opt, urladr(), sitemaps);
           }
         } else if (!r.is_write) {
@@ -2132,8 +2122,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
                   ": restoring previous one!");
     /* this run replaces nothing, so its archive must not be committed */
     warc_abort_opt(opt);
-    /* 2 exits 0, so it must not overwrite an abort the engine already decided,
-       and a crash on the first fetch lands in exactly this state. */
+    /* 2 exits 0, so it must not overwrite an earlier abort, such as a crash on
+       the first fetch. */
     if (hts_load_acquire_int(&opt->state.exit_xh) != -1) {
       /* interrupted (no connection detected) */
       hts_store_release_int(&opt->state.exit_xh, 2);
@@ -2196,10 +2186,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
             hts_changes_previous(opt, file + root);
             if (!strstr(new_lst, line)) { // not found in the new list?
               if (fexist_utf8(file)) {    // still on disk
-                /* A link this crawl did try but never wrote (a transfer
-                   killed mid-flight) also drops out of new.lst. Unless it
-                   is about to be purged, its previous copy stands and the
-                   file is not gone. */
+                /* A transfer killed mid-flight also drops out of new.lst.
+                   Unless purged, its previous copy stands. */
                 const hts_boolean kept =
                     !purge_files &&
                     hash_read(opt->hash, file, NULL, HASH_STRUCT_FILENAME) >= 0;
@@ -2357,9 +2345,8 @@ cleanup:
     if (hts_upper_links_note(opt, upperNote, sizeof(upperNote)))
       fprintf(opt->log, "(%s)" LF, upperNote);
   }
-  /* Verdict first: XH_uninit below fires the end callback, and a front end
-     woken by it reads the verdict right there. `completed` is already final,
-     because nothing below this label assigns it. */
+  /* Set the verdict first, because XH_uninit below fires the end callback that
+     reads it. Nothing below this label assigns `completed`. */
   set_mirror_completed(opt, completed_out, completed);
   warc_close_opt(opt); /* a no-op once warc_abort_opt() has run */
   /* An abort never ran hts_changes_indexed(), so its report would be false;
@@ -2644,7 +2631,7 @@ void hts_apply_live_filters(httrackp *opt, struct_back *sback, int ptr) {
   int added = 0, dropped = 0, first_new, first_add, i;
   size_t k;
 
-  /* one take, so a set always lands before the adds queued after it */
+  /* take both under one lock, so a set lands before later adds */
   hts_mutexlock(&opt->state.lock);
   set = opt->live_filters_set;
   opt->live_filters_set = NULL;
@@ -2653,9 +2640,8 @@ void hts_apply_live_filters(httrackp *opt, struct_back *sback, int ptr) {
   hts_mutexrelease(&opt->state.lock);
   if (set == NULL && rules == NULL)
     return;
-  /* A link can be queued although the rules refuse it, as a start URL, an
-     added URL or a +mime: accept, and only a new rule may drop it. ptr is
-     being fetched or parsed. */
+  /* A start URL, added URL or +mime: accept may sit queued though the rules
+     refuse it. Only a new rule may drop it. ptr is being fetched or parsed. */
   if (queued > 0) {
     was_refused = calloct(queued, sizeof(*was_refused));
     if (was_refused == NULL)
@@ -2666,7 +2652,7 @@ void hts_apply_live_filters(httrackp *opt, struct_back *sback, int ptr) {
   /* the rules this change inserts end the user's rules */
   first_new = opt->wizard_filters + (set != NULL ? 0 : opt->user_filters);
   if (set != NULL) {
-    /* the old user rules, to tell a resent rule from a new one */
+    /* old user rules tell a resent rule from a new one */
     old = (char **) calloct(opt->user_filters + 1, sizeof(char *));
     for (i = 0; old != NULL && i < opt->user_filters; i++) {
       old[i] = strdupt((*opt->filters.filters)[opt->wizard_filters + i]);
@@ -2718,8 +2704,7 @@ void filters_bind(httrackp *opt, char ***ptrfilters, int *filptr) {
   opt->user_filters = 0;
 }
 
-/* A rule the array takes is one strjoker() reads and one a slot holds, whatever
-   the two caps become; a hardcoded limit would silently stop being either. */
+/* A rule must fit both a slot and strjoker(), whatever the two caps become. */
 enum {
   hts_filter_maxlen_matches = 1 / (HTS_FILTER_MAXLEN <= STRJOKER_MAXLEN),
   hts_filter_maxlen_fits = 1 / (HTS_FILTER_MAXLEN < HTS_FILTER_SLOT_SIZE)
@@ -2796,7 +2781,7 @@ int filters_init(char ***ptrfilters, int maxfilter, int filterinc) {
       return 0;
     filters[0] = slots;
   }
-  // One slot past filter_max, as a guard.
+  // Slot filter_max is the guard.
   for (i = 0; i <= filter_max; i++)
     filters[i] = filters[0] + (size_t) i * HTS_FILTER_SLOT_SIZE;
   for (i = filterinc == 0 ? 0 : filter_max - filterinc; i <= filter_max; i++)
@@ -2887,7 +2872,7 @@ static int structcheck_mkdir(const char *file, hts_boolean utf8) {
   return utf8 ? MKDIR(file) : mkdir_compat(file);
 }
 
-/* path ends with "/" or a file name; utf8 picks the UTF-8 calls, else ANSI */
+/* path ends with "/" or a file name. utf8 selects UTF-8 calls over ANSI. */
 static int structcheck_impl(const char *path, hts_boolean utf8) {
   int mode;
   char BIGSTK tmpbuf[HTS_URLMAXSIZE * 2];
@@ -2991,13 +2976,12 @@ static int structcheck_impl(const char *path, hts_boolean utf8) {
     if (end_char != 0) {
       file[i] = '\0';
     }
-    /* Something exists */
     if (structcheck_stat(file, utf8, &mode)) {
       if (!S_ISDIR(mode)) {
 #if HTS_REMOVE_ANNOYING_INDEX
         /* Regular file in place: move it and create directory */
         if (S_ISREG(mode)) {
-          /* bounded here, not by the path-length guard far above */
+          /* the path-length guard above does not bound this */
           if (!structcheck_aside(tmpbuf, sizeof(tmpbuf), file, utf8))
             return -1;
           if ((utf8 ? RENAME(file, tmpbuf) : rename(file, tmpbuf)) != 0) {
@@ -3025,7 +3009,7 @@ static int structcheck_impl(const char *path, hts_boolean utf8) {
   return 0;
 }
 
-/* Note: *not* UTF-8 */
+/* path is ANSI. */
 HTSEXT_API int structcheck(const char *path) {
   return structcheck_impl(path, HTS_FALSE);
 }
@@ -3105,7 +3089,7 @@ FILE *filecreate(filenote_strc * strc, const char *s) {
     errno = last_errno;
   }
 #ifndef _WIN32
-  /* by descriptor: a name swapped for a symlink would chmod its target */
+  /* fchmod, because a symlinked name would chmod its target */
   if (fp != NULL)
     (void) fchmod(fileno(fp), HTS_ACCESS_FILE);
 #endif
@@ -3284,8 +3268,8 @@ HTS_INLINE int back_fillmax(struct_back * sback, httrackp * opt,
   return -1;                    /* plus de place */
 }
 
-/* Seed-derived: stable within a gap, rerolls per launch; a per-call rand()
-   would bias the delay toward min_ms (see header). Jitter, not crypto. */
+/* The seed keeps the target stable within a gap and new per launch, because a
+   per-call rand() biases the delay toward min_ms. It is not crypto. */
 int hts_pause_target_ms(TStamp seed, int min_ms, int max_ms) {
   uint64_t z = (uint64_t) seed;
 
@@ -3387,7 +3371,7 @@ hts_boolean hts_loop_tick(struct_back *sback, httrackp *opt, int b, int ptr) {
              : HTS_FALSE;
 }
 
-/* Single implementation of the historical WAIT_FOR_AVAILABLE_SOCKET macros. */
+/* Wait for a pluggable socket. */
 hts_boolean hts_wait_available_socket(struct_back *sback, httrackp *opt,
                                       cache_back *cache, int ptr) {
   const int prev = opt->state._hts_in_html_parsing;
@@ -3489,7 +3473,7 @@ int back_fill(struct_back * sback, httrackp * opt, cache_back * cache,
 #if HTS_POLL
 #ifdef _WIN32
 int check_stdin(void) {
-  /* The console queue, not stdin: no end of file to mistake for a keystroke. */
+  /* Read the console queue, because stdin's EOF would read as a keystroke. */
   return (_kbhit());
 }
 #else
@@ -3512,8 +3496,8 @@ int check_stdin(void) {
   fflush(stdout);
   if (!check_flot(0))
     return 0;
-  /* Readable is not data: an stdin at EOF stays readable forever and reads as a
-     keypress (#1072). clearerr: a terminal can get input again after a ^D. */
+  /* An stdin at EOF stays readable and reads as a keypress (#1072). Clear EOF
+     because a terminal can get input again after a ^D. */
   clearerr(stdin);
   if ((c = fgetc(stdin)) == EOF)
     return 0;

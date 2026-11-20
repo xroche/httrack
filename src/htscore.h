@@ -523,9 +523,8 @@ void filters_bind(httrackp *opt, char ***ptrfilters, int *filptr);
   (HTS_FILTER_SLOT_SIZE - 1 < STRJOKER_MAXLEN ? HTS_FILTER_SLOT_SIZE - 1       \
                                               : STRJOKER_MAXLEN)
 
-/* Stores `pattern` at `pos`, shifting the rules from there up a slot. The one
-   door into the array: a rule past HTS_FILTER_MAXLEN, or one that finds the
-   array full, warns and returns HTS_FALSE, never stored dead (#1270). */
+/* Insert pattern at pos. Warn and return HTS_FALSE when it is too long or the
+   array is full (#1270). */
 hts_boolean filters_insert(httrackp *opt, int pos, const char *pattern);
 
 /* Remove the n rules starting at pos, shifting the rest down. */

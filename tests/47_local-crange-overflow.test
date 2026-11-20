@@ -1,9 +1,6 @@
 #!/bin/bash
 # C2: a resume whose 206 carries a Content-Range end of INT64_MAX must not
-# sign-overflow the crange+1 range check (UBSan aborts on the pre-fix binary).
-# Pass 1 leaves a partial + temp-ref; pass 2 resumes, gets the hostile 206, and
-# must reject the range and refetch the whole file rather than overflow. Teeth
-# are UBSan-only: a normal build wraps to the same reject+restart.
+# sign-overflow the crange+1 check. Only UBSan sees the overflow.
 set -u
 
 # shellcheck source=tests/crawllib.sh

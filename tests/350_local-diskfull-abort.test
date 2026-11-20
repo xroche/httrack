@@ -1,11 +1,7 @@
 #!/bin/bash
 #
-# A full disk must abort the mirror, not pass for a dropped connection that the
-# engine retries and then purges against. /dev/full stands in, under the save
-# name each crawl is about to write: once for a body that reaches the disk as
-# it streams, once for a page and once for a file small enough that stdio holds
-# them until the close. A coded body never reaches its save name as it streams,
-# so its arm dooms the ~hts-tmp spool it lands in instead.
+# A full disk must abort the mirror rather than pass for a dropped connection.
+# /dev/full stands in under the save name a crawl is about to write.
 
 set -euo pipefail
 
@@ -18,12 +14,10 @@ tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_diskfull.XXXXXX")
 cleanup() { rm -rf "$tmpdir"; }
 cleanup_push cleanup
 
-# The engine here is a native binary and the shell is MSYS, so a symlink the
-# shell writes through as /dev/full is a plain file to the crawl: the probe
-# below cannot see that difference and would let the test run.
+# The native engine sees an MSYS symlink to /dev/full as a plain file, and the
+# probe below cannot tell.
 skip_on_windows "a native binary does not follow an MSYS symlink to /dev/full"
-# Probe the mechanism, not the node: macOS has no /dev/full and links to it
-# happily, so a write through the probe fails with ENOENT rather than ENOSPC.
+# Probe a write, because a macOS link to /dev/full fails with ENOENT.
 test -c /dev/full || skip "no /dev/full device"
 probe="${tmpdir}/probe"
 ln -s /dev/full "$probe" 2>/dev/null || skip "cannot symlink /dev/full"
@@ -77,8 +71,7 @@ grep -q 'Mirror aborted: keeping all previously mirrored files' <<<"$log" ||
     fail "the mirror carried on past the full disk, purge armed: ${log}"
 ok "the mirror gives up and keeps every mirrored file"
 
-# Keeping the mirror is the point of the abort, so read the tree, not the log:
-# what preceded the full disk survives and the doomed name is still the symlink.
+# Files from before the full disk survive, and the doomed name stays a link.
 site="${tmpdir}/stream/127.0.0.1_${SRV_PORT}/diskfull"
 test -s "${site}/index.html" || fail "the page mirrored before the abort was lost"
 grep -q DISKFULL-TINY "${site}/tiny.bin" ||
@@ -184,9 +177,8 @@ grep -q 'Fatal write error, giving up' <<<"$log" ||
 ok "a coded page that cannot be written is fatal too"
 
 # --- a write error outside the fatal class must stay retryable ---------------
-# A pipe whose reader has gone gives EPIPE, which is about this file, not the
-# filesystem: the mirror must finish the rest rather than give up. The write
-# fails mid-body here; 355 pins the read that both completes a body and fails.
+# EPIPE concerns this file only, so the mirror must finish the rest. 355
+# covers a read that completes a body and fails.
 epipe="${tmpdir}/epipe"
 epipesite="${epipe}/127.0.0.1_${SRV_PORT}/diskfull"
 mkdir -p "$epipesite"
@@ -253,9 +245,7 @@ grep -q 'Unable to write file .*stall\.bin' <<<"$log" ||
     fail "the stopped slot's buffered bytes were dropped without a word: ${log}"
 ok "a slot flushed on the way out still reports the full disk"
 
-# An exit the user asked for is not an abort, whatever the flush then finds:
-# WebHTTrack renders its cancel button through this status (htsserver.c
-# branches on commandReturn), so an abort here would put an error page on it.
+# A user exit is never an abort, since WebHTTrack's cancel reads this status.
 test "$stall_rc" -eq 0 ||
     fail "a mirror stopped by SIGTERM exited ${stall_rc}, wanted 0: ${log}"
 ok "and the signalled exit is still 0, not an abort"

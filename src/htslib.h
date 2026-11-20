@@ -226,13 +226,9 @@ void hts_set_hash_handler(coucal hashtable, httrackp *opt);
 // fonctions unix/winsock
 int hts_read(htsblk * r, char *buff, int size);
 
-/* Add to, read and reset the received-byte total, which an FTP worker counts on
-   its own thread while the crawl thread counts the HTTP bytes: a lost += reads
-   low, and -M gives up on that total (back_maxsize_reached()). A lock, not a
-   64-bit atomic add, which needs libatomic where the target has no 8-byte
-   compare-and-swap. hts_stat_recv_publish() copies the total to the
-   HTS_STAT.HTS_TOTAL_RECV a front end reads and returns it, on the crawl thread
-   beside every other field engine_stats() refreshes there. */
+/* Add to, read and reset the received-byte total, which FTP workers update
+   from their thread. A lock guards it, as a 64-bit atomic needs libatomic.
+   hts_stat_recv_publish() copies it to HTS_STAT on the crawl thread. */
 void hts_stat_recv_add(LLint bytes);
 LLint hts_stat_recv_get(void);
 void hts_stat_recv_set(LLint bytes);
@@ -328,11 +324,8 @@ int connect_socket_error(T_SOC soc);
 /* Start a non-blocking connect to iadr; port -1 takes it from iadr or the
    scheme default. */
 T_SOC newhttp(httrackp *opt, const char *iadr, htsblk *retour, int port);
-/* Like newhttp(), but connect to the addr_index-th resolved address of the host
-   (0-based) instead of always the first; *addr_count, if non-NULL, is set to
-   the total resolved addresses. newhttp() == newhttp_addr(...,0,NULL). Used by
-   the slot scheduler to try the next address when a connect fails (dead IPv6
-   etc.). */
+/* Like newhttp(), but connect to resolved address addr_index (0-based) and
+   set *addr_count, if non-NULL, to the address count. */
 T_SOC newhttp_addr(httrackp *opt, const char *iadr, htsblk *retour, int port,
                    int addr_index, int *addr_count);
 /* Clips the formatted failure reason into r->msg, which also round-trips
@@ -598,7 +591,7 @@ void secret_vfprintf(httrackp *opt, FILE *fp,
                      HTS_FORMAT_STRING const char *format, va_list args)
     HTS_PRINTF_FUN(3, 0);
 
-/* adr past its blanks and scheme, and then past its login as well. */
+/* Skip adr's blanks and scheme, then its login. */
 const char *login_start(const char *adr);
 const char *login_end(const char *adr);
 
@@ -756,10 +749,8 @@ static HTS_INLINE HTS_UNUSED int hts_send_nosignal(T_SOC soc, const char *s,
 
   sigpipe_hold(&m);
   n = (int) send(soc, s, ilen, HTS_MSG_NOSIGNAL);
-  /* Saved across the release, whose sigtimedwait() reports EAGAIN whenever
-     nothing was pending. Callers read errno on the next line to tell a would
-     block from a dead socket, and EAGAIN is the answer that means keep going.
-   */
+  /* Save errno across the release, whose sigtimedwait() sets EAGAIN when
+     nothing was pending, which callers would read as a would-block. */
   err = errno;
   sigpipe_release(&m);
   errno = err;
@@ -894,10 +885,8 @@ HTS_STATIC int strcmpnocase(const char *a, const char *b) {
 
 // is this MIME an hypertext MIME (text/html), html/js-style or other script/text type?
 #define HTS_HYPERTEXT_DEFAULT_MIME "text/html"
-/* Sentinel stored when the server declared no Content-Type. It is html-ish
-   for every type test (so a typeless response still parses/stores as today),
-   but the naming code (wire_patches_ext) treats it as "no declared type" and
-   keeps the URL extension. It rides the cache, so updates name consistently. */
+/* Cached when the server sent no Content-Type. Type tests treat it as html,
+   but wire_patches_ext() keeps the URL extension. */
 #define HTS_UNKNOWN_MIME "unknown/unknown"
 /* Map the no-declared-type sentinel back to a real type for any header or
    record we EMIT or PERSIST, so "unknown/unknown" never reaches a consumer

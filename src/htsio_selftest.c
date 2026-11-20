@@ -379,11 +379,9 @@ static int st_addlink(httrackp *opt, int argc, char **argv) {
   str.ptr_ = &ptr;
   str.addLink = htsAddLink;
 
-  /* [0] is the underflow; [1] and [2] are controls that the trim is unchanged.
-     A query-only link is the one that notices the trim at all: for the others
-     ident_url_relatif() re-derives the directory from the path it is given.
-     [3] to [5] give a class an applet codebase: http, https, too long.
-     An absolute link is the one a too-long codebase does not already stop. */
+  /* [0] is the underflow and [1], [2] check the trim, which only a query-only
+     link sees. [3] to [5] give a class an http, https or too-long codebase,
+     plus an absolute link, because only that link gets past a too-long one. */
   memset(longcod, 'a', sizeof(longcod) - 1);
   longcod[0] = longcod[sizeof(longcod) - 2] = '/';
   longcod[sizeof(longcod) - 1] = '\0';
@@ -452,10 +450,10 @@ static void makeindex_run(httrackp *opt, const char *path, const char *footer,
   st_read_file(path, buf, size);
 }
 
-// Whole file as a NUL-terminated heap string, or NULL when it cannot be read.
+// Read a whole file into a NUL-terminated heap string, NULL if unreadable.
 static char *makeindex_slurp(const char *path) { return readfile_utf8(path); }
 
-// Whether `at` sits in live markup rather than inside an HTML comment.
+// Does `at` sit in live markup rather than inside an HTML comment?
 static hts_boolean makeindex_outside_comment(const char *buf, const char *at) {
   const char *open = NULL, *close = NULL, *p;
 
@@ -466,8 +464,7 @@ static hts_boolean makeindex_outside_comment(const char *buf, const char *at) {
   return open == NULL || (close != NULL && close > open) ? HTS_TRUE : HTS_FALSE;
 }
 
-// %-contract of a built-in template: the slots its caller fills, and no escape
-// besides %%.
+// Check a built-in template has its caller's slots and no escape but %%.
 static void makeindex_template_contract(const char *name, const char *tmpl,
                                         size_t slots) {
   size_t i, n;
@@ -494,8 +491,8 @@ static void makeindex_template_contract(const char *name, const char *tmpl,
 // makeindex_links==1, and clears *fp / sets *done. argv[0] is a writable dir,
 // argv[1] is an optional templates/ whose on-disk footer is rendered too.
 static int st_makeindex(httrackp *opt, int argc, char **argv) {
-  /* the minimal template is the control: it proves an assertion below can only
-     fail on the real one because that template lost a slot */
+  /* the minimal template is the control: an assertion can fail on the real one
+     only if it lost a slot */
   const char *footers[] = {"%s%s", HTS_INDEX_FOOTER, NULL};
   size_t nfooters = sizeof(footers) / sizeof(*footers) - 1;
   char *ondisk = NULL;
@@ -735,9 +732,8 @@ static int st_instpaths(httrackp *opt, int argc, char **argv) {
 #endif
 }
 
-// hts_buildtopindex() writes a system-charset name into a charset=utf-8 doc: on
-// Windows the gifs land in a mangled twin dir (#217) and a listed name renders
-// as mojibake (#216). Both must come out utf-8. argv[0] is writable.
+// hts_buildtopindex() must write utf-8 into its utf-8 doc, or Windows mangles
+// the gif dir (#217) and the listing (#216). argv[0] is writable.
 static int st_topindex(httrackp *opt, int argc, char **argv) {
   char topdir[HTS_URLMAXSIZE];
   char path[HTS_URLMAXSIZE + 32];
@@ -827,9 +823,8 @@ static int st_topindex(httrackp *opt, int argc, char **argv) {
   assertf(strstr(buf, "???") == NULL);
 
 #ifndef _WIN32
-  /* #1329: a rebuild replaces the index instead of rewriting it, so a reader
-     holding the old one open still reads it whole. Windows refuses to rename
-     over an open target, so this probe is POSIX-only. */
+  /* #1329: a reader of the old index still reads it whole after a rebuild.
+     POSIX-only, because Windows cannot rename over an open file. */
   {
     FILE *const held = fopen(path, "rb");
 
@@ -1288,8 +1283,8 @@ static int st_longpath(httrackp *opt, int argc, char **argv) {
 }
 
 // -#test=mirrorio <dir>: round-trip a file through a long AND non-ASCII path
-// via the mirror I/O wrappers — fexist_utf8/fsize_utf8, FOPEN/RENAME/UNLINK,
-// and the new hts_rmdir_utf8 (RMDIR) teardown (#133, #630).
+// via fexist_utf8/fsize_utf8, FOPEN/RENAME/UNLINK and hts_rmdir_utf8
+// (#133, #630).
 static int st_mirrorio(httrackp *opt, int argc, char **argv) {
   char path[HTS_URLMAXSIZE * 2];
   size_t base = 0;
@@ -1581,8 +1576,7 @@ static int st_refetchbackup(httrackp *opt, int argc, char **argv) {
     err++;
   }
 
-  /* #758: only a killed run can leave something there, and it must be replaced
-     rather than disable the backup for good. */
+  /* #758: replace what a killed run left, or the backup stays disabled. */
   if (structcheck(want) != 0) {
     fprintf(stderr, "refetchbackup: cannot create %s\n", want);
     freet(back);
@@ -1595,9 +1589,9 @@ static int st_refetchbackup(httrackp *opt, int argc, char **argv) {
     err++;
   }
 
-  /* #775: filecreate() failed, so there is nothing to commit to. Saying so is
-     load-bearing: the caller must not cache this response against the old
-     body, or the next --update gets a 304 pinning it. */
+  /* #775: filecreate() failed, so the commit must report failure. Otherwise
+     the caller caches the response against the old body, and --update pins it
+     by 304. */
   (void) UNLINK(back->url_sav);
   if (back_finalize_backup(opt, back, HTS_TRUE)) {
     fprintf(stderr, "refetchbackup: a commit that restored reported success\n");
@@ -1608,9 +1602,8 @@ static int st_refetchbackup(httrackp *opt, int argc, char **argv) {
     err++;
   }
 
-  /* An aborted transfer restores, as before. The resume reference goes with
-     the partial it described, because a kept one would make the next run ask
-     past the restored copy's end (#1595). */
+  /* An aborted transfer restores and drops the resume reference, or the next
+     run asks past the restored copy's end (#1595). */
   {
     String saved = STRING_EMPTY;
 
@@ -1840,9 +1833,8 @@ static int st_ioexact(httrackp *opt, int argc, char **argv) {
   assertf(hts_fwrite_exact(payload, 0, fp) == HTS_TRUE);
   assertf(fclose(fp) == 0);
 
-  /* Short WRITE: the cases above only ever get 0 back, so a helper accepting
-     any non-zero count survives them. fmemopen's buffer is smaller than the
-     payload, which yields a partial count instead. */
+  /* Short WRITE: the cases above only get 0, which a helper accepting any
+     non-zero count passes. A small fmemopen buffer gives a partial count. */
 #if !defined(_WIN32)
   {
     char small[8];

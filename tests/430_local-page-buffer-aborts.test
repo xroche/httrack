@@ -56,10 +56,8 @@ open(os.path.join(sys.argv[1], "cp1252-2040.html"), "wb").write(
     head + b'<a href="' + b"\x80" * 680 + b'">q</a></body></html>\n')
 open(os.path.join(sys.argv[1], "cp1252-2043.html"), "wb").write(
     head + b'<base href="' + b"\x80" * 681 + b'"></body></html>\n')
-# The two that straddle the threshold: 677 quotes make 2031 and an ASCII byte
-# in front makes 2032. A link this long cannot be mirrored on any platform, a
-# save-path check drops it far earlier, so what the pair pins is which side of
-# the PARSE guard each lands on.
+# 677 quotes make 2031 bytes and a leading ASCII byte makes 2032, so the two
+# land on either side of the parse guard.
 open(os.path.join(sys.argv[1], "cp1252-2031.html"), "wb").write(
     head + b'<a href="' + b"\x80" * 677 + b'">k</a></body></html>\n')
 open(os.path.join(sys.argv[1], "cp1252-2032.html"), "wb").write(

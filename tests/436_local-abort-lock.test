@@ -71,9 +71,8 @@ wait_until_still_running "test ! -e '${out}/${ABORTLOCK}'" \
 stop_crawl
 echo "OK"
 
-# The point of the whole feature: an abort keeps hts-cache/ref, where the
-# interactive stop erases it. Both log "Exit requested by shell or user", and so
-# does the -E budget, so only the directory tells them apart.
+# An abort keeps hts-cache/ref and the interactive stop erases it. Both log the
+# same line, so only the directory tells them apart.
 printf '[an abort keeps the cut transfers] ..\t'
 arm_paths keep
 httrack -O "$out" "${common[@]}" --max-rate=200000 \

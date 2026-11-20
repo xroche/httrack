@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# A field typed into the extra-headers box (-%X) replaces the engine's own line
-# instead of adding a second one (#1337). The predicate first, then the wire.
+# A field typed into the extra-headers box (-%X) replaces the engine's own line (#1337).
 
 set -euo pipefail
 
@@ -97,9 +96,7 @@ probe() { # probe TAG [extra httrack args...]
     assert_eq "$nreq" "$(count_lines '^=== REQUEST ===$' "$wire")" "$tag: requests logged"
     # the server's own byte-for-byte copy, never the log split by a text tool
     cp "$wire.$nreq" "$tmpdir/$tag.req"
-    # the last header line's CRLF and the blank CRLF that closes the block; the
-    # fixture appends nothing to a per-request file. Hex with all whitespace
-    # dropped, since od's column padding differs between GNU and BSD.
+    # Strip od's padding, which differs between GNU and BSD.
     assert_eq 0d0a0d0a \
         "$(tail -c 4 "$tmpdir/$tag.req" | od -An -t x1 | tr -d '[:space:]')" \
         "$tag: the CRLF CRLF ending the request"
@@ -120,9 +117,7 @@ assert_value() { # assert_value TAG FIELD VALUE
     assert_eq "$3" "$(value_of "$2" "$tmpdir/$1.req")" "$1: $2"
 }
 
-# The rest of the request is byte-identical to the one no box produced: RE names
-# the only lines allowed to differ. Compared as files, since a command
-# substitution would eat a lost trailing newline on both sides alike.
+# Compare files, because $(...) would hide a lost trailing newline.
 assert_same_but() { # assert_same_but TAG RE
     local base=$tmpdir/$1.base got=$tmpdir/$1.got
     grep -Ev "$2" "$tmpdir/plain.req" >"$base" || true
