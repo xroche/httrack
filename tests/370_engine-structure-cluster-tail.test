@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# --structure=1L0 read as one value but smuggled a second option in: preset 1
-# plus the -L0 behind it. --structure=8I0 was the visible cost, mirroring with
-# no top index at exit 0. Every digits-then-tail value is refused now.
+# A --structure digit run with a tail is refused, because the tail would reach
+# the engine as short options. --structure=8I0 would drop the top index.
 
 set -euo pipefail
 
@@ -14,14 +13,13 @@ tmpbase=${TMPDIR:-/tmp}
 # Slash-stripped: the engine normalizes a "//" away, failing every layout below.
 tmp=$(mktemp -d "${tmpbase%/}/httrack_ntail.XXXXXX") || fail "no tmpdir"
 
-# The mirror name the engine builds from a path: its leading slash goes, and
-# what Windows forbids becomes '_'. Taken from the path the engine saw, since
-# under wsl2 the shell holds /mnt/d/... while the shim hands over D:/...
+# Build the mirror name the engine derives from a path. The leading slash goes
+# and what Windows forbids becomes '_'. Use the path the engine saw, because the
+# wsl2 shim turns /mnt/d/... into D:/...
 localname() { printf '%s' "$(nativepath "$1")" | sed 's|^/||' | tr ':~' '__'; }
 cleanup_push rm -rf "${tmp}"
 
-# Our own marker, so a mirrored page is recognized by content rather than by a
-# path this host may spell differently (macOS $TMPDIR, Windows ':' -> '_').
+# Find a mirrored page by our marker, because hosts spell its path differently.
 marker=STRUCTURE-TAIL-MARKER-370
 printf '<html><body>%s</body></html>\n' "${marker}" >"${tmp}/page.html"
 url="file://${tmp}/page.html"

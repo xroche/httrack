@@ -55,7 +55,7 @@ link_target() {
 
 link_target default "${docs}" "${docs_rel}"
 
-# The served root itself is a real directory now: the UI is installed there and
+# The served root is a real directory, because the UI is installed there and
 # must survive a build that strips the documentation.
 test ! -L "${work}/default${served}" || fail "the served root is still a symlink"
 test -d "${work}/default${served}" || fail "the served root is not a directory"
@@ -83,9 +83,8 @@ link_target glob-in-datadir "${glob_data}/doc/httrack" "${docs_rel}" "${glob_dat
 # an ancestor of the link.
 not_linked datadir-as-docdir "${data}/"
 
-# docdir outside the data dir keeps an absolute target, since the chop only
-# relativizes under it. That target does not survive staging, so this pins a
-# limitation rather than a good outcome. A chop ignoring the "/" fails here.
+# A docdir outside the data dir keeps an absolute target, a known limitation
+# because it does not survive staging. A chop ignoring the "/" fails here.
 link_target outside-datadir /usr/sharefoo/doc /usr/sharefoo/doc
 
 # Neighbours of the link path and of the served root. Without these the
@@ -102,22 +101,20 @@ not_linked under-link-path "${served}/doc/pages"
 # The same path as at-link-path, spelled the way configure keeps --datadir=/usr//share.
 not_linked unfolded-datadir "${served}/doc" /usr//share
 
-# Every ancestor of the link. Making the directory first cannot catch these: the
-# link path stays free, so only the ancestor test refuses them. Each would serve
-# /doc/doc/doc/... to a browser following the panes' Help link.
+# Test every ancestor of the link, because each would serve /doc/doc/... to
+# the panes' Help link.
 not_linked at-served-root "${served}"
 not_linked at-package-dir "${data}/httrack"
 not_linked at-datadir "${data}"
 
-# An upgrade over the absolute link older installs left (#885): it must be
-# replaced, not kept because it happens to resolve.
+# An upgrade must replace the absolute link older installs left (#885).
 stale=${work}/upgrade${served}/doc
 mkdir -p "$(dirname "${stale}")" "${work}/upgrade${docs}"
 ln -s "${docs}" "${stale}"
 link_target upgrade "${docs}" "${docs_rel}"
 
-# Before this layout the served root was itself the symlink. Left in place, the
-# UI would install into $(docdir) again and vanish with a doc strip.
+# Older installs made the served root a symlink. Left in place, the UI would
+# install into $(docdir) again and vanish with a doc strip.
 older=${work}/older-layout${served}
 mkdir -p "$(dirname "${older}")" "${work}/older-layout${docs}/html"
 ln -s ../doc/httrack/html "${older}"

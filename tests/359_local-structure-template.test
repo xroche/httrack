@@ -1,8 +1,6 @@
 #!/bin/bash
 #
-# Issue #1380: --structure took the numeric presets only. A template glued onto
-# the short form is not something -N consumes, so the token fell through to the
-# URL list and the mirror silently ran with the default structure.
+# --structure must accept a template as well as a numeric preset (#1380).
 
 set -euo pipefail
 
@@ -14,11 +12,9 @@ tmpbase=${TMPDIR:-/tmp}
 tmp=$(mktemp -d "${tmpbase%/}/httrack_structure.XXXXXX") || fail "no tmpdir"
 cleanup_push rm -rf "${tmp}"
 
-# The engine maps what Windows forbids in a filename to '_', on every platform,
-# so a drive-letter TMPDIR lands as D_ and an 8.3 one as RUNNE_1.
-# From the path the ENGINE saw: under wsl2 the shell holds /mnt/d/... while the
-# shim hands over D:/..., and it is the drive colon that becomes the '_'.
-# The leading slash goes last: stripping it first leaves nativepath no /mnt/d to match.
+# The engine maps what Windows forbids to '_' and the wsl2 shim turns /mnt/d/
+# into D:/, so use the path it saw. Strip the leading slash last, because
+# stripping it first leaves nativepath no /mnt/d to match.
 localname() { # localname ABSOLUTE-PATH
     local n
     n=$(nativepath "$1" | tr ':~' '__')
@@ -35,9 +31,8 @@ run() { # run ARG...
         >"${tmp}/out/.log" 2>&1 || RC=$?
 }
 
-# Everything the crawl saved, minus the engine's own furniture. Naming the whole
-# set, not just the wanted path, is what catches a value that fell through to
-# the URL list: the mirror then holds the wanted file AND the junk one.
+# List what the crawl saved, minus engine files. A value lost to the URL list
+# then shows up as a junk file next to the wanted one.
 mirrored() {
     (cd "${tmp}/out" && find . -type f ! -path './hts-cache/*' ! -name '.log' \
         ! -name 'hts-log.txt' ! -name '*.gif' ! -name '*.lock' -print |
@@ -63,9 +58,8 @@ refused() { # refused WANTED-MESSAGE ARG...
         fail "$* refused without saying why: $(<"${tmp}/out/.log")"
 }
 
-# The presets, in every spelling. 100 and 5 pin the whole value: a truncated one
-# lands back on the default layout, which "no web/page.html" cannot tell apart
-# from the option never arriving.
+# Test the presets in every spelling. 100 and 5 pin the whole value, because a
+# truncated one gives the default layout.
 default_layout="file/$(localname "${tmp}")/page.html"
 layout web/page.html -N1
 layout web/page.html --structure 1
@@ -75,13 +69,12 @@ layout web/html/page.html --structure=5
 layout "$(localname "${tmp}")/page.html" --structure=100
 layout "${default_layout}" --structure=0
 
-# A detached -N 1 used to mean a user template literally named "1", collapsing
-# the mirror onto one file; it is preset 1 now, and the long forms agree.
+# A detached -N 1 is preset 1, not a template named "1" (which would collapse
+# the mirror).
 layout web/page.html -N 1
 
-# A preset trailed by more short options is refused, in either spelling: 1L0
-# used to apply preset 1 and the -L0 behind it. A value taken as a template
-# instead would exit 0, which refused() catches too, and that is 1%c8's risk.
+# A preset trailed by short options is refused, so 1L0 must not apply -L0.
+# refused() also catches 1%c8 taken as a template, which exits 0.
 refused 'does not take the value' --structure=1L0
 refused 'does not take the value' --structure 1L0
 refused 'does not take the value' --structure=1c8
@@ -94,8 +87,7 @@ layout "${default_layout}" --structure=off
 layout "${default_layout}" --structure=on
 layout "${default_layout}" --structure on
 
-# A template reaches the engine whatever spelling carried it. The literal "tpl/"
-# is the point: no preset can produce it, so this cannot pass on a fallback.
+# A template reaches the engine in every spelling. No preset makes "tpl/".
 layout tpl/page.html -N tpl/%n.%t
 layout tpl/page.html --structure tpl/%n.%t
 layout tpl/page.html --structure=tpl/%n.%t
@@ -106,10 +98,9 @@ layout 2col/page.html --structure 2col/%n.%t
 layout 2col/page.html --structure=2col/%n.%t
 layout 2col/page.html -N 2col/%n.%t
 
-# optreal_find matches -N exactly, so the engine bounds a glued run itself, and
-# not with sscanf("%d"): past INT_MAX that is negative on LP64 (userdef with an
-# empty template, which crashes url_savename) and INT_MAX on ILP32 (a preset
-# that flattens the mirror). INT_MAX itself pins the ILP32 half alone.
+# The engine bounds a glued digit run itself. Past INT_MAX, sscanf("%d") would
+# crash url_savename on LP64 and flatten the mirror on ILP32. INT_MAX alone
+# pins the ILP32 case.
 layout "${default_layout}" -N4294967295
 layout "${default_layout}" -N99999999999999999999
 layout "${default_layout}" -N2147483648
@@ -120,15 +111,13 @@ layout "${default_layout}" -N2147483647
 refused 'does not take the value' --structure=4294967295
 layout 4294967295 -N 4294967295
 
-# A %-free value maps every URL onto one local name, so it is a typo rather than
-# a template: these mirrored the whole site as ./flat and ./flat-2.
+# A %-free value maps every URL onto one local name, so it is refused as a typo.
 for word in OFF flat none default yes -1; do
     refused 'does not take the value' "--structure=${word}"
 done
 refused 'does not take the value' --structure none
-# Control: an option whose class checks its value rejects the same word, so this
-# is --structure catching up rather than a rule invented for it. (--cache cannot
-# play that part: it is "param", which glues any value into a mangled cluster.)
+# Control: an option whose class checks its value rejects the same word. --cache
+# cannot be that control, because "param" glues any value into a cluster.
 refused 'does not take the value' --index=OFF
 # --user-structure is how to ask for such a name on purpose.
 layout flat --user-structure flat

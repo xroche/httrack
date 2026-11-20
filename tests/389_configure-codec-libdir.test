@@ -1,8 +1,7 @@
 #!/bin/bash
-# --with-brotli=DIR and --with-zstd=DIR used to append DIR/lib and nothing else.
 # A multilib host keeps the 64-bit copy in lib64, Debian under a multiarch
-# triplet, so that -L named a directory that does not exist and the link quietly
-# took the system copy while configure reported the coding as enabled.
+# triplet, so --with-brotli=DIR and --with-zstd=DIR must look past DIR/lib.
+# A missing -L directory makes the link take the system copy.
 
 # TEST_TIMEOUT_AT_LEAST: 900
 
@@ -159,12 +158,11 @@ expect() { # expect CODEC WANT-SUBDIR REJECTED-SUBDIR DESC PREFIX ARG...
     case " ${line} " in
     *" -L${prefix}/${nope} "*) fail "${desc}: ${var} also picked -L${prefix}/${nope}: ${line}" ;;
     esac
-    # The whole bug: the emitted -L named a directory that was not there.
+    # The emitted -L must name a directory that exists.
     test -d "${prefix}/${want}" || fail "${desc}: -L${prefix}/${want} does not exist"
 
-    # The emitted flag is not the probe. Detection linking under the old
-    # unresolved path while only the flag is fixed would pass every check
-    # above, so read the link command configure actually ran.
+    # Read the link command configure ran, because detection could still link
+    # under the unresolved path while the emitted flag is right.
     probe=$(grep -e '-o conftest' "${dir}/config.log" | grep -e "-l${lib}" || true)
     probe=$(tr '\n' ' ' <<<"${probe}")
     test -n "${probe}" || fail_dump "${desc}: config.log has no -l${lib} link probe" "${dir}/config.log"
@@ -246,9 +244,8 @@ fi
 expect zstd lib64 lib "a lib64-only zstd prefix resolves" "${zs_lib64}"
 
 expect_fail brotli "a prefix with no libbrotlidec is rejected" "${br_headers}"
-# A prefix whose lib64 holds some other library must be rejected too: matching
-# any lib*.* there would resolve to a directory with no decoder in it, and the
-# link would fall back to the system copy that this whole macro exists to avoid.
+# A prefix whose lib64 holds another library must be rejected, or the link
+# falls back to the system copy.
 expect_fail brotli "a prefix whose lib64 holds the wrong library is rejected" "${br_wrong}"
 
 assert_steps_ran "${cases}" "${n}"

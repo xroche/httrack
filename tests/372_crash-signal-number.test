@@ -1,6 +1,6 @@
 #!/bin/bash
-# The crash banner printed signal numbers backwards. Invisible on x86, whose
-# fatal signals are 4, 6, 7 and 11; hppa's SIGBUS is 10 and the report said 01.
+# The crash banner must print signal numbers in the right digit order. On x86
+# the fatal ones read the same backwards, but hppa's SIGBUS is 10.
 
 set -euo pipefail
 
@@ -17,8 +17,8 @@ command -v "${cc_argv[0]}" >/dev/null || skip "no C compiler (${cc_argv[0]})"
 work=$(mktemp -d "${TMPDIR:-/tmp}/httrack_printnum.XXXXXX")
 cleanup_push rm -rf "${work}"
 
-# The build's own flags first, so the sanitizer legs instrument the probe and
-# the INT_MIN case is more than decorative; -O0 after, to keep our own.
+# Put the build's own flags first, so the sanitizer legs instrument the probe
+# and the INT_MIN case. -O0 goes after them to win.
 cflags=()
 for flags in "${TEST_CFLAGS:-}" "${TEST_CPPFLAGS:-}"; do
     if [ -n "${flags}" ]; then
@@ -26,10 +26,8 @@ for flags in "${TEST_CFLAGS:-}" "${TEST_CPPFLAGS:-}"; do
         cflags+=("${extra_argv[@]}")
     fi
 done
-# HTS_INTERNAL_BUILD pulls in config.h. Its HAVE_UNISTD_H gives macOS write()
-# and STDERR_FILENO. Only macOS ever failed, because glibc leaks both anyway.
-# Its HAVE_BACKTRACE also compiles the Linux symbolizer, so DL_LIBS and
-# BACKTRACE_LIBS below are load-bearing.
+# HTS_INTERNAL_BUILD pulls in config.h for macOS write() and STDERR_FILENO. Its
+# HAVE_BACKTRACE builds the Linux symbolizer, which needs the libs below.
 cflags+=(-DHTS_INTERNAL_BUILD
     -g -O0 -I"${builddir}" -I"${builddir}/src" -I"${srcdir}/src")
 # shellcheck disable=SC2086 # DL_LIBS/BACKTRACE_LIBS are flag lists; splitting is the point
@@ -37,8 +35,8 @@ if ! "${cc_argv[@]}" "${cflags[@]}" -o "${work}/probe" \
     "${srcdir}/tests/printnumprobe.c" "${srcdir}/src/htsbacktrace.c" \
     ${DL_LIBS:-} ${BACKTRACE_LIBS:-} >"${work}/cc.log" 2>&1; then
     head -20 "${work}/cc.log" >&2
-    # 218 pins this build on Linux. On Darwin nothing else does, so a skip here
-    # is how the gap hid.
+    # Fail on Linux and Darwin, because only test 218 builds this on Linux and
+    # nothing else covers Darwin.
     case "$HTS_OS" in
     Linux | Darwin) fail "the crash printer does not build standalone" ;;
     esac

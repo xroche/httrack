@@ -17,7 +17,7 @@ cleanup_push rm -rf "$dir"
 
 doomed="${dir}/doomed.bin"
 ln -s /dev/full "$doomed" 2>/dev/null || skip "cannot symlink /dev/full"
-# Probe the mechanism, not the node: macOS links to a missing /dev/full happily.
+# Probe the write itself, because macOS links to a missing /dev/full.
 if printf x >"$doomed" 2>/dev/null; then
     skip "a write through /dev/full succeeds here, so it stands in for nothing"
 fi

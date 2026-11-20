@@ -1,9 +1,7 @@
 #!/bin/bash
 #
-# hts_main2() returned 0 whatever the mirror did, so a wrapper script could not
-# tell a finished mirror from one the engine gave up on. Both directions here,
-# plus a refused command line, so the aborted status means that and not "any
-# failure". /dev/full stands in for the full disk, as in 350.
+# The exit status must tell a finished mirror from one the engine gave up on.
+# /dev/full stands in for a full disk, as in 350.
 
 set -euo pipefail
 
@@ -50,8 +48,8 @@ crawl_status() {
 # --- a mirror that runs to the end -------------------------------------------
 crawl_status clean index.html
 test "$rc" -eq 0 || fail "a completed mirror exited $rc: $(<"$rc_log")"
-# The engine's own verdict, not just a file on disk: a crawl that mirrored the
-# entry page and then gave up would satisfy the weaker check and exit 0 too.
+# Check the engine's verdict too. A crawl that mirrored the entry page and then
+# gave up passes the file check.
 grep -q 'mirror complete in' <<<"$log" ||
     fail "the control crawl did not finish, so its exit 0 proves nothing: ${log}"
 ok "a mirror that completes still exits 0"
@@ -66,7 +64,7 @@ grep -q 'Mirror aborted: keeping all previously mirrored files' <<<"$log" ||
 test "$rc" -eq "$ABORTED" || fail "an aborted mirror exited $rc, wanted $ABORTED"
 ok "a mirror the engine aborts exits $ABORTED"
 
-# stderr is the only place httrack.c says why, and it used to be empty here.
+# stderr is the only place httrack.c says why.
 grep -q 'mirror aborted' <"$rc_log" ||
     fail "the non-zero exit came with no reason: $(<"$rc_log")"
 ok "and says so on stderr rather than printing an empty error"
@@ -95,8 +93,7 @@ test "$rc" -eq "$ABORTED" || fail "the cache arm exited $rc, wanted $ABORTED"
 ok "a cache write failure aborts with the same status"
 
 # --- a producer that has nothing to do with the disk -------------------------
-# -#L caps the link table. The parser reached that cap and returned quietly
-# while htsAddLink's identical refusal aborted, so one limit gave two statuses.
+# -#L caps the link table, and the parser and htsAddLink must give one status.
 crawl_status linklimit index.html "-#L1"
 grep -q 'Too many URLs, giving up' <<<"$log" ||
     fail "the link cap was not reached, so the status proves nothing: ${log}"

@@ -1,8 +1,6 @@
 #!/bin/bash
-# Every optional feature defaulted to "auto", so the same source built a
-# different binary on each distribution: Gentoo linked both codecs off a recipe
-# naming neither, and Void would have shipped both off. --disable-auto-features
-# moves those defaults to no and leaves an explicit flag alone.
+# --disable-auto-features moves every "auto" default to no and leaves an
+# explicit flag alone, so a recipe builds the same binary on every distribution.
 
 # TEST_TIMEOUT_AT_LEAST: 900
 
@@ -172,12 +170,9 @@ assert_state() { # assert_state DIR NAME on|off
 n=0
 planned=10 # steps below; the last one needs the libraries to be installed
 
-# A GNU-libiconv-shaped prefix: a header that renames iconv_open the way the
-# real one does away from LIBICONV_PLUG, and a library under a subdirectory the
-# bare prefix does not name. Both halves matter, because a probe that declares
-# the symbol itself agrees where the compiler would not, and a -L naming the
-# prefix rather than the libdir resolves to nothing.
-# Prints the prefix, or fails when this host cannot build a shared library.
+# A GNU-libiconv-shaped prefix renames iconv_open away from LIBICONV_PLUG and
+# hides the library in a subdirectory, which fools a self-declaring probe and a
+# -L on the bare prefix. Prints the prefix, or fails with no shared library.
 iconv_fixture() { # iconv_fixture SUBDIR
     local prefix=${work}/iconvdir lib ext=so
     lib=${prefix}/$1
@@ -223,12 +218,8 @@ for flag in --disable-auto-features $(for f in ${features}; do feature_flag "${f
 done
 
 # --disable-auto-features makes the flags after it the whole optional set, so a
-# flag dropped from debian/rules ships a package that decodes less.
-# Reading that list out of the file means parsing make and the shell at once,
-# and every attempt at it lost to a continuation, a comment or a variable. Run
-# the recipe instead with every dh_* stubbed, and record what the real
-# dh_auto_configure would have been handed: make expands, the shell splits.
-# $MAKE carries its flags on some hosts, the way $CC does above.
+# dropped flag ships a weaker package. Run the recipe with dh_* stubbed and
+# record what dh_auto_configure gets. $MAKE carries flags on some hosts.
 read -r -a make_argv <<<"${MAKE:-make}"
 
 rules_argv() { # rules_argv RULESFILE DIR
@@ -251,16 +242,9 @@ rules_argv() { # rules_argv RULESFILE DIR
     chmod +x "${dir}/stub/dh_auto_configure"
     : >"${dir}/make.log"
     : >"${dir}/failed"
-    # Every target the build phase reaches, not just "build": dpkg-buildpackage
-    # runs build-arch for an arch:any package, and a dh-driven file keeps its
-    # flags in an override or an execute_ hook. A configure hidden in binary or
-    # install is out of reach, because those recipes move files no scratch tree
-    # has and stop before their own dh_auto_configure line.
-    # Each pass gets its own directory, or the stamp files the first one leaves
-    # make the rest no-ops. The foreign environment is a sample and not a
-    # proof: it catches a flag behind the conditional a porting fix reaches for.
-    # The first pass sets nothing, so its array is empty: expand it in the form
-    # bash 3.2 accepts under set -u.
+    # Run every build-phase target, each pass in its own directory, or the first
+    # one's stamps make the rest no-ops. The foreign environment catches a flag
+    # behind a porting conditional. The empty first array uses a bash 3.2 form.
     local envs=("" "DEB_HOST_ARCH_OS=hurd DEB_HOST_ARCH=hurd-i386 DEB_BUILD_PROFILES=nocheck DEB_BUILD_OPTIONS=nocheck")
     local pass=0 target vars
     for cmd in "${envs[@]}"; do
@@ -388,10 +372,8 @@ elif test -r "${rules}"; then
     *) fail_dump "make could not run debian/rules" "${work}/rules-real/make.log" ;;
     esac
 
-    # A reader that recorded nothing would call any file complete, so put every
-    # way of losing a feature past it. Every fixture is literal text under a
-    # quoted here-doc: built by expansion, one of them came out with an escaped
-    # quote under bash 3.2 and read as passed on the macOS leg alone.
+    # A reader that recorded nothing would pass any file, so every fixture
+    # loses a feature. They are quoted here-docs, as bash 3.2 mangles quotes.
     seq=0
     reads() { # reads WANT DESC <<'MUT' -- a whole makefile with a build target
         local want=$1 desc=$2 got dir rc
@@ -423,12 +405,8 @@ elif test -r "${rules}"; then
             fail "${desc}: expected [${want}], the reader said [${got:-(nothing)}]"
     }
 
-    # Two of the fixtures below turn on how make reports a recipe it could not
-    # finish, and that is not the same everywhere: the macOS leg graded as a
-    # silent short list what reds here, on either make version and any of three
-    # shells. So measure this host and require the reader to agree with it. A
-    # fixture asserting a fixed outcome there would be asserting the build
-    # machine, which is the whole defect this file exists to keep out.
+    # Two fixtures depend on how make reports a failed recipe, which varies by
+    # host, so the reader must agree with what this host does.
     measured() { # measured DESC <<'MUT' -- the reader must match this host
         local desc=$1 dir got want rc=0 prc=0
         seq=$((seq + 1))
