@@ -121,7 +121,7 @@ run --errors 0 --log-not-found 'Information, Warnings and Errors' httrack "$url"
 test "$rc" -ne 0 || fail "a log audit matched nothing in the body: $out"
 ok "a log audit still sees what the mirror wrote"
 
-# The log audit skips only the echo below the banner, so it must still see it.
+# The audit skips only line 2, the echoed command line, so it must still see the banner.
 run --errors 0 --log-found 'launched on' httrack "$url"
 test "$rc" -eq 0 || fail "a log audit stopped seeing the banner: $out"
 ok "a log audit still sees the launch banner"
