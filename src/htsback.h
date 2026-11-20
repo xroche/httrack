@@ -90,8 +90,7 @@ int back_index_peek(httrackp *opt, struct_back *sback, const char *adr,
 HTS_INLINE int back_exist(struct_back * sback, httrackp * opt, const char *adr,
                           const char *fil, const char *sav);
 int back_nsoc(const struct_back *sback);
-/* refetch_whole: force a whole-file GET, ignoring any partial/temp-ref resume;
-   also the caller's latch marking this link's one free restart spent (#581). */
+/* refetch_whole forces a whole-file GET and spends the free restart (#581). */
 int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
              const char *adr, const char *fil, const char *save,
              const char *referer_adr, const char *referer_fil, int test,
@@ -119,12 +118,10 @@ void back_copy_static(const lien_back * src, lien_back * dst);
 #define HTS_REF_MAX_STR (1024 * 1024)
 #define HTS_REF_MAX_BLOB ((uint64_t) 1024 * 1024 * 1024)
 
-/* In-process slot spool: host-native, and meaningful only inside the run that
-   wrote it. */
+/* The slot spool is host-native and valid only in the run that wrote it. */
 int back_serialize(FILE * fp, const lien_back * src);
 int back_unserialize(FILE * fp, lien_back ** dst);
-/* Resume state that outlives the run, so a portable little-endian record; a
-   file in any other shape is refused rather than misread. */
+/* The resume state outlives the run, so its format is portable. */
 int back_serialize_ref(httrackp * opt, const lien_back * src);
 int back_unserialize_ref(httrackp * opt, const char *adr, const char *fil,
                          lien_back ** dst);
@@ -176,29 +173,21 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
    this also decides whether the previous copy survives the update (#746). */
 hts_boolean back_transfer_failed(const int statuscode);
 /* Commit a decoded body size onto r, refusing in memory what http_xfread1()
-   refuses: hts_codec_maxout() caps at INT_MAX inclusive, so the one size the
-   receive guard rejects is reachable through a content coding. A refusal
-   classes and names r, drops its still-coded body, and returns HTS_FALSE. */
+   refuses. A refusal drops the coded body and returns HTS_FALSE. */
 hts_boolean back_set_decoded_size(htsblk *r, LLint size);
-/* Move the previous copy of back->url_sav to back->tmpfile so back_finalize()
-   can put it back when the re-fetch fails (#77 follow-up). Call right before
-   truncating url_sav; tmpfile stays NULL when there is nothing to save. */
+/* Back up url_sav to tmpfile for back_finalize() to restore on failure. Call
+   right before truncating url_sav. */
 void back_refetch_backup(httrackp *opt, lien_back *const back);
-/* Commit or restore a re-fetch backup (#77 follow-up): a re-fetch over an
-   existing file moved the good copy to back->tmpfile before truncating url_sav.
-   commit keeps the new file and drops the backup, unless url_sav was never
-   created; else restore it so an aborted transfer leaves the previous copy
-   intact. Skips the zlib .z temp. HTS_FALSE when a requested commit had to
-   restore instead: the caller then holds the OLD body and must not cache this
-   response's validators against it. */
+/* Commit or restore the re-fetch backup in back->tmpfile. HTS_FALSE means a
+   commit had to restore, so the caller must not cache these validators. */
 hts_boolean back_finalize_backup(httrackp *opt, lien_back *const back,
                                  hts_boolean commit);
 /* Remove the reserved directory a temporary sat in, once the last slot sharing
    it is done; a non-empty one just refuses. No-op outside that directory. */
 void back_tmpdir_drop(const char *tmp);
-/* Name the spool file of a frozen backlog slot, in ~hts-tmp at the mirror
-   root, carrying this process's pid. Consumes an opt->state.tmpnameid.
-   Returns HTS_FALSE (dest emptied) if the name does not fit. Note: utf-8. */
+/* Name the spool file of a frozen backlog slot. Consumes an
+   opt->state.tmpnameid. Returns HTS_FALSE (dest emptied) if the name does not
+   fit. Note: utf-8. */
 hts_boolean back_spoolname(httrackp *opt, char *dest, size_t size);
 /* Returns this process's id, as back_spoolname() writes it. */
 unsigned long back_self_pid(void);
@@ -224,10 +213,8 @@ int back_checksize(httrackp * opt, lien_back * eback, int check_only_totalsize);
 /* Enforce -M/-E quotas: smooth-stops when reached; returns 0 once the -M cap
    or -E deadline overruns its grace period (callers must stop waiting). */
 int back_checkmirror(httrackp * opt);
-/* Give up the mirror where a thread runner recovered from a fault, because the
-   worker it cut short left state nothing can audit. Crawl thread only, because
-   it is the one that holds opt. Idempotent, and back_checkmirror() already
-   calls it on every crawl iteration. */
+/* Give up the mirror after a worker thread faulted. Call it from the crawl
+   thread. Idempotent. */
 void back_check_worker_fault(httrackp *opt);
 
 #endif
