@@ -376,6 +376,25 @@ static hts_boolean st_savename_write_body(const char *path, const char *arg) {
   return HTS_TRUE;
 }
 
+/* Copies src into dst with its '*' expanded to pad bytes of padunit. Is there a
+   '*' and room for the result? */
+static hts_boolean st_expand_pad(char *dst, size_t size, const char *src,
+                                 int pad, const char *padunit) {
+  const char *const star = strchr(src, '*');
+  const size_t unit = strlen(padunit);
+  size_t head, j;
+
+  if (star == NULL || pad < 0 || strlen(src) > size ||
+      (size_t) pad > size - strlen(src))
+    return HTS_FALSE;
+  head = (size_t) (star - src);
+  memcpy(dst, src, head);
+  for (j = 0; j < (size_t) pad; j++)
+    dst[head + j] = padunit[j % unit];
+  strlcpybuff(dst + head + pad, star + 1, size - head - pad);
+  return HTS_TRUE;
+}
+
 static int st_savename(httrackp *opt, int argc, char **argv) {
   struct {
     lien_adrfilsave afs;
@@ -403,7 +422,7 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
   const char *bodyfile = "st-savename-body.tmp";
   const char *tmpbodyfile = "st-savename-tmpfile.tmp";
   int statuscode = HTTP_OK, status = 0;
-  int filpad = 0;
+  int filpad = 0, adrpad = 0;
   const char *padunit = "a"; /* the bytes filpad repeats */
   int nosback = 0;
   int rc = 0;
@@ -445,6 +464,8 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
       cached = a + 7;
     else if (strncmp(a, "filpad=", 7) == 0)
       filpad = atoi(a + 7);
+    else if (strncmp(a, "adrpad=", 7) == 0) /* as filpad, for adr= */
+      adrpad = atoi(a + 7);
     else if (strncmp(a, "padunit=", 8) == 0 && a[8] != '\0')
       padunit = a + 8;
     else if (strncmp(a, "delayed=", 8) == 0) /* -%N */
@@ -467,27 +488,23 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
   }
   memset(&probe, 0, sizeof(probe));
   memset(probe.canary, ST_POISON, sizeof(probe.canary));
-  strcpybuff(afs->af.adr, adr);
+  if (adrpad > 0) {
+    if (!st_expand_pad(afs->af.adr, sizeof(afs->af.adr), adr, adrpad,
+                       padunit)) {
+      fprintf(stderr, "savename: adrpad needs a '*' in the adr, and room\n");
+      return 1;
+    }
+  } else {
+    strcpybuff(afs->af.adr, adr);
+  }
   if (filpad > 0) {
     /* '*' stands for filpad bytes: a link longer than argv can carry, argv
        being capped at HTS_CDLMAXSIZE (htscoremain.c) */
-    const char *const star = strchr(argv[0], '*');
-    char BIGSTK pad[HTS_URLMAXSIZE * 2];
-    const size_t unit = strlen(padunit);
-    size_t j;
-
-    /* refuse rather than let the harness itself abort in strcatbuff */
-    if (star == NULL ||
-        (size_t) filpad > sizeof(afs->af.fil) - strlen(argv[0])) {
+    if (!st_expand_pad(afs->af.fil, sizeof(afs->af.fil), argv[0], filpad,
+                       padunit)) {
       fprintf(stderr, "savename: filpad needs a '*' in the fil, and room\n");
       return 1;
     }
-    for (j = 0; j < (size_t) filpad; j++)
-      pad[j] = padunit[j % unit];
-    pad[filpad] = '\0';
-    strncatbuff(afs->af.fil, argv[0], star - argv[0]);
-    strcatbuff(afs->af.fil, pad);
-    strcatbuff(afs->af.fil, star + 1);
   } else {
     strcpybuff(afs->af.fil, argv[0]);
   }
