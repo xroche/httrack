@@ -539,7 +539,12 @@ jobs:
             f=$(basename "$c" .c)
             mkdir -p "$RUNNER_TEMP/corpus/$f"
             unzip -q "$RUNNER_TEMP/out/${f}_seed_corpus.zip" -d "$RUNNER_TEMP/corpus/$f"
-            "$RUNNER_TEMP/out/$f" -runs=0 -timeout=25 "$RUNNER_TEMP/corpus/$f"
+            # Load the dict as OSS-Fuzz does, so a malformed one fails here.
+            dict=()
+            if [ -f "$RUNNER_TEMP/out/$f.dict" ]; then
+              dict=(-dict="$RUNNER_TEMP/out/$f.dict")
+            fi
+            "$RUNNER_TEMP/out/$f" "${dict[@]}" -runs=0 -timeout=25 "$RUNNER_TEMP/corpus/$f"
           done
 
   # This leg also installs no libssl, so configure cannot turn HTTPS back on.
