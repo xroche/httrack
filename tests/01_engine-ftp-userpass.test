@@ -15,9 +15,9 @@ out=$(httrack -O "${tmpdir}/st" "-#test=ftp-userpass" run 2>&1) ||
     fail "self-test exited non-zero: ${out}"
 grep -q "ftp-userpass self-test OK" <<<"${out}" || fail "unexpected output: ${out}"
 
-# The reachable half: a URL carries the userinfo straight into user[256]/pass[256].
-# 66 is the sanitizer runtimes' own exit code and httrack never returns it, so a
-# finding is named as one rather than as a crash, because the two differ in fix.
+# A URL carries the userinfo straight into user[256]/pass[256]. Exit 66 is the
+# sanitizers' own code, which httrack never returns, so it is named a finding
+# rather than a crash.
 probe() {
     local rc=0 err="${tmpdir}/probe.err"
     rm -rf "${tmpdir}/mir"

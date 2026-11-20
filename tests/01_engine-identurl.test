@@ -16,7 +16,7 @@ split 'http://www.example.com/a/b/../c.html' 'adr=www.example.com fil=/a/c.html'
 split 'ftp://ftp.example.com/pub/file.txt' 'adr=ftp://ftp.example.com fil=/pub/file.txt'
 split 'file:///etc/hostname' 'adr=file:// fil=/etc/hostname'
 
-# empty-path file:// used to read one byte past the URL (p[1] with *p=0)
+# an empty-path file:// must not read one byte past the URL
 split 'file://' 'adr=file:// fil=//'
 
 # ident_url_absolute() rejects a URL of HTS_URLMAXSIZE*2 bytes or more before
@@ -30,10 +30,9 @@ limit=$((urlmaxsize * 2))
 
 split_pad() { selftest_queue "$3" identurl "$1" "$2"; }
 
-# One byte under the limit, exactly on it, one byte over. The accepted case pins
-# the whole string it yields: on its own, 'error' at the limit is satisfied by
-# any URL the parser refuses for an unrelated reason, and by a guard that starts
-# rejecting a kilobyte early.
+# Cases sit one byte under the limit, on it and one byte over. The accepted one
+# pins its whole result, because 'error' alone also passes when the URL fails
+# for another reason or the guard rejects a kilobyte early.
 boundary() { # boundary BASE WANT-ADR
     local base=$1 adr=$2
     local pad=$((limit - 1 - ${#base}))

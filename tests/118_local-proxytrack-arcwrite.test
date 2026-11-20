@@ -1,7 +1,6 @@
 #!/bin/bash
-# The .arc writer builds each entry's headers in a fixed 8192-byte block, and
-# its one bound ignored what the block already held: a long cached header
-# string wrapped the subtraction and smashed it.
+# The .arc writer builds each entry's headers in a fixed 8192-byte block. Its
+# bound must count what the block holds, or a long header wraps it.
 
 set -euo pipefail
 export LC_ALL=C

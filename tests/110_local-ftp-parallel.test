@@ -1,9 +1,8 @@
 #!/bin/bash
 #
-# A completed FTP transfer used to end as a 0-byte file when its ready backlog
-# slot was swapped out to the spool (#797): the FTP worker writes url_sav
-# itself and leaves no in-memory body, and the swap round-trip zeroed the slot's
-# size, so the link writer then created an empty file over the bytes.
+# A completed FTP transfer whose ready slot is swapped to the spool must keep
+# its bytes (#797). The FTP worker writes url_sav itself and leaves no body in
+# memory, and a slot size lost in the swap made the link writer empty the file.
 
 set -euo pipefail
 
@@ -37,10 +36,9 @@ for name in $names; do
     urls+=("ftp://127.0.0.1:${FTP_PORT}/${name}.bin")
 done
 
-# -c8, never -c1: a slot is only swapped out while other transfers keep the
-# parser from picking it up. -Z because the swap only logs at debug level, and
-# the run below proves nothing unless it happened. Bounded like every crawl
-# pass: a wedge must fail the test, not hang the job until CI discards the log.
+# -c8 because a slot is only swapped out while other transfers keep the parser
+# busy. -Z because the swap only logs at debug level, and the run proves nothing
+# without it. Bounded so a wedge fails the test instead of hanging the job.
 # $1 names the run and $2 is HTTRACK_DEBUG_SPOOL_MEM: 0 forces the disk spool,
 # '' keeps the default memory budget. $3 is the debug line proving the swap.
 crawl() {

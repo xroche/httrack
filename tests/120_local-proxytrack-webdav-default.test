@@ -1,8 +1,7 @@
 #!/bin/bash
 #
 # A PROPFIND whose path is an exact cache entry enumerates that entry's default
-# document under an empty name; proxytrack used to index one byte before it and
-# die on the whole listener.
+# document under an empty name, and proxytrack must not index before it.
 
 set -euo pipefail
 
@@ -115,8 +114,7 @@ until test "$(count_matching_lines_nocase ' \* log: HTTP [^ ]* 207 [0-9]* propfi
 done
 
 # Neither what the client sent nor the generated body is echoed anywhere. The
-# markers the #911 traces printed are gone from the tree, so a grep for them
-# could only ever miss: these two are what a re-added trace would carry.
+# two markers are what a re-added #911 trace would carry.
 log=$(<"$ptlog")
 for marker in "$sentinel" 'Default Document for the Folder'; do
     if grep -q "$marker" <<<"$log"; then

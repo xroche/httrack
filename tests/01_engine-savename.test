@@ -83,8 +83,8 @@ name '/style.css' 'image/png' 'style.png' 'body=body { }' # no rule for css: wir
 name '/photo.jpg' 'image/png' 'photo.jpg' coding=gzip body=hex:89504E470D0A1A0A tmpbody=hex:1F8B08000000000002FFFB7FE3FF0306012F3700E4185A9E08000000
 name '/photo.jpg' 'image/png' 'photo.png' body= tmpbody=hex:FFD8FFE000104A46
 
-# A redirect answer resolves nothing: delayed placeholder name, which keeps the
-# URL's own extension so an update can look for the file under it (#1926).
+# A redirect resolves nothing and gets the delayed placeholder name. It keeps
+# the URL's extension, so an update can find the file under it (#1926).
 name '/x.php' 'text/html' 'x.php.0.delayed' statuscode=301
 
 # Root and query-only URLs get index + the md5-of-query suffix.
@@ -193,10 +193,9 @@ if ! target_is_windows; then
         "${out#*www.example.com}" 'cut counts UTF-8 characters'
 fi
 full '/x.php' 'application/pdf' '/dev/null/www.example.com/evil.exe' 'cdispo=../../evil.exe'
-# Not queued: those spaces are htsmain()'s rewrite of the CR and TAB, which only
-# an argv goes through. Assigned first, since MSYS drops the CR from a $'..' that
-# sits inside the command substitution; asserted, so a shell that drops it here
-# too says so rather than leaving the TAB to carry the case alone.
+# Not queued, because only an argv gets htsmain()'s CR/TAB-to-space rewrite.
+# Assigned first because MSYS drops the CR from a $'..' inside a command
+# substitution, and asserted so a shell that drops it here too says so.
 fil=$'/evil\rname\t.php'
 assert_eq 15 "${#fil}" 'the shell kept both control bytes'
 out=$("$HTTRACK_PATH" -O /dev/null -#test=savename "$fil" 'text/html')
@@ -239,9 +238,8 @@ selftest_queue_head 'savename-sequence: 12 cases' savename-sequence
 
 selftest_run_queued
 
-# #1926: with no cache, the mirror's own copy is what names the link. A known
-# extension is taken from disk, while an HTML copy is not, so the delayed type
-# still decides the name of a page.
+# #1926: with no cache, the mirror's copy names the link. A known extension
+# comes from disk, but an HTML copy does not, and the delayed type names a page.
 ondisk=$(mktemp -d)
 cleanup_push rm -rf "$ondisk"
 mkdir -p "${ondisk}/www.example.com"

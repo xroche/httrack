@@ -1,14 +1,11 @@
 #!/bin/bash
 #
-# The end-of-mirror purge read old.lst with linput(fp, line, 1000), which caps a
-# chunk at 999 bytes. filenote() writes "[<save path>]", so a 998-byte save path
-# makes a 1000-byte line that comes back as 999 bytes plus a one-byte "]" tail.
-# For that tail `line + 1` is empty, and with no -O so is path_html, so the purge
-# indexed file[-1] (#770). Needs no -O, hence not local-crawl.sh.
+# A 998-byte save path makes a 1000-byte old.lst line, which linput(fp, line,
+# 1000) splits into 999 bytes and a "]" tail. With no -O, the purge must not
+# index file[-1] on that tail (#770), hence not local-crawl.sh.
 #
-# The OOB write lands in stack padding, so only the sanitized CI leg fails on
-# unfixed code; the length assertion below is what keeps this from passing
-# vacuously if the save path ever stops landing on the chunk boundary.
+# Only the sanitized leg sees the stack-padding write. The length assertion
+# below checks the save path still lands on the chunk boundary.
 
 set -euo pipefail
 

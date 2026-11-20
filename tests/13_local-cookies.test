@@ -1,10 +1,8 @@
 #!/bin/bash
 #
-# Cookie chain against the local test server (replaces the old online
-# ut/cookies/*.php fixtures). entrance.php sets cat/cake; second.php checks
-# them and sets badger; third.php checks all three. A missing or wrong cookie
-# returns 500, which would surface as an httrack error and a missing file, so a
-# clean 3-files/0-errors run proves the cookie jar is replayed across links.
+# Cookie chain against the local test server. entrance.php sets cat/cake,
+# second.php checks them and sets badger, third.php checks all three. A wrong
+# cookie returns 500, so a clean 3-files/0-errors run proves the jar works.
 
 : "${top_srcdir:=..}"
 

@@ -3,12 +3,11 @@
 
 set -euo pipefail
 
-# http_xfread1 must refuse an in-memory receive buffer that would exceed a
-# 32-bit index (hostile Content-Length, or an endless stream) rather than
-# allocate it, while still accepting a normal small size. The same bound has to
-# hold on the two paths that fill r->adr without going through that guard: a
-# chunk stream (see 130_local-chunked-truncated.test), a decoded content coding,
-# and a local file read back for parsing. -#test=xfread-limit drives all of them.
+# http_xfread1 must refuse a receive buffer past a 32-bit index (hostile
+# Content-Length or endless stream) yet accept a small one. A chunk stream
+# (see 130_local-chunked-truncated.test), a decoded content coding and a local
+# file read back fill r->adr past that guard and need the same bound.
+# -#test=xfread-limit drives them all.
 
 # The file is sparse, so only a build missing the bound reads its 2 GiB.
 bigdir=
@@ -62,9 +61,8 @@ for expect in 'fits(0)=1' 'fits(1000)=1' 'fits(2147483646)=1' \
     has "$expect"
 done
 
-# A decoded body is capped at INT_MAX inclusive, so the size the receive guard
-# refuses is reachable through a content coding: refuse it, and drop the coded
-# bytes rather than commit them as the page. Only the in-memory path is bound.
+# A content coding can decode up to INT_MAX, the size the receive guard refuses.
+# Refuse it and drop the coded bytes. Only the in-memory path is bound.
 has 'decode_mem_max: ok=0 body=dropped size=64 code=-1 msg=Decompressed content too large'
 has 'decode_mem_ok: ok=1 body=kept size=2147483646 code=0 msg='
 has 'decode_disk_max: ok=1 body=kept size=2147483647 code=0 msg='

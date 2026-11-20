@@ -94,9 +94,9 @@ test "$RC" -lt 128 || fail "lone-quote argument crashed (exit $RC)"
 run_only "$tmp/q-long" "\"$(repeat_chars 1022 A)"
 test "$RC" -lt 128 || fail "near-cap dangling-quote argument crashed (exit $RC)"
 
-# --pause (#185): valid MIN[:MAX] accepted; malformed, reversed, over-range and
-# non-finite values refused cleanly. NaN defeats naive `<`/`>` checks (it
-# compares false to everything), so it must not slip through to the int cast.
+# --pause (#185) accepts a valid MIN[:MAX] and refuses malformed, reversed,
+# over-range and non-finite values. NaN compares false to everything and
+# would pass a plain `<`/`>` check on its way to the int cast.
 run "$tmp/pause-ok" --pause 0.2:0.4
 accepted "$tmp/pause-ok" "#185: valid --pause range rejected"
 run "$tmp/pause-fix" --pause 0.2
@@ -106,9 +106,9 @@ for bad in nan nan:5 5:nan inf 10:5 99999; do
     refused "#185: invalid --pause '$bad' not refused cleanly"
 done
 
-# --max-retry-after (#1738): the cap is what keeps a server from parking the
-# mirror, so a value it cannot parse must be refused rather than left at 0. An
-# over-limit value is clipped instead (#1776).
+# --max-retry-after (#1738) refuses an unparsable value, because 0 drops the
+# cap that stops a server parking the mirror. Over-limit values are clipped
+# (#1776).
 for good in 0 5 3600 --max-retry-after=7; do
     case $good in
     --*) run "$tmp/mra-ok" "$good" ;;
@@ -116,10 +116,9 @@ for good in 0 5 3600 --max-retry-after=7; do
     esac
     accepted "$tmp/mra-ok" "#1738: valid --max-retry-after '$good' rejected"
 done
-# Parsing predates the log file, so the notice lands on stdout. Grepping for it
-# is the real assertion, because storing 99999 unclipped passes acceptance alone.
-# 3600 is HTS_MAX_RETRY_AFTER_LIMIT, which the notice reports from the value it
-# stored: matching it is what tells a clip from a bare log line.
+# Parsing runs before the log file opens, so the notice goes to stdout. The grep
+# is needed because an unclipped 99999 also passes acceptance. 3600 is
+# HTS_MAX_RETRY_AFTER_LIMIT, as the notice reads it back from the stored value.
 clipped() {
     grep -q -- "--max-retry-after $2s is above the limit, using 3600s" "$1/.log" ||
         fail "$3"
@@ -140,8 +139,8 @@ done
 run "$tmp/mra-lim" "-%J3600"
 accepted "$tmp/mra-lim" "#1776: --max-retry-after at the limit refused"
 not_clipped "$tmp/mra-lim" "#1776: a value at the limit was clipped"
-# The message matters: without it a value the generic option parser chokes on
-# passes this table while never reaching the range check.
+# Matching the message stops a value the generic option parser refuses from
+# passing here without reaching the range check.
 # A digit string too wide even for LLint is malformed rather than over-limit.
 for bad in "" x -3 999999999999999999999999; do
     run "$tmp/mra-bad" "-%J$bad"
@@ -155,8 +154,8 @@ refused "#1738: fractional --max-retry-after not refused cleanly"
 ! grep -q 'Invalid --max-retry-after' "$tmp/mra-bad/.log" ||
     fail "#1738: 1.5 now reaches the range check, so it belongs in the table above"
 
-# An option is not -i (continue) merely because its name contains an 'i' (#615).
-# These used to wipe the URL given before them and exit on the usage screen.
+# An option whose name contains an 'i' is not -i (continue). It must keep the
+# URL given before it and not exit on the usage screen (#615).
 run "$tmp/ord-bti" --build-top-index
 accepted "$tmp/ord-bti" "#615: --build-top-index after the URL wiped the URL list"
 run "$tmp/ord-bti-s" "-%i"
@@ -201,9 +200,8 @@ accepted "$tmp/pre-bti" "#615: -%i before the URL broke the crawl"
 run_only "$tmp/pre-proto" "-@i2" "file://$tmp/index.html"
 accepted "$tmp/pre-proto" "#615: -@i2 before the URL broke the crawl"
 
-# -K must not reset the -c socket count (its case fell through into 'c'). maxsoc
-# is only observable via the ">8, limited to 8" warning: -c16 trips it, and would
-# stop tripping it if a trailing -K reset the count back to the default 4.
+# -K must not reset the -c socket count. The ">8, limited to 8" warning is the
+# only view of maxsoc, and -c16 stops tripping it if a later -K resets it to 4.
 warned() {
     grep -q 'simultaneous connections limited to' "$1/hts-log.txt" ||
         fail "$2"

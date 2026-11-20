@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# A -%F footer whose expansion overflows the on-page buffer must be dropped, not
-# crash the crawl. Before the fix the unchecked hts_footer_format return left the
-# buffer unterminated and the next strcatbuff aborted (SIGABRT).
+# A -%F footer whose expansion overflows the on-page buffer must be dropped
+# without crashing the crawl or leaving the buffer unterminated.
 
 set -eu
 # shellcheck source=tests/testlib.sh

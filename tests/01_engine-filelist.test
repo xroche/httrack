@@ -1,9 +1,8 @@
 #!/bin/bash
 #
-# -%L URL-list loading (#49): a readable list is honored; an unusable one fails
-# with the reason (errno / not-a-regular-file), not a bare "Could not include
-# URL list". Offline: file:// fixture, no server. Asserts on httrack's own
-# strings and the message shape, so it is locale-independent.
+# -%L URL-list loading (#49): a readable list is honored, and an unusable one
+# fails with its reason rather than a bare "Could not include URL list".
+# It runs offline and matches httrack's own strings, whatever the locale.
 
 set -euo pipefail
 

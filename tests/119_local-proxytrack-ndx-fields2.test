@@ -1,8 +1,7 @@
 #!/bin/bash
-# Two bounds in the .ndx/.dat reader: a position field that did not parse left
-# "pos" holding the previous entry's offset, or the stack on the first entry,
-# and the base path and index filenames were copied with strncat calls bounded
-# by the source path instead of by their 1024-byte destinations.
+# Two bounds in the .ndx/.dat reader. An unparsable position field must not
+# leave "pos" stale or uninitialized, and the base path and index names are
+# bounded by their 1024-byte destinations.
 
 set -euo pipefail
 export LC_ALL=C
@@ -104,8 +103,7 @@ fi
 
 comp=$(printf '%200s' '' | tr ' ' 'd')
 
-# A path just short of the 1024-byte destinations must still load: refusing
-# these is as wrong as overflowing them.
+# A path just short of the 1024-byte destinations must still load.
 fits="$dir/$comp/$comp/$comp"
 mkdir -p "$fits"
 build_cache "$fits/c" 0 "$posA"

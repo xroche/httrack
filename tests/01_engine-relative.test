@@ -52,9 +52,8 @@ ident 'file://srv/share/../x' 'www.foo.com' '/p.html' 'adr=file:// fil=//srv/x'
 ident 'mailto:foo@bar.com' 'www.foo.com' '/p.html' 'error=-1' # unsupported scheme
 ident 'javascript:void(0)' 'www.foo.com' '/p.html' 'error=-1'
 
-# A build without TLS must drop an https link (-2), not fold it into the origin
-# host: the "https:" arm of the relative branch strips the scheme and the link
-# is then refetched from the origin in the clear.
+# A build without TLS must drop an https link (-2). Folding it into the origin
+# host would refetch it from the origin in the clear.
 if test "${HTTPS_SUPPORT:-yes}" = "no"; then
     ident 'https://secure.foo.com/a/b/../c.gif' 'www.foo.com' '/p.html' 'error=-2'
     ident 'HTTPS://secure.foo.com/x' 'www.foo.com' '/p.html' 'error=-2'

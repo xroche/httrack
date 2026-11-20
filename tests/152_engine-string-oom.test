@@ -1,10 +1,9 @@
 #!/bin/bash
 #
 # A String that cannot grow must stop the process loudly rather than carry on
-# with a NULL buffer and a capacity already bumped. assert() is compiled out of
-# the MSVC Release build, so the check cannot lean on it (#915). The failure is
-# injected through a realloc stub: asking a real allocator for a size it should
-# refuse is a guess about the machine, not a test.
+# with a NULL buffer. The check cannot lean on assert(), which MSVC Release
+# compiles out (#915). The failure comes from a realloc stub, because a real
+# allocator's limits are a guess about the machine.
 
 set -euo pipefail
 

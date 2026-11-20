@@ -1,9 +1,8 @@
 #!/bin/bash
 #
-# -#c crashes on purpose so the fatal-signal handler can be tested. Checks the
-# handler still catches, announces and backtraces each fault it claims to
-# handle. Not in the Windows glob: MSVC's abort() can raise a modal fault
-# dialog, which would wedge the runner rather than fail.
+# -#c crashes on purpose to check that the fatal-signal handler catches,
+# announces and backtraces each fault it claims. Not in the Windows glob,
+# because MSVC's abort() can raise a modal dialog that wedges the runner.
 
 set -eu
 
