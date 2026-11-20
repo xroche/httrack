@@ -146,7 +146,7 @@ static int st_wizardfilter(httrackp *opt, int argc, char **argv) {
   EMITS(5, "foo.com", "page.html", HTS_FALSE, "");
   EMITS(7, "foo.com", "page.html", HTS_FALSE, "");
 
-  /* A long link must emit a short link's pattern, as clipping widens it. */
+  /* A long link must emit its full pattern, because clipping would widen it. */
   {
     const size_t urlmax = HTS_URLMAXSIZE * 2 - 1; /* the engine's adr and fil */
     char *adr = malloct(urlmax + 1);

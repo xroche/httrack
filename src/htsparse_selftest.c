@@ -958,9 +958,9 @@ static int tagattr_case(selftest_sweep *sw, const char *before,
   return err;
 }
 
-/* The sweep puts every string of up to four bytes before the quote. */
-/* Checks what the walk may claim about a tag nobody would write. The span
-   rules restate the walk, so they cannot catch an off-by-one. */
+/* Checks what the walk may claim about a tag nobody would write, such as one
+   with up to four junk bytes before the quote. The span rules restate the
+   walk, so they cannot catch an off-by-one. */
 static int tagattr_probe(selftest_sweep *sw, char *text, size_t at) {
   const char *nend = NULL;
   const char *name;
