@@ -1,7 +1,7 @@
 #!/bin/bash
 # Issue #121: a URL that looks like an asset (".../distorted.jpg") on a foreign
-# host, answered with text/html, must be stored and not scanned. Only that one
-# file of the host may land, under -n and under +*.jpg.
+# host, answered with text/html, must be stored and not scanned. Only that page
+# and its .readme may land from the host, under -n and under +*.jpg.
 set -eu
 
 # shellcheck source=tests/crawllib.sh

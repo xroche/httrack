@@ -2,7 +2,7 @@
 #
 # A -mime: exclusion must abort on the response Content-Type instead of
 # fetching the 1 MB body (#58). The file is absent either way, so match a
-# bytes-received count of at most 4 digits.
+# bytes-received count of at most 4 digits, so a missing summary line fails.
 
 : "${top_srcdir:=..}"
 
