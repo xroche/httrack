@@ -1,12 +1,10 @@
 #!/bin/bash
 #
 # A mirror the engine gave up on must not say "Done." on stdout, and shell mode
-# (-#S) must stay silent whatever the outcome: its end-of-mirror token goes to a
-# scratch buffer rather than the stream a front end parses.
-# An abort reaches the engine three ways and all three are exercised: -#L makes
-# httpmirror() return -1, a full disk leaves it returning 1 with exit_xh set,
-# and a cap or a ^C raises state.stop with exit_xh untouched. Only the disk arm
-# needs /dev/full and only the ^C arm needs signals, so the rest carry Windows.
+# (-#S) must stay silent whatever the outcome.
+# Each abort path has an arm: -#L makes httpmirror() return -1, a full disk
+# returns 1 with exit_xh set, and a cap or a ^C raises state.stop alone. Only
+# the disk and ^C arms need /dev/full or signals, so the rest run on Windows.
 
 set -euo pipefail
 
@@ -55,7 +53,7 @@ assert_says() { # assert_says finished|aborted WHAT
     grep -q 'Mirror not completed' "$out" || fail_dump "$2" "$out" "$err"
 }
 
-# The whole point of the shell arm: neither verdict reaches the token stream.
+# In shell mode, neither verdict may reach the token stream.
 assert_shell_silent() { # assert_shell_silent WHAT
     if grep -qE '^Done\.$|Mirror not completed|TRANSFER DONE' "$out"; then
         fail_dump "$1" "$out" "$err"
@@ -78,10 +76,9 @@ assert_says aborted "a mirror the link cap stopped still claimed to be done"
 ok "a mirror the link cap stopped does not claim to be done"
 
 # --- a full disk: httpmirror() returns 1 and only exit_xh says otherwise -----
-# The engine is a native binary under MSYS, so a symlink the shell writes
-# through as /dev/full is a plain file to the crawl. Probe the mechanism, not
-# the node: macOS has no /dev/full and links to it happily, so a write through
-# the probe fails with ENOENT rather than ENOSPC.
+# The engine is a native binary under MSYS, so a symlink to /dev/full is a
+# plain file to the crawl. Probe with a write, because macOS has no /dev/full
+# and the write then fails with ENOENT instead of ENOSPC.
 disk_abort_works() {
     local probe="${tmpdir}/probe" refused=1
     ! target_is_windows || return 1
@@ -115,8 +112,8 @@ assert_says aborted "a mirror the time cap stopped still claimed to be done"
 ok "a mirror the time cap stopped does not claim to be done"
 
 # --- ^C: the other state.stop producer, and the one users actually hit -------
-# SIGINT goes to sig_leave (state.stop), SIGTERM to sig_finish (exit_xh): two
-# handlers, so the interrupt a user types needs its own arm.
+# SIGINT goes to sig_leave (state.stop) and SIGTERM to sig_finish (exit_xh), so
+# the interrupt a user types needs its own arm.
 if target_is_windows; then
     echo "note: MSYS cannot signal a native httrack.exe, the ^C arm is not covered here"
 else
@@ -154,8 +151,8 @@ assert_says finished "--why was reported as an aborted mirror"
 ok "--why still reports Done."
 
 # --- shell mode ends the same way for both, which is silently ---------------
-# The arms above are what make this non-vacuous: the same two crawls print one
-# of these lines when -#S is off.
+# The arms above prove the same two crawls print one of these lines when -#S is
+# off.
 crawl shell-complete changes/index.html -\#S
 assert_shell_silent "shell mode gained an end-of-mirror token (completed)"
 crawl shell-linkcap changes/index.html -\#S -\#L4

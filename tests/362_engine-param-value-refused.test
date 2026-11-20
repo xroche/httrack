@@ -1,8 +1,8 @@
 #!/bin/bash
 #
-# A "param" option takes a number, and used to have any other value glued onto
-# its short form regardless: --long-names=yes wrote DOS 8.3 names and
-# --sockets=8I0 mirrored with no top index, both exit 0 (#1426).
+# A "param" option takes a number and must refuse any other value. Glued onto
+# the short form, --long-names=yes writes DOS 8.3 names and --sockets=8I0
+# drops the top index, both at exit 0 (#1426).
 
 set -euo pipefail
 
@@ -65,8 +65,8 @@ for value in yes none OFF true "8I0"; do
     refused "--long-names=${value}"
 done
 
-# ...and the same on rows reaching four other short options. --sockets=8I0 is
-# the second visible one: the I0 tail reached -I0 and dropped the top index.
+# ...and the same on rows reaching four other short options. In --sockets=8I0
+# the I0 tail would reach -I0 and drop the top index.
 refused --sockets=8I0
 refused --depth=none
 refused --cache=OFF
@@ -74,14 +74,13 @@ refused --robots=yes
 refused --max-files=none
 # a detached value is the same value: --depth ate the URL and mirrored nothing
 refused --depth "file://${tmp}/page.html"
-# the separator -m and -%c read is one occurrence with a digit after it, or the
-# value converts short: 1.2.3 reached maxconn as 1.2, and 100, died downstream
+# -m and -%c take one separator followed by a digit. 1.2.3 would reach maxconn
+# as 1.2.
 refused --connection-per-second=1.2.3
 refused --max-files=100,
 refused --max-files=,,,5
 
-# The message names the option that was typed. --cache=OFF used to report
-# "Option O needs [...] a path", -O being reached out of the middle of OFF.
+# The message names the option as typed. For --cache=OFF it must not blame -O.
 crawl --cache=OFF
 grep -q 'Option --cache does not take the value OFF' "${tmp}/log" ||
     fail_dump "--cache=OFF blamed another option" "${tmp}/log"
@@ -103,8 +102,8 @@ accepted --max-files=,5000
 accepted --max-files=100,5000
 accepted --connection-per-second=0.5
 
-# on/off is a mapping, not merely an accepted spelling: off is -C0, which writes
-# no cache, and on is the bare -C, which does.
+# on/off must map to a value. off is -C0, which writes no cache, and on is the
+# bare -C, which does.
 accepted --cache=off
 ! has_cache || fail_dump "--cache=off still wrote a cache" "${tmp}/log"
 accepted --cache=on
@@ -112,8 +111,8 @@ has_cache || fail_dump "--cache=on wrote no cache" "${tmp}/log"
 accepted --cache=0
 ! has_cache || fail_dump "--cache=0 still wrote a cache" "${tmp}/log"
 
-# "paramn" now agrees with "param" on a cluster tail, and refused() wants the
-# 8.3 name absent, so the -L0 is proven gone rather than merely unreported.
+# "paramn" refuses a cluster tail like "param". refused() also wants the 8.3
+# name absent, which proves the -L0 was not applied.
 refused --structure=1L0
 # What still separates the classes: the template, which "param" would mangle.
 accepted --structure=1

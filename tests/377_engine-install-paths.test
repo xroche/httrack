@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# The compiled-in install paths ignored --prefix and stayed on /usr, so a
-# non-/usr build looked for /etc/httrack.conf; Termux patched htsglobal.h by
-# hand for it. Each one has to be the directory configure was given.
+# Each compiled-in install path must be the directory configure was given, so a
+# non-/usr build does not look for /etc/httrack.conf.
 
 set -euo pipefail
 
@@ -35,7 +34,7 @@ assert_eq "${sysconfdir%/}" "$(value_of etcpath)" "HTS_ETCPATH"
 assert_eq "${bindir%/}" "$(value_of binpath)" "HTS_BINPATH"
 assert_eq "${libdir%/}" "$(value_of libpath)" "HTS_LIBPATH"
 assert_eq "${sysconfdir%/}/httrack.conf" "$(value_of httrackcnf)" "HTS_HTTRACKCNF"
-# HTS_HTTRACKDIR already followed DATADIR before the fix: the control, not coverage.
+# HTS_HTTRACKDIR always followed DATADIR, so it is the control.
 assert_eq "${datadir%/}/httrack/" "$(value_of httrackdir)" "HTS_HTTRACKDIR"
 
 # On a /usr layout the assertions above compare two coinciding strings, so the

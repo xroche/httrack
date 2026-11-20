@@ -1,9 +1,8 @@
 #!/bin/bash
 #
-# A "param" or "level" option's value was bounded at 16 characters rather than
-# by magnitude: --depth=0000000000000000001 was refused, while the sixteen
-# digits of --sockets=1234567890123456 reached sscanf("%d") as 1015724736, and
-# --generate-errors=3000000000 as -1294967296 (#1437).
+# A "param" or "level" option's value is bounded by its magnitude (#1437).
+# Zero padding is accepted, and a value past its destination's range is refused
+# rather than wrapped by sscanf("%d").
 
 set -euo pipefail
 
@@ -25,7 +24,7 @@ refuses() { # refuses WORD...
         fail "$* refused without saying why: ${out}"
 }
 
-# Padding is not a value: these all sat above the old 16-character cap.
+# Zero padding is accepted, even past 16 characters.
 assert_selftest -r0000000000000000001 optalias --depth=0000000000000000001
 assert_selftest -L00000000000000001 optalias --long-names=00000000000000001
 assert_selftest -m0000000100,0000005000 optalias --max-files=0000000100,0000005000
@@ -44,8 +43,8 @@ assert_selftest -r00000000002147483647 optalias --depth=00000000002147483647
 refuses --depth=2147483648
 refuses --depth=00000000002147483648
 
-# Each row is bounded by its own destination, not by one shared number: -m, -M
-# and -G read an LLint and -%c a float, where -r reads an int.
+# Each row is bounded by its own destination. -m, -M and -G read an LLint, -%c
+# a float and -r an int.
 assert_selftest -m3000000000 optalias --max-files=3000000000
 assert_selftest -G3000000000 optalias --max-pause=3000000000
 assert_selftest -M9999999999999999 optalias --max-size=9999999999999999
@@ -65,8 +64,8 @@ refuses --max-size=99999999999999999999
 refuses --max-files=100,99999999999999999999
 refuses --connection-per-second=0.99999999999999999999
 
-# Controls: the structural rule the magnitude bound replaced still holds. A
-# sign is not a digit run, or -5 would spill into the cluster loop (#1426).
+# Controls: a sign is not a digit run, or -5 would spill into the cluster loop
+# (#1426).
 refuses --sockets=8I0
 refuses --max-files=100,
 refuses --depth=none
@@ -74,8 +73,8 @@ refuses --depth=-5
 refuses --depth=+5
 refuses --generate-errors=-5
 
-# The value still has to fit the buffer the expansion is glued into, which
-# aborts rather than clips. Only the detached form gets that far: the glued
+# The value must still fit the buffer the expansion is glued into, which
+# aborts. Only the detached form gets that far, because the glued
 # --depth=<1022 zeros> is one argument past HTS_CDLMAXSIZE.
 zeros=$(printf '0%.0s' $(seq 1021))
 assert_selftest "-r${zeros}" optalias --depth "${zeros}"

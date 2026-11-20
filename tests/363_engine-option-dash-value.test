@@ -48,10 +48,9 @@ accepted() { # accepted LABEL
     ! grep -q 'Syntax error' <<<"$stderr" || fail "$1: $stderr"
 }
 
-# A refusal leaves no mirror behind and says why on stderr, never only on the
-# stdout the log and WebHTTrack never see. It suggests no spelling: none passes a
-# refused word through, and advice that dies at a second refusal is worse than
-# none.
+# A refusal leaves no mirror behind and says why on stderr, because the log and
+# WebHTTrack never see stdout. It suggests no spelling, because no spelling
+# passes a refused word through.
 refused() { # refused LABEL RE...
     local label=$1
     shift
@@ -123,9 +122,8 @@ echo OK
 
 # Only where the alias layer put the word there as the option's parameter.
 # Nothing vets a clustered spelling, and the URL pass reads the word after it as
-# short options, so -q%F -mirrored would silently mean -i; left relaxed, -qF
-# --mirror sends "-w" as the User-Agent and drops the mirror. A quoted whole
-# token is refused as quoted.
+# short options. Left relaxed, -q%F -mirrored would mean -i and -qF --mirror
+# would send "-w" as the User-Agent. A quoted whole token is refused as quoted.
 printf '[an unvetted spelling still refuses the word after it] ..\t'
 for opt in %A %F %K %L %S %rf %X F; do
     for word in --mirror -q -dashvalue; do
@@ -153,10 +151,9 @@ parse --user-structure '-%h/%p/%n.%t'
 accepted "--user-structure -%h/%p/%n.%t"
 echo OK
 
-# The bytes, not just the verdict. -#test=optalias calls optalias_check alone, so
-# it pins the alias layer; --filterlist is the one that reaches a syscall while
-# parsing, and a trimmed or rewritten name reads back as the open failure the
-# last probe shows.
+# Check the bytes as well as the verdict. -#test=optalias pins the alias layer
+# alone. --filterlist opens its file while parsing, so a trimmed or rewritten
+# name shows up as the open failure in the last probe.
 printf '[the value reaches the engine byte for byte] ..\t'
 expand() { # expand OPTION [VALUE]
     "$bin" -O /dev/null '-#test=optalias' "$@"
@@ -176,10 +173,8 @@ parse --filterlist -nosuch.txt
 refused "--filterlist -nosuch.txt" 'File url list could not be opened'
 echo OK
 
-# What the option refuses, it now explains in the terms the code decided it: the
-# option as the user spelled it, the word it choked on, and which of the two
-# tests rejected it. The old message claimed the parameter was missing and named
-# the internal -%A.
+# The refusal names the option as the user spelled it, the word it choked on,
+# and which of the two tests rejected it.
 printf '[a refusal names the option, the value and the reason] ..\t'
 parse --proxy -q
 refused "--proxy -q" 'Option --proxy takes a value' '"-q" names an option'
@@ -259,9 +254,8 @@ if ! grep -q 'v6 routines not compiled' <<<"$stdout"; then
 fi
 echo OK
 
-# The value has to survive the round trip through doit.log, which a resumed
-# mirror is rebuilt from: its words are re-inserted one by one, reaching none of
-# the checks the first run's command line went through.
+# The value must survive the round trip through doit.log. A resumed mirror
+# re-inserts its words one by one, past the checks the first run went through.
 printf '[a dash value survives doit.log and --continue] ..\t'
 rm -rf "$tmp/resume"
 (cd "$tmp/cwd" && "$bin" -O "$tmp/resume" --quiet --timeout=1 --retries=0 \

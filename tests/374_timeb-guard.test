@@ -12,9 +12,8 @@ src="${abs_top_srcdir:-${testdir}/..}/src"
 
 # Prints "OK|BAD <file>:<line>" for every <sys/timeb.h> include, "struct timeb" and
 # ftime() call. BAD means no enclosing arm proves _WIN32 is defined, and anything the
-# grammar cannot prove reads BAD: a redundant guard costs a line, a missed one costs
-# the Android build. One false BAD is left in on purpose: an "#if 0" arm is dead
-# rather than Windows-only, and nobody guards a header that way.
+# grammar cannot prove reads BAD. An "#if 0" arm reads BAD too, because nobody
+# guards a header that way.
 scan() {
     LC_ALL=C awk '
     # One record per open #if level, indexed by depth:
@@ -231,7 +230,7 @@ BAD' "$(printf '#\tinclude\t<sys/timeb.h>\n#  include <sys/timeb.h>')"
 control two_files BAD '#ifdef _WIN32
 #include <windows.h>' '#include <sys/timeb.h>'
 
-# the type and the call, not just the include
+# the type and the call too
 control struct_use BAD 'struct timeb B;'
 control ftime_use BAD 'ftime(&B);'
 control struct_guarded OK '#ifdef _WIN32

@@ -120,8 +120,8 @@ for path in catalogs:
 if checked < 70:
     sys.exit("only %d translator names checked across %d catalogs" % (checked, len(catalogs)))
 
-# The blurb used to thank one person in every language, and Uzbek thanked the
-# Russian translator. Names the msgid itself carries are the development credit.
+# The blurb must not thank one translator in every language. Names the msgid
+# itself carries are the development credit.
 msgid = None
 for line in read("lang.def").replace("\r\n", "\n").split("\n"):
     if line.startswith("\\r\\n(Please notify us"):
@@ -191,8 +191,8 @@ check 1 English Lagadec Klueting
 check 4 Deutsch Klueting Lagadec
 check 10 Türkçe Aksoy Lagadec
 
-# An upgrading user keeps the CRLF catalogs they already have, and this tree
-# ships none now, so make one and read it back.
+# An upgrading user keeps their old CRLF catalogs, and this tree ships none, so
+# make one and read it back.
 recode() { # recode <catalog> <lf|crlf>
     "${HTS_PYTHON}" - "$1" "$2" <<'PY' || fail "cannot recode $1 to $2"
 import sys
@@ -212,10 +212,9 @@ grep -q "Lagadec" <<<"${reply}" ||
     fail "a CRLF catalog did not name its translator: ${reply}"
 recode "${root}/lang/English.txt" lf
 
-# The page interpolates catalog text into a <pre>, so the escaper is what stops a
-# translator's punctuation reaching the browser as markup. Both keys it reads,
-# and the second one contains \r\n escapes, so a loader mangling those would
-# not find it.
+# The page puts catalog text into a <pre>, so the escaper must keep a
+# translator's punctuation from becoming markup. Check both keys it reads. The
+# second holds \r\n escapes, which a mangling loader would break.
 "${HTS_PYTHON}" - "${root}/lang/English.txt" <<'PY' || fail "cannot plant the markup probe"
 import sys
 path = sys.argv[1]

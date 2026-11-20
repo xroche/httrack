@@ -1,9 +1,7 @@
 #!/bin/bash
 #
-# A write error the fatal class does not cover -- a broken pipe rather than a
-# full disk -- must still be told apart from a body that ended cleanly. r.size
-# counts bytes read, so the read that both completes a body and fails to write
-# it used to report a clean EOF. A fifo nobody holds open stands in for the save
+# A write error outside the fatal class, such as a broken pipe, must not read as
+# a body that ended cleanly. A fifo nobody holds open stands in for the save
 # name each crawl is about to write.
 
 set -euo pipefail
@@ -53,8 +51,8 @@ crawl_onto_dead_pipe() {
     cached=$(<"${dir}/hts-cache/new.txt")
 }
 
-# What every arm owes: the file we could not write named, not counted as
-# mirrored, and the rest of the mirror still standing.
+# Every arm must name the file it could not write, leave it out of the
+# mirrored count, and keep the rest of the mirror.
 assert_write_error() {
     local what="$1" name="$2"
 
@@ -76,8 +74,8 @@ assert_write_error() {
 }
 
 # --- the read that completes the body is the one whose write fails ----------
-# One byte, then the rest: the first block stays in stdio, so the flush that
-# fails is the one on the read bringing r.size up to the announced length.
+# Send one byte, then the rest. The first block stays in stdio, so the failing
+# flush is on the read that completes the announced length.
 crawl_onto_dead_pipe split splitindex.html split.bin
 assert_write_error "a body completed by the failing read" 'split.bin'
 test -s "${site}/splitindex.html" ||
@@ -127,8 +125,8 @@ grep -q DISKFULL-GZPAGE "${decodesite}/gzpage.html" ||
 ok "a decode that cannot write its output names our own filesystem"
 
 # --- and the copy that failed decode preserved outlives the update purge -----
-# The re-fetch fails on our side, so the previous copy is all there is: dropping
-# it from new.lst would have the purge unlink the file we took care to keep.
+# The re-fetch fails on our side, so the previous copy is the only one. It must
+# stay in new.lst, or the purge unlinks it.
 upd="${tmpdir}/update"
 updsite="${upd}/127.0.0.1_${SRV_PORT}/diskfull"
 local_crawl --log "${tmpdir}/log-update1" "${common[@]}" --retries=0 -O "$upd" \

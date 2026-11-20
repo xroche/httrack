@@ -1,7 +1,6 @@
 #!/bin/bash
 # A multilib host keeps the 64-bit zlib in lib64, Debian under a multiarch
-# triplet. The DIR/lib --with-zlib=DIR used to append holds nothing there,
-# or the wrong ABI.
+# triplet, so --with-zlib=DIR must look past DIR/lib.
 
 set -euo pipefail
 
@@ -123,9 +122,8 @@ expect_fail() { # expect_fail DESC PREFIX
     skip_if_out_of_budget "$((cases - n))" "$((SECONDS - began))"
 }
 
-# The subdirectory names are the fixture's own, not the host's, so every case
-# below means the same thing on a platform that has no real lib64 (macOS, and
-# this box): what they exercise is the macro's candidate order, which is shell.
+# The subdirectory names belong to the fixture, so every case below tests the
+# macro's candidate order even on a host with no real lib64.
 lib_only=$(fixture lib-only lib)
 lib64_only=$(fixture lib64-only lib64)
 both=$(fixture both lib lib64)

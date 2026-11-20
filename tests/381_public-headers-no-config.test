@@ -1,9 +1,9 @@
 #!/bin/bash
 #
-# The installed headers must not need config.h: an autoconf consumer has one of
-# its own. What they do need is the layout switches (HTS_INET6, HTS_USEOPENSSL),
-# which htsfeatures.h carries; a downstream that just deletes the include gets a
-# consumer whose SOCaddr and htsblk differ from the library's.
+# The installed headers must not need config.h, because an autoconf consumer
+# has its own. They need the layout switches (HTS_INET6, HTS_USEOPENSSL) from
+# htsfeatures.h. Without them a consumer's SOCaddr and htsblk differ from the
+# library's.
 
 set -euo pipefail
 
@@ -86,9 +86,9 @@ missing=$(comm -12 "$tmp/config.names" "$tmp/read.names" | comm -23 - "$tmp/publ
 [ -z "$missing" ] ||
     fail "installed headers read config.h macros htsfeatures.h omits: $(echo "$missing" | tr '\n' ' ')"
 
-# The library's own layout, printed from inside libhttrack. st_pubheaders and
+# Print the library's own layout from inside libhttrack. st_pubheaders and
 # pubheaderlayout.c hold the same field list twice, so pin the half that cannot
-# shrink: dropping a line from both would otherwise pass unnoticed.
+# shrink, or a line dropped from both would pass.
 httrack -O /dev/null '-#test=pubheaders' | tr -d '\r' >"$tmp/library.out"
 for key in 'sizeof SOCaddr' 'sizeof INTsys' 'sizeof htsblk' 'offsetof htsblk.address' \
     'offsetof htsblk.etag' 'sizeof httrackp' 'HTS_INET6 = ' 'HTS_USEOPENSSL = '; do
@@ -107,9 +107,8 @@ probe "$tmp/consumer.out" || {
 diff -u "$tmp/library.out" "$tmp/consumer.out" ||
     fail "the installed headers lay the structs out differently from the library"
 
-# Force the layout switch to the wrong value: the probe has to notice, or none
-# of the above was measuring anything. Which value is wrong depends on the
-# build, so flip it rather than writing 0 over a build that already has 0.
+# Flip the layout switch and the probe must notice. Flip it rather than write
+# 0, because the build may already have 0.
 chmod -R u+w "$inc"
 grep -qx '#define HTS_INET6 1' "$inc/htsfeatures.h" && wrong=0 || wrong=1
 sed -i.bak "s|^#define HTS_INET6 .*|#define HTS_INET6 $wrong|" "$inc/htsfeatures.h" && rm -f "$inc/htsfeatures.h.bak"
@@ -118,10 +117,9 @@ probe "$tmp/wrong.out" || fail "the wrong-HTS_INET6 consumer did not build, so t
 ! diff -q "$tmp/library.out" "$tmp/wrong.out" >/dev/null ||
     fail "HTS_INET6=$wrong changed no size or offset, so this test cannot see the bug it guards"
 
-# And the downstream patch itself: dropping the header and its include, which is
-# what installing config.h was buying. Which way it breaks is decided, not
-# whichever happens: HTS_DO_NOT_REDEFINE_in_addr_t means the platform declares
-# in_addr_t, so htsnet.h's own typedef of it stops the consumer compiling.
+# Now try the downstream patch, which drops the header and its include. The
+# consumer must fail to compile, because HTS_DO_NOT_REDEFINE_in_addr_t goes
+# missing and htsnet.h then redefines in_addr_t.
 grep -qx '#define HTS_DO_NOT_REDEFINE_in_addr_t /\*\*/' "$inc/htsfeatures.h" &&
     want=nocompile || want=differs
 rm -f "$inc/htsfeatures.h"

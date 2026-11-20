@@ -1,12 +1,8 @@
 #!/bin/bash
 #
-# --wide-mirror and --tiny-mirror built the connection count their prefix
-# exists to add, then dropped it: the value was written and never read.
-#
-# hts-log.txt echoes the expanded command line on its second line, so the word
-# the engine actually received is readable; the security limiter, which caps a
-# count above 8 and logs it, then says the count reached the option and not
-# just the argv.
+# --wide-mirror and --tiny-mirror must pass on the connection count they add.
+# hts-log.txt echoes the expanded command line on its second line, and the
+# security limiter logs a count above 8, which proves it reached the option.
 
 set -euo pipefail
 
@@ -74,9 +70,8 @@ echoed ' -o1c1 ' 'tiny generate-errors' --tiny-generate-errors 1
 echoed ' -c8 ' 'plain sockets' --sockets 8
 ok "the prefix glues its count on, and only the prefix does"
 
-# ...and the count reaches the option, not just the rebuilt argv: above 8 the
-# security limiter caps it and says so. 32 is above the ceiling, the default 4
-# and tiny's 1 are below.
+# ...and the count reaches the option. Above 8 the security limiter caps it
+# and says so. 32 is above that ceiling, the default 4 and tiny's 1 below.
 clamped() { # clamped WANT LABEL ARG...
     local want=$1 label=$2 got=no hits
     shift 2
@@ -101,12 +96,11 @@ clamped no 'plain mirror over --sockets 3' --sockets 3 --mirror
 clamped yes 'wide mirror over --sockets 3' --sockets 3 --wide-mirror
 ok "the count applies whole, and the unprefixed alias adds none"
 
-# Everywhere the glue would be misread, the alias runs without the count and
-# warns: a value sharing the word (-N, -c8), the -% and -# families whose names
-# are not self-delimiting, a cluster already carrying a count, a value of its
-# own. The base alias has to still do its job.
-# Whether -N takes its template glued or detached is #1380's business, so pin
-# the template followed by a word break: a glued count would land inside it.
+# Where the glue would be misread, the alias drops the count, warns, and still
+# does its job. That covers a value sharing the word (-N, -c8), the -% and -#
+# families, a cluster that already has a count, and a value of its own.
+# The -N template is followed by a word break, because a glued count would land
+# inside it.
 warned '%h%p/%n.%t ' 'wide structure' --wide-structure '%h%p/%n.%t'
 test -f "${tmp}/out/file${tmp}/page.html" ||
     fail "--wide-structure lost the template it warned about"
