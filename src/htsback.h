@@ -185,8 +185,9 @@ hts_boolean back_finalize_backup(httrackp *opt, lien_back *const back,
 /* Remove the reserved directory a temporary sat in, once the last slot sharing
    it is done; a non-empty one just refuses. No-op outside that directory. */
 void back_tmpdir_drop(const char *tmp);
-/* Name the spool file of a frozen backlog slot. Returns HTS_FALSE (dest
-   emptied) if the name does not fit. */
+/* Name the spool file of a frozen backlog slot. Consumes an
+   opt->state.tmpnameid. Returns HTS_FALSE (dest emptied) if the name does not
+   fit. Note: utf-8. */
 hts_boolean back_spoolname(httrackp *opt, char *dest, size_t size);
 /* Returns this process's id, as back_spoolname() writes it. */
 unsigned long back_self_pid(void);

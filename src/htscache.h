@@ -79,7 +79,8 @@ htsblk cache_read_ro(httrackp * opt, cache_back * cache, const char *adr,
                      const char *fil, const char *save, char *location);
 /* Like cache_read, but also yields broken and kept entries (#1421). Optional
    return_save (HTS_URLMAXSIZE*2) and return_location (HTS_LOCATION_SIZE) get
-   the save name and Location. Read return_location, not r.location. */
+   the save name and Location. Read return_location, not r.location. adr and
+   headers are NULL: nothing to free. */
 htsblk cache_read_including_broken(httrackp *opt, cache_back *cache,
                                    const char *adr, const char *fil,
                                    char *return_save, char *return_location);

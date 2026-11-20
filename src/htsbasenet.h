@@ -170,7 +170,8 @@ static HTS_INLINE HTS_UNUSED hts_boolean statuscode_is_write_error(int code) {
 }
 
 /** Connection state of a backing slot. The engine tests ranges: above zero is
-    in flight, and 1000 or more is FTP. */
+    in flight, and 1000 or more is FTP. An HTTPS slot reaches STATUS_CONNECTING
+    twice, at connect() and after the handshake, so that branch runs twice. */
 typedef enum HTTrackStatus {
   STATUS_ALIVE = -103,             /**< keep-alive socket, no request on it */
   STATUS_FREE = -1,                /**< slot unused, and free to take */

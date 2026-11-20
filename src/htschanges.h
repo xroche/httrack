@@ -60,7 +60,9 @@ typedef enum {
 } hts_change_bucket;
 
 /* Record what this crawl does to the local file `save`. `not_updated` (304)
-   is used only when no digest can be taken. */
+   is used only when no digest can be taken. `save` is an absolute path, and
+   adr/fil may be empty. Only the first call for a file samples the previous
+   copy. */
 void hts_changes_notify(httrackp *opt, const char *adr, const char *fil,
                         const char *save, hts_boolean rewritten,
                         hts_boolean not_updated);
@@ -70,7 +72,8 @@ void hts_changes_html(httrackp *opt, cache_back *cache, const htsblk *r,
                       const char *adr, const char *fil, const char *save);
 
 /* Record `file` as listed by the previous index and absent from this run's.
-   `kept` means its local copy was not replaced. */
+   `kept` means its local copy was not replaced, so it is reported unchanged,
+   not gone. */
 void hts_changes_dropped(httrackp *opt, const char *file, hts_boolean kept);
 
 /* Record that the previous mirror's index listed `file`. */

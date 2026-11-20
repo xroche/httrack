@@ -849,7 +849,8 @@ static int back_nsoc_overall(const struct_back *sback) {
 }
 
 /* Build save's temporary outside the mirror, so a site's own <path>.bak is
-   never taken as the backup (#774). HTS_FALSE (dest emptied) if too long. */
+   never taken as the backup (#774). HTS_FALSE (dest emptied) if too long.
+   Note: utf-8. */
 static hts_boolean back_tmpname(char *dest, size_t size, const char *save,
                                 const char *ext) {
   const char *const slash = strrchr(save, '/');
@@ -4292,7 +4293,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                         chunk_size = -1;
                       } else if (back[i].r.adr != NULL ||
                                  !back[i].r.is_write) { // Not to disk
-                        /* The next read would refuse a wider bound. */
+                        /* Refuse here what the next read would refuse, to avoid
+                           the realloc. */
                         if (!hts_inmem_size_fits(back[i].r.totalsize)) {
                           hts_log_print(opt, LOG_WARNING,
                                         "Chunked resource too large for %s%s",
@@ -5245,7 +5247,7 @@ static hts_boolean back_maxtime_reached(const httrackp *opt) {
          hts_mirror_elapsed_ms() >= (TStamp) opt->maxtime * 1000;
 }
 
-/* Has a cap, rather than the user, stopped the mirror? */
+/* Has a cap been reached? */
 static hts_boolean back_mirror_capped(const httrackp *opt) {
   return back_maxsize_reached(opt) || back_maxtime_reached(opt);
 }

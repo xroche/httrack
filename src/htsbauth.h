@@ -82,7 +82,8 @@ typedef struct httrackp httrackp;
 
 /* cookies */
 
-/** Copy ADR's host into DST as RFC 6265 scopes cookies, lowercased and bare.
+/** Copy ADR's host into DST as RFC 6265 scopes cookies: lowercased,
+    without identification, brackets or port.
     HTS_FALSE means the caller sends no cookie. */
 hts_boolean cookie_host(const char *adr, char *dst, size_t dst_size);
 
@@ -116,7 +117,8 @@ int cookie_set(t_cookie *cookie, const char *cook_name, const char *cook_value,
                const char *domain, const char *path, const cookie_attr *attr);
 
 /** This is cookie_set for a server cookie. A full jar evicts the oldest
-    records of the largest host over 50 records or 8 KB. */
+    records of the largest host over 50 records or 8 KB. Refuses if no host is
+    over. A cookies file loads uncapped through cookie_set. */
 int cookie_set_capped(t_cookie *cookie, const char *cook_name,
                       const char *cook_value, const char *domain,
                       const char *path, const cookie_attr *attr);
