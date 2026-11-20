@@ -508,7 +508,7 @@ jobs:
           path: tests/*.log
           if-no-files-found: warn
 
-      # Non-gating until the findings are triaged.
+      # The step stays non-gating until its findings are triaged.
       - name: Static analysis of libhttrack (/analyze)
         if: ${{ !cancelled() && matrix.platform == 'x64' }}
         continue-on-error: true
@@ -525,7 +525,6 @@ jobs:
             /flp:LogFile=msbuild-analyze.log`;Verbosity=normal
           $build = $LASTEXITCODE
           # Each warning is logged twice, during the compile and in the summary.
-          # C6xxx PREfast, C26xxx/C28xxx analysis rules.
           $w = @(Select-String -Path msbuild-analyze.log -Pattern 'warning C(6|2[68])\d{3}' |
             ForEach-Object { ($_.Line -replace '\s*\[[^\]]*\.vcxproj\]$', '').Trim() } |
             Sort-Object -Unique)

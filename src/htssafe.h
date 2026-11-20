@@ -130,8 +130,8 @@ static HTS_NORETURN HTS_UNUSED void abortf_(const char *exp, const char *file,
 #define HTS_IS_CHAR_BUFFER(VAR)                                                \
   (__builtin_types_compatible_p(__typeof__(VAR), char[]))
 #else
-/* An array of exactly pointer size reads as a pointer and loses its bound:
-   keep buff() destinations off char[8] (Win64) and char[4] (Win32). */
+/* In C++ and pre-C11 C, an array of pointer size reads as a pointer and loses
+   its bound, so keep buff() destinations off char[8] and char[4]. */
 #define HTS_IS_CHAR_BUFFER(VAR) (sizeof(VAR) != sizeof(char *))
 #endif
 #define HTS_IS_NOT_CHAR_BUFFER(VAR) (!HTS_IS_CHAR_BUFFER(VAR))
@@ -148,25 +148,17 @@ static HTS_NORETURN HTS_UNUSED void abortf_(const char *exp, const char *file,
    1)
 #elif (!defined(__cplusplus) && defined(__STDC_VERSION__) &&                   \
        __STDC_VERSION__ >= 201112L)
-/* &A of an array is char (*)[N] and takes default. The list covers the common
-   pointer forms, and GNU builds reject every pointer. */
+/* Only a char array matches, so every pointer type fails to compile. */
 #define HTS_BUFF_C11_
 #define htsbuff_must_be_array_(A)                                              \
   (sizeof(char[_Generic(&(A),                                                  \
-                   char **: -1,                                                \
-                   const char **: -1,                                          \
-                   char *const *: -1,                                          \
-                   const char *const *: -1,                                    \
-                   unsigned char **: -1,                                       \
-                   const unsigned char **: -1,                                 \
-                   unsigned char *const *: -1,                                 \
-                   signed char **: -1,                                         \
-                   signed char *const *: -1,                                   \
-                   volatile char **: -1,                                       \
-                   char *volatile *: -1,                                       \
-                   void **: -1,                                                \
-                   void *const *: -1,                                          \
-                   default: 1)]) -                                             \
+                   char(*)[sizeof(A)]: 1,                                      \
+                   const char(*)[sizeof(A)]: 1,                                \
+                   unsigned char(*)[sizeof(A)]: 1,                             \
+                   const unsigned char(*)[sizeof(A)]: 1,                       \
+                   signed char(*)[sizeof(A)]: 1,                               \
+                   const signed char(*)[sizeof(A)]: 1,                         \
+                   default: -1)]) -                                            \
    1)
 #endif
 

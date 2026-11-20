@@ -17,9 +17,8 @@ cleanup_push rm -rf "$tmp"
 
 # The control: system headers that htssafe.h includes must survive -U__GNUC__.
 printf '#include <stdarg.h>\n#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stdint.h>\n#include <inttypes.h>\nint main(void) { return 0; }\n' >"$tmp/ctl.c"
-read -r -a cc_argv <<<"${CC:-cc}"
 cc=()
-for c in "${cc_argv[*]}" clang; do
+for c in "${CC:-cc}" clang; do
     read -r -a try <<<"$c"
     command -v "${try[0]}" >/dev/null 2>&1 || continue
     try+=(-std=c11 -U__GNUC__ -Wno-builtin-macro-redefined -I"$abs_top_builddir" -I"$top/src")
@@ -48,6 +47,11 @@ void neg(void) {
 int main(int argc, char **argv) {
   static const char src[] = "0123456789abcdefghi"; /* 20 bytes */
   char a[64], eight[8], out[32], small[16];
+  static const char ca[4];
+  unsigned char ua[4];
+  signed char sa[4];
+  const unsigned char cua[4] = {0};
+  const signed char csa[4] = {0};
   struct s st;
   htsbuff b = htsbuff_array(out);
   a[0] = eight[0] = small[0] = st.f[0] = '\0';
@@ -59,6 +63,9 @@ int main(int argc, char **argv) {
   strcpybuff(eight, "1234567");
   if (!sprintfbuff(out, "%d", 1))
     return 2;
+  (void) (htsbuff_must_be_array_(ca) + htsbuff_must_be_array_(ua) +
+          htsbuff_must_be_array_(sa) + htsbuff_must_be_array_(cua) +
+          htsbuff_must_be_array_(csa));
 #ifdef NEG
   {
     char *ptr = a;
@@ -74,13 +81,17 @@ int main(int argc, char **argv) {
     strcpybuff(small, "0123456789abcde");
     strcatbuff(small, "f");
   }
+  if (argc > 1 && strcmp(argv[1], "ncat") == 0) {
+    strcpybuff(small, "0123456789abcde");
+    strncatbuff(small, "fg", 2);
+  }
   return (int) b.cap - 32;
 }
 PROBE
 
 "${cc[@]}" -o "$tmp/probe" "$tmp/probe.c" 2>"$tmp/pos.err" || fail_dump "an array destination does not compile" "$tmp/pos.err"
 "$tmp/probe" 2>"$tmp/run.err" || fail_dump "a copy that fits does not run clean (exit $?)" "$tmp/run.err"
-for mode in cpy cat; do
+for mode in cpy cat ncat; do
     st=0
     # The outer redirect drops the shell's own report of the signal.
     {
@@ -105,11 +116,8 @@ for neg in 'strcpybuff(ptr, src)' 'strcatbuff(ptr, src)' 'strncatbuff(ptr, src, 
     '(void) sprintfbuff(ptr, "%d", 1)' 'htsbuff_array(ptr)'; do
     check_neg "-DNEG=$neg"
 done
-# One per _Generic association in htssafe.h.
-for type in 'char *' 'const char *' 'char *const' 'const char *const' \
-    'unsigned char *' 'const unsigned char *' 'unsigned char *const' \
-    'signed char *' 'signed char *const' 'volatile char *' 'char *volatile' \
-    'void *' 'void *const'; do
+for type in 'char *' 'unsigned char *' 'void *' 'char *restrict' \
+    'const volatile char *' 'char *const volatile'; do
     check_neg "-DPTRTYPE=$type"
 done
 echo "OK: ${cc[0]} bounds every array and refuses every pointer destination"
