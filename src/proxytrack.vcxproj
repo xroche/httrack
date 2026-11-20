@@ -76,6 +76,9 @@
       <!-- Hardening: /guard:cf and an explicit /GS, so the set is a contract. -->
       <ControlFlowGuard>Guard</ControlFlowGuard>
       <BufferSecurityCheck>true</BufferSecurityCheck>
+      <!-- /std:c17 enables the _Generic buff() guard in htssafe.h. -->
+      <SDLCheck>true</SDLCheck>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
     </ClCompile>
     <Link>
       <DataExecutionPrevention>true</DataExecutionPrevention>

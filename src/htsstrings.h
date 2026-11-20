@@ -195,8 +195,8 @@ HTS_STATIC char *StringBuffN_(String *blk, int size) {
     conversion error, or a length past STRING_SPRINTF_MAX). **/
 #define StringSprintf(BLK, ...) StringSprintf_(&(BLK), __VA_ARGS__)
 
-HTS_STATIC HTS_PRINTF_FUN(2, 3) void StringSprintf_(String *blk,
-                                                    const char *fmt, ...) {
+HTS_STATIC HTS_PRINTF_FUN(2, 3) void StringSprintf_(
+    String *blk, HTS_FORMAT_STRING const char *fmt, ...) {
   size_t capacity = StringCapacity(*blk) > 256 ? StringCapacity(*blk) : 256;
 
   for (;;) {

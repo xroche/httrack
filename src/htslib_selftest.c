@@ -493,7 +493,9 @@ static int string_safety_selftests(void) {
       return 1;
   }
 
-  /* strcpybuff's unchecked pointer-destination fallback must still copy. */
+  /* strcpybuff's unchecked pointer-destination fallback must still copy.
+     C11 mode has no fallback. */
+#ifndef HTS_BUFF_C11_
 #if defined(__GNUC__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wattribute-warning"
@@ -508,6 +510,7 @@ static int string_safety_selftests(void) {
   }
 #if defined(__GNUC__)
 #pragma GCC diagnostic pop
+#endif
 #endif
 
   /* htsbuff: bounded builder over a fixed array (append, truncating append,

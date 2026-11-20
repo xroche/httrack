@@ -96,6 +96,16 @@ Please visit our Website: http://www.httrack.com
 #endif
 #endif
 
+/* Marks a printf-style format parameter so MSVC /analyze checks callers. */
+#ifndef HTS_FORMAT_STRING
+#ifdef _MSC_VER
+#include <sal.h>
+#define HTS_FORMAT_STRING _Printf_format_string_
+#else
+#define HTS_FORMAT_STRING
+#endif
+#endif
+
 /* Where the build switches come from. Windows hard-codes them because MSVC
    runs no configure, and every other build reads the generated header below. */
 #ifdef _WIN32
