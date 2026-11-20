@@ -5,6 +5,7 @@ noinst_PROGRAMS = fuzz-charset fuzz-codepage fuzz-meta fuzz-idna fuzz-entities \
 	fuzz-htsparse fuzz-singlefile fuzz-sitemap fuzz-arc fuzz-cookie \
 	fuzz-robots \
 	fuzz-accept \
+	fuzz-alias \
 	fuzz-bundle \
 	fuzz-savename \
 	fuzz-warc \
@@ -62,6 +63,9 @@ fuzz_robots_SOURCES = fuzz-robots.c fuzz.h
 
 # The link-acceptance wizard: hostile links against rules and answers.
 fuzz_accept_SOURCES = fuzz-accept.c fuzz.h
+
+# The option alias and command-line splitter, engine side and server side.
+fuzz_alias_SOURCES = fuzz-alias.c fuzz.h
 
 # The login-bundle reader: a plain file parser, the library links everything.
 fuzz_bundle_SOURCES = fuzz-bundle.c fuzz.h
