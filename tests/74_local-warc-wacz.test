@@ -1,13 +1,7 @@
 #!/bin/bash
 #
-# A --wacz crawl packages the WARC, its CDXJ index and a pages.jsonl into one
-# WACZ file at crawl end. The stdlib validator checks STORE-mode entries, the
-# layout, the sha256 digests and the datapackage-digest chain (plus py-wacz and
-# pywb when importable). A build without OpenSSL skips.
-#
-# The cacheless (-C0) second pass repackages over the first .wacz, which fails
-# where a platform refuses to rename onto an existing file (#726). A
-# cache-served pass keeps the old package, see 97_local-warc-update-keep.
+# A --wacz crawl packages the WARC, CDXJ and pages.jsonl into a valid WACZ.
+# The -C0 pass replaces the first .wacz, which some platforms refuse (#726).
 
 set -eu
 

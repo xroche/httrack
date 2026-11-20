@@ -1,8 +1,6 @@
 #!/bin/bash
-# A resume that must repair the cache first must still reject an unusable 206
-# and refetch whole. Truncating new.zip past its last local entry drops the
-# central directory, so unzOpen fails and the repair path runs. Test 235 covers
-# #581, because on POSIX the restart drops the partial and sends no Range.
+# A resume that repairs the cache must still reject an unusable 206 and refetch.
+# Truncating new.zip past its last entry drops the directory, so repair runs.
 set -u
 
 # shellcheck source=tests/crawllib.sh

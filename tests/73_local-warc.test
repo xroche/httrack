@@ -1,12 +1,7 @@
 #!/bin/bash
 #
-# A --warc crawl writes a conformant WARC/1.1 archive, and a re-crawl of an
-# unchanged (all-304) site writes revisit records. The stdlib validator checks
-# the page.html body against what was served, the stripped encoding headers,
-# the payload digest, and that unchanged assets became revisits.
-#
-# The second pass archives under its own name, the recovery the engine suggests
-# when it refuses to strand a previous archive (#759).
+# A --warc crawl writes a valid WARC/1.1 archive, and an unchanged re-crawl
+# writes revisit records. The second pass uses its own name (#759).
 
 set -eu
 

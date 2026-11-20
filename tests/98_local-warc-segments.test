@@ -1,9 +1,6 @@
 #!/bin/bash
 #
-# The same keep/replace rule under --warc-max-size. A cache-served pass must
-# keep every segment and a cacheless pass must swap every one, which only a
-# rotated archive can check (#759). --archive-min-files pins two segments and
-# the .cdx, so the crawl must keep rotating.
+# A cache-served pass keeps every segment and a cacheless one swaps all (#759).
 
 set -eu
 

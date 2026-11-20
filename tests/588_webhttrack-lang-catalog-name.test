@@ -1,7 +1,6 @@
 #!/bin/bash
-# lang.def names each language's catalog file and the server joins it to lang/,
-# so the name must be a bare basename. A separator would read outside lang/,
-# and a long name must not overflow the 1024-byte buffer it is formatted into.
+# lang.def's catalog names are joined to lang/, so each must be a bare basename
+# that fits the 1024-byte buffer it is formatted into.
 
 set -euo pipefail
 
@@ -16,9 +15,8 @@ cleanup_push htsserver_cleanup_dir "${work}"
 
 long=$(printf 'X%.0s' $(seq 1 1100))
 
-# Build a root that shares the dist tree by symlink. lang.def and lang/ are
-# real, because a write through a symlink would land in the source tree. $2
-# replaces the catalog of LANGUAGE_1, the default and lang.def's first line.
+# Build a root sharing the dist tree by symlink. lang.def and lang/ are real, so
+# writes stay out of the source tree. $2 replaces the default catalog.
 make_root() { # $1 = root, $2 = catalog name
     local root=$1 name=$2 entry
     mkdir -p "${root}/lang"
@@ -48,8 +46,7 @@ make_root() { # $1 = root, $2 = catalog name
     fi
 }
 
-# Start htsserver on the named root and return once it has announced. It
-# announces before loading the catalog, and dies just after on a refusal.
+# Start htsserver on $1. It announces before it loads the catalog.
 serve() { # $1 = root
     htsserver_start --root "${work}/$1" --home "${work}/$1.home" \
         --log "${work}/$1.log"
@@ -79,8 +76,7 @@ for label in stock planted; do
     mkdir -p "${work}/${label}.home"
     make_root "${work}/${label}" "${name}"
     serve "${label}"
-    # A refusal kills the server, so staying up is the answer. The short wait
-    # only covers the gap after the announcement.
+    # A refusal kills the server, so staying up means the name was accepted.
     if refused 2; then
         fail "a ${label} catalog name was refused: $(cat "${srvlog}")"
     fi
@@ -90,8 +86,7 @@ done
 
 for label in dotdot subdir overlong; do
     case "${label}" in
-    # With no separator, only the ".." check can refuse this name. That check
-    # is defence in depth, because ".." with a separator fails on the separator.
+    # With no separator, only the ".." check can refuse this name.
     dotdot) name=.. ;;
     subdir) name=lang2/planted ;;
     # Past NAME_MAX, so a build without a sanitizer cannot tell the refusal

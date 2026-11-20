@@ -1,8 +1,6 @@
 #!/bin/bash
 #
-# The Windows build must get brotli 1.2.1 or later (CVE-2026-111497). The
-# manifest's version>= floor makes vcpkg refuse an older baseline, and this
-# test pins that floor (#2028).
+# This pins the manifest's brotli>=1.2.1 floor (CVE-2026-111497, #2028).
 
 set -euo pipefail
 

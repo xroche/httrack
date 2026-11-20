@@ -231,11 +231,7 @@ clean-local:
 	-rm -rf $(STDERR_WRAP_DIR)
 
 TEST_EXTENSIONS = .test
-# Run each .test through bash, so "make check" works on a noexec source tree
-# and needs no executable bit. The scripts use bash features.
-#
-# test-timeout.sh adds a wall-clock budget, so a wedged test fails by name with
-# diagnostics. A step CI cancels keeps neither log nor artifacts.
-# HTTRACK_TEST_TIMEOUT overrides the budget, and 0 disables it.
+# Run tests through bash, so they work on a noexec tree without an exec bit.
+# test-timeout.sh fails a wedged test by name, unless HTTRACK_TEST_TIMEOUT=0.
 TEST_LOG_COMPILER = $(BASH_SHELL) $(srcdir)/test-timeout.sh
 CLEANFILES = check-network_sh.cache 62_lang-untranslated.counts.new

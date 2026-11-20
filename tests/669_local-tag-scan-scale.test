@@ -1,9 +1,6 @@
 #!/bin/bash
 #
-# A tag must not be rescanned to the end of the page once per attribute
-# (OSS-Fuzz 578272899): an <applet> or robots <meta> with no '>', an http-equiv
-# <meta> with no '>', a '>' in a comment with no "-->", or an unclosed CSS url(.
-# Each hostile page must crawl about as fast as a well-formed twin of its size.
+# A hostile tag must crawl as fast as its well-formed twin (OSS-Fuzz 578272899).
 
 # TEST_TIMEOUT_AT_LEAST: 900
 

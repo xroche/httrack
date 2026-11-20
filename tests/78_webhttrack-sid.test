@@ -33,8 +33,7 @@ for bad in "redirect=/nosid" "sid=&redirect=/empty" \
     resp=$(htsserver_post "${bad}")
     grep -q '^Location:' <<<"${resp}" &&
         fail "body accepted without a valid sid: ${bad}"
-    # A refusal must be a well-formed reply, because a headerless one reads as
-    # a protocol error and hides the reason.
+    # A refusal must be a well-formed reply, or it reads as a protocol error.
     grep -q '^HTTP/1\.0 403 ' <<<"${resp}" ||
         fail "refusal was not a 403: ${bad}"
 done
@@ -56,9 +55,7 @@ resp=$(htsserver_get /server/../../../../../../../../etc/passwd)
 grep -q '^HTTP/1\.0 200 ' <<<"${resp}" && fail "a path with .. was served"
 htsserver_alive || fail "a path with .. killed the server"
 
-# Suppressing the reply does not refuse the write. The body goes to one global
-# key store that later requests and the command dispatcher read. So probe the
-# store, which step3 shows through ${projname} in its title.
+# A suppressed reply still writes the key store, so read it back via step3.
 store_page() {
     # a dead probe or a non-page reply must not read as "the store was not written"
     page=$(htsserver_get /server/step3.html) || fail "the key store probe failed"

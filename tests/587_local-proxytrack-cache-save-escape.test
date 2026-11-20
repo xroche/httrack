@@ -1,7 +1,5 @@
 #!/bin/bash
-# A ProxyTrack store is someone else's file. Its save names are joined to the
-# store's directory, which is empty when the store has no parent, so an absolute
-# save name must not be read into the archive.
+# An absolute save name in a ProxyTrack store must not reach the archive.
 
 set -euo pipefail
 
@@ -94,8 +92,7 @@ secret=$(cat "$dir/secret.txt")
 abs=$(nativepath "$dir/secret.txt")
 nsecret=$abs
 
-# A contained relative name must be served, or the refusals below would pass
-# on a reader that stopped reading bodies.
+# A contained name must be served, which proves the reader still reads bodies.
 mkdir -p "$dir/ok/example.com"
 printf 'INSIDE-THE-STORE-%s\n' "$$" >"$dir/ok/example.com/p.html"
 inside=$(cat "$dir/ok/example.com/p.html")
@@ -112,8 +109,7 @@ test -s "$dir/esc/out.arc" || fail "no archive was written for the escape"
 if grep -qaF -- "$secret" "$dir/esc/out.arc"; then
     fail "an absolute save name read a file outside the store"
 fi
-# The guard under test must refuse a parsed record. An unreadable record also
-# keeps the secret out, and three guards can refuse a name.
+# The refusal must come from this guard, because three guards can refuse a name.
 grep -qaF 'holds no path to reduce' "$dir/log" ||
     fail "the escape was not refused by the fallback: $(cat "$dir/log")"
 if grep -qaF 'Truncated or corrupt cache record' "$dir/log"; then
@@ -162,8 +158,7 @@ grep -qaF 'is not a contained relative name' "$dir/log" ||
 grep -qaF -- "$inside" "$dir/sticky/out.arc" ||
     fail "the refusal cost the contained entry its body: $(cat "$dir/log")"
 
-# The host guessed from the first absolute name must also reduce a second
-# name whose host it cannot find.
+# The host guessed from the first absolute name must also reduce a second one.
 mkdir -p "$dir/fixed/example.com" "$dir/fixed/other.org"
 cp "$dir/ok/example.com/p.html" "$dir/fixed/example.com/p.html"
 printf 'REDUCED-BY-FIXEDPATH-%s\n' "$$" >"$dir/fixed/other.org/q.html"

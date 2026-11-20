@@ -1,6 +1,5 @@
 #!/bin/bash
-# A pre-3.40 cache holds absolute save names, so a moved mirror needs the reader
-# to find the relative part by the URL's host. htsname.c lowercases the name but
+# A moved pre-3.40 cache is read by host, and the save name is lowercase while
 # the key keeps the href's case (#1958).
 
 set -euo pipefail

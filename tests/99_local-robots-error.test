@@ -6,9 +6,8 @@ set -eu
 
 : "${top_srcdir:=..}"
 
-# The failed robots probe still drives the sitemap fallback and substitutes no
-# body. A re-added placeholder block (#783) over-reads the heap, which the
-# sanitizer legs catch. -Z because the failed probe is logged at debug level.
+# A failed robots probe must substitute no body (#783), which sanitizers catch.
+# -Z because that probe logs at debug level.
 bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
     --found 'sitemapdir/orphan1.html' \
     --log-found 'No robots\.txt rules at' \

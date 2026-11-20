@@ -31,9 +31,7 @@ printf 'hello' >"$dir/body"
 
 proxytrack --convert "$dir/out.arc" "$dir/in.arc" >/dev/null 2>&1 || fail "proxytrack crashed reading an ARC with over-long headers"
 test -s "$dir/out.arc" || fail "ARC entry dropped instead of clipped"
-# Only contenttype reaches the ARC output. The over-long Etag and
-# Content-Disposition above still matter, because bounding one field alone
-# lets the others smash the element and crash the run above.
+# Only contenttype reaches the ARC, but bounding it alone lets the others crash.
 got=$(runlen "$dir/out.arc" A)
 test "${got:-0}" = 54 || fail "ARC content-type clipped to ${got:-0}, expected 54"
 
@@ -83,8 +81,7 @@ M 400
 EOF
 
 # --- ZIP reader, per-line bound ---------------------------------------------
-# The buffer holds every line HTTrack can write. A longer one is dropped whole,
-# because its prefix could be a wrong Location or X-Save (#1294).
+# An over-long line is dropped whole, because its prefix could mislead (#1294).
 "$python" - "$(nativepath "$dir")" <<'EOF'
 import os, sys, zipfile
 

@@ -40,24 +40,11 @@ shopt -u nocaseglob nullglob
 # Floor: an empty tests/ would satisfy every check above.
 [ "$count" -gt 0 ] || bad "no test matched [0-9]*_*.test under $testdir"
 
-# One number names one test, except for the families below, each read out of
-# the history:
-#   01_engine-           the self-test bucket AGENTS.md documents, ~70 members
-#   01_zlib-             "group zlib-dependent self-tests under 01_zlib-*" (#460)
-#   11_crawl-            five crawl tests the original author added over 2013-2014
-#   53_local-proxytrack- #701 took #572's prefix twelve days later, not a free number
-#   62_lang-             one test plus the two count files it pins
-#   74_local-warc-       one author, two WARC PRs half an hour apart one night,
-#                        so the shared prefix was a choice and not a collision
-# This catches a duplicate that reaches master. Two open PRs picking one number
-# still need a hand check at handout time, because the ruleset leaves
-# strict_required_status_checks_policy off.
+# One number names one test, except these families from the history.
+# Two open PRs can still share a number, which this catches only on master.
 families=(01_engine- 01_zlib- 11_crawl- 53_local-proxytrack- 62_lang- 74_local-warc-)
 
-# Every extension counts, because the count files 62_lang-integrity.test pins
-# carry a number too. A file is this build's own output (an in-tree .log or
-# .trs) when a test of the same stem sits beside it, so no extension list can
-# go stale. Anything else keeps its claim on the number, a stray .log included.
+# Any file claims its number, unless it is build output beside a same-stem test.
 shopt -s nullglob
 numbered=""
 for f in "$testdir"/[0-9]*_*; do

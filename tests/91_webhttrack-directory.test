@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# fopen() succeeds on a directory on POSIX and reading one never reaches EOF,
-# and a FIFO blocks in fopen(). Neither may wedge the single-threaded server.
+# A directory or a FIFO must not wedge the single-threaded server.
 
 set -euo pipefail
 

@@ -23,8 +23,7 @@ post_redirect() {
     htsserver_client --headers-only --field "sid=$2" --field "redirect=$1"
 }
 
-# "free"/"inuse"/"unusable": can $1 still be bound on 127.0.0.2? A wildcard
-# listener takes the port on every address, but a loopback-only one does not.
+# Can $1 still be bound on 127.0.0.2? Prints free, inuse or unusable.
 probe_alias() {
     "${HTS_PYTHON}" -c 'import socket, sys
 sys.stdout.reconfigure(newline="\n")  # the word below is compared byte for byte

@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# Reaching the -#L cap must not discard the entry page the parser just
-# rewrote. The cap still aborts the mirror (#1419, and the man page).
+# The -#L cap aborts the mirror but must keep the page just rewritten (#1419).
 
 set -euo pipefail
 
@@ -88,14 +87,12 @@ ok "a crawl that reaches the cap still reports the abort #1419 gave it"
 
 # The regression: the parser used to unwind here and take this page with it.
 assert_file "${site}/index.html" "the capped mirror kept no entry page"
-# The abort ends the run before the caught leaves are fetched. Their local
-# links dangle, as in any aborted mirror. Only links past the cap go external.
+# Only links past the cap go external. Caught leaves dangle, as in any abort.
 test ! -e "${site}/page01.html" ||
     fail "a leaf caught before the cap was fetched, so the cap stopped nothing"
 ok "and keeps the page it had already rewritten"
 
-# Links past the cap point at the live server. The control above shows the
-# same links are local without the cap.
+# Links past the cap point at the live server, unlike in the control above.
 assert_eq "$((PAGES - CAUGHT))" "$(external_links)" \
     "leaf links the cap left external"
 ok "links past the cap are rewritten external rather than left dangling"
@@ -105,9 +102,8 @@ assert_eq 1 "$(grep -c 'Too many URLs' <<<"$log")" "times the cap reported itsel
 ok "and the cap reports itself once however many links follow it"
 
 # --- the reserve: robots.txt and its link are recorded in one parser step ---
-# The hub names a second host. The engine records its robots.txt, then the
-# link, so hts_maxlinks_no_room() reserves two slots. With one, the page under
-# rewrite is lost and the run exits 0.
+# The hub's second host adds its robots.txt and then the link, so the reserve is
+# two slots. With one, the page under rewrite is lost and the run exits 0.
 {
     printf '<html><body>\n'
     for i in $(seq -w 1 "$PAGES"); do

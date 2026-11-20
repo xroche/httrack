@@ -11,11 +11,8 @@ set -eu
 
 crawl() { bash "$top_srcdir/tests/local-crawl.sh" "$@"; }
 
-# robots.txt Sitemap: -> index -> .xml.gz, seeds behaving like -r2 seeds. Both
-# documents are served from /sitemapdir/index.xml and the well-known
-# /sitemap.xml, so the log assertions pin which route was taken. --not-found
-# checks the documents feed the crawl but never land in the mirror. --rerun
-# also walks the update path over a mirror holding sitemap seeds.
+# robots.txt Sitemap: -> index -> .xml.gz seeds behave like -r2 seeds, and the
+# documents feed the crawl but never land in the mirror.
 crawl --errors 0 --rerun \
     --found 'sitemapdir/orphan1.html' \
     --found 'sitemapdir/orphan2.html' \
@@ -83,8 +80,7 @@ crawl --errors 0 \
     --not-found 'elsewhere/updir.html' \
     httrack 'BASEURL/deep/dir/start.html' --sitemap -r3 -F 'scopesitemap-agent'
 
-# How far a sitemap fetch is gated depends on who asked for it, so each case
-# below checks its own direction. The harness disables robots, hence -s2.
+# Each case checks its own gating. -s2 undoes the harness's robots opt-out.
 
 # We guessed /sitemap.xml, so a Disallow on it wins.
 crawl --errors 0 \

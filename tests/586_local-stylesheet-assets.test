@@ -1,6 +1,6 @@
 #!/bin/bash
-# #139: the fonts and images a stylesheet names. They must not land one level
-# too deep, and the // in an absolute url() must not start a comment.
+# #139: a stylesheet's fonts and images must not land one level too deep, and
+# the // in an absolute url() must not start a comment.
 set -eu
 
 # shellcheck source=tests/crawllib.sh

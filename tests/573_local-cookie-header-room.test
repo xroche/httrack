@@ -1,7 +1,5 @@
 #!/bin/bash
-# #101: the Cookie line is written last and must leave room for the blank line
-# and the body after it. A jar larger than the request buffer must not make the
-# engine refuse its own request.
+# #101: a jar bigger than the request buffer must not make the request fail.
 set -eu
 
 # shellcheck source=tests/crawllib.sh

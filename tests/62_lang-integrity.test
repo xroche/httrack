@@ -1,9 +1,7 @@
 #!/bin/bash
 #
-# lang/*.txt are line pairs: an English msgid, then its translation. A stray
-# blank or a drifted msgid unhooks every later translation without an error.
-# Pairs are physical lines here, so a msgid ending in \ would continue for the
-# engine (hts_readline_cpp) but not for us. None do today.
+# lang/*.txt are msgid/translation pairs, and a stray line unhooks the rest.
+# A msgid ending in \ would continue for the engine but not here. None do.
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
@@ -177,8 +175,7 @@ PYEOF
     fi
 fi
 
-# Άκυρο. Valid UTF-8 does not prove the right source charset. cp1253 and
-# ISO-8859-7 disagree on this letter, and the wrong one gives a curly quote.
+# cp1253 and ISO-8859-7 differ on Άκυρο, and the wrong one gives a curly quote.
 cancel=$(LC_ALL=C awk '{ sub(/\r$/, "") } $0 == "Cancel" { getline v; sub(/\r$/, "", v); print v; exit }' \
     "$langdir/Greek.txt")
 if [ "$cancel" != "$(printf '\316\206\316\272\317\205\317\201\316\277')" ]; then
@@ -192,9 +189,8 @@ if [ -n "$ln" ]; then
     fail=1
 fi
 
-# LANGUAGE_FILE is the catalog basename and is sent as the update link's
-# Language= (#1353), so it must exist, be ASCII and match the filename. The
-# loader fills an absent key from English, which reports the wrong language.
+# LANGUAGE_FILE is sent as the update link's Language= (#1353), so it must
+# exist, be ASCII and match the filename.
 for f in "$langdir"/*.txt; do
     base=${f##*/}
     base=${base%.txt}
@@ -211,9 +207,7 @@ for f in "$langdir"/*.txt; do
     fi
 done
 
-# webhttrack maps the caller's locale to a lang.def number through lang.indexes,
-# so a wrong number serves another catalog. The oracle is the LANGUAGE_ISO
-# declared by the file lang.def names for each number.
+# Each lang.indexes number must name a file whose LANGUAGE_ISO matches.
 indexes="$top_srcdir/lang.indexes"
 [ -f "$indexes" ] || fail "cannot find $indexes"
 LC_ALL=C awk '
@@ -286,10 +280,8 @@ for probe in wrongnum nodef dropped; do
 done
 indexes_agree "$indexes" || fail=1
 
-# LANGUAGE_NAME must be the endonym, because the menu lists every catalog
-# together (#116). It may repeat no word of the catalog's English
-# LANGUAGE_WINDOWSID and no common English language name. A language whose
-# endonym is the English word joins own_name_is_english below.
+# LANGUAGE_NAME must be the endonym (#116), with no word of an English name.
+# A language whose endonym is its English name joins own_name_is_english.
 own_name_is_english="en"
 exonyms="afrikaans albanian arabic basque belarusian bulgarian catalan chinese croatian czech
 danish dutch english estonian farsi filipino finnish flemish french galician georgian
@@ -379,9 +371,7 @@ for scope in "Mirror %s and every host below it" "Ignore %s and every host below
     done
 done
 
-# A msgid absent from a language file falls back to English (#862). Compare
-# multisets, because a catalog repeating a msgid more often than English.txt
-# leaves one of its values unreachable. English.txt's own repeats cancel out.
+# Compare msgid multisets, because an extra repeat hides a value (#862).
 LC_ALL=C sort <"$keys" >"$tmp/english.sorted"
 for f in "$langdir"/*.txt; do
     LC_ALL=C awk 'NR%2==1 { sub(/\r$/, ""); print }' "$f" | LC_ALL=C sort >"$tmp/have"
@@ -503,8 +493,7 @@ if [ -n "$(unknown_escapes "$tmp/legal.txt" legal.txt | LC_ALL=C sed '/^values=/
     echo "the escape check rejects a legally escaped backslash"
     exit 1
 fi
-# The allowed set mirrors conv_printf's switch and is pinned, because a probe
-# only names the letters it uses and cannot see the set widen.
+# This mirrors conv_printf's switch. Probes cannot see the set widen, so pin it.
 want_ok="abfnrtv?$(printf '\047\042\134')"
 got_ok=$(printf 'x\ny\n' >"$tmp/ok.txt" && unknown_escapes "$tmp/ok.txt" ok.txt 1 | head -1)
 if [ "$got_ok" != "$want_ok" ]; then
@@ -564,8 +553,7 @@ count_untranslated() {
     ' "$1"
 }
 
-# A counter stuck at zero would match the catalogs pinned at zero. Count a
-# fixture with one of each shape first.
+# Count a fixture with one of each shape first, or a stuck counter would pass.
 printf 'Cancel\nCancel\nClose\nClose \nOK\n \nSave\nEnregistrer\n' >"$tmp/probe.txt"
 got=$(count_untranslated "$tmp/probe.txt" probe.txt)
 want=$(printf '%-25s %-9d %d\n' probe.txt 2 1)
@@ -643,10 +631,8 @@ elif [ "$rc" -ne 0 ]; then
     fail=1
 fi
 
-# These name real paths on disk and on the wire, and a translated one sends the
-# user nowhere ("htscache/new.*" and "robot.txt" both shipped). Case is the
-# translator's, spelling is not, and example hostnames stay their call. Counts
-# must match, because one too few loses a path and one too many adds a row.
+# These name real paths, so a translation keeps their spelling but may change
+# case. Counts must match, because a missing or extra one moves a path.
 literal_tokens="hts-cache robots.txt cgi-bin web/images web/html"
 translated_literals() {
     LC_ALL=C awk -v name="$2" -v toks="$literal_tokens" '
@@ -686,17 +672,15 @@ case $(translated_literals "$tmp/literals.txt" literals.txt) in
     exit 1
     ;;
 esac
-# The second pair drops one robots.txt of three, which a presence check would
-# pass. The token list is pinned, because a fixture only exercises the tokens
-# it names.
+# The second pair drops one robots.txt of three. The token list is pinned,
+# because a fixture exercises only the tokens it names.
 want_tokens="hts-cache robots.txt cgi-bin web/images web/html"
 if [ "$literal_tokens" != "$want_tokens" ]; then
     echo "literal_tokens is [$literal_tokens], expected [$want_tokens]"
     exit 1
 fi
 
-# One damaged pair per token catches a narrowed list. A token named twice where
-# the msgid names it once adds a row, so that direction must fail too.
+# Each token has a damaged pair, and a doubled token must fail too.
 if [ "$(translated_literals "$tmp/literals.txt" literals.txt | wc -l)" -ne 6 ]; then
     echo "the literal-token check did not report all six damaged fixtures"
     exit 1
@@ -710,9 +694,7 @@ for f in "$langdir"/*.txt; do
     fi
 done
 
-# A combo-box "\n" starts a row, so a value whose break count differs from its
-# msgid shifts every later row. Most drift is prose reflowed to another width,
-# so counts are pinned per catalog, and a new one needs a look.
+# A "\n" in a combo value starts a row, so break counts are pinned per catalog.
 count_linebreaks() {
     LC_ALL=C awk -v name="$2" '
         # Escaped backslashes go first: in "\\n" the break belongs to neither
@@ -786,9 +768,8 @@ LC_ALL=C awk -v pin="$lbpin" '
     }
 ' "$tmp/lb" || fail=1
 
-# A catalog re-encoded from the wrong source is still valid UTF-8. Mojibake is
-# text that survives a round trip through Latin-1 and UTF-8. A byte pattern
-# would flag French no-break spaces after an accent, before ! ? : ; ».
+# A wrongly re-encoded catalog is still UTF-8, so look for text that survives a
+# Latin-1 round trip. A byte pattern would flag French no-break spaces.
 if [ -z "$py" ]; then
     defer_skip "python3 not found, so the mojibake sweep did not run"
 elif ! command -v iconv >/dev/null 2>&1; then
@@ -849,11 +830,8 @@ if [ "$npage" -lt 20 ]; then
     exit 1
 fi
 
-# Each combo box comes from a LISTDEF_* list and is read back as a row index
-# that picks an engine option. A list whose item count differs from its msgid
-# hands the engine the neighbour of the user's choice, in that locale only.
-# WinHTTrack's selftest checks only English, so this is the one check. Counts
-# must be exact, because compensating changes hide in these strings.
+# A combo list whose item count differs from its msgid gives the engine the
+# wrong option in that locale. Only this check covers the other locales.
 listdef_keys="$tmp/listdef.keys"
 LC_ALL=C awk '
     { sub(/\r$/, "") }
@@ -870,8 +848,7 @@ fi
 
 listdef_items() {
     LC_ALL=C awk -v name="$2" -v keyfile="$3" '
-        # Count items. An escaped backslash is not a separator, so it goes
-        # first, and the count then sees a \n inside a \r\n once either way.
+        # Escaped backslashes go first, because they are not separators.
         function items(s) {
             gsub(/\\\\/, "", s)
             return gsub(/\\n/, "", s) + 1

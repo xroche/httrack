@@ -1,14 +1,5 @@
-/* Reports what happened to the alternate signal stack a process was handed,
-   for 181_altstack-honoured.test. ALTSTACK_MODE "keep" installs one first, and
-   "none" leaves none installed.
-
-   ALTSTACK_TRACE names a log for the per-thread lifecycle (183_altstack-worker,
-   Linux only): "<pid> <tid> query|set on|off|own <sp>" per sigaltstack(), and
-   "<pid> <tid> munmap - <sp>" per unmap of a stack seen installed. The order
-   shows whether a worker disables its stack before giving it back.
-
-   "own" marks a mapping this shim saw mmap() return. Sanitizer runtimes map
-   their stacks with a raw syscall no interposer sees. */
+/* Reports the alternate signal stack state for 181_altstack-honoured.test.
+   ALTSTACK_TRACE logs stack syscalls per thread for 183_altstack-worker. */
 
 #define _GNU_SOURCE
 
@@ -190,9 +181,8 @@ static void *trace_mapped(void *sp) {
   return sp;
 }
 
-/* The fallback when dlsym() failed. 32-bit arches have no SYS_mmap and i386's
-   takes an argument block, so use SYS_mmap2, whose offset is in 4096-byte units
-   whatever the page size. */
+/* Fallback for a failed dlsym(). It uses SYS_mmap2, whose offset counts
+   4096-byte units whatever the page size. */
 static void *raw_mmap(void *addr, size_t len, int prot, int flags, int fd,
                       off_t off) {
 #ifdef SYS_mmap2
@@ -232,9 +222,7 @@ SHIM_EXPORT void *mmap64(void *addr, size_t len, int prot, int flags, int fd,
 SHIM_EXPORT int munmap(void *addr, size_t len);
 
 SHIM_EXPORT int munmap(void *addr, size_t len) {
-  /* Log only stacks, because the trace is read as an unbroken per-thread
-     sequence. Logging before the call keeps the record of a stack the kernel
-     still points at. */
+  /* Log before the call, so a stack the kernel still uses keeps its record. */
   if (trace_fd >= 0 && trace_is_stack(addr)) {
     trace_line("munmap", "-", addr);
   }

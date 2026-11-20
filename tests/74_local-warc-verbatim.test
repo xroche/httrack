@@ -1,11 +1,7 @@
 #!/bin/bash
 #
-# A --warc crawl stores compressed bodies verbatim (the default). The response
-# record keeps Content-Encoding: gzip, and the validator's --verbatim mode
-# checks that its bytes inflate back to the served page.
-#
-# page.html is kept in memory, and data.bin (application/octet-stream) is
-# streamed to disk, so both branches of back_finalize run.
+# A --warc crawl stores gzip bodies verbatim, and they must inflate to the page.
+# page.html stays in memory and data.bin streams to disk, covering both paths.
 
 set -eu
 

@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# #607: a peer that accepts the TCP connect but never speaks TLS leaves the slot
-# stuck in the handshake. The per-slot --timeout must reap it.
+# #607: --timeout must reap a peer that accepts TCP but never speaks TLS.
 
 set -euo pipefail
 

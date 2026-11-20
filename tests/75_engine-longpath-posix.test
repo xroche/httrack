@@ -5,8 +5,7 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-# #133: off Windows, a name well under the platform PATH_MAX must be kept
-# whole rather than hashed to fit the Windows MAX_PATH.
+# #133: off Windows, a name well under PATH_MAX must not be hashed.
 
 httrack_bin=$(httrack_path)
 scratch=$(mktemp -d)
@@ -59,9 +58,7 @@ else
     fi
 fi
 
-# #852: when the directories eat the budget, the cut must not take the final
-# segment's extension. Linux's ceiling is out of the save buffer's reach, so
-# this checks something only on Windows and macOS.
+# #852: a cut must keep the extension. Linux's ceiling is out of reach here.
 dirs="/$(printf 'p%.0s' {1..200})/$(printf 'q%.0s' {1..200})/$(printf 'r%.0s' {1..200})"
 cut="$("$httrack_bin" -O "/$(printf 'o%.0s' {1..100})" -#test=savename \
     "$dirs/$(printf 'Y%.0s' {1..300}).html" text/html | sed -n 's/^savename: //p')"

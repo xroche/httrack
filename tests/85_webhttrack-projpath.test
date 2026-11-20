@@ -13,8 +13,7 @@ htsserver_require
 base=$(mktemp -d)
 cleanup_push htsserver_cleanup_dir "${base}"
 
-# GET $1 into ${reply}, requiring status $2. A pipe would let a dead request, a
-# truncated body or a 302 to the file read as marker-absent.
+# GET $1 into ${reply} and require status $2, with no pipe to hide a failure.
 reply=
 fetch() {
     reply=$(htsserver_get "$1") || fail "the request for $1 failed"
@@ -35,9 +34,8 @@ echo "SECRETMARKER" >"${base}/secret.txt"
 mkdir -p "${base}/proj"
 echo "LOGMARKER" >"${base}/proj/hts-log.txt"
 
-# error_redirect is the branch that must clear fsfile, so fail the save with a
-# component over NAME_MAX, which mkdir refuses for any uid. Run it before any
-# successful save, because commandEnd then shows the finished page instead.
+# A component over NAME_MAX fails the save and reaches error_redirect. It must
+# run before any successful save, which changes the page commandEnd shows.
 htsserver_get /server/style.css >/dev/null # leaves a path behind in fsfile
 saved=$(htsserver_post "sid=${sid}&command=httrack&command_do=save&winprofile=x&path=${base}/$(printf '%0300d' 0)&projname=p")
 grep -q '^Location: /server/error.html' <<<"${saved}" ||
@@ -49,8 +47,7 @@ fetch /website/secret.txt 404
 grep -q SECRETMARKER <<<"${reply}" &&
     fail "a posted projpath served a file outside any project"
 
-# Positive control: step4's "save settings" registers the project without
-# crawling, and /website/ must still serve its mirror.
+# A save without a crawl must still let /website/ serve the mirror.
 body="sid=${sid}&command=httrack&command_do=save&winprofile=x"
 body="${body}&path=${base}&projname=proj&projpath=${base}/proj/"
 htsserver_post "${body}" >/dev/null
@@ -71,8 +68,7 @@ fetch /website/passwd 404
 grep -q '^root:' <<<"${reply}" &&
     fail "a posted projpath read an arbitrary system file"
 
-# A ".." in the recorded root would escape the mirror on every later request.
-# The save must be refused and the previous root kept.
+# A ".." in the root must be refused, and the previous root kept.
 htsserver_post "sid=${sid}&command=httrack&command_do=save&winprofile=x&path=${base}/proj&projname=.." >/dev/null
 fetch /website/secret.txt 404
 grep -q SECRETMARKER <<<"${reply}" &&
@@ -81,8 +77,7 @@ fetch /website/hts-log.txt 200
 grep -q LOGMARKER <<<"${reply}" ||
     fail "rejecting the '..' root also lost the previous one"
 
-# The root is built from two posted fields, and 800-odd bytes of them must not
-# overflow a 1024-byte buffer.
+# 800-odd bytes of the two root fields must not overflow a 1024-byte buffer.
 seg=$(printf '%0200d' 0)
 longpath="${base}/${seg}/${seg}/${seg}/${seg}"
 fspath="${longpath}/proj"

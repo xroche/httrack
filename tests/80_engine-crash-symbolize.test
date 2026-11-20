@@ -47,8 +47,8 @@ grep -q "$rawframe" "$out" ||
 build_names_frames || skip "built without <spawn.h>, so frames stay module+offset"
 command -v addr2line >/dev/null || skip "addr2line not installed"
 
-# Resolve the same frames ourselves, so a stripped build cannot pass the check
-# below. With a zero load bias, glibc drops the "+0x" and shows the file offset.
+# Resolve the frames ourselves, so a stripped build cannot pass the check.
+# With a zero load bias, glibc shows the file offset with no "+0x".
 oracle="${tmpdir}/oracle"
 frames="${tmpdir}/frames"
 sed -n -e 's/^\([^(]*\)(+\(0x[0-9a-f]*\)).*$/\1 \2/p' \
@@ -76,9 +76,8 @@ if ! grep -qE 'st_strsafe|strcpy_safe_' "$oracle"; then
     skip "addr2line names no hidden symbol in this build"
 fi
 
-# Drop the raw frames first, because both names are static and .dynsym could
-# never carry them. The match is not anchored on the "0xOFF:" line, because the
-# inline chain puts the name on either half.
+# Drop raw frames first, because .dynsym never holds these static names. The
+# inline chain puts the name on either half, so the match is unanchored.
 symbolized=$(grep -v "$rawframe" "$out" || true)
 grep -qE 'st_strsafe|strcpy_safe_' <<<"$symbolized" ||
     fail_dump "the handler did not name the hidden frames:" "$out"
