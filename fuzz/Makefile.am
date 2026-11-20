@@ -6,6 +6,7 @@ noinst_PROGRAMS = fuzz-charset fuzz-codepage fuzz-meta fuzz-idna fuzz-entities \
 	fuzz-robots \
 	fuzz-accept \
 	fuzz-alias \
+	fuzz-sniff \
 	fuzz-bundle \
 	fuzz-savename \
 	fuzz-warc \
@@ -66,6 +67,9 @@ fuzz_accept_SOURCES = fuzz-accept.c fuzz.h
 
 # The option alias and command-line splitter, engine side and server side.
 fuzz_alias_SOURCES = fuzz-alias.c fuzz.h
+
+# The MIME magic-byte consistency check over a hostile body.
+fuzz_sniff_SOURCES = fuzz-sniff.c fuzz.h
 
 # The login-bundle reader: a plain file parser, the library links everything.
 fuzz_bundle_SOURCES = fuzz-bundle.c fuzz.h

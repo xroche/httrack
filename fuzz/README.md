@@ -34,4 +34,6 @@ Run one target by hand: `fuzz/fuzz-url -max_total_time=300 corpusdir fuzz/corpus
 
 `fuzz-alias` splits a command line with `hts_split_args()`, maps each argument through the option aliases, and checks that each argument, once quoted, splits back to itself. Its first byte holds the split flags: 6 is how `doit.log` is read back, 3 is the WebHTTrack form. Bytes after a NUL become a config file for `optinclude_file()`, the path that reads a project's `httrackrc`.
 
+`fuzz-sniff` drives the MIME magic-byte check in `htssniff.c`. Its input is the MIME type the server claims, a NUL, then the body. The dict holds the MIME names the rules know, so a new rule needs a dict entry but no harness change.
+
 OSS-Fuzz builds these harnesses with `oss-fuzz-build.sh`, so a new harness needs only a `Makefile.am` entry and a `corpus/<target>/` directory. The script links each harness with `$LIB_FUZZING_ENGINE`. When it is set, `configure` uses it in place of `-fsanitize=fuzzer`.
