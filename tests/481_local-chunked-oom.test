@@ -13,8 +13,7 @@ skip_on_windows "RLIMIT_AS is not enforced there"
 cap=1048576 # KB; the fixture announces a chunk of 0x70000000
 python=$(find_python) || skip "python3 not found"
 
-# so detect the build before capping, with 283's probe and detect_leaks=0.
-# probe as 283, with detect_leaks=0 so the probe leaves no leak report.
+# A sanitized build cannot map its shadow under the cap, so detect it first with 283's probe and detect_leaks=0.
 probe=$(ASAN_OPTIONS=help=1:detect_leaks=0 httrack -O /dev/null --version 2>&1 || true)
 case "$probe" in
 *AddressSanitizer*) skip "a sanitized build cannot map its shadow under an address-space cap" ;;
