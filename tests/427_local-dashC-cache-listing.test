@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# -#C lists what the cache holds. It read hts-cache/new.ndx, which nothing has
-# written since the 3.31 ZIP cache, so it answered "No cache entry found" over
-# any cache at all.
+# -#C lists what the cache holds. It must read the ZIP cache that 3.31
+# introduced, because nothing writes hts-cache/new.ndx.
 
 set -euo pipefail
 
@@ -108,8 +107,8 @@ if grep -q 'noheaders' <<<"$listing"; then
 fi
 ok "the listing follows the ZIP index, and skips what that index refuses"
 
-# Controls: a result that is genuinely empty still reads as one, whether the
-# filter matched nothing or the index came back empty.
+# Controls: an empty result still reads as one, whether the filter matched
+# nothing or the index came back empty.
 rc=0
 none=$(httrack -O "$out" -#C '*no-such-url*' 2>&1) || rc=$?
 test "$rc" = 0 || fail "a filter matching nothing exited ${rc}"

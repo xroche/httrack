@@ -1,12 +1,10 @@
 #!/bin/bash
 #
-# These four build something out of a fresh allocation and use it on the next
-# line. Each one had no NULL check, so an out-of-memory run dereferenced NULL
-# instead of reporting a failure. RLIMIT_AS cannot reach allocations this small,
-# which is why this reads the source instead of starving a run.
+# These four build something from a fresh allocation and use it on the next
+# line, so each needs a NULL check. RLIMIT_AS cannot reach allocations this
+# small, so this reads the source.
 #
-# Named outside every category the Windows CI suite globs, as the other source
-# scans are: it reads the tracked sources, so a second platform tells it nothing.
+# Named outside the Windows CI suite's globs, like the other source scans.
 
 set -euo pipefail
 
@@ -18,9 +16,8 @@ top="${abs_top_srcdir:?not run under make check}"
 work=$(mktemp -d "${TMPDIR:-/tmp}/allocnull.XXXXXX") || fail "no tmpdir"
 cleanup_push rm -rf "$work"
 
-# An allocation is answered for only if one of the next few lines tests THAT
-# variable against NULL, or asserts it. Any nearby "NULL" would otherwise do,
-# and the "if (head == NULL)" two lines below one of these made the scan blind.
+# An allocation counts as checked only if one of the next few lines tests THAT
+# variable against NULL or asserts it. Any nearby "NULL" would blind the scan.
 unchecked() { # unchecked FILE -> the allocation lines with no answer after them
     awk '
     { line[NR] = $0 }

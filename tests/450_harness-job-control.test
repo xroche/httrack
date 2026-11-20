@@ -1,11 +1,9 @@
 #!/bin/bash
 #
 # run_with_timeout must resolve the backend before it turns job control on. A
-# fork between "set -m" and "set +m" makes bash report the job it has just
-# reaped ("[1]+ Done") on stderr, and local_crawl points that stderr at the
-# crawl log, so the harness lands inside the crawl's own output. Only some bash
-# builds print it (5.2.21 on Ubuntu 24.04 does, 5.2.37 does not), so the log is
-# no witness here; the call is.
+# fork between "set -m" and "set +m" makes bash print "[1]+ Done" on stderr,
+# which local_crawl points at the crawl log. Only some bash builds print it
+# (5.2.21 on Ubuntu 24.04 does, 5.2.37 does not), so the test checks the call.
 
 set -euo pipefail
 

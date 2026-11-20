@@ -1,9 +1,8 @@
 #!/bin/bash
 #
-# The update purge read old.lst in 999-byte chunks, so the tail of a longer line
-# came back as an entry of its own and named a file the site chose. Here that
-# tail is "Znotes.txt]", which made --update delete the user's notes.txt.
-# The empty-directory clean-up after it must stay inside the mirror.
+# The update purge must read each old.lst line whole. A split tail such as
+# "Znotes.txt]" names a file the site chose, and --update would delete the
+# user's notes.txt. The empty-directory clean-up must stay inside the mirror.
 
 set -euo pipefail
 

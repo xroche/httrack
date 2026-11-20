@@ -17,9 +17,9 @@ if ! test -d "$wfdir"; then
     skip "no .github under $top (dist tarball), so the audit has nothing to read"
 fi
 
-# Every context the "Protect master" ruleset requires by name, with the
-# workflow and job that emits it. Pinned rather than read back from the
-# tree, because one file compared against itself proves nothing. Tab-separated.
+# Each row is a context the "Protect master" ruleset requires, with the
+# workflow and job that emit it. It is pinned because a tree compared with
+# itself proves nothing. Tab-separated.
 required='ci.yml	dco	DCO sign-off
 ci.yml	gate	ci gate
 windows-build.yml	gate	windows gate'
@@ -166,12 +166,10 @@ test -z "$bad" || fail "required contexts nothing emits on a pull request:$bad
 A required check that never reports blocks every open PR, not only this one.
 Keep the job where it is, or drop the context from the ruleset first."
 
-# Second invariant: a workflow reachable only by workflow_call has to be named
-# by one that actually runs. tier2.yml schedules the legs it absorbed, and
-# ci.yml calls sanitizer.yml on the pull-request path.
-#
-# workflow_dispatch does not count, for the callable workflow or for its caller:
-# a button nobody presses is not coverage.
+# Second invariant: a workflow reachable only by workflow_call must be named by
+# one that runs. tier2.yml schedules the legs it absorbed, and ci.yml calls
+# sanitizer.yml on the pull-request path. workflow_dispatch counts for neither
+# side, because nobody presses the button.
 triggered() { # triggered <workflow>: does it run without a human pressing one?
     command grep -Eq '^  (schedule|push|pull_request|release|workflow_run):' "$1"
 }
@@ -201,9 +199,8 @@ orphans=$(orphan_gaps "$wfdir")
 test -z "$orphans" || fail "callable workflows nothing schedules and nothing calls:$orphans
 A workflow with neither a trigger nor a caller never runs again, and says nothing about it."
 
-# The mutant this exists to catch: a callable workflow loses the caller that ran
-# it. Every callable workflow takes its turn, so the check is proved on each
-# edge rather than on whichever one happens to sort first.
+# Each callable workflow in turn loses the caller that ran it, so the check is
+# proved on every edge.
 mutdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_orphan.XXXXXX")
 cleanup_push rm -rf "$mutdir"
 proved=0
@@ -232,9 +229,8 @@ for wf in "$wfdir"/*.yml; do
 done
 test "$proved" -gt 0 || fail "no callable workflow has a caller, so the mutant proves nothing"
 
-# Third invariant: each gate has to need every other job in its workflow. A job
-# it does not name can red while the gate reports green, which is worse than
-# having no gate, and nothing in the workflow itself notices.
+# Third invariant: each gate must need every other job in its workflow. A job
+# it does not name can red while the gate reports green.
 gate_gaps() { # gate_gaps <workflow>: prints the gap, or the job count
     local wf=$1 legs_raw legs needed_raw needed coe
     # A key this cannot read would drop the job from BOTH lists, and they would

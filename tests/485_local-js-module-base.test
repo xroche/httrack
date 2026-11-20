@@ -1,10 +1,9 @@
 #!/bin/bash
 #
-# A JavaScript document made every link in it resolve against the page that
-# loaded the script, so import("./chunk.js") inside /assets/app.js was fetched
-# as /chunk.js. A browser fetches /assets/chunk.js. Only a module specifier
-# moved: document.write('<img src="img/x.png">') is inserted into the document
-# and must still take the page's base, which the two copies of x.png tell apart.
+# A module specifier in /assets/app.js resolves against the script, so
+# import("./chunk.js") fetches /assets/chunk.js as a browser does. Markup that
+# document.write('<img src="img/x.png">') inserts still takes the page's base.
+# The two copies of x.png tell the two apart.
 
 set -euo pipefail
 

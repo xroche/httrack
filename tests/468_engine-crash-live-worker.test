@@ -45,12 +45,11 @@ expect_segv() { # expect_segv FILE NAME
         fail "$2 caught signal $num ($(kill -l "$num" 2>/dev/null)), expected SEGV"
 }
 
-# Name the frames the handler printed as module+offset: -fvisibility=hidden
-# hides the engine's own, so only addr2line can say which function faulted.
-# LC_ALL=C because addr2line translates its own "at", which a grep would miss.
-# Returns 1 unless the unwind walked out of the engine, which is the qemu case:
-# there it stops at the signal frame, leaving only the handler's own frames, and
-# that is a platform answer rather than a verdict on where the fault came from.
+# Name the frames the handler printed as module+offset. -fvisibility=hidden
+# hides the engine's own, so only addr2line can name the faulting function.
+# LC_ALL=C because addr2line translates its own "at". Returns 1 unless the
+# unwind walked out of the engine. Under qemu it stops at the signal frame,
+# which says nothing about where the fault came from.
 name_frames() { # name_frames TRACE OUT
     local mod off
     build_names_frames && command -v addr2line >/dev/null || return 1
@@ -67,8 +66,7 @@ name_frames() { # name_frames TRACE OUT
     grep -qE 'hts_entry_point|hts_run_body|hts_main|start_thread' "$2"
 }
 
-# The control, and the whole point of the new kinds: a parse-time kind dies
-# before the engine has a project on disk.
+# Control: a parse-time kind dies before the engine has a project on disk.
 rc=0
 (cd "$tmp" && run_with_timeout 60 "$bin" -#c=segv "ftp://127.0.0.1:9/" \
     -O "$tmp/parsetime") >"$tmp/parsetime.out" 2>&1 || rc=$?
@@ -88,7 +86,7 @@ for kind in dnssegv ftpsegv; do
         --timeout 5) >"$out" 2>&1 || rc=$?
     expect_crash "$rc" "-#c=$kind" "$out"
     expect_segv "$out" "-#c=$kind"
-    # By worker word, not by prefix, so the marker cannot lose which one faulted.
+    # Match the worker word, so the marker keeps which one faulted.
     grep -q "faulting a live $worker worker" "$out" ||
         fail_dump "$kind did not name the $worker worker:" "$out"
     # The mirror was running, which no other kind can say.

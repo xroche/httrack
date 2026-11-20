@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # A banned host's FTP slot belongs to its worker thread, so host_ban() must not
-# end it. The http slot beside it is ended, which is what proves the check works.
+# end it. Ending the http slot beside it shows the check works.
 
 set -eu
 

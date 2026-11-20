@@ -1,9 +1,8 @@
 #!/bin/bash
-# C2 (memory branch): a resume whose 206 lies text/html with a matching
-# INT64_MAX Content-Length must not overflow the resume buffer-size add
-# (UBSan aborts on the pre-fix binary at alloc_mem += totalsize). Pass 1 leaves
-# a partial + temp-ref; pass 2 resumes and must reject and refetch the whole
-# file. Teeth are UBSan-only: a normal build wraps to the same reject+restart.
+# C2 (memory branch): a resume whose 206 claims text/html with an INT64_MAX
+# Content-Length must not overflow alloc_mem += totalsize. Pass 2 resumes pass
+# 1's partial and must refetch the whole file. Only UBSan sees the overflow,
+# because a normal build wraps to the same restart.
 set -u
 
 # shellcheck source=tests/crawllib.sh

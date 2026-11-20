@@ -1,8 +1,7 @@
 #!/bin/bash
-# --sizehack on an update decided from the cache index alone, where its three
-# siblings ask the copy on disk and refuse hypertext. So an HTML page was kept
-# whenever its length held, and a file the disk no longer held at the recorded
-# size was dropped from the mirror instead of re-fetched.
+# --sizehack on an update must ask the copy on disk and refuse hypertext, as its
+# three siblings do. An HTML page is not kept on its length alone, and a file
+# whose size on disk changed is re-fetched.
 set -eu
 
 # shellcheck source=tests/crawllib.sh

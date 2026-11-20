@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# Every engine header needs a whole-file include guard whose macro is its own.
-# httrack.h once reused htstools.h's HTSTOOLS_DEFH, so whichever came first
-# emptied the other, and htsparse.h had no guard at all.
+# Every engine header needs a whole-file include guard whose macro is its own,
+# or whichever header comes first empties the other.
 
 set -euo pipefail
 

@@ -1,13 +1,12 @@
 #!/bin/bash
 #
-# WSL2 drops its interop channel on the Windows runner and the exe never launches,
-# so whichever tests called it then fail on the empty output they read (#1672). One
-# of their logs catches WSL's own error line; the rest look like ordinary reds. The
-# driver must retry them all once and judge each retry on its own log.
+# WSL2 drops its interop channel on the Windows runner and the exe never
+# launches, so the tests calling it fail on empty output (#1672). One log
+# catches WSL's error line and the rest look like ordinary reds. The driver
+# must retry them all once and judge each retry on its own log.
 #
-# Four staged suite runs of 121 stubs each are real work, not a wedge. They outlast
-# the 600s guard on a loaded macOS runner, so the arms pace themselves. Split from
-# 337 so the two run side by side under "make check -j".
+# Four staged runs of 121 stubs each outlast the 600s guard on a loaded macOS
+# runner, so the arms pace themselves. Split from 337 to run beside it.
 # TEST_TIMEOUT_AT_LEAST: 1200
 
 set -euo pipefail
@@ -35,9 +34,8 @@ ci_stage_init
 cases=4
 n=0
 
-# A failure whose log carries WSL2's interop error is not a red: the exe never
-# launched (#1672). Here rather than in 469, which calls the verdict directly and
-# so leaves the driver's own gate untested.
+# A failure whose log carries WSL2's interop error means the exe never launched
+# (#1672). It is tested here because 469 calls the verdict directly.
 stage "$tmp/interop" ':'
 stub "$tmp/interop/900_zlib-pass.test" 3 \
     'echo "<3>init: (2409) ERROR: UtilAcceptVsock:235: accept4 failed 110" >&2'
@@ -131,5 +129,5 @@ grep -q '::warning title=WSL2 lost its interop channel::caught by: 901_watchdog-
     fail "the annotation does not separate the catcher from the collateral: $(<"$tmp/out")"
 ok "an outage that only one log caught still retries the tests beside it"
 n=$((n + 1))
-# Nothing left to pace. It catches an arm counted out of step, not one never counted.
+# No arm is left to pace. It catches a miscounted arm, not an uncounted one.
 assert_steps_ran "$cases" "$n"

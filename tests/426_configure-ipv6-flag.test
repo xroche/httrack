@@ -1,8 +1,7 @@
 #!/bin/bash
-# HTS_INET6 picks which arm of SOCaddr the installed htsnet.h declares, and it
-# used to be decided by an unoverridable getaddrinfo probe that only warned when
-# it failed. Two builds of one version could then ship different layouts under
-# the same soname, and htsfeatures.h recorded neither.
+# HTS_INET6 picks which arm of SOCaddr the installed htsnet.h declares. A probe
+# that only warns must not decide it, or two builds of one version can ship
+# different layouts under the same soname.
 
 # TEST_TIMEOUT_AT_LEAST: 900
 
@@ -34,8 +33,8 @@ n=0
 cases=9
 last_dir=
 
-# The two rejections below give up early, and projecting a full configure off one
-# of them is how the s390x leg ran into its budget instead of skipping.
+# The two rejections below give up early, so a full configure's cost cannot be
+# projected from them.
 
 # Seeding the cache variable is the answer a host without getaddrinfo gives, and
 # AC_CHECK_LIB takes the same action-if-not-found branch either way. "have"
@@ -63,8 +62,8 @@ run_configure() { # run_configure DIR have|hide|probe ARG...
 check_state() {
     local desc=$1 dir=$2 want=$3 hdr line
     for hdr in config.h htsfeatures.h; do
-        # The whole bug: an undefined HTS_INET6 lets htsglobal.h pick, so the
-        # installed header set never says which layout it was built with.
+        # An undefined HTS_INET6 lets htsglobal.h pick, and then the installed
+        # headers never say which layout they were built with.
         grep -qx "#define HTS_INET6 ${want}" "${dir}/${hdr}" ||
             fail_dump "${desc}: ${hdr} does not define HTS_INET6 to ${want}" \
                 "${dir}/${hdr}" "${dir}/configure.log"

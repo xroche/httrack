@@ -1,8 +1,8 @@
 #!/bin/bash
 #
-# A postprocess-html callback returns its byte count as an int, which the engine
-# used to store as the output buffer's size unchecked. 440 keeps that route from
-# reappearing; this pins what the check accepts.
+# A postprocess-html callback returns its byte count as an int, and the engine
+# checks it before using it as the buffer's size. 440 keeps the unchecked route
+# out, and this pins what the check accepts.
 
 set -euo pipefail
 

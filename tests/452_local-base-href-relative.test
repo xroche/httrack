@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# A relative <base href> such as "./" was read as a hostname, so httrack
-# fetched none of the assets hanging off it. An Angular app mirrors to one page.
+# A relative <base href> such as "./" must resolve as a path, so the assets
+# under it are fetched.
 
 set -euo pipefail
 

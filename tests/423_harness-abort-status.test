@@ -1,8 +1,8 @@
 #!/bin/bash
 #
 # bash before 4.2 patch 23 drops the exit status when an EXIT trap runs after a
-# fatal expansion error under errexit. macOS ships 3.2.57, so an aborted test was
-# recorded there as a PASS and 331_fortify-source.test ran vacuously for months.
+# fatal expansion error under errexit. On macOS (3.2.57) an aborted test would
+# record a PASS.
 
 set -euo pipefail
 
@@ -13,12 +13,12 @@ driver="${testdir}/test-timeout.sh"
 test -r "$driver" || fail "no test-timeout.sh next to $0"
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_abortst.XXXXXX")
-# Hand-written, not cleanup_push: this test must not lose its own teardown to the
-# machinery it is looking at.
+# Hand-written, so the teardown survives a break in the cleanup_push machinery
+# this test checks.
 trap 'set +e; rm -rf "$tmpdir"' EXIT
 
-# Does this shell forget the status of a fatal expansion error? Measured, not read
-# off $BASH_VERSION, because the patch level is what decides it.
+# Does this shell forget the status of a fatal expansion error? The patch level
+# decides it, so probe rather than read $BASH_VERSION.
 # shellcheck disable=SC2016 # the fixture expands it, not us
 loses_status() { # loses_status SHELL
     local rc=0

@@ -31,13 +31,12 @@ http_head() { # http_head CONTENT_LENGTH
     printf 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\n\r\n' "$1"
 }
 
-# Three records: one the greedy record cannot reach, the greedy one, and the
-# victim page whose bytes must never leave the greedy record's URL. TAIL adds a
-# fourth after the victim. DECLARED is the body length the greedy record
-# announces, or "eof" for a record reaching the last byte the victim holds, but
-# it stores $GREEDY_BODY whatever it says. PAD is
-# what the victim page is padded with, so each archive's declared length lands
-# on a different class of byte. HOST keys the archive apart.
+# The archive holds a record the greedy one cannot reach, the greedy record, and
+# the victim page whose bytes must stay off the greedy record's URL. TAIL adds a
+# fourth record. DECLARED is the length the greedy record announces ("eof" ends
+# it on the victim's last byte), but it always stores $GREEDY_BODY. PAD fills
+# the victim page, so each declared length lands on a different class of byte.
+# HOST keys the archive apart.
 craft() { # craft OUT HOST DECLARED PAD [VICTIM_SCHEME] [LEAD] [TAIL]
     local out=$1 host=$2 declared=$3 pad=$4 scheme=${5:-http://} lead=${6:-yes}
     local tail=${7:-no}
@@ -129,10 +128,9 @@ craft "$dir/urlend.arc" urlend urlend ' '
 # and one stopping inside that record's line, so the line the scan must catch
 # is one that ENDS outside the greedy record
 craft "$dir/urlmid.arc" urlmid urlmid ' '
-# The lie the declared length is FOR: it ends exactly where a record starts, so
-# a check that accepts on "a record follows" passes it while a whole page inside
-# goes out under the greedy record's URL. The tail record says whether the walk
-# survives the refusal.
+# This declared length ends exactly where a record starts. A check that accepts
+# on "a record follows" passes it and serves a whole page under the greedy
+# record's URL. The tail record shows whether the walk survives the refusal.
 craft "$dir/later.arc" later eof ' ' http:// yes yes
 # A scheme this reader never serves still marks where the record before it ends.
 # Heritrix writes one "dns:" record per host, so an archive without this is the
@@ -407,8 +405,8 @@ convert() { # convert IN OUT
         fail_dump "proxytrack died converting $1" "$dir/convert.log"
 }
 
-# The control the rest rests on. An honest chain keeps the records apart, so all
-# three markers exist in the fixture and each stays under its own URL.
+# Control. An honest chain keeps the records apart, and each of the three
+# markers stays under its own URL.
 convert "$dir/honest.arc" "$dir/honest-out.arc"
 stored "$dir/honest-out.arc" http://honest/kept.html "$dir/out.kept"
 is_body "$dir/out.kept" "$KEPT_BODY" "the honest archive lost its first record"

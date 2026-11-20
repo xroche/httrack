@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# The shipped example wrappers took their arguments and the engine's link and
-# save buffers with strcpy/strcat into fixed fields. They now refuse what does
-# not fit; the fields themselves are what the sizes below come from.
+# The shipped example wrappers must refuse arguments and engine buffers that do
+# not fit their fixed fields. The sizes below come from those fields.
 
 set -euo pipefail
 
@@ -48,9 +47,8 @@ test ! -s "$work/found" ||
 f2=$(resolve "${FILENAME2_LIB}") || skip "nothing built at ${FILENAME2_LIB}.so"
 cf=$(resolve "${CONTENTFILTER_LIB}") || skip "nothing built at ${CONTENTFILTER_LIB}.so"
 
-# 256 is the width of filename2's string1 and string2. One over is what used to
-# be copied in unchecked. Nothing longer is worth trying: htscoremain.c caps
-# every argv element below HTS_CDLMAXSIZE (1024) at src/htscoremain.c:463.
+# 256 is the width of filename2's string1 and string2. Nothing longer is worth
+# trying, because htscoremain.c caps every argv element below HTS_CDLMAXSIZE.
 long256=$(printf 'a%.0s' $(seq 256))
 
 # A URL is needed or httrack prints its usage before loading anything. The plug
@@ -88,22 +86,18 @@ bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
     httrack 'BASEURL/simple/basic.html' --wrapper "${f2},simple,plain"
 
 # ---------------------------------------------------------------------------
-# Runtime probes. The argument checks above cannot reach the copies that take
-# the ENGINE's buffers, and those are what a crawled page fills. No crawl can
-# overflow them: the engine caps a link at HTS_URLMAXSIZE and both destinations
-# are twice that. So these assert what is left to get wrong, which is the engine
-# surviving the rewrite and the join coming back whole.
+# Runtime probes for the copies that take the ENGINE's buffers. No crawl can
+# overflow them, because the engine caps a link at HTS_URLMAXSIZE and both
+# destinations are twice that. These assert the engine survives the rewrite
+# and the join comes back whole.
 # ---------------------------------------------------------------------------
 
 bl=$(resolve "${BASELINKS_LIB}") || skip "nothing built at ${BASELINKS_LIB}.so"
 ll=$(resolve "${LISTLINKS_LIB}") || skip "nothing built at ${LISTLINKS_LIB}.so"
 
-# A relative href, so no BASEURL substitution is needed inside the fixture, and
-# 200 bytes, which the filesystem can still store as a name. The engine drops any
-# link past HTS_URLMAXSIZE before a wrapper sees it anyway (measured: 926 arrives,
-# 1000 does not), and both destinations here are HTS_URLMAXSIZE * 2, so no crawl
-# can drive these copies past their buffers. What a probe can still catch is the
-# join coming back truncated.
+# A relative href needs no BASEURL substitution, and 200 bytes still fits a
+# file name. The engine drops links past HTS_URLMAXSIZE anyway, so the probe
+# can only catch a truncated join.
 longseg=$(printf 'L%.0s' $(seq 200))
 probe="$work/site"
 mkdir -p "$probe"

@@ -1,16 +1,13 @@
 #!/bin/bash
 #
-# A 100 Continue is not the response that follows it. When that response has no
-# headers of its own, httrack takes its "bogus server" branch. The engine used
-# to archive the interim block there, so the WARC record described a 100
-# Continue with a body (#1740).
+# A 100 Continue is not the response that follows it. When that response has
+# no headers of its own, the WARC record must not describe the interim block
+# (#1740).
 #
-# /warc100/plain.html is the same reply without the 100. The two records must
-# carry byte-equal header blocks. /warc100/normal.html is a 100 ahead of a real
-# response, and the record must keep that response's own headers.
-#
-# The last two cases probe the validator. A response block with no header
-# terminator must be an error, or its body is read as its headers.
+# /warc100/plain.html is the same reply without the 100, and both records must
+# carry byte-equal header blocks. /warc100/normal.html puts a 100 ahead of a
+# real response, whose own headers the record keeps. The last two cases probe
+# the validator: a response block with no header terminator is an error.
 
 set -euo pipefail
 

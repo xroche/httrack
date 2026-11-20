@@ -27,13 +27,10 @@ ci_expected_skips_for_backend wsl2 || fail "wsl2 was rejected as an unknown back
 test "$ci_skip_list" = "$expected_skips_wsl2" || fail "wsl2 did not select its own list"
 
 # --- the lists' CONTENT, not just which one is chosen ---------------------
-# A spot-check of the names that moved, not of every entry: a rename inside the
-# part no row pins is caught by the driver's own set compare on a live Windows
-# leg, and neither can see a listed test that in fact runs.
-# 420 compared each list against itself, so editing either one stayed green.
-# "neither" is a name that left a list, and nothing must put one back without
-# measuring it again: 386 ran once python stopped bypassing the shim, and 24
-# once its pass-1 interrupt went through hts-abort.lock instead of a signal.
+# This spot-checks the names that moved. The driver's set compare on a live
+# Windows leg catches a rename elsewhere, but neither sees a listed test that in
+# fact runs. "neither" marks a name that left a list, and it must not go back
+# without a new measurement.
 ci_expected_skips_for_backend msys || fail "msys was rejected"
 msys_list=$ci_skip_list
 ci_expected_skips_for_backend wsl2 || fail "wsl2 was rejected"
@@ -76,9 +73,8 @@ done <<'EOF'
 EOF
 ok "the two lists hold the names the runs measured moving"
 
-# The lists genuinely differ now, so the checks above already separate "read the
-# right variable" from "always read msys". Kept because it holds either way, and
-# because it is what caught that selection when the two lists were identical.
+# While the lists differ, the checks above already tell "read the right
+# variable" from "always read msys". This one holds when they are identical.
 expected_skips_wsl2="99_sentinel-only.test"
 ci_skip_list=''
 ci_expected_skips_for_backend wsl2 || fail "wsl2 was rejected as an unknown backend"

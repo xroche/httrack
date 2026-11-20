@@ -1,11 +1,9 @@
 #!/bin/bash
 #
-# Three things the tree defines but does not act on. htsglobal.h gives
-# HTS_DLOPEN a value on both arms, so htsweb.c's #ifdef was always true and a
-# build without dlopen still advertised DLOPEN=1 to the web UI (the #1552 class,
-# there for HTS_INET6). The -@ option set reported a bad option under the '%'
-# prefix, naming a character the user did not type. And HTS_PLATFORM_NAME was
-# used but defined nowhere, so --help printed no [compiled: ...] line.
+# Three things the tree defines but does not act on. HTS_DLOPEN has a value on
+# both arms, so a build without dlopen must still tell the web UI DLOPEN=0 (the
+# #1552 class). A bad -@ option must not be named under the '%' prefix. And
+# --help must print the [compiled: ...] line from HTS_PLATFORM_NAME.
 
 set -euo pipefail
 
@@ -68,8 +66,8 @@ fi
 "${cc_argv[@]}" "${cpp_argv[@]}" "$web" >"$tmp/nodl.i" 2>"$tmp/nodl.err" ||
     skip "cannot preprocess htsweb.c here: $(firstline "$(cat "$tmp/nodl.err")")"
 
-# HTS_DLOPEN really is 0 in this shadow, and the block really was reached: an
-# empty or truncated preprocessor output would satisfy the DLOPEN check alone.
+# HTS_DLOPEN is 0 in this shadow and the block was reached. An empty or
+# truncated preprocessor output would satisfy the DLOPEN check alone.
 printf '#include "htsglobal.h"\nPROBE HTS_DLOPEN\n' >"$tmp/probe.c"
 "${cc_argv[@]}" "${cpp_argv[@]}" "$tmp/probe.c" >"$tmp/probe.i" 2>/dev/null ||
     fail "the probe TU did not preprocess"

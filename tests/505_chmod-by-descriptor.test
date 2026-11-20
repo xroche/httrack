@@ -1,13 +1,10 @@
 #!/bin/bash
 #
-# A file whose descriptor is still open gets its mode set through that
-# descriptor. chmod() re-resolves the name, so a local process that swaps it for
-# a symlink in the window makes us chmod the symlink's target instead. The mode
-# itself is already pinned by 51_local-update-codec.test's --file-mode.
+# A file whose descriptor is still open gets its mode set through it, because
+# chmod() re-resolves the name and a swapped-in symlink would redirect it.
+# 51_local-update-codec.test pins the mode itself.
 #
-# Named outside every category the Windows CI suite globs, as the other source
-# scans are: it reads the tracked sources, so a second platform tells it nothing,
-# and that job runs without automake's abs_top_srcdir.
+# Named outside the Windows CI suite's globs, like the other source scans.
 
 set -euo pipefail
 

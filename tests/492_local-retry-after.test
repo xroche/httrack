@@ -28,9 +28,8 @@ serverpid=$!
 port=$(discover_server_port "$tmpdir/srv.out" "$serverpid") || exit 1
 
 retries=2
-# --max-retry-after. Not 1: httrack's own connect limiter costs this crawl
-# about six seconds whatever we ask, and a cap of 1 puts the floor below that,
-# so the gate could be disabled outright and this test still passed.
+# --max-retry-after. httrack's own connect limiter costs this crawl about six
+# seconds, so with a cap of 1 the test would pass with the gate disabled.
 cap=4
 crawl() { # crawl NAME [extra httrack args...]
     local name=$1 rc=0
@@ -91,9 +90,8 @@ echo "capped crawl: ${retried_seconds}s (floor ${floor}s)"
 test "$retried_seconds" -ge "$floor" ||
     fail "the crawl obeyed no Retry-After: ${retried_seconds}s, expected ${floor}s or more"
 
-# And the wait is the cap's to waive: --max-retry-after=0 makes the same
-# requests without any of it. Graded on the count, not on a second timing,
-# which a loaded runner decides for us.
+# --max-retry-after=0 makes the same requests without the wait. This is graded
+# on the count, because a loaded runner skews timing.
 requests() { command grep -c '^HIT GET ' "$tmpdir/srv.out" || true; }
 capped_requests=$(requests)
 crawl nowait --max-retry-after=0

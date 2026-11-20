@@ -18,8 +18,8 @@ root="$work/root"
 mkdir -p "$root"
 
 # One query letter pair per context, so no assertion can pass for another. A
-# script sits on each side of the markup, because a condition that latches
-# leaks in one direction only and one ordering would miss it.
+# script sits on each side of the markup, because a latching condition leaks
+# in one direction only.
 cat >"$root/index.html" <<'EOF'
 <!DOCTYPE html><html><head>
 <link rel="stylesheet" href="s.css">
@@ -38,9 +38,8 @@ echo 'var ext = "q.html?k=1&l=2";' >"$root/app.js"              # raw text
 echo '.c { background: url("q.html?m=1&n=2"); }' >"$root/s.css" # raw text
 printf 'x\n' >"$root/q.html"
 
-# Raw text keeps the ampersand, markup keeps the entity. Each pattern fails if
-# the other form is emitted, so no negative assertion is needed. The order
-# below follows the fixture above.
+# Raw text keeps the ampersand and markup keeps the entity. Each pattern fails
+# if the other form is emitted. The order below follows the fixture.
 bash "$top_srcdir/tests/local-crawl.sh" --root "$root" --errors 0 \
     --file-matches 'index.html' 'a=1&b=2' \
     --file-matches 'index.html' 'c=1&d=2' \

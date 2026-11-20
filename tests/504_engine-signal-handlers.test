@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# A signal handler may only write() and put errno back. httrack's handlers did
-# neither: printf takes a lock on stdout, so a ^C arriving while the mirror held
-# that lock deadlocked, and hts_log_print allocated on top of it.
+# A signal handler may only write() and restore errno. printf takes a lock on
+# stdout, so a ^C arriving while the mirror holds it deadlocks.
 
 set -euo pipefail
 
@@ -21,10 +20,9 @@ grep -q 'sighandlers self-test: OK' <<<"$out" ||
     fail "the self-test's own verdict is missing: $out"
 ok "the signal handlers keep errno and write with no locking output"
 
-# The self-test raises the signals, so it cannot see a handler that never gets
-# installed. Read the installation back instead, and pair it with the two
-# SIG_DFL/SIG_IGN dispositions the file also sets, so a sweep matching
-# everything proves nothing.
+# The self-test raises the signals, so it cannot see a handler that is never
+# installed. Read the installation back, with the file's SIG_DFL and SIG_IGN
+# dispositions as controls.
 src=${top_srcdir:-..}/src
 handlers=$(sed -n '/^static void signal_handlers/,/^}/p' "$src/httrack.c")
 test -n "$handlers" || fail "signal_handlers() is gone from $src/httrack.c"

@@ -38,10 +38,9 @@ bash "$top_srcdir/tests/local-crawl.sh" \
     httrack "BASEURL/simple/basic.html" "http://127.0.0.1:${dead}/dead.html" \
     "http://127.0.0.1:${dead}/dead.png" --timeout=3 --retries=0 --robots=1
 
-# A GUI polls the count through hts_loop_tick's refresh, not hts_get_stats's, so
-# only an embedder reading the callback's own hts_stat_struct covers that path.
-# The live page is the primary: a crawl that ends at the failure fires no tick
-# after it, and the reading stays 0 however correct the refresh is.
+# A GUI polls the count through hts_loop_tick's refresh, so only an embedder
+# reading the callback's hts_stat_struct covers that path. The live page is the
+# primary, because a crawl ending at the failure fires no later tick.
 if test -n "${MIRRORVERDICT_BIN:-}"; then
     test -r "$MIRRORVERDICT_BIN" || fail "$MIRRORVERDICT_BIN was not built"
     tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_tfctick.XXXXXX") || exit 1

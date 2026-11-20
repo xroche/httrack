@@ -1,10 +1,9 @@
 #!/bin/bash
 #
 # A library must not kill the process that embedded it. The engine writes to
-# sockets whose peer may already be gone, and only the three front ends ever
-# set a SIGPIPE disposition, so an embedder that installed none died mid-crawl
-# (#1689). The self-test puts the default action back before it writes, which
-# is what lets a regression reach this script as a signal.
+# sockets whose peer may be gone, and an embedder with no SIGPIPE disposition
+# died mid-crawl (#1689). The self-test restores the default action before it
+# writes, so a regression reaches this script as a signal.
 
 set -euo pipefail
 
@@ -12,8 +11,8 @@ set -euo pipefail
 . "${0%"${0##*/}"}./testlib.sh"
 
 skip_on_windows "Windows raises no SIGPIPE, so none of the three mechanisms exists there"
-# The engine really does die there. #1784 is wontfix, because every binary we
-# ship sets its own SIGPIPE handler before it crawls.
+# The engine dies there. #1784 is wontfix, because every binary we ship sets
+# its own SIGPIPE handler before it crawls.
 skip_on_hurd "the engine dies on SIGPIPE here (#1784, wontfix)"
 
 rc=0
@@ -25,9 +24,8 @@ test "$rc" = 0 || fail "-#test=sigpipe exited $rc: $out"
 assert_eq "sigpipe self-test OK" "$out" "the self-test's own verdict"
 ok "a write to a vanished peer leaves the process alive"
 
-# The self-test above cannot reach the TLS calls, which need a peer that speaks
-# TLS and then vanishes. What it can check is that each of them still carries
-# the mask, which is the regression a new call site would bring.
+# The self-test cannot reach the TLS calls, which need a TLS peer that
+# vanishes. This checks that each one still carries the mask.
 src=${top_srcdir:-..}/src
 for call in SSL_write SSL_connect SSL_shutdown SSL_read; do
     while IFS=: read -r file line _; do
@@ -40,8 +38,8 @@ for call in SSL_write SSL_connect SSL_shutdown SSL_read; do
 done
 ok "every OpenSSL call that writes carries the mask"
 
-# Same reasoning for our own writes: the flag is what covers them everywhere
-# but macOS, and the self-test above only exercises the one in sendc().
+# The flag covers our own writes everywhere but macOS, and the self-test above
+# only exercises the one in sendc().
 for file in htslib.c htsftp.c htscatchurl.c htsproxy.c; do
     while IFS=: read -r line text; do
         case $text in *HTS_MSG_NOSIGNAL*) continue ;; esac

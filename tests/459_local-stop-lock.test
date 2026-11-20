@@ -1,8 +1,8 @@
 #!/bin/bash
-# hts-stop.lock is how a script pauses a running engine, under the same staleness
-# rule as hts-abort.lock. The engine pauses only for a request stamped later than
-# the run's own hts-in_progress.lock that it could also delete, so a copy an
-# earlier mirror left behind no longer pauses the next one.
+# hts-stop.lock is how a script pauses a running engine, under the staleness
+# rule of hts-abort.lock. The engine pauses only for a request newer than its
+# own hts-in_progress.lock that it could also delete, so a stale copy is
+# ignored.
 set -eu
 
 # shellcheck source=tests/crawllib.sh
@@ -45,10 +45,9 @@ arm_paths() { # arm_paths NAME: leaves the paths in $out, $crawllog, $enginelog
     enginelog="${out}/hts-log.txt"
 }
 
-# Before the staleness rule the engine took any hts-stop.lock it found, so a
-# copy left in a reused output directory paused the next mirror. Dated back,
-# because the engine backdates its own progress lock by a second. A file written
-# just before the mirror starts lands inside that second.
+# A copy left in a reused output directory must not pause the next mirror.
+# Dated back, because the engine backdates its own progress lock by a second
+# and a file written just before the mirror starts lands inside it.
 printf '[a request left behind does not pause the next mirror] ..\t'
 arm_paths stale
 mkdir -p "$out"

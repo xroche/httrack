@@ -1,10 +1,9 @@
 #!/bin/bash
 #
-# -m caps a file's size, but a chunked response announces no length, so the
-# header check saw -1 and let the body grow unbounded (#1708). plainover.bin is
-# the control: the same overlong body under a Content-Length, which -m always
-# refused. flood.bin is cut with no terminating chunk, so only a refusal raised
-# as the announced total grows ever reaches it.
+# -m caps a file's size even when a chunked response announces no length
+# (#1708). plainover.bin is the control, the same body under a Content-Length.
+# flood.bin has no terminating chunk, so only a refusal as the running total
+# grows reaches it.
 
 set -euo pipefail
 
