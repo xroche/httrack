@@ -1,14 +1,9 @@
-/* PATH shim the sanitizer legs run the engine through. It copies PROGRAM's
-   stderr into $HTTRACK_STDERR_CAPTURE_DIR for tools/ci-sanitizer-report.sh,
-   because gcc's UBSan writes findings there that most tests discard.
+/* The sanitizer legs run the engine through this shim, which copies its stderr
+   into $HTTRACK_STDERR_CAPTURE_DIR, because gcc's UBSan reports there.
 
-   Usage: stderrwrap PROGRAM [ARG...]. Without a capture directory this is a
-   bare exec. With one, the caller reads its stderr file as soon as we exit, so
-   the writer must be reaped first, and no exec'd process can do that (#1374).
-   PROGRAM therefore stays a child, and we pass on its exit status, death by
-   signal, pid-directed signals, stdin and our process group. A shell cannot be
-   this parent, because POSIX leaves SIGINT and SIGQUIT untrappable in a
-   backgrounded shell, which is how crawl tests run the engine. */
+   Usage: stderrwrap PROGRAM [ARG...]. With a capture directory, PROGRAM stays a
+   child, so the stderr writer is reaped before we exit (#1374). A shell cannot
+   do this, because a backgrounded shell cannot trap SIGINT or SIGQUIT. */
 
 #include <ctype.h>
 #include <errno.h>
@@ -40,10 +35,8 @@ static volatile sig_atomic_t child = 0;
    unreaped child being a pid the suite still reads as a running server. */
 static int wakefd[2] = {-1, -1};
 
-/* Forwards only a kill(2) from elsewhere. A kernel-raised signal (a tty ^C,
-   our child's SIGCHLD) has reached the child already or is not for it. The
-   test is si_code <= 0, because Darwin reports kill(2) as 0 but defines SI_USER
-   as 0x10001. */
+/* This forwards only a kill(2) from elsewhere. It tests si_code <= 0, because
+   Darwin reports kill(2) as 0 but defines SI_USER as 0x10001. */
 static void forward(int sig, siginfo_t *info, void *ctx) {
   const int saved = errno;
 
@@ -216,8 +209,7 @@ int main(int argc, char **argv) {
     close(pipefd[1]);
 #ifdef __linux__
     /* A kill -9 reaches us and not PROGRAM. The re-check covers a parent that
-       died before the request was in. BSD has no equivalent, but only the
-       Linux sanitizer jobs set the capture variable. */
+       died first. Only Linux jobs set the capture variable. */
     prctl(PR_SET_PDEATHSIG, SIGKILL);
     if (getppid() != parent) {
       _exit(127);

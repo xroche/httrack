@@ -1,9 +1,7 @@
-/* Borrows Windows' rename() for tests POSIX cannot otherwise reach. An
-   existing target is refused with EEXIST, for hts_rename_over()'s fallback.
-   RENAMEFAIL_MODE=locked reports EACCES, as the CRT does for a source another
-   process holds. =repair and =repair-eexist refuse only the cache-repair move
-   (#786), the latter at the retry inside the fallback. RENAMEFAIL_ASIDE_FAILS=N
-   refuses the first N moves back out of a parked ".hts-old" name (#790). */
+/* This shim refuses rename() over an existing target with EEXIST, as Windows
+   does, or with EACCES under RENAMEFAIL_MODE=locked. =repair and =repair-eexist
+   refuse only the cache-repair move (#786), the latter inside the fallback.
+   RENAMEFAIL_ASIDE_FAILS=N refuses N moves out of a parked .hts-old (#790). */
 
 #define _GNU_SOURCE
 #include <dlfcn.h>

@@ -121,11 +121,9 @@ list_stray_processes() {
     fi
 }
 
-# Kill engine processes a finished test left behind, and name them so the leak
-# is blamed on that test. An orphaned httrack.exe starves the runner until the
-# Windows job dies of "lost communication". SERIAL RUNNERS ONLY, because it
-# matches by name host-wide. It kills only engine images, because a runner may
-# run its own python.exe.
+# Kill and name the engine processes a finished test left behind, because an
+# orphaned httrack.exe starves the Windows runner. Use it on
+# SERIAL RUNNERS ONLY, because it matches by name host-wide.
 reap_leftover_processes() {
     local label=${1:-} left
     if target_is_windows; then
@@ -161,15 +159,10 @@ list_engine_pids() {
 # How long a SIGABRT'd engine gets to print its stack and exit.
 ABRT_GRACE=${ABRT_GRACE:-30}
 
-# Ask the wedged test's engine processes for a stack. Each branch says which
-# route it took, because a dump that produces nothing would read as coverage.
-#
-#   Linux  httrack's SIGABRT handler symbolizes and writes to the process's own
-#          stderr, so the caller must salvage the test's logs. It walks only
-#          the signalled thread, and it aborts the process.
-#   macOS  that handler is Linux-only, so this uses sample(1), which needs no
-#          root, covers every thread and leaves the process running.
-#
+# Ask the wedged test's engine processes for a stack, and say which route ran.
+#   Linux  SIGABRT makes httrack print one thread to its own stderr and abort,
+#          so the caller must salvage the test's logs.
+#   macOS  sample(1) covers every thread and leaves the process running.
 # gdb -p fails with EPERM from a sibling under yama ptrace_scope=1.
 request_engine_backtraces() {
     local p os start
@@ -214,12 +207,9 @@ request_engine_backtraces() {
     done
 }
 
-# Dump the stack of every native engine process through cdb. Windows has no
-# backtrace handler, and MSYS signals never reach a native httrack.exe. cdb may
-# be missing, so probe for it and say so. The MSVC PDBs sit beside the binaries
-# on PATH, so frames resolve to names. Opt-in (HTTRACK_EXCLUSIVE_HOST), because
-# it stacks every engine on the host. That freezes each parallel sibling's for
-# up to 60s, and a cdb killed by its own timeout can take its debuggee with it.
+# Dump the stack of every native engine process through cdb, if present. It is
+# opt-in (HTTRACK_EXCLUSIVE_HOST), because it freezes every engine on the host
+# for up to 60s, and a cdb killed by its timeout can take its debuggee with it.
 dump_windows_stacks() {
     local c p
     local cdb='' found=''

@@ -78,8 +78,7 @@ def textarea(page, name):
     m = re.search(r'<textarea name="%s"[ >].*?>(.*?)</textarea>' % name, page, re.S)
     if m is None:
         sys.exit("no %s textarea in the rendered page" % name)
-    # Drop the one newline right after the tag, which is markup. A second one
-    # is a blank first line, which a test may assert on.
+    # Drop only one newline after the tag, because a second one is content.
     return re.sub(r"\A\r?\n", "", m.group(1))
 
 

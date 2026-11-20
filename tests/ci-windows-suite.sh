@@ -133,14 +133,10 @@ ci_failure_verdict() { # ci_failure_verdict TEST...
     return 1
 }
 
-# End a wedged suite before its runner dies, because a lost runner keeps no log
-# or annotations (#795). Quiet for $1s, then names the test in flight from $3
-# every $2s. Kills $5 once $3 has been static for $4s, or $6s in (0: never).
-# Every outcome writes a line, the per-test timeout included, so a log static
-# for $4s past that timeout means a wedge. The cap stops a tail of blown budgets
-# from walking the step onto the workflow timeout (#1126).
-# Assigns hb_time rather than printing, so reading the clock forks nothing.
-# Overridable for the unit test virtual clock.
+# End a wedged suite before its runner dies and loses its log (#795). It stays
+# quiet for $1s, then names the test in flight from $3 every $2s. It kills $5
+# once $3 has been static for $4s, or $6s in (0: never) to beat the workflow
+# timeout (#1126). The unit test overrides hb_now with a virtual clock.
 hb_time=0
 hb_now() { hb_time=$SECONDS; }
 
@@ -225,8 +221,7 @@ ci_heartbeat_kill() {
 ci_suite_heartbeat() {
     local quiet=$1 every=$2 progress=$3 stuck=$4 main=$5 hard=${6:-0}
     local tick=$2 begin now line said moved last=''
-    # Elapsed time is read from the clock, because the starvation this watchdog
-    # catches makes each sleep overshoot.
+    # The clock is read each tick, because starvation makes sleeps overshoot.
     test "$tick" -le 30 || tick=30
     hb_now
     begin=$hb_time said=$begin moved=$begin
@@ -236,8 +231,7 @@ ci_suite_heartbeat() {
         sleep "$tick" >/dev/null 2>&1 || : # holds no stdout: the caller's trap orphans it
         hb_now
         now=$hb_time
-        # Guarded: under the caller's errexit a bare substitution assignment would
-        # end the watchdog in silence.
+        # Guarded, because under errexit a failing substitution ends this.
         line=$(tail -n 1 "$progress" 2>/dev/null || true)
         test "$line" = "$last" || { last=$line moved=$now; }
         # Ahead of the quiet window, which only delays the staticness verdict: a
@@ -266,10 +260,8 @@ ci_suite_heartbeat() {
     done
 }
 
-# Every gate here exits 77, so an all-skipped suite would report green having
-# tested nothing. Pin the skips, and floor the passes in case the glob empties.
-# One name per line, so two branches each appending one don't collide. The lists
-# compare as sorted sets, so glob order cannot cause a mismatch.
+# Every gate here exits 77, so pin the skips and floor the passes, or an
+# all-skipped suite reports green. One name per line keeps branches apart.
 # footer-overflow, purge-longpath and purge-split-tail skip on Windows (need a
 # path past MAX_PATH);
 # webdav-default and proxytrack-quiet read proxytrack's console through a pty,
@@ -375,13 +367,10 @@ expected_skips_msys="01_engine-usercommand.test
 718_local-fd-setsize.test
 2371_local-syscall-trim.test"
 
-# Taken from windows-build run 33927128153, both platforms alike. Written out
-# rather than derived from the msys list, so a name leaving one list has to be a
-# visible edit to the other.
-# The reasons above apply, plus one. On a stdin the Linux shell owns across
-# interop, 294's wizard never reaches its feof||ferror arm and spins to the
-# watchdog. 296 passes with a real answer file, so the fault is at EOF and
-# closed stdin. 294 skips itself, in the test.
+# This list comes from windows-build run 33927128153 and is written out, so a
+# name leaving the msys list must be a visible edit here too.
+# The reasons above apply. 294 also skips itself, because its wizard spins on a
+# stdin the Linux shell owns across interop.
 # isalive-openfail holds its trigger file by making a directory read-only,
 # which Windows does not enforce, so the test's own probe declines and it
 # skips itself.
@@ -572,17 +561,11 @@ export TMPDIR
 export HTTPS_SUPPORT=yes BROTLI_ENABLED=yes ZSTD_ENABLED=yes
 export LC_ALL=C.UTF-8
 
-# A wedged crawl must not eat the job's timeout budget. MSYS signals don't
-# reach a native httrack.exe, so run_with_timeout TerminateProcess-es the
-# whole tree. 600s clears the 540s a three-pass crawl may take under
-# local-crawl.sh's own watchdogs. The slowest healthy test here takes 39s.
+# 600s clears the 540s a three-pass crawl may take under local-crawl.sh.
 per_test=600
 
-# The whole suite must give up before the workflow's 45-minute step timeout,
-# because a cancelled step keeps neither its log nor its artifacts. It stays
-# at the serial budget because it bounds a wedge. A value fitted to the pool
-# would fail a slow run and every jobs=1 run (23 min), and would starve the
-# traced rerun below.
+# The suite must give up before the 45-minute step timeout, which keeps no log.
+# It stays at the serial budget, because a tighter one fails jobs=1 (23 min).
 suite_deadline=1500
 started=$SECONDS
 
@@ -592,18 +575,12 @@ progress=suite-progress.log
 : >"$progress"
 export HTTRACK_PROGRESS_LOG="$PWD/$progress"
 
-# A dying runner loses the log and every annotation (#795), so the watchdog
-# must end the step first. Under the pool any live worker keeps the log moving,
-# so staticness catches only a stalled suite. $per_test and $hard_deadline
-# bound one wedged test.
+# Any live worker moves the log, so this catches only a stalled suite.
 stuck=900
-# Independent of the heartbeat, which needs 960s of quiet and 900s of static
-# log. Every #795 death measured so far lands in the first 750s of the step.
+# The native watchdog covers the first 750s, where every #795 death lands.
 watchdog='' ci_watchdog_pid=''
-# Wall-clock backstop. Past the deadline above, the tests in flight may still
-# spend $per_test plus a traced rerun, and each progress line re-arms $stuck.
-# 2400s clears that 1500+600 worst case plus the hang dump, and leaves 300s of
-# the 45-minute step to fail and upload (#1126).
+# Progress lines re-arm $stuck, so this caps the wall clock. 2400s clears the
+# 1500+600 worst case and leaves 300s of the step to fail and upload (#1126).
 hard_deadline=2400
 ci_start_native_watchdog "$PWD/$progress" && watchdog=$ci_watchdog_pid
 test -n "$watchdog" || echo "no off-box watchdog: no usable PowerShell"

@@ -671,11 +671,9 @@ class Handler(SimpleHTTPRequestHandler):
             self.wfile.write(body)
 
     # --- sitemap ingestion (issue #712) ------------------------------------
-    # start.html links to nothing, so orphan*.html are reachable only through
-    # the sitemap. deep1.html proves the seeds keep a full depth budget. The
-    # travel scope drops the off-host page <loc>, and the same-host rule drops
-    # the off-host child sitemap. The index is at /sitemapdir/ (from robots.txt)
-    # and at the fallback /sitemap.xml.
+    # orphan*.html are reachable only through the sitemap, served at
+    # /sitemapdir/ (named by robots.txt) and /sitemap.xml. Off-host entries must
+    # be dropped, and deep1.html proves the seeds keep a full depth budget.
 
     def route_sitemap_index(self):
         host = self.headers.get("Host")
@@ -712,9 +710,8 @@ class Handler(SimpleHTTPRequestHandler):
     def route_sitemap_deep1(self):
         self.send_html("\tOne level below an orphan.")
 
-    # chainN is a sitemapindex at nesting level N, listing chain(N+1) and a
-    # urlset capN.xml whose one page is capN.html. capN.html appears for N below
-    # HTS_SITEMAP_MAX_LEVEL and not at it, so a cap moved either way fails.
+    # chainN lists chain(N+1) and capN.xml, whose one page capN.html must
+    # appear only for N below HTS_SITEMAP_MAX_LEVEL.
     def route_sitemap_chain(self):
         host = self.headers.get("Host")
         level = int(self.path.rsplit("/", 1)[-1][len("chain") : -len(".xml")])
@@ -1040,8 +1037,7 @@ class Handler(SimpleHTTPRequestHandler):
     # differential (stored compressed bytes must inflate to this).
     WARCGZ_BODY = b"<html><body>verbatim gzip page for WARC strategy A</body></html>\n"
 
-    # A non-HTML gzip-coded asset, which HTTrack streams to disk, so the verbatim
-    # spool adoption runs on the direct-to-disk path that route_warcgz_page misses.
+    # This non-HTML gzip body takes the direct-to-disk path, unlike the page.
     WARCGZ_BIN_BODY = b"verbatim gzip octet-stream body for the WARC is_write path\n"
 
     def route_warcgz_index(self):
@@ -1168,10 +1164,8 @@ class Handler(SimpleHTTPRequestHandler):
         )
 
     # --- coded re-fetch that fails to decode (#557) -------------------------
-    # Pass 1 mirrors each file from a valid gzip body, and pass 2 (--update)
-    # serves one that cannot be decoded. The mirrored copy must survive.
-    # fresh.html is the control: its pass-2 body decodes, so it must be updated.
-    # Per-path body-fetch counter, shared by the update-refetch routes.
+    # Pass 2 (--update) serves a body that cannot be decoded, and the mirrored
+    # copy must survive. fresh.html is the control, whose pass-2 body decodes.
     REFETCH_SEEN = {}
 
     def refetch_pass(self):
@@ -1311,8 +1305,7 @@ class Handler(SimpleHTTPRequestHandler):
         v = 1 if self.refetch_pass() == 1 else 2
         self.send_raw(b"<html><body><p>BINSTAY-V%d</p></body></html>" % v, "text/html")
 
-    # Linked on pass 1 only. Its removal proves the purge ran, which file.bin
-    # surviving cannot.
+    # It is linked on pass 1 only, so its removal proves the purge ran.
     def route_uptruncbin_gone(self):
         self.send_raw(b"<html><body><p>GONE-V1</p></body></html>", "text/html")
 
@@ -1588,9 +1581,8 @@ class Handler(SimpleHTTPRequestHandler):
         )
 
     # --- a hub page that fails on the update, taking its children with it --
-    # The children are reachable only through hub.html. If the engine drops
-    # them from new.lst because the hub was never parsed, the purge unlinks
-    # them. gone.html is the control that leaves the site.
+    # The children are reachable only through hub.html, so an unparsed hub
+    # lets the purge unlink them. gone.html is the control that leaves the site.
     HUBFAIL_CHILD = b"<html><body><p>HUBFAIL-CHILD-%d</p></body></html>"
 
     def route_hubfail_index(self):
@@ -1763,8 +1755,7 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_raw(b"<html><body><p>TWICEFAIL-CHILD</p></body></html>", "text/html")
 
     # --- negative control: a blob that carries no links (#1395) ------------
-    # It was mirrored and fails like the hubs, but it is a blob, so neither the
-    # cached entry nor the kept copy may hold the purge.
+    # It fails like the hubs, but as a blob it must not hold the purge.
     def route_binfail_index(self):
         links = '\t<a href="binblob.bin">blob</a>\n'
         if self.refetch_pass() <= 2:  # bingone.html leaves the site for crawl 3
@@ -1786,8 +1777,7 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_raw(b"<html><body><p>BINFAIL-GONE</p></body></html>", "text/html")
 
     # --- negative control: a Location on an answered blob (#1395) -----------
-    # Location: is parsed and cached whatever the status, but a 200 carrying one
-    # is not a redirect and must not hold the purge.
+    # A 200 carrying a Location: is not a redirect and must not hold the purge.
     def route_locfail_index(self):
         links = '\t<a href="locblob.bin">blob</a>\n'
         if self.refetch_pass() == 1:  # locgone.html leaves the site afterwards
@@ -1844,8 +1834,7 @@ class Handler(SimpleHTTPRequestHandler):
             '\t<a href="blob.pdf">pdf</a>\n' '\t<a href="real.html">real</a>\n'
         )
 
-    # 1 MB body. Aborting after the header keeps httrack's "bytes received"
-    # tiny, and reading the body makes it jump.
+    # Aborting after the header keeps httrack's "bytes received" far below 1 MB.
     MIMEX_BLOB = b"%PDF-1.4\n" + b"\x00" * (1024 * 1024)
 
     def route_mimex_blob(self):
@@ -2213,10 +2202,8 @@ class Handler(SimpleHTTPRequestHandler):
         if self.command != "HEAD":
             self.wfile.write(body)
 
-    # A 206 resume must honor the server's Content-Range rather than the offset
-    # asked for (#198), or an early resume duplicates the overlap. flaky.bin
-    # breaks once and resumes OVERLAP_EARLY bytes early, and full.bin serves
-    # the same bytes in one shot for comparison.
+    # A 206 resume must honor the server's Content-Range (#198). flaky.bin
+    # resumes OVERLAP_EARLY bytes early, and full.bin is the one-shot reference.
     OVERLAP_BLOB = b"%PDF-1.4\n" + bytes((i * 37 + 11) % 256 for i in range(8000))
     OVERLAP_EARLY = 8
     OVERLAP_PREFIX_LEN = 4000  # flushed before the stall
@@ -2277,8 +2264,7 @@ class Handler(SimpleHTTPRequestHandler):
         if self.command != "HEAD":
             self.wfile.write(part)
 
-    # C2: a resume answered by a 206 whose Content-Range end is INT64_MAX would
-    # overflow the crange+1 range check. httrack must reject it and refetch.
+    # C2: a 206 whose range ends at INT64_MAX must not overflow crange+1.
     CRANGE206_BODY = b"CR206DAT" + bytes((i * 5 + 1) % 256 for i in range(6000))
     _crange206_started = False
 
@@ -2429,9 +2415,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self._resume206_stall()
         return self._resume206_unusable()  # unusable forever, Range or not
 
-    # An unusable 206 alternating with a redirect to a case-different alias of
-    # the same path. The hop re-records the link, and a latch lost there buys a
-    # free restart every round (#1052).
+    # An unusable 206 alternates with a redirect to a case-different alias, and
+    # a latch lost on that hop would buy a free restart every round (#1052).
     _alias206_count = 0
 
     def route_alias206_index(self):
@@ -2598,8 +2583,7 @@ class Handler(SimpleHTTPRequestHandler):
             pass
         self.close_connection = True
 
-    # A chunk-size line of exactly INT32_MAX, the one int http_xfread1() refuses.
-    # The chunk path must not first buy the 2 GiB realloc.
+    # The chunk path must refuse a size of INT32_MAX before a 2 GiB realloc.
     def route_chunktrunc_huge(self):
         self.protocol_version = "HTTP/1.1"
         self.send_response(200)
@@ -2893,8 +2877,7 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_html('\t<a href="go.php">go</a>')
 
     def route_longloc_go(self):
-        # absolute, because a relative target is capped at HTS_URLMAXSIZE
-        # before the gate under test sees it
+        # The target is absolute, because a relative one is capped earlier.
         base = "http://127.0.0.1:%d/longloc/" % self.server.server_address[1]
         self.send_response(302, "Found")
         self.send_header("Location", base + "target.html?q=" + "a" * 2400)
@@ -3027,10 +3010,8 @@ class Handler(SimpleHTTPRequestHandler):
         self.big_send(b"<html><body>tiny cacheable page</body></html>\n", "text/html")
 
     # --- /bakname/: #774, a mirrored file named like a re-fetch backup ----
-    # a.bin changes every pass, so the update re-fetches it and takes a backup.
-    # The sibling has a validator, so it only revalidates and must survive. It
-    # is served under hts-tmp/, where the backup lives, so the crawl asks for
-    # the exact path the engine writes.
+    # The update backs up a.bin, which changes every pass. The sibling sits at
+    # the backup's exact path and only revalidates, so it must survive.
     BAKNAME_SIB = b"BAKNAME-SIBLING\n" + b"\x41\x42\x43\x44" * 512
 
     def route_bakname_index(self):
@@ -3059,16 +3040,14 @@ class Handler(SimpleHTTPRequestHandler):
         if self.command != "HEAD":
             self.wfile.write(self.BAKNAME_SIB)
 
-    # --- /tmpspace/: #842, the same collision through the trailing-space bypass
-    # of the reserved-segment escape. "hts-tmp%20" escapes nothing and loses its
-    # space, so the sibling lands on the backup's name.
+    # --- /tmpspace/: #842, the same collision through "hts-tmp%20", which
+    # escapes nothing and then loses its trailing space.
     def route_tmpspace_index(self):
         self.send_html(
             '\t<a href="a.bin">a</a>\n' '\t<a href="hts-tmp%20/a.bin.bak">bak</a>\n'
         )
 
-    # --- /errmask/: issue #176, a page that 200'd on the first crawl but 403s
-    # on the update must keep its good copy, neither overwritten nor purged.
+    # --- /errmask/: #176, a page that 403s on the update keeps its good copy.
     ERRMASK_GOOD = b"KEEP" + b"." * 1020  # 1024 B distinctive non-HTML body
     ERRMASK_ERR = b"<html><body>error 403</body></html>\n"
 
@@ -3097,8 +3076,7 @@ class Handler(SimpleHTTPRequestHandler):
             self.wfile.write(self.ERRMASK_GOOD)
 
     def route_errmask_empty(self):
-        # Same masking shape as keep.dat, with a zero-length body. An
-        # engine-forced revisit must still digest and archive it (#839).
+        # This empty keep.dat twin must still be digested and archived (#839).
         if self.headers.get("If-Modified-Since") or self.headers.get("If-None-Match"):
             self.send_response(403, "Forbidden")
             self.send_header("Content-Type", "text/html")
@@ -3113,8 +3091,7 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Content-Length", "0")
         self.end_headers()
 
-    # --- /challenge/: issue #1732, a bot-protection refusal beside a plain
-    # 403, so the note must key on the vendor header rather than the status.
+    # --- /challenge/: #1732, the note must key on the vendor header alone.
     CHALLENGE_BODY = b"<html><body>Checking your browser</body></html>\n"
 
     def send_challenge(self, extra=()):
@@ -3363,11 +3340,9 @@ class Handler(SimpleHTTPRequestHandler):
     def route_short_trickle(self):
         self.route_trickle_page(8)
 
-    # #973: quoted, so the link parser keeps the < and > and the whole run
-    # reaches the progress panel.
+    # #973: quoting keeps the < and > in the link the progress panel shows.
     XSS_NAME = "p0<img src=x onerror=alert(1)>'quote.bin"
-    # Only a directory reaches the panel's name column, and the engine elides
-    # that column past 40 chars.
+    # Only a directory reaches the name column, which is elided past 40 chars.
     XSS_DIR = "d0<i'>"
 
     def route_xssjob_index(self):
@@ -3570,16 +3545,14 @@ class Handler(SimpleHTTPRequestHandler):
         except OSError:
             pass
 
-    # -M under a slow server (#77): p0 is a fast 640KB file that alone overruns
-    # -M, and p1..p3 trickle for a minute. The cap must abort those transfers.
+    # -M (#77): p0 alone overruns it, and the cap must abort trickling p1..p3.
     def route_bigtrickle_index(self):
         self.send_html(
             "".join('\t<a href="p%d.bin">p%d</a>\n' % (i, i) for i in range(4))
         )
 
-    # -M hard-abort must not destroy an already-complete file (#77 follow-up).
-    # fast.bin alone overruns -M. slow.bin downloads fully once, then stalls on
-    # the --update re-fetch until -M aborts it. The good local copy must survive.
+    # fast.bin overruns -M, which aborts slow.bin's stalled --update re-fetch.
+    # slow.bin's complete local copy must survive (#77).
     slow_seen = 0
 
     def route_bigtrunc_index(self):
@@ -3625,9 +3598,8 @@ class Handler(SimpleHTTPRequestHandler):
         if self.command != "HEAD":
             self.wfile.write(body)
 
-    # --changes (#714). No route sends validators, so the transfer signal would
-    # call the whole site changed on pass 2. A payload comparison tells
-    # stable.html and stable.bin from moved.*.
+    # --changes (#714) gets no validators, so only a payload comparison tells
+    # stable.* from moved.*.
     def route_changes_index(self):
         links = "".join(
             '\t<a href="%s">%s</a>\n' % (name, name)
@@ -3703,8 +3675,7 @@ class Handler(SimpleHTTPRequestHandler):
     # retry notifies again, so the accumulator keeps the first pre-run sample.
     FLAKY = b"CHANGES-FLAKY\n" + b"\x07\x06\x05\x04" * 512
 
-    # A stable page linking through a redirect whose target is renamed between
-    # passes. The rewritten link changes the file's length on disk, but the
+    # A renamed redirect target changes this page's length on disk, but the
     # payload is identical and must count as unchanged.
     SIZED_SHORT = "s.html"
     SIZED_LONG = "s" * 40 + ".html"
@@ -3727,9 +3698,8 @@ class Handler(SimpleHTTPRequestHandler):
         self.refetch_pass()
         self.send_raw(b"<html><body><p>SIZED-TARGET</p></body></html>", "text/html")
 
-    # Content-Encoding on a direct-to-disk body. The decoded temp replaces the
-    # mirror file, so the old copy is sampled first. Both passes have the same
-    # length, so only a digest tells them apart.
+    # The decoded temp replaces the mirror file, so the old copy must be sampled
+    # first. Both passes have one length, so only a digest tells them apart.
     def route_changes_coded(self):
         pass1 = self.refetch_pass() == 1
         body = b"CHANGES-CODED-V%d\n" % (1 if pass1 else 2) + b"\x11\x22" * 1024
@@ -3753,8 +3723,7 @@ class Handler(SimpleHTTPRequestHandler):
             b"<html><body><p>CHANGES-TRANSIENT</p></body></html>", "text/html"
         )
 
-    # Answers once, then hangs up before sending on every later attempt. The
-    # file never reaches new.lst, and its mirrored copy stays intact.
+    # It answers once, then hangs up, so the file misses new.lst but survives.
     RESET = b"CHANGES-RESET\n" + b"\x21\x22\x23\x24" * 512
 
     def route_changes_reset(self):
@@ -3987,9 +3956,7 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_raw(b"<html><body><p>COLLIDE-HTML</p></body></html>", "text/html")
 
     # --- a failed hub with no cache left at all (#1414's fallback) ----------
-    # With no cache entry, the kept copy is typed by guessing from the file. A
-    # carried-forward record supplies an entry wherever a cache exists, so only
-    # a mirror with no cache reaches that arm.
+    # Only a mirror with no cache left reaches the guess-from-file typing arm.
 
     def route_nocachefail_index(self):
         self.send_html('\t<a href="nhub.html">hub</a>\n')

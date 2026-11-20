@@ -1,11 +1,8 @@
 #!/bin/bash
 #
-# automake TEST_LOG_COMPILER: run one .test under a wall-clock budget. CI
-# cancels a wedged job, and a cancelled step keeps no log. On expiry this names
-# the test, dumps what still runs, and exits 124 so the step fails with logs.
-#
-# Output goes to the test's own tests/NN_*.log and from there into
-# test-suite.log, which CI prints.
+# automake TEST_LOG_COMPILER: run one .test under a wall-clock budget. On expiry
+# this names the test, dumps what still runs and exits 124, so CI fails the step
+# with its log rather than cancelling it.
 
 set -u
 
@@ -15,10 +12,8 @@ testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/proclib.sh
 . "${testdir}/proclib.sh"
 
-# 600s clears the 540s that local-crawl.sh's watchdogs allow a three-pass crawl
-# (CRAWL_DEADLINE, 180s a pass). The slowest healthy test takes 39s. A
-# non-numeric or absurd value falls back, and 0 disables the guard for use
-# under a debugger.
+# 600s clears the 540s local-crawl.sh allows a three-pass crawl. A bad value
+# falls back, and 0 disables the guard for use under a debugger.
 budget=$(budget_secs)
 
 # The test script is the last argument; automake passes no others today.
@@ -37,9 +32,8 @@ if test -n "${HTTRACK_STDERR_CAPTURE_DIR:-}" && test -d "${HTTRACK_STDERR_WRAP_D
     export PATH HTTRACK_STDERR_CAPTURE_TAG
 fi
 
-# A test whose work outlasts the budget raises it in its header. Nothing can
-# lower it, so no test can disarm the guard. The shell reads it to save a fork
-# per test, and caps its length because bash's `test` errors past intmax.
+# A test header may raise the budget but never lower it. The value's length is
+# capped, because bash's `test` errors past intmax.
 if test "$budget" -gt 0 && test -r "$path"; then
     read_lines=0
     while test "$read_lines" -lt 40 && IFS= read -r line; do
@@ -81,12 +75,9 @@ fi
 export TESTLIB_DONE_FILE
 rm -f "$TESTLIB_DONE_FILE" 2>/dev/null || true
 
-# bash before 4.2 patch 23 loses the exit status when an EXIT trap follows a
-# fatal expansion error under errexit, and macOS ships 3.2.57. So the test
-# marks its own end, and a zero status with no mark is an abort. Sourcing from
-# `bash -c` keeps $0 the test's path, writes nothing in a read-only srcdir and
-# leaves stdin alone. A subshell's exit is not the test's. A top-level `exec`,
-# or removing the driver's TMPDIR, would lose the mark.
+# bash before 4.2p23 (macOS has 3.2) loses the exit status after a fatal error
+# under errexit, so a zero status without the test's end mark is an abort.
+# A top-level `exec`, or removing the driver's TMPDIR, would lose the mark.
 # shellcheck disable=SC2016 # the child expands it, not us
 TESTLIB_RUNNER='exit() {
     if test "$BASH_SUBSHELL" -eq 0; then : >"$TESTLIB_DONE_FILE" 2>/dev/null || true; fi

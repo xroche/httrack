@@ -3,11 +3,10 @@
 # Launcher for httrack crawl tests against the local Python test server.
 #
 # Starts tests/local-server.py on an ephemeral port, runs httrack against it
-# and audits the mirror. The server is always killed and the tmpdir removed.
+# and audits the mirror.
 #
 # In httrack arguments, BASEURL becomes http(s)://127.0.0.1:$PORT and BASEHOST
-# becomes 127.0.0.1:$PORT. --found/--directory paths are relative to the
-# 127.0.0.1_<port>/ host root, because the port is in the mirror directory name.
+# becomes 127.0.0.1:$PORT. --found/--directory paths start at 127.0.0.1_<port>/.
 #
 # Usage:
 #   bash local-crawl.sh [--tls] [--root DIR] [--cookie NAME=VALUE ...] \
@@ -309,9 +308,8 @@ fi
 declare -a moreargs=(--quiet "--max-time=$CRAWL_MAX_TIME" --timeout=30 --disable-security-limits --robots=0)
 console="${tmpdir}/console"
 
-# One pass: $1 gets its console output, $2 names it in diagnostics, the rest
-# are httrack arguments. local_crawl would hide the engine from the watchdog's
-# stack dump (105), so the pass is backgrounded here.
+# run_pass CONSOLE LABEL ARGS... is backgrounded here, because local_crawl
+# would hide the engine from the watchdog's stack dump (105).
 function run_pass {
     local passout=$1 label=$2 deadline rc=0
     shift 2
@@ -605,9 +603,8 @@ if test -n "$wacz_validate"; then
     result "OK"
 fi
 
-# No crawl, even a cancelled one, may leave engine temporaries: .delayed (#107,
-# #483), the .z/.u content-coding temps (#557), or their ~hts-tmp directory
-# (#774). A test that planted something in ~hts-tmp skips the scan.
+# No crawl may leave .delayed (#107, #483), .z/.u (#557) or ~hts-tmp (#774)
+# temporaries, unless the test planted something in ~hts-tmp.
 info "checking for leftover engine temporaries"
 scan_tmpdir=1
 i=0

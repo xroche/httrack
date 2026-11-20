@@ -129,18 +129,16 @@ exec /usr/bin/uname "$@"
 EOF
 chmod +x "$stubdir/uname"
 
-# Stub browser, named after the first entry of webhttrack's browser list. It goes
-# in $prefix/bin because webhttrack searches its own SRCHPATH before $PATH, and the
-# GitHub Linux runners ship a real /usr/bin/x-www-browser. It records PASS only for
-# a whole UI, and checks here because htsserver exits with webhttrack.
+# The stub browser goes in $prefix/bin, because webhttrack searches it before
+# $PATH and the runners ship a real x-www-browser. It checks the UI itself,
+# because htsserver exits with webhttrack.
 # -a: the UI is served ISO-8859-1, so grep must not treat it as binary.
 cat >"$browserstub" <<EOF
 #!/bin/bash
 echo "stub browser invoked with: \$1" >&2
-# An option page must render a title='' tooltip, so the \${html:} filter escapes
-# into the attribute. option9 checks the WARC and change-report controls, option8
-# the sitemap ones, and option2 the --single-file pair with no unexpanded key
-# (the default locale here is French).
+# A title='' tooltip proves the \${html:} filter escapes into the attribute.
+# option9, option8 and option2 check the WARC, sitemap and single-file controls.
+# option2 also checks for an unexpanded key under the French default locale.
 opturl="\${1%/}/server/option2.html"
 warcurl="\${1%/}/server/option9.html"
 smurl="\${1%/}/server/option8.html"
@@ -205,9 +203,8 @@ test "$(cat "$marker" 2>/dev/null || true)" = PASS || {
 }
 echo "webhttrack smoke: PASS"
 
-# The browser helper must not outlive the session. Darwin's open -W blocks until the
-# browser quits, and an unreaped one keeps its Dock icon up until force-quit. Darwin
-# only, because elsewhere a real browser is found ahead of open.
+# Darwin's open -W blocks until the browser quits, so the helper must be reaped
+# with the session. Elsewhere a real browser is found ahead of open.
 rm -f "$stubdir/uname"
 test "$(uname -s)" = Darwin || {
     echo "not Darwin: skipping the browser-helper check"
@@ -276,8 +273,7 @@ end_session() {
     }
 }
 
-# $prefix/bin heads webhttrack's search path, so this shadows /usr/bin/open. This PATH
-# is the one launchd gives an app opened from Finder, where no browser is found.
+# $prefix/bin heads webhttrack's search path, so this shadows /usr/bin/open.
 rm -f "$browserstub"
 openstub="$prefix/bin/open"
 openargs="$work/open.args"
@@ -317,8 +313,7 @@ wait_gone "$helper" 10 || {
 }
 echo "browser helper reaped on the signal path"
 
-# x-www-browser heads webhttrack's browser list, so it is chosen over open here. Only
-# the helper we asked to wait is reaped, and the user's browser is left alone.
+# x-www-browser beats open here, and a real browser must never be reaped.
 echo "case 3: a real browser is left alone"
 browserargs="$work/browser.args"
 browserpid="$work/browser.pid"

@@ -39,9 +39,8 @@ local_server_stop() {
 }
 
 # Start local-server.py on an ephemeral port and wait for its "PORT n" line.
-# Sets SRV_PORT, SRV_PID, SRV_LOG and BASEURL, registers the reaping cleanup and
-# appends to SRV_PIDS. A second call overwrites all four, so give each server
-# its own --log. Options come before any server argument, and -- ends them:
+# It sets SRV_PORT, SRV_PID, SRV_LOG and BASEURL, and a second call overwrites
+# them. Options come before any server argument, and -- ends them:
 #   --root DIR    tree to serve (default: the shared server-root fixture)
 #   --log FILE    where the announcement lands (default: $tmpdir/server.log)
 #   --env V=VAL   an environment variable for the server, repeatable
@@ -228,13 +227,9 @@ assert_lockrule_selftest() {
 write_lock_request() { # write_lock_request DIR NAME PID
     local dir=$1 name=$2 pid=$3 gone='' up=$1
     local try max_tries=30 went='' staged="${1}/${2}.staged"
-    # drvfs refuses a write into a directory it still holds (#1639), so the
-    # first attempt gets 29 retries. Each failure re-reads the path, so a
-    # removal that comes back inside the window is still reported.
-    #
-    # drvfs can also refuse a write that landed (#1712). Only the staging file
-    # going away proves the move, because the engine may already have taken the
-    # request.
+    # drvfs refuses a write into a directory it still holds (#1639), so retry.
+    # It can also refuse a write that landed (#1712), so only the staging file
+    # going away proves the move.
     for try in $(seq 1 "$max_tries"); do
         test "$try" -eq 1 || sleep 0.1
         # The shell reports a failing redirect before it applies the 2>/dev/null

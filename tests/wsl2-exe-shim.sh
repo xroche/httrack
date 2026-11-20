@@ -1,19 +1,15 @@
 #!/bin/bash
 #
 # PATH shim for the wsl2 backend, symlinked once per engine under the name the
-# tests use. WSL2's PATH matches a filename exactly, so a bare "httrack" finds
-# nothing, and a drvfs path means nothing to the exe. This fixes both in one
-# place.
+# tests use. It finds the .exe a bare name misses, and maps drvfs paths for it.
 #
 # exec, so the pid does not change: win_capture reads /proc/<pid>/cmdline to
 # find the Windows process, and after the exec that cmdline is the translated
 # one the Windows side really carries.
 set -uo pipefail
 
-# The drvfs mapping testlib.sh does, repeated because this runs as its own
-# process and a bare rootfs ships no wslpath. The result goes into TRANSLATED
-# because a command substitution strips trailing newlines. Each comma-separated
-# piece is mapped, because httrack's -O takes `dir,cache`.
+# This repeats testlib.sh's drvfs mapping, because a bare rootfs has no wslpath.
+# It sets TRANSLATED, because a command substitution strips trailing newlines.
 TRANSLATED=
 translate_arg() { # translate_arg ARG
     local rest=$1 piece drive
@@ -46,8 +42,7 @@ for a in "$@"; do
         translate_arg "$a"
         args+=("$TRANSLATED")
         ;;
-    # A file:// URL built from one of those paths, mapped to the file://D:/...
-    # form MSYS produces.
+    # Map a file:// URL to the file://D:/... form MSYS produces.
     file:///mnt/[A-Za-z]/*)
         translate_arg "${a#file://}"
         args+=("file://$TRANSLATED")

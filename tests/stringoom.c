@@ -82,9 +82,7 @@ static String room = STRING_EMPTY;
 static const char *kept = NULL;
 static size_t kept_capacity = 0;
 
-/* The handler must run once and get the size the allocator was asked for,
-   because an under-allocation reports a size the String does not have. The
-   stub's own record is the reference, so the test pins no initial capacity. */
+/* The handler must run once and report the size the stub recorded. */
 static int failure_reported(const char *name) {
   if (oom_calls != 1) {
     printf("%s: FAIL (handler ran %d times)\n", name, oom_calls);
