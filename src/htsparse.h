@@ -222,10 +222,8 @@ const char *hts_dirty_attr_name(const char *quote, const char *tag_start,
 
 /*
   Non-zero if a redirect (cur_adr,cur_fil)->(moved_adr,moved_fil) saves to the
-  same local file. Such a redirect is followed, because a "moved" stub would
-  point at itself (#159). It strips scheme and userinfo, keeps www, and
-  normalizes the path per the URL-hack flags. hash_url_equals cannot replace
-  it because it folds www and keeps http and https apart.
+  same local file, where a "moved" stub would point at itself (#159).
+  hash_url_equals folds www and splits http/https, so it cannot replace this.
 */
 hts_boolean hts_redirect_same_savefile(httrackp *opt, const char *cur_adr,
                                        const char *cur_fil,
@@ -233,10 +231,9 @@ hts_boolean hts_redirect_same_savefile(httrackp *opt, const char *cur_adr,
                                        const char *moved_fil);
 
 /*
-  Did a postprocess-html callback's reply come out of the engine's own storage?
-  "html" is the reply, "buffer" and "capa" the storage. A reply anywhere inside
-  it, such as buffer+3 after a BOM, was edited in place. The engine must then
-  move its bytes down instead of appending them onto themselves.
+  Did a postprocess-html callback's reply come out of the engine's own storage
+  (buffer, capa)? Such a reply, maybe offset past a BOM, was edited in place
+  and must be moved down rather than appended onto itself.
 */
 hts_boolean hts_postprocess_reply_inplace(const char *html, const char *buffer,
                                           size_t capa);

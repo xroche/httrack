@@ -31,10 +31,8 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
-/* Self-tests sit behind one registry reached as `httrack -#test=NAME [args]`
-   (`-#test` lists them). A handler runs over the positional args
-   (argv[0..argc-1]), prints one result line, and returns the process exit code.
-   Each engine module publishes its table in hts<module>_selftest.c. */
+/* `httrack -#test=NAME [args]` runs one self-test, and `-#test` lists them. A
+   handler prints one result line and returns the process exit code. */
 
 #include "htsselftest_int.h"
 
@@ -115,10 +113,8 @@ static char *st_batch_field(char **pos, const char *end) {
   return field;
 }
 
-/* Each case gets a fresh option set, as it would in its own process. It
-   carries the seven fields htsmain() derives before the dispatch from the
-   harness's -O, the data directory and the tty probe. Every other field keeps
-   hts_create_opt's default. */
+/* Give each case a fresh option set, as in its own process, carrying the
+   fields htsmain() derives before the dispatch (-O, data directory, tty). */
 static httrackp *st_batch_opt(const httrackp *from) {
   httrackp *const opt = hts_create_opt();
 
@@ -132,12 +128,10 @@ static httrackp *st_batch_opt(const httrackp *from) {
   return opt;
 }
 
-/* Run a script of self-tests in one process, so a test file costs one fork
-   instead of one per assertion (#1305). Cases come on stdin, because in argv
-   the engine would parse a `-*` as its own filter and rewrite the rest. The
-   script is NUL-separated fields repeating <argc> <name> <arg>*. Each case
-   prints its output, RS, its exit code and RS, which testlib.sh's
-   selftest_run_queued splits on. */
+/* Run a script of self-tests in one process (#1305). Cases come on stdin,
+   because argv would parse a `-*` as an engine filter. Input is NUL-separated
+   <argc> <name> <arg>* records. Each case prints its output, RS, its exit code
+   and RS, for testlib.sh's selftest_run_queued. */
 static int st_batch(httrackp *opt, int argc, char **argv) {
   char *buff, *pos;
   const char *end;

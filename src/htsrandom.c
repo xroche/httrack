@@ -40,8 +40,7 @@ Please visit our Website: http://www.httrack.com
 #else
 #include <errno.h>
 #include <stdio.h>
-/* One macro gates the include and the call, because <sys/random.h> is the
-   only declaration of getrandom(). */
+/* One macro gates both, because only <sys/random.h> declares getrandom(). */
 #if defined(HAVE_SYS_RANDOM_H) && defined(HAVE_GETRANDOM)
 #define HTS_USE_GETRANDOM
 #include <sys/random.h>

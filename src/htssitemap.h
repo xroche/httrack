@@ -27,9 +27,8 @@ Please visit our Website: http://www.httrack.com
 
 /* ------------------------------------------------------------ */
 /* HTTrack sitemap ingestion (sitemaps.org 0.9). Internal, not installed.
-   It feeds the <loc> URLs of <urlset>/<sitemapindex> documents, plain or
-   gzip-framed, to the crawl as top-level seeds. Every entry point is capped,
-   because the input is hostile. */
+   It seeds the crawl with the <loc> URLs of plain or gzipped sitemaps, and
+   caps every entry point against hostile input. */
 /* ------------------------------------------------------------ */
 
 #ifndef HTS_SITEMAP_DEFH

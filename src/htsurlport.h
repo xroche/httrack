@@ -98,8 +98,7 @@ hts_boolean hts_header_param(const char *value, const char *seps,
                              const char *name, char *out, size_t size);
 
 /* Return the static reason phrase of HTTP status CODE, or NULL if unknown.
-   It lives here for proxytrack, which does not link the library. HTSEXT_API
-   would break the MSVC proxytrack build. */
+   It sits here for proxytrack, and HTSEXT_API would break its MSVC build. */
 const char *hts_status_reason(int code);
 
 #endif

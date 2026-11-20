@@ -27,10 +27,8 @@ Please visit our Website: http://www.httrack.com
 
 /* ------------------------------------------------------------ */
 /* --single-file asset inliner. See htssinglefile.h.
-   htsparse marked every inlinable reference while saving, and this pass only
-   substitutes those marks without parsing HTML or CSS. A mark resolves by path
-   arithmetic clamped to the mirror root. An unresolvable mark keeps its link,
-   so a second --update run is a no-op. */
+   This pass substitutes the marks htsparse left while saving, and parses no
+   HTML or CSS. An unresolvable mark keeps its link, so a rerun is a no-op. */
 /* ------------------------------------------------------------ */
 
 #include "htssinglefile.h"
@@ -147,10 +145,8 @@ const char *singlefile_mark(httrackp *opt, char *buf, size_t bufsize, char cls,
   return buf;
 }
 
-/* These (tag, attribute) pairs name a page or a media stream instead of an
-   asset, and a NULL tag matches any. The pass decides every other detected
-   reference by its file's MIME type, so a new hts_attrs[] row needs no change
-   here. */
+/* These (tag, attribute) pairs name a page or media stream, never an asset.
+   A NULL tag matches any. Other references go by MIME type alone. */
 static const htspair_t sf_deny_rules[] = {
     {"a", "href"},      {"area", "href"},   {"iframe", "src"},
     {"frame", "src"},   {"applet", "code"}, {NULL, "longdesc"},
@@ -202,8 +198,7 @@ static int sf_rel_is_stylesheet(const char *tag_name) {
   return -1;
 }
 
-/* Here a NULL tag means "any tag", but in htswizard's table it marks the
-   end. */
+/* A NULL tag means "any tag" here, but ends htswizard's table. */
 static hts_boolean sf_denied(const char *tag_name, const char *attr) {
   size_t i;
 
@@ -498,8 +493,7 @@ static void sf_append_escaped(String *out, const char *p, size_t len,
   }
 }
 
-/* The context said one type and the file is another. A marked reference
-   resolved to the wrong thing, which is a bug. */
+/* A marked reference resolved to a file of another type, which is a bug. */
 static void sf_warn_mismatch(sf_ctx *ctx, const char *path, char want,
                              const char *mime) {
   if (*ctx->warn_budget <= 0)
@@ -726,10 +720,8 @@ static size_t sf_strip_marks(const char *intro, size_t introlen, char *body,
 }
 
 /* Copy [body,body+len) to out, replacing each marked reference by its data:
-   URI, or by the bare reference when it cannot be inlined. The mark carries
-   the reference's length, and whatever follows it (a fragment, a kept query)
-   stays after the data: URI. A value keeps htsparse's quoting, so an unquoted
-   attribute holds base64 padding, which parsers accept but HTML forbids. */
+   URI, or by the bare reference when it cannot be inlined. Whatever follows
+   the reference (a fragment, a kept query) stays after the data: URI. */
 static void sf_expand(sf_ctx *ctx, const char *base_dir, int depth,
                       const char *body, size_t len, String *out) {
   const char *const intro = singlefile_intro(ctx->opt);
@@ -822,8 +814,7 @@ static hts_boolean sf_replace_file(httrackp *opt, const char *path,
   if (len > 0 && !hts_fwrite_exact(body, len, fp))
     ok = HTS_FALSE;
 #ifndef _WIN32
-  /* The spool bypassed filecreate(), which chmods every other mirrored file.
-     Without this, the file keeps the umask's mode. */
+  /* The spool bypassed filecreate(), so set the mode it would have. */
   if (ok)
     (void) fchmod(fileno(fp), HTS_ACCESS_FILE);
 #endif
@@ -897,9 +888,8 @@ void singlefile_process_mirror(httrackp *opt) {
     if (singlefile_rewrite_file(opt, root, link->sav))
       pages++;
   }
-  /* Strip marks only after every page has been through the pass, because a
-     stylesheet expands from the marks in its copy on disk. Pages are swept
-     too, for marks the pass declined or an interrupted run left behind. */
+  /* Strip marks only after every page is done, because a stylesheet expands
+     from the marks in its copy on disk. */
   for (i = 0; i < opt->lien_tot; i++) {
     const lien_url *const link = opt->liens[i];
 

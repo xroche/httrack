@@ -77,8 +77,7 @@ typedef struct String String;
 #ifndef HTS_DEF_STRUCT_String
 #define HTS_DEF_STRUCT_String
 
-/** A growable string, released by StringFree(). Read it with StringBuff() and
-    never write its fields. htsstrings.h holds the field contract. */
+/** A growable string. Read it with StringBuff() and never write its fields. */
 struct String {
   char *buffer_;
   size_t length_;
@@ -413,10 +412,8 @@ typedef enum hts_hostcontrol {
 typedef struct lien_buffers lien_buffers;
 #endif
 
-/** Per-mirror options and live state: hts_create_opt() builds one and
-    hts_main2() runs it. Callers set it through an argv vector, and write only
-    log and errlog directly. copy_htsopt() skips an hts_tristate field left at
-    HTS_DEFAULT. */
+/** Per-mirror options and live state. Callers set it through an argv vector
+    and write only log and errlog directly. */
 #ifndef HTS_DEF_FWSTRUCT_httrackp
 #define HTS_DEF_FWSTRUCT_httrackp
 typedef struct httrackp httrackp;

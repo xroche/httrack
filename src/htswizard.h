@@ -67,8 +67,7 @@ hts_boolean hts_robots_forbids(httrackp *opt, const char *adr, const char *fil,
 /* Builds into `f` the `slot`-th filter answer `n` adds for the link (adr,fil),
    and leaves `f` empty past the last one. Only host-scope answers emit a
    second, because their starred form misses the apex. `seeker_up` is
-   opt->seeker's HTS_SEEKER_UP bit, read by answer 5. `f` needs a full
-   HTS_FILTER_SLOT_SIZE so no pattern is truncated. */
+   opt->seeker's HTS_SEEKER_UP bit. `f` needs HTS_FILTER_SLOT_SIZE bytes. */
 void hts_wizard_answer_filter(htsbuff *f, int slot, int n, const char *adr,
                               const char *fil, hts_boolean seeker_up);
 
@@ -83,11 +82,9 @@ void hts_wizard_prompt_url(char *dst, size_t dstsize, const char *adr,
 int hts_wizard_parse_reply(const char *s);
 
 /* Records the filters answer `n` leaves behind for the link (adr,fil), on top
-   of the wizard's block at the low indices of opt->filters. Last match wins,
-   so the command-line filters above the block outrank every answer. Returns
-   the number inserted at the tail of the block, ending at
-   opt->wizard_filters. A rule too long for the matcher is dropped, so the
-   count can fall short of what the answer emits. */
+   of the wizard's block at the low indices of opt->filters. The last match
+   wins, so the command-line filters above it outrank every answer. Returns
+   the count inserted, which drops a rule too long for the matcher. */
 int hts_wizard_insert_filters(httrackp *opt, int n, const char *adr,
                               const char *fil, hts_boolean seeker_up);
 
@@ -96,9 +93,8 @@ int hts_wizard_insert_filters(httrackp *opt, int n, const char *adr,
 hts_tristate hts_wizard_scope_answer(int n);
 
 /* Applies the verdict half of answer `n` for the link (adr,fil): refuses it,
-   stops the questions, or bans recursion from it. It resolves an undecided
-   (-1) link but never overturns a computed verdict. The filter half is
-   hts_wizard_answer_filter(), and a new answer needs both. */
+   stops the questions, or bans recursion from it. It never overturns a
+   computed verdict. A new answer also needs hts_wizard_answer_filter(). */
 void hts_wizard_apply_verdict(httrackp *opt, int n, const char *adr,
                               const char *fil, int *forbidden_url,
                               int *set_prio_to);

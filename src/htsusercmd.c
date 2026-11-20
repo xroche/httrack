@@ -182,13 +182,11 @@ static int usercommand_refuse(const char **why, const char *reason) {
 }
 
 /*
- * Rewrite the -V template "cmd" into "dest". On POSIX each "$0" becomes a
- * reference to the shell's first positional parameter, which usercommand_exe()
- * sets to the save name, so "file" is unused. On Windows "cmd /c" has no
- * positional parameters, so "$0" is replaced by "file" quoted for cmd.exe.
- * Returns USERCOMMAND_EXPAND_OK, _TOOLONG if the result does not fit, or
- * _REFUSED if "$0" lands where neither holds, with "*why" naming the cause.
- * Except on OK, "dest" holds a prefix that must not be run.
+ * Rewrite the -V template "cmd" into "dest". On POSIX "$0" becomes the
+ * shell's first positional parameter, which usercommand_exe() sets to the save
+ * name. On Windows it becomes "file" quoted for cmd.exe. Returns
+ * USERCOMMAND_EXPAND_OK, _TOOLONG, or _REFUSED with "*why" set. Except on OK,
+ * "dest" holds a prefix that must not be run.
  */
 int usercommand_expand(char *dest, size_t size, const char *cmd,
                        const char *file, const char **why) {
@@ -210,12 +208,9 @@ int usercommand_expand(char *dest, size_t size, const char *cmd,
   for (i = 0; cmd[i] != '\0'; i++) {
     const char c = cmd[i];
 
-    /* Substitute it wherever it appears, except where the quoting that makes
-       it safe would not survive. */
     if ((c == '$') && (cmd[i + 1] == '0')) {
-      /* The allowlist. A parameter is data only in a plain word, in "..." and
-         in '...'. Elsewhere bash may re-expand it (${v:off:len}, unset) or
-         evaluate it as arithmetic. Every region the scanner opens refuses. */
+      /* $0 is data only in a plain word, "..." and '...'. Elsewhere bash may
+         re-expand or evaluate it, so every region the scanner opens refuses. */
       if (depth != 0)
         return usercommand_refuse(why, "$0 must be a plain word, or inside "
                                        "\"...\" or '...'; it is inside a "
@@ -223,10 +218,8 @@ int usercommand_expand(char *dest, size_t size, const char *cmd,
                                        "arithmetic, a subscript or [[ ]], "
                                        "where the shell reads it again");
 #ifndef _WIN32
-      /* A backslash here was meant for an outer shell that did not strip it,
-         and it would eat the first character of the parameter reference, so
-         drop it. This keeps the documented -V "rm \$0" working. On Windows a
-         backslash is a path separator, and cmd.exe does not escape with it. */
+      /* Drop a backslash an outer shell left, or it eats the parameter's first
+         character. This keeps the documented -V "rm \$0" working. */
       if (escaped) {
         /* the flag is set only by a backslash this loop just emitted */
         assertf(pos > 0 && dest[pos - 1] == '\\');
@@ -289,11 +282,9 @@ int usercommand_expand(char *dest, size_t size, const char *cmd,
           return USERCOMMAND_EXPAND_TOOLONG;
         continue;
       } else if (!escaped && c == '[') {
-        /* An array subscript is evaluated as arithmetic, whether read
-           (${a[$0]}) or written (a[$0]=1, a=([$0]=x), unset a[$0]). A
-           subscript is stuck to a word, and "[ -f $0 ]" and "[[" start none.
-           It is spotted inside '...' too, because the '"${1}"' emitted there
-           splits the quote, and unset 'a[$0]' then evaluates the name. */
+        /* Bash evaluates a subscript (${a[$0]}, a[$0]=1) as arithmetic. A
+           subscript sticks to a word, so "[ -f $0 ]" starts none. Inside '...'
+           the emitted '"${1}"' splits the quote, so it is caught there too. */
         if (i != 0 && strchr(" \t\n;&|", cmd[i - 1]) == NULL) {
           if (!usercommand_push(stack, &depth, ctx, ']', 1))
             return usercommand_refuse(why, too_deep);

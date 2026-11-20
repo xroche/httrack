@@ -35,12 +35,9 @@ Please visit our Website: http://www.httrack.com
  * Safe string helpers, the fatal-assert machinery, and the "t" allocator
  * wrappers the engine uses instead of raw libc.
  *
- * The buff() family aborts on overflow when the destination is an array (see
- * the size contract below), and the htsbuff builder always aborts. That suits
- * data we built. Clip a value read off the wire, a cache or a header with
- * strclipbuff() or slprintfbuff() instead, because malformed input must not
- * crash. Both still abort on a NULL buffer or a zero size, so check a
- * computed size first.
+ * The buff() family and the htsbuff builder abort on overflow, which suits data
+ * we built. Clip data read off the wire, a cache or a header with strclipbuff()
+ * or slprintfbuff() instead. Those still abort on a NULL buffer or zero size.
  */
 
 #ifndef HTSSAFE_DEFH
@@ -199,18 +196,13 @@ static char *strncatbuff_ptr_(char *dest, const char *src, size_t n) {
 #endif
 
 /*
- * SIZE CONTRACT of strcpybuff/strcatbuff/strncatbuff (the "buff" family): the
- * bound is sizeof(A), the full array size including the NUL, so A must be a
- * char[] array in scope. On overflow the *_safe_ helpers abort() (assertf)
- * instead of truncating. The destination must already be NUL-terminated
- * within its capacity, or the call aborts. A successful result is always
- * NUL-terminated.
+ * SIZE CONTRACT of strcpybuff/strcatbuff/strncatbuff: the bound is sizeof(A),
+ * NUL included, so A must be a char[] array in scope. They abort() on overflow
+ * or on a destination not NUL-terminated within it, and always NUL-terminate.
  *
- * If A is a bare char* pointer, sizeof(A) is the pointer size, and these
- * macros fall back to the unbounded strcpy()/strcat()/strncat(). On GCC/Clang
- * (C) the *_ptr_ stubs above flag such a site with a 'warning' attribute, but
- * other compilers say nothing. For a pointer of known capacity, call
- * strlcpybuff/strlcatbuff with that capacity, NUL included.
+ * A bare char* pointer makes them fall back to unbounded strcpy()/strcat()/
+ * strncat(), and only GCC/Clang warn. Pass a pointer's capacity to
+ * strlcpybuff/strlcatbuff instead.
  */
 
 /**
@@ -277,10 +269,8 @@ static char *strncatbuff_ptr_(char *dest, const char *src, size_t n) {
 #endif
 
 /*
- * Explicit-size variants (strlcatbuff/strlncatbuff/strlcpybuff) take the
- * capacity S from the caller (total bytes, NUL included) instead of sizeof(A).
- * Use them when A is a pointer or its capacity is not its sizeof. They keep
- * the abort-on-overflow, always-NUL-terminated contract.
+ * The explicit-size variants strlcatbuff/strlncatbuff/strlcpybuff take the
+ * capacity S, NUL included, instead of sizeof(A). They abort on overflow too.
  */
 
 /** Append all of B to A, whose capacity is S bytes including the NUL. ABORTS
@@ -512,11 +502,9 @@ hts_path_is_contained(const char *path) {
 }
 
 /**
- * True if path is a relative name that no ".." component can walk out of, as a
- * filename read from a cache must be before it is joined to a root. Absolute
- * names are refused too, because with no -O that root is "". It matches
- * ProxyTrack's readers plus the Windows backslash. Letters are ranged so this
- * header needs no <ctype.h>.
+ * True if path is a relative name no ".." component can walk out of. A cache
+ * filename must pass before it is joined to a root. Absolute names fail too,
+ * because with no -O that root is "".
  */
 static HTS_INLINE HTS_UNUSED hts_boolean
 hts_path_is_relative_contained(const char *path) {
@@ -665,9 +653,7 @@ static HTS_INLINE HTS_UNUSED hts_boolean hts_choplastchar(char *s) {
 }
 
 /** These sets match htslib.h's is_space(), is_realspace(), is_taborspace()
-    and is_retorsep(), for hts_rtrim() and the strspn()/strcspn() skips. The
-    -#test=rtrim self-test keeps each set in sync with its macro. HTS_RETORSEP
-    has no skip caller yet. */
+    and is_retorsep(). The -#test=rtrim self-test keeps them in sync. */
 #define HTS_SPACES " \"\n\r\t\f\v'"
 #define HTS_REALSPACES " \n\r\t\f\v"
 /* The blanks that separate tokens in line formats: SPACE, TAB, CR, LF. */

@@ -44,10 +44,9 @@ Please visit our Website: http://www.httrack.com
 
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
-/* Inflate filename into newfile (gzip, zlib or raw deflate). Returns the
-   decoded size, or -1 on a corrupt or truncated stream, an over-budget body
-   or an I/O failure. A body in no deflate framing is copied verbatim. On -1,
-   errno holds the local failure, or 0 for a bad coded body. */
+/* Inflate filename into newfile (gzip, zlib or raw deflate), copying other
+   bodies verbatim. Returns the decoded size or -1, with errno 0 when the
+   coded body itself was bad. */
 extern int hts_zunpack(const char *filename, const char *newfile);
 /* As hts_zunpack(), with the decoded size also capped at cap when cap > 0;
    HTS_CODEC_TOOBIG when that cap was exceeded. */
@@ -60,9 +59,8 @@ extern int hts_extract_meta(const char *path);
 /* The message for a minizip error code. buf (HTS_STRERROR_SIZE) backs the
    UNZ_ERRNO case, where the text comes from errno; the rest are literals. */
 extern const char *hts_get_zerror(int err, char *buf, size_t size);
-/* Open a ZIP for reading / writing through the UTF-8 file wrappers, because
-   minizip's plain fopen mangles a non-ASCII path on Windows (#630). `append`
-   takes the zipOpen2_64 APPEND_STATUS_* values. */
+/* Open a ZIP through the UTF-8 file wrappers, because minizip's fopen mangles
+   a non-ASCII Windows path (#630). `append` takes APPEND_STATUS_* values. */
 extern unzFile hts_unzOpen_utf8(const char *path);
 extern zipFile hts_zipOpen_utf8(const char *path, int append);
 /* The table both open with, for a caller that overrides one entry. */

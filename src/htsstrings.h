@@ -32,11 +32,9 @@ Please visit our Website: http://www.httrack.com
 
 /**
  * @file htsstrings.h
- * Growable string (String) that owns its buffer, header-only. Release a String
- * with StringFree(), or hand its buffer over with StringAcquire().
- *
- * A macro takes the String itself, not a pointer, and may evaluate it several
- * times, so pass a plain variable. Lengths and capacities count bytes.
+ * A growable String owns its buffer. Release it with StringFree(), or hand the
+ * buffer over with StringAcquire(). Macros take the String itself and may
+ * evaluate it several times, so pass a plain variable.
  */
 
 #ifndef HTS_STRINGS_DEFSTATIC

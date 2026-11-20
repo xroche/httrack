@@ -110,8 +110,7 @@ typedef enum {
 
 #define INSCRIPT_NSTATES 10 /* rows in the transition table */
 
-/* This view lets the helpers below drive the parser's automaton locals
-   without capturing them by lexical scope. */
+/* The helpers below drive the parser's automaton locals through this view. */
 typedef struct {
   const int *inscript;             /* nonzero while inside a script body */
   const hts_boolean *css_file;     /* is the whole document a stylesheet? */
@@ -449,9 +448,7 @@ hts_boolean hts_dirty_link_is_url(httrackp *opt, const char *str, size_t len,
 }
 
 /* Can the byte before "at" continue a name, making the keyword the tail of a
-   longer one? A dot glues, because the keyword is then a property name that
-   the ".xxx" rows above take when they want it. A quote ends a string, and CSS
-   and template literals both put a url() right after one. */
+   longer one? A dot glues, because the ".xxx" rows above own property names. */
 static hts_boolean js_glues_keyword(const char *at, const char *buffer) {
   const unsigned char *const p = (const unsigned char *) at;
   const unsigned char c = (unsigned char) html_prevc(at, buffer);
@@ -1559,7 +1556,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   char size_str[32];
                   // {url} scheme: jump_identification_const strips it for
                   // http/https/ftp, so re-add it (http for a bare host).
-                  // Other schemes keep their "scheme://".
                   const char *const url_host =
                       jump_identification_const(urladr());
                   const char *const url_scheme =
@@ -1583,7 +1579,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   {
                     // Network strings go through html_inline_safe(), because a
                     // "-->" would close the footer's HTML comment (#165).
-                    // Zeroing first makes a new enum field expand empty here.
                     const char *values[HTS_FOOTER_FIELD_COUNT] = {NULL};
 
                     values[HTS_FOOTER_ADDR] = safe_adr;
@@ -2288,15 +2283,13 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
             int quoteinscript = 0;
             int noquote = 0;
             const char *tag_attr_start = html;
-            /* --single-file needs the tag, but the value scan below clears
-               intag on an unquoted value ending at '>'. inscript_locked marks
-               a whole CSS or JS file, which has no tag. */
+            /* Save the tag for --single-file now, because the value scan
+               below clears intag on an unquoted value ending at '>'. */
             const char *const sf_tag = intag_start_valid ? intag_name : NULL;
             const int sf_tagless_body = inscript_locked;
             hts_fetch_meta link_fetch = {0};
 
-            /* Past the cap, the rest of the page's links are written
-               external, because nothing would fetch their files. */
+            /* Past the cap nothing fetches links, so write them external. */
             if (hts_maxlinks_no_room(opt)) {
               p_nocatch = 1;
               maxlinks_give_up(opt, stre->exit_xh_);
@@ -3545,9 +3538,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         (p_type != -2) &&
                         (forbidden_url !=
                          1)) { // if the file does not exist, add it to the list
-                      /* A front end's queued hts_addurl() can fill the cap
-                         after the gate above. Skipping keeps room for the two
-                         records below. No .test reaches this path. */
+                      /* A front end's hts_addurl() can fill the cap after the
+                         gate above. Skip to keep room for the records below. */
                       if (hts_maxlinks_no_room(opt)) {
                         maxlinks_give_up(opt, stre->exit_xh_);
                       } else { // room for it: record the link
@@ -3845,9 +3837,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
           if (RUN_CALLBACK4(opt, postprocess, &cAddr, &cSize, urladr(), urlfil()) == 1) {
             hts_log_print(opt, LOG_DEBUG,
               "engine: postprocess-html: callback modified data, applying %d bytes", cSize);
-            /* A reply pointing into sink.buf edited it in place and is moved
-               down, because growing the buffer to append it onto itself can
-               move the block out from under cAddr. */
+            /* A reply inside sink.buf was edited in place. Move it down, since
+               an append onto itself can move the buffer under cAddr. */
             if (!hts_postprocess_reply_ok(
                     cAddr, cSize, TypedArrayElts(sink.buf),
                     TypedArraySize(sink.buf), TypedArrayCapa(sink.buf))) {

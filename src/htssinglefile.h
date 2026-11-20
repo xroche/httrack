@@ -27,10 +27,9 @@ Please visit our Website: http://www.httrack.com
 
 /* ------------------------------------------------------------ */
 /* --single-file: post-mirror pass embedding each page's assets as data: URIs.
-   It is internal. Unlike -%M, it rewrites pages in place and keeps
-   page-to-page links relative, so every page also stands alone. An asset left
-   as a link inside an inlined stylesheet no longer resolves, because a data:
-   URL's path is opaque. Raise --single-file-max-size to inline it too. */
+   Unlike -%M, it rewrites pages in place and keeps page links relative. An
+   asset linked from an inlined stylesheet no longer resolves, because a
+   data: URL's path is opaque. */
 /* ------------------------------------------------------------ */
 
 #ifndef HTS_SINGLEFILE_DEFH
@@ -58,11 +57,10 @@ extern "C" {
 
      #!<16-hex secret>.<class>.<len>
 
-   It is a fragment, so a mirror left marked by an interrupted run still
-   browses. The secret is 64 CSPRNG bits drawn once per run and never written
-   to disk, so a site cannot forge a mark. <len> is the byte length of the
-   reference text just before the mark. <class> is the context htsparse saw,
-   checked against the resolved type. */
+   It is a fragment, so a half-marked mirror still browses. The secret is 64
+   CSPRNG bits per run, never written to disk, so a site cannot forge a mark.
+   <len> is the byte length of the reference before the mark, and <class> the
+   context htsparse saw. */
 #define SINGLEFILE_MARK_INTRO "#!"
 #define SINGLEFILE_SECRET_HEX 16
 
@@ -91,9 +89,8 @@ void singlefile_free(httrackp *opt);
    nothing may be marked). Draws the secret on first use. */
 const char *singlefile_intro(httrackp *opt);
 
-/* HTS_FALSE if [body,len) already contains this run's intro, and the document
-   must then not be marked. Fetched content cannot spell the intro, so only a
-   2^-64 coincidence trips this. */
+/* HTS_FALSE if [body,len) already holds this run's intro, so the document
+   must not be marked. Only a 2^-64 coincidence trips this. */
 hts_boolean singlefile_may_mark(httrackp *opt, const char *body, size_t len);
 
 /* Write the mark for a reference of reflen bytes into buf; returns buf, left

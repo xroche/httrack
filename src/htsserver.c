@@ -1195,9 +1195,8 @@ static void cat_cmdline_arg(String *output, const char *value) {
   cat_cmdline_argn(output, value, strlen(value));
 }
 
-/* Append FLAG "<rule>" once per rule in VALUE, because the engine takes one
-   flag per accumulated rule. Whitespace separates rules, except beside a ','
-   or '=', where the parser trims it out of the rule. */
+/* Append FLAG "<rule>" once per rule in VALUE. Whitespace separates rules,
+   except beside a ',' or '=', where the parser trims it. */
 static void cat_cmdline_arglist(String *output, const char *value,
                                 const char *flag) {
   /* isspace()'s C-locale set, so a rules box splits the same here and in the
@@ -1302,10 +1301,9 @@ static const char *const ini_checkbox_keys[] = {
     NULL,
 };
 
-/* These hold a ${listid:} id, numbered from 1, but winprofile.ini stores
-   WinHTTrack's 0-based combo index. A file with no ProfileFormat key is
-   WinHTTrack's own and is read that way too (#1314). ProxyType's ordinal
-   already agrees, so it is not listed. */
+/* These hold a 1-based ${listid:} id, but winprofile.ini stores WinHTTrack's
+   0-based combo index, as does a file with no ProfileFormat key (#1314).
+   ProxyType's ordinals already agree. */
 static const char *const ini_list_keys[] = {
     "CurrentAction", "Build",     "PrimaryScan",     "Travel",  "GlobalTravel",
     "RewriteLinks",  "CheckType", "FollowRobotsTxt", "LogType", NULL,
@@ -1453,8 +1451,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
   String tmpbuff = STRING_EMPTY;
   String fspath = STRING_EMPTY;
   String profile = STRING_EMPTY;
-  /* The project directory this server set up, the only root /website/ serves
-     from. It persists between requests. */
+  /* /website/ serves only from this project directory, kept across requests. */
   String website = STRING_EMPTY;
   hts_boolean path_from_cmdline;
   char catbuff[CATBUFF_SIZE];
@@ -1741,19 +1738,17 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
         denied = "Foreign Host header.";
       }
 
-      /* CSP stops a mirrored page reading /server/ but not a blind no-cors
-         POST, which still runs the command. Script cannot forge Origin. Most
-         non-browser clients send none, so an absent Origin is allowed. */
+      /* CSP cannot stop a blind no-cors POST, but script cannot forge Origin.
+         Non-browser clients often send none, so an absent Origin passes. */
       if (meth == 2 && origin[0] != '\0' && !origin_is_self(origin, host)) {
         buffer[0] = '\0';
         meth = 0;
         denied = "Foreign origin.";
       }
 
-      /* Authenticate the body before parsing it, because every field it
-         carries, "command" included, goes straight into the global key store
-         below. A later check would also pass a request that omits "sid",
-         since the pre-seeded value compares equal to itself. */
+      /* Authenticate the body before parsing it, because every field goes
+         straight into the global key store, and a request omitting "sid"
+         would then compare the pre-seeded value with itself. */
       if (meth && buffer[0]) {
         intptr_t expected = 0;
 
@@ -2322,9 +2317,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                         name = colon + 1;
                       }
                     } else if ((p = strfield(name, "date:"))) {
-                      /* Expanded per request, so the footer year follows
-                         the calendar (#1165). SOURCE_DATE_EPOCH pins it for
-                         tests. */
+                      /* The year follows the calendar (#1165), and
+                         SOURCE_DATE_EPOCH pins it for tests. */
                       const char *epoch = getenv("SOURCE_DATE_EPOCH");
                       struct tm tmv;
                       hts_boolean ok = HTS_FALSE;

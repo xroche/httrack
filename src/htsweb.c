@@ -107,10 +107,8 @@ static void htsweb_sig_brpipe(int code) {
 /* Threads that never return; no wait may count on them draining. */
 static int nonjoinable_threads = 0;
 
-/* Session lifetime: each window pings under its own id and drops it when it
-   closes, so an abandoned server stops instead of holding its payload open
-   (a mounted disk image, on macOS). Closing one of several windows does not
-   end the session. */
+/* Each window pings under its own id and drops it on close, so an abandoned
+   server stops instead of holding a mounted macOS disk image open. */
 #define PING_PERIOD 5
 /* Silence tolerated from one window. Generous: a hidden tab has its timers
    throttled to as little as one wake-up a minute. */
@@ -123,8 +121,7 @@ static int pingTimeout = 120;
 #define MAX_WINDOWS 16
 
 static htsmutex pingMutex = HTSMUTEX_INIT;
-/* Seconds the watchdog has been awake. time(NULL) jumps across a laptop
-   suspend, and a suspended machine must not age a session. */
+/* The watchdog counts its own seconds, because time(NULL) jumps on suspend. */
 static int ticks = 0;
 
 static struct {
@@ -353,9 +350,8 @@ int main(int argc, char *argv[]) {
              "webhttrack and its library");
   }
 
-  /* The session id alone authenticates a command, so seed it from the
-     system CSPRNG. A clock-derived id is guessable from the "Mirrored from"
-     stamp on every mirrored page (#877). */
+  /* The session id alone authenticates a command, so draw it from the CSPRNG.
+     A clock-derived id is guessable from the "Mirrored from" stamp (#877). */
   {
     unsigned char seed[32];
     char digest[32 + 2];
@@ -373,8 +369,7 @@ int main(int argc, char *argv[]) {
   /* set commandline keys */
   for(i = 2; i < argc; i += 2) {
     if (strcmp(argv[i], "--port") == 0 && i + 1 < argc) {
-      // a huge value must not wrap into a plausible port (#614), and 0 and
-      // 65535 both mean what they say.
+      // A huge value must not wrap into a plausible port (#614).
       if (!hts_parse_url_port(argv[i + 1], &defaultPort)) {
         fprintf(stderr, "couldn't set the port number to %s\n", argv[i + 1]);
         return -1;

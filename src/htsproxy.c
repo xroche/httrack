@@ -216,8 +216,7 @@ static int socks5_fail(char *msg, size_t msgsize, const char *text) {
   return 0;
 }
 
-/* Read n bytes or fail. SOCKS frames are not self-delimiting, and a short
-   read would desync the stream shared with the origin traffic. */
+/* Read n bytes or fail, because a short read would desync the SOCKS stream. */
 static int socks5_read_n(socks5_stream *st, unsigned char *buf, size_t n) {
   size_t got = 0;
   int stalls = 0;

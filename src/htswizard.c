@@ -150,9 +150,8 @@ static hts_boolean is_embed_pair(const htspair_t *table, const char *tag,
   return HTS_FALSE;
 }
 
-/* The engine's robots.txt verdict for (adr,fil). The filter outcome is an
-   input because under HTS_ROBOTS_SOMETIMES an explicit filter acceptance
-   overrides the ban. The sitemap fetcher asks this outside the wizard. */
+/* Return the engine's robots.txt verdict for (adr,fil). Under
+   HTS_ROBOTS_SOMETIMES an explicit filter acceptance overrides the ban. */
 hts_boolean hts_robots_forbids(httrackp *opt, const char *adr, const char *fil,
                                hts_boolean filters_decided,
                                hts_boolean filters_refused) {
@@ -196,8 +195,7 @@ void hts_wizard_prompt_url(char *dst, size_t dstsize, const char *adr,
                            const char *fil) {
   if (dst == NULL || dstsize == 0)
     return;
-  /* clip, because adr and fil come from a crawled link and together can
-     outgrow any prompt buffer */
+  /* clip, because a crawled adr and fil can outgrow any prompt buffer */
   strclipbuff(dst, dstsize, adr);
   if (*fil != '/')
     strlncatbuff(dst, "/", dstsize, dstsize - 1 - strlen(dst));
@@ -272,8 +270,7 @@ static hts_boolean wizard_answer_scope(const char *adr, int n, char *dst,
   return hts_wizard_host_scope(adr, k, dst, dstsize);
 }
 
-/* Slot 0 gets the scope's subdomain form, slot 1 its apex, because the
-   starred form does not match the apex. */
+/* Slot 0 gets the subdomain form, slot 1 the apex it does not match. */
 static void wizard_cat_scope(htsbuff *f, const char *sign, const char *adr,
                              int n, int slot) {
   char scope[HTS_URLMAXSIZE];

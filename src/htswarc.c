@@ -102,8 +102,7 @@ struct warc_writer {
   char *main_date; /* its WARC-Date (mainPageDate) */
 };
 
-/* A 32-bit offset misindexes every record past 4GB, and `unsigned long` is
-   that narrow on LLP64, so check the width. */
+/* A 32-bit offset misindexes records past 4GB, as on LLP64 `unsigned long`. */
 HTS_STATIC_ASSERT(sizeof(((struct warc_writer *) 0)->offset) >= 8,
                   warc_offset_is_64bit);
 
@@ -293,11 +292,10 @@ static void base32_20(const unsigned char in[20], char out[33]) {
 }
 #endif
 
-/* Stream a block to a sink. When http_section, the HTTP header bytes (maybe
-   empty) and their CRLF go first, so an empty header still emits and counts
-   the separator. The body is written as body_len octets, capped if the file
-   grew and zero-padded if it shrank, so Content-Length matches the bytes of
-   every pass. region 0=header, 1=body. Returns 0 on success. */
+/* Stream a block to a sink, where region 0 is the header and 1 the body. When
+   http_section, the header (maybe empty) and its CRLF go first. The body is
+   capped or zero-padded to body_len, so Content-Length always matches.
+   Returns 0 on success. */
 typedef int (*warc_sink)(void *ctx, int region, const void *p, size_t n);
 
 static int stream_body_pad(warc_sink sink, void *ctx, size_t remaining) {
@@ -797,8 +795,7 @@ static int cdx_lines_add(warc_writer *w, char *line) {
   return 0;
 }
 
-/* Print the uint64_t with PRIu64, because an `(unsigned long)` cast truncates
-   past 4GB on LLP64 Windows. */
+/* Use PRIu64, because an `(unsigned long)` cast truncates on LLP64. */
 int warc_cdx_extent(char *out, size_t outsz, uint64_t length, uint64_t offset) {
   const int n = snprintf(
       out, outsz, ", \"length\": \"%" PRIu64 "\", \"offset\": \"%" PRIu64 "\"",
@@ -1161,12 +1158,10 @@ static void warc_wacz_package(warc_writer *w) {
 /* Close the current segment and open the next; writes its warcinfo. */
 static int warc_rotate(warc_writer *w);
 
-/* Emit one full WARC record. When http_section, the block carries an HTTP
-   header block (http_hdr, possibly empty) and a CRLF separator, and body
-   follows when has_body. block_len is counted here the way stream_block emits,
-   so Content-Length matches the written bytes. The payload digest (body only)
-   is passed in when known. truncated is a WARC-Truncated reason token or NULL.
-   On success the record id is copied to out_id (may be NULL). */
+/* Emit one full WARC record. When http_section, the block holds http_hdr
+   (maybe empty) and a CRLF, then body when has_body. block_len is counted the
+   way stream_block emits. truncated is a WARC-Truncated reason or NULL, and
+   out_id (may be NULL) receives the record id. */
 static int warc_emit(warc_writer *w, const char *type, const char *content_type,
                      const char *target_uri, const char *ip,
                      const char *concurrent_to, const char *refers_uri,

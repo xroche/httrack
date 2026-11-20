@@ -44,10 +44,8 @@ typedef struct sniff_magic {
   const char *bytes;
 } sniff_magic;
 
-/* Direction is mime -> magic, to verify a claim and never to classify. Types
-   with no reliable magic (plain text, css, js..) are absent. Patterns follow
-   the WHATWG MIME Sniffing tables (https://mimesniff.spec.whatwg.org/) where
-   they exist. Types our MIME tables lack (EOT, font/collection) are out. */
+/* This maps mime -> magic, to verify a claim and never to classify. Types
+   with no reliable magic are absent. Patterns follow WHATWG MIME Sniffing. */
 static const sniff_magic sniff_table[] = {
     /* images */
     {"image/jpeg", 0, 3, "\xff\xd8\xff"},
