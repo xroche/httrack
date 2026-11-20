@@ -10,6 +10,7 @@ noinst_PROGRAMS = fuzz-charset fuzz-codepage fuzz-meta fuzz-idna fuzz-entities \
 	fuzz-bundle \
 	fuzz-savename \
 	fuzz-warc \
+	fuzz-cache \
 	fuzz-codec \
 	fuzz-response \
 	fuzz-redirect \
@@ -78,6 +79,9 @@ fuzz_bundle_SOURCES = fuzz-bundle.c fuzz.h
 fuzz_savename_SOURCES = fuzz-savename.c fuzz.h
 
 fuzz_warc_SOURCES = fuzz-warc.c fuzz.h
+
+# The ZIP cache reader: index walk, header block, record read and repair.
+fuzz_cache_SOURCES = fuzz-cache.c fuzz.h
 
 # The Content-Encoding unpackers: gzip, deflate, and br and zstd where built in.
 fuzz_codec_SOURCES = fuzz-codec.c fuzz.h

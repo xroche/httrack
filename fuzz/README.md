@@ -36,4 +36,6 @@ Run one target by hand: `fuzz/fuzz-url -max_total_time=300 corpusdir fuzz/corpus
 
 `fuzz-sniff` drives the MIME magic-byte check in `htssniff.c`. Its input is the MIME type the server claims, a NUL, then the body. The dict holds the MIME names the rules know, so a new rule needs a dict entry but no harness change.
 
+`fuzz-cache` drives the ZIP cache reader the way `--continue` does, since a copied project folder brings its own `hts-cache/new.zip`. Its first byte picks the mode. When it is odd, the rest is written as the cache file itself, and when it is even, the rest is a list of name, header and body records that the harness zips first, so the input gets past the CRC check. Each indexed entry is then read back through the cache readers, and `cache_repair()` runs on the file. Files go in a temp dir under `$TMPDIR`.
+
 OSS-Fuzz builds these harnesses with `oss-fuzz-build.sh`, so a new harness needs only a `Makefile.am` entry and a `corpus/<target>/` directory. The script links each harness with `$LIB_FUZZING_ENGINE`. When it is set, `configure` uses it in place of `-fsanitize=fuzzer`.
