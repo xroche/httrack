@@ -62,16 +62,11 @@ Please visit our Website: http://www.httrack.com
 
 #include <limits.h>
 
-/* macOS reaches Multipath TCP through connectx() on an AF_MULTIPATH socket
-   rather than through a protocol, so the two platforms differ at connect time
-   and not only at socket time. */
+/* macOS reaches Multipath TCP through connectx() on an AF_MULTIPATH socket. */
 #if HTS_INET_MPTCP && defined(__APPLE__)
 #define HTS_INET_MPTCP_DARWIN 1
 #ifndef AF_MULTIPATH
-/* Measured, not assumed: the macOS SDK does not declare this, so a build that
-   required the declaration compiled the whole arm out. hts_mptcp_probe() opens
-   one socket with it at startup, which is what makes the number safe to name
-   here, because a wrong one leaves Multipath TCP off. */
+/* The macOS SDK lacks it, and a wrong value only leaves Multipath TCP off. */
 #define AF_MULTIPATH 39
 #endif
 #else
@@ -299,16 +294,13 @@ static void print_buffer(buff_struct*const str, const char *format, ...) {
   assertf(str->pos < str->capacity);
 }
 
-/* Append the request "Cookie:" header line for every stored cookie matching
-   adr/path, where adr may carry its scheme and only "https://" gets a Secure
-   cookie. The port in adr is ignored (see cookie_host). RFC 6265
-   form: bare "name=value" pairs joined by "; ", no $Version/$Path attributes
-   (those are RFC 2965 syntax that modern servers reject, issue #151).
-   A pair that will not fit whole is dropped whole and counted in *skipped (may
-   be NULL), so the line never ends mid-pair and never raises the caller's
-   overflow. The line takes whatever room bstr has left, so the caller must say
-   in reserve how many bytes it still has to write after it.
-   Returns the number emitted. */
+/* Append a "Cookie:" request line for every stored cookie matching adr/path.
+   Only an "https://" adr gets Secure cookies, and its port is ignored. Pairs
+   use the RFC 6265 form, because modern servers reject RFC 2965 $Version and
+   $Path (#151). A pair that does not fit is dropped whole and counted in
+   *skipped (may be NULL), so the line never ends mid-pair. The line takes all
+   of bstr's remaining room, so reserve is the room the caller still needs
+   after it. Returns the number emitted. */
 static int append_cookie_header(buff_struct *bstr, t_cookie *cookie,
                                 const char *adr, const char *path,
                                 size_t reserve, int *skipped) {
@@ -661,9 +653,7 @@ void http_append_custom_headers(char *dst, size_t dst_size,
   append_custom_headers(&bstr, headers);
 }
 
-/* See htslib.h. Clipping rather than aborting: a body bigger than the request
-   block has always been truncated here, so an abort would be a new way to lose
-   the mirror. */
+/* See htslib.h. Clip an oversized body, because aborting loses the mirror. */
 size_t http_postfile_body(char *buffer, size_t buffer_size, size_t pos,
                           FILE *fp) {
   size_t room;
@@ -2424,10 +2414,8 @@ static long hts_mptcp_sysctl(const char *path) {
   return value;
 }
 
-/* Can the kernel climb out of a SYN that a middlebox dropped for carrying the
-   MPTCP option? It needs the retry enabled and blackhole detection on, or the
-   first connect to any host behind a silent middlebox pays the full timeout.
-   Zero turns the detection off, so the file being there is not the answer. */
+/* Can the kernel recover from a SYN a middlebox dropped for its MPTCP option?
+   Without the retry and blackhole detection, such a host costs a timeout. */
 static hts_boolean hts_mptcp_kernel_recovers(void) {
   static const char retrans[] =
       "/proc/sys/net/mptcp/syn_retrans_before_tcp_fallback";
@@ -2443,9 +2431,8 @@ static hts_boolean hts_mptcp_kernel_recovers(void) {
 /* Being able to open an MPTCP socket is not enough to turn it on by default. */
 static void hts_mptcp_probe(void) {
 #if HTS_INET_MPTCP_DARWIN
-  /* Left off by default here: macOS offers neither the blackhole sysctls that
-     make the default safe nor a way to see whether a connection negotiated it,
-     so it is the user who asks. */
+  /* Off by default, because macOS has neither the blackhole sysctls nor a way
+     to see whether a connection negotiated it. */
   const T_SOC soc = (T_SOC) socket(AF_MULTIPATH, SOCK_STREAM, 0);
 
   if (soc != INVALID_SOCKET) {
@@ -2484,10 +2471,7 @@ T_SOC hts_socket_client(int family, const httrackp *opt,
   T_SOC soc = INVALID_SOCKET;
 
 #if HTS_INET_MPTCP_DARWIN
-  /* The multipath socket has its own domain, and takes the address family from
-     the address hts_socket_connect() hands connectx(). It also cannot bind:
-     macOS gives AF_MULTIPATH no bind at all, and a pinned source address is
-     the opposite of what multipath is for, so a caller that binds gets TCP. */
+  /* AF_MULTIPATH cannot bind on macOS, so a caller that binds gets TCP. */
   if (!will_bind && hts_mptcp_enabled(opt))
     soc = (T_SOC) socket(AF_MULTIPATH, SOCK_STREAM, 0);
 #elif HTS_INET_MPTCP
@@ -2548,8 +2532,7 @@ hts_boolean hts_socket_is_mptcp(T_SOC soc) {
 }
 
 void hts_mptcp_account(httrackp *opt, T_SOC soc) {
-  /* Where a fallback cannot be seen, every connection would be counted as one,
-     which is a wrong number rather than a missing one. */
+  /* Without fallback reporting, every connection would count as multipath. */
   if (!hts_mptcp_reports() || !hts_mptcp_enabled(opt))
     return;
   if (hts_socket_is_mptcp(soc))
@@ -3151,9 +3134,8 @@ time_t get_filetime(const char *file) {
 /* Note: utf-8 */
 hts_boolean hts_file_mtime(const char *file, hts_filetime_t *when) {
 #ifdef _WIN32
-  /* _wstat64()'s st_mtime is whole seconds even in an x64 build, and whole
-     seconds cannot order a request against a mirror that started in the same
-     one. GetFileAttributesExW reports 100ns ticks. */
+  /* _wstat64() gives whole seconds, too coarse to order a request against a
+     mirror started in the same second. GetFileAttributesExW gives 100ns. */
   WIN32_FILE_ATTRIBUTE_DATA attr;
   LPWSTR wfile = hts_pathToUCS2(file);
   ULARGE_INTEGER ticks;
@@ -3858,11 +3840,9 @@ static const char *hts_query_strip_keys_match(const char *rules,
   /* holds a host and a path, each up to HTS_URLMAXSIZE * 2 */
   char BIGSTK url[HTS_URLMAXSIZE * 4];
 
-  /* Match string = normalized host/path, query removed. jump_normalized_const
-     collapses www+scheme/auth so read and write (double-normalized) agree;
-     query excluded keeps the decision on host/path only. Clipped rather than
-     aborting: a longer one is hostile input, and which rule it picks is a
-     filter decision, not a memory error. */
+  /* Match the normalized host/path without the query, so read and write agree.
+     A host/path longer than url[] is hostile input and is clipped, because it
+     only changes which rule matches. */
   (void) strclipbuff(url, sizeof(url), jump_normalized_const(adr));
   if (fil[0] != '/')
     (void) strclipbuff(&url[strlen(url)], sizeof(url) - strlen(url), "/");
@@ -3959,9 +3939,8 @@ const char *hts_host_alias_match(const char *rules, const char *host,
         if (strjoker(strstr(glob, "://") != NULL ? full : host,
                      strstr(glob, "://") != NULL ? glob : ghost, NULL,
                      NULL) != NULL) {
-          /* Trim here, where the canonical is produced: the resolver compares
-             one match against the next to see a chain settle, and an untrimmed
-             one never equals the trimmed bytes it emits. */
+          /* Trim here, because the resolver compares each match with the
+             next to see a chain settle. */
           canon = hts_span_trim(canon, " \t", " \t/");
           found = canon.p;
           *canonlen = canon.len;
@@ -4018,9 +3997,8 @@ static const char *hts_host_alias_resolve_rules(const char *rules,
     return NULL;
   memcpy(schemebuf, adr, schemelen);
   schemebuf[schemelen] = '\0';
-  /* Match the host in the form the dedup layer uses: under the www. collapse a
-     rule naming example.com covers www.example.com, and with the collapse off
-     the rule matches the name as the link spells it. */
+  /* Match the host as the dedup layer does, so with the www. collapse on, a
+     rule naming example.com also covers www.example.com. */
   hostsubj = collapse_www ? jump_normalized_const(host) : host;
   if (!hts_host_alias_subject(adr, hostsubj, fullsubj, sizeof(fullsubj)))
     return NULL;
@@ -4036,9 +4014,8 @@ static const char *hts_host_alias_resolve_rules(const char *rules,
     const char *next, *dhost, *chost, *cproto;
     size_t nextlen = 0, credlen, hostlen;
 
-    /* The rule may name the scheme the canonical host speaks; when it does not,
-       the scheme in effect stays, which is the previous hop's when a rule
-       earlier in the chain named one. The link's credentials are kept. */
+    /* A rule may name the canonical host's scheme. If not, the scheme in
+       effect stays, which may come from an earlier rule in the chain. */
     if (canonlen >= sizeof(canonbuf))
       return NULL;
     memcpy(canonbuf, canon, canonlen);
@@ -4642,9 +4619,8 @@ HTSEXT_API size_t append_ ##NAME(const char *const src, char *const dest, const 
   const size_t len = strnlen(dest, size); \
   assertf(len < size); \
   RUNTIME_TIME_CHECK_SIZE(size); \
-  /* The remainder is computed, so the one value the size heuristic reads as \
-     a caller mistake is a legitimate near-full buffer here: report it as the \
-     overflow the caller already tests for. */ \
+  /* A near-full buffer can leave the remainder the size heuristic rejects. \
+     Report it as the overflow the caller already tests for. */ \
   if (size - len == sizeof(void *)) { \
     return size - len; \
   } \
