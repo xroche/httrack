@@ -1,7 +1,8 @@
 #!/bin/bash
 #
 # A consumer picks its own include order, so every ordered pair of installed
-# headers must compile. The MSVC job stages the same list out of
+# headers must compile. Pairs only: a break needing three headers or a prior
+# consumer macro is not covered. The MSVC job stages the same list out of
 # DevIncludes_DATA (#1153).
 #
 # The n^2 compiles pace themselves against what is left of this budget.

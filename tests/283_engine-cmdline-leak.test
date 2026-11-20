@@ -127,8 +127,8 @@ else
     chmod 755 "$d/hts-cache"
 fi
 
-# Only a terminal run reports an aborted mirror, so probe both script(1)
-# spellings.
+# Only a terminal run reports an aborted mirror, because opt->quiet is set when
+# stdout is not a tty, so probe both script(1) spellings.
 tty_form=
 for form in linux bsd; do
     rm -f "$tmp/ttyprobe"
