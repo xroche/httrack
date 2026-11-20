@@ -35,7 +35,8 @@ if ! "${cc_argv[@]}" "${cflags[@]}" -o "${work}/probe" \
     "${srcdir}/tests/printnumprobe.c" "${srcdir}/src/htsbacktrace.c" \
     ${DL_LIBS:-} ${BACKTRACE_LIBS:-} >"${work}/cc.log" 2>&1; then
     head -20 "${work}/cc.log" >&2
-    # Only 218 pins this build, on Linux, so it must fail on Darwin too.
+    # Fail on Linux and Darwin, because only test 218 builds this on Linux and
+    # nothing else covers Darwin.
     case "$HTS_OS" in
     Linux | Darwin) fail "the crash printer does not build standalone" ;;
     esac

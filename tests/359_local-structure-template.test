@@ -13,7 +13,8 @@ tmp=$(mktemp -d "${tmpbase%/}/httrack_structure.XXXXXX") || fail "no tmpdir"
 cleanup_push rm -rf "${tmp}"
 
 # The engine maps what Windows forbids to '_' and the wsl2 shim turns /mnt/d/
-# into D:/, so use the path it saw. Strip the leading slash last for nativepath.
+# into D:/, so use the path it saw. Strip the leading slash last, because
+# stripping it first leaves nativepath no /mnt/d to match.
 localname() { # localname ABSOLUTE-PATH
     local n
     n=$(nativepath "$1" | tr ':~' '__')
@@ -68,7 +69,8 @@ layout web/html/page.html --structure=5
 layout "$(localname "${tmp}")/page.html" --structure=100
 layout "${default_layout}" --structure=0
 
-# A detached -N 1 is preset 1, but a template "1" would collapse the mirror.
+# A detached -N 1 is preset 1, not a template named "1" (which would collapse
+# the mirror).
 layout web/page.html -N 1
 
 # A preset trailed by short options is refused, so 1L0 must not apply -L0.

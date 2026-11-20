@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# --wide-mirror and --tiny-mirror must pass on their connection count. The
-# security limiter logs a count above 8, which proves it reached the option.
+# --wide-mirror and --tiny-mirror must pass their connection count on to the
+# option. The security limiter logs a count above 8, which proves it got there.
 
 set -euo pipefail
 
