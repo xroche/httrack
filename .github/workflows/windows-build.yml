@@ -465,8 +465,9 @@ jobs:
           . ./ci-windows-suite.sh
           ci_report_lost_workers suite-console-wsl2.log
 
-      # Windows has no make check, so these run the tests natively. The
-      # *_local-* ones are our only Windows test of TLS, cache and writer.
+      # Windows has no make check, so these run the tests against the native
+      # httrack.exe. The *_local-* ones are our only Windows test of TLS, cache
+      # and writer.
       - name: Upload the test logs
         if: always() && env.RUNNABLE == 'true'
         uses: actions/upload-artifact@v7
