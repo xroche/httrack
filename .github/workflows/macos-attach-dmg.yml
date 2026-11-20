@@ -1,6 +1,4 @@
-# Attaches on the publish event rather than on the tag push: releases are cut by hand,
-# so the tag lands up to half an hour before the release exists. macos-release.yml used
-# to wait out that gap on a macOS runner and still lose it (3.49.25 missed by 73s).
+# This runs on publish, because the tag can land long before the release.
 name: attach the macOS DMG
 
 on:

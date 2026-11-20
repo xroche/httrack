@@ -39,7 +39,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsbase.h"
 
-/* Heap NUL-terminated copy of the fuzzer input, so ASan bounds every read. */
+/* Return a NUL-terminated heap copy, so ASan bounds every read. */
 HTS_UNUSED static char *fuzz_strdup(const uint8_t *data, size_t size) {
   char *s = malloct(size + 1);
 

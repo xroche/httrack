@@ -14,12 +14,8 @@ want=${EMULATED_ARCH:?EMULATED_ARCH must name the architecture under test}
 test "$(dpkg --print-architecture)" = "$want" ||
     fail "container is $(dpkg --print-architecture), not $want"
 
-# The property this leg exists for: binfmt_misc leaves the interpreter in argv[0]
-# and the program one place right, which is what hid the engine from the harness
-# on hppa (#1146). Read it off a CHILD. qemu answers /proc/self/cmdline from the
-# guest argv it was handed, so only another pid reaches the host kernel -- the
-# same reason the harness sees the shift at all, and why a self-check here would
-# report bash and fail forever.
+# binfmt_misc can put the interpreter in argv[0] (#1146). Read it off a CHILD,
+# because qemu answers /proc/self/cmdline from the guest argv.
 sleep 60 &
 probe=$!
 argv0=
@@ -50,14 +46,11 @@ make -j"$(nproc)"
 # The buildd's own invocation, so a failure here is the one it would report.
 rc=0
 make check -j"$(nproc)" || rc=$?
-# Always, not only where automake prints it: this leg exists to say what an emulated
-# host does. A paced-out skip must not read as coverage with no reason given.
+# Always print the log, so a paced-out skip shows its reason.
 cat tests/test-suite.log || true
 test "$rc" -eq 0 || exit "$rc"
 
-# make check exits 0 for an all-SKIP run, and this leg skips a lot by design, so
-# a container that quietly lost a dependency would report a green covering
-# nothing. Pin the floor instead of trusting the status.
+# make check passes an all-SKIP run, so floor the PASS count.
 passed=$(sed -n 's/^# PASS: *//p' tests/test-suite.log | head -1)
 test "${passed:-0}" -ge "${EMULATED_PASS_FLOOR:-100}" ||
     fail "only ${passed:-0} tests passed, want ${EMULATED_PASS_FLOOR:-100} or more"

@@ -1,8 +1,6 @@
 /*
-  The bundle's main executable: hands off to the webhttrack script beside it. A
-  Mach-O, not the shell stub it replaces, because Apple treats a script here as
-  a bundle resource rather than code, and TCC will not attribute a prompt to one
-  (#901).
+  This Mach-O hands off to the webhttrack script, because TCC will not
+  attribute a prompt to a script (#901).
 */
 
 #include <libgen.h>

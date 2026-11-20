@@ -11,16 +11,13 @@ langhtmldir = $(langrootdir)/html
 EXTRA_DIST = $(lang_DATA) $(langroot_DATA)
 
 # The link is relative, because an absolute $(docdir) dangles under DESTDIR or
-# relocation (#885). Stripping the documentation only dangles it, and htsserver
-# answers a dangling link with a 404. Making $(docdir) first leaves a real
-# directory at the link path wherever the two coincide, and a $(docdir) holding
-# the link path is refused outright, or htsserver would serve /doc/doc/doc/...
-# Both paths are folded first, because a user's "//", "/." or trailing "/"
-# survives into the Makefile and defeats the prefix test.
+# relocation (#885). A $(docdir) holding the link path is refused, or htsserver
+# would serve /doc/doc/doc/... Folding the paths first keeps that test exact.
+# Make $(docdir) first, so a link path equal to it is a real directory, not a
+# dangling link.
 #
-# lang precedes html in SUBDIRS, so the served-root symlink an older install
-# left is dropped before html writes through it into $(docdir). Test 385 pins
-# that ordering.
+# lang precedes html in SUBDIRS, so an older install's served-root symlink is
+# dropped before html writes through it. Test 385 pins that order.
 install-data-hook:
 	@fold() { printf '%s\n' "$$1" | \
 		sed -e 's|//*|/|g' -e ':a' -e 's|/\./|/|g' -e 'ta' -e 's|/\.$$|/|'; }; \

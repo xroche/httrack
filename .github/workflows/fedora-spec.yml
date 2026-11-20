@@ -1,8 +1,5 @@
-# Fedora patches files we ship before running our suite, and a patch that
-# corrupts one only surfaces when a packager reports it: the %prep iconv of
-# html/contact.html double-encoded it from 3.49.18 to #1463. This builds master
-# through their own spec so we hear it first. Their tree, so a red here can be
-# theirs to fix, which is why it blocks nothing.
+# This builds master through Fedora's spec, whose patches can corrupt ours
+# (#1463). It blocks nothing, because a red can be theirs.
 name: fedora spec canary
 
 on:
@@ -80,10 +77,7 @@ jobs:
           chown -R builder ~builder
           sudo -u builder rpmbuild -bb --nodeps ~builder/httrack.spec 2>&1 |
             tee build.log
-          # -bb removes the build tree on success, so the suite's own banner is
-          # the only place left to read it. A %check that skipped almost
-          # everything still exits 0, and a canary that green-lights an untested
-          # tree is worse than none: a python3-less container passes 212.
+          # -bb removes the build tree, so only the banner shows what ran.
           grep -E '^# (TOTAL|PASS|SKIP|FAIL):' build.log ||
             { echo "no testsuite summary: %check did not run" >&2; exit 1; }
           # The largest banner, not the last: a second one would otherwise read

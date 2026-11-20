@@ -19,12 +19,9 @@ permissions:
 jobs:
   automerge:
     name: Arm auto-merge
-    # Checks the PR's author, not github.actor, because on a synchronize the actor is whoever
-    # pushed, including a fork's own Dependabot. The head-repo clause has no witness while
-    # only Dependabot's own PRs pass the author check, and is kept for if that ever loosens.
-    # Not vcpkg: its ecosystem tracks vcpkg's release tags, so a baseline pinned
-    # to a newer commit reads as behind and is "upgraded" backwards. That
-    # reverted a security pin unattended in #1614, so a human merges those.
+    # This checks the PR author, because github.actor is whoever pushed last.
+    # The head-repo clause is a guard for if the author check loosens.
+    # vcpkg bumps can go backwards (#1614), so a human merges those.
     if: >-
       github.repository == 'xroche/httrack'
       && github.event.pull_request.user.login == 'dependabot[bot]'

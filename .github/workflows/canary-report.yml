@@ -50,11 +50,7 @@ jobs:
         run: |
           set -euo pipefail
           title="CI canary: $WF is failing"
-          # A second label naming the workflow file, because the canary's issue
-          # has to be found by something a maintainer cannot change. Keying on
-          # the title means one retitle orphans the old issue AND files a new
-          # one, and keying on the shared label alone means a long-lived issue
-          # pages away once a hundred have accrued under it.
+          # This label names the workflow file, which a retitle cannot move.
           key="canary:${WF_PATH##*/}"
 
           gh label create "$LABEL" --color fbca04 \
@@ -62,10 +58,8 @@ jobs:
           gh label create "$key" --color ededed \
             --description "Canary issues for $WF_PATH" || true
 
-          # Labelled, not searched: the search index lags minutes behind a fresh
-          # issue, which is the window a second delivery would duplicate in.
-          # Plain assignment, so a failed list aborts rather than reading as
-          # "nothing open yet" and filing a duplicate.
+          # Search by label, because the search index lags a new issue. A plain
+          # assignment aborts on a failed list instead of filing a duplicate.
           mine=$(gh issue list --state all --label "$LABEL" --label "$key" \
             --limit 100 --json number,state --jq '.[] | [.number, .state] | @tsv')
           open=$(awk -F'\t' '$2 == "OPEN" { print $1; exit }' <<<"$mine")
