@@ -1,9 +1,9 @@
 #!/bin/bash
 #
-# A cache-served second pass fetches no bodies, so it must leave the WARC, CDXJ
-# and WACZ of the first pass untouched (#759). The kept package is re-validated
-# to prove it still replays, not just that a same-named file is still there.
-# The one Error: line is the keep notice; a second means the pass also failed.
+# A cache-served second pass fetches no bodies, so it must leave the first
+# pass's WARC, CDXJ and WACZ untouched (#759). The kept package is re-validated
+# to prove it still replays. The one Error: line is the keep notice, and a
+# second one means the pass also failed.
 
 set -eu
 

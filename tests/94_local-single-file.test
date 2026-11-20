@@ -79,8 +79,7 @@ page="${out}/127.0.0.1_${SRV_PORT}/index.html"
 test -f "$page" || fail "no mirrored page at $page"
 
 # --- what must be inlined, byte for byte ------------------------------------
-# The decoder is python, not httrack, so a broken encoder cannot agree with
-# itself here.
+# The decoder is python, so a broken encoder cannot agree with itself.
 extract() {
     "$python" - "$(nativepath "$1")" "$2" "$(nativepath "$3")" <<'PY'
 import base64, re, sys
@@ -132,8 +131,8 @@ grep -q 'rel="canonical" href="other.html"' "$page" || fail "rel=canonical was i
 echo OK
 
 printf '[an unnamed tag cannot skip the deny rules] ..\t'
-# An unquoted value ending at '>' loses the tag name, which used to read as
-# "a CSS body" and took these past every tag-bearing deny rule.
+# An unquoted value ending at '>' loses the tag name, and must not then pass
+# as "a CSS body" past every tag-bearing deny rule.
 grep -q '<a href=pixel.svg>' "$page" || fail "an unquoted anchor was inlined"
 grep -q '<iframe src=pixel.svg>' "$page" || fail "an unquoted iframe was inlined"
 echo OK
@@ -195,10 +194,9 @@ test ! -e "${bad}/127.0.0.1_${SRV_PORT}/index.html" || fail "a rejected cap stil
 echo OK
 
 printf '[a page cannot forge a mark] ..\t'
-# A mark of the right shape but the wrong secret, against a real mirrored
-# asset. Expanding needs the secret, so it is deleted rather than resolved: a
-# truncated secret comparison would put a data: URI here instead. pixel.svg is
-# inlined elsewhere on the page, so the encoder was demonstrably willing.
+# This mark has the right shape but the wrong secret, for a real mirrored
+# asset. It must be deleted, and a truncated secret check would put a data:
+# URI here. pixel.svg is inlined elsewhere on the page.
 forged=$(sed -n 's/.*<p>\(id=[^<]*\)<\/p>.*/\1/p' "$page")
 test "$forged" = 'id=pixel.svg end' || fail "the page was altered: $forged"
 grep -q 'data:image/svg+xml;base64,' "$page" || fail "nothing was inlined at all, so the probe proves nothing"
@@ -220,10 +218,10 @@ grep -q 'content="text/html;charset=pixel.svg" />' "$markpage" || fail "the char
 echo OK
 
 printf '[no file keeps a mark] ..\t'
-# Stripping matches the mark's shape, not this run's secret, so nothing in the
-# mirror may carry one -- pages included, and whatever an earlier run left.
-# grep's own status, kept out of a pipeline that would launder it: 0 matched,
-# 1 clean, anything above that means the sweep never read the tree.
+# Stripping matches the mark's shape rather than this run's secret, so no file
+# in the mirror may carry one, including pages and older runs' leftovers.
+# grep's status stays out of a pipeline: 0 matched, 1 clean, and anything
+# higher means the sweep never read the tree.
 st=0
 marked=$(grep -rlE '#![0-9a-f]{16}\.[-cj]\.[0-9]+' \
     "${out}/127.0.0.1_$SRV_PORT" 2>/dev/null) || st=$?
@@ -234,8 +232,8 @@ echo OK
 
 printf '[an unrecognised type still inlines from its context] ..\t'
 # style_noext and app_noext have no usable extension, so only the referencing
-# context says what they are. plain.css/plain.js are the control: they inline
-# either way, so a failure here is the context path and not the encoder.
+# context says what they are. plain.css and plain.js inline either way, which
+# puts a failure here on the context path.
 grep -q 'href="data:text/css;base64,' "$page" || fail "no stylesheet inlined at all"
 if grep -q 'href="style_noext"' "$page"; then
     echo "FAIL: extensionless stylesheet was not inlined"
@@ -270,8 +268,8 @@ case "$both" in
 esac
 
 printf '[--changes and --single-file together] ..\t'
-# Both hook end-of-mirror, and the report stats the file it names, so its size
-# for the page is the inlined one only if expansion ran first.
+# Both run at end of mirror and the report stats the file it names, so it
+# shows the inlined size only if expansion ran first.
 chg="${tmpdir}/chg"
 mkdir "$chg"
 # Its own -O: "$common" points at the first mirror, which left $chgpage absent
@@ -322,8 +320,8 @@ print("%04o" % (os.stat(sys.argv[1]).st_mode & 0o777))' "$(nativepath "$1")"; }
 fi
 
 # --- the rewriter in isolation, over a hand-built mirror --------------------
-# After the crawl assertions, so a failure here cannot hide them: the two cover
-# different ground (this one reaches media, anchors and the mirror-root clamp).
+# This runs after the crawl assertions so its failure cannot hide them. It
+# also covers media, anchors and the mirror-root clamp.
 printf '[engine self-test] ..\t'
 st=$(httrack -O /dev/null "-#test=singlefile" "${tmpdir}/st/" 2>/dev/null)
 case "$st" in

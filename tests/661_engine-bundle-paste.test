@@ -279,7 +279,7 @@ refused 'the name is kept for an escaped device name' "curl http://_com1/ -b a=$
 refused 'invalid login bundle name: 128 bytes or more' \
     "curl 'https://$(repeat_chars 60 a).$(repeat_chars 63 b).con.com/' -b a=$sec"
 refused 'the address cannot be used' "curl 'https://bad.test/$(repeat_chars 1024 p)' -b a=$sec"
-# 1023 bytes, "ü" being two of them, and 1029 once the host is in ASCII
+# It is 1023 bytes ("ü" is two), and 1029 once the host is ASCII.
 refused 'the address is too long once its host is in ASCII' \
     "curl 'https://ü.test/$(repeat_chars $((1023 - 16)) p)' -b a=$sec"
 refused 'the address is longer than 1023 bytes once the bundle name is added' \

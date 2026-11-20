@@ -15,10 +15,9 @@ set -euo pipefail
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_portsib.XXXXXX") || exit 1
 cleanup_push rm -rf "$tmp"
 
-# A port the old code accepted only by wrapping: 4295009395 = 2^32 + 42099 and
-# 4294967376 = 2^32 + 80 both fold to a plausible listen port. They are the
-# load-bearing cases, since a value that merely exceeds 65535 while still
-# fitting an int (65616) was already caught by the htsserver range check.
+# Ports that wrap to a plausible listen port: 4295009395 = 2^32 + 42099 and
+# 4294967376 = 2^32 + 80. A value over 65535 that still fits an int (65616) is
+# already caught by the htsserver range check.
 overflowing="4295009395"
 
 # Values sscanf("%d") took as a port that no operator meant: a trailing
@@ -46,9 +45,9 @@ web_refused() {
 web_accepted() {
     local port=$1
     : >"$tmp/web.log"
-    # A bound server blocks, so stop it once it announces, not on a fixed
-    # deadline: the announce trails a local-hostname resolve that stalls on macOS,
-    # where a 3s kill landed mid-resolve, before the URL= line ever printed.
+    # A bound server blocks, so stop it once it announces. The announce follows
+    # a local-hostname resolve that stalls on macOS, so a fixed deadline can
+    # kill it before the URL= line prints.
     local had_m='' is_msys=''
     # Before "set -m", because shell_is_msys forks and a fork inside the
     # job-control window makes bash announce the job it just reaped.
@@ -126,9 +125,9 @@ done
 proxy_accepted 45678
 
 # --- ftp:// URL port -------------------------------------------------------
-# A URL port, so it follows the crawled-URL policy: refuse the link rather than
-# fold it into range. An ftp:// link in scanned HTML is not followed, so the
-# seed has to come from the command line.
+# A URL port follows the crawled-URL policy: refuse the link rather than fold
+# it into range. ftp:// links in scanned HTML are not followed, so the seed
+# comes from the command line.
 
 ftp_port() {
     local out="$tmp/ftp"

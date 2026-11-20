@@ -5,14 +5,12 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-# #623: url_savename shortens an over-ceiling path by cutting the tail of the
-# last segment, where the mandatory ".<id>.delayed" placeholder lives. A cut
-# marker fails IS_DELAYED_EXT, so back_delayed_rename never renames the file and
-# the download is lost. The marker must survive the cut.
+# #623: url_savename shortens an over-ceiling path by cutting the end of the
+# last segment, where the ".<id>.delayed" marker lives. The marker must survive,
+# or back_delayed_rename skips the file and the download is lost.
 #
-# The ceiling is the Windows MAX_PATH on Windows but the (far larger) save
-# buffer elsewhere (#133). Each CLI arg is capped at HTS_CDLMAXSIZE (1024), so
-# on POSIX we lengthen the output dir as well to overrun the ceiling.
+# The ceiling is MAX_PATH on Windows and the larger save buffer elsewhere
+# (#133). Each argument is capped at 1024 bytes, so POSIX lengthens -O too.
 
 httrack_bin=$(httrack_path)
 scratch=$(mktemp -d)
@@ -41,9 +39,8 @@ run() {
     "$httrack_bin" -O "$outdir" -#test=savename "$@" | sed -n 's/^savename: //p'
 }
 
-# untruncated "outdir/host/name" is longer than the ceiling, so truncation must
-# fire; out then sits at or under it. Together these keep the marker check below
-# non-vacuous.
+# untruncated "outdir/host/name" exceeds the ceiling, so truncation must fire,
+# and out must then fit under it. Both keep the marker check below meaningful.
 check_truncated() {
     local out=$1 fil=$2
     local untrunc=$((${#outdir} + 1 + 15 + ${#fil})) # host = www.example.com

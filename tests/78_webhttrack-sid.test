@@ -27,17 +27,14 @@ resp=$(htsserver_post "sid=${sid}&redirect=/accepted")
 grep -q '^Location: /accepted' <<<"${resp}" ||
     fail "a body carrying the correct sid was refused"
 
-# Refuse: missing and wrong. A missing one is the regression under test — the
-# expected value used to be pre-seeded into the compared key, so omitting the
-# field compared equal to itself.
+# Refuse a missing or wrong sid. Omitting the field must not compare equal.
 for bad in "redirect=/nosid" "sid=&redirect=/empty" \
     "sid=00000000000000000000000000000000&redirect=/wrong"; do
     resp=$(htsserver_post "${bad}")
     grep -q '^Location:' <<<"${resp}" &&
         fail "body accepted without a valid sid: ${bad}"
-    # A refusal has to be a well-formed reply, not a headerless fragment: the
-    # release build used to emit only Content-length, which reads as a protocol
-    # error to any client and hides the reason.
+    # A refusal must be a well-formed reply, because a headerless one reads as
+    # a protocol error and hides the reason.
     grep -q '^HTTP/1\.0 403 ' <<<"${resp}" ||
         fail "refusal was not a 403: ${bad}"
 done
@@ -59,10 +56,9 @@ resp=$(htsserver_get /server/../../../../../../../../etc/passwd)
 grep -q '^HTTP/1\.0 200 ' <<<"${resp}" && fail "a path with .. was served"
 htsserver_alive || fail "a path with .. killed the server"
 
-# Suppressing the reply is not the same as refusing the write: the body is
-# applied to one global key store that later requests render from, and the
-# command dispatcher reads it from there. Probe the store itself — step3
-# interpolates ${projname} into its title — rather than the refused reply.
+# Suppressing the reply does not refuse the write. The body goes to one global
+# key store that later requests and the command dispatcher read. So probe the
+# store, which step3 shows through ${projname} in its title.
 store_page() {
     # a dead probe or a non-page reply must not read as "the store was not written"
     page=$(htsserver_get /server/step3.html) || fail "the key store probe failed"

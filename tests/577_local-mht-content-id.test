@@ -1,6 +1,6 @@
 #!/bin/bash
-# Issue #1925: two paths could alias onto one Content-ID, so one MIME part
-# served both images. Nothing in tests/ produced a .mht before this.
+# #1925: two paths must never share one Content-ID, or one MIME part serves
+# both images.
 set -eu
 
 # shellcheck source=tests/crawllib.sh
@@ -16,8 +16,8 @@ mkdir -p "${tmpdir}/root"
 # GIF89a header, enough for the engine to type both bodies the same way.
 printf 'GIF89a\001\000\001\000\200\000\000\377\377\377\000\000\000!\371\004\001\000\000\000\000,\000\000\000\000\001\000\001\000\000\002\002D\001\000;' \
     >"${tmpdir}/root/p.gif"
-# The two spellings of the escape "/p.gif" now produces: the marker that used
-# to alias onto it, and the one that would alias if it stopped being escaped.
+# Decoys spelling the escape of "/p.gif": the pre-#1925 marker, and the one
+# that would alias if the escape were dropped.
 cp "${tmpdir}/root/p.gif" "${tmpdir}/root/pX2egif"
 cp "${tmpdir}/root/p.gif" "${tmpdir}/root/p-2egif"
 cat >"${tmpdir}/root/index.html" <<'EOF'

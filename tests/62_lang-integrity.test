@@ -1,10 +1,9 @@
 #!/bin/bash
 #
 # lang/*.txt are line pairs: an English msgid, then its translation. A stray
-# blank or a drifted msgid silently unhooks every translation that follows,
-# rather than failing, so assert the pairing and the join against English.txt.
-# Pairs are physical lines here; a msgid ending in \ continues onto the next one
-# for the engine (hts_readline_cpp) but not for us. None do today.
+# blank or a drifted msgid unhooks every later translation without an error.
+# Pairs are physical lines here, so a msgid ending in \ would continue for the
+# engine (hts_readline_cpp) but not for us. None do today.
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
@@ -75,8 +74,7 @@ fi
 
 nfiles=0
 fail=0
-# A sweep that could not run must not read as a pass: these reasons turn the
-# run into a skip.
+# A sweep that could not run must not pass, so these reasons make it a skip.
 skipped=''
 defer_skip() { skipped="${skipped:+$skipped; }$1"; }
 for f in "$langdir"/*.txt; do
@@ -121,8 +119,7 @@ field() {
 
 bytes_are_utf8() {
     f=$1
-    # Not iconv: macOS 14 swapped GNU libiconv for a Citrus one that rejects
-    # valid UTF-8, reporting a stale ENOTTY that no conversion can produce.
+    # Python checks UTF-8 because macOS 14's iconv rejects valid UTF-8.
     if ! "$py" "$tmp/utf8.py" "$f" 2>"$tmp/err"; then
         echo "${f##*/}: not valid UTF-8: $(<"$tmp/err")"
         return 1
@@ -180,9 +177,8 @@ PYEOF
     fi
 fi
 
-# Άκυρο. Valid UTF-8 does not say the re-encode read the right source: cp1253
-# and ISO-8859-7 disagree on this letter, and reading the file as the label
-# rather than the bytes turns it into a curly quote.
+# Άκυρο. Valid UTF-8 does not prove the right source charset. cp1253 and
+# ISO-8859-7 disagree on this letter, and the wrong one gives a curly quote.
 cancel=$(LC_ALL=C awk '{ sub(/\r$/, "") } $0 == "Cancel" { getline v; sub(/\r$/, "", v); print v; exit }' \
     "$langdir/Greek.txt")
 if [ "$cancel" != "$(printf '\316\206\316\272\317\205\317\201\316\277')" ]; then
@@ -196,10 +192,9 @@ if [ -n "$ln" ]; then
     fail=1
 fi
 
-# LANGUAGE_FILE is the catalog basename and reaches the network as the update
-# link's Language= (#1353), so it must exist, be ASCII, and match the filename.
-# The loader backfills an absent key from English, which would silently report
-# the wrong language rather than nothing.
+# LANGUAGE_FILE is the catalog basename and is sent as the update link's
+# Language= (#1353), so it must exist, be ASCII and match the filename. The
+# loader fills an absent key from English, which reports the wrong language.
 for f in "$langdir"/*.txt; do
     base=${f##*/}
     base=${base%.txt}
@@ -216,10 +211,9 @@ for f in "$langdir"/*.txt; do
     fi
 done
 
-# webhttrack turns the caller's locale into a lang.def number through
-# lang.indexes and hands it to htsserver, so a wrong number serves another
-# catalog silently. lang.def names the file behind each number and that file
-# declares its own LANGUAGE_ISO, which is the oracle here.
+# webhttrack maps the caller's locale to a lang.def number through lang.indexes,
+# so a wrong number serves another catalog. The oracle is the LANGUAGE_ISO
+# declared by the file lang.def names for each number.
 indexes="$top_srcdir/lang.indexes"
 [ -f "$indexes" ] || fail "cannot find $indexes"
 LC_ALL=C awk '
@@ -292,11 +286,10 @@ for probe in wrongnum nodef dropped; do
 done
 indexes_agree "$indexes" || fail=1
 
-# LANGUAGE_NAME must be the endonym, not English: the menu shows every catalog
-# together (#116). Two oracles rather than a copy of the current values, so the
-# name may repeat neither a word of the catalog's own English LANGUAGE_WINDOWSID
-# nor a common English language name. A language whose endonym really is the
-# English word joins own_name_is_english below.
+# LANGUAGE_NAME must be the endonym, because the menu lists every catalog
+# together (#116). It may repeat no word of the catalog's English
+# LANGUAGE_WINDOWSID and no common English language name. A language whose
+# endonym is the English word joins own_name_is_english below.
 own_name_is_english="en"
 exonyms="afrikaans albanian arabic basque belarusian bulgarian catalan chinese croatian czech
 danish dutch english estonian farsi filipino finnish flemish french galician georgian
@@ -386,10 +379,9 @@ for scope in "Mirror %s and every host below it" "Ignore %s and every host below
     done
 done
 
-# A msgid absent from a language file silently falls back to English (#862).
-# Multisets, not sets: a catalog repeating a msgid more often than English.txt
-# does keeps the set equal while one of the values it pairs goes unreachable.
-# English.txt repeats 27 msgids of its own, and those cancel out on both sides.
+# A msgid absent from a language file falls back to English (#862). Compare
+# multisets, because a catalog repeating a msgid more often than English.txt
+# leaves one of its values unreachable. English.txt's own repeats cancel out.
 LC_ALL=C sort <"$keys" >"$tmp/english.sorted"
 for f in "$langdir"/*.txt; do
     LC_ALL=C awk 'NR%2==1 { sub(/\r$/, ""); print }' "$f" | LC_ALL=C sort >"$tmp/have"
@@ -511,8 +503,8 @@ if [ -n "$(unknown_escapes "$tmp/legal.txt" legal.txt | LC_ALL=C sed '/^values=/
     echo "the escape check rejects a legally escaped backslash"
     exit 1
 fi
-# The set is the spec, mirroring conv_printf's switch: a probe can only ever
-# name the letters it happens to use, so widening by any other one is invisible.
+# The allowed set mirrors conv_printf's switch and is pinned, because a probe
+# only names the letters it uses and cannot see the set widen.
 want_ok="abfnrtv?$(printf '\047\042\134')"
 got_ok=$(printf 'x\ny\n' >"$tmp/ok.txt" && unknown_escapes "$tmp/ok.txt" ok.txt 1 | head -1)
 if [ "$got_ok" != "$want_ok" ]; then
@@ -572,8 +564,8 @@ count_untranslated() {
     ' "$1"
 }
 
-# Catalogs pinned at zero would also match a counter that never leaves it, so
-# count a fixture carrying one of each shape before trusting the real ones.
+# A counter stuck at zero would match the catalogs pinned at zero. Count a
+# fixture with one of each shape first.
 printf 'Cancel\nCancel\nClose\nClose \nOK\n \nSave\nEnregistrer\n' >"$tmp/probe.txt"
 got=$(count_untranslated "$tmp/probe.txt" probe.txt)
 want=$(printf '%-25s %-9d %d\n' probe.txt 2 1)
@@ -584,7 +576,7 @@ fi
 
 : >"$tmp/counts"
 for f in "$langdir"/*.txt; do
-    # English.txt is the msgid side of every pair, identical by construction.
+    # English.txt is the msgid side of every pair.
     [ "$f" != "$eng" ] || continue
     count_untranslated "$f" "${f##*/}" >>"$tmp/counts"
 done
@@ -651,11 +643,10 @@ elif [ "$rc" -ne 0 ]; then
     fail=1
 fi
 
-# These name real paths on disk and on the wire, so a translated one sends the
-# user nowhere: "htscache/new.*" and "robot.txt" both shipped. Case is the
-# translator's, spelling is not, and example hostnames stay their call. Counted
-# rather than matched: keeping one web/ of eleven still misroutes ten rows.
-# Counts must match: one too few loses a path, one too many duplicates a row.
+# These name real paths on disk and on the wire, and a translated one sends the
+# user nowhere ("htscache/new.*" and "robot.txt" both shipped). Case is the
+# translator's, spelling is not, and example hostnames stay their call. Counts
+# must match, because one too few loses a path and one too many adds a row.
 literal_tokens="hts-cache robots.txt cgi-bin web/images web/html"
 translated_literals() {
     LC_ALL=C awk -v name="$2" -v toks="$literal_tokens" '
@@ -695,19 +686,17 @@ case $(translated_literals "$tmp/literals.txt" literals.txt) in
     exit 1
     ;;
 esac
-# Two findings, not one: the second pair drops one robots.txt of three, which a
-# checker looking only for presence would pass.
-# The list is the spec, so pin it: a fixture can only ever exercise the tokens
-# it happens to name, and dropping any other one would go unnoticed.
+# The second pair drops one robots.txt of three, which a presence check would
+# pass. The token list is pinned, because a fixture only exercises the tokens
+# it names.
 want_tokens="hts-cache robots.txt cgi-bin web/images web/html"
 if [ "$literal_tokens" != "$want_tokens" ]; then
     echo "literal_tokens is [$literal_tokens], expected [$want_tokens]"
     exit 1
 fi
 
-# One damaged pair per token, so narrowing the list cannot pass, plus the other
-# direction: a token named twice where the msgid names it once duplicates a
-# dropdown row, so a one-sided comparison has to fail here too.
+# One damaged pair per token catches a narrowed list. A token named twice where
+# the msgid names it once adds a row, so that direction must fail too.
 if [ "$(translated_literals "$tmp/literals.txt" literals.txt | wc -l)" -ne 6 ]; then
     echo "the literal-token check did not report all six damaged fixtures"
     exit 1
@@ -722,8 +711,8 @@ for f in "$langdir"/*.txt; do
 done
 
 # A combo-box "\n" starts a row, so a value whose break count differs from its
-# msgid shifts every row after it. Most drift here is prose reflowed to another
-# width, so counts are pinned per catalog; a new one has to be looked at.
+# msgid shifts every later row. Most drift is prose reflowed to another width,
+# so counts are pinned per catalog, and a new one needs a look.
 count_linebreaks() {
     LC_ALL=C awk -v name="$2" '
         # Escaped backslashes go first: in "\\n" the break belongs to neither
@@ -797,10 +786,9 @@ LC_ALL=C awk -v pin="$lbpin" '
     }
 ' "$tmp/lb" || fail=1
 
-# A catalog re-encoded from the wrong source is still valid UTF-8, so the check
-# above cannot see it. Mojibake is exactly text that survives a trip back to
-# Latin-1 and reads as UTF-8 again. A byte pattern instead flags real
-# punctuation: French needs a no-break space after an accent before ! ? : ; ».
+# A catalog re-encoded from the wrong source is still valid UTF-8. Mojibake is
+# text that survives a round trip through Latin-1 and UTF-8. A byte pattern
+# would flag French no-break spaces after an accent, before ! ? : ; ».
 if [ -z "$py" ]; then
     defer_skip "python3 not found, so the mojibake sweep did not run"
 elif ! command -v iconv >/dev/null 2>&1; then
@@ -861,13 +849,11 @@ if [ "$npage" -lt 20 ]; then
     exit 1
 fi
 
-# Each combo box is filled from a LISTDEF_* list and read back as a bare row
-# index that selects an engine option, so a list whose item count differs from
-# its msgid hands the engine the neighbour of what the user clicked: wrong robots
-# policy, wrong travel mode, wrong structure, silently and per locale. WinHTTrack
-# cannot catch it (its own selftest checks the English list) and it never shows
-# in English, so this is the only place it is caught. Exact, not pinned like the
-# line-break counts: these are the strings where a compensating change hides.
+# Each combo box comes from a LISTDEF_* list and is read back as a row index
+# that picks an engine option. A list whose item count differs from its msgid
+# hands the engine the neighbour of the user's choice, in that locale only.
+# WinHTTrack's selftest checks only English, so this is the one check. Counts
+# must be exact, because compensating changes hide in these strings.
 listdef_keys="$tmp/listdef.keys"
 LC_ALL=C awk '
     { sub(/\r$/, "") }
@@ -884,9 +870,8 @@ fi
 
 listdef_items() {
     LC_ALL=C awk -v name="$2" -v keyfile="$3" '
-        # Items, not breaks: an escaped backslash is not a separator.
-        # An escaped backslash is not a separator, so it goes first; the count
-        # that follows sees a \n inside a \r\n exactly once either way.
+        # Count items. An escaped backslash is not a separator, so it goes
+        # first, and the count then sees a \n inside a \r\n once either way.
         function items(s) {
             gsub(/\\\\/, "", s)
             return gsub(/\\n/, "", s) + 1

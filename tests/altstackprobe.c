@@ -1,16 +1,14 @@
-/* Says what happened to the alternate signal stack a process was handed, for
-   181_altstack-honoured.test. ALTSTACK_MODE picks the state main() inherits:
-   "keep" installs one first, "none" leaves none installed.
+/* Reports what happened to the alternate signal stack a process was handed,
+   for 181_altstack-honoured.test. ALTSTACK_MODE "keep" installs one first, and
+   "none" leaves none installed.
 
-   ALTSTACK_TRACE names a file to log the per-thread lifecycle to, for
-   183_altstack-worker.test, Linux only as that leg is: "<pid> <tid> query|set
-   on|off|own <sp>" for every sigaltstack(), "<pid> <tid> munmap - <sp>" for
-   every unmap of a stack seen installed. Only the ordering across those two
-   syscalls can show that a worker gives its stack back, disabled first.
+   ALTSTACK_TRACE names a log for the per-thread lifecycle (183_altstack-worker,
+   Linux only): "<pid> <tid> query|set on|off|own <sp>" per sigaltstack(), and
+   "<pid> <tid> munmap - <sp>" per unmap of a stack seen installed. The order
+   shows whether a worker disables its stack before giving it back.
 
-   "own" is an install of a mapping this shim watched mmap() hand out, which is
-   what tells httrack's stacks apart from a sanitizer runtime's: those come from
-   a raw syscall no interposer sees, though installed the same way. */
+   "own" marks a mapping this shim saw mmap() return. Sanitizer runtimes map
+   their stacks with a raw syscall no interposer sees. */
 
 #define _GNU_SOURCE
 
@@ -192,9 +190,9 @@ static void *trace_mapped(void *sp) {
   return sp;
 }
 
-/* The fallback when dlsym() failed, so it has to be right: 32-bit arches have
-   no SYS_mmap and i386's wants an argument block, so prefer SYS_mmap2, whose
-   offset is in 4096-byte units whatever the page size. */
+/* The fallback when dlsym() failed. 32-bit arches have no SYS_mmap and i386's
+   takes an argument block, so use SYS_mmap2, whose offset is in 4096-byte units
+   whatever the page size. */
 static void *raw_mmap(void *addr, size_t len, int prot, int flags, int fd,
                       off_t off) {
 #ifdef SYS_mmap2
@@ -234,9 +232,9 @@ SHIM_EXPORT void *mmap64(void *addr, size_t len, int prot, int flags, int fd,
 SHIM_EXPORT int munmap(void *addr, size_t len);
 
 SHIM_EXPORT int munmap(void *addr, size_t len) {
-  /* Only the stacks: a process unmaps plenty else, and the trace is read as an
-     unbroken per-thread sequence. Logged before the call, so a stack the kernel
-     is still pointed at leaves its record behind. */
+  /* Log only stacks, because the trace is read as an unbroken per-thread
+     sequence. Logging before the call keeps the record of a stack the kernel
+     still points at. */
   if (trace_fd >= 0 && trace_is_stack(addr)) {
     trace_line("munmap", "-", addr);
   }

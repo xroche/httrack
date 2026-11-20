@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# Issue #607: a peer that accepts the TCP connect but never speaks TLS leaves the
-# slot stuck in the handshake. The per-slot --timeout must reap it; before the
-# fix only --max-time did, so these crawls ran until the kill guard.
+# #607: a peer that accepts the TCP connect but never speaks TLS leaves the slot
+# stuck in the handshake. The per-slot --timeout must reap it.
 
 set -euo pipefail
 

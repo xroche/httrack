@@ -1,13 +1,11 @@
 #!/bin/bash
 #
-# A --warc crawl stores compressed bodies verbatim (the default): the response
-# record keeps Content-Encoding: gzip and its stored bytes inflate back to the
-# served page. The validator's --verbatim mode is the differential gate:
-# inflate(stored) must equal the decoded body the server compressed.
+# A --warc crawl stores compressed bodies verbatim (the default). The response
+# record keeps Content-Encoding: gzip, and the validator's --verbatim mode
+# checks that its bytes inflate back to the served page.
 #
-# Two fixtures cover both adoption branches of back_finalize: page.html (text/html)
-# takes the in-memory branch; data.bin (application/octet-stream) is streamed to
-# disk, so it exercises the is_write direct-to-disk spool adoption.
+# page.html is kept in memory, and data.bin (application/octet-stream) is
+# streamed to disk, so both branches of back_finalize run.
 
 set -eu
 

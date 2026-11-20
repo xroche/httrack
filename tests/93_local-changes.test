@@ -1,6 +1,6 @@
 #!/bin/bash
-# --changes (#714): the report must match the mirror's real deltas. Every route
-# answers 200 with no validators on both passes, so the transfer signal alone
+# --changes (#714): the report must match what changed in the mirror. Every
+# route answers 200 without validators on both passes, so transfers alone
 # would call the whole site changed.
 set -euo pipefail
 
@@ -91,20 +91,17 @@ expect "new is the two fresh pages and the renamed redirect target" \
 expect "gone is doomed.html and the old redirect target" \
     "$(lines "${host}/changes/doomed.html" "${host}/changes/s.html")" \
     "$(listed gone | sort)"
-# index.html changes because its link list does; moved.* change their bodies.
-# coded.bin arrives gzipped and direct-to-disk, so its previous copy has to be
-# sampled before the decoded temp is renamed over it; it is the same length on
-# both passes, so only a digest separates it from codedstable.bin.
+# index.html changes with its link list, and moved.* change their bodies.
+# coded.bin arrives gzipped to disk, so its old copy is sampled before the
+# decoded temp replaces it. Its length never changes, so only a digest counts.
 expect "changed is exactly the four moved resources" \
     "$(lines "${host}/changes/coded.bin" "${host}/changes/index.html" \
         "${host}/changes/moved.bin" "${host}/changes/moved.html")" \
     "$(listed changed | sort)"
-# Re-served byte for byte, 200, no Last-Modified, no ETag. flaky.bin gets there
-# through a failed transfer and a retry, so its file is notified twice;
-# redirtarget.html arrives behind a 302. sized.html has a byte-identical
-# payload, but the rewritten link to the renamed redirect target makes the file
-# on disk change length. reset.bin never completes a transfer (#746), so its
-# previous copy stands.
+# All seven come back byte for byte with a 200 and no validators. flaky.bin
+# needs a retry and is notified twice, and redirtarget.html comes behind a 302.
+# sized.html changes length on disk only through a rewritten link. reset.bin
+# never completes a transfer (#746), so its old copy stands.
 expect "unchanged is exactly the seven stable resources" \
     "$(lines "${host}/changes/codedstable.bin" "${host}/changes/flaky.bin" \
         "${host}/changes/redirtarget.html" "${host}/changes/reset.bin" \

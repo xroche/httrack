@@ -1,12 +1,10 @@
 #!/bin/bash
 #
-# A single non-ASCII -O sets both path_html and path_log to "café" (#630). The
-# logs (hts-log.txt/hts-err.txt) and the hts-cache must land there, not in an
-# ANSI-mangled twin: on Windows path_log holds UTF-8 bytes the raw file calls
-# read as the codepage. The --log-found audit greps logroot=café/hts-log.txt and
-# --cache-under-logroot checks café/hts-cache/new.zip, so anything written to the
-# twin fails them. POSIX has no twin, so this bites on the Windows CI leg (test
-# 64), exercising only the code path elsewhere.
+# A single non-ASCII -O sets path_html and path_log to "café" (#630). The logs
+# and hts-cache must land there, not in an ANSI-mangled twin, because on Windows
+# path_log holds UTF-8 bytes that raw file calls read as the codepage. The
+# --log-found and --cache-under-logroot checks fail on a write to the twin.
+# POSIX has no twin, so the bug shows only on the Windows leg.
 
 : "${top_srcdir:=..}"
 

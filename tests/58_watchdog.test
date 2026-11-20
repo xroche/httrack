@@ -1,9 +1,8 @@
 #!/bin/bash
 #
-# Unit-tests the suite watchdog (run_with_timeout/kill_tree in testlib.sh): a
-# hung child must be killed tree-and-all and reported 124, never left to orphan
-# a spinning httrack.exe. Regression guard for the Windows x64 hangs that read as
-# "the hosted runner lost communication with the server".
+# Unit-tests the suite watchdog (run_with_timeout and kill_tree in testlib.sh).
+# A hung child must be killed with its whole tree and reported as 124. On CI an
+# orphaned httrack.exe shows as "the hosted runner lost communication".
 
 set -euo pipefail
 
@@ -38,16 +37,16 @@ fi
 test "$rc" -eq 124 || fail "hang reported $rc, want 124"
 test "$((SECONDS - start))" -lt 15 || fail "watchdog fired late"
 
-# The native descendant tree is really dead, not orphaned. The Windows arm reads
-# /proc/<pid>/winpid, which only MSYS has, so it asks about that shell and not
-# about the binary; on POSIX it asks whether the grandchild's own pid still runs.
+# The native descendant tree must be dead. On MSYS the check reads
+# /proc/<pid>/winpid, so it asks about that shell rather than the binary. On
+# POSIX it asks whether the grandchild's own pid still runs.
 rc=0
 if shell_is_msys; then
-    # Existence by exact Windows PID, not a global ping.exe count: the timing
-    # sub-test above leaves a still-dying ping that a count would race.
+    # Match the exact Windows PID, because a ping.exe count would race the
+    # still-dying ping the timing sub-test above leaves.
     alive() { win_pid_runs "$1" ping.exe; }
-    # alive() is a conjunction now, and one that never matches would call every
-    # survivor reaped. Prove it fires on a live ping, reached the same way.
+    # An alive() that never matches would call every survivor reaped. Prove it
+    # fires on a live ping, reached the same way.
     ping -n 20 127.0.0.1 >/dev/null 2>&1 &
     cpid=$!
     cw=$(cat "/proc/$cpid/winpid" 2>/dev/null)
@@ -61,8 +60,8 @@ if shell_is_msys; then
     ! win_pid_runs "$cw" no-such-image.exe || fail "win_pid_runs accepts any image at all"
     kill_tree "$cpid" "$cw"
     wait "$cpid" 2>/dev/null || true
-    # The grandchild ping records its own Windows PID: non-empty proves it ran
-    # (positive control, so the reap check can't pass vacuously), then it must go.
+    # The grandchild ping records its Windows PID. A non-empty file proves it
+    # ran, so the reap check cannot pass on nothing. Then the pid must go.
     gw="$tmp/gcwinpid"
     # `wait` keeps the bash alive on the ping past the deadline; without it the
     # bash exits at once and run_with_timeout returns 0 instead of timing out.
@@ -71,8 +70,8 @@ if shell_is_msys; then
     test "$rc" -eq 124 || fail "grandchild hang reported $rc"
     w=$(cat "$gw" 2>/dev/null)
     test -n "$w" || fail "positive control: grandchild ping never started"
-    # Poll, not one sleep: taskkill returns before the teardown finishes. An
-    # orphan pings for ~29s, past REAP_GRACE, so waiting cannot hide a survivor.
+    # Poll, because taskkill returns before the teardown finishes. An orphan
+    # pings for ~29s, past REAP_GRACE, so waiting cannot hide a survivor.
     start=$SECONDS
     while alive "$w" && test "$((SECONDS - start))" -lt "$REAP_GRACE"; do sleep 1; done
     ! alive "$w" || fail "native ping grandchild (pid $w) survived the watchdog"
@@ -80,10 +79,8 @@ else
     started="$tmp/started" pidfile="$tmp/gcpid"
     grandchild_lives() { kill -0 "$gcpid" 2>/dev/null && ! pid_is_zombie "$gcpid"; }
     reap_grandchild() { test -z "${gcpid:-}" || kill -9 "$gcpid" 2>/dev/null || true; }
-    # The grandchild marks that it ran, hands back its own pid and then execs a
-    # sleep that outlasts every deadline here, so killing only the direct child
-    # leaves that one pid running. A marker it wrote on a timer instead would go
-    # missing whenever the scheduler starved it, and missing reads as reaped.
+    # The grandchild marks that it ran, hands back its pid, then execs a sleep
+    # that outlasts every deadline, so killing only the direct child leaves it.
     # shellcheck disable=SC2016 # $1, $2 and $! expand in the sh -c child, by design
     run_with_timeout 2 sh -c '{ : >"$1"; exec sleep 300; } & echo $! >"$2"; wait' _ "$started" "$pidfile" || rc=$?
     test "$rc" -eq 124 || fail "grandchild hang reported $rc"
@@ -93,8 +90,8 @@ else
     cleanup_push reap_grandchild
     # A probe that answers "gone" for everything would call any survivor reaped.
     kill -0 "$$" || fail "kill -0 cannot see this shell, so it can see nothing"
-    # Zombie counts as dead: who reaps an orphan is prompt on a workstation and
-    # not on a buildd, and reap_bounded already splits them that way.
+    # A zombie counts as dead, because orphans are reaped fast on a
+    # workstation but not on a buildd. reap_bounded splits them that way.
     start=$SECONDS
     while grandchild_lives; do
         test "$((SECONDS - start))" -lt "$REAP_GRACE" || fail "watchdog left a grandchild running (pid $gcpid)"
@@ -103,16 +100,15 @@ else
     gcpid= # disarm: the number is free to be recycled from here on
 fi
 
-# Wall clock, not iteration count: under starvation a poll costs more than it asks,
-# so a counted deadline never fires before the CI step it was meant to beat.
+# Use the wall clock. Under starvation a poll takes longer than it asks, so a
+# counted deadline would fire after the CI step it must beat.
 (
-    # The forked tick is the only one a shimmed sleep can reach: against the fd
-    # tick nothing here would be starved but the payload, and the case goes inert.
+    # Only the forked tick goes through a shimmed sleep. With the fd tick only
+    # the payload would starve, and the case would test nothing.
     export HTTRACK_POLL_SLEEP=1
     starve_sleep "$shim" 4 || fail "could not install the slow sleep"
-    # Control: starvation must not make the watchdog kill work that is inside its
-    # budget. The command outlives several polls, so a guard that fires on the
-    # first one cannot pass this by exiting before it is ever looked at.
+    # Starvation must not make the watchdog kill a command inside its budget.
+    # The command outlives several polls, so the watchdog sees it running.
     rc=0 && run_with_timeout 30 sleep 2 || rc=$?
     test "$rc" -eq 0 || fail "starved watchdog killed a healthy command ($rc)"
 
@@ -125,7 +121,7 @@ fi
     fi
     elapsed=$((SECONDS - start))
     test "$rc" -eq 124 || fail "starved watchdog reported $rc, want 124"
-    # Never under budget, or a guard that kills everything on sight would pass.
+    # It must not fire under budget, or a guard killing on sight would pass.
     test "$elapsed" -ge 3 || fail "the watchdog fired early (${elapsed}s of 3s)"
     # The first 4s poll is past 3s, so it fires at 4-5s, while counting three polls takes 12s.
     test -n "$WATCHDOG_FIRED_AT" || fail "the watchdog never recorded when it fired"

@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# Reaching the -#L cap unwound the parser mid-page, so the entry page it had
-# just rewritten was thrown away with it and a crawl could keep nothing at all.
-# The cap still aborts the mirror, as #1419 decided and the man page documents.
+# Reaching the -#L cap must not discard the entry page the parser just
+# rewrote. The cap still aborts the mirror (#1419, and the man page).
 
 set -euo pipefail
 
@@ -89,16 +88,14 @@ ok "a crawl that reaches the cap still reports the abort #1419 gave it"
 
 # The regression: the parser used to unwind here and take this page with it.
 assert_file "${site}/index.html" "the capped mirror kept no entry page"
-# The abort ends the run before the leaves it did catch are fetched, so the
-# kept page keeps CAUGHT local links to files that are not there. That is what
-# any aborted mirror leaves; only the links past the cap become external.
+# The abort ends the run before the caught leaves are fetched. Their local
+# links dangle, as in any aborted mirror. Only links past the cap go external.
 test ! -e "${site}/page01.html" ||
     fail "a leaf caught before the cap was fetched, so the cap stopped nothing"
 ok "and keeps the page it had already rewritten"
 
-# Links past the cap address the live server, so the kept page references no
-# file the abort stopped the engine from fetching. The control above proves
-# these same links are local when the cap is not in the way.
+# Links past the cap point at the live server. The control above shows the
+# same links are local without the cap.
 assert_eq "$((PAGES - CAUGHT))" "$(external_links)" \
     "leaf links the cap left external"
 ok "links past the cap are rewritten external rather than left dangling"
@@ -108,10 +105,8 @@ assert_eq 1 "$(grep -c 'Too many URLs' <<<"$log")" "times the cap reported itsel
 ok "and the cap reports itself once however many links follow it"
 
 # --- the reserve: robots.txt and its link are recorded in one parser step ---
-# The hub names a second host, so the engine must record that host's robots.txt
-# and then the link itself. Both have to fit, which is why
-# hts_maxlinks_no_room() holds back two slots. With one, the engine records the
-# robots.txt, has no slot left for the link, and unwinds: the page under
+# The hub names a second host. The engine records its robots.txt, then the
+# link, so hts_maxlinks_no_room() reserves two slots. With one, the page under
 # rewrite is lost and the run exits 0.
 {
     printf '<html><body>\n'

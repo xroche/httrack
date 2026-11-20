@@ -12,9 +12,8 @@ dir=$(mktemp -d)
 cleanup_push rm -rf "$dir"
 
 # $1 Last-Modified value (empty = omit the header), $2 expected archive date,
-# $3 label. The date is asserted exactly: a guard that fires unconditionally
-# would clobber the valid case, and one that skips the year/day would emit a
-# month and day of 00.
+# $3 label. The exact date catches a guard that always fires and clobbers the
+# valid case, and one that skips the year and day and emits 00.
 run_case() {
     lastmod=$1
     wantdate=$2

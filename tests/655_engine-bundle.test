@@ -117,9 +117,9 @@ https://mixed.test ua=M headers=X-M: 1|" bundle "$dir" \
         host:https://mixed.test
 done
 
-# Merging is transitive: A and C share no site, but both overlap B, so C's
-# https URL keeps A's headers off plain http too, in either order. scope lines
-# leave the https rule as it is.
+# Merging is transitive. A and C share no site but both overlap B, so C's https
+# URL keeps A's headers off plain http too, in either order. scope lines leave
+# the https rule alone.
 for n in a b c; do
     lines=('# HTTrack bundle 1' 'ua H' 'header X-H: 1')
     case $n in
@@ -414,7 +414,7 @@ selftest_queue "refused: /alphasid.hts, line 6: a cookie has another value in an
     'https://alpha.test/#httrack-bundle=alphasid'
 
 # Chained bundles must load in linear time: 2000 may cost at most 64 times 250
-# (linear is about 8, cubic about 512). Relative, so slow legs pass.
+# (linear is about 8, cubic 512). A ratio lets slow legs pass.
 now_ms() {
     if perl -MTime::HiRes=time -e 1 2>/dev/null; then
         perl -MTime::HiRes=time -e 'printf "%d", time * 1000'

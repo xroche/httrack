@@ -14,9 +14,9 @@ out=$(CRAWL_DEADLINE=3 bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
 test "$rc" -ne 77 || skip "local crawl prerequisites missing"
 ! grep -q "could not discover server port" <<<"$out" || skip "server port announce raced"
 
-# The message prints only on the 124 reap, and 25s < the engine's --timeout=30, so
-# together they pin the fast exit on the 3s watchdog, not httrack giving up.
-# Timed from the engine's launch, so a slow server start on Hurd cannot red it.
+# The message prints only on the 124 reap, and 25s is under --timeout=30, so
+# the fast exit comes from the 3s watchdog. The clock starts at the engine's
+# launch, so a slow server start on Hurd cannot fail it.
 test "$rc" -ne 0 || fail "stalled crawl reported success"
 grep -q "watchdog fired" <<<"$out" ||
     fail "crawl failed but not via the watchdog: $out"

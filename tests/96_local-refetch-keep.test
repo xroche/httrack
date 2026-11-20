@@ -1,9 +1,9 @@
 #!/bin/bash
 #
 # A re-fetch cut mid-header must leave the mirrored file alone (#748) and keep
-# it out of the update purge (#746). err.bin is the control, an HTTP 500 on the
-# same resource already surviving both; stay.bin answers normally with a new
-# body, so a fix that stopped overwriting anything fails.
+# it out of the update purge (#746). err.bin is the control, an HTTP 500 that
+# already survives both. stay.bin gets a new body, so a fix that stops
+# overwriting anything fails.
 
 set -euo pipefail
 

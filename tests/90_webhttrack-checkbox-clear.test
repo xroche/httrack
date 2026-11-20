@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# An unchecked box posts nothing and the stored "1" survives: hence a hidden
-# companion per box, plus a disabling flag for the default-on ones.
+# An unchecked box posts nothing, so the stored "1" survives. Each box gets a
+# hidden companion, and default-on boxes a disabling flag too.
 
 set -euo pipefail
 
@@ -100,8 +100,8 @@ GATES = sorted(set(GATED_BY.values()))
 for field, key, when_set, when_clear in BOXES:
     for value, want, unwanted, stored in (("on", when_set, when_clear, "1"),
                                           ("", when_clear, when_set, "0")):
-        # Every gate is posted either way: session state outlives a request, so
-        # a box left set here would gate a later row without the table saying so.
+        # Every gate is posted, because session state outlives a request and a
+        # box left set would gate a later row the table does not mention.
         fields = [(g, "on" if GATED_BY.get(field) == g else "")
                   for g in GATES if g != field]
         fields.append((field, value))
@@ -121,8 +121,8 @@ for field, key, when_set, when_clear in BOXES:
 missing = sorted(set(page_of) - set(b[0] for b in BOXES))
 check(not missing, "every checkbox is exercised (missing %s)" % missing)
 
-# A browser posts the companion and the ticked box under one name, so the fix
-# rests on the body loop keeping the last value; both orders pin that down.
+# A browser posts the companion and the ticked box under one name. The fix
+# needs the body loop to keep the last value, and both orders pin that.
 cmd = textarea(s.post("step4.html", [("cookies", ""), ("cookies", "on")]),
                "command").split()
 check("--cookies=0" not in cmd, "cookies=&cookies=on keeps cookies set")

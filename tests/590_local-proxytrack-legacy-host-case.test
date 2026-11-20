@@ -1,8 +1,7 @@
 #!/bin/bash
-# A cache written before 3.40 holds an absolute save name, so moving the mirror
-# breaks it unless the reader can find the relative part again. It looks for the
-# URL's host inside the name, and htsname.c lowercases the name it writes while
-# the key keeps the case the href had (#1958).
+# A pre-3.40 cache holds absolute save names, so a moved mirror needs the reader
+# to find the relative part by the URL's host. htsname.c lowercases the name but
+# the key keeps the href's case (#1958).
 
 set -euo pipefail
 

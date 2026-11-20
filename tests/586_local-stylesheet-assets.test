@@ -1,7 +1,6 @@
 #!/bin/bash
-# #139: the fonts and images a stylesheet names. A sheet taken as a near link
-# lost them one level too deep, and the // of an absolute url()'s scheme read
-# as a comment and killed the rest of the line.
+# #139: the fonts and images a stylesheet names. They must not land one level
+# too deep, and the // in an absolute url() must not start a comment.
 set -eu
 
 # shellcheck source=tests/crawllib.sh

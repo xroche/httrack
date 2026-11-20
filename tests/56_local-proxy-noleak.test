@@ -1,9 +1,8 @@
 #!/bin/bash
 #
-# A crawl through a proxy must never resolve or dial the origin itself: the proxy
-# does that. A dead proxy + a multi-address origin used to fall back to dialing
-# the origin direct (bypassing the proxy, leaking its DNS and IP). The decoy
-# origin here must therefore receive nothing.
+# A crawl through a proxy must never resolve or dial the origin itself, even
+# when the proxy is dead and the origin has several addresses. The decoy origin
+# here must receive nothing.
 
 set -euo pipefail
 
@@ -28,11 +27,9 @@ cleanup_push cleanup
 # decoy origin: it must stay silent. LOCAL_SERVER_VERBOSE logs any request it gets.
 local_server_start --env LOCAL_SERVER_VERBOSE=1 --root "$root" --bind 127.0.0.1
 
-# a proxy port nothing listens on, held for the whole crawl: a freeport number a
-# neighbour then binds would answer, retiring the premise silently (#1218).
-# Not on macOS, which drops the SYN on a held port where Linux resets it, so the
-# crawl would time out instead of failing to connect and stop testing the bypass.
-# That leaves the #1218 race here on macOS alone, as it was everywhere before.
+# a proxy port nothing listens on, held for the whole crawl, because a freeport
+# number a neighbour binds later would answer (#1218). Not on macOS, which drops
+# the SYN on a held port, so the crawl would time out instead of failing fast.
 if test "$HTS_OS" = Darwin; then
     deadproxy=$(freeport)
 else

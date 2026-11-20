@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# argv reaches the engine final: a quote on the command line is data, except
-# around a whole URL, filter or number, where it is refused. -O, doit.log and
-# the WebHTTrack command line each decode their own quotes. doit.log line 1
+# A quote in argv is data, but one around a whole URL, filter or number is
+# refused. -O, doit.log and WebHTTrack decode their own quotes. doit.log line 1
 # shows the argv the engine kept.
 
 set -euo pipefail

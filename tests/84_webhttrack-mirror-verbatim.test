@@ -27,8 +27,8 @@ export HOME="${work}"
 
 htsserver_start
 
-# Positive control: the GUI's own templates must still expand. This is also
-# where the real token comes from, so its absence below can be asserted.
+# Positive control: the GUI's own templates must still expand. The sid read
+# here is the token whose absence is asserted below.
 htsserver_client --path /server/index.html --head-file "${hdr}" --body-file "${body}"
 sid=$(firstline "$(sed -n 's/.*name="sid" value="\([0-9a-f]*\)".*/\1/p' "${body}")")
 test "${#sid}" -eq 32 || fail "GUI page did not expand \${sid} (got '${sid}')"
@@ -71,8 +71,8 @@ htsserver_client --path /step4.html --field "sid=${sid}" --field "path=${work}" 
     --field "command=httrack --quiet --robots=0 http://127.0.0.1:${cport}/trickle/p0.bin -O ${work}/crawl" \
     >/dev/null
 
-# command_do=start saves the profile before it starts the engine, and the save alone
-# creates the project directory, so only the pane proves a crawl is really running.
+# command_do=start saves the profile, which creates the project directory,
+# before the engine starts. Only the pane shows that a crawl is running.
 start=$SECONDS
 while :; do
     htsserver_client --path /server/index.html >"${work}/pane.txt"
@@ -83,9 +83,8 @@ while :; do
         fail "the crawl never showed as running: $(<"${HTS_LOG}")"
     poll_wait 0.2
 done
-# The same payload, plus a line naming which project it came from: the profile
-# save left an identical hostile.html in proj, so comparing against that one
-# would pass even if /website/ never followed the crawl.
+# The same payload plus a line naming its project, because proj also holds an
+# identical hostile.html from the profile save.
 crawled="${work}/crawl/hostile.html"
 cp "${mirror}" "${crawled}"
 echo "served from the crawl project" >>"${crawled}"
@@ -97,8 +96,8 @@ grep -q '^HTTP/1\.0 200 ' "${hdr}" ||
 cmp -s "${crawled}" "${body}" ||
     fail "running crawl: /website/ served $(head -c 120 "${body}") instead of the crawl project"
 
-# A crawl ending mid-probe leaves the checks above reading the finished pane and
-# passing for the wrong reason, so pin the state they ran in.
+# Pin the pane state, because a crawl ending mid-probe would let the checks
+# above pass on the finished pane.
 htsserver_client --path /server/index.html >"${work}/pane.txt"
 grep -qF 'In progress:' "${work}/pane.txt" ||
     fail "the crawl ended during the probes, so /website/ never faced a running one"
