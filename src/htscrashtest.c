@@ -103,7 +103,7 @@ static CRASH_NOINLINE char blow_the_stack(size_t depth) {
 static CRASH_NOINLINE void crash_stack(void) { (void) blow_the_stack(0); }
 
 /* See htscrashtest.h. */
-void hts_crash_test_announce(HTS_FORMAT_STRING const char *format, ...) {
+void hts_crash_test_announce(const char *format, ...) {
   va_list args;
 
   va_start(args, format);

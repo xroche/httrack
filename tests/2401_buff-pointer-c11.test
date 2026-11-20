@@ -1,8 +1,8 @@
 #!/bin/bash
 #
 # On a C11 compiler without GNU extensions (MSVC /std:c17), the buff() family
-# must refuse a pointer destination at compile time, as GCC does. Clang with
-# __GNUC__ undefined takes that path.
+# must refuse a pointer destination at compile time and bound an array by its
+# size. Clang with -U__GNUC__ stands in for MSVC.
 
 set -euo pipefail
 
@@ -16,14 +16,14 @@ tmp=$(mktemp -d) || exit 1
 cleanup_push rm -rf "$tmp"
 
 # The control: system headers that htssafe.h includes must survive -U__GNUC__.
-printf '#include <stdarg.h>\n#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stdint.h>\n#include <inttypes.h>\n' >"$tmp/ctl.c"
+printf '#include <stdarg.h>\n#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stdint.h>\n#include <inttypes.h>\nint main(void) { return 0; }\n' >"$tmp/ctl.c"
 read -r -a cc_argv <<<"${CC:-cc}"
 cc=()
 for c in "${cc_argv[*]}" clang; do
     read -r -a try <<<"$c"
     command -v "${try[0]}" >/dev/null 2>&1 || continue
-    try+=(-std=c11 -U__GNUC__ -Wno-builtin-macro-redefined -I"$abs_top_builddir" -I"$top/src" -fsyntax-only)
-    if "${try[@]}" "$tmp/ctl.c" 2>/dev/null; then
+    try+=(-std=c11 -U__GNUC__ -Wno-builtin-macro-redefined -I"$abs_top_builddir" -I"$top/src")
+    if "${try[@]}" -o "$tmp/ctl" "$tmp/ctl.c" 2>/dev/null; then
         cc=("${try[@]}")
         break
     fi
@@ -32,40 +32,84 @@ done
 
 cat >"$tmp/probe.c" <<'PROBE'
 #include "htssafe.h"
-#ifndef HTS_BUFF_GENERIC_
+#ifndef HTS_BUFF_C11_
 #error the C11 path was not taken
 #endif
 struct s {
-  char f[16];
+  char f[64];
 };
-int probe(const char *src, struct s *p);
-int probe(const char *src, struct s *p) {
-  char a[64], eight[8], out[32];
+#ifdef PTRTYPE
+void neg(void);
+void neg(void) {
+  PTRTYPE ptr = 0;
+  (void) htsbuff_must_be_array_(ptr);
+}
+#endif
+int main(int argc, char **argv) {
+  static const char src[] = "0123456789abcdefghi"; /* 20 bytes */
+  char a[64], eight[8], out[32], small[16];
+  struct s st;
   htsbuff b = htsbuff_array(out);
-  a[0] = eight[0] = '\0';
+  a[0] = eight[0] = small[0] = st.f[0] = '\0';
   strcpybuff(a, src);
-  strcatbuff(a, "x");
+  strcatbuff(a, src);
   strncatbuff(a, src, 2);
+  strcpybuff(st.f, src);
+  strcatbuff(st.f, src);
   strcpybuff(eight, "1234567");
-  strcpybuff(p->f, src);
-  sprintfbuff(out, "%d", 1);
+  if (!sprintfbuff(out, "%d", 1))
+    return 2;
 #ifdef NEG
   {
     char *ptr = a;
     NEG;
   }
 #endif
-  return a[0] + eight[0] + (int) b.cap;
+  if (strlen(a) != 40 || strlen(st.f) != 38 || strcmp(eight, "1234567") != 0)
+    return 3;
+  /* Each overflows small[16] by one byte. */
+  if (argc > 1 && strcmp(argv[1], "cpy") == 0)
+    strcpybuff(small, "0123456789abcdef");
+  if (argc > 1 && strcmp(argv[1], "cat") == 0) {
+    strcpybuff(small, "0123456789abcde");
+    strcatbuff(small, "f");
+  }
+  return (int) b.cap - 32;
 }
 PROBE
 
-"${cc[@]}" "$tmp/probe.c" 2>"$tmp/pos.err" || fail_dump "an array destination does not compile" "$tmp/pos.err"
-
-for neg in 'strcpybuff(ptr, src)' 'strcatbuff(ptr, src)' 'strncatbuff(ptr, src, 1)' \
-    'sprintfbuff(ptr, "%d", 1)' 'htsbuff_array(ptr)'; do
-    if "${cc[@]}" "-DNEG=$neg" "$tmp/probe.c" 2>"$tmp/neg.err"; then
-        fail "a pointer destination compiles: $neg"
+"${cc[@]}" -o "$tmp/probe" "$tmp/probe.c" 2>"$tmp/pos.err" || fail_dump "an array destination does not compile" "$tmp/pos.err"
+"$tmp/probe" 2>"$tmp/run.err" || fail_dump "a copy that fits does not run clean (exit $?)" "$tmp/run.err"
+for mode in cpy cat; do
+    st=0
+    # The outer redirect drops the shell's own report of the signal.
+    {
+        (
+            ulimit -c 0
+            exec "$tmp/probe" "$mode"
+        ) 2>"$tmp/ovf.err"
+    } 2>/dev/null || st=$?
+    if [ "$st" -le 128 ] || [ "$(kill -l $((st - 128)))" != ABRT ]; then
+        fail_dump "$mode one byte too long did not abort (exit $st)" "$tmp/ovf.err"
     fi
-    grep -q 'negative' "$tmp/neg.err" || fail_dump "$neg fails for another reason" "$tmp/neg.err"
 done
-echo "OK: ${cc[0]} refuses every pointer destination"
+
+# Only the guard's char[-1] says "negative", so any other compile error fails.
+check_neg() {
+    if "${cc[@]}" -fsyntax-only "$@" "$tmp/probe.c" 2>"$tmp/neg.err"; then
+        fail "a pointer destination compiles: $*"
+    fi
+    grep -q 'negative' "$tmp/neg.err" || fail_dump "$* fails for another reason" "$tmp/neg.err"
+}
+for neg in 'strcpybuff(ptr, src)' 'strcatbuff(ptr, src)' 'strncatbuff(ptr, src, 1)' \
+    '(void) sprintfbuff(ptr, "%d", 1)' 'htsbuff_array(ptr)'; do
+    check_neg "-DNEG=$neg"
+done
+# One per _Generic association in htssafe.h.
+for type in 'char *' 'const char *' 'char *const' 'const char *const' \
+    'unsigned char *' 'const unsigned char *' 'unsigned char *const' \
+    'signed char *' 'signed char *const' 'volatile char *' 'char *volatile' \
+    'void *' 'void *const'; do
+    check_neg "-DPTRTYPE=$type"
+done
+echo "OK: ${cc[0]} bounds every array and refuses every pointer destination"

@@ -75,7 +75,7 @@
       <!-- Hardening: /guard:cf and an explicit /GS, so the set is a contract. -->
       <ControlFlowGuard>Guard</ControlFlowGuard>
       <BufferSecurityCheck>true</BufferSecurityCheck>
-      <!-- /sdl adds checks such as uninitialized-use errors; C17 mode brings the conforming preprocessor. -->
+      <!-- /sdl: extra security checks. /std:c17: needed for the _Generic buff() checks. -->
       <SDLCheck>true</SDLCheck>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
     </ClCompile>

@@ -96,8 +96,7 @@ Please visit our Website: http://www.httrack.com
 #endif
 #endif
 
-/* HTS_FORMAT_STRING prefixes the format parameter of an HTS_PRINTF_FUN
-   function, so MSVC /analyze checks its callers too. */
+/* Marks a printf-style format parameter so MSVC /analyze checks callers. */
 #ifndef HTS_FORMAT_STRING
 #ifdef _MSC_VER
 #include <sal.h>

@@ -52,8 +52,8 @@ static hts_boolean proxytrack_verbose = HTS_FALSE;
    address; the per-enumeration statistics summary then lands on the operator's
    console once per WebDAV request (#918). */
 static HTS_PRINTF_FUN(3, 0) void proxytrack_coucal_loghandler(
-    coucal_opaque arg, coucal_loglevel level,
-    HTS_FORMAT_STRING const char *format, va_list args) {
+    coucal_opaque arg, coucal_loglevel level, const char *format,
+    va_list args) {
   const char *severity;
 
   (void) arg;

@@ -137,7 +137,10 @@ static HTS_NORETURN HTS_UNUSED void abortf_(const char *exp, const char *file,
 #define HTS_IS_NOT_CHAR_BUFFER(VAR) (!HTS_IS_CHAR_BUFFER(VAR))
 
 /* htsbuff_must_be_array_(A) is 0 for an array and fails to compile for a
-   pointer, whose sizeof is not a capacity. */
+   pointer. Which path a compiler takes:
+   - GNU C: __builtin_types_compatible_p.
+   - C11 without GNU, such as MSVC /std:c17: _Generic (HTS_BUFF_C11_).
+   - C++ and older C: no guard, only the HTS_IS_CHAR_BUFFER size guess. */
 #if (defined(__GNUC__) && !defined(__cplusplus))
 #define htsbuff_must_be_array_(A)                                              \
   (sizeof(char[1 - 2 * !!__builtin_types_compatible_p(__typeof__(A),           \
@@ -145,9 +148,9 @@ static HTS_NORETURN HTS_UNUSED void abortf_(const char *exp, const char *file,
    1)
 #elif (!defined(__cplusplus) && defined(__STDC_VERSION__) &&                   \
        __STDC_VERSION__ >= 201112L)
-/* C11 without GNU extensions, such as MSVC /std:c17: &A of an array is
-   char (*)[N], which matches none of the pointer-to-pointer types. */
-#define HTS_BUFF_GENERIC_
+/* &A of an array is char (*)[N] and takes default. The list covers the common
+   pointer forms, and GNU builds reject every pointer. */
+#define HTS_BUFF_C11_
 #define htsbuff_must_be_array_(A)                                              \
   (sizeof(char[_Generic(&(A),                                                  \
                    char **: -1,                                                \
@@ -156,6 +159,13 @@ static HTS_NORETURN HTS_UNUSED void abortf_(const char *exp, const char *file,
                    const char *const *: -1,                                    \
                    unsigned char **: -1,                                       \
                    const unsigned char **: -1,                                 \
+                   unsigned char *const *: -1,                                 \
+                   signed char **: -1,                                         \
+                   signed char *const *: -1,                                   \
+                   volatile char **: -1,                                       \
+                   char *volatile *: -1,                                       \
+                   void **: -1,                                                \
+                   void *const *: -1,                                          \
                    default: 1)]) -                                             \
    1)
 #endif
@@ -233,16 +243,11 @@ static char *strncatbuff_ptr_(char *dest, const char *src, size_t n) {
  * capacity, because its length is measured first, and an unterminated one
  * aborts too. On success the result is always NUL-terminated.
  *
- * CRITICAL CAVEAT: if A is a bare char* pointer (not an array), sizeof(A) is
- * the pointer size, not the buffer capacity. There is no way to recover the
- * real capacity, so these macros SILENTLY DEGRADE to the unbounded raw
- * strcpy()/strcat()/strncat() while still looking like a checked call. The
- * bound is lost. On GCC/Clang (C) the pointer case routes through the
- * *_ptr_ stubs above, which carry a 'warning' attribute to flag the site at
- * compile time. Other C11 compilers (MSVC) refuse to compile it, and C++ and
- * older C compilers stay silent. When the destination is a
- * pointer of known capacity, call the explicit-size strlcpybuff/strlcatbuff
- * (passing the capacity, NUL included) instead.
+ * CRITICAL CAVEAT: sizeof of a bare char* is the pointer size, not a capacity.
+ * Under C++ and pre-C11 non-GNU C, these macros then SILENTLY DEGRADE to the
+ * unbounded strcpy()/strcat()/strncat(). GNU C warns through the *_ptr_ stubs
+ * above, and C11 refuses to compile it. For a pointer of known capacity, call
+ * strlcpybuff/strlcatbuff with the capacity, NUL included.
  */
 
 /**
@@ -259,7 +264,7 @@ static char *strncatbuff_ptr_(char *dest, const char *src, size_t n) {
                                       "' to '" #A "'",                         \
                                       __FILE__, __LINE__),                     \
                         strncatbuff_ptr_((A), (B), (N)))
-#elif defined(HTS_BUFF_GENERIC_)
+#elif defined(HTS_BUFF_C11_)
 #define strncatbuff(A, B, N)                                                   \
   strncat_safe_(                                                               \
       A, sizeof(A) + htsbuff_must_be_array_(A), B, HTS_SIZEOF_SRC_(B), N,      \
@@ -284,7 +289,7 @@ static char *strncatbuff_ptr_(char *dest, const char *src, size_t n) {
                     "overflow while appending '" #B "' to '" #A "'", __FILE__, \
                     __LINE__),                                                 \
       strcatbuff_ptr_((A), (B)))
-#elif defined(HTS_BUFF_GENERIC_)
+#elif defined(HTS_BUFF_C11_)
 #define strcatbuff(A, B)                                                       \
   strncat_safe_(A, sizeof(A) + htsbuff_must_be_array_(A), B,                   \
                 HTS_SIZEOF_SRC_(B), (size_t) -1,                               \
@@ -310,7 +315,7 @@ static char *strncatbuff_ptr_(char *dest, const char *src, size_t n) {
                                      "'",                                      \
                                      __FILE__, __LINE__),                      \
                         strcpybuff_ptr_((A), (B)))
-#elif defined(HTS_BUFF_GENERIC_)
+#elif defined(HTS_BUFF_C11_)
 #define strcpybuff(A, B)                                                       \
   strcpy_safe_(                                                                \
       A, sizeof(A) + htsbuff_must_be_array_(A), B, HTS_SIZEOF_SRC_(B),         \
@@ -453,9 +458,9 @@ static HTS_INLINE HTS_UNUSED htsbuff htsbuff_ptr_(char *buf, size_t cap) {
 
 /**
  * Builder over the in-scope array ARR (capacity = sizeof(ARR)).
- * In C on GCC/Clang and C11 compilers this rejects a non-array (e.g. a char*
- * pointer), whose sizeof would be the pointer size and silently wrong; use
- * htsbuff_ptr() for pointers. C++ has no such guard, so pass only true arrays.
+ * In C on GCC/Clang and C11 compilers this rejects a char* pointer, whose
+ * sizeof is the pointer size. Use htsbuff_ptr() for pointers. C++ has no such
+ * guard, so pass only true arrays.
  */
 #ifdef htsbuff_must_be_array_
 #define htsbuff_array(ARR)                                                     \

@@ -378,9 +378,9 @@ static int st_binputline(httrackp *opt, int argc, char **argv) {
 
 static int st_location_logged = 0;
 
-static HTS_PRINTF_FUN(3, 0) void st_location_log(
-    httrackp *opt, int type, HTS_FORMAT_STRING const char *format,
-    va_list args) {
+static HTS_PRINTF_FUN(3, 0) void st_location_log(httrackp *opt, int type,
+                                                 const char *format,
+                                                 va_list args) {
   (void) type;
   (void) format;
   (void) args;

@@ -5195,8 +5195,7 @@ static int get_loglevel_from_coucal(coucal_loglevel level) {
 
 /* log to default console */
 static HTS_PRINTF_FUN(3, 0) void default_coucal_loghandler(
-    void *arg, coucal_loglevel level, HTS_FORMAT_STRING const char *format,
-    va_list args) {
+    void *arg, coucal_loglevel level, const char *format, va_list args) {
 
   /* informational chatter (hashtable stats on delete, etc.) only when
      debugging; keep warnings and critical errors always visible. */
@@ -5211,9 +5210,10 @@ static HTS_PRINTF_FUN(3, 0) void default_coucal_loghandler(
 }
 
 /* log to project log */
-static HTS_PRINTF_FUN(3, 0) void htsopt_coucal_loghandler(
-    void *arg, coucal_loglevel level, HTS_FORMAT_STRING const char *format,
-    va_list args) {
+static HTS_PRINTF_FUN(3, 0) void htsopt_coucal_loghandler(void *arg,
+                                                          coucal_loglevel level,
+                                                          const char *format,
+                                                          va_list args) {
   httrackp *const opt = (httrackp*) arg;
   if (opt != NULL && opt->log != NULL) {
     hts_log_vprint(opt, get_loglevel_from_coucal(level), 
