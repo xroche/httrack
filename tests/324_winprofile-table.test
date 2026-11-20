@@ -75,9 +75,8 @@ for i, line in enumerate(open(sys.argv[1], encoding="ascii"), 1):
     if not f[7] and not f[10]:
         sys.exit("line %d: %s has no default_state and no legacy_of"
                  % (i, f[0]))
-    # The generator owns the value's domain. Its presence is what it cannot
-    # judge: whether empty differs from absent is a fact about the other front
-    # ends' readers, and a value-bearing kind has to state one either way.
+    # Whether empty differs from absent depends on the other front ends, so a
+    # value-bearing kind must state it.
     if not f[9] and f[3].split(":")[0] in ("string", "number") \
             and not f[10] and f[7] != "none":
         sys.exit("line %d: %s states no empty_means" % (i, f[0]))
@@ -285,9 +284,7 @@ for value, gate in sorted(gates.items()):
         sys.exit("the command block still reads %s ungated" % value)
     if not re.search(r"\$\{(?:z?test|arg|unquoted):%s_eff[:}]" % value, cmd):
         sys.exit("the command block does not read %s_eff" % value)
-    # The stored value is what the profile keeps, gate or no gate. A checkbox
-    # goes through ${ztest:}; anything else must reach the file verbatim, so a
-    # row that started storing 1/0 instead of the typed value is a regression.
+    # The profile keeps values verbatim whatever the gate, except checkboxes.
     if value not in key_of or gate not in key_of:
         sys.exit("no winprofile key writes %s"
                  % (value if value not in key_of else gate))
@@ -300,7 +297,7 @@ for m in re.finditer(r"\$\{(?:z?test|arg|unquoted):([a-z0-9_]+)_eff[:}]", cmd):
         sys.exit("the command block reads %s_eff, which htsserver.c never publishes"
                  % m.group(1))
 
-# LISTDEF cardinality, so a list row's count is checkable rather than decorative
+# Count each LISTDEF so a list row's count can be checked.
 lang = read("lang.def").split("\n")
 listdef = {}
 for i, l in enumerate(lang):
@@ -347,11 +344,8 @@ for key in sorted(claimed):
     elif key in checkbox:
         checked += same(kind, "checkbox", "%s kind" % key)
 
-    # Whether this repo has an opinion, decided here rather than read from the
-    # table: a row that says unresolved where a default is derivable would
-    # otherwise switch its own check off.
-    # Rows where Xavier's ruling took WinHTTrack's answer over this repo's, so
-    # the table says none while htsserver still ships a default it should lose.
+    # A row marked unresolved where a default is derivable would disable its
+    # own check. RULED rows took WinHTTrack's answer over htsserver's default.
     RULED = {"MaxRate", "Sockets"}
     ruled = key in RULED
     if ruled:
@@ -378,8 +372,7 @@ for key in sorted(claimed):
     else:
         checked += same("0", r["default_value"], "%s default" % key)
 
-    # A string default this repo states, checked by nothing until now, which is
-    # how Footer sat as a disagreement it was never part of.
+    # A string default this repo states must match the table.
     if r["default_state"] == "agreed" and var in init_str and var not in init_on:
         checked += same(literal(init_str[var]), r["default_value"],
                         "%s default" % key)
@@ -393,8 +386,7 @@ for key in sorted(claimed):
         checked += same("", r["flag_off"], "%s flag_off" % key)
         continue
 
-    # Only an on/off setting has an on/off pair: a list emits through a ladder
-    # the table deliberately does not carry.
+    # A list has no on/off pair, because it emits through a ladder.
     if kind != "checkbox" or len(emit.get(var, [])) != 1:
         continue
     slots = emit[var][0].split(":")
