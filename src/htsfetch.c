@@ -394,8 +394,8 @@ static const char *psl_site_key(const fetch_origin *o, size_t n, size_t *len) {
   return o->host + (reg - host);
 }
 
-/* The tail of the host same-site compares: the registrable domain, else the
-   last two labels, or the whole host for an IP literal. */
+/* Return the registrable domain, else the last two labels, or the whole host
+   for an IP literal. */
 static const char *site_key(const fetch_origin *o, size_t *len) {
   size_t n = o->host_len, i, dots = 0;
 
@@ -454,7 +454,7 @@ void hts_fetch_through(httrackp *opt, hts_fetch_meta *fm, const char *adr) {
 
   if (fm->dest == HTS_FETCH_DEST_UNKNOWN || fm->site == HTS_FETCH_SITE_NONE)
     return;
-  /* No page to compare with: send nothing rather than a guess. */
+  /* With no page to compare with, send nothing. */
   if (fm->initiator <= 0 || fm->initiator >= opt->lien_tot) {
     fm->dest = HTS_FETCH_DEST_UNKNOWN;
     return;

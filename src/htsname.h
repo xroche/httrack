@@ -90,7 +90,7 @@ typedef struct lien_adrfilsave lien_adrfilsave;
 #endif
 
 // note: 'headers' can either be null, or incomplete (only r member filled)
-// note: 'sback' can be null: the type-probing request is then skipped
+// 'sback' may be NULL, which skips the type-probing request
 int url_savename(lien_adrfilsave *const afs,
                  lien_adrfil *const former,
                  const char *referer_adr, const char *referer_fil, 
@@ -117,11 +117,10 @@ void url_savename_escape_reserved(char *save, size_t size);
    dsize. */
 void url_savename_addtail(char *d, size_t dsize, const char *sep,
                           const char *s);
-/* Leading len bytes of path into buf; returns how many were read (0 on any
-   failure), so a caller reading nothing decides for itself what that means. */
+/* Read the first len bytes of path into buf. Return the count, 0 on failure. */
 size_t hts_read_file_head(const char *path, void *buf, size_t len);
 
-/* Contested wire-vs-ext verdict that a body sniff could settle (htssniff.h). */
+/* Is the wire-vs-ext verdict contested and settleable by a body sniff? */
 int hts_ext_sniff_wanted(httrackp *opt, const char *wiremime, const char *file);
 char *url_md5(char *digest_buffer, const char *fil_complete);
 void url_savename_refname(const char *adr, const char *fil, char *filename);

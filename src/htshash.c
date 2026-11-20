@@ -86,8 +86,7 @@ static const char* value_sav_debug_print(void *arg, coucal_value_const a) {
   return (char*) a.ptr;
 }
 
-/* Dedup-key host for ADR: --host-alias first, so a rule may name the www. form
-   the urlhack collapse would otherwise have eaten. */
+/* Return ADR's dedup-key host, aliased before urlhack drops a www. prefix. */
 static const char *key_host_alias(const hash_struct *hash, const char *adr,
                                   char *buf, size_t bufsize) {
   const char *const canon =
@@ -96,7 +95,7 @@ static const char *key_host_alias(const hash_struct *hash, const char *adr,
   return canon != NULL ? canon : adr;
 }
 
-/* hash_url_key() once the host alias and the strip keys are resolved */
+/* Run hash_url_key() with the host alias and strip keys resolved. */
 static const char *hash_url_key_(const hash_struct *hash, const char *adr_canon,
                                  const char *fil, const char *keys, char *dst,
                                  size_t dstsize) {
@@ -106,8 +105,7 @@ static const char *hash_url_key_(const hash_struct *hash, const char *adr_canon,
 
   // copy address
   assertf(adr_norm != NULL);
-  /* clip, don't abort: a wire URL feeds this, and the key only feeds the hash,
-     so a clipped one costs a collision and never a wrong dedup */
+  /* Clip, because a wire URL feeds this, and a clipped key only collides. */
   (void) strclipbuff(dst, dstsize, adr_norm);
 
   // copy link
@@ -166,8 +164,7 @@ key_adrfil_hashes_generic(void *arg, coucal_key_const value, const int former) {
       hash_url_key(hash, adr, fil, hash->normfil, sizeof(hash->normfil)));
 }
 
-/* key_adrfil_equals_generic() once the host aliases and the strip keys are
-   resolved */
+/* Compare as key_adrfil_equals_generic() with aliases and keys resolved. */
 static int key_adrfil_equals_(hash_struct *hash, const char *a_canon,
                               const char *a_fil, const char *keysa,
                               const char *b_canon, const char *b_fil,
@@ -294,14 +291,14 @@ void hash_init(httrackp *opt, hash_struct *hash, hts_boolean normalized) {
   hash->sav = coucal_new(0);
   hash->adrfil = coucal_new(0);
   hash->former_adrfil = coucal_new(0);
-  /* urlhack is the umbrella; per-feature negatives opt out of each part */
+  /* urlhack sets all three, and each negative opts one out */
   hash->norm_host = normalized && !opt->no_www_dedup;
   hash->norm_slash = normalized && !opt->no_slash_dedup;
   hash->norm_query = normalized && !opt->no_query_dedup;
   /* snapshot the query-strip list (not owned; valid for the hash lifetime) */
   hash->strip_query =
       StringNotEmpty(opt->strip_query) ? StringBuff(opt->strip_query) : NULL;
-  /* same for the host-alias rules: they apply whatever urlhack says */
+  /* host-alias rules apply whatever urlhack says */
   hash->host_alias = hts_host_alias_rules(opt);
 
   hts_set_hash_handler(hash->sav, opt);
@@ -495,8 +492,7 @@ void hash_savename_next_set(hash_struct *hash, char kind, const char *name,
 void hash_write(hash_struct * hash, size_t lpos) {
   const lien_url *const link = (*hash->liens)[lpos];
 
-  /* several links one url_savename() call could match: remember if their
-     names differ */
+  /* remember if links one url_savename() call could match differ in name */
   {
     char key[64];
     intptr_t prev;
