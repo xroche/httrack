@@ -2,22 +2,12 @@
 #
 # Differential for src/htsparse.c. --help says how to run it.
 #
-# Three signals are compared, each normalized only where two runs of one binary
-# disagree:
-#   - every mirrored file, byte for byte. The footer is off (-%F '') because its
-#     {date} is the only clock a page carries, and the footer leg uses a
-#     template without it. The -%M archive drops its Date, Message-ID and
-#     boundary, and its parts are sorted.
-#   - hts-changes.json (--changes), which shows a link gained or lost when no
-#     page body changed. It is sorted because adjacent fetches race.
-#   - hts-log.txt, the only record of a scanned but filtered candidate, such as
-#     the corpus's off-host <loc> entries.
+# It compares three signals, normalized where two runs of one binary differ:
+#   - every mirrored file. The footer is off because its {date} is a clock.
+#   - hts-changes.json, sorted because adjacent fetches race.
+#   - hts-log.txt, the only record of a scanned but filtered link.
 #
-# Each leg is an option set that reaches a writer the default crawl skips. The
-# legs run in parallel.
-#
-# hts-cache is dropped because it stores mtimes. The two text files lose their
-# clock, generator version, build path, run duration and transfer rate.
+# hts-cache is dropped because it stores mtimes.
 
 set -euo pipefail
 
@@ -120,8 +110,7 @@ newest_tag() {
         tail -1
 }
 
-# Copy the tree at $1 into $2, .git aside, so no build touches the real checkout,
-# where config.status can re-run under another session's build directory.
+# Copy $1 to $2 without .git, so no build touches the real checkout.
 copy_tree() {
     mkdir -p "$2"
     (cd "$1" && tar --exclude=.git -cf - .) | (cd "$2" && tar -xf -)
@@ -167,9 +156,7 @@ build_tree() {
     echo "$bld/src/httrack"
 }
 
-# Sets server_pid and server_port in the caller's shell, for cleanup. It avoids
-# tests/testlib.sh, which pulls in TAP, so it waits longer than its 200 ticks
-# suggest and strips the CR a Windows python under wsl2 leaves.
+# This sets server_pid and server_port in the caller's shell, for cleanup.
 start_server() {
     local root=$1 tries=0
     server_port=
@@ -437,10 +424,8 @@ release)
     exit "$rc"
     ;;
 self-check)
-    # Each mutant edits one hts_attrs row, the table that decides whether an
-    # attribute is a link. make check passes both, because no test names "cite"
-    # and test 36's data-srcset repeats a plain srcset. The corpus's "1x"
-    # descriptor stops the dirty-attribute fallback from rescuing data-srcset.
+    # Each mutant disables one hts_attrs link row. The corpus's "1x" descriptor
+    # keeps the dirty-attribute fallback from rescuing data-srcset.
     mutant_file=src/htsparse.c
 
     crawl "$tree_httrack" reference
@@ -501,8 +486,7 @@ self-check)
                 echo "MISSED on$mutant_missed")"
     done
 
-    # A bumped version must read as no change, because every release branch
-    # opens with one.
+    # Every release branch bumps the version, so a bump must read as no change.
     echo
     echo "parser-diff: planting a version bump in a copy of the tree"
     bumped="$workdir/src-version"

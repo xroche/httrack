@@ -175,9 +175,7 @@ main() {
         die "Debian revision $rev needs --orig FILE (the orig is frozen from revision 1)"
     fi
 
-    # A quilt patch targets the archive's orig. An orig built from HEAD already
-    # carries the fix, so the patch fails or applies with fuzz. Unsigned builds
-    # check it too, because it breaks the build.
+    # A quilt patch targets the archive's orig, so an orig from HEAD breaks it.
     if [[ -z $orig_in && -s $export_dir/debian/patches/series ]]; then
         die "debian/patches is not empty, so --orig FILE is required: the orig built from HEAD already carries the patches"
     fi
@@ -186,8 +184,7 @@ main() {
         info "reusing upstream tarball $orig_in"
         cp -- "$orig_in" "$scratch/$orig"
     else
-        # Build only because regen-man needs the binaries. debuild below runs
-        # the test suite.
+        # regen-man needs the binaries. debuild below runs the test suite.
         info "regenerating build system and man page"
         (
             cd "$export_dir"
@@ -246,10 +243,8 @@ main() {
     shopt -u nullglob
     [[ ${#changes[@]} -ge 1 ]] || die "debuild produced no .changes file"
 
-    # The lintian gate, because debuild only reports tags. --profile debian
-    # because Ubuntu's vendor data rejects "unstable". An older local lintian
-    # raises the suppressed tags: newer-standards-version, and recommended-field
-    # for the Priority field that sid's lintian lets us drop.
+    # debuild only reports tags. Ubuntu's vendor data rejects "unstable", and
+    # only an older lintian raises the suppressed tags.
     info "running lintian gate (--fail-on=error,warning)"
     lintian --profile debian -I -i --fail-on=error,warning \
         --suppress-tags newer-standards-version,recommended-field \
@@ -257,8 +252,7 @@ main() {
 
     dcmd cp -- "${changes[@]}" "$outdir/"
 
-    # Rebuild in a chroot holding only the Build-Depends, as the buildds do, so an
-    # undeclared dependency fails before upload. Logs and debs go to $outdir/sbuild.
+    # Rebuild with only the Build-Depends installed, as the buildds do.
     if [[ $sbuild -eq 1 ]]; then
         local -a dscs
         shopt -s nullglob

@@ -111,8 +111,8 @@ while IFS= read -r bin; do
 done <"$mach"
 codesign --verify --strict "$app" || fail "$app arrived with a broken signature"
 
-# Sign inside out and skip the main executable. Signing the bundle signs it, and
-# signing it early would seal resources this loop still rewrites.
+# Sign inside out. The bundle signs the main executable, because signing it
+# here would seal resources this loop still rewrites.
 while IFS= read -r bin; do
     if [ "$bin" != "$mainexe" ]; then
         sign --options runtime "$bin"

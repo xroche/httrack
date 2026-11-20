@@ -5,8 +5,7 @@ set -euo pipefail
 
 repo=xroche/httrack
 since=
-# GitHub drops step records after about a week. Past that, a kill is a job the
-# runner lease reaped at ~45 min, where a real failure ends in ~15.
+# Past a week GitHub drops step records, so a job past 40 min counts as reaped.
 reaped_minutes=40
 
 usage() {
@@ -30,9 +29,7 @@ done
 [ -n "$since" ] || since=$(python3 -c \
     'import datetime; print(datetime.date.today() - datetime.timedelta(days=7))')
 
-# filter=all, or a rerun hides the killed attempt (#1228). A killed job keeps
-# only its record, with an unfinished step, no steps once they age out, or no
-# conclusion.
+# Use filter=all, or a rerun hides the killed attempt (#1228).
 census() {
     local wf=$1 runs id total
     total=$(gh api -X GET "repos/$repo/actions/workflows/$wf/runs" \
@@ -59,9 +56,8 @@ census() {
     done
 }
 
-# Columns: job name, conclusion, unfinished steps, step count, runtime in
-# minutes. A cancelled job is censored and counts in neither column. Wilson,
-# because with few kills the normal approximation puts the bound below zero.
+# Columns: job name, conclusion, unfinished steps, step count, minutes run.
+# The bound is Wilson's, because with few kills a normal one goes below zero.
 report() {
     awk -F'\t' -v reaped="$reaped_minutes" '
         $2 == "cancelled" { censored[$1]++; next }

@@ -98,8 +98,7 @@ main() {
     command -v newuidmap >/dev/null 2>&1 ||
         die "newuidmap not found; install the uidmap package for the unshare backend"
 
-    # The base install creates system users, so unshare needs an /etc/subuid and
-    # subgid range or dpkg crashes. Root uses mode=root and needs no range.
+    # Without root, unshare needs an /etc/subuid range or dpkg crashes.
     if [[ $(id -u) -ne 0 ]]; then
         local me
         me=$(id -un)

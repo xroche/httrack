@@ -92,8 +92,8 @@ def free_port():
 def start_htsserver(exe, root, home, lang, logpath):
     """Launch htsserver and return (process, base URL) once it announces itself."""
     env = dict(os.environ, HOME=home)
-    # Announce through a file, as webhttrack does, because htsserver
-    # block-buffers a pipe. Omit --ppid, which exits the server with its parent.
+    # htsserver block-buffers a pipe, so announce through a file. Omit --ppid,
+    # which exits the server with its parent.
     log = open(logpath, "w+")
     proc = subprocess.Popen(
         [
@@ -202,8 +202,7 @@ def run(page, url, site_url, outdir, popup_size):
     w.shot("ready_to_start")
 
     w.next_pane()
-    # The progress and finished screens are both refresh.html, so tell them apart
-    # by their form. The first render has an empty stats table, so wait for it.
+    # Both progress and finished screens are refresh.html, so match the form.
     page.wait_for_selector("form[action='step4.html']")
     deadline = time.time() + 120
     while time.time() < deadline:
@@ -265,9 +264,7 @@ def main():
     from playwright.sync_api import sync_playwright
 
     site, site_url = start_site(args.site_host, args.site_port)
-    # A pristine HOME by default, because an old mirror finishes from cache and
-    # the project list would show the host's projects. It puts a /tmp path on
-    # the screens that show the base path.
+    # Use a fresh HOME by default, because an old mirror finishes from cache.
     home = args.home or tempfile.mkdtemp(prefix="webhttrack-shots-")
     os.makedirs(home, exist_ok=True)
     fd, logpath = tempfile.mkstemp(prefix="htsserver-", suffix=".log")

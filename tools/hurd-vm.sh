@@ -70,7 +70,7 @@ cleanup() {
 }
 trap 'set +e; cleanup' EXIT
 
-# The build and the suite run as a user. su wants a terminal, so log in again.
+# su wants a terminal, so run as the user through a new ssh login.
 as_user() {
     timeout "$STEP_TIMEOUT" ssh -p "$SSH_PORT" -i "$key" \
         -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
@@ -92,8 +92,7 @@ screendump() {
         timeout 30 socat - "unix-connect:$work/monitor" >/dev/null 2>&1 || true
 }
 
-# Boot probe. slirp accepts the TCP connect at once, so ConnectTimeout cannot
-# catch an sshd that never sends a banner.
+# slirp accepts the connect at once, so ConnectTimeout misses a silent sshd.
 ssh_probe() {
     timeout 30 ssh -p "$SSH_PORT" -i "$key" \
         -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
@@ -110,8 +109,7 @@ if ! test -r "$cache/$IMG_NAME"; then
 fi
 echo "$IMG_SHA512  $cache/$IMG_NAME" | sha512sum -c -
 rm -f "$img"
-# tar recreates the holes only when it writes a file. With -O the image would
-# cost its full ten gigabytes after the resize below.
+# tar keeps the holes only when it writes a file. -O would cost the full 10 GB.
 tar -xJf "$cache/$IMG_NAME" -C "$work"
 extracted=$(echo "$work"/debian-hurd-*.img)
 test -s "$extracted" || fail "no image came out of $IMG_NAME"
@@ -119,8 +117,7 @@ mv "$extracted" "$img"
 echo "::endgroup::"
 
 echo "::group::Install an ssh key"
-# The README's partitions 2 and 5 are the i386 layout. The amd64 image has two
-# primaries and no extended partition, so read its table.
+# The README's partitions are the i386 layout, so read the amd64 image's table.
 root_part=$(sfdisk -J "$img" | python3 -c '
 import json, re, sys
 
@@ -159,8 +156,7 @@ sudo cp "$key.pub" "$mnt$VM_HOME/.ssh/authorized_keys"
 sudo chmod 700 "$mnt$VM_HOME/.ssh"
 sudo chmod 600 "$mnt$VM_HOME/.ssh/authorized_keys"
 sudo chown -R "$ids" "$mnt$VM_HOME/.ssh"
-# sshd keeps the FIRST value it reads, and Debian's sshd_config includes this
-# directory on its opening line.
+# sshd keeps the FIRST value it reads, and Debian includes this directory first.
 sudo grep -q '^Include /etc/ssh/sshd_config.d/' "$mnt/etc/ssh/sshd_config" ||
     fail "this image's sshd_config includes no drop-in directory"
 sudo mkdir -p "$mnt/etc/ssh/sshd_config.d"
@@ -266,8 +262,7 @@ suite_pid=$!
 tail -f --pid="$suite_pid" "$check_log" 2>/dev/null &
 tail_pid=$!
 
-# Hurd's ext2fs translator can assert and kill the VM, so detect that instead of
-# waiting out STEP_TIMEOUT.
+# Hurd's ext2fs can assert and kill the VM, so do not wait out STEP_TIMEOUT.
 misses=0
 while ! test -e "$status_file"; do
     sleep "$SUITE_TICK"
@@ -325,8 +320,7 @@ test "$rc" -eq 0 || {
     exit "$rc"
 }
 
-# automake counts a SKIP as success, so an all-skipped suite exits 0. The
-# buildds prove a Hurd runs nearly all of these tests.
+# automake counts a SKIP as success, so an all-skipped suite exits 0.
 banner=$(command grep -E '^# (TOTAL|PASS|SKIP|FAIL|ERROR):' "$work/out/test-suite.log") ||
     fail "no result banner in the suite log, so nothing proves the suite ran"
 echo "$banner"

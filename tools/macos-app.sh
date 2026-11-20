@@ -1,7 +1,6 @@
 #!/bin/sh
-# Assemble HTTrack.app from an installed prefix, then verify it. It is POSIX sh so
-# shellcheck catches a bashism. webhttrack finds htsserver and its data relative to
-# its own path in Contents/Resources.
+# Build HTTrack.app from an installed prefix and verify it. Keep this POSIX sh.
+# webhttrack finds htsserver and its data relative to Contents/Resources.
 set -eu
 
 # shellcheck source=tools/macos-bundle.sh
@@ -98,8 +97,7 @@ machos() {
     machos_into "$app/Contents" "$mach"
 }
 
-# Indented lines are dependencies, and the others head a slice. A dylib's first
-# entry is its own LC_ID_DYLIB, skipped like any satisfied dependency.
+# Indented lines are dependencies, and a dylib lists its own id first.
 deps() {
     otool -L "$1" >"$otmp" || fail "otool -L failed on $1"
     awk '/^[[:space:]]/ {print $1}' "$otmp"
@@ -285,8 +283,7 @@ test "$plistver" = "$binver" ||
 bundlever=$(plist_value "$app/Contents/Info.plist" CFBundleVersion)
 test "$bundlever" = "$binver" ||
     fail "CFBundleVersion says $bundlever, httrack says $binver"
-# A bottled dylib's floor can exceed what the plist declares, and Finder reads only
-# the plist, so a mismatch fails the build.
+# Finder reads only the plist, so the payload's floor must not exceed it.
 minos=$(macho_floor "$mach") || fail "could not read a minimum macOS out of the payload"
 test -n "$minos" || fail "no Mach-O in the bundle declares a minimum macOS"
 plistmin=$(plist_value "$app/Contents/Info.plist" LSMinimumSystemVersion)

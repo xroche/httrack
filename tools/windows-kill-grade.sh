@@ -9,11 +9,8 @@
 # ambiguous job where this one must refuse to act on it.
 set -euo pipefail
 
-# A lost runner leaves the live step and the ones after it unfinished, with none
-# failed. A job with no steps never started one, and that is the same wedge.
-#
-# $bad holds every finished job that did not succeed. A timed_out job needs a
-# human even when a sibling leg was killed.
+# A lost runner leaves steps unfinished and none failed, or no steps at all.
+# A timed_out job needs a human even when a sibling leg was killed.
 verdict=$(jq -r '
     def ended_badly: .conclusion != null and .conclusion != "success"
         and .conclusion != "skipped" and .conclusion != "cancelled";
