@@ -1074,7 +1074,7 @@ stalled_ticks_due() {
     backoff_ticks_due "$1" | cut -d' ' -f1-2
 }
 
-# Prints the first due tick where the schedules disagree, or nothing by 64.
+# Prints the fewest due ticks whose schedules disagree, or nothing by 64.
 separating_ticks() { # separating_ticks <rival schedule function>
     local n=1
     while test "$n" -le 64; do
