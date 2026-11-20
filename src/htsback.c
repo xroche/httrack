@@ -55,6 +55,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsftp.h"
 #include "htscodec.h"
 #include "htsproxy.h"
+#include "htsckd.h"
 
 #ifdef _WIN32
 #ifndef __cplusplus
@@ -1663,10 +1664,13 @@ static int back_data_unserialize(back_source *s, void **str, size_t *size) {
   if (back_source_get(s, size, sizeof(*size))) {
     if (*size == 0)             /* serialized NULL ptr */
       return 0;
+    size_t alloc;
+
     /* Untrusted, and the guard byte's extra byte must not wrap the size. */
-    if (*size > SIZE_MAX - 1 || (s->fp == NULL && *size > s->len - s->pos))
+    if (hts_ckd_add(&alloc, *size, 1) ||
+        (s->fp == NULL && *size > s->len - s->pos))
       return 1; /* error */
-    *str = malloct(*size + 1);
+    *str = malloct(alloc);
     if (*str == NULL)
       return 1;                 /* error */
     ((char *) *str)[*size] = 0; /* guard byte */

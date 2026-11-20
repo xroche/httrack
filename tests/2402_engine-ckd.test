@@ -1,0 +1,13 @@
+#!/bin/bash
+#
+# Checked size_t add and multiply (htsckd.h), on the compiler's path and on the
+# portable fallback, at the boundaries of whatever width size_t has here.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+require_httrack
+
+assert_selftest ok ckd

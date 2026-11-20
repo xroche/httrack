@@ -43,6 +43,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscodec.h"
 #include "htszlib.h"
 #include "htsmirror.h"
+#include "htsckd.h"
 #include <ctype.h>
 #include <limits.h>
 
@@ -561,7 +562,9 @@ static void save_keep_clipped_name(char *save, size_t size, const char *name) {
    memory. */
 static size_t *utf8_char_offsets(const char *s, size_t *nChars) {
   const size_t size = strlen(s);
-  size_t *const pos = malloct((size + 1) * sizeof(size_t));
+  size_t alloc;
+  size_t *const pos =
+      hts_ckd_mul(&alloc, size + 1, sizeof(size_t)) ? NULL : malloct(alloc);
   size_t i, n;
 
   if (pos == NULL)

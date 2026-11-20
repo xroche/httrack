@@ -45,6 +45,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsarrays.h"
 #include "htszlib.h"
 #include "coucal/coucal.h"
+#include "htsckd.h"
 
 #include <ctype.h>
 #include <stdarg.h>
@@ -135,17 +136,16 @@ static void wbuf_free(wbuf *b) {
 
 /* Make room for n more bytes; returns 0 on success, -1 on OOM/overflow. */
 static int wbuf_reserve(wbuf *b, size_t n) {
-  size_t ncap;
+  size_t ncap, need;
   char *nd;
-  if (n > (size_t) -1 - b->len)
+  if (hts_ckd_add(&need, b->len, n))
     return -1;
-  if (b->len + n <= b->cap)
+  if (need <= b->cap)
     return 0;
   ncap = b->cap ? b->cap : 256;
-  while (ncap < b->len + n) {
-    if (ncap > (size_t) -1 / 2)
+  while (ncap < need) {
+    if (hts_ckd_mul(&ncap, ncap, 2))
       return -1;
-    ncap *= 2;
   }
   nd = realloct(b->data, ncap);
   if (nd == NULL)

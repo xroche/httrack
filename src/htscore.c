@@ -72,6 +72,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsarrays.h"
 #include "htsarena.h"
 #include "htscmdline.h"
+#include "htsckd.h"
 
 /* END specific definitions */
 
@@ -804,17 +805,17 @@ static hts_boolean bundle_start(httrackp *opt, char **primary,
   for (i = 0; (extra = hts_bundle_url(opt, i)) != NULL; i++)
     room += strlen(extra) + sizeof("http://\n");
   if (room != 0) {
-    char *const grown =
-        room < (size_t) -1 - primarybuff->cap
-            ? (char *) realloct(*primary, primarybuff->cap + room)
-            : NULL;
+    size_t cap;
+    char *const grown = hts_ckd_add(&cap, primarybuff->cap, room)
+                            ? NULL
+                            : (char *) realloct(*primary, cap);
 
     if (grown == NULL) {
       printf("PANIC! : Not enough memory [%d]\n", __LINE__);
       return HTS_FALSE;
     }
     *primary = primarybuff->buf = grown;
-    primarybuff->cap += room;
+    primarybuff->cap = cap;
   }
   for (i = 0; (extra = hts_bundle_url(opt, i)) != NULL; i++) {
     seed_append(primarybuff, extra);
@@ -2781,16 +2782,20 @@ int filters_init(char ***ptrfilters, int maxfilter, int filterinc) {
       return 0;
     }
   } else {
+    size_t alloc;
     char **const grown =
-        (char **) realloct(filters, sizeof(char *) * (filter_max + 2));
+        hts_ckd_mul(&alloc, (size_t) filter_max + 2, sizeof(char *))
+            ? NULL
+            : (char **) realloct(filters, alloc);
     char *slots;
 
     if (grown == NULL)
       return 0;
     filters = grown;
     *ptrfilters = filters;
-    slots = (char *) realloct(filters[0],
-                              (size_t) (filter_max + 2) * HTS_FILTER_SLOT_SIZE);
+    slots = hts_ckd_mul(&alloc, (size_t) filter_max + 2, HTS_FILTER_SLOT_SIZE)
+                ? NULL
+                : (char *) realloct(filters[0], alloc);
     // The old slots and their pointers stay valid, so the list is unchanged.
     if (slots == NULL)
       return 0;
@@ -3850,14 +3855,16 @@ HTSEXT_API hts_boolean hts_setfilters(httrackp *opt, const char *const *rules) {
 HTSEXT_API hts_boolean hts_addfilter(httrackp *opt, const char *rule) {
   char *copy;
   char **list;
-  size_t n = 0;
+  size_t n = 0, alloc;
 
   if (opt == NULL || (copy = filter_rule_dup_(rule)) == NULL)
     return HTS_FALSE;
   hts_mutexlock(&opt->state.lock);
   while (opt->live_filters != NULL && opt->live_filters[n] != NULL)
     n++;
-  list = (char **) realloct(opt->live_filters, (n + 2) * sizeof(char *));
+  list = hts_ckd_add(&alloc, n, 2) || hts_ckd_mul(&alloc, alloc, sizeof(char *))
+             ? NULL
+             : (char **) realloct(opt->live_filters, alloc);
   if (list != NULL) {
     list[n] = copy;
     list[n + 1] = NULL;

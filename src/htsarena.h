@@ -31,6 +31,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsglobal.h"
 #include "htssafe.h"
+#include "htsckd.h"
 
 #include <string.h>
 
@@ -77,15 +78,16 @@ HTS_STATIC_ASSERT(!(HTS_ARENA_ALIGN & (HTS_ARENA_ALIGN - 1)), arena_align_pow2);
 static HTS_UNUSED hts_boolean hts_arena_grow_(hts_arena *arena, size_t need) {
   size_t size = arena->size < HTS_ARENA_MAX / 2 ? arena->size * 2
                                                 : (size_t) HTS_ARENA_MAX;
+  size_t alloc;
   hts_arena_chunk *chunk;
 
   if (size < HTS_ARENA_MIN)
     size = HTS_ARENA_MIN;
   if (size < need)
     size = need;
-  if (size > (size_t) -1 - HTS_ARENA_HDR)
+  if (hts_ckd_add(&alloc, HTS_ARENA_HDR, size))
     return HTS_FALSE;
-  chunk = (hts_arena_chunk *) malloct(HTS_ARENA_HDR + size);
+  chunk = (hts_arena_chunk *) malloct(alloc);
   if (chunk == NULL)
     return HTS_FALSE;
   chunk->next = arena->chunks;
