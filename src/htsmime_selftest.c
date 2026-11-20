@@ -64,9 +64,9 @@ static void st_assume_rule(httrackp *opt, size_t value_len) {
 
 static unsigned st_assume_clips; /* clip warnings the callback has seen */
 
-static HTS_PRINTF_FUN(3, 0) void st_assume_log(httrackp *opt, int type,
-                                               const char *format,
-                                               va_list args) {
+static HTS_PRINTF_FUN(3, 0) void st_assume_log(
+    httrackp *opt, int type, HTS_FORMAT_STRING const char *format,
+    va_list args) {
   (void) format;
   (void) args;
   if ((type & 0xff) == LOG_WARNING)

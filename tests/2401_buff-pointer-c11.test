@@ -1,0 +1,71 @@
+#!/bin/bash
+#
+# On a C11 compiler without GNU extensions (MSVC /std:c17), the buff() family
+# must refuse a pointer destination at compile time, as GCC does. Clang with
+# __GNUC__ undefined takes that path.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+top=$(cd "$top_srcdir" && pwd)
+# htsfeatures.h is generated, so a hand run outside make check has none.
+[ -n "${abs_top_builddir:-}" ] || skip "abs_top_builddir unset, no automake environment"
+tmp=$(mktemp -d) || exit 1
+cleanup_push rm -rf "$tmp"
+
+# The control: system headers that htssafe.h includes must survive -U__GNUC__.
+printf '#include <stdarg.h>\n#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <stdint.h>\n#include <inttypes.h>\n' >"$tmp/ctl.c"
+read -r -a cc_argv <<<"${CC:-cc}"
+cc=()
+for c in "${cc_argv[*]}" clang; do
+    read -r -a try <<<"$c"
+    command -v "${try[0]}" >/dev/null 2>&1 || continue
+    try+=(-std=c11 -U__GNUC__ -Wno-builtin-macro-redefined -I"$abs_top_builddir" -I"$top/src" -fsyntax-only)
+    if "${try[@]}" "$tmp/ctl.c" 2>/dev/null; then
+        cc=("${try[@]}")
+        break
+    fi
+done
+[ ${#cc[@]} -gt 0 ] || skip "no compiler builds the system headers without __GNUC__"
+
+cat >"$tmp/probe.c" <<'PROBE'
+#include "htssafe.h"
+#ifndef HTS_BUFF_GENERIC_
+#error the C11 path was not taken
+#endif
+struct s {
+  char f[16];
+};
+int probe(const char *src, struct s *p);
+int probe(const char *src, struct s *p) {
+  char a[64], eight[8], out[32];
+  htsbuff b = htsbuff_array(out);
+  a[0] = eight[0] = '\0';
+  strcpybuff(a, src);
+  strcatbuff(a, "x");
+  strncatbuff(a, src, 2);
+  strcpybuff(eight, "1234567");
+  strcpybuff(p->f, src);
+  sprintfbuff(out, "%d", 1);
+#ifdef NEG
+  {
+    char *ptr = a;
+    NEG;
+  }
+#endif
+  return a[0] + eight[0] + (int) b.cap;
+}
+PROBE
+
+"${cc[@]}" "$tmp/probe.c" 2>"$tmp/pos.err" || fail_dump "an array destination does not compile" "$tmp/pos.err"
+
+for neg in 'strcpybuff(ptr, src)' 'strcatbuff(ptr, src)' 'strncatbuff(ptr, src, 1)' \
+    'sprintfbuff(ptr, "%d", 1)' 'htsbuff_array(ptr)'; do
+    if "${cc[@]}" "-DNEG=$neg" "$tmp/probe.c" 2>"$tmp/neg.err"; then
+        fail "a pointer destination compiles: $neg"
+    fi
+    grep -q 'negative' "$tmp/neg.err" || fail_dump "$neg fails for another reason" "$tmp/neg.err"
+done
+echo "OK: ${cc[0]} refuses every pointer destination"

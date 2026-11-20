@@ -242,12 +242,14 @@ HTSEXT_API hts_boolean hts_log(httrackp *opt, const char *prefix,
 /** printf-style log at level @p type (an hts_log_type, optionally |LOG_ERRNO).
     Forwards to the registered log callback, and when the level is <= opt->debug
     also to opt->log. @p format must be non-NULL. */
-HTSEXT_API void hts_log_print(httrackp *opt, int type, const char *format, ...)
+HTSEXT_API void hts_log_print(httrackp *opt, int type,
+                              HTS_FORMAT_STRING const char *format, ...)
     HTS_PRINTF_FUN(3, 4);
 
 /** va_list form of hts_log_print(). @p opt may be NULL (only the callback
    runs). Preserves errno. @p format must be non-NULL. */
-HTSEXT_API void hts_log_vprint(httrackp *opt, int type, const char *format,
+HTSEXT_API void hts_log_vprint(httrackp *opt, int type,
+                               HTS_FORMAT_STRING const char *format,
                                va_list args) HTS_PRINTF_FUN(3, 0);
 
 /** Install the process-global log callback invoked by hts_log_vprint() for

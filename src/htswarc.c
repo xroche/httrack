@@ -168,12 +168,13 @@ static int wbuf_puts(wbuf *b, const char *s) {
   return wbuf_add(b, s, strlen(s));
 }
 
-static int wbuf_printf(wbuf *b, const char *fmt, ...) HTS_PRINTF_FUN(2, 3);
+static int wbuf_printf(wbuf *b, HTS_FORMAT_STRING const char *fmt, ...)
+    HTS_PRINTF_FUN(2, 3);
 
 /* A header line carrying a URL has no useful bound, and giving up here loses
    the whole record, so anything past the stack buffer is formatted into the
    wbuf itself rather than rejected (#785). */
-static int wbuf_printf(wbuf *b, const char *fmt, ...) {
+static int wbuf_printf(wbuf *b, HTS_FORMAT_STRING const char *fmt, ...) {
   char tmp[1024];
   size_t need;
   int n;

@@ -136,6 +136,30 @@ static HTS_NORETURN HTS_UNUSED void abortf_(const char *exp, const char *file,
 #endif
 #define HTS_IS_NOT_CHAR_BUFFER(VAR) (!HTS_IS_CHAR_BUFFER(VAR))
 
+/* htsbuff_must_be_array_(A) is 0 for an array and fails to compile for a
+   pointer, whose sizeof is not a capacity. */
+#if (defined(__GNUC__) && !defined(__cplusplus))
+#define htsbuff_must_be_array_(A)                                              \
+  (sizeof(char[1 - 2 * !!__builtin_types_compatible_p(__typeof__(A),           \
+                                                      __typeof__(&(A)[0]))]) - \
+   1)
+#elif (!defined(__cplusplus) && defined(__STDC_VERSION__) &&                   \
+       __STDC_VERSION__ >= 201112L)
+/* C11 without GNU extensions, such as MSVC /std:c17: &A of an array is
+   char (*)[N], which matches none of the pointer-to-pointer types. */
+#define HTS_BUFF_GENERIC_
+#define htsbuff_must_be_array_(A)                                              \
+  (sizeof(char[_Generic(&(A),                                                  \
+                   char **: -1,                                                \
+                   const char **: -1,                                          \
+                   char *const *: -1,                                          \
+                   const char *const *: -1,                                    \
+                   unsigned char **: -1,                                       \
+                   const unsigned char **: -1,                                 \
+                   default: 1)]) -                                             \
+   1)
+#endif
+
 /* Source capacity for the buff() family, (size_t)-1 when unknown; sizeof of the
    TYPE keeps a decayed operand ("buf + 1") off -Wsizeof-array-decay. */
 #if (defined(__GNUC__) && !defined(__cplusplus))
@@ -215,7 +239,8 @@ static char *strncatbuff_ptr_(char *dest, const char *src, size_t n) {
  * strcpy()/strcat()/strncat() while still looking like a checked call. The
  * bound is lost. On GCC/Clang (C) the pointer case routes through the
  * *_ptr_ stubs above, which carry a 'warning' attribute to flag the site at
- * compile time; on other compilers it is silent. When the destination is a
+ * compile time. Other C11 compilers (MSVC) refuse to compile it, and C++ and
+ * older C compilers stay silent. When the destination is a
  * pointer of known capacity, call the explicit-size strlcpybuff/strlcatbuff
  * (passing the capacity, NUL included) instead.
  */
@@ -234,6 +259,11 @@ static char *strncatbuff_ptr_(char *dest, const char *src, size_t n) {
                                       "' to '" #A "'",                         \
                                       __FILE__, __LINE__),                     \
                         strncatbuff_ptr_((A), (B), (N)))
+#elif defined(HTS_BUFF_GENERIC_)
+#define strncatbuff(A, B, N)                                                   \
+  strncat_safe_(                                                               \
+      A, sizeof(A) + htsbuff_must_be_array_(A), B, HTS_SIZEOF_SRC_(B), N,      \
+      "overflow while appending '" #B "' to '" #A "'", __FILE__, __LINE__)
 #else
 #define strncatbuff(A, B, N)                                                   \
   (HTS_IS_NOT_CHAR_BUFFER(A)                                                   \
@@ -254,6 +284,12 @@ static char *strncatbuff_ptr_(char *dest, const char *src, size_t n) {
                     "overflow while appending '" #B "' to '" #A "'", __FILE__, \
                     __LINE__),                                                 \
       strcatbuff_ptr_((A), (B)))
+#elif defined(HTS_BUFF_GENERIC_)
+#define strcatbuff(A, B)                                                       \
+  strncat_safe_(A, sizeof(A) + htsbuff_must_be_array_(A), B,                   \
+                HTS_SIZEOF_SRC_(B), (size_t) -1,                               \
+                "overflow while appending '" #B "' to '" #A "'", __FILE__,     \
+                __LINE__)
 #else
 #define strcatbuff(A, B)                                                       \
   (HTS_IS_NOT_CHAR_BUFFER(A)                                                   \
@@ -274,6 +310,11 @@ static char *strncatbuff_ptr_(char *dest, const char *src, size_t n) {
                                      "'",                                      \
                                      __FILE__, __LINE__),                      \
                         strcpybuff_ptr_((A), (B)))
+#elif defined(HTS_BUFF_GENERIC_)
+#define strcpybuff(A, B)                                                       \
+  strcpy_safe_(                                                                \
+      A, sizeof(A) + htsbuff_must_be_array_(A), B, HTS_SIZEOF_SRC_(B),         \
+      "overflow while copying '" #B "' to '" #A "'", __FILE__, __LINE__)
 #else
 #define strcpybuff(A, B)                                                       \
   (HTS_IS_NOT_CHAR_BUFFER(A)                                                   \
@@ -412,18 +453,11 @@ static HTS_INLINE HTS_UNUSED htsbuff htsbuff_ptr_(char *buf, size_t cap) {
 
 /**
  * Builder over the in-scope array ARR (capacity = sizeof(ARR)).
- * On GCC/Clang this rejects a non-array (e.g. a char* pointer), whose sizeof
- * would be the pointer size and silently wrong; use htsbuff_ptr() for pointers.
- * On other compilers there is no such guard, so pass only true arrays there.
+ * In C on GCC/Clang and C11 compilers this rejects a non-array (e.g. a char*
+ * pointer), whose sizeof would be the pointer size and silently wrong; use
+ * htsbuff_ptr() for pointers. C++ has no such guard, so pass only true arrays.
  */
-#if (defined(__GNUC__) && !defined(__cplusplus))
-
-/** It evaluates to 0 for an array, and fails to compile for a pointer. */
-#define htsbuff_must_be_array_(A)                                              \
-  (sizeof(char[1 - 2 * !!__builtin_types_compatible_p(__typeof__(A),           \
-                                                      __typeof__(&(A)[0]))]) - \
-   1)
-
+#ifdef htsbuff_must_be_array_
 #define htsbuff_array(ARR)                                                     \
   htsbuff_ptr_((ARR), sizeof(ARR) + htsbuff_must_be_array_(ARR))
 #else
@@ -546,7 +580,8 @@ hts_path_is_relative_contained(const char *path) {
  * slprintfbuff(), so it is not HTS_CHECK_RESULT.
  */
 static HTS_INLINE HTS_UNUSED HTS_PRINTF_FUN(3, 0) hts_boolean
-    vslprintfbuff(char *dest, size_t size, const char *fmt, va_list args) {
+    vslprintfbuff(char *dest, size_t size, HTS_FORMAT_STRING const char *fmt,
+                  va_list args) {
   int ret;
 
   assertf(dest != NULL && size != 0);
@@ -567,7 +602,8 @@ static HTS_INLINE HTS_UNUSED HTS_PRINTF_FUN(3, 0) hts_boolean
  * remote input.
  */
 static HTS_INLINE HTS_UNUSED HTS_CHECK_RESULT HTS_PRINTF_FUN(3, 4) hts_boolean
-    slprintfbuff(char *dest, size_t size, const char *fmt, ...) {
+    slprintfbuff(char *dest, size_t size, HTS_FORMAT_STRING const char *fmt,
+                 ...) {
   va_list args;
   hts_boolean ret;
 
@@ -584,8 +620,8 @@ static HTS_INLINE HTS_UNUSED HTS_CHECK_RESULT HTS_PRINTF_FUN(3, 4) hts_boolean
  * a half-written one. *used must be below size.
  */
 static HTS_INLINE HTS_UNUSED HTS_CHECK_RESULT HTS_PRINTF_FUN(4, 5) hts_boolean
-    slcatprintfbuff(char *dest, size_t size, size_t *used, const char *fmt,
-                    ...) {
+    slcatprintfbuff(char *dest, size_t size, size_t *used,
+                    HTS_FORMAT_STRING const char *fmt, ...) {
   va_list args;
   hts_boolean fit;
 
@@ -607,7 +643,7 @@ static HTS_INLINE HTS_UNUSED HTS_CHECK_RESULT HTS_PRINTF_FUN(4, 5) hts_boolean
  * cast on slprintfbuff() is no substitute, GCC warns through it.
  */
 static HTS_INLINE HTS_UNUSED HTS_PRINTF_FUN(3, 4) void slprintfbuff_clip(
-    char *dest, size_t size, const char *fmt, ...) {
+    char *dest, size_t size, HTS_FORMAT_STRING const char *fmt, ...) {
   va_list args;
 
   va_start(args, fmt);
@@ -621,7 +657,8 @@ static HTS_INLINE HTS_UNUSED HTS_PRINTF_FUN(3, 4) void slprintfbuff_clip(
  * HTS_CHECK_RESULT.
  */
 static HTS_INLINE HTS_UNUSED HTS_PRINTF_FUN(4, 5) void slcatprintfbuff_clip(
-    char *dest, size_t size, size_t *used, const char *fmt, ...) {
+    char *dest, size_t size, size_t *used, HTS_FORMAT_STRING const char *fmt,
+    ...) {
   va_list args;
 
   assertf(dest != NULL && used != NULL && *used < size);
@@ -633,9 +670,10 @@ static HTS_INLINE HTS_UNUSED HTS_PRINTF_FUN(4, 5) void slcatprintfbuff_clip(
 
 /**
  * slprintfbuff() over the in-scope array ARR (capacity = sizeof(ARR)).
- * On GCC/Clang a pointer is a compile error; use slprintfbuff() for those.
+ * In C on GCC/Clang and C11 compilers a pointer is a compile error; use
+ * slprintfbuff() for those.
  */
-#if (defined(__GNUC__) && !defined(__cplusplus))
+#ifdef htsbuff_must_be_array_
 #define sprintfbuff(ARR, ...)                                                  \
   slprintfbuff((ARR), sizeof(ARR) + htsbuff_must_be_array_(ARR), __VA_ARGS__)
 #else

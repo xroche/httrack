@@ -470,9 +470,9 @@ static int st_cachedefault(httrackp *opt, int argc, char **argv) {
 
 static char st_log_callback_seen[256];
 
-static HTS_PRINTF_FUN(3, 0) void st_log_callback(httrackp *opt, int type,
-                                                 const char *format,
-                                                 va_list args) {
+static HTS_PRINTF_FUN(3, 0) void st_log_callback(
+    httrackp *opt, int type, HTS_FORMAT_STRING const char *format,
+    va_list args) {
   (void) type;
   (void) vsnprintf(st_log_callback_seen, sizeof(st_log_callback_seen), format,
                    args);
@@ -538,9 +538,10 @@ static char st_crash_seen[256];
 static int st_crash_level;
 static hts_boolean st_crash_had_opt;
 
-static HTS_PRINTF_FUN(3, 0) void st_crash_log(httrackp *opt, int type,
-                                              const char *format,
-                                              va_list args) {
+static HTS_PRINTF_FUN(3,
+                      0) void st_crash_log(httrackp *opt, int type,
+                                           HTS_FORMAT_STRING const char *format,
+                                           va_list args) {
   st_crash_had_opt = opt != NULL ? HTS_TRUE : HTS_FALSE;
   st_crash_level = type;
   (void) vsnprintf(st_crash_seen, sizeof(st_crash_seen), format, args);
@@ -548,9 +549,9 @@ static HTS_PRINTF_FUN(3, 0) void st_crash_log(httrackp *opt, int type,
 
 static FILE *st_crash_fp;
 
-static HTS_PRINTF_FUN(3, 0) void st_crash_file_log(httrackp *opt, int type,
-                                                   const char *format,
-                                                   va_list args) {
+static HTS_PRINTF_FUN(3, 0) void st_crash_file_log(
+    httrackp *opt, int type, HTS_FORMAT_STRING const char *format,
+    va_list args) {
   (void) type;
   vfprintf(st_crash_fp, format, args);
   fputc('\n', st_crash_fp);

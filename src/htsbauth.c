@@ -779,11 +779,12 @@ static void cookie_refuse(int *refused) {
    reason, never a byte that can be secret. */
 static void cookie_warn(httrackp *opt, const cookie_filter *filter,
                         const char *given, int *refused, const char *reason,
-                        const char *fmt, ...) HTS_PRINTF_FUN(6, 7);
+                        HTS_FORMAT_STRING const char *fmt, ...)
+    HTS_PRINTF_FUN(6, 7);
 
 static void cookie_warn(httrackp *opt, const cookie_filter *filter,
                         const char *given, int *refused, const char *reason,
-                        const char *fmt, ...) {
+                        HTS_FORMAT_STRING const char *fmt, ...) {
   va_list args;
 
   if (refused != NULL)

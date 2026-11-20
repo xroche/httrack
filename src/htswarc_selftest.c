@@ -1070,9 +1070,9 @@ static char st_cdx_log[2048];
 
 /* Collect the "WARC:" diagnostics only, so an unrelated message cannot satisfy
    (or break) a silence assertion. */
-static HTS_PRINTF_FUN(3, 0) void st_cdx_log_cb(httrackp *opt, int type,
-                                               const char *format,
-                                               va_list args) {
+static HTS_PRINTF_FUN(3, 0) void st_cdx_log_cb(
+    httrackp *opt, int type, HTS_FORMAT_STRING const char *format,
+    va_list args) {
   char line[512];
   (void) type;
   (void) vsnprintf(line, sizeof(line), format, args);

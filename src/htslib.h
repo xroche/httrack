@@ -589,11 +589,13 @@ void hts_secret_add_headers(httrackp *opt, const char *headers);
 void hts_secret_fwrite(httrackp *opt, FILE *fp, const char *s, size_t len);
 
 /* fprintf() to fp, with each secret of opt as ***. */
-void hts_secret_fprintf(httrackp *opt, FILE *fp, const char *format, ...)
+void hts_secret_fprintf(httrackp *opt, FILE *fp,
+                        HTS_FORMAT_STRING const char *format, ...)
     HTS_PRINTF_FUN(3, 4);
 
 /* vfprintf() to fp, with each secret of opt as ***. */
-void secret_vfprintf(httrackp *opt, FILE *fp, const char *format, va_list args)
+void secret_vfprintf(httrackp *opt, FILE *fp,
+                     HTS_FORMAT_STRING const char *format, va_list args)
     HTS_PRINTF_FUN(3, 0);
 
 /* adr past its blanks and scheme, and then past its login as well. */
