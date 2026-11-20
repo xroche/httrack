@@ -109,8 +109,7 @@ test -s "${proj}/hts-cache/repair.zip" || fail "the recovery was not kept for a 
 echo "OK"
 
 # --- the move is refused the way Windows refuses it --------------------------
-# The destination always exists there, so every repair takes hts_rename_over()'s
-# fallback, which must not lose the cache (#790).
+# hts_rename_over()'s fallback must not lose the cache (#790).
 printf '[a refused fallback keeps the cache] ..\t'
 proj="${tmpdir}/eexist"
 plant_damaged_cache "$proj"

@@ -30,9 +30,8 @@ limit=$((urlmaxsize * 2))
 
 split_pad() { selftest_queue "$3" identurl "$1" "$2"; }
 
-# Cases sit one byte under the limit, on it and one byte over. The accepted one
-# pins its whole result, because 'error' alone also passes when the URL fails
-# for another reason or the guard rejects a kilobyte early.
+# The accepted case pins its whole result, because 'error' alone also passes
+# when the URL fails for another reason.
 boundary() { # boundary BASE WANT-ADR
     local base=$1 adr=$2
     local pad=$((limit - 1 - ${#base}))

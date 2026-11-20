@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# configure must give the Makefiles a real bash (BASH_SHELL) for "make deb" and the test
-# driver. Not BASH, which bash presets, because on macOS it read /bin/sh (#895, #891).
+# configure must set BASH_SHELL to a real bash, because macOS BASH is /bin/sh (#895).
 #
 # shellcheck disable=SC2016 # the probes are for the shell under test to expand
 
@@ -49,8 +48,7 @@ for f in "$abs_top_srcdir"/*; do
     ln -s "$f" "$tmp/src/"
 done
 
-# Prefer the Makefile, which shows the value that reaches $(BASH_SHELL). configure may die
-# on a library check before writing one, so fall back to the trace it printed.
+# Prefer the Makefile, but fall back to the trace when configure died before writing one.
 (cd "$tmp/bld" && BASH_SHELL="$tmp/mybash" bash "$tmp/src/configure" --disable-https >conf.log 2>&1) || true
 if test -f "$tmp/bld/Makefile"; then
     got=$(sed -n 's/^BASH_SHELL = //p' "$tmp/bld/Makefile")

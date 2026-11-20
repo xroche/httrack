@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# A -%F footer whose expansion overflows the on-page buffer must be dropped
-# without crashing the crawl or leaving the buffer unterminated.
+# A -%F footer that overflows the on-page buffer must be dropped cleanly.
 
 set -eu
 # shellcheck source=tests/testlib.sh

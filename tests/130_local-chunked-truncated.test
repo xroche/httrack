@@ -1,16 +1,13 @@
 #!/bin/bash
 #
-# A chunked response cut before its zero-length chunk is refused like a short
-# Content-Length body (#840): never cached, and never replacing a good copy on
-# --update. A first crawl still leaves a direct-to-disk partial (always.bin).
+# A chunked body cut before its last chunk is refused like a short one (#840).
 
 set -euo pipefail
 
 : "${top_srcdir:=..}"
 
 # First crawl: always.* are cut on every pass, the other three are the control.
-# reset.bin dies on an RST, whose read error keeps its own diagnostic. The
-# GNU/Hurd pfinet reports an RST as a plain EOF, so expect the framing label.
+# GNU/Hurd pfinet reports an RST as a plain EOF, hence the framing label there.
 reset_label=(--log-found 'Interrupted transfer.*chunktrunc/reset\.bin')
 reset_not_found=(--log-not-found 'runcated chunked transfer.*chunktrunc/(page|stay|file|reset|hostile)')
 case "$HTS_OS" in
@@ -40,8 +37,7 @@ bash "$top_srcdir/tests/local-crawl.sh" \
     httrack 'BASEURL/chunktrunc/index.html'
 
 # --update: page.html and file.bin come back cut, and stay.html is the control.
-# hostile.html sends a 0x80000000 chunk size, INT_MIN as an int, which must be
-# rejected. huge.html sends 0x7fffffff, the size http_xfread1() refuses.
+# hostile.html and huge.html send chunk sizes of INT_MIN and INT_MAX.
 bash "$top_srcdir/tests/local-crawl.sh" \
     --rerun-args '--update' \
     --log-found 'truncated chunked transfer.*chunktrunc/page\.html' \

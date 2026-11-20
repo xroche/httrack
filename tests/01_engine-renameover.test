@@ -5,9 +5,8 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-# -#test=renameover: hts_rename_over() must replace an existing dst, but leave
-# it alone when moving it aside cannot fix the failure (#779, #790). Each leg
-# pins the regime and restore outcome the selftest prints.
+# hts_rename_over() must replace an existing dst, but keep it when moving it
+# aside cannot fix the failure (#779, #790).
 dir=$(mktemp -d)
 cleanup_push rm -rf "$dir"
 
@@ -27,7 +26,6 @@ if ! target_is_linux; then
     exit 0
 fi
 # Only a --disable-shared build may skip, because it has nothing to preload.
-# Anything else missing fails, or the interposed legs would test nothing.
 if [ ! -r "${RENAMEFAIL_LA:-}" ]; then
     echo "renameover: ${RENAMEFAIL_LA:-\$RENAMEFAIL_LA} was not built" >&2
     exit 1

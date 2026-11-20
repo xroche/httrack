@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# #842/#774 end to end: a sibling at "hts-tmp /" must not resolve to the path
-# a.bin's re-fetch backup is renamed to, or the update destroys it.
+# A sibling at "hts-tmp /" must not collide with a.bin's backup (#842, #774).
 
 set -euo pipefail
 

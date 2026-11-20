@@ -1,6 +1,5 @@
 #!/bin/bash
-# The .arc writer builds each entry's headers in a fixed 8192-byte block. Its
-# bound must count what the block holds, or a long header wraps it.
+# A long header must not wrap the .arc writer's fixed 8192-byte header block.
 
 set -euo pipefail
 export LC_ALL=C

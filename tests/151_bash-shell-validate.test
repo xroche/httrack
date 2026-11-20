@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# AC_PATH_PROGS keeps an absolute BASH_SHELL and replaces a relative one, so configure
-# must check the result. Otherwise BASH_SHELL=/bin/sh brings #895 back, unseen until
-# "make check" or "make deb" (#908).
+# configure must validate BASH_SHELL, because AC_PATH_PROGS keeps an absolute one
+# as is, and BASH_SHELL=/bin/sh brings #895 back (#908).
 
 set -euo pipefail
 
@@ -69,8 +68,7 @@ run() { # run <label> <env argument>...
     rundir="$tmp/run$n"
     mkdir "$rundir"
     status=0
-    # Capped, because configure executes the candidate and a hang wedges "make check"
-    # silently. Polled, because a backgrounded "sleep" watchdog outlives the run.
+    # Polled, because a backgrounded sleep watchdog outlives the run.
     local had_m=
     case "$-" in *m*) had_m=1 ;; esac
     # Own process group, so the kills below reach what configure spawned: bash 3.2 keeps
@@ -83,8 +81,7 @@ run() { # run <label> <env argument>...
     ) >"$rundir/log" 2>&1 &
     local pid=$! waited=0 quiet=0 size=0 now left
     test -n "$had_m" || set +m
-    # Detect a hang by silence, because configure writes a line per probe but hppa's
-    # emulated run can outlast a runner's whole budget (#1146).
+    # Detect a hang by silence, because an emulated hppa run is slow (#1146).
     while kill -0 "$pid" 2>/dev/null; do
         sleep 1
         waited=$((waited + 1))
@@ -102,9 +99,8 @@ run() { # run <label> <env argument>...
             tail -5 "$rundir/log" >&2
             exit 1
         }
-        # Skip when still writing but out of time, rather than let the harness kill
-        # the test. Only with a full silence window still affordable, or a hang
-        # would report a skip. 0 turns the guard off.
+        # Skip when still writing but out of time, keeping a full silence window so
+        # a hang cannot pass as a skip. 0 turns the guard off.
         left=$(budget_left)
         if test "$quiet" -eq 0 && test "$left" -ne 0 &&
             test "$left" -le "$((RESERVE + SILENCE))"; then
@@ -223,9 +219,7 @@ sleep 1
 # Not through a pipe: grep -q would leave ps_snapshot writing into a closed one,
 # and pipefail would then read the leaked child as an absent one.
 ! grep -q '[s]leep 987' <<<"$(ps_snapshot)" || fail "the killed run left its child running"
-# The pacer must not fire before the case is judged, or a skip would bury a
-# wrong configure answer. Use the real run(), because a stub cannot see a pacer
-# left inside the one it replaced.
+# The pacer must not fire before the real run() has judged the case.
 verdict() { # verdict <accept|reject> <run number> <status the child exits with>
     local rc=0
     (
@@ -308,9 +302,7 @@ status=0
 log=
 took=0
 
-# The four that configure to completion run first, because the pacer projects
-# from the step it just timed. Behind the cheap rejects it read too low and 151
-# met the harness kill (#1146). Positive control first, as in 196.
+# Run the slow cases first, since the pacer projects from the last one (#1146).
 accept override "$tmp/mybash" '' "BASH_SHELL=$tmp/mybash"
 # A set-but-empty override searches like no override, so it can still fall back to /bin/sh (#895 again) with configure exiting 0.
 accept empty '' '' BASH_SHELL=

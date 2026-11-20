@@ -73,8 +73,7 @@ check "version.rc ProductVersion" "$version" "$rc_productversion"
 # Signing pins the product name too.
 check "version.rc ProductName" "HTTrack Website Copier" "$rc_productname"
 
-# ls-files drives the loop and guards the pin, because distcheck unpacks inside
-# the checkout, where git reads every untracked pin as unspecified.
+# ls-files drives the loop, because distcheck's untracked files have no pin.
 if command -v git >/dev/null 2>&1 &&
     git -C "$top" ls-files --error-unmatch src/version.rc >/dev/null 2>&1; then
     tracked=yes

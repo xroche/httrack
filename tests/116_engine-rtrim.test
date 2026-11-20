@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# The config-file right trim and the collision-rename digit scan walk back from
-# s + strlen(s) - 1 and must stop at the buffer's start. ASan cannot see an
-# overrun within one frame, hence the poisoned byte.
+# The rc right trim and the rename digit scan must stop at the buffer's start.
+# ASan cannot see an overrun within one frame, hence the poisoned byte.
 
 set -euo pipefail
 
@@ -87,10 +86,8 @@ case "$log" in
 esac
 
 # --- 4. the call sites stay bounded -----------------------------------------
-# On a plain build the byte below the buffer is rarely a digit, so sections 2
-# and 3 fail only under a sanitizer. Pin the two sites at the source as well.
-# Read out of a substitution, because bash 3.2 errexit kills the script when a
-# command-prefixed builtin returns non-zero, even in a condition.
+# Sections 2 and 3 fail only under a sanitizer, so pin both sites at the source.
+# Use a substitution, because bash 3.2 errexit fires even inside a condition.
 test -n "$(command grep -l 'hts_rtrim(line, HTS_REALSPACES)' "$top_srcdir/src/htsalias.c" || true)" ||
     fail "htsalias.c right trim no longer goes through hts_rtrim"
 test -n "$(command grep -l 'hts_rtrimlen(tempo, "0123456789")' "$top_srcdir/src/htsname.c" || true)" ||

@@ -1,7 +1,6 @@
 #!/bin/bash
-# Two bounds in the .ndx/.dat reader. An unparsable position field must not
-# leave "pos" stale or uninitialized, and the base path and index names are
-# bounded by their 1024-byte destinations.
+# An unparsable .ndx position field must not leave "pos" stale, and paths must
+# fit their 1024-byte destinations.
 
 set -euo pipefail
 export LC_ALL=C

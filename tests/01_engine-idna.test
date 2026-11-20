@@ -42,9 +42,8 @@ dec 'xn--' 'xn--'
 dec 'xn--!!!' '㚯'
 dec 'xn--already-encoded.com' 'ǮalǭǮreaǭǫdy.com'
 
-# The second label has a truncated UTF-8 sequence and must not leak the segment
-# buffer. Fed as hex, because a Windows command line would turn the invalid
-# UTF-8 into a valid U+FFFD that encodes fine.
+# A truncated UTF-8 label must not leak the segment buffer. It goes in as hex
+# because a Windows command line turns invalid UTF-8 into U+FFFD.
 enc_bad 'hex:62c3bc636865762ee4be8be5ad62c3bc636865706c65'
 
 selftest_run_queued

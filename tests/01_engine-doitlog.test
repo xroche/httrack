@@ -1,12 +1,7 @@
 #!/bin/bash
 #
 
-# doit.log reprise (no network). Running httrack with no URL in a mirror makes
-# the engine replay hts-cache/doit.log through cmdl_ins(), a path no other test
-# covers. Two properties:
-#   1. A multi-token reprise re-mirrors the same files with no errors, so every
-#      packed token survives.
-#   2. The reprise re-crawls: a changed source file is picked up.
+# A doit.log replay must keep every token and pick up a changed source file.
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh

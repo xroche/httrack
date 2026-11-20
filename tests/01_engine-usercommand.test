@@ -7,14 +7,9 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-# -V runs a shell command per saved page, with "$0" standing for the save name,
-# which can hold shell metacharacters. On POSIX each "$0" becomes $1 and the
-# engine execs sh -c <command> sh <name>. -#test=usercmd prints the verdict and
-# vector, and -#test=usercmdrun runs it.
+# -V runs a command per saved page, and "$0" stands for a hostile save name.
 
-# The round-trip replays each expansion through a POSIX shell, but a native
-# Windows engine emits the cmd.exe form, where a backtick inside "..." is inert
-# and the replaying bash would run it.
+# The bash round-trip cannot replay a native Windows engine's cmd.exe form.
 skip_on_windows "the expansion is quoted for cmd.exe, which bash cannot replay"
 
 work=$(mktemp -d) || fail "mktemp failed"
@@ -125,9 +120,7 @@ for t in "${templates[@]}"; do
     done
 done
 
-# Two substitutions, the first backslash-escaped. The backslash is spent on its
-# $0, or it would suppress the next quote transition and the second $0 would be
-# rewritten for the wrong context.
+# A backslash spent on the first $0 must not change how the second is quoted.
 pair_templates=(
     'printf %s \$0$0'
     'printf %s \$0"$0"'
@@ -186,14 +179,12 @@ refused_for 'a=(1); unset a[$0]' 'plain word'
 refused_for 'a=(1 2 3); unset "a[$0]"' 'plain word'
 refused_for 'printf %s a[$0]' 'plain word'
 
-# Refuse a subscript inside '...' too. The emitted '"${1}"' rejoins one word
-# across the quote break, so unset evaluates a[<name>] as for double quotes.
+# Refuse a subscript inside '...' too, since '"${1}"' rejoins it into one word.
 refused_for "a=(1); unset 'a[\$0]'" 'plain word'
 refused_for "echo 'a[\$0]'" 'plain word'
 refused_for "echo '[[ \$0 ]]'" 'plain word'
 
-# bash re-reads the operands of [[ ]], where -eq evaluates arithmetic and =~
-# takes a regex.
+# Inside [[ ]], bash evaluates -eq operands as arithmetic and =~ as a regex.
 refused_for '[[ -f $0 ]]' 'plain word'
 refused_for '[[ 1 -eq $0 ]]' 'plain word'
 
@@ -206,12 +197,10 @@ refused_for 'echo $( (true) (true) $0 )' 'plain word'
 deep=$(repeat_chars 17 '(')
 refused_for "echo ${deep//(/\$(}$0" 'nests substitutions'
 
-# ${ } without a subscript refuses too. It is inert, but one rule beats a list
-# of the regions that happen to be dangerous.
+# ${ } without a subscript is inert but refused too, to keep one rule.
 refused_for 'printf %s ${x:-$0}' 'plain word'
 
-# Each refusal is a command that never runs, reported as one. The names carry
-# the subscript gadget that reaches an evaluator once the name is a parameter.
+# Each name carries the subscript gadget that reaches an evaluator.
 for t in 'echo $(($0))' 'echo $[$0]' '((n=$0))' 'echo ${a[$0]}' 'a[$0]=1' \
     'a=([$0]=x)' 'a=(1); unset a[$0]' "a=(1); unset 'a[\$0]'" \
     'v=abcdef; echo ${v:$0}' '[[ 1 -eq $0 ]]' \
@@ -251,8 +240,7 @@ assert_eq 'echo `true` "${1}"' "$CMD" '`...` closed'
 roundtrip '[ -n $0 ] && printf %s $0' "a;touch $canary;.html"
 roundtrip 'printf %s ${HOME:+}$0' "a;touch $canary;.html"
 
-# The documented \$0 spelling gives the same command as $0, because httrack
-# substitutes both and the backslash was meant for an outer shell.
+# The documented \$0 spelling must give the same command as $0.
 usercmd 'rm \$0' '/out/a b.html'
 escaped=$CMD
 usercmd 'rm $0' '/out/a b.html'
@@ -263,9 +251,7 @@ assert_eq "$escaped" "$CMD" 'rm \$0 against rm $0'
 usercmd 'echo \\$0' 'a;id;.html'
 assert_eq 'echo \\"${1}"' "$CMD" 'escaped backslash'
 
-# A command that does not fit is refused rather than cut mid-quote, where
-# "rm '$0'" would run as "rm". A -V template stops at HTS_CDLMAXSIZE, so the
-# room is capped here to make it overflow.
+# A command too long for the capped room is refused rather than cut mid-quote.
 usercmd 'rm $0' 'x.html' 9
 assert_eq TOOLONG "$VERDICT" 'over-long command'
 usercmd 'rm $0' 'x.html' 10

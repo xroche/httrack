@@ -183,9 +183,7 @@ notfound "ns.gif" "$out3"
 notfound "og.gif" "$out3"
 notfound "rdfs.gif" "$out3"
 
-# CSS @import (#94): crawling the .css directly captures every form's target.
-# The "cond"/"sup"/"spc" cases add a trailing media/supports/layer condition
-# or a space before ';', and a parser that drops those URLs fails them.
+# Crawling a .css directly must capture every @import form's target (#94).
 site4="$tmp/cssimport"
 mkdir -p "$site4"
 for f in nq dqu squ dqs sqs med cond sup lay spc; do printf 'body{}\n' >"$site4/$f.css"; done
@@ -237,8 +235,7 @@ out6="$tmp/parse-off0-out"
 crawl "$site6/main.css" "$out6"
 found "off0.css" "$out6"
 
-# XMLHttpRequest.open(method, url) (#218): "GET" must not be captured as a link
-# and fetched (offline it saves a bare file GET, live it becomes GET.html).
+# The method in XMLHttpRequest.open(method, url) is not a link (#218).
 # window.open(url) detection must be unaffected.
 site7="$tmp/xhropen"
 mkdir -p "$site7"
@@ -269,8 +266,7 @@ grep -Fq 'window.open("winopen.gif")' "$saved7" ||
 ! grep -Fq 'window.open("file://' "$saved7" ||
     fail "#218: window.open URL left absolute (not rewritten)"
 
-# Parens in an unquoted url(...) (#163) decode to '(' ')' in the saved name, but
-# must stay %28/%29 in the rewritten url(), where a ')' would close the token.
+# Parens in an unquoted url() must stay %28/%29 in the rewrite (#163).
 site8="$tmp/cssparens"
 mkdir -p "$site8"
 for f in 'img (1).gif' 'a(b)c(1).gif' 'q (4).gif'; do gif "$site8/$f"; done
@@ -293,8 +289,7 @@ grep -Fq 'url(a%28b%29c%281%29.gif)' "$css8" ||
 grep -Fq 'url("q%20%284%29.gif")' "$css8" ||
     fail "#163: quoted url() altered or parens left literal on rewrite"
 
-# <script> and inline style= get the same url() encoding as CSS. Ordinary
-# href/src keep literal parens, which checks the gate does not over-fire.
+# <script> and style= get the same url() encoding, but href/src keep parens.
 site9="$tmp/urlparens"
 mkdir -p "$site9"
 for f in 'js (1).gif' 'inl (2).gif' 'asrc (3).gif' 'ahref (4).gif'; do gif "$site9/$f"; done

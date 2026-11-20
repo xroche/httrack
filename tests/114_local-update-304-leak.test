@@ -1,8 +1,6 @@
 #!/bin/bash
 #
-# A 304 during --update must not drop the 8 KB header buffer the response owns
-# (#782). Only a leak checker sees it, so this sets its own options around a
-# two-pass mini304 crawl. The fresh pass is the control.
+# A 304 during --update must not leak the response's 8 KB header buffer (#782).
 
 set -eu
 

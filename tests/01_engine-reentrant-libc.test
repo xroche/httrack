@@ -6,8 +6,7 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-# The messages are only compared to each other, but a fixed locale keeps the
-# threads and the reference on one catalogue.
+# A fixed locale keeps the threads and the reference on one catalogue.
 LC_ALL=C
 export LC_ALL
 
@@ -18,9 +17,7 @@ cleanup_push rm -rf "$tmpdir"
 # buffer does (#1697).
 expect_ok "strerror self-test" httrack -O "${tmpdir}/o1" -#test=strerror
 
-# gethostbyname() answers into a shared static hostent, and its arm builds only
-# under --disable-ipv6, which no CI leg uses. The source guard checks the lock
-# is still held at h_addr_list, or another worker can replace the hostent.
+# No CI leg builds the gethostbyname() arm, so a source check pins its lock.
 body=$(awk '/^static int hts_dns_resolve_nocache_list_\(/,/^}/' \
     "$top_srcdir/src/htsdns.c")
 if [ -z "$body" ]; then

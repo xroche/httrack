@@ -43,9 +43,7 @@ exp 'foo~bar' 'foo~bar'
 # an unset or empty $HOME must not turn ~/foo into the absolute /foo
 unset_home=$(env -u HOME httrack -O /dev/null -#test=expandhome '~/foo')
 if test "$(suite_backend)" = wsl2; then
-    # HOME still resolves from the Windows environment block, which the distro
-    # cannot unset. Pin the shape, because an inequality also passes on an empty
-    # answer or an unexpanded ~/foo.
+    # Windows still supplies HOME. Pin the shape, which an empty answer fails.
     case $unset_home in
     expanded=/foo) fail "unset HOME: expanded to the absolute /foo" ;;
     expanded=?*/foo) ;;

@@ -1,8 +1,6 @@
 #!/bin/bash
 #
-# An --update over a complete copy must not REST-resume and splice the old body
-# into the new one (#798). Pass 1 is cut short to leave a partial, pass 2 must
-# resume it, pass 3 must not.
+# An --update over a complete copy must not REST-resume and splice (#798).
 
 set -euo pipefail
 

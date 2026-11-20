@@ -1,8 +1,6 @@
 #!/bin/bash
 #
-# coucal logs a per-table summary when a table is deleted, and with no handler
-# it writes it itself. proxytrack drops one table per WebDAV enumeration, so
-# every unauthenticated PROPFIND printed a line on the console (#918).
+# A PROPFIND must not print coucal's per-table summary to the console (#918).
 
 set -euo pipefail
 
@@ -68,9 +66,7 @@ propfind() { # port path
         "http://127.0.0.1:$1/webdav/example.com/$2"
 }
 
-# Print what the process wrote once serving. The banner ends on the PID line
-# (stdout) and the loaded archive (stderr), which sanitizer legs relay in either
-# order (#1374), so cut past whichever landed last.
+# Print what followed the banner, whose last lines come in either order (#1374).
 request_log() { # log
     tr -d '\r' <"$1" | awk '
         /^PID=/ || /^processed: / { banner = NR }
@@ -114,8 +110,7 @@ start_proxytrack "$dir/quiet" launch_quiet
 quietlog=$ptlog quietport=$proxyport quietpid=$ptpid ptpid=
 wait_banner "$quietlog"
 
-# Both on one connection, because the keep-alive loop reads the second request
-# only after the first one's teardown, which orders writes made after send().
+# Send both on one connection, so the first one's teardown writes come first.
 resp=$("$curl" -s -i --max-time 30 -X PROPFIND -H "Depth: 1" \
     "http://127.0.0.1:$quietport/webdav/example.com/" \
     "http://127.0.0.1:$quietport/webdav/example.com/page.html") ||
@@ -139,9 +134,7 @@ until test "$(request_log "$quietlog" | grep -ci ' \* log: HTTP [^ ]* 207 [0-9]*
     waited=$((waited + 1))
 done
 
-# Read the capture once proxytrack is gone and the drainer has copied it all.
-# Teardown and keep-alive writes have no ordering against the fence above, and
-# no sleep is both sound and reliable.
+# Read the capture only once proxytrack is gone and the drainer has copied it.
 stop_server "$quietpid"
 quietpid=
 wait_drained "$quietlog"

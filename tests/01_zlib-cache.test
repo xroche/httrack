@@ -1,9 +1,6 @@
 #!/bin/bash
 #
 # Cache create/read/update logic (driven by 'httrack -#test=cache <dir>').
-#
-# The self-test stores edge entries, a few thousand small ones and some large
-# bodies, reads them all back field by field, then updates one entry.
 
 set -eu
 # shellcheck source=tests/testlib.sh
@@ -24,9 +21,8 @@ test "$out" = "cache-selftest: OK" || fail "expected 'cache-selftest: OK', got: 
 # The self-test must have actually produced a ZIP cache on disk.
 assert_file "$dir/hts-cache/new.zip" "the self-test wrote no ZIP cache"
 
-# The few-thousand-entry pass weighs ~1-2 MB, so fail well past that to catch a
-# per-entry overhead regression. du -sk is portable (BSD du has no -b), and the
-# block-allocated size is an upper bound, which a ceiling check accepts.
+# The pass weighs ~1-2 MB, so a far larger cache means per-entry overhead grew.
+# Use du -sk, because BSD du has no -b.
 ceiling=$((4 * 1024)) # KiB
 kbytes=$(du -sk "$dir/hts-cache" | cut -f1)
 test "$kbytes" -le "$ceiling" || fail "cache footprint ${kbytes} KiB exceeds ${ceiling} KiB ceiling"

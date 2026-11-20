@@ -170,9 +170,8 @@ for macro in HTS_INDEX_HEADER HTS_INDEX_BODY HTS_INDEX_FOOTER \
     assert_eq 0 "$(macro_body "$macro" | bare_amps)" "$macro: unescaped &"
 done
 
-# Check the pin rather than the bytes, because it keeps a Windows checkout from
-# putting CRs in a file the engine pastes into the index. ls-files first,
-# because distcheck unpacks inside the checkout, where every pin is unspecified.
+# Check the eol pin, which keeps CRs out of a Windows checkout. Call ls-files
+# first, because in distcheck's unpacked tree every pin reads unspecified.
 if command -v git >/dev/null 2>&1 &&
     git -C "$srcroot" ls-files --error-unmatch templates >/dev/null 2>&1; then
     for file in "$templates"/*.html; do

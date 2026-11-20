@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# copy_htsopt() must still copy hts_boolean fields when that type is unsigned
-# and its `> -1` sentinel is always false. Runs 'httrack -#test=copyopt'.
+# copy_htsopt() must copy hts_boolean fields even when that type is unsigned.
 
 set -eu
 

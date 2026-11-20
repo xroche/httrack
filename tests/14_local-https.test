@@ -1,8 +1,6 @@
 #!/bin/bash
 #
-# HTTPS crawl against the local test server with the shipped self-signed cert,
-# which httrack accepts without --check-cert (test 735). basic.html links to
-# link.html with four query strings, saved under hashed names: 5 files.
+# httrack must crawl over HTTPS with the shipped self-signed cert (5 files).
 
 : "${top_srcdir:=..}"
 
@@ -11,8 +9,7 @@ if test "$HTTPS_SUPPORT" == "no"; then
     exit 77
 fi
 
-# The URL in the log pins the scheme. Without it, a harness that dropped --tls
-# would crawl plain http and pass every other check here.
+# The URL in the log pins the scheme, in case the harness dropped --tls.
 bash "$top_srcdir/tests/local-crawl.sh" --tls --errors 0 --files 5 \
     --found 'simple/basic.html' \
     --log-found 'https://127\.0\.0\.1:' \

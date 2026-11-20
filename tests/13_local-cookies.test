@@ -1,8 +1,6 @@
 #!/bin/bash
 #
-# Cookie chain against the local test server. entrance.php sets cat/cake,
-# second.php checks them and sets badger, third.php checks all three. A wrong
-# cookie returns 500, so a clean 3-files/0-errors run proves the jar works.
+# A cookie chain spans three pages, and each returns 500 on a wrong cookie.
 
 : "${top_srcdir:=..}"
 

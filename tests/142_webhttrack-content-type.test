@@ -120,8 +120,7 @@ check(raw.startswith(b"HTTP/1.0 200 OK\r\n"), "status line ends CRLF")
 check(b"\r\nContent-type: image/png\r\n" in raw, "type line ends CRLF")
 check(b"\n" not in head.replace(b"\r\n", b""), "no bare LF in the header block")
 
-# Point the server at the mirror the way step4.html does, with the session id.
-# Only a profile save records the served root. command_do=save runs no crawl.
+# Save a profile as step4.html does, because only that records the served root.
 index = urllib.request.urlopen(url + "/server/index.html", timeout=20).read()
 sid = re.search(rb'name="sid" value="([0-9a-f]+)"', index)
 if sid is None:

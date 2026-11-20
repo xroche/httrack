@@ -1,8 +1,6 @@
 #!/bin/bash
 #
-# -%L URL-list loading (#49): a readable list is honored, and an unusable one
-# fails with its reason rather than a bare "Could not include URL list".
-# It runs offline and matches httrack's own strings, whatever the locale.
+# -%L must load a readable URL list and name why an unusable one fails (#49).
 
 set -euo pipefail
 

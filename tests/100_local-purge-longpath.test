@@ -1,11 +1,7 @@
 #!/bin/bash
 #
-# A 998-byte save path makes a 1000-byte old.lst line, which linput(fp, line,
-# 1000) splits into 999 bytes and a "]" tail. With no -O, the purge must not
-# index file[-1] on that tail (#770), hence not local-crawl.sh.
-#
-# Only the sanitized leg sees the stack-padding write. The length assertion
-# below checks the save path still lands on the chunk boundary.
+# A 998-byte save path splits its old.lst line, and the purge must not index
+# file[-1] on the "]" tail (#770). local-crawl.sh always passes -O.
 
 set -euo pipefail
 

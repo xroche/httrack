@@ -12,9 +12,7 @@ skip_crash_on_hurd
 # must behave correctly. 'run' selects the success path (vs the overflow modes).
 assert_selftest "strsafe: OK" strsafe run
 
-# An over-capacity write into a sized buffer must abort rather than truncate.
-# Match the htssafe abort message, because a missing strsafe test also exits
-# non-zero.
+# An over-capacity write must abort, which the htssafe message proves.
 # the bounded macro aborts (non-zero exit), so don't let set -e trip on it
 err=$(httrack -#test=strsafe overflow "this string is far too long for the buffer" 2>&1) || true
 case "$err" in
@@ -29,9 +27,7 @@ case "$err" in
     ;;
 esac
 
-# Same for the htsbuff builder, with a source exactly the buffer's capacity
-# (6 bytes) so a '<=' off-by-one prints "NOT aborted". Match the htsbuff
-# abort message.
+# Same for htsbuff, with a source exactly the 6-byte capacity to catch a '<='.
 err=$(httrack -#test=strsafe overflow-buff "abcdef" 2>&1) || true
 case "$err" in
 *"strsafe: NOT aborted"*)

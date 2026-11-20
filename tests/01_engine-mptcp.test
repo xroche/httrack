@@ -6,7 +6,6 @@ set -euo pipefail
 . "${0%"${0##*/}"}./testlib.sh"
 
 require_httrack
-# Gated on the feature alone, since macOS connects a multipath socket but cannot
-# see a fallback. Only this test reaches connectx(). 'run' is ignored.
+# Gate on the feature alone, because macOS cannot see a multipath fallback.
 have_feature mptcp || skip "no Multipath TCP on this system"
 assert_selftest "mptcp: OK" mptcp run

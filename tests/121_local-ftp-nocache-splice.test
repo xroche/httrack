@@ -1,8 +1,6 @@
 #!/bin/bash
 #
-# With no cache entry, an FTP resume needs SIZE and MDTM to agree that the
-# remote still extends the local copy, or a changed remote splices its tail onto
-# the old head (#823). Pass 2 proves a partial still resumes.
+# Without a cache, FTP must resume only when SIZE and MDTM agree (#823).
 
 set -euo pipefail
 
@@ -30,8 +28,7 @@ no_errors() {
 # Commands the server saw since the last pass; each pass starts by emptying it.
 sent() { cat "$cmds"; }
 
-# Generations differ in their first bytes, so a splice shows wherever it lands.
-# The mtime is explicit because the fix decides on it.
+# Each generation has distinct first bytes and an explicit mtime the fix reads.
 write_body() {
     "$python" -c 'import os, sys
 path, tag, fill, stamp = sys.argv[1:5]
@@ -61,7 +58,6 @@ host="127.0.0.1_${FTP_PORT}"
 url="ftp://127.0.0.1:${FTP_PORT}/a.bin"
 mirror="${out}/${host}/a.bin"
 # --cache=0 leaves no cache entry to tell a partial from a stale copy.
-# Bounded like every crawl pass, so a wedge fails instead of hanging.
 crawl() { run_with_timeout 300 httrack "$url" -O "$out" --quiet \
     --disable-security-limits --robots=0 --timeout=20 --max-time=120 --retries=1 \
     --cache=0; }
@@ -136,8 +132,7 @@ no_errors "pass 5"
 ok "the unprovable resume was re-fetched whole"
 
 # --- pass 6: a copy this engine never stamped, so dated by the local clock ---
-# Every mirror made before the fix looks like this. The date must match rather
-# than lead, because "not newer than the remote" waves it through.
+# Every pre-fix mirror looks like this, with a date equal to the remote's.
 : >"$mode"
 plant_stale 4000 "$future_stamp"
 : >"$cmds"

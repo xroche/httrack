@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# A -%F footer whose expansion exactly fills the on-page buffer must not abort
-# the crawl when its closing newline is appended. #670 covers the overflow.
+# A -%F footer that exactly fills the on-page buffer must not abort the crawl.
 
 set -eu
 # shellcheck source=tests/testlib.sh
@@ -60,8 +59,7 @@ path_expansion() { # the length {path} expands to
 # exactly pathlen, rather than inherit whatever length mktemp handed out.
 make_page 8
 fixed=$(($(path_expansion) - 8))
-# Fail rather than skip. The Windows leg compares the skip set exactly, and a
-# skip would drop the coverage on every other leg.
+# Fail rather than skip, because the Windows leg pins its skip set exactly.
 test "$fixed" -lt "$pathlen" ||
     fail "temp path is ${fixed} chars, leaving no room for a ${pathlen}-char one"
 make_page $((pathlen - fixed))
@@ -96,7 +94,6 @@ sweep() { # sweep LABEL: walk the expansion across the point where footers drop
 }
 
 sweep LF
-# CRLF costs two bytes at each end, which lowers the boundary. A fix that
-# reserves one byte instead of strlen(eol) still aborts here.
+# With CRLF, a fix that reserves one byte instead of strlen(eol) still aborts.
 write_page $'<html>\r\n<body>hi</body></html>'
 sweep CRLF

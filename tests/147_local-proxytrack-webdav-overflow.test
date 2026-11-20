@@ -1,8 +1,6 @@
 #!/bin/bash
 #
-# escapexml() expands '&' fivefold, and a PROPFIND path of escaped ampersands
-# must not overflow the DAV item reserve (#836). The Depth: 1 listing at the end
-# covers the enumeration branch's item URLs.
+# Escaped '&' grow fivefold and must not overflow the DAV item reserve (#836).
 
 set -euo pipefail
 
@@ -44,8 +42,7 @@ propfind() {
         "http://127.0.0.1:$proxyport/webdav/x/$1"
 }
 
-# 900 '&' become 4500 bytes, written twice, past the old 1024-byte reserve while
-# under the 1024-byte request-line cap.
+# 900 '&' fit the 1024-byte request line but escape to 4500 bytes.
 amps=$("$python" -c "print('&' * 900)" | tr -d '\r')
 resp=$(propfind "$amps") ||
     fail_dump "proxytrack died on an escapexml-amplified PROPFIND" "$ptlog"

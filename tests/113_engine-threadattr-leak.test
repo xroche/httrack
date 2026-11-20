@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# hts_newthread() must destroy the pthread attributes even when
-# pthread_create() fails (#772). glibc allocates nothing for a default attr, so
-# the interposer counts the init/destroy imbalance instead of a leak checker.
+# hts_newthread() must destroy its pthread attr when pthread_create() fails.
+# glibc allocates nothing for one, so the interposer counts init/destroy (#772).
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh

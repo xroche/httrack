@@ -27,9 +27,8 @@ bash "$top_srcdir/tests/local-crawl.sh" --warc-validate \
     --file-not-matches 'errmask/keep.dat' 'error 403' \
     httrack 'BASEURL/mini304/index.html' 'BASEURL/errmask/index.html' --warc-file warc-out
 
-# Scenario 2: an all-forced pass under pass 1's archive name must not replace
-# that archive with an almost empty one (#777). No --wacz, which needs OpenSSL
-# and would skip this on a build without it.
+# Scenario 2: an all-forced pass must not replace pass 1's archive (#777).
+# It omits --wacz, because that needs OpenSSL.
 bash "$top_srcdir/tests/local-crawl.sh" --archive-kept-on-rerun \
     --archive-min-files 2 --rerun \
     --found 'errmask/keep.dat' \

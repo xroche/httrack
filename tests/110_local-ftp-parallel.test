@@ -1,8 +1,6 @@
 #!/bin/bash
 #
-# A completed FTP transfer whose ready slot is swapped to the spool must keep
-# its bytes (#797). The FTP worker writes url_sav itself and leaves no body in
-# memory, and a slot size lost in the swap made the link writer empty the file.
+# A finished FTP transfer swapped to the spool must keep its bytes (#797).
 
 set -euo pipefail
 
@@ -36,9 +34,7 @@ for name in $names; do
     urls+=("ftp://127.0.0.1:${FTP_PORT}/${name}.bin")
 done
 
-# -c8 because a slot is only swapped out while other transfers keep the parser
-# busy. -Z because the swap only logs at debug level, and the run proves nothing
-# without it. Bounded so a wedge fails the test instead of hanging the job.
+# -c8 keeps the parser busy enough to swap, and -Z logs the swap.
 # $1 names the run and $2 is HTTRACK_DEBUG_SPOOL_MEM: 0 forces the disk spool,
 # '' keeps the default memory budget. $3 is the debug line proving the swap.
 crawl() {

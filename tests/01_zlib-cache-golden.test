@@ -1,10 +1,6 @@
 #!/bin/bash
 #
-# Golden cache-format test (driven by 'httrack -#test=cache-golden <dir>').
-# 01_zlib-cache.test reads back what the same build wrote, so it misses a
-# read-path or ZIP-format change where writer and reader drift together. This
-# reads a committed cache from an earlier build and checks fixed entries decode
-# byte-exact.
+# A cache committed by an earlier build must still decode byte-exact.
 #
 # After a deliberate format change, run 'httrack -#test=cache-golden <dir> regen'
 # and copy <dir>/hts-cache/new.zip over the committed file.
@@ -21,9 +17,7 @@ assert_file "$fixture/hts-cache/new.zip" "the committed cache fixture is missing
 dir=$(mktemp -d)
 cleanup_push rm -rf "$dir"
 
-# Read a private copy so the source tree is never touched. mkdir keeps it
-# writable for the cleanup trap, because "cp -r" of distcheck's read-only srcdir
-# would copy its mode and defeat the rm -rf.
+# mkdir first, because cp -r would copy distcheck's read-only mode.
 mkdir -p "$dir/hts-cache"
 cp "$fixture/hts-cache/new.zip" "$dir/hts-cache/new.zip"
 

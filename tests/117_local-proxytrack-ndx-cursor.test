@@ -1,6 +1,5 @@
 #!/bin/bash
-# binput() must not step its caller's cursor past the buffer's terminating NUL
-# (#793). The sanitizer build turns that read into a heap-buffer-overflow.
+# binput() must not step its caller's cursor past the terminating NUL (#793).
 
 set -euo pipefail
 
@@ -43,9 +42,7 @@ test "$got" = 2 || fail "control: distinct URLs gave $got keys, expected 2"
 got=$(items "$dir/first-1024.ndx")
 test "$got" = 2 || fail "URLs differing on the 1024 bound gave $got keys, expected 2"
 
-# The header field goes through the same helper, bounded at 256. One byte past
-# the bound must start the entry walk where a fitting header does, rather than a
-# line early, where it reads a fourth entry (#1294).
+# A header one byte over 256 must not shift the entry walk a line (#1294).
 for at in 1 256 257 258; do
     {
         repeat_chars "$at" C

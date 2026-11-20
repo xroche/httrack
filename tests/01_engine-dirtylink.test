@@ -1,8 +1,6 @@
 #!/bin/bash
 #
-# Pins hts_dirty_link_is_url, which decides whether a quoted string inside a
-# script or a tag is a link. The engine checks every string of up to four bytes
-# over the predicate's alphabet against a model of its rules (#1612).
+# The engine checks hts_dirty_link_is_url on all strings up to 4 bytes (#1612).
 
 set -euo pipefail
 

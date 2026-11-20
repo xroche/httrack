@@ -1,9 +1,7 @@
 #!/bin/bash
 #
 # A .bak left by a killed run must not disable the #77 re-fetch backup (#758).
-# A leftover file (slow.bin.bak) is clobbered so -M can restore pass 1, and one
-# the engine cannot clobber (fast.bin.bak, a directory) is reported. Only the
-# Windows leg arms the first half, because POSIX rename() clobbers.
+# Only the Windows leg arms slow.bin.bak, because POSIX rename() clobbers.
 
 set -euo pipefail
 
