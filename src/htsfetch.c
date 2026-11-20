@@ -394,7 +394,8 @@ static const char *psl_site_key(const fetch_origin *o, size_t n, size_t *len) {
   return o->host + (reg - host);
 }
 
-/* Return the registrable domain, else the last two labels or an IP literal. */
+/* Return the registrable domain, else the last two labels, or the whole host
+   for an IP literal. */
 static const char *site_key(const fetch_origin *o, size_t *len) {
   size_t n = o->host_len, i, dots = 0;
 

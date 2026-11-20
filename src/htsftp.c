@@ -291,8 +291,8 @@ static FTPDownloadStruct *ftp_handoff_register(struct_back *sback) {
   return worker;
 }
 
-/* Drive back_wait() until the worker has left the list, and once more. Only
-   back_wait() may synchronize with the worker. */
+/* Drive back_wait() until the worker has left the list, and once more:
+   ftp_workers_live()'s lock carries nothing from the publish. */
 static void ftp_handoff_drive(struct_back *sback, httrackp *opt,
                               cache_back *cache) {
   int spins;
