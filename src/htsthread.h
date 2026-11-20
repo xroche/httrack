@@ -128,8 +128,8 @@ static HTS_INLINE HTS_UNUSED void hts_store_relaxed_llint(volatile LLint *dst,
    release compare-and-swap. arm64 reorders such loads. */
 static HTS_INLINE HTS_UNUSED htsmutex hts_load_acquire_mutex(htsmutex *src) {
 #ifdef _MSC_VER
-  /* Every lock runs this, so read without a fence. The dependent read of the
-     lock body keeps x86 ordered, but ARM needs the fence. */
+  /* Every lock runs this, so use a plain volatile read, with a fence only on
+     ARM. On x86 the dependent read of the lock body keeps the order. */
   htsmutex const value = *(htsmutex volatile *) src;
 
 #if defined(_M_ARM) || defined(_M_ARM64)

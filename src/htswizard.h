@@ -84,7 +84,9 @@ int hts_wizard_parse_reply(const char *s);
 /* Records the filters answer `n` leaves behind for the link (adr,fil), on top
    of the wizard's block at the low indices of opt->filters. The last match
    wins, so the command-line filters above it outrank every answer. Returns
-   the count inserted, which drops a rule too long for the matcher. */
+   the count inserted, which sit at the tail of the block ending at
+   opt->wizard_filters. A rule too long for the matcher is dropped and not
+   counted. */
 int hts_wizard_insert_filters(httrackp *opt, int n, const char *adr,
                               const char *fil, hts_boolean seeker_up);
 
@@ -94,7 +96,8 @@ hts_tristate hts_wizard_scope_answer(int n);
 
 /* Applies the verdict half of answer `n` for the link (adr,fil): refuses it,
    stops the questions, or bans recursion from it. It never overturns a
-   computed verdict. A new answer also needs hts_wizard_answer_filter(). */
+   computed verdict. An undecided (-1) verdict becomes refused or allowed. A
+   new answer also needs hts_wizard_answer_filter(). */
 void hts_wizard_apply_verdict(httrackp *opt, int n, const char *adr,
                               const char *fil, int *forbidden_url,
                               int *set_prio_to);
