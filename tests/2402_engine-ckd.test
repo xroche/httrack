@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Boundary checks for htsckd.h.
+# Runs the checked size_t arithmetic self-test.
 
 set -euo pipefail
 

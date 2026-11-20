@@ -72,7 +72,6 @@ Please visit our Website: http://www.httrack.com
 #include "htsarrays.h"
 #include "htsarena.h"
 #include "htscmdline.h"
-#include "htsckd.h"
 
 /* END specific definitions */
 
@@ -805,17 +804,17 @@ static hts_boolean bundle_start(httrackp *opt, char **primary,
   for (i = 0; (extra = hts_bundle_url(opt, i)) != NULL; i++)
     room += strlen(extra) + sizeof("http://\n");
   if (room != 0) {
-    size_t cap;
-    char *const grown = hts_ckd_add(&cap, primarybuff->cap, room)
-                            ? NULL
-                            : (char *) realloct(*primary, cap);
+    char *const grown =
+        room < (size_t) -1 - primarybuff->cap
+            ? (char *) realloct(*primary, primarybuff->cap + room)
+            : NULL;
 
     if (grown == NULL) {
       printf("PANIC! : Not enough memory [%d]\n", __LINE__);
       return HTS_FALSE;
     }
     *primary = primarybuff->buf = grown;
-    primarybuff->cap = cap;
+    primarybuff->cap += room;
   }
   for (i = 0; (extra = hts_bundle_url(opt, i)) != NULL; i++) {
     seed_append(primarybuff, extra);
@@ -2782,20 +2781,16 @@ int filters_init(char ***ptrfilters, int maxfilter, int filterinc) {
       return 0;
     }
   } else {
-    size_t alloc;
     char **const grown =
-        hts_ckd_mul(&alloc, (size_t) filter_max + 2, sizeof(char *))
-            ? NULL
-            : (char **) realloct(filters, alloc);
+        (char **) realloct(filters, sizeof(char *) * (filter_max + 2));
     char *slots;
 
     if (grown == NULL)
       return 0;
     filters = grown;
     *ptrfilters = filters;
-    slots = hts_ckd_mul(&alloc, (size_t) filter_max + 2, HTS_FILTER_SLOT_SIZE)
-                ? NULL
-                : (char *) realloct(filters[0], alloc);
+    slots = (char *) realloct(filters[0],
+                              (size_t) (filter_max + 2) * HTS_FILTER_SLOT_SIZE);
     // The old slots and their pointers stay valid, so the list is unchanged.
     if (slots == NULL)
       return 0;

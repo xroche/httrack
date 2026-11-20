@@ -35,8 +35,7 @@ Please visit our Website: http://www.httrack.com
 #include <stdint.h>
 
 /** @file htsckd.h
- *  C23 ckd_add() and ckd_mul() for size_t. They store the wrapped result in *r
- *  and return HTS_TRUE on overflow. They are engine-internal and never
+ *  C23 ckd_add() and ckd_mul() for size_t, engine-internal and never
  *  installed. **/
 
 #if defined(__has_builtin)
@@ -48,7 +47,7 @@ Please visit our Website: http://www.httrack.com
 #define HTS_CKD_BUILTIN
 #endif
 
-/** Portable a + b. The self-test uses it as reference. **/
+/* Portable fallbacks, also the self-test's reference. */
 static HTS_UNUSED HTS_CHECK_RESULT hts_boolean hts_ckd_add_portable(size_t *r,
                                                                     size_t a,
                                                                     size_t b) {
@@ -56,7 +55,6 @@ static HTS_UNUSED HTS_CHECK_RESULT hts_boolean hts_ckd_add_portable(size_t *r,
   return b > SIZE_MAX - a ? HTS_TRUE : HTS_FALSE;
 }
 
-/** Portable a * b. The self-test uses it as reference. **/
 static HTS_UNUSED HTS_CHECK_RESULT hts_boolean hts_ckd_mul_portable(size_t *r,
                                                                     size_t a,
                                                                     size_t b) {
@@ -64,6 +62,7 @@ static HTS_UNUSED HTS_CHECK_RESULT hts_boolean hts_ckd_mul_portable(size_t *r,
   return a != 0 && b > SIZE_MAX / a ? HTS_TRUE : HTS_FALSE;
 }
 
+/** Sets *r = a + b, wrapped, and returns HTS_TRUE if it overflowed. **/
 static HTS_UNUSED HTS_CHECK_RESULT hts_boolean hts_ckd_add(size_t *r, size_t a,
                                                            size_t b) {
 #if defined(HTS_CKD_BUILTIN)
@@ -73,6 +72,7 @@ static HTS_UNUSED HTS_CHECK_RESULT hts_boolean hts_ckd_add(size_t *r, size_t a,
 #endif
 }
 
+/** Sets *r = a * b, wrapped, and returns HTS_TRUE if it overflowed. **/
 static HTS_UNUSED HTS_CHECK_RESULT hts_boolean hts_ckd_mul(size_t *r, size_t a,
                                                            size_t b) {
 #if defined(HTS_CKD_BUILTIN)
