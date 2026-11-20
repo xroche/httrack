@@ -83,6 +83,7 @@ static int fuzz_addlink(htsmoduleStruct *str, char *link) {
 
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   static int inited = 0;
+  static char empty_template[] = "";
 
   const char *charset;
   unsigned mode, bits;
@@ -202,9 +203,9 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   stre.makeindex_fp_ = &makeindex_fp;
   stre.makeindex_links_ = &makeindex_links;
   stre.makeindex_firstlink_ = makeindex_firstlink;
-  stre.template_header_ = "";
-  stre.template_body_ = "";
-  stre.template_footer_ = "";
+  stre.template_header_ = empty_template;
+  stre.template_body_ = empty_template;
+  stre.template_footer_ = empty_template;
   stre.stat_fragment_ = &stat_fragment;
   stre.makestat_time = 0;
   stre.makestat_fp = NULL;
