@@ -903,21 +903,6 @@ int url_savename(lien_adrfilsave *const afs,
         fil_normalized_filtered_ex(fil_complete, normfil_, strip,
                                    !opt->no_slash_dedup, !opt->no_query_dedup);
   } else {
-    if (link_has_authority(adr_complete)) {     // https or other protocols : in "http/" subfolder
-      char *pos = strchr(adr_complete, ':');
-
-      /* normadr is only a hash key, and the hash skips a known scheme, so a
-         prefix that does not fit is dropped rather than clipped */
-      if (pos != NULL && (size_t) (pos - adr_complete) < sizeof(normadr_) - 3 &&
-          strlen(normadr) <
-              sizeof(normadr_) - 3 - (size_t) (pos - adr_complete)) {
-        normadr_[0] = '\0';
-        strncatbuff(normadr_, adr_complete, (int) (pos - adr_complete));
-        strcatbuff(normadr_, "://");
-        strcatbuff(normadr_, normadr);
-        normadr = normadr_;
-      }
-    }
     // strip still applies with urlhack off (host left untouched); no // or
     // query-sort here, to match the hash key (norm_slash/norm_query are 0 when
     // urlhack is off) so a URL is looked up under the key it was stored with
