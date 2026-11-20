@@ -70,7 +70,9 @@ Please visit our Website: http://www.httrack.com
   paramn : glues a preset or on/off onto -N, detaches a %-carrying template, refuses the rest, a cluster tail (1L0) included
 
   A glued value shares one HTS_CDLMAXSIZE buffer with its short form. Only
-  param1, and paramn where it detaches, give the value the whole buffer.
+  param1, and paramn where it detaches, give the value the whole buffer. A
+  front end bounding a glued value at HTS_CDLMAXSIZE accepts lengths this
+  refuses.
 
   A name may appear twice, and the FIRST row wins, also for reverse lookups.
 */
@@ -546,7 +548,9 @@ static const char *optalias_help_line(char *dest, size_t dest_size,
 }
 
 /* Tell the user why SPELLING did not get the parameter REAL needs. The run
-   dies here, before any log file exists. */
+   dies here, before any log file exists. No spelling is suggested:
+   --name=value passes an option name through, but a '--' value dies
+   unrecognized. */
 static void optparam_error(optparam_state state, const char *spelling,
                            const char *real, const char *next,
                            char *return_error, size_t return_error_size) {

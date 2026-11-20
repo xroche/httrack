@@ -59,7 +59,9 @@ typedef enum {
   HTS_CHANGE_BUCKETS
 } hts_change_bucket;
 
-/* Record what this crawl does to the local file `save`. `not_updated` (304)
+/* Record what this crawl does to the local file `save`. No-op unless
+   --changes is on. `rewritten` means the copy on disk is being written over.
+   `not_updated` (304)
    is used only when no digest can be taken. `save` is an absolute path, and
    adr/fil may be empty. Only the first call for a file samples the previous
    copy. */

@@ -848,8 +848,8 @@ static int back_nsoc_overall(const struct_back *sback) {
   return n;
 }
 
-/* Build save's temporary outside the mirror, so a site's own <path>.bak is
-   never taken as the backup (#774). HTS_FALSE (dest emptied) if too long.
+/* Build save's temporary in HTS_TMPDIR beside save, outside the site's name
+   space, so a site's own <path>.bak is never taken as the backup (#774). HTS_FALSE (dest emptied) if too long.
    Note: utf-8. */
 static hts_boolean back_tmpname(char *dest, size_t size, const char *save,
                                 const char *ext) {
@@ -1907,7 +1907,8 @@ static hts_boolean ref_get_u64(FILE *fp, uint64_t *v) {
   return HTS_TRUE;
 }
 
-/* A cast back is implementation-defined above the signed maximum. */
+/* ref_get_int decodes two's complement by hand, because a cast back is
+   implementation-defined above the signed maximum. */
 static hts_boolean ref_put_int(FILE *fp, int v) {
   return ref_put_u32(fp, (uint32_t) v);
 }
@@ -3436,7 +3437,8 @@ static void back_abort_slot(httrackp *opt, struct_back *sback, const int p,
 }
 
 /* Drop what a user stop must not leave running, and return the count. A cap
-   lets transfers finish (#77, #481), but not a connect (#1073). */
+   grants running transfers a grace that only back_abort_limit() ends (#77,
+   #481). A slot still connecting is aborted at once (#1073). */
 static int back_abort_stopped(httrackp *opt, struct_back *sback) {
   const hts_boolean grace = back_mirror_capped(opt);
   int aborted = 0;
@@ -4277,7 +4279,10 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                       else if (chunk_size == 0)
                         back[i].chunk_blocksize = -1;   /* ending */
                       back[i].r.totalsize += chunk_size;        // noter taille
-                      /* The header -m check saw no length (#1708). */
+                      /* Re-check -m per chunk, because the header carried
+                         no length (#1708). istoobig() alone, because
+                         back_checksize()'s wizard pass costs a filter match
+                         per chunk. */
                       if (istoobig(
                               opt, back[i].r.totalsize, back[i].maxfile_html,
                               back[i].maxfile_nonhtml, back[i].r.contenttype)) {
@@ -5328,8 +5333,8 @@ void back_info(struct_back * sback, int i, int j, FILE * fp) {
 
   assertf(i >= 0 && i < back_max);
   if (back_status(&back[i]) >= 0) {
-    // url_adr and url_fil are each HTS_URLMAXSIZE*2, plus framing, or
-    // back_infostr's bounded appends abort on a long URL.
+    // Size s for url_adr and url_fil (HTS_URLMAXSIZE*2 each) plus framing,
+    // or back_infostr's bounded appends abort on a long URL.
     char BIGSTK s[HTS_URLMAXSIZE * 4 + 1024];
 
     s[0] = '\0';

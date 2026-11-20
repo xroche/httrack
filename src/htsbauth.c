@@ -365,7 +365,8 @@ static int cookie_rec_cmp(const void *x, const void *y) {
 
 /* Evict the oldest records of the largest host over its share until `need`
    bytes fit. The jar keeps no age, so the oldest is the shortest path's first
-   record. The jar is untouched unless the record then fits. */
+   record. The setter's host counts the new record, and the replaced record
+   stays. The jar is untouched unless the record then fits. */
 static hts_boolean cookie_make_room(char *data, size_t max_len,
                                     const char *domain, const char *cook_name,
                                     const char *path, size_t need) {
