@@ -1,7 +1,6 @@
 #!/bin/bash
-# Issue #1286: the rule store stopped at 4 KB, so a robots.txt longer than that
-# lost its tail, and one landing on 4094 bytes lost every rule it had. Nothing
-# said so, and the "will be forbidden" note listed the rules anyway.
+# Issue #1286: a robots.txt over 4 KB must keep its rules, including one of
+# 4094 bytes, and a tail dropped past the RFC 9309 floor must be logged.
 set -eu
 
 # shellcheck source=tests/crawllib.sh
@@ -39,8 +38,8 @@ bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$doc")" \
     --log-not-found "$warn" \
     httrack 'BASEURL/index.html' -r3 -s2 -F 'robotsblob4094-agent'
 
-# Past the RFC 9309 floor the tail really is dropped, and that is exactly what
-# has to reach the log, naming the first rule left out.
+# Past the RFC 9309 floor the tail is dropped, and the log must name the first
+# rule left out.
 bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$doc")" \
     --errors 0 --found 'ok/page.html' --found 'secret/page.html' \
     --not-found 'pad00000/page.html' \

@@ -56,9 +56,8 @@ crawl "$tmp/m1000" -W
 grep -q "$tag '1000' (n=1000) for $link: allowed, filters: [+][*].other.invalid/[*] [+]other.invalid/[*]\$" "$log" ||
     fail "a two-filter answer is not logged whole in $log"
 
-# nobody was asked: the automatic resolution stays at the debug level. This run
-# is silent because no question is put, not because the callback is missing;
-# the CLI always registers query3, so no test here reaches that guard.
+# nobody was asked: the automatic resolution stays at the debug level. The CLI
+# always registers query3, so this run is silent because no question is put.
 answers 0
 crawl "$tmp/mauto"
 ! grep -q "$tag" "$log" ||

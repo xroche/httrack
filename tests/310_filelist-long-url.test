@@ -58,8 +58,8 @@ lognot() {
     fi
 }
 
-# Blank line 4 keeps "physical line" and "binput call" from agreeing by
-# accident, so a line number counted the wrong way shows up on line 6.
+# Blank line 4 makes physical lines and binput calls disagree, so a line
+# number counted the wrong way shows up on line 6.
 {
     echo "${base}one.html"
     padded_url 1500 ENDMRK
@@ -71,7 +71,7 @@ lognot() {
 } >"$tmp/urls.txt"
 
 run "$tmp/urls.txt"
-# Named, so a fix that drops the line silently does not pass...
+# Named, so a fix that drops it unlogged does not pass...
 loghas "\"[^\"]*urls\.txt\", line 2: URL longer than $limit bytes, ignored"
 loghas "\"[^\"]*urls\.txt\", line 6: URL longer than $limit bytes, ignored"
 # ...and refused, so neither does one that warns and splits anyway. 4 is every
@@ -83,8 +83,8 @@ lognot 'ENDMRK|endmrk|OVERMRK|overmrk'
 test -n "$(find "$mirror" -type f -path '*/file/*' -name three.html -print -quit)" ||
     fail "the near-limit URL was not fetched"
 
-# A Windows-authored list: binput drops the CR, so the byte it stopped on is
-# not the '\n'. A line of exactly $limit bytes still has to load.
+# In a Windows-authored list binput stops on a CR and drops it. A line of
+# exactly $limit bytes must still load.
 {
     padded_url "$limit" CRLFMRK
     echo "${base}two.html"

@@ -1,8 +1,8 @@
 #!/bin/bash
 #
-# _FORTIFY_SOURCE expands to nothing without -O, and glibc stopped warning about
-# it: configure said "yes" while the shipped binaries carried no checked call at
-# all. Assert the mitigation in the products, not in a configure answer.
+# _FORTIFY_SOURCE does nothing without -O, and glibc no longer warns about it.
+# Check the built products for checked calls, because configure can say "yes"
+# when there are none.
 
 set -euo pipefail
 
@@ -40,8 +40,7 @@ n_chk() { # n_chk FILE
         awk '{ s = $NF; sub(/@.*/, "", s); if (s ~ /_chk$/) n++ } END { print n + 0 }' || true
 }
 
-# A known destination size is what fortification needs to lower strcpy to
-# __strcpy_chk.
+# The destination size is known, so a fortified build calls __strcpy_chk.
 cat >"$tmp/probe.c" <<'EOF'
 #include <string.h>
 char dst[16];
@@ -57,8 +56,8 @@ compile() { # compile OUT FLAGS...
     }
 }
 
-# Without both controls every verdict below is vacuous: the build's own flags
-# must produce a checked call, and the same flags minus the define must not.
+# Controls: the build's flags must produce a checked call, and the same flags
+# without the define must not.
 compile "$tmp/dirty.o" ${cppflags_argv[@]+"${cppflags_argv[@]}"}
 # =0, not -U: Apple's headers re-default the level when it is merely undefined.
 compile "$tmp/clean.o" -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0

@@ -38,11 +38,9 @@ kept 2047 2047
 refused 2048
 refused 3000
 
-# A wider gate only helps if the reader stops handing it cut values. Each case
-# reads four lines from a header block and compares every one: a cut line must
-# be reported, and the line after it must be the server's next header rather
-# than the tail of the one before. "over" says the cursor walked past the
-# block's end, which must never happen.
+# Each case reads four lines from a header block. A cut line must be reported,
+# and the next line must be the next header, not the cut line's tail. "over"
+# means the cursor walked past the block's end, which must never happen.
 line() { # line READSIZE BLOCK WANT
     if [ -n "$2" ]; then
         selftest_queue_lines "$3" headerline "$1" "$2"

@@ -1,15 +1,12 @@
 #!/bin/bash
 #
-# An external script is link-scanned whatever spelling of the JavaScript type
-# the server sends: text/javascript (with or without a charset parameter),
-# application/javascript, the legacy application/x-javascript, and a .mjs
-# module. Only the legacy spelling was recognised before, so the targets of
-# every other script went unmirrored (#302).
+# An external script is link-scanned under any JavaScript type the server
+# sends: text/javascript (with or without charset), application/javascript,
+# application/x-javascript, and a .mjs module (#302).
 #
-# The link-free quiet/q.js guards the other direction: widening the set widens
-# what gets scanned, and a scanned script must come out byte-identical to
-# quiet/q.bin, the same bytes served under a type nothing scans. json/d.json
-# holds a link-shaped string under a non-script type and must stay unscanned.
+# The link-free quiet/q.js must come out byte-identical to quiet/q.bin, the same
+# bytes under a type nothing scans. json/d.json holds a link-shaped string under
+# a non-script type and must stay unscanned.
 
 set -euo pipefail
 

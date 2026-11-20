@@ -69,7 +69,7 @@ bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$doc")" \
     httrack 'BASEURL/index.html' -r3 -s2 -F 'tailrobots-agent'
 
 # Control: that same Allow on a line of its own is honoured, so the refusal
-# above is the tail going unread and not a rule the engine ignores anyway.
+# above shows the tail went unread.
 bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$doc")" \
     --errors 0 --found 'ok/page.html' --not-found 'hidden/page.html' \
     --found 'secret/page.html' \

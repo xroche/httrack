@@ -1,7 +1,7 @@
 #!/bin/bash
-# X-Size rides the cache as a signed 64-bit value, and the proxy hands it to
-# malloc(): a negative one becomes SIZE_MAX and the body inflates into the
-# 1-byte allocation that follows. Cases mirror htscache_selftest.c's.
+# X-Size is a signed 64-bit cache value that the proxy passes to malloc(). A
+# negative one becomes SIZE_MAX, and the body then overflows a 1-byte buffer.
+# Cases mirror htscache_selftest.c's.
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh

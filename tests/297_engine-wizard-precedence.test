@@ -10,7 +10,7 @@ set -euo pipefail
 # answering "ignore this link" and then "mirror the whole host" takes it back
 list=$(httrack -O /dev/null -#test=wizardinsert h /dir/one.html 0 6)
 test "$list" = "-h/dir/one.html +h/*" || fail "answer order: got [$list]"
-# shellcheck disable=SC2086 # the array is one filter per word, by construction
+# shellcheck disable=SC2086 # the array holds one filter per word
 selftest_queue "verdict=allowed rule=1" filterdual http://h/dir/one.html h/dir/one.html $list
 
 # the reverse order still refuses, so the block is ordered rather than sorted

@@ -13,8 +13,8 @@ htsserver_require
 work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_bind.XXXXXX") || fail "no tmpdir"
 cleanup_push htsserver_cleanup_dir "${work}"
 
-# "ok", or the errno name: a filtered address times out where an unbound one is
-# refused, and only the refusal proves nothing is listening.
+# Prints "ok" or the errno name. Only a refusal proves nothing is listening,
+# because a filtered address times out.
 probe() { # $1 = host, $2 = port
     htsserver_python - "$1" "$2" <<'PY'
 import socket, sys
@@ -27,9 +27,9 @@ except OSError as e:
 PY
 }
 
-# The primary outbound IPv4, which a UDP connect() picks without sending a byte,
-# or the classification of $1 when given one, so the guard below is checkable.
-# A function, not a heredoc inside $(): bash 3.2 runs that one as commands.
+# Prints the primary outbound IPv4, picked by a UDP connect() that sends
+# nothing, or classifies $1 when given, so the guard below can be tested.
+# bash 3.2 runs a heredoc inside $() as commands, hence a function.
 primary_ipv4() { # [address]
     htsserver_python - ${1+"$1"} <<'PY'
 import ipaddress, socket, sys
@@ -55,8 +55,7 @@ print("" if ip is None or ip.is_loopback or ip.is_unspecified else ip)
 PY
 }
 
-# Taking the wildcard for an address was #1463; taking nothing would drop the
-# widening half in silence.
+# None of these may pass for an address (#1463).
 for unusable in 0.0.0.0 127.0.0.1 127.9.9.9 ''; do
     test -z "$(primary_ipv4 "${unusable}")" || fail "primary_ipv4 accepts ${unusable}"
 done

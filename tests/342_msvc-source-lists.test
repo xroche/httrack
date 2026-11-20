@@ -1,8 +1,7 @@
 #!/bin/bash
 #
 # The Visual Studio projects carry their own hand-written source lists, so a new
-# .c added to Makefile.am alone links fine everywhere except MSVC (#1376 lost two
-# Windows legs to exactly that).
+# .c added to Makefile.am alone breaks only the MSVC link (#1376).
 
 set -euo pipefail
 
@@ -45,7 +44,7 @@ check() {
     [ -z "$extra" ] || fail "$proj builds sources $var does not: $extra"
 }
 
-# A typo in a variable name would make every check vacuously pass.
+# A typo in a variable name would make every check pass.
 [ -n "$(am_sources libhttrack_la_SOURCES)" ] || fail "parsed no sources from $am"
 
 check libhttrack_la_SOURCES libhttrack.vcxproj

@@ -1,8 +1,8 @@
 #!/bin/bash
 #
-# The six headers #1337 left out: the box wins for Proxy-Authorization, Referer
-# and Cookie, and the engine for xsend's own lines. A framing field such as
-# Content-length or Connection never goes out from the box (#1340).
+# Of the six headers #1337 left out, the box wins for Proxy-Authorization,
+# Referer and Cookie, and the engine for xsend's lines. The box never sends a
+# framing field such as Content-length or Connection (#1340).
 
 set -euo pipefail
 
@@ -14,12 +14,12 @@ LF=$'\n'
 CRLF=$'\r\n'
 TAB=$'\t'
 
-# -v, or od folds a run of identical lines into a "*" and the bytes are lost
+# without -v, od folds a run of identical lines into a "*"
 tohex() { printf '%s' "$1" | od -An -v -t x1 | tr -d '[:space:]'; }
 
-# What the box appends to a request already carrying REQ, with CR and LF escaped
-# in the answer. Both arguments travel as hex: Windows reads the batch script in
-# text mode, which would turn every CRLF in them into a bare LF.
+# WANT is what the box appends to a request carrying REQ, CR and LF escaped.
+# Both arguments go as hex, because Windows reads the batch script in text mode
+# and would turn each CRLF into LF.
 hd() { # hd WANT REQ BLOCK
     selftest_queue "$1" headerdedup "hex:$(tohex "$2")" "hex:$(tohex "$3")"
 }
@@ -33,8 +33,8 @@ hd '' "$req" "Connection: keep-alive$CRLF"
 hd 'X-A: 1\r\n' "$req" "Connection: keep-alive${CRLF}X-A: 1$CRLF"
 # field names are case-insensitive, and the engine spells this one "length"
 hd '' "GET /p HTTP/1.1${CRLF}Content-length: 0$CRLF" "Content-Length: 99$CRLF"
-# a dropped line takes its folded continuations with it: kept, they would
-# attach to whichever header precedes them in the request
+# a dropped line takes its folded continuations with it, or they would attach
+# to the header before them
 hd 'X-B: 2\r\n' "$req" "Connection: keep-alive$CRLF X-Injected: yes${CRLF}X-B: 2$CRLF"
 hd 'X-B: 2\r\n' "$req" "Connection: x$CRLF${TAB}folded${CRLF}X-B: 2$CRLF"
 hd '' "$req" "Connection: x${CRLF} one${CRLF}${TAB}two$CRLF"
@@ -78,8 +78,7 @@ hd 'X-A: 1' "$req" 'X-A: 1'
 hd '' "$req" 'Connection: x'
 hd 'X-A: 1\n' "$req" "Connection: x${LF}X-A: 1$LF"
 hd 'X-A: 1\r' "$req" "Connection: x${CR}X-A: 1$CR"
-# the resume and conditional lines ride in the opaque xsend blob, which the walk
-# reads back off the request rather than unpacking
+# the walk reads the resume and conditional lines of xsend off the request
 hd '' "GET /x HTTP/1.1${CRLF}Range: bytes=100-$CRLF" "Range: bytes=0-1$CRLF"
 hd 'Range: bytes=0-1\r\n' "$req" "Range: bytes=0-1$CRLF"
 hd '' "GET /x HTTP/1.1${CRLF}If-None-Match: \"e\"${CRLF}If-Modified-Since: Mon$CRLF" \
@@ -143,9 +142,8 @@ probe() { # probe TAG COUNT URL [extra httrack args...]
     done
     nreq=$((nreq + count))
     cp "$tmpdir/$tag.$count.req" "$tmpdir/$tag.req"
-    # the last header line's CRLF and the blank CRLF that closes the block; the
-    # fixture appends nothing to a per-request file. Hex with all whitespace
-    # dropped, since od's column padding differs between GNU and BSD.
+    # The request ends with two CRLFs, because the fixture appends nothing to a
+    # per-request file. Strip od's padding, which differs between GNU and BSD.
     assert_eq 0d0a0d0a \
         "$(tail -c 4 "$tmpdir/$tag.req" | od -An -t x1 | tr -d '[:space:]')" \
         "$tag: the CRLF CRLF ending the request"
@@ -167,9 +165,8 @@ assert_same() { # assert_same BASE TAG
         fail "$2: the request differs from $1's"
 }
 
-# The rest of the request is byte-identical to BASE's: RE names the only lines
-# allowed to differ. Compared as files, since a command substitution would eat a
-# lost trailing newline on both sides alike.
+# Apart from lines matching RE, the request is byte-identical to BASE's.
+# Compare files, because $(...) would hide a lost trailing newline.
 assert_same_but() { # assert_same_but BASE TAG RE
     local base=$tmpdir/$2.base got=$tmpdir/$2.got
     grep -Ev "$3" "$tmpdir/$1.req" >"$base" || true
@@ -198,8 +195,7 @@ assert_once boxreferer Referer
 assert_value boxreferer Referer http://box.example/
 assert_same_but plain boxreferer '^Referer:'
 
-# the other Referer site: a page reached by a link refers to the page that
-# linked to it
+# the other Referer site: a linked page refers to the page that links it
 probe hop 2 "http://127.0.0.1:$port/hop.html"
 assert_value hop Referer "http://127.0.0.1:$port/hop.html"
 probe boxhop 2 "http://127.0.0.1:$port/hop.html" -%X 'Referer: http://box.example/'
@@ -208,7 +204,7 @@ assert_value boxhop Referer http://box.example/
 assert_same_but hop boxhop '^Referer:'
 
 jar=$tmpdir/cookies.txt
-# bare host, the way a browser exports one: a cookie has no port
+# a browser exports a bare host, because a cookie has no port
 printf '127.0.0.1\tTRUE\t/\tFALSE\t1999999999\tsession\topensesame\n' >"$jar"
 probe cookie 1 "$base" --cookies-file "$jar"
 assert_value cookie Cookie session=opensesame
@@ -217,8 +213,8 @@ assert_once boxcookie Cookie
 assert_value boxcookie Cookie box=1
 assert_same_but cookie boxcookie '^Cookie:'
 
-# an older httrack, and a hand-edited jar, wrote the port into the domain field;
-# the send side queries the bare host, so cookie_load has to normalise it off
+# a jar from an older httrack or a hand edit may hold host:port, and the send
+# side queries the bare host, so cookie_load must strip the port
 printf '127.0.0.1:%s\tTRUE\t/\tFALSE\t1999999999\tsess\tPERSIST\n' \
     "$port" >"$jar"
 probe portjar 1 "$base" --cookies-file "$jar"
@@ -244,7 +240,7 @@ assert_once boxconn Connection
 assert_value boxconn Connection close
 assert_same nokeep boxconn
 
-# the undocumented >post: tag, whose length must keep describing the body
+# with the undocumented >post: tag, the length must describe the body
 probe post 1 "$base?>post:" -%X 'Content-Length: 99'
 assert_eq POST "$(sed -n '1s/ .*//p' "$tmpdir/post.req")" 'post: the method'
 assert_eq 1 "$(count_lines '^[Cc]ontent-[Ll]ength:' "$tmpdir/post.req")" \
@@ -259,9 +255,8 @@ assert_same_but plain range '^Range:'
 
 # --- a dropped line takes its continuations with it --------------------------
 
-# The control for the drop probe below, and the probe for whether argv here
-# carries the leading space at all: a box line the shell unfolded on the way in
-# would leave that probe asserting the absence of a header nobody folded.
+# Control for the drop probe below. It also checks that argv keeps the leading
+# space, or that probe would test a header nobody folded.
 probe keptfold 1 "$base" -%X 'X-Fold: a' -%X ' zzfold'
 assert_eq 'Connection Host From User-Agent Accept Accept-Language Accept-Encoding X-Fold' \
     "$(fields_of "$tmpdir/keptfold.req")" 'keptfold: the field order'

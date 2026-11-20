@@ -49,15 +49,13 @@ for good in "127.0.0.1" "127.0.0.1:${HTS_PORT}" "localhost" "localhost:${HTS_POR
 done
 echo "ok: the panel answers at every authority it is reachable at"
 
-# The name this host answers to, which is what `htsserver --bind <lan ip>`
-# browsed at http://myhost.lan:8080/ presents. Dropped when another rule would
-# accept it anyway, since it would then prove nothing.
+# This host's name, which a browser presents for `htsserver --bind <lan ip>`
+# at http://myhost.lan:8080/. It is dropped when another rule accepts it too.
 selfname=$(htsserver_python -c 'import socket, sys
 sys.stdout.reconfigure(newline="\n")  # this name goes out in a Host header
 print(socket.gethostname())')
-# True for a name some other rule vouches for anyway: localhost, or anything
-# shaped like an address literal, which host_is_address() takes for whoever
-# opened the socket.
+# Succeeds for localhost or an address-shaped name, which other rules accept
+# (host_is_address()).
 covered_elsewhere() {
     case $(printf '%s' "$1" | tr '[:upper:]' '[:lower:]') in
     localhost | '') return 0 ;;
@@ -83,7 +81,7 @@ fi
 
 bad_hosts=("evil.example" "evil.example:${HTS_PORT}" "127.0.0.1.evil.example")
 if test -n "${selfname}"; then
-    # Near-misses on every side: the match is the whole name, never part of it.
+    # Near-misses on every side, because the match must cover the whole name.
     bad_hosts+=("${selfname}.evil.example" "evil.${selfname}" "${selfname}x")
     # Not every truncation is a near-miss: dropping the last character of
     # "12764103200x" leaves an address literal the server accepts by design.
@@ -96,8 +94,7 @@ for bad in "${bad_hosts[@]}"; do
     grep -q '^HTTP/1\.0 403 ' <<<"${resp}" ||
         fail "POST with Host '${bad}' was not a 403: '$(firstline "${resp}")'"
     grep -q '^Location:' <<<"${resp}" && fail "POST with Host '${bad}' still ran"
-    # GET too: a guard sitting on the POST path alone is the shape of the last
-    # bug found here.
+    # GET too, because a guard on the POST path alone was an earlier bug here.
     resp=$(htsserver_client --host "${bad}" --path /server/index.html)
     grep -q '^HTTP/1\.0 403 ' <<<"${resp}" ||
         fail "GET with Host '${bad}' was not a 403: '$(firstline "${resp}")'"
@@ -106,8 +103,8 @@ for bad in "${bad_hosts[@]}"; do
 done
 echo "ok: a foreign authority is refused, on every method"
 
-# Suppressing the reply is not refusing the write: the body lands in one global
-# key store that later requests render from. step3 interpolates ${projname}.
+# A refused reply must also refuse the write, because the body lands in a
+# global key store that later pages render. step3 interpolates ${projname}.
 store_page() {
     page=$(htsserver_get /server/step3.html) || fail "the key store probe failed"
     grep -q '^HTTP/1\.0 200 ' <<<"${page}" ||
@@ -172,7 +169,7 @@ try:
     addrs = {a[4][0] for a in socket.getaddrinfo("ip6-localhost", None)}
 except OSError:
     sys.exit(1)
-# Skip where it could be one of ours, which is the whole premise of the row.
+# The row needs ip6-localhost to be foreign, so skip when it may be ours.
 ours = {socket.getnameinfo(("::1", 0), 0)[0], socket.gethostname(), socket.getfqdn()}
 sys.exit(0 if addrs == {"::1"} and "ip6-localhost" not in ours else 1)
 RESOLVES

@@ -1,8 +1,7 @@
 #!/bin/bash
-# A Location past the header-line read buffer reaches the engine already cut,
-# so the redirect must be dropped rather than followed to a target the server
-# never named (#1291). Only the page that links the redirect is mirrored: a
-# second file means the cut target was fetched.
+# A Location past the header-line read buffer arrives cut, so the redirect
+# must be dropped (#1291). A second mirrored file means the cut target was
+# fetched.
 set -e
 
 : "${top_srcdir:=..}"
@@ -13,8 +12,8 @@ bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
     --log-found 'Over-long header dropped for .*/longloc/go\.php' \
     httrack 'BASEURL/longloc/index.html'
 
-# Control: the same shape with a Location the reader takes whole is followed
-# to its target, so the refusal above is the header length and not the fixture.
+# Control: a Location short enough to read whole is followed, so the refusal
+# above comes from the header length.
 bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
     --files 2 \
     --found 'shortloc/index.html' \

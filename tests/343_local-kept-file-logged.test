@@ -1,8 +1,7 @@
 #!/bin/bash
 # A file kept in place instead of downloaded must say so at the default log
-# level (#113). Both acceptance paths were silent: the 416 answered to a resume
-# request, and --sizehack over a server that refuses Range. The re-fetch legs
-# are the control, since a marker that always appears proves nothing.
+# level (#113), on both paths: a 416 answering a resume request, and --sizehack
+# over a server that refuses Range. The re-fetch legs are the control.
 set -eu
 
 # shellcheck source=tests/crawllib.sh
@@ -47,8 +46,8 @@ refhost="${refout}/127.0.0.1_${SRV_PORT}"
 assert_file "${refhost}/plain.bin" "reference mirror"
 assert_file "${refhost}/ranged/asset.bin" "reference mirror"
 
-# A clean directory holding only the assets, as the reporter's workflow builds
-# it: no cache, and mtimes stamped now, so If-Unmodified-Since always passes.
+# Seeds the assets alone, as the reporter's workflow does. With no cache and
+# fresh mtimes, If-Unmodified-Since always passes.
 seed() { # seed <outdir> <plain source> <ranged source>
     local host="$1/127.0.0.1_${SRV_PORT}"
     rm -rf "$1"
@@ -74,9 +73,8 @@ kepthost="${keptout}/127.0.0.1_${SRV_PORT}"
 n=$(kept_lines "$keptout")
 test "$n" -eq 2 || fail "kept: log names $n kept files, expected 2:
 $(grep -a 'complete\|Kept existing' "${keptout}/hts-log.txt" || true)"
-# A count alone passes a line naming the wrong file or a garbage size, which is
-# the whole value of the line.
-# Each file takes a different arm, so the reason pins which one fired.
+# A count alone would pass a line naming the wrong file or size. Each file
+# takes a different arm, so the reason pins which one fired.
 names_file() { # names_file <mirror-relative path> <reason>
     count_matching_lines -F "$1 ($(size_of "${refhost}/$1") bytes), $2:" \
         "${keptout}/hts-log.txt"
@@ -93,7 +91,7 @@ cmp -s "${poison}/asset.bin" "${kepthost}/ranged/asset.bin" ||
     fail "kept: ranged/asset.bin was re-fetched"
 ok "both kept files are named in the log"
 
-# Control: a genuine prefix of each asset. Neither size matches, so both are
+# Control: a prefix of each asset. Neither size matches, so both are
 # completed off the server and nothing may claim a file was kept.
 part="${tmpdir}/part"
 mkdir -p "$part"

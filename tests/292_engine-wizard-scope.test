@@ -10,10 +10,8 @@ set -euo pipefail
 # a scope answer emits back through the matcher that authorizes a link.
 
 # The front end enumerates by looping until the engine stops answering. Strip
-# the CRs: MSYS hands the engine a text-mode stdout and $(...) eats only the
-# trailing newline, so an assertion spanning several lines keeps the interior
-# ones. Every other selftest_queue here compares a single line and cannot see
-# this.
+# the CRs, because MSYS writes a text-mode stdout and $(...) keeps the CRs of
+# interior lines.
 want="0 download.example.co.uk
 1 example.co.uk
 2 co.uk"

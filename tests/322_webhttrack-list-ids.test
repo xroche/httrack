@@ -60,9 +60,8 @@ EOF
 # The save below overwrites it, and the round trip is judged against this.
 cp "${work}/proj/hts-cache/winprofile.ini" "${work}/seeded.ini"
 
-# A second pattern, its "on" key disjoint from the first. One boolean triple
-# cannot pin a permutation of the three: whichever two keys share a value are
-# interchangeable, so exactly one swap stays invisible until a second load.
+# A second pattern, its "on" key disjoint from the first. With one boolean
+# triple, the two keys that share a value can swap unseen.
 mkdir -p "${work}/proj2/hts-cache"
 cat >"${work}/proj2/hts-cache/winprofile.ini" <<'EOF'
 CurrentUrl=http://example.org/
@@ -213,9 +212,8 @@ for flag in ["--update", "-N2", "--priority=1", "--can-go-up-and-down",
                  % (flag, command))
 only_flag(command, "--near")
 
-# Dos=3 is WinHTTrack's alone, and its select has no entry for it. Showing the
-# blank one would re-save as 0, which reads there as long names, losing the DOS
-# names this very command line just asked for.
+# Dos=3 is WinHTTrack's alone and has no entry in the select. A blank entry
+# would re-save as 0, which WinHTTrack reads as long names.
 if selected(s.get("option2.html?sid=" + sid), "dos") != "1":
     sys.exit("a stored Dos=3 does not show as DOS names alone")
 
