@@ -822,7 +822,8 @@ static int st_topindex(httrackp *opt, int argc, char **argv) {
   assertf(strstr(buf, "???") == NULL);
 
 #ifndef _WIN32
-  /* #1329: a reader of the old index still reads it whole after a rebuild. */
+  /* #1329: a reader of the old index still reads it whole after a rebuild.
+     POSIX-only, because Windows cannot rename over an open file. */
   {
     FILE *const held = fopen(path, "rb");
 
@@ -1598,7 +1599,8 @@ static int st_refetchbackup(httrackp *opt, int argc, char **argv) {
     err++;
   }
 
-  /* An aborted transfer restores and drops the resume reference (#1595). */
+  /* An aborted transfer restores and drops the resume reference, or the next
+     run asks past the restored copy's end (#1595). */
   {
     String saved = STRING_EMPTY;
 

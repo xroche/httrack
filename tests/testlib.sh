@@ -223,6 +223,8 @@ selftest_queue_head() { # selftest_queue_head WANT NAME [ARGS...]
 
 # Queue NAME once per base-dir length across a segment period, because a
 # length-blind stop bound lands on MAX_PATH for some bases only (#1409).
+# st_mkdeep's own assertf detects that and aborts the whole batch, so WANT only
+# pins that each base length got that far.
 selftest_queue_base_lengths() { # selftest_queue_base_lengths MODE WANT NAME DIR
     local mode=$1 want=$2 name=$3 dir=$4 pad i
     # 41 is st_mkdeep's ASCII segment, so this covers every residue.
@@ -795,7 +797,8 @@ poll_open() {
 
 # One poll tick of at most $1 seconds, forking nothing where bash can time out a
 # read on that fd, because a `sleep` per tick is costly under MSYS (#795).
-# Callers re-check their own deadline. HTTRACK_POLL_SLEEP=1, re-read per tick,
+# $1 is only a ceiling, the fd tick is 0.1s, and callers re-check their own
+# deadline. HTTRACK_POLL_SLEEP=1, re-read per tick,
 # forces the forked tick so a test can starve the poll mid-run.
 poll_wait() {
     local rc=0

@@ -296,9 +296,10 @@ static void print_buffer(buff_struct*const str, const char *format, ...) {
 
 /* Append a "Cookie:" request line for every stored cookie matching adr/path.
    Only an "https://" adr gets Secure cookies, and its port is ignored. Pairs
-   use the RFC 6265 form (#151). A pair that does not fit is dropped whole and
-   counted in *skipped (may be NULL). reserve is the room the caller still
-   needs after this line. Returns the number emitted. */
+   use the RFC 6265 form, because modern servers reject RFC 2965 $Version and
+   $Path (#151). A pair that does not fit is dropped whole and counted in
+   *skipped (may be NULL). The line takes all of bstr's remaining room, so
+   reserve is the room the caller still needs after it. Returns the number emitted. */
 static int append_cookie_header(buff_struct *bstr, t_cookie *cookie,
                                 const char *adr, const char *path,
                                 size_t reserve, int *skipped) {
@@ -3839,7 +3840,8 @@ static const char *hts_query_strip_keys_match(const char *rules,
   char BIGSTK url[HTS_URLMAXSIZE * 4];
 
   /* Match the normalized host/path without the query, so read and write agree.
-     A longer one is clipped, because it only changes which rule matches. */
+     A host/path longer than url[] is hostile input and is clipped, because it
+     only changes which rule matches. */
   (void) strclipbuff(url, sizeof(url), jump_normalized_const(adr));
   if (fil[0] != '/')
     (void) strclipbuff(&url[strlen(url)], sizeof(url) - strlen(url), "/");
