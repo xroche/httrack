@@ -108,7 +108,7 @@ static int st_syscharset(httrackp *opt, int argc, char **argv) {
    back a path separator for it. */
 static int st_nobestfit(httrackp *opt, int argc, char **argv) {
 #ifdef _WIN32
-  /* internal, not in htscharset.h: ties cp below to cs by name, not by guess */
+  /* this maps cs to cp by name and is not in htscharset.h */
   extern UINT hts_getCodepage(const char *name);
   static const char *const yen = "\xC2\xA5";      /* U+00A5 */
   static const char *const micro = "\xC2\xB5";    /* U+00B5, best-fit 83 CA */
@@ -132,8 +132,7 @@ static int st_nobestfit(httrackp *opt, int argc, char **argv) {
     printf("nobestfit: CP932 is not installed\n");
     return 77;
   }
-  /* the trap, asserted rather than assumed: left to itself the codepage hands
-     back a path separator and reports no substitution at all */
+  /* by default the codepage returns a path separator and reports nothing */
   wn = MultiByteToWideChar(CP_UTF8, 0, yen, (int) strlen(yen), wide,
                            (int) (sizeof(wide) / sizeof(wide[0])));
   assertf(wn == 1);
@@ -147,13 +146,12 @@ static int st_nobestfit(httrackp *opt, int argc, char **argv) {
   assertf(wn == 1);
   n = WideCharToMultiByte(cp, 0, wide, wn, raw, (int) sizeof(raw), NULL, NULL);
   assertf(n == 2);
-  /* the sizing passes disagree, and the shorter one under-allocates: banning
-     best-fit sizes to the substitute but converts into room for the best-fit */
+  /* The ban sizes for the substitute, so a buffer sized under the ban overflows
+     when converted without it. */
   n = WideCharToMultiByte(cp, WC_NO_BEST_FIT_CHARS, wide, wn, NULL, 0, NULL,
                           NULL);
   assertf(n == 1);
-  /* same disagreement, summed over 4 code points instead of 1: a flag gated
-     on wsize==1 would leave yen/micro best-fit instead of substituted here */
+  /* The same check over 4 code points catches a flag gated on wsize==1. */
   wn = MultiByteToWideChar(CP_UTF8, 0, mixed, (int) strlen(mixed), wide,
                            (int) (sizeof(wide) / sizeof(wide[0])));
   assertf(wn == 4);
@@ -169,8 +167,7 @@ static int st_nobestfit(httrackp *opt, int argc, char **argv) {
   freet(s);
   s = hts_convertStringFromUTF8Strict(yen, strlen(yen), cs);
   assertf(s == NULL);
-  /* the non-strict caller still substitutes, but with the codepage's own
-     default character rather than a lookalike */
+  /* the non-strict caller substitutes the codepage's default character */
   gotCpInfo = GetCPInfo(cp, &cpi);
   assertf(gotCpInfo);
   s = hts_convertStringFromUTF8(yen, strlen(yen), cs);
@@ -183,9 +180,7 @@ static int st_nobestfit(httrackp *opt, int argc, char **argv) {
   assertf(s != NULL);
   assertf(s[0] == (char) cpi.DefaultChar[0] && s[1] == '\0');
   freet(s);
-  /* the mixed string, asserted byte-exact: both mutants above would either
-     mis-size the buffer (undersized usize) or mis-gate flags (best-fit
-     leaking through for a >1 code point string), and either shows up here */
+  /* A wrong size or flag gate changes the mixed string's bytes. */
   s = hts_convertStringFromUTF8Strict(mixed, strlen(mixed), cs);
   assertf(s == NULL); /* yen and micro are both lossy */
   s = hts_convertStringFromUTF8(mixed, strlen(mixed), cs);
@@ -195,8 +190,7 @@ static int st_nobestfit(httrackp *opt, int argc, char **argv) {
   assertf((unsigned char) s[2] == 0x82 && (unsigned char) s[3] == 0xA0);
   assertf(s[4] == 'A' && s[5] == '\0');
   freet(s);
-  /* the other arm of the gate: a codepage that refuses a non-zero dwFlags must
-     still convert, so UTF-7 encodes the yen instead of failing */
+  /* UTF-7 refuses a non-zero dwFlags but must still encode the yen */
   s = hts_convertStringFromUTF8(yen, strlen(yen), "utf-7");
   assertf(s != NULL && s[0] == '+');
   freet(s);
@@ -455,7 +449,7 @@ static int st_entities_sweep(httrackp *opt, int argc, char **argv) {
   return failures == 0 ? 0 : 1;
 }
 
-/* Length of the first well-formed sequence of s (Unicode table 3-7), or 0. */
+/* Returns the first valid sequence length of s (Unicode table 3-7), or 0. */
 static size_t utf8_oracle(const unsigned char *s, size_t n) {
   unsigned lo = 0x80, hi = 0xbf;
   size_t len, k;
@@ -617,9 +611,7 @@ static int st_utf8_strict(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* The unescapers must reserve one byte for the trailing NUL: a 'max'-byte
-   dest holding 'max' output chars pre-fix wrote dest[max] (1-byte OOB, caught
-   by ASan). Both unescapeEntities and unescapeUrl share the guard. */
+/* The unescapers must keep one byte of a 'max'-byte dest for the NUL. */
 static int st_unescape_bounds(httrackp *opt, int argc, char **argv) {
   char dest[4];
 
@@ -703,8 +695,7 @@ static int st_unescape_form(httrackp *opt, int argc, char **argv) {
 
 /* escape_remove_control() compacts in place, so it has to terminate at the new
    end or the caller reads the compacted head plus the original tail (#974). */
-/* append_escape_*() hands on what is LEFT of dest, so a remainder equal to
-   sizeof(void *) used to trip the size heuristic meant for caller mistakes. */
+/* The room left in dest can equal sizeof(void *) without a caller bug. */
 static int st_escape_append_room(httrackp *opt, int argc, char **argv) {
   char buf[64];
   size_t room;
@@ -820,7 +811,7 @@ static int st_inplace_escape(httrackp *opt, int argc, char **argv) {
 
 /* Pin HTS_HTMLESCAPE*_MAXEXP to each escaper's true max byte expansion. */
 static int st_escape_room(httrackp *opt, int argc, char **argv) {
-  /* N > 1023: where 6n outgrows the old 5n+1024 reservation */
+  /* N > 1023, where 6n outgrows 5n+1024 */
   enum { N = 2000 };
 
   char *src = malloct(N + 1);
@@ -837,7 +828,7 @@ static int st_escape_room(httrackp *opt, int argc, char **argv) {
   assertf(strlen(dst) == got);
   freet(dst);
 
-  /* one factor short overflows (returns size), truncating the page: the bug */
+  /* one factor short overflows, returns size, and truncates the page */
   room = (size_t) N * (HTS_HTMLESCAPE_FULL_MAXEXP - 1) + 1024;
   dst = malloct(room);
   got = escape_for_html_print_full(src, dst, room);

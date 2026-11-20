@@ -34,7 +34,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsindex.h"
 
-/* How many descriptors this process holds, or -1 if it cannot be told. */
+/* Returns the descriptors this process holds, or -1 if unknown. */
 static int open_fd_count(void) {
 #if defined(_WIN32)
   return -1;
