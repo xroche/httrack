@@ -1,6 +1,7 @@
 #!/bin/bash
 #
-# A cookie chain spans three pages, and each returns 500 on a wrong cookie.
+# A three-page cookie chain: the entrance sets cookies, and the next two pages
+# return 500 on a wrong one.
 
 : "${top_srcdir:=..}"
 
