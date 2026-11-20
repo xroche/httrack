@@ -582,8 +582,8 @@ static PT_Element proxytrack_process_HTTP_List(PT_Indexes indexes,
   return NULL;
 }
 
-/* Bytes the reply may take from an element: the send skips a body the reader
-   refused, and announcing one would desync a kept-alive peer. */
+/* Returns 0 when the reader refused the body, because the send skips it and a
+   kept-alive peer would desync. */
 static size_t element_body_size(const PT_Element element) {
   return (element != NULL && element->adr != NULL) ? element->size : 0;
 }
@@ -1166,7 +1166,7 @@ proxytrack_process_generic(void (*process) (PT_Indexes indexes, T_SOC soc_c),
   return 0;
 }
 
-/* Client threads alive; a flood past the cap gets 503 instead of a thread. */
+/* Past this many client threads, a new client gets 503. */
 #define PROXYTRACK_MAX_CLIENTS 256
 static volatile int proxytrack_clients = 0;
 
@@ -1234,7 +1234,7 @@ static int ICP_reply(struct sockaddr *clientAddr, int clientAddrLen, T_SOC soc,
   unsigned long int BufferSize;
   unsigned char *buffer;
 
-  /* NUL terminated; RFC2186 caps an ICP message at 16 KB, so this fits */
+  /* Count the NUL. RFC2186's 16 KB cap fits Message_Length (unsigned short) */
   if (Message_Length == 0 && Message != NULL)
     Message_Length = (unsigned short) (strlen((char *) Message) + 1);
   BufferSize = 20 + Message_Length;
@@ -1305,8 +1305,7 @@ static int proxytrack_start_ICP(PT_Indexes indexes, T_SOC soc) {
         unsigned int Request_Number = READ_NET32(&buffer[4]); /* Session ID */
         unsigned char *Payload = &buffer[20];
 
-        /* Terminate at the datagram, not at the buffer: the payload's strlen()
-           otherwise runs into the previous one and the reply echoes it back. */
+        /* Clear past the datagram, or strlen() reads the previous one */
         memset(&buffer[n], 0, (size_t) (bufferSize + 1 - n));
         if (Message_Length <= bufferSize - 20) {
           if (Opcode >= ICP_OP_MIN && Opcode <= ICP_OP_MAX) {

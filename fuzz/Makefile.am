@@ -4,6 +4,7 @@ noinst_PROGRAMS = fuzz-charset fuzz-codepage fuzz-meta fuzz-idna fuzz-entities \
 	fuzz-unescape fuzz-filters fuzz-url fuzz-header fuzz-cachendx \
 	fuzz-htsparse fuzz-singlefile fuzz-sitemap fuzz-arc fuzz-cookie \
 	fuzz-robots \
+	fuzz-accept \
 	fuzz-alias \
 	fuzz-bundle \
 	fuzz-savename \
@@ -59,6 +60,9 @@ fuzz_arc_CPPFLAGS = $(AM_CPPFLAGS) -DZLIB_CONST
 
 # The robots.txt parser and its RFC 9309 wildcard matcher.
 fuzz_robots_SOURCES = fuzz-robots.c fuzz.h
+
+# The link-acceptance wizard: hostile links against rules and answers.
+fuzz_accept_SOURCES = fuzz-accept.c fuzz.h
 
 # The option alias and command-line splitter, engine side and server side.
 fuzz_alias_SOURCES = fuzz-alias.c fuzz.h
