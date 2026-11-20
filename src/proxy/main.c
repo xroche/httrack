@@ -48,9 +48,7 @@ Please visit our Website: http://www.httrack.com
 /* HTS_LOG, the engine's own debug switch. */
 static hts_boolean proxytrack_verbose = HTS_FALSE;
 
-/* Without a handler coucal writes to stderr itself, prefixing the table
-   address; the per-enumeration statistics summary then lands on the operator's
-   console once per WebDAV request (#918). */
+/* Without a handler, coucal prints statistics on every WebDAV request (#918) */
 static HTS_PRINTF_FUN(3, 0) void proxytrack_coucal_loghandler(
     coucal_opaque arg, coucal_loglevel level, const char *format,
     va_list args) {
@@ -62,7 +60,7 @@ static HTS_PRINTF_FUN(3, 0) void proxytrack_coucal_loghandler(
   } else if (level <= coucal_log_warning) {
     severity = WARNING;
   } else {
-    /* not the DEBUG macro: it is NULL outside a debug build, voiding HTS_LOG */
+    /* DEBUG is NULL outside a debug build, which would void HTS_LOG */
     severity = proxytrack_verbose ? "debug" : NULL;
   }
   proxytrack_vprint_log(severity, format, args);
@@ -75,8 +73,7 @@ static void sig_brpipe(int code) {
 }
 #endif
 
-// split a "host:port" listen argument; FALSE sends the caller to the usage
-// screen. The port was unchecked, so a huge one wrapped into range (#614).
+// Split a "host:port" listen argument, rejecting an out-of-range port (#614).
 static hts_boolean scanHostPort(const char *str, char *host, int *port) {
   char *pos = strrchr(str, ':');
 
@@ -93,10 +90,7 @@ static hts_boolean scanHostPort(const char *str, char *host, int *port) {
 }
 
 #ifdef _WIN32
-/* Windows opens stdout in text mode, so every \n leaves as \r\n. A shell
-   reading that pipe sees the CR: MSYS folds it away, a Linux one under WSL2
-   does not, and the test suite then compares against a byte it never wrote.
-   Set by tests/ci-windows-suite.sh, so nothing changes for anyone else. */
+/* A text-mode stdout writes \r\n, and a WSL2 test shell keeps the CR. */
 static void hts_binary_stdio(void) {
   if (getenv("HTS_BINARY_STDIO") != NULL) {
     _setmode(_fileno(stdout), _O_BINARY);
