@@ -95,8 +95,9 @@ expect "changed is exactly the four moved resources" \
     "$(lines "${host}/changes/coded.bin" "${host}/changes/index.html" \
         "${host}/changes/moved.bin" "${host}/changes/moved.html")" \
     "$(listed changed | sort)"
-# flaky.bin retries, redirtarget.html sits behind a 302, and reset.bin never
-# completes (#746), yet all of them stay unchanged.
+# flaky.bin retries, redirtarget.html sits behind a 302, reset.bin never
+# completes (#746), and sized.html changes length only through a rewritten
+# link, yet none is reported as changed.
 expect "unchanged is exactly the seven stable resources" \
     "$(lines "${host}/changes/codedstable.bin" "${host}/changes/flaky.bin" \
         "${host}/changes/redirtarget.html" "${host}/changes/reset.bin" \

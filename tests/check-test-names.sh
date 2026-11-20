@@ -40,8 +40,8 @@ shopt -u nocaseglob nullglob
 # Floor: an empty tests/ would satisfy every check above.
 [ "$count" -gt 0 ] || bad "no test matched [0-9]*_*.test under $testdir"
 
-# One number names one test. Exceptions are listed by name, each a deliberate
-# shared prefix (01_zlib- #460, 53_local-proxytrack- #701, 62_lang- count files).
+# One number names one test. Exceptions are listed in `families`, each a
+# deliberate shared prefix, for example 01_zlib- (#460).
 # Two open PRs can still share a number, which this catches only on master.
 families=(01_engine- 01_zlib- 11_crawl- 53_local-proxytrack- 62_lang- 74_local-warc-)
 
