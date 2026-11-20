@@ -48,8 +48,7 @@ class SiteHandler(BaseHTTPRequestHandler):
         if links is None:
             self.send_error(404)
             return
-        # Pace the crawl so the progress screen carries live counters rather
-        # than a set of zeros the engine blew through before the first refresh.
+        # Pace the crawl so the progress screen shows live counters.
         time.sleep(self.delay)
         body = PAGE % (
             path,
@@ -93,9 +92,8 @@ def free_port():
 def start_htsserver(exe, root, home, lang, logpath):
     """Launch htsserver and return (process, base URL) once it announces itself."""
     env = dict(os.environ, HOME=home)
-    # Announce through a file, as webhttrack does: htsserver block-buffers a pipe
-    # and the URL line would not arrive. No --ppid either -- that arms a pinger
-    # that exits the server when its parent goes, and the walk is its own parent.
+    # htsserver block-buffers a pipe, so announce through a file. Omit --ppid,
+    # which exits the server with its parent.
     log = open(logpath, "w+")
     proc = subprocess.Popen(
         [
@@ -135,8 +133,7 @@ class Walk:
         # Shrink to the content: these pages are short, and a fixed viewport
         # would frame each one in a slab of empty background.
         size = page.viewport_size
-        # Squash first: scrollHeight never reports less than the viewport, so a
-        # short page measured at full height just gives the height back.
+        # scrollHeight never reports less than the viewport, so shrink it first.
         page.set_viewport_size({"width": size["width"], "height": 200})
         height = page.evaluate("Math.ceil(document.documentElement.scrollHeight)")
         page.set_viewport_size({"width": size["width"], "height": max(height, 200)})
@@ -205,9 +202,7 @@ def run(page, url, site_url, outdir, popup_size):
     w.shot("ready_to_start")
 
     w.next_pane()
-    # Both the progress and the finished screen are served as refresh.html, so
-    # tell them apart by the form each carries, not by the URL. Wait for live
-    # counters as well: the first render arrives with the stats table empty.
+    # Both progress and finished screens are refresh.html, so match the form.
     page.wait_for_selector("form[action='step4.html']")
     deadline = time.time() + 120
     while time.time() < deadline:
@@ -269,10 +264,7 @@ def main():
     from playwright.sync_api import sync_playwright
 
     site, site_url = start_site(args.site_host, args.site_port)
-    # A pristine HOME by default: an existing mirror would finish from cache in
-    # no time and turn the progress shot into a second copy of the finished
-    # screen, and the project list would show whatever the host had lying
-    # around. It does put a /tmp path on the screens that show the base path.
+    # Use a fresh HOME by default, because an old mirror finishes from cache.
     home = args.home or tempfile.mkdtemp(prefix="webhttrack-shots-")
     os.makedirs(home, exist_ok=True)
     fd, logpath = tempfile.mkstemp(prefix="htsserver-", suffix=".log")
