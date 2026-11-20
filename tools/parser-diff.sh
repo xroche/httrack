@@ -424,7 +424,8 @@ release)
     exit "$rc"
     ;;
 self-check)
-    # Each mutant disables one hts_attrs link row. The corpus's "1x" descriptor
+    # Each mutant edits one hts_attrs link row: widen adds cite, narrow drops
+    # data-srcset. make check misses both. The corpus's "1x" descriptor
     # keeps the dirty-attribute fallback from rescuing data-srcset.
     mutant_file=src/htsparse.c
 
