@@ -98,8 +98,7 @@ void hts_dns_test_move_clock(httrackp *opt, const char *host, TStamp ms) {
   hts_mutexrelease(&opt->state.lock);
 }
 
-/* Double the wait per consecutive failure up to the ceiling, so an outage is
-   retried soon and a dead host costs only a few lookups. */
+/* Double the wait per failure up to the ceiling, so dead hosts cost little. */
 int hts_dns_negative_wait_ms(int failures) {
   int wait = hts_dns_negative_ttl_ms;
   int i;
@@ -128,8 +127,7 @@ static int hts_ghbn_all(coucal cache, const char *const iadr,
     int i;
 
     assertf(record->host_count <= HTS_MAXADDRNUM);
-    /* Expire a negative record on time, and also when the wall clock went
-       back, or an NTP step would delay the retry by the step's size. */
+    /* Also expire a negative record when the wall clock went back. */
     if (record->expiry != 0) {
       const TStamp now = mtime_local();
 
@@ -158,9 +156,8 @@ void hts_dns_set_resolver_backend(const hts_resolver_backend *backend) {
   hts_resolver = (backend != NULL) ? backend : &hts_resolver_libc;
 }
 
-/* Test hook: HTTRACK_DEBUG_RESOLVE="host:ip[,ip...]" pins `host` to the listed
-   addresses (like curl --resolve) to test the connect fallback. The backend
-   below owns its chain, so both kinds of result free the same way. */
+/* Test hook: HTTRACK_DEBUG_RESOLVE="host:ip[,ip...]" pins host like curl
+   --resolve. The backend owns its chains, so both kinds free the same way. */
 
 static void HTS_RESOLVER_CALL override_freeaddrinfo(struct addrinfo *res);
 

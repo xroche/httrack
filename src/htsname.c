@@ -101,8 +101,7 @@ static const char *hts_tbdev[] = {
 };
 /* clang-format on */
 
-/* Directories the engine owns inside the mirror. A URL naming one would land
-   on the cache and destroy it (#774). hts-tmp is defence in depth. */
+/* A URL naming an engine directory would destroy the cache (#774). */
 static const char *hts_tbreserved[] = {"hts-cache", "hts-tmp", ""};
 
 /* True once the component holds only what cleanEndingSpaceOrDot() strips. */
@@ -123,9 +122,8 @@ static size_t reservedNameAt(const char *save, const char *c,
     if (len == 0)
       continue;
     if (c == save) {
-      /* save lost its leading '/' above, so the table's anchor never reached
-         the first component (#842). It usually holds the hostname, so only a
-         trailing run ends it here, or '.' would rename aux.example.com. */
+      /* The first component usually holds the hostname (#842), so only a
+         trailing run ends it, or aux.example.com would be renamed. */
       if (strippedToComponentEnd(c + len))
         return len;
     } else {
@@ -428,10 +426,8 @@ static void tmpl_catc(char *d, size_t dsize, char c) {
   tmpl_catn(d, dsize, s, 1);
 }
 
-/* Appends that build a savename_type -1 name from a crawled link clip, never
-   abort (#1295). URL text loses its own tail (TMPL_CAT). The template's
-   separators, extension and digest collect in tmpltail and go in through
-   save_append_tail(), which cuts the name instead, in one run so ".html"
+/* These appends clip a savename_type -1 name, never abort (#1295). Template
+   parts go in through tmpltail and save_append_tail() in one run, so ".html"
    keeps its dot. */
 #define TMPL_FLUSH()                                                           \
   do {                                                                         \
@@ -1086,8 +1082,7 @@ int url_savename(lien_adrfilsave *const afs,
                      is_userknowntype(opt, fil)) { /* PATCH BY BRIAN SCHRÖDER.
                               Lookup mimetype not only by extension,
                               but also by filename */
-            /* "foo.cgi => text/html" gives foo.cgi the text/html MIME type,
-               that is, ".html" */
+            /* "foo.cgi => text/html" saves foo.cgi as ".html" */
             if (user_mime_ext(opt, fil, ext, sizeof(ext))) {
               ext_chg = 1;
             }
@@ -1854,17 +1849,14 @@ int url_savename(lien_adrfilsave *const afs,
 
   /* convert name to UTF-8 ? Note: already done while parsing. */
 
-  /* cleanEndingSpaceOrDot() can put a leading slash back ("/.../x.html" ->
-     "/x.html"). Strip it here, so the reserved-name and 8.3 passes above see
-     the name unchanged. */
+  /* cleanEndingSpaceOrDot() can restore a leading slash. Strip it so the
+     reserved-name and 8.3 passes above see the same name. */
   stripLeadingSlashes(afs->save);
 
   /* callback */
   {
-    /* Nothing sanitizes the hook's name, and it is joined to the output
-       directory below, so it must come back relative and ".."-free. Refuse
-       it rather than collapse it, because an absolute name has no "../" to
-       drop. */
+    /* The hook's name joins the output directory unsanitized, so refuse an
+       absolute or ".." name, because an absolute one has no "../" to drop. */
     char BIGSTK engine_save[HTS_URLMAXSIZE * 2];
 
     strcpybuff(engine_save, afs->save);
@@ -2009,15 +2001,12 @@ int url_savename(lien_adrfilsave *const afs,
     // Re-check again ending space or dot after cut (see bug #5)
     cleanEndingSpaceOrDot(afs->save);
   }
-  // The cut above counts codepoints, but parent+name lands in a fixed byte
-  // buffer that aborts on overflow. Hard-cut on a codepoint boundary so a
-  // multibyte name fits too (#133).
+  // Parent+name must fit a fixed byte buffer, so hard-cut on a codepoint
+  // boundary (#133).
   {
     const size_t parentBytes = strlen(StringBuff(opt->path_html_utf8));
     const size_t cap = HTS_SAVE_BUFSIZE - HTS_PATH_TAIL_RESERVE;
-    // Shrink only the name. A parent that fills the buffer alone is left to the
-    // prepend abort, because an empty name would collide across URLs and
-    // overrun the collision-suffix sprintf.
+    // Shrink only the name, because an empty name would collide across URLs.
     if (parentBytes < cap) {
       const size_t budget = cap - parentBytes;
       if (strlen(afs->save) > budget) {

@@ -54,22 +54,18 @@ extern hts_codec hts_codec_parse(const char *encoding);
 extern const char *hts_acceptencoding(hts_boolean compressible,
                                       hts_boolean secure);
 
-/* Is ext the codec's archive extension? A foo.gz served gzip-coded stays
-   packed on disk. */
+/* Is ext the codec's archive extension, which stays packed on disk? */
 extern hts_boolean hts_codec_is_archive_ext(hts_codec codec, const char *ext);
 
-/* Decode filename into newfile. Return the decoded size, or -1 on a bad or
-   truncated stream, an unsupported coding, a bomb, or I/O. On -1, errno holds
-   the local failure, or 0 when the coded body was at fault. */
+/* Decode filename into newfile and return its size, or -1 on failure. Then
+   errno is 0 when the coded body was at fault. */
 extern int hts_codec_unpack(hts_codec codec, const char *filename,
                             const char *newfile);
 
-/* Run hts_codec_unpack() with the decoded size also capped at cap (-m) when
-   positive. Return HTS_CODEC_TOOBIG when that cap is exceeded. */
+/* Run hts_codec_unpack() with the output also capped at cap when > 0. */
 extern int hts_codec_unpack_max(hts_codec codec, const char *filename,
                                 const char *newfile, LLint cap);
-/* hts_codec_unpack_max() returns this when the caller's cap stopped the body.
-   A bad stream or the built-in bomb limit gives -1. */
+/* Returned when the caller's cap stopped the body. A bomb gives -1. */
 #define HTS_CODEC_TOOBIG (-2)
 
 /* Return hts_codec_maxout(in_size), lowered to cap if cap > 0. */

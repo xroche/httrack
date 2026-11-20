@@ -49,8 +49,7 @@ Please visit our Website: http://www.httrack.com
 #define HTS_ZSTD_WINDOWLOG_MAX 23
 #endif
 
-/* The budget bounds a bomb, because brotli and zstd reach a million to one.
-   Deflate tops out at 1032x and meets it only at the 2 GiB ceiling. */
+/* Deflate tops out at 1032x, but brotli and zstd reach a million to one. */
 #define HTS_CODEC_MAX_RATIO 4096
 #define HTS_CODEC_MIN_MAXOUT (1024 * 1024)
 /* Per-body decoded size without -m: past it a bomb is "File too big". */

@@ -122,8 +122,7 @@ int fa_strjoker_dual(int type, char **filters, int nfil, const char *nom1,
 /* STRJOKER_MAXLEN alone still allows ~2000 frames, ~900KB of stack, which
    overflows the 1MB a Windows thread gets (#574). */
 #define STRJOKER_MAXDEPTH 256u
-/* The budget counts work quanta, because one call can rescan its whole class.
-   A scanned byte costs one and a call costs STRJOKER_CALLCOST. */
+/* A scanned byte costs one step and a call costs STRJOKER_CALLCOST. */
 #define STRJOKER_MAXSTEPS 24000000u
 #define STRJOKER_CALLCOST 16u
 

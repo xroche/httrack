@@ -154,10 +154,8 @@ typedef struct in6_addr INaddr;
 typedef struct in_addr INaddr;
 #endif
 
-/** One IPv4 or IPv6 endpoint. Use the SOCaddr_* accessors, because sa_family
-    picks the active union member. HTS_INET6 sets sizeof(SOCaddr) and the
-    layout of structs holding one, such as htsblk, so build a consumer with the
-    value htsfeatures.h publishes. */
+/** One IPv4 or IPv6 endpoint, read through the SOCaddr_* accessors. HTS_INET6
+    changes its size, so build consumers with the htsfeatures.h value. */
 #ifndef HTS_DEF_FWSTRUCT_SOCaddr
 #define HTS_DEF_FWSTRUCT_SOCaddr
 typedef struct SOCaddr SOCaddr;
@@ -173,8 +171,7 @@ struct SOCaddr {
 };
 
 /** Pointer to the port field of the active family, network byte order.
-    Asserts on NULL or a family other than AF_INET and AF_INET6, reporting the
-    caller's @p file and @p line, which the SOCaddr_* macros pass. */
+    Asserts on NULL or an unknown family, citing @p file and @p line. */
 static HTS_INLINE HTS_UNUSED in_port_t *
 SOCaddr_sinport_(SOCaddr *const addr, const char *file, const int line) {
   assertf_(addr != NULL, file, line);
@@ -221,9 +218,8 @@ SOCaddr_clear_(SOCaddr *const addr, const char *file, const int line) {
   addr->m_addr.sa.sa_family = AF_UNSPEC;
 }
 
-/* server must be an lvalue SOCaddr, because every macro below names a member
-   of it. Each evaluates its arguments once unless its comment says
-   otherwise. */
+/* server must be an lvalue SOCaddr. Each macro evaluates its arguments once
+   unless its comment says otherwise. */
 
 /** Address family of an endpoint: AF_INET, AF_INET6, or AF_UNSPEC when
     unset. An lvalue. */

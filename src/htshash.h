@@ -75,9 +75,8 @@ int hash_savename_next(hash_struct *hash, char kind, const char *name);
 /* Record that the collision walk from NAME reached suffix N. */
 void hash_savename_next_set(hash_struct *hash, char kind, const char *name,
                             int n);
-/* Return the link whose host matches ADR case-insensitively and path is FIL,
-   as url_savename() does. Return -1 if none, -2 if several with distinct
-   save-names might. */
+/* Return the link with host ADR (any case) and path FIL, -1 if none, or -2 if
+   several with distinct save-names might match. */
 int hash_savename_owner(hash_struct *hash, const char *adr, const char *fil);
 int *hash_calc_chaine(hash_struct * hash, hash_struct_type type, int pos);
 unsigned long int hash_cle(const char *nom1, const char *nom2);

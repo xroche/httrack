@@ -65,9 +65,8 @@ Please visit our Website: http://www.httrack.com
 
 #define FTP_DEBUG 0
 
-/* Live FTP workers. Each uses its backlog slot and opt for its whole run, so
-   neither may be freed while the list is not empty (#1051). A worker registers
-   at spawn, so an unscheduled one already holds the list against a teardown. */
+/* Live FTP workers, registered at spawn. Their slots and opt must outlive the
+   list (#1051). */
 static FTPDownloadStruct *ftp_workers = NULL;
 static htsmutex ftp_workers_mutex = HTSMUTEX_INIT;
 
@@ -126,9 +125,8 @@ static void ftp_worker_release(FTPDownloadStruct *worker, const char *error) {
     strcpybuff(worker->pBack->r.msg, error);
     worker->pBack->r.statuscode = STATUSCODE_INVALID;
   }
-  /* Publish and unlink as one step, or a teardown still holding this worker
-     would set stop_ftp on a slot the crawl thread now owns. This is the
-     worker's last touch of the slot and of opt. */
+  /* Publish and unlink in one step, or a teardown could set stop_ftp on a slot
+     the crawl thread owns again. */
   hts_mutexlock(&ftp_workers_mutex);
   hts_store_release_int(&worker->pBack->status, STATUS_FTP_READY);
   ftp_worker_unlink(worker);
@@ -226,13 +224,11 @@ int ftp_worker_selftests(void) {
 #define FTP_HANDOFF_ROUNDS 32
 /* The settle tells a blocked tail from one the scheduler never ran. */
 #define FTP_HANDOFF_SETTLE 500
-/* Spins per wait, at 1ms each. The test must fit the suite's 600s guard even
-   when every wait runs out. */
+/* Spins per wait, at 1ms each, sized to fit the 600s test guard. */
 #define FTP_HANDOFF_SPINS 2000
 
-/* The payload a worker body leaves. It is negative so back_wait()'s reap skips
-   back_finalize(), because the test pins the read. An unpublished slot reads 0
-   and "". */
+/* A worker's payload, negative so back_wait()'s reap skips back_finalize().
+   An unpublished slot reads 0 and "". */
 #define FTP_HANDOFF_CODE STATUSCODE_INVALID
 static const char ftp_handoff_msg[] = "Transfer complete";
 
@@ -295,9 +291,8 @@ static FTPDownloadStruct *ftp_handoff_register(struct_back *sback) {
   return worker;
 }
 
-/* Drive back_wait() until the worker has left the list, and once more. The
-   loop must not synchronize with the worker ahead of back_wait(), and a lock
-   that still finds the worker listed carries nothing from the publish. */
+/* Drive back_wait() until the worker has left the list, and once more. Only
+   back_wait() may synchronize with the worker. */
 static void ftp_handoff_drive(struct_back *sback, httrackp *opt,
                               cache_back *cache) {
   int spins;

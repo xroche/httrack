@@ -432,8 +432,7 @@ static const char *hts_mime_find(int key, const char *needle) {
 // fallback) returns 1 if a type was written to s, 0 otherwise
 HTSEXT_API hts_boolean get_httptype_sized(httrackp *opt, char *s, size_t ssize,
                                           const char *fil, hts_boolean flag) {
-  // userdef overrides get_httptype. An empty rule such as "--assume cgi="
-  // matches but writes nothing, which reports "no type".
+  // userdef wins. An empty rule ("--assume cgi=") reports "no type".
   if (get_userhttptype(opt, s, ssize, fil)) {
     return s[0] != '\0';
   }
@@ -531,8 +530,7 @@ hts_boolean get_userhttptype(httrackp *opt, char *s, size_t ssize,
 
                 i++;
                 len = strcspn(&mimedefs[i], "\n");
-                /* clip, because a value long enough to be clipped matches no
-                   consumer anyway (#1276) */
+                /* clip, as a value that long matches no consumer (#1276) */
                 if (len >= ssize) {
                   hts_log_print(opt, LOG_WARNING,
                                 "--assume value for '%s' is %d bytes, clipped "

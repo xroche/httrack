@@ -226,11 +226,9 @@ void hts_set_hash_handler(coucal hashtable, httrackp *opt);
 // fonctions unix/winsock
 int hts_read(htsblk * r, char *buff, int size);
 
-/* Add to, read and reset the received-byte total. FTP workers add on their own
-   thread, a lost += reads low, and -M gives up on that total. It uses a lock,
-   because a 64-bit atomic add needs libatomic without an 8-byte CAS.
-   hts_stat_recv_publish() copies it to HTS_STAT.HTS_TOTAL_RECV on the crawl
-   thread and returns it. */
+/* Add to, read and reset the received-byte total, which FTP workers update
+   from their thread. A lock guards it, as a 64-bit atomic needs libatomic.
+   hts_stat_recv_publish() copies it to HTS_STAT on the crawl thread. */
 void hts_stat_recv_add(LLint bytes);
 LLint hts_stat_recv_get(void);
 void hts_stat_recv_set(LLint bytes);
@@ -326,9 +324,8 @@ int connect_socket_error(T_SOC soc);
 /* Start a non-blocking connect to iadr; port -1 takes it from iadr or the
    scheme default. */
 T_SOC newhttp(httrackp *opt, const char *iadr, htsblk *retour, int port);
-/* Like newhttp(), but connect to the addr_index-th (0-based) resolved address,
-   and set *addr_count, if non-NULL, to the address count. The slot scheduler
-   uses it to try the next address when a connect fails. */
+/* Like newhttp(), but connect to resolved address addr_index (0-based) and
+   set *addr_count, if non-NULL, to the address count. */
 T_SOC newhttp_addr(httrackp *opt, const char *iadr, htsblk *retour, int port,
                    int addr_index, int *addr_count);
 /* Clips the formatted failure reason into r->msg, which also round-trips
@@ -886,9 +883,8 @@ HTS_STATIC int strcmpnocase(const char *a, const char *b) {
 
 // is this MIME an hypertext MIME (text/html), html/js-style or other script/text type?
 #define HTS_HYPERTEXT_DEFAULT_MIME "text/html"
-/* Sentinel stored when the server declared no Content-Type. Type tests treat it
-   as html, but wire_patches_ext() keeps the URL extension for it. It rides the
-   cache, so updates name consistently. */
+/* Cached when the server sent no Content-Type. Type tests treat it as html,
+   but wire_patches_ext() keeps the URL extension. */
 #define HTS_UNKNOWN_MIME "unknown/unknown"
 /* Map the no-declared-type sentinel back to a real type for any header or
    record we EMIT or PERSIST, so "unknown/unknown" never reaches a consumer

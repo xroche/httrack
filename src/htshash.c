@@ -86,8 +86,7 @@ static const char* value_sav_debug_print(void *arg, coucal_value_const a) {
   return (char*) a.ptr;
 }
 
-/* Return ADR's dedup-key host. --host-alias runs first, so a rule may name the
-   www. form before urlhack drops it. */
+/* Return ADR's dedup-key host, aliased before urlhack drops a www. prefix. */
 static const char *key_host_alias(const hash_struct *hash, const char *adr,
                                   char *buf, size_t bufsize) {
   const char *const canon =
@@ -106,8 +105,7 @@ static const char *hash_url_key_(const hash_struct *hash, const char *adr_canon,
 
   // copy address
   assertf(adr_norm != NULL);
-  /* Clip, because a wire URL feeds this. A clipped key only costs a hash
-     collision, never a wrong dedup. */
+  /* Clip, because a wire URL feeds this, and a clipped key only collides. */
   (void) strclipbuff(dst, dstsize, adr_norm);
 
   // copy link

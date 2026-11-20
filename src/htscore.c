@@ -1094,8 +1094,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
         joker = 1;
 
       if (joker) { // a filter rule
-        /* sized off the rule cap, so the decode refuses what the array and
-           the matcher refuse (#1288) */
+        /* sized off the rule cap, as the array and matcher are (#1288) */
         char BIGSTK tempo[HTS_FILTER_MAXLEN + 1];
         char BIGSTK raw[HTS_FILTER_MAXLEN * 3 + 1];
         int type;
@@ -1728,9 +1727,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
                 r.adr = new_adr;
                 r.size = (LLint) new_size;
               }
-              /* NULs also count when the server sent no type, because
-                 the blanking below would corrupt an untyped binary
-                 (#1415). The ratio and floor match the test above. */
+              /* NULs also count with no server type, or the blanking below
+                 corrupts an untyped binary (#1415). */
             } else if (((nspec > r.size / 100) && (nspec > 10)) ||
                        ((map[0] > r.size / 100) && (map[0] > 10) &&
                         strfield2(r.contenttype, HTS_UNKNOWN_MIME))) {
@@ -1791,9 +1789,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
       /* Load file and decode if necessary, after redirect check. */
       LOAD_IN_MEMORY_IF_NECESSARY();
 
-      /* Turn a sitemap's <loc> URLs into top-level seeds. htsAddLink applies
-         the filters and scope, and this link's depth gives them the full
-         budget. */
+      /* Seed a sitemap's <loc> URLs at top level with a full depth budget. */
       if (opt->sitemap_state != NULL &&
           hts_sitemap_pending(opt, urladr(), urlfil())) {
         htsmoduleStruct BIGSTK smstr;
@@ -1945,9 +1941,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
                               adr_nologin(opt, urladr()), infobuff);
               }
             }
-            /* This runs after robots_parse, so this body's rules gate the
-               sitemap fetch. A failed probe still runs it, to fall back to
-               the well-known location. */
+            /* robots_parse ran, so this body's rules gate the sitemap fetch.
+               A failed probe still falls back to the well-known location. */
             hts_sitemap_robots(opt, urladr(), sitemaps);
           }
         } else if (!r.is_write) {
@@ -2709,8 +2704,7 @@ void filters_bind(httrackp *opt, char ***ptrfilters, int *filptr) {
   opt->user_filters = 0;
 }
 
-/* A rule the array takes must fit a slot and strjoker(), whatever the two caps
-   become. A hardcoded limit could drift from either. */
+/* A rule must fit both a slot and strjoker(), whatever the two caps become. */
 enum {
   hts_filter_maxlen_matches = 1 / (HTS_FILTER_MAXLEN <= STRJOKER_MAXLEN),
   hts_filter_maxlen_fits = 1 / (HTS_FILTER_MAXLEN < HTS_FILTER_SLOT_SIZE)

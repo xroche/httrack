@@ -406,8 +406,7 @@ void index_finish(const char *indexpath, int mode) {
   char *a, *b;
   int index = 0;
   const LLint fs = fpsize(indexer.tmp);
-  /* refuse a size size_t cannot hold, or malloct() would wrap short while
-     the reader keeps the 64-bit length */
+  /* refuse a size size_t cannot hold, or malloct() would wrap short */
   const size_t size = fs > 0 ? llint_to_size_t(fs) : (size_t) -1;
 
   if (size == (size_t) -1 || !indexer.tmp)

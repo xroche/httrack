@@ -144,8 +144,7 @@ const char *hts_self_path(char *dst, size_t dstsize) {
     return dst;
   }
 #endif
-  /* GetModuleFileNameA() and sysctl() leave a clipped path in dst on failure,
-     so empty it rather than return a shorter path. */
+  /* GetModuleFileNameA() and sysctl() leave a clipped path on failure. */
   dst[0] = '\0';
   return NULL;
 }
@@ -529,9 +528,8 @@ static int cmdl_cluster_params(cmdl_argv *cmd, const char *word, int argc,
   return next - first;
 }
 
-/* May the option at NA take a next word that begins with '-'? Only when
-   optalias_check() put that word there as the option's parameter. A clustered
-   (-q%A) or quoted ("-%A") spelling keeps it as the next option (#1425). */
+/* May the option at NA take a '-' word that optalias_check() put there as its
+   parameter? A clustered or quoted spelling may not (#1425). */
 static hts_boolean optparam_dash_ok(const cmdl_argv *cmd, int na) {
   return na + 1 < cmd->argc && cmd->param[na + 1];
 }
@@ -2247,8 +2245,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                 char *end;
                 LLint secs;
 
-                /* strtoll flags an overflow with ERANGE, which a sscanf("%d")
-                   clip would hide. */
+                /* strtoll reports overflow, which sscanf("%d") would clip. */
                 errno = 0;
                 secs = strtoll(com + 1, &end, 10);
                 if (end == com + 1 || errno == ERANGE || secs < 0) {
@@ -3043,8 +3040,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
       }
     }
 
-    /* The exit status is all a wrapper sees. Read the fault flag too, because a
-       user stop writes exit_xh = 1 and can land after the abort. */
+    /* Also read the fault flag, as a user stop may overwrite exit_xh's -1. */
     if (hts_load_acquire_int(&opt->state.exit_xh) == -1 ||
         hts_worker_faulted()) {
       exit_code = HTS_EXIT_MIRROR_ABORTED;

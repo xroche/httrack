@@ -115,8 +115,7 @@ static hts_boolean hts_link_may_carry_links(httrackp *opt, cache_back *cache,
     return HTS_TRUE;
 
   /* A run that failed the same way stored no entry, so the kept copy (#746) is
-     the only record of this page. Its bytes are checked too, because the name
-     can be the sentinel's. */
+     the only record. Check its bytes too, as its name may be the sentinel's. */
   guessed[0] = '\0';
   return save != NULL && strnotempty(save) && fexist_utf8(save) &&
          guess_httptype_sized(opt, guessed, sizeof(guessed), save) &&
@@ -520,10 +519,8 @@ int hts_mirror_check_moved(htsmoduleStruct *str,
             opt->transport_failures++;
           }
 
-          /* With no response, nothing says the site dropped this page's links.
-             This predicate must match the one keeping the previous copy (#746),
-             so every preserved file keeps its children. An answered error is
-             recovered from the cache and re-parsed. */
+          /* No response does not mean the links are gone. Keep this test equal
+             to the one that keeps the previous copy (#746). */
           if (back_transfer_failed(r->statuscode) && !heap(ptr)->testmode &&
               hts_link_may_carry_links(opt, cache, urladr(), urlfil(),
                                        savename())) {
