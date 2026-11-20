@@ -27,12 +27,10 @@ Please visit our Website: http://www.httrack.com
 
 /* ------------------------------------------------------------ */
 /* --single-file: post-mirror pass embedding each page's assets as data: URIs.
-   Internal, not installed. Unlike -%M (one MHT archive for the whole mirror)
-   it rewrites the saved pages in place and keeps page-to-page links relative,
-   so the mirror stays browsable and every page also stands alone.
-   Limitation: an inlined stylesheet becomes a data: URL, whose path is opaque,
-   so an asset inside it that stayed a link (over the cap) no longer resolves.
-   Raise --single-file-max-size past it to inline it too. */
+   Unlike -%M, it rewrites pages in place and keeps page links relative. An
+   asset that stayed a link (over the cap) no longer resolves inside an inlined
+   stylesheet, because a data: URL's path is opaque. Raise
+   --single-file-max-size to inline it. */
 /* ------------------------------------------------------------ */
 
 #ifndef HTS_SINGLEFILE_DEFH
@@ -60,13 +58,10 @@ extern "C" {
 
      #!<16-hex secret>.<class>.<len>
 
-   A fragment, so a mirror left marked by an interrupted run still browses.
-   The secret is 64 CSPRNG bits drawn once per run and never written to disk,
-   which is what makes the mark unforgeable: a site cannot spell one, so no
-   sanitiser has to keep hostile bytes away from it. <len> is the byte length
-   of the reference text immediately preceding the mark, so the pass never has
-   to guess where that reference starts. <class> is the context htsparse saw,
-   checked against the resolved type so a mismatch fails loudly. */
+   It is a fragment, so a half-marked mirror still browses. The secret is 64
+   CSPRNG bits per run, never written to disk, so a site cannot forge a mark.
+   <len> is the byte length of the reference before the mark, and <class> the
+   context htsparse saw. */
 #define SINGLEFILE_MARK_INTRO "#!"
 #define SINGLEFILE_SECRET_HEX 16
 
@@ -82,10 +77,9 @@ extern "C" {
 /* Enough for the intro, the secret, both separators and a 20-digit length. */
 #define SINGLEFILE_MARK_MAX 64
 
-/* Longest <len> a mark may carry, which is what htsparse can append for one
-   reference: HTS_URLMAXSIZE*2 of savename through escape_for_html_print_full,
-   plus as much query through escape_for_html_print. The emit site asserts the
-   derivation against its own buffers. */
+/* The longest <len> a mark may carry is HTS_URLMAXSIZE*2 of savename through
+   escape_for_html_print_full, plus as much query through
+   escape_for_html_print. The emit site asserts this against its buffers. */
 #define SINGLEFILE_MAX_SPAN                                                    \
   (HTS_URLMAXSIZE * 2 * (HTS_HTMLESCAPE_FULL_MAXEXP + HTS_HTMLESCAPE_MAXEXP))
 
@@ -96,10 +90,8 @@ void singlefile_free(httrackp *opt);
    nothing may be marked). Draws the secret on first use. */
 const char *singlefile_intro(httrackp *opt);
 
-/* HTS_FALSE if [body,len) already contains this run's intro, in which case the
-   document must not be marked: RFC 2046 gives the generator the same duty for
-   a MIME boundary. Only a 2^-64 coincidence can trip it, since the intro is
-   not something fetched content can spell. */
+/* HTS_FALSE if [body,len) already holds this run's intro, so the document
+   must not be marked. Only a 2^-64 coincidence trips this. */
 hts_boolean singlefile_may_mark(httrackp *opt, const char *body, size_t len);
 
 /* Write the mark for a reference of reflen bytes into buf; returns buf, left

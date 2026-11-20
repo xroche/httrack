@@ -1,18 +1,7 @@
 #!/bin/bash
 #
 
-# doit.log reprise (no network). Re-running httrack in a mirror directory with
-# NO url makes the engine read hts-cache/doit.log and re-insert every recorded
-# argument into the command line through cmdl_ins() (the token-block builder).
-# That path is distinct from the rc-file one in 01_engine-rcfile.test
-# (htsalias.c) and from the url-on-command-line update in
-# 394_update-cache.test, and nothing else exercises it. Two properties:
-#   1. A multi-token reprise re-mirrors cleanly: every token (the url and each
-#      option) survives the back-to-back packing, so the no-url run reproduces
-#      the file set with no errors. A packing/bound bug corrupts a later token
-#      and surfaces as an error or a missing file.
-#   2. The reprise actually re-crawls through the inserted url: changing a source
-#      file and re-running with no url picks up the new content.
+# A doit.log replay must keep every token and pick up a changed source file.
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
@@ -33,7 +22,6 @@ echo 'OLDCONTENT' >"$site/a.html"
 echo '<p>bbb</p>' >"$site/sub/b.html"
 url="file://$site/index.html"
 
-# count Error: lines in the log
 errors() { count_log_errors "$out/hts-log.txt"; }
 
 # initial mirror with the url and a handful of options, so doit.log records a

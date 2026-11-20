@@ -12,7 +12,7 @@ cleanup_push rm -rf "$tmpdir"
 
 make_tls_pem "$tmpdir"
 
-# The shipped pair verbatim, key first, and not a fixture minted per run (#1099).
+# It must be the shipped key then cert, never a pair minted per run (#1099).
 cat "${testdir}/server.key" "${testdir}/server.crt" >"$tmpdir/want.pem"
 cmp -s "$tmpdir/both.pem" "$tmpdir/want.pem" ||
     fail "both.pem is not tests/server.key followed by tests/server.crt"

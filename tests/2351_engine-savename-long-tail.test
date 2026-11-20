@@ -88,7 +88,7 @@ name_is "/dev/null/$(a 239)/index.html" '/*/' text/html 2040 type=100
 name_is "/dev/null/$(a 239)/$(a 238)/i" '/*/' application/x-unknown 1088 \
     'userdef=%p/%p/%n' statuscode=404
 
-# A path 126 or more directories deep keeps its name, it used to give "./".
+# A path 126 or more directories deep keeps its name.
 for segs in 126 600; do
     selftest_queue_tail '/x/y.html' savename '/*y.html' text/html \
         "filpad=$((2 * segs))" padunit=x/

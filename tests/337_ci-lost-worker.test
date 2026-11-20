@@ -1,14 +1,10 @@
 #!/bin/bash
 #
-# A worker of ci-windows-suite.sh that dies before writing any status (#1352): the
-# tally must call it lost rather than failed, and the suite must end on a status
-# that says re-run, not investigate. The workflow counts them again off the console
-# the step teed, for the runs the watchdog kills before that verdict (#1588). Driven
-# here because the Windows leg, where it happens, keeps no evidence of it.
+# A worker that dies before writing a status counts as lost and asks for a
+# re-run (#1352), also when counted from the teed console (#1588).
 #
-# Four staged suite runs of 121 stubs each are real work, not a wedge. They outlast
-# the 600s guard on a loaded macOS runner, so the arms pace themselves. The interop
-# arms are in 495, which runs beside this test rather than after it.
+# The arms pace themselves, because four runs outlast the 600s guard on macOS.
+# The interop arms live in 495.
 # TEST_TIMEOUT_AT_LEAST: 1200
 
 set -euo pipefail
@@ -40,7 +36,7 @@ echo 77 >"$res/skip.test.rc"
 echo 3 >"$res/fail.test.rc"
 # A worker killed mid-write: the file exists and holds nothing, which is not a 0.
 : >"$res/halfwritten.test.rc"
-# gone.test.rc is deliberately absent.
+# gone.test.rc is left absent.
 
 for c in pass:pass skip:skip fail:fail gone:lost halfwritten:lost; do
     ci_read_outcome "${c%:*}.test" "$res"
@@ -48,8 +44,7 @@ for c in pass:pass skip:skip fail:fail gone:lost halfwritten:lost; do
         fail "${c%:*}.test classified as $ci_outcome, want ${c#*:} (rc=[$ci_rc])"
 done
 
-# On synthetic logs, not in the run below, where which of the three a killed worker
-# lands on depends on what its test had managed to print.
+# Use synthetic logs, because a killed worker's reason depends on its output.
 lostdir=$tmp/lost
 mkdir -p "$lostdir"
 (
@@ -68,9 +63,7 @@ subshell_ok $?
 
 # --- and the same thing end to end, with a worker really killed --------------
 
-# The killer stub finds its target by reading argv out of ps, and the emulated
-# leg's rootfs has no procps: a walk that matches nothing there is the missing
-# tool, not a missing worker.
+# Skip without procps, because the killer stub reads argv out of ps.
 psargs=$(ps -o args= -p $$ 2>/dev/null || true)
 psppid=$(ps -o ppid= -p $$ 2>/dev/null | tr -d " " || true)
 if test -z "$psargs" || test -z "$psppid"; then
@@ -79,9 +72,8 @@ fi
 
 ci_stage_init
 
-# Kill the run_one_test subshell where the real one died: after its log was opened,
-# before it could write a status. It is the closest ancestor still carrying the
-# driver's argv, so a lone match is the driver itself and the stub says so instead.
+# Kill the run_one_test subshell after its log opens and before its status.
+# A lone match is the driver itself, which the stub reports.
 # shellcheck disable=SC2016 # the stub's own expansions, not this shell's
 killer='
 p=$PPID
@@ -115,7 +107,7 @@ run_suite "$tmp/ok"
 test "$rc" -eq 0 || fail "a clean stub suite exited $rc: $(<"$tmp/out")"
 grep -q "^ran=$ran pass=92 fail=0 skip=$nskip lost=0$" "$tmp/out" ||
     fail "clean tally: $(grep '^ran=' "$tmp/out" || true)"
-# A whole healthy run for the counter below: no LOST line, and a tally saying lost=0.
+# Keep a healthy console for the counter below, with no LOST line and lost=0.
 cp "$tmp/out" "$tmp/console-clean.log"
 ! grep -q 'interop-retried' "$tmp/out" || fail "a green leg retried something"
 n=$((n + 1))
@@ -126,7 +118,7 @@ run_suite "$tmp/killed"
 case "$(<"$share/killed")" in
 none*) fail "the stub killed no worker, so the run proves nothing: $(<"$share/killed")" ;;
 esac
-# On its own line, not folded into the failures: the counter step reads these back.
+# LOST gets its own line, because the counter step reads these back.
 grep -q '^LOST 906_engine-lost.test (worker left no status; ' "$tmp/out" ||
     fail "the vanished worker was not reported: $(<"$tmp/out")"
 grep -q "^ran=$ran pass=91 fail=0 skip=$nskip lost=1$" "$tmp/out" ||
@@ -180,9 +172,8 @@ count_lost "$tmp/console-cr.log"
 grep -q '2 worker(s) died before reporting' <<<"$counted" ||
     fail "the CR-joined console counted wrong: $counted"
 
-# More than two, so a counter that clamps is not green here. The watchdog killed this
-# step, so there is no tally, and the third verdict is joined onto a failure tail that
-# ends mid-line: a test killed on its budget leaves its log that way, and sed keeps it.
+# Three verdicts make a clamping counter fail. The third follows a tail with no
+# newline, as a test killed on its budget leaves it.
 lostline='(worker left no status; no log at all)'
 {
     echo "LOST 900_a.test $lostline"
@@ -209,8 +200,7 @@ count_lost "$tmp/console-decoy.log"
 grep -q '1 worker(s) died before reporting' <<<"$counted" ||
     fail "the decoys were counted as verdicts: $counted"
 
-# Where the two disagree the tally wins, since the suite counted its own workers. No
-# driver writes this console: the disagreement is what says which side was read.
+# When the two disagree the tally wins, because the suite counted its workers.
 {
     echo "LOST 907_h.test $lostline"
     echo "LOST 908_i.test $lostline"
@@ -247,11 +237,8 @@ echo "lost-worker classification OK"
 n=$((n + 1))
 pace "$((cases - n))" "$arm_took" "the pinned-skip gate and precedence"
 
-# Again with the killer on one of the pinned skips. That run reaches the skip-set
-# gate, which exits before the lost gate unless it is told a vanished worker
-# explains the difference: the reason this stays a leg to repeat.
-# No pipe: bash's printf writes a line at a time, so head -1 leaving early
-# gives it SIGPIPE, and pipefail turns that into this test's own failure.
+# Again with the killer on a pinned skip, which must stay a re-run. Avoid a
+# pipe, because head -1 leaving early would SIGPIPE bash's printf.
 # shellcheck disable=SC2086 # the splitting is what picks one name
 set -- $expected_skips
 pinned=$1
@@ -270,8 +257,7 @@ ok "a skip that vanished is still a leg to repeat"
 n=$((n + 1))
 pace "$((cases - n))" "$arm_took" "precedence, where a failure outranks a loss"
 
-# A loss alongside a real failure: the failure decides, or a red ships as a leg to
-# repeat and nobody investigates it.
+# With a loss and a failure the failure decides, or a red ships as a re-run.
 stage "$tmp/mixed" "$killer"
 stub "$tmp/mixed/900_zlib-pass.test" 3
 run_suite "$tmp/mixed"
@@ -284,11 +270,10 @@ grep -q '::error::failing: 900_zlib-pass.test' "$tmp/out" ||
     fail "the failing test was not named: $(<"$tmp/out")"
 test "$rc" -eq 1 ||
     fail "a failure alongside a loss exited $rc, want 1: $(<"$tmp/out")"
-# No outage here, so nothing may be retried: without this the retry gate could
-# drop its interop check and every arm below would still pass.
+# There is no outage here, so nothing may be retried.
 ! grep -q 'interop-retried' "$tmp/out" ||
     fail "a plain red was retried as an outage: $(<"$tmp/out")"
 ok "a real failure outranks a lost worker"
 n=$((n + 1))
-# Nothing left to pace. It catches an arm counted out of step, not one never counted.
+# This catches an arm counted out of step, but not one never counted.
 assert_steps_ran "$cases" "$n"

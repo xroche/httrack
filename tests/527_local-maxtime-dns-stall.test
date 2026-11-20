@@ -10,8 +10,7 @@ set -euo pipefail
 if ! target_is_linux; then
     skip "maxtime-dns-stall: LD_PRELOAD interposition is Linux-only here"
 fi
-# A --disable-shared build has nothing to preload; anything else missing is a
-# build problem, not a skip, or the leg would pass vacuously.
+# Only a --disable-shared build may lack the preload library.
 if [ ! -r "${GAISTALL_LA:-}" ]; then
     echo "maxtime-dns-stall: ${GAISTALL_LA:-\$GAISTALL_LA} was not built" >&2
     exit 1
@@ -38,7 +37,7 @@ GAISTALL=120 LD_PRELOAD="$GAISTALL_LIB" \
     "http://127.0.0.1:1/" >"$dir/out" 2>&1 || rc=$?
 elapsed=$((SECONDS - start))
 
-# Teeth: this line is printed only when a worker was still stuck at exit.
+# This line is printed only when a worker was still stuck at exit.
 grep -q "Exiting without waiting for engine threads" "$dir/out" ||
     fail_dump "maxtime-dns-stall: no stuck worker at exit, nothing was tested (rc=$rc)" "$dir/out"
 test "$rc" -eq 0 || fail_dump "maxtime-dns-stall: exit status $rc" "$dir/out"

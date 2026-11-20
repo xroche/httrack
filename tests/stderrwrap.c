@@ -1,16 +1,10 @@
-/* PATH shim the sanitizer legs run the engine through: a copy of PROGRAM's
-   stderr lands in $HTTRACK_STDERR_CAPTURE_DIR for tools/ci-sanitizer-report.sh,
-   where gcc's UBSan writes findings that most tests discard.
+/* The sanitizer legs run the engine through this shim, which copies its stderr
+   into $HTTRACK_STDERR_CAPTURE_DIR, because gcc's UBSan ignores log_path and
+   writes findings to stderr, which most tests discard.
 
-   Usage: stderrwrap PROGRAM [ARG...]. Without a capture directory this is a
-   bare exec. With one, stderr has to be fanned out, and the caller reads the
-   file it redirected stderr into the moment we exit -- so whatever writes that
-   file has to be reaped before we are, which no exec'd process can do (#1374).
-   The capture path therefore keeps PROGRAM as a child and hands back what a
-   parent can: exit status, death by signal, the pid-directed signals it is
-   sent, stdin and our process group. A shell cannot be that parent, since
-   POSIX leaves SIGINT and SIGQUIT untrappable in a backgrounded shell, and a
-   backgrounded shell is how every crawl test runs the engine. */
+   Usage: stderrwrap PROGRAM [ARG...]. With a capture directory, PROGRAM stays a
+   child, so the stderr writer is reaped before we exit (#1374). A shell cannot
+   do this, because a backgrounded shell cannot trap SIGINT or SIGQUIT. */
 
 #include <ctype.h>
 #include <errno.h>
@@ -42,11 +36,8 @@ static volatile sig_atomic_t child = 0;
    unreaped child being a pid the suite still reads as a running server. */
 static int wakefd[2] = {-1, -1};
 
-/* Only a kill(2) from elsewhere: what the kernel raises here -- a tty ^C, our
-   own child's SIGCHLD -- has reached the child already, or is not for it. That
-   is the si_code <= 0 convention, not SI_USER: Darwin leaves si_code 0 for
-   kill(2) while defining SI_USER as 0x10001, so naming the constant forwarded
-   nothing there and the suite hung on the first pid-directed signal. */
+/* This forwards only a kill(2) from elsewhere. It tests si_code <= 0, because
+   Darwin reports kill(2) as 0 but defines SI_USER as 0x10001. */
 static void forward(int sig, siginfo_t *info, void *ctx) {
   const int saved = errno;
 
@@ -218,10 +209,8 @@ int main(int argc, char **argv) {
     }
     close(pipefd[1]);
 #ifdef __linux__
-    /* A kill -9 reaches us and not PROGRAM; the re-check closes the window
-       where the parent died before the request was in. BSD has no equivalent,
-       so there a killed wrapper orphans PROGRAM; only the two Linux sanitizer
-       jobs export the capture variable, so nothing reaches that today. */
+    /* A kill -9 reaches us and not PROGRAM. The re-check covers a parent that
+       died first. Only Linux jobs set the capture variable. */
     prctl(PR_SET_PDEATHSIG, SIGKILL);
     if (getppid() != parent) {
       _exit(127);

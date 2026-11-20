@@ -1,9 +1,7 @@
 # Windows build of the engine (VS2022 v143 + vcpkg): libhttrack, the CLI,
 # webhttrack, proxytrack.
 #
-# The autotools CI covers the unix builds; this covers the MSVC one, which had
-# no coverage at all and had drifted (the old .vcproj pinned OpenSSL 1.0.1j).
-# libhttrack.dll is what the WinHTTrack GUI links against.
+# This is our only MSVC coverage. The WinHTTrack GUI links libhttrack.dll.
 name: windows-build
 
 on:
@@ -31,12 +29,9 @@ jobs:
       matrix:
         platform: [x64, Win32, ARM64]
         configuration: [Release]
-    # No repo-wide cap: #1213 added one against runner starvation, which #1228
-    # later measured out. The step timeouts stay as they are, sized by 226
-    # against the suite watchdog, not against how long a job takes.
-    # Redirect vcpkg's default `files` binary cache into the workspace so
-    # actions/cache can persist it. vcpkg builds openssl/brotli/zlib/zstd from
-    # source otherwise, several minutes every run.
+    # No job cap: #1228 showed the starvation it guarded against was not real (#1213).
+    # Test 226 sizes the step timeouts.
+    # vcpkg's binary cache lives in the workspace so actions/cache can save it.
     env:
       VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}\vcpkg_cache
       # The platform as dumpbin and the VS dev shell name it.
@@ -73,11 +68,8 @@ jobs:
         shell: pwsh
         run: New-Item -ItemType Directory -Force -Path $env:VCPKG_DEFAULT_BINARY_CACHE | Out-Null
 
-      # x-gha is gone (vcpkg-tool #1662 dropped it after GitHub changed the cache
-      # API), so cache the binary archives directly. An exact key hit skips the save,
-      # so a cache orphaned by a toolchain bump pins itself, and naming every input
-      # vcpkg's ABI hash folds in is a list that can come up short: key on the run
-      # id instead, and restore by prefix.
+      # vcpkg-tool #1662 dropped x-gha. The key is the run id, restored by
+      # prefix, because an exact hit would skip the save.
       - name: Restore the vcpkg binary archives
         uses: actions/cache/restore@v6
         with:
@@ -149,17 +141,14 @@ jobs:
           } else { Write-Host "no build log" }
           if ($stale) {
             Write-Host "::warning::stale vcpkg cache: $before archives, none matching this toolchain; every port rebuilt from source"
-            # Provably dead: drop them rather than carry every past toolchain
-            # generation in the saved entry forever. -LiteralPath because a piped
-            # string binds -Path, which globs on a name carrying [ ].
+            # -LiteralPath, unlike -Path, does not glob a [ ] name.
             Get-Content vcpkg-restored.txt -EA SilentlyContinue | Where-Object { $_ } |
               ForEach-Object { Remove-Item -LiteralPath $_ -Force -EA SilentlyContinue }
           }
           $after = @(Get-ChildItem -Recurse -File -Filter *.zip `
             $env:VCPKG_DEFAULT_BINARY_CACHE -EA SilentlyContinue).Count
           Write-Host "$after archive(s) to cache"
-          # Pruning can leave the count unmoved while replacing every archive, so the
-          # stale case saves on its own account rather than on growth.
+          # Save when stale, because pruning can leave the count unchanged.
           "save=$($stale -or ($after -gt $before))".ToLower() |
             Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
@@ -250,7 +239,7 @@ jobs:
             $out -join "`n"
           }
 
-          # Each mitigation, as the pattern that finds it in that dump.
+          # Maps each mitigation to its pattern in that dump.
           $want = [ordered]@{
             "ASLR (/DYNAMICBASE)"        = "Dynamic base"
             "DEP (/NXCOMPAT)"            = "NX compatible"
@@ -260,11 +249,8 @@ jobs:
             $want["Shadow stacks (/CETCOMPAT)"] = "CET\s*Compat"
           }
 
-          # Everything a dump does not show. /GS is counted rather than matched:
-          # the load-config "Security Cookie" field holds the address of
-          # __security_cookie, which the CRT links into every image whatever /GS
-          # was, so matching it can never fail. The VC feature record counts the
-          # objects actually compiled with it.
+          # /GS is read from the VC feature record, because the CRT links
+          # __security_cookie whatever /GS was.
           function Missing($hdr) {
             $out = @()
             foreach ($k in $want.Keys) {
@@ -277,10 +263,7 @@ jobs:
             ,$out
           }
 
-          # Negative control: the same parse, over a dump that carries ASLR and a
-          # security cookie but neither guard nor a /GS count, must report the
-          # rest missing. A row that cannot fail is worse than no row, and that
-          # is exactly how the first /GS check shipped.
+          # This proves each row can fail.
           $none = "Dynamic base`nSecurity Cookie 0x140001000`n" +
                   "Counts: Pre-VC++ 11.00=0, C/C++=73, /GS=0, /sdl=0"
           $ctl = Missing $none
@@ -340,18 +323,12 @@ jobs:
           path: ${{ runner.temp }}\wsl-rootfs.tar.gz
           key: wsl-rootfs-jammy-amd64-v1
 
-      # WSL2 brings up in ~35s on a hosted runner with no reboot and no
-      # third-party action: the three features are already enabled on the image.
-      # It buys a real Linux shell against the same native httrack.exe, and is
-      # the only suite leg since MSYS's fork emulation wedged its own (#1273).
-      # Dropping the MSYS leg also took the runner-death rate from 12.5% to
-      # 0.3%, so do not bring one back (#1228).
+      # WSL2 runs the native httrack.exe from Linux. Do not bring back MSYS,
+      # because its fork emulation wedged runners (#1273, #1228).
       - name: Bring up WSL2
         id: wslup
         if: env.RUNNABLE == 'true'
-        # Still non-gating now that the suite step gates: a failed import
-        # reaches that step, which names it and reds there. Failing here too
-        # would report one cause twice, and less clearly.
+        # A failed import reds at the suite step, which names it.
         continue-on-error: true
         shell: pwsh
         timeout-minutes: 15
@@ -407,8 +384,7 @@ jobs:
           # For the record when a path stops converting: this rootfs has no
           # wslpath, which is why nothing in the suite calls one.
           wsl -d httrack-suite -- sh -c 'command -v wslpath || echo "no wslpath"'
-          # Recorded because a path error naming no path sent this looking in
-          # the wrong place: the automount is there, /mnt/c and /mnt/d included.
+          # Logs the automount, /mnt/c and /mnt/d included, for path errors.
           wsl -d httrack-suite -- sh -c 'echo mounts:; ls -d /mnt/*'
 
       - name: Save the WSL rootfs
@@ -463,14 +439,9 @@ jobs:
             exit 1
             ;;
           esac
-          # Through the environment, not argv: `wsl -- sh -c '...' _ "$ws"`
-          # delivered an empty $1, which is what the path error naming no path
-          # was. WSLENV already carries everything else this step needs.
-          # The bring-up is continue-on-error, so a failed import reaches here as
-          # "There is no distribution with the supplied name" and exit 127, which
-          # names neither the step that failed nor why. wsl -l writes UTF-16.
-          # Captured, not piped into grep -q: grep exits on the match, tr
-          # takes SIGPIPE, and pipefail would red a step whose distro was there.
+          # The path goes in the environment, because `wsl -- sh -c '...' _ "$ws"` gave an empty $1.
+          # A failed bring-up arrives here as exit 127.
+          # Capture wsl -l, because grep -q would SIGPIPE tr under pipefail.
           distros=$(wsl -l -q | tr -d '\0\r')
           grep -qx httrack-suite <<<"$distros" || {
             # One annotation is one line: a newline would drop all but the first.
@@ -485,8 +456,7 @@ jobs:
           # shellcheck disable=SC2016 # same: the distro's shell expands these
           wsl -d httrack-suite -- sh -c 'cd "$HTS_WS/tests" && exec bash ./ci-windows-suite.sh "$HTS_BIN"' 2>&1 | tee suite-console-wsl2.log
 
-      # Its own step: the watchdog can kill the suite's step before it counts,
-      # which is exactly when the count is worth having (#1588).
+      # The watchdog can kill the suite step before it counts (#1588).
       - name: Count the workers the suite lost
         if: always() && env.RUNNABLE == 'true'
         shell: bash
@@ -495,11 +465,9 @@ jobs:
           . ./ci-windows-suite.sh
           ci_report_lost_workers suite-console-wsl2.log
 
-      # The engine ships ~90 tests and none had ever run on Windows: "make check"
-      # is Linux/macOS only. These are the offline ones, run against the native
-      # httrack.exe. The *_local-* ones crawl the bundled Python server over
-      # loopback: the real TLS handshake, cache and file writer, which nothing
-      # else on Windows covers.
+      # Windows has no make check, so these run the tests against the native
+      # httrack.exe. The *_local-* ones are our only Windows test of TLS, cache
+      # and writer.
       - name: Upload the test logs
         if: always() && env.RUNNABLE == 'true'
         uses: actions/upload-artifact@v7

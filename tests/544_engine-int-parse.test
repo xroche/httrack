@@ -6,8 +6,8 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-# The bounded decimal parser, then every site converted to it against a frozen
-# copy of its old sscanf parse (-#test=int-parse-diff in htsheader_selftest.c).
+# This checks the bounded decimal parser, then each site using it against a
+# frozen copy of its old sscanf parse (-#test=int-parse-diff).
 
 max64=9223372036854775807
 

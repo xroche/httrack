@@ -1,9 +1,7 @@
 #!/bin/bash
 #
-# Assert pac-ret in the artifact, not the GNU property note: the linker ANDs
-# that note across every input, and Ubuntu's aarch64 crt objects carry none, so
-# it is absent there however the engine was built. The signing instructions are
-# what survive, and they are what actually protects a return address.
+# Count pac-ret instructions, because the GNU property note is ANDed across
+# all linker inputs and Ubuntu's aarch64 crt objects carry none.
 
 set -euo pipefail
 
@@ -42,9 +40,7 @@ esac
 tmp=$(mktemp -d) || exit 1
 cleanup_push rm -rf "$tmp"
 
-# Counted inside hts* functions only. httrack-android measured 40 paciasp in
-# its arm64 libhttrack.so with the engine entirely unprotected, because every
-# one sat in the prebuilt OpenSSL it links; a whole-file count reads as a pass.
+# Count in hts* functions only, because a linked OpenSSL can carry paciasp.
 signed() { # signed FILE -- engine functions that sign their return address
     "$objdump" -d "$1" 2>/dev/null |
         awk '/^[0-9a-fA-F]+ <hts[^>]*>:/ { ours = 1; next }
@@ -59,8 +55,7 @@ engine_syms() { # engine_syms FILE
     "$objdump" -d "$1" 2>/dev/null | grep -c '^[0-9a-fA-F]* <hts' || true
 }
 
-# Named hts* so the controls exercise signed()'s own scoping, and non-leaf and
-# not inlinable, so pac-ret has a return address to sign.
+# The hts* name tests the scoping, and the call gives pac-ret something to sign.
 cat >"$tmp/probe.c" <<'PROBE'
 int hts_callee(int x);
 int hts_probe(int x) { return hts_callee(x) + 1; }
@@ -73,7 +68,7 @@ build() { # build OUT FLAGS...
     "${cc_argv[@]}" -Werror "$@" -c -o "$out" "$tmp/probe.c" >/dev/null 2>&1
 }
 
-# Two controls, because the assertion below is vacuous without both.
+# The assertion below needs both controls to mean anything.
 build "$tmp/asked.o" -mbranch-protection=standard ||
     skip "${CC:-cc} does not accept -mbranch-protection=standard"
 [ "$(signed "$tmp/asked.o")" -gt 0 ] ||
@@ -88,8 +83,7 @@ build "$tmp/plain.o" -mbranch-protection=none ||
 [ "$(engine_syms "$subject")" -gt 0 ] ||
     skip "$(basename "$subject") shows no hts* symbols, so it cannot be scoped"
 
-# The note says whether the loader also enforces BTI, which the crt objects
-# decide rather than we do, so report it and assert only what we control.
+# The crt objects decide whether the note enables BTI, so only report it.
 echo "$(basename "$subject"): $(signed "$subject") signed function(s), property note:" \
     "$("$readelf" -nW "$subject" 2>/dev/null | sed -n 's/.*[Ff]eature: *//p' | head -1)"
 

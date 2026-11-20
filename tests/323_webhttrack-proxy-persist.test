@@ -1,8 +1,6 @@
 #!/bin/bash
 #
-# The proxy a user types must reach winprofile.ini and come back. Its keys were
-# bound to variables no page renders, so the box was never saved and a stored
-# one never restored, while the file kept whatever a desktop GUI last wrote.
+# A typed proxy must reach winprofile.ini and come back into the box.
 
 set -euo pipefail
 
@@ -14,8 +12,7 @@ distdir=$(cd "${distdir}" && pwd)
 
 # Ahead of htsserver_require, which skips where python3 is absent: pure text.
 printf '[the proxy keys name the rendered fields] ..\t'
-# The keys are worth nothing unless they carry the variables option10.html
-# actually draws, which is the whole of the bug.
+# The keys must carry the variables option10.html draws.
 for pair in "Proxy:prox" "Port:portprox" "ProxyType:proxytype"; do
     key=${pair%:*} var=${pair#*:}
     grep -q "do:copy:${key}:${var}}" "${distdir}/html/server/step2.html" ||
@@ -46,8 +43,7 @@ PORT=3128
 test -n "${HOST}" || fail "the probe host is empty"
 test -n "${PORT}" || fail "the probe port is empty"
 
-# Kept although the leg below covers its mutants: the bug had two user-visible
-# halves, and a regression report that names only one reads as covering one.
+# Redundant with the leg below, but it names the other half of the bug.
 printf '[a typed proxy reaches the file] ..\t'
 htsserver_start --home "${work}"
 

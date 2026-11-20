@@ -41,9 +41,8 @@ assert_eq "" "$(httrack -O /dev/null -#test=charset 'no-such-charset-xyz' 'café
 runs 'utf-8' 'hex:80'
 runs 'utf-8' 'hex:c3'
 
-# A leading NUL used to store the terminator through a pointer the loop had
-# never allocated. The non-ASCII byte is what makes these reach the tables at
-# all, because an all-ASCII string is copied without consulting them.
+# A leading NUL must not be stored through a pointer the loop never allocated.
+# The non-ASCII byte is there because an all-ASCII string skips the tables.
 runs 'windows-1252' 'hex:0080'
 runs 'ibm850' 'hex:0080'
 

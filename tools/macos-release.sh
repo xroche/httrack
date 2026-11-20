@@ -64,7 +64,7 @@ while [ $# -gt 0 ]; do
 done
 test -n "$app" || usage
 test -n "$identity" || usage
-# Checked here, not at the DMG: a typo must not cost a notarization submission first.
+# Check the label before a typo costs a notarization submission.
 case "$label" in
 *[!A-Za-z0-9._-]*) fail "--label $label is not usable in a filename" ;;
 esac
@@ -111,8 +111,8 @@ while IFS= read -r bin; do
 done <"$mach"
 codesign --verify --strict "$app" || fail "$app arrived with a broken signature"
 
-# Inside out, and never the main executable on its own: signing the bundle is what
-# signs it, and doing it early would seal resources the rest of this loop rewrites.
+# Sign inside out. The bundle signs the main executable, because signing it
+# here would seal resources this loop still rewrites.
 while IFS= read -r bin; do
     if [ "$bin" != "$mainexe" ]; then
         sign --options runtime "$bin"
@@ -126,7 +126,7 @@ notarize() {
     xcrun notarytool submit "$1" --key "$notary_key" --key-id "$notary_key_id" \
         --issuer "$notary_issuer" --wait --timeout 2h >"$nlog" 2>&1 || st=$?
     cat "$nlog"
-    # A rejected submission has exited 0 in the past, so read the verdict, not just $?.
+    # A rejected submission has exited 0 before, so check the verdict too.
     if [ "$st" -ne 0 ] || ! grep -q "status: Accepted" "$nlog"; then
         id=$(sed -n 's/^ *id: \([0-9a-fA-F][0-9a-fA-F-]*\)$/\1/p' "$nlog" | head -1)
         # The rejection reason lives only in this log.

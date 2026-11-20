@@ -106,10 +106,8 @@ bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$nolink")" \
     httrack 'BASEURL/index.html' -r3
 
 # --- 3. contract, and the -%P heuristic on top of it ------------------------
-# data-src and the href= inside data-template are links by contract, through
-# hts_attrs[]. The rest come from the -%P scan, which opens a candidate only
-# where "=(," precedes the quote, so data-args pins the "(" and "," arms while
-# the JSON blob's paths sit behind a ":" and stay unread.
+# data-src and data-template's href= are links. -%P opens a candidate only where
+# "=(," precedes the quote, so the JSON paths behind a ":" stay unread.
 attrs="$tmp/attrs"
 mkdir -p "$attrs"
 cat >"$attrs/index.html" <<'EOF'

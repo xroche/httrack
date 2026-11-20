@@ -1,9 +1,7 @@
 #!/bin/bash
 #
-# Issue #772: hts_newthread() destroyed the pthread attributes object only when
-# the thread started, so a failed pthread_create() left it initialised forever.
-# glibc allocates nothing for a default attr, so no leak checker sees it: the
-# interposer counts the init/destroy imbalance instead.
+# hts_newthread() must destroy its pthread attr when pthread_create() fails.
+# glibc allocates nothing for one, so the interposer counts init/destroy (#772).
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh

@@ -48,7 +48,7 @@ typedef enum unescapeFlags {
   UNESCAPE_URL_NO_ASCII = 1
 } unescapeFlags;
 
-/* Value of one hex digit, or -1 if 'c' is not one. */
+/* Return the value of hex digit c, or -1. */
 static HTS_INLINE HTS_UNUSED int hts_ehexh(const char c) {
   if (c >= '0' && c <= '9')
     return c - '0';
@@ -60,8 +60,7 @@ static HTS_INLINE HTS_UNUSED int hts_ehexh(const char c) {
     return -1;
 }
 
-/* Value of the two-hex-digit sequence at 's', or -1 if either digit is not one.
- */
+/* Return the value of the two hex digits at s, or -1. */
 static HTS_INLINE HTS_UNUSED int hts_ehex(const char *s) {
   const int c1 = hts_ehexh(s[0]);
 
@@ -97,8 +96,8 @@ extern int hts_unescapeEntitiesWithCharset(const char *src,
                                            const char *charset);
 
 /**
- * Flags for hts_unescapeEntitiesWithCharsetSpecial(). Values stay distinct from
- * unescapeFlags above: both reach their function as a plain int.
+ * Flags for hts_unescapeEntitiesWithCharsetSpecial(). Keep them distinct from
+ * unescapeFlags above, because both pass as a plain int.
  **/
 typedef enum unescapeEntitiesFlags {
   /** The destination is a URL query string: write a reference the charset can
@@ -110,7 +109,7 @@ typedef enum unescapeEntitiesFlags {
 /**
  * Unescape HTML entities into their charset equivalents, "flags" being a mask
  * of UNESCAPE_ENTITIES_XXX constants.
- * Note: source and destination MUST NOT be the same with a flag that may grow
+ * Source and destination MUST NOT be the same with a flag that may grow
  * the string (UNESCAPE_ENTITIES_URL_QUERY).
  * Returns 0 upon success, -1 upon overflow or error.
  **/

@@ -5,9 +5,7 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-# #133: the save-path ceiling used to be the Windows MAX_PATH (236 usable) on
-# every platform, needlessly hashing long names on Linux/macOS/Android. Off
-# Windows a name well under the platform PATH_MAX must now be kept whole.
+# #133: off Windows, a name well under PATH_MAX must not be hashed.
 
 httrack_bin=$(httrack_path)
 scratch=$(mktemp -d)
@@ -60,10 +58,8 @@ else
     fi
 fi
 
-# #852: with the directories eating the budget, the final segment was bounded
-# by the whole path alone, so the cut took its extension with it. Vacuous on
-# Linux, whose ceiling is out of the save buffer's reach; it bites on Windows
-# and macOS.
+# #852: a cut must keep the extension. Vacuous on Linux, whose ceiling is past
+# the save buffer, so it bites only on Windows and macOS.
 dirs="/$(printf 'p%.0s' {1..200})/$(printf 'q%.0s' {1..200})/$(printf 'r%.0s' {1..200})"
 cut="$("$httrack_bin" -O "/$(printf 'o%.0s' {1..100})" -#test=savename \
     "$dirs/$(printf 'Y%.0s' {1..300}).html" text/html | sed -n 's/^savename: //p')"

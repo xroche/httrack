@@ -35,9 +35,8 @@ Please visit our Website: http://www.httrack.com
 #include <string.h>
 
 /** @file htsarena.h
- *  Bump allocator over chunks that are never resized, so what it hands out
- *  keeps its address, which the realloc-based String and TypedArray cannot
- *  promise. Nothing is released until the whole arena is. **/
+ *  Bump allocator whose allocations never move and are freed only together.
+ **/
 
 /** Alignment fit for anything an arena is asked to hold. **/
 typedef union {

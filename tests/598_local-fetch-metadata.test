@@ -124,7 +124,7 @@ selftest_queue no fetchtrust 127.example.com
 selftest_queue no fetchtrust localhost.example.com
 selftest_queue no fetchtrust ftp://127.0.0.1/
 selftest_run_queued
-# Alone, so that a quadratic scan stalls only this case.
+# Run alone so a quadratic scan stalls only this case.
 assert_selftest 'nobase document' fetchscale
 
 d=fetchmeta

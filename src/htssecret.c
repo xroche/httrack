@@ -323,8 +323,7 @@ void fprint_redacted(FILE *fp, size_t len) {
   fprintf(fp, "<redacted, %lu bytes>", (unsigned long) len);
 }
 
-/* The -%H log hides the value of these fields because they carry logins.
-   This list governs the -%H log, not the wire. */
+/* Only the -%H log hides these fields, because they carry logins. */
 static const char *const secret_fields[] = {
     "Authorization", "Proxy-Authorization", "Cookie", "Set-Cookie"};
 

@@ -25,27 +25,19 @@ would dishonor our work and waste the many hours we have spent on it.
 Please visit our Website: http://www.httrack.com
 */
 
-/* Fuzz httrack's own codepage decoder: hts_codepageToUTF8() and the
-   htscodepages.h tables. A build with iconv compiles none of that (htscharset.c
-   hides it behind DISABLE_ICONV), yet it is what Windows and every iconv-less
-   distro ship, so this harness links its own copy of htscharset.c forced onto
-   the tables. fuzz-charset covers whichever path the build itself chose.
-
-   The label reaches hts_equalsCodepageName(), which matches a table name
-   loosely, so that "windows-1252" and "IBM850" name cp1252 and cp850. The
-   input picks either a fixed label or one made of its own bytes. */
+/* Fuzz hts_codepageToUTF8() and the htscodepages.h tables, which iconv builds
+   skip, so this links its own htscharset.c forced onto the tables. */
 #include "fuzz.h"
 #include "htscharset.h"
 
-/* Table names, the IANA and IBM spellings that must resolve to the same table,
-   and two that must resolve to none. */
+/* Aliases must resolve to their name's table, and the last two to none. */
 static const char *const labels[] = {
     "iso88591", "iso885915", "cp1252",    "windows-1252", "windows1252",
     "IBM850",   "cp850",     "koi8r",     "koi8-r",       "cp037",
     "cp864",    "cp1256",    "iso885911", "utf-8",        "no-such-charset",
 };
 
-/* Selector asking for a label out of the input rather than out of labels[]. */
+/* This selector takes the label from the input instead of labels[]. */
 #define FUZZ_LABEL_FROM_INPUT 0xff
 
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
@@ -56,7 +48,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   if (size == 0)
     return 0;
   if (data[0] == FUZZ_LABEL_FROM_INPUT) {
-    /* label up to the first NUL, payload after it; no NUL means no payload */
+    /* The label ends at the first NUL, and any payload follows it */
     const uint8_t *const nul = memchr(data + 1, '\0', size - 1);
     const size_t labelLen =
         nul != NULL ? (size_t) (nul - (data + 1)) : size - 1;

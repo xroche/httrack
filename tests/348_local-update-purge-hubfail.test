@@ -1,9 +1,7 @@
 #!/bin/bash
 #
-# A page that fails to re-fetch on --update keeps its copy (#746), but its
-# children were never queued, so the purge unlinked them. A hang-up and a
-# decode failure hold the purge back for the run; a link never mirrored, an
-# answered error and a deliberate size skip must not.
+# On --update, a page that fails to re-fetch keeps its copy and its children
+# (#746). Only a hang-up or decode failure holds the purge.
 
 set -euo pipefail
 
@@ -38,7 +36,7 @@ local_crawl --log "${tmpdir}/log2" "${common[@]}" -O "$out" --update \
     "${BASEURL}/hubfail/index.html"
 
 assert_gave_up "$out" '/hubfail/hub\.html'
-# #746 keeps the copy whole, links included, not just a non-empty file.
+# #746 keeps the copy whole, links included.
 assert_alive "${site}/hub.html" 'child2\.html'
 assert_alive "${site}/child1.html" HUBFAIL-CHILD-1
 assert_alive "${site}/child2.html" HUBFAIL-CHILD-2
@@ -87,8 +85,7 @@ assert_purged false "$out"
 ok "a mangled gzip body holds the purge like a hang-up does"
 
 # --- boundary: a hub that answers 500 needs no hold at all ------------------
-# The update recovers it from the previous copy ahead of the give-up arm, so
-# the guard is never asked: the ordering the guard rests on, asserted below.
+# The update recovers it from the previous copy before the guard can run.
 out="${tmpdir}/err"
 mkdir -p "$out"
 site="${out}/127.0.0.1_${SRV_PORT}/errfail"

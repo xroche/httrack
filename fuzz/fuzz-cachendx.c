@@ -25,10 +25,7 @@ would dishonor our work and waste the many hours we have spent on it.
 Please visit our Website: http://www.httrack.com
 */
 
-/* Fuzz the legacy .ndx/.dat cache reader, which is proxytrack's (store.c) and
-   is now the only one left: #1551 moved -#C off the .ndx onto the ZIP index.
-   The loader walks length-prefixed index entries and seeks the .dat on offsets
-   read out of them, so both files come from the input:
+/* Fuzz proxytrack's .ndx/.dat cache reader (store.c). The input holds both:
 
      bytes 0..1   big-endian length of the .ndx part
      then         the .ndx, then the rest as the .dat

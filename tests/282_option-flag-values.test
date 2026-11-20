@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# A long option must honour the value its short form takes: --index=0 dropped
-# its value and read back as the enabling bare --index (#1195).
+# A long option must honour the value its short form takes, so --index=0 must
+# not read back as the enabling bare --index (#1195).
 
 set -euo pipefail
 
@@ -45,9 +45,8 @@ indexed yes --index
 indexed yes --index=1
 indexed yes -I
 
-# A value the option cannot take stops the run instead of being dropped. The
-# message has to name the reason, or a mangled flag the engine happens to reject
-# would read as a refusal; 134 would be an abort rather than either.
+# A value the option cannot take must stop the run with a message naming the
+# reason. Status 134 would be an abort.
 refused() { # refused WANTED-MESSAGE ARG...
     local want=$1
     shift
@@ -61,8 +60,8 @@ refused 'does not take the value' --index=2
 refused 'does not take the value' --mirror=0
 refused 'Unknown option: nomirror' --nomirror
 
-# The three rows that were misclassified "param" (#1200). That class demands a
-# following token, so =1 died on "invalid option 1" and the space form was worse.
+# These three rows must not be class "param", which demands a following token
+# and turns =1 into "invalid option 1" (#1200).
 for opt in purge-old httpproxy-ftp extended-parsing; do
     for form in "--${opt}" "--${opt}=0" "--${opt}=1" "--no${opt}"; do
         crawl "${form}"
@@ -74,8 +73,7 @@ for opt in purge-old httpproxy-ftp extended-parsing; do
     done
 done
 
-# ...and a URL after one of them is a URL again: as "param" it was eaten as the
-# value, and the run mirrored nothing.
+# ...and a URL after one of them stays a URL and gets mirrored.
 rm -rf "${tmp}/out"
 mkdir -p "${tmp}/out"
 RC=0
@@ -112,10 +110,7 @@ for name in $(awk '{print $2}' <<<"${rows}" | sort | uniq -d); do
         fail "--${name} has ${n} classes in the table; the first row silently wins"
 done
 
-# --structure is a preset number, and the engine reads a DETACHED -N value as a
-# user template whatever it holds, so the presets must stay glued (#1380).
-# Assert the layout each preset produces: a dropped value falls back to -N0's,
-# which "no file named 5" cannot tell apart from the preset working.
+# A detached -N value reads as a user template, so presets stay glued (#1380).
 structure_layout() { # structure_layout PRESET RELATIVE-PATH
     crawl "--structure=$1"
     test "${RC}" -eq 0 || fail "--structure=$1 exited ${RC}"
@@ -127,8 +122,8 @@ structure_layout 5 web/html/page.html
 structure_layout 0 "file/${tmp#/}/page.html"
 
 # The file-list synonyms share a short option, so they must share its class. A
-# list naming a URL must be read, not merely not refused: a run that dies before
-# the parser also prints no syntax error.
+# list naming a URL must be read, because a run that dies before the parser
+# also prints no syntax error.
 echo "file://${tmp}/page.html" >"${tmp}/urls.txt"
 for name in list filelist urllist filterlist; do
     crawl "--${name}=${tmp}/urls.txt"
@@ -137,9 +132,8 @@ for name in list filelist urllist filterlist; do
         fail "--${name}=FILE is refused, but its synonym takes the same value"
 done
 
-# Non-circular control on the classes, since the sweep above reads the table it
-# is checking: every --name=0 the wizard writes has to be a row that takes a
-# value, or the flag means the opposite of the box (#1195, #1200).
+# The sweep above reads the table it checks, so control it from step4.html.
+# Every --name=0 the wizard writes must name a row that takes a value (#1195).
 literals=$(grep -o -- '--[a-z0-9-]*=0' "${distdir}/html/server/step4.html" |
     sed -e 's/^--//' -e 's/=0$//' | sort -u)
 test "$(grep -c . <<<"${literals}")" -ge 10 || fail "step4.html scan came up short"

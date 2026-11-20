@@ -1,8 +1,6 @@
 #!/bin/bash
 #
-# Regression guard for the unsigned-enum sentinel trap: copy_htsopt's
-# `if (from->X > -1)` guard is always false for unsigned hts_boolean fields, so
-# they silently stop being copied. Driven by the in-process 'httrack -#test=copyopt' test.
+# copy_htsopt() must copy hts_boolean fields even when that type is unsigned.
 
 set -eu
 

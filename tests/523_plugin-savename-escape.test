@@ -1,12 +1,7 @@
 #!/bin/bash
 #
-# url_savename() collapses "../" and then hands the name to the savename hook,
-# which rewrites it where it is, so whatever the hook wrote reached the open()
-# unchecked. Measured before the fix: "../../X" put a file one directory above
-# the mirror root, and with no -O, where the root a name joins to is empty, an
-# absolute name was used verbatim. The first fix then only looked at the name
-# when the engine's own was already relative, which -N100 on a "//path" URL is
-# not, so that whole family walked straight past it.
+# The savename hook runs after url_savename() collapses "../", so its result
+# must be checked again before open().
 
 set -e
 # shellcheck source=tests/crawllib.sh

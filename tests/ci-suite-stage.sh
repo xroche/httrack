@@ -1,12 +1,7 @@
 #!/bin/bash
 #
-# One staged run of ci-windows-suite.sh over 121 stub tests, for the tests that
-# drive the suite itself (337, 495). ci_stage_init reads the pinned skip set and
-# builds the stub bindir under $tmp; stage writes one suite, run_suite drives it.
-# Sourcing defines the helpers and stages nothing.
-#
-# $tmp and $testdir come from the test that sources this, and $ran, $rc and
-# $arm_took go back to it.
+# Stages one run of ci-windows-suite.sh over stub tests, for tests 337 and 495.
+# The caller sets $tmp and $testdir and gets $ran, $rc and $arm_took back.
 # shellcheck disable=SC2154,SC2034
 
 # Sets $bin, $share, $expected_skips, $nskip and $ran, and skips the caller where

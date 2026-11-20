@@ -38,8 +38,7 @@ case "$body" in
     ;;
 esac
 
-# The deadline is only as monotonic as the clock it reads, one function away,
-# so pin that mtime_monotonic() still asks the OS for one.
+# The deadline relies on mtime_monotonic() asking the OS for a monotonic clock.
 clock=$(awk '/^TStamp mtime_monotonic\(void\)/,/^}/' "$top_srcdir/src/htslib.c")
 for sym in clock_gettime GetTickCount64; do
     case "$clock" in

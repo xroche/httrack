@@ -1,10 +1,7 @@
 #!/bin/bash
 #
-# A quoted string ending in a slash counted as a directory link inside a script,
-# so httrack rewrote JavaScript's own separators. split("/") became
-# split("index-2.html") and the mirrored bundle behaved differently. Requiring a
-# second slash then stopped rewriting "/#top" and "/?q=1", which are URLs. The
-# evidence must come from the source bytes, because unescape_amp decodes
+# Inside a script, split("/") stays as written but "/#top" and "/?q=1" are
+# rewritten. Assertions read the source bytes, because unescape_amp decodes
 # "&num;" to a '#' before the parser looks.
 
 set -euo pipefail
@@ -57,12 +54,8 @@ for d in subdir a/b api/v1 assets/img cdir fragdir deep/sub; do
     printf 'reached\n' >"$root/$d/index.html"
 done
 
-# The cdir case cannot fail on the helper, since CSS url() reaches the parser by
-# another path. The data-x attribute catches a fix that drops the inscript test,
-# because outside a script a two-segment string must stay put. The two index*
-# matches pin the rewritten form, where "/" becomes the mirror's root page and
-# may gain a collision suffix. The anch case reaches the leading-marker path,
-# where the sanitizer legs catch a dropped length guard.
+# cdir goes through CSS url() and anch through the leading-marker path. data-x
+# catches a dropped inscript test, and index* allows a collision suffix.
 bash "$top_srcdir/tests/local-crawl.sh" --root "$root" --errors 0 \
     --file-matches 'app.js' 'split\("/"\)' \
     --file-matches 'app.js' '"image/"' \

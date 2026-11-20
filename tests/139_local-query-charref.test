@@ -1,8 +1,5 @@
 #!/bin/bash
-# Issue #854: a character reference the page charset can not represent must be
-# percent-escaped in a query string (%26%23<decimal>%3B), not left as source
-# text whose '&' and '#' split the query into extra parameters. A reference the
-# charset does represent must still go out as its encoded bytes.
+# A charref the page charset cannot encode must go out as %26%23<n>%3B (#854).
 set -eu
 
 # shellcheck source=tests/crawllib.sh
@@ -31,9 +28,7 @@ query_of() {
 }
 
 # check <label> <page> <want-parameter-count> <acceptable-query>...
-# The count is the origin's own parse of the wire bytes, independent of the
-# expected string. More than one query is acceptable where iconv and Windows
-# encode the same code point differently.
+# Several queries are accepted where iconv and Windows encode differently.
 check() {
     local label="$1" page="$2" wantcount="$3" got count want ok=
     shift 3
@@ -56,10 +51,7 @@ check() {
     echo "OK (${count} parameters)"
 }
 
-# iso-8859-1 fallback: € is unrepresentable (named and numeric alike), é is not.
-# The codepage tables convert to UTF-8 only, so a build without iconv cannot put
-# é back as a Latin-1 byte and escapes it like the €. One answer is right per
-# build: offering both as acceptable would stop telling the two apart.
+# iso-8859-1: € is escaped, and é is too in a build without iconv.
 if have_feature iconv; then
     want_none='a=%26%238364%3B&b=%26%238364%3B&c=%e9&d=x'
 else
@@ -77,8 +69,7 @@ if ! have_feature iconv; then
 fi
 
 # Multi-byte: あ and 〜 must survive as their encoded bytes, only € gets escaped.
-# The two cp932 tables disagree about 〜 (U+301C): iconv encodes it, Windows maps
-# 0x8160 to U+FF5E instead and reports the substitution, so both are correct.
+# iconv encodes 〜 (U+301C) in cp932, but Windows maps 0x8160 to U+FF5E.
 check "declared shift_jis page" qsjis 4 \
     'a=%82%a0&c=%81`&b=%26%238364%3B&d=x' \
     'a=%82%a0&c=%26%2312316%3B&b=%26%238364%3B&d=x'

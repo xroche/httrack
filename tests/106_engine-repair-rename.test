@@ -1,9 +1,7 @@
 #!/bin/bash
 #
-# #786: both cache-repair paths moved the recovered zip onto the cache without
-# checking the move, and announced success either way. #824: they also committed
-# a recovery holding no entry at all. Neither may replace the cache, and both
-# must be reported.
+# Both cache-repair paths must report a failed move of the recovered zip
+# (#786) and must not commit a recovery holding no entry (#824).
 
 set -euo pipefail
 
@@ -111,8 +109,7 @@ test -s "${proj}/hts-cache/repair.zip" || fail "the recovery was not kept for a 
 echo "OK"
 
 # --- the move is refused the way Windows refuses it --------------------------
-# The destination always exists there, so every repair takes hts_rename_over()'s
-# fallback. Before #790 that fallback removed the cache and then failed.
+# hts_rename_over()'s fallback must not lose the cache (#790).
 printf '[a refused fallback keeps the cache] ..\t'
 proj="${tmpdir}/eexist"
 plant_damaged_cache "$proj"

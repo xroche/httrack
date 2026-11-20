@@ -1,9 +1,6 @@
 #!/bin/bash
 #
-# With no cache entry an FTP transfer resumed on the strength of the local
-# file's mere existence, so a changed remote got its tail spliced onto the old
-# head (#823). Resuming now needs SIZE and MDTM to agree that the remote can
-# still extend the local copy; pass 2 proves a genuine partial still resumes.
+# Without a cache, FTP must resume only when SIZE and MDTM agree (#823).
 
 set -euo pipefail
 
@@ -31,8 +28,7 @@ no_errors() {
 # Commands the server saw since the last pass; each pass starts by emptying it.
 sent() { cat "$cmds"; }
 
-# Generations differ in their first bytes, so a splice shows wherever it lands;
-# the mtime is explicit because the fix decides on it, and a race would not do.
+# Each generation has distinct first bytes and an explicit mtime the fix reads.
 write_body() {
     "$python" -c 'import os, sys
 path, tag, fill, stamp = sys.argv[1:5]
@@ -61,8 +57,7 @@ ftp_server_start --root "$root" --mode-file "$(nativepath "$mode")" \
 host="127.0.0.1_${FTP_PORT}"
 url="ftp://127.0.0.1:${FTP_PORT}/a.bin"
 mirror="${out}/${host}/a.bin"
-# --cache=0 is the whole point: no cache entry to tell a partial from a stale
-# copy. Bounded like every crawl pass, so a wedge fails instead of hanging.
+# --cache=0 leaves no cache entry to tell a partial from a stale copy.
 crawl() { run_with_timeout 300 httrack "$url" -O "$out" --quiet \
     --disable-security-limits --robots=0 --timeout=20 --max-time=120 --retries=1 \
     --cache=0; }
@@ -137,8 +132,8 @@ no_errors "pass 5"
 ok "the unprovable resume was re-fetched whole"
 
 # --- pass 6: a copy this engine never stamped, so dated by the local clock ---
-# Every mirror made before the fix looks like this. "Not newer than the remote"
-# waves it through, which is why the date has to match rather than merely lead.
+# Every pre-fix mirror looks like this: dated by the local clock, later than the
+# remote. Resume must require a matching date, and a later one is not enough.
 : >"$mode"
 plant_stale 4000 "$future_stamp"
 : >"$cmds"

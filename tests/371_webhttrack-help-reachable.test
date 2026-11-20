@@ -35,9 +35,7 @@ for a in ${anchors}; do
     esac
 done
 
-# Every page and the section it names, pinned: an id that merely exists is not
-# the right one. finished.html named step-ready, "Last checks", for years
-# (#1444). The count is compared too, so deleting a link cannot pass quietly.
+# Pin each page's section too, because an existing id may be wrong (#1444).
 pairs=$(
     cat <<'PAIRS'
 addurl.html step-address
@@ -100,9 +98,8 @@ IDLE='Existing project name:'
 # invisible. about.html is not a pane; the four tail spellings open the files
 # the first four name, since the path reaches open() unnormalized.
 PANES=$(
-    # An if, not a case: bash 3.2 cannot parse a case inside a command
-    # substitution, and the syntax error read as a pass, so this test was
-    # vacuous on macOS.
+    # Use if, because bash 3.2 cannot parse a case inside a command
+    # substitution and its syntax error reads as a pass.
     for f in "${distdir}"/html/server/*.html; do
         test "${f##*/}" != about.html || continue
         printf '/server/%s\n' "${f##*/}"

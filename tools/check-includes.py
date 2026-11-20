@@ -21,16 +21,14 @@ MACROS_BY_HEADER = {
 }
 
 # One pass over all four, because each can hold the others. The // inside "http://"
-# opens no comment, and the lone quote in '"' opens no string. Getting that wrong
-# blanked 6% of this tree and hid every macro in it.
+# opens no comment, and the lone quote in '"' opens no string.
 COMMENT_OR_LITERAL = re.compile(
     r"/\*.*?\*/" r"|//(?:\\\n|[^\n])*" r"|'(?:\\.|[^'\\])*'" r'|"(?:\\.|[^"\\])*"',
     re.S,
 )
 LITERAL = re.compile(r"'(?:\\.|[^'\\])*'" r'|"(?:\\.|[^"\\])*"', re.S)
 
-# The name a #define, #undef or #ifdef introduces is not a use, which is what the usual
-# "#ifndef SIZE_MAX / #define SIZE_MAX ..." portability shim looks like.
+# A name that #define, #undef or #ifdef introduces is not a use.
 DECLARED = re.compile(r"^[ \t]*#[ \t]*(?:define|undef|ifdef|ifndef)[ \t]+\w+", re.M)
 
 CONDITIONAL = re.compile(r"^\s*#\s*(if|ifdef|ifndef|endif)\b")

@@ -1,20 +1,16 @@
 #!/bin/sh
 #
-# One-shot build from a git checkout: bootstrap (autoreconf) -> configure -> make.
-# A convenience wrapper; the canonical steps are ./bootstrap && ./configure && make.
+# One-shot build from a git checkout: ./bootstrap && ./configure && make.
 #
-# Extra arguments are passed straight to ./configure, e.g.
+# Extra arguments go to ./configure, e.g.
 #   ./build.sh --prefix="$HOME" --disable-https
 #
-# Build out of tree (recommended; required if the source tree is read-only or
-# mounted noexec) by pointing BUILD_DIR at a scratch directory:
+# Set BUILD_DIR to build out of tree, which a read-only or noexec tree needs:
 #   BUILD_DIR=/var/tmp/httrack-build ./build.sh
 #
-# On a noexec filesystem the executable bit does not take effect, so invoke the
-# script explicitly with sh:  sh build.sh
+# On a noexec filesystem, run the script with sh:  sh build.sh
 #
-# Requires autoconf/automake/libtool (for bootstrap); the release tarball ships
-# ./configure, so from a tarball just run ./configure && make.
+# bootstrap needs autoconf, automake and libtool. A release tarball does not.
 
 set -e
 

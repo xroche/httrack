@@ -149,10 +149,8 @@ int verif_external(httrackp * opt, int nb, int test);
 int istoobig(httrackp *opt, LLint size, LLint maxhtml, LLint maxnhtml,
              char *type);
 /* Move src onto dst, replacing an existing dst; HTS_TRUE on success. Both paths
-   are fconv()'d. A dst in the way is parked under a sibling name rather than
-   removed, so the old content survives a failure: back at dst, or under that
-   sibling (named in the log) when the move back failed too. Not atomic: a crash
-   between the two renames leaves dst absent and its content beside it. */
+   are fconv()'d. A failure leaves the old content at dst or under a logged
+   sibling name, and a crash between the two renames leaves only the sibling. */
 hts_boolean hts_rename_over(httrackp *opt, const char *src, const char *dst);
 
 /* Selftest hook: run the aside fallback directly, on a platform whose rename()

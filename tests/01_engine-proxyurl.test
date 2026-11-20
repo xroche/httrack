@@ -39,14 +39,11 @@ p 'socks5://user:pass@host:9050' 'name=socks5://user:pass@host port=9050 host=ho
 p 'connect://host' 'name=connect://host port=8080 host=host kind=connect'
 p 'connect://host:8082' 'name=connect://host port=8082 host=host kind=connect'
 p 'connect://user:pass@host:8082' 'name=connect://user:pass@host port=8082 host=host kind=connect'
-# only the scheme selects connect mode: a host literally named "connect" is a
-# plain http proxy, not a tunnel
+# a host named "connect" is still a plain http proxy
 p 'connect:8080' 'name=connect port=8080 host=connect kind=http'
 p 'connect.example.com:3128' 'name=connect.example.com port=3128 host=connect.example.com kind=http'
 
-# the split is byte-transparent: percent-escapes stay encoded (decoded later at
-# auth time), only structural ASCII ':'/'@' delimit, and the last '@' ends the
-# userinfo. So %40/%3A and UTF-8 bytes never mis-split host or port.
+# %40, %3A and UTF-8 bytes stay encoded, and the last '@' ends the userinfo
 p 'socks5://user:p%40ss@host:1080' 'name=socks5://user:p%40ss@host port=1080 host=host kind=socks'
 p 'socks5://us%3Aer:pass@host:1080' 'name=socks5://us%3Aer:pass@host port=1080 host=host kind=socks'
 p 'socks5://a@b:c@host:1080' 'name=socks5://a@b:c@host port=1080 host=host kind=socks'
@@ -81,8 +78,7 @@ p 'http://host:65536' 'name=http://host port=8080 host=host kind=http'
 p 'http://host:2147483648' 'name=http://host port=8080 host=host kind=http'
 p 'http://host:4294967296' 'name=http://host port=8080 host=host kind=http'
 p 'http://host:99999999999999' 'name=http://host port=8080 host=host kind=http'
-# discriminating: this one wrapped to a plausible 80, so range-checking the
-# sscanf result instead of rejecting the overflow still passes everything above
+# this one wraps to a plausible 80, which only rejecting the overflow catches
 p 'http://host:4294967376' 'name=http://host port=8080 host=host kind=http'
 p 'http://host:999999999999999999999999999999' 'name=http://host port=8080 host=host kind=http'
 p 'http://host:0' 'name=http://host port=8080 host=host kind=http'

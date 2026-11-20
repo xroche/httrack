@@ -6,8 +6,6 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-# Cache-index (.ndx) parse must stay inside the buffer on a corrupt length
-# prefix (ASan aborts here on the pre-fix binary; the OK check gates the
-# non-sanitized build too).
+# The .ndx parse must stay inside the buffer on a corrupt length prefix.
 
 assert_selftest 'cacheindex: OK' cacheindex

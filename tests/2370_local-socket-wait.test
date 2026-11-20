@@ -46,7 +46,7 @@ timed_crawl() {
     assert_eq $((2 * pages)) "$got" "files mirrored at -c$1"
 }
 
-# The old pause cost each page at least 100 ms at -c1. -c8 never fills its
+# A pause costs each page at least 100 ms at -c1. -c8 never fills its
 # sockets on a chain, so it times the same crawl with no pause on this host.
 # A loaded host may stall one run, never three, while the pause fails all three.
 for attempt in 1 2 3; do

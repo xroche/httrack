@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# --updatehttrack was recognised and then left in argv, so the main option loop
-# re-read it letter by letter as -u -p -d -a -t -e -h and the h printed the
-# usage and returned 0. A script could not tell that nothing had been mirrored.
+# --updatehttrack must leave argv. Otherwise the option loop reads it as
+# -u -p -d -a -t -e -h, and the h prints usage and exits 0.
 
 set -euo pipefail
 
@@ -46,7 +45,7 @@ assert_eq 1 "$(count_matching_lines "${usage_marker}" "${tmp}/run.log")" \
     "-h printed the usage"
 ok "the fixture mirrors, and the usage marker fires on -h"
 
-# The bug's whole signature: usage on stdout, exit 0, nothing mirrored.
+# The bug printed usage on stdout, exited 0 and mirrored nothing.
 crawl --updatehttrack
 test "${RC}" -ne 0 ||
     fail "--updatehttrack exited 0, mirroring $(mirror_names "${tmp}/out")"

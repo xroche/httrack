@@ -20,7 +20,7 @@ selftest_queue "foo.com/b.html does match $pattern" filter "$pattern" foo.com/b.
 selftest_queue "foo.com/ does match $pattern" filter "$pattern" foo.com/
 selftest_queue "foo.com.evil.org/x does NOT match $pattern" filter "$pattern" foo.com.evil.org/x
 
-# answers 0, 1, 5 (no up), 7, the ones adding nothing, credentials and port
+# Cover answers 0, 1, 5 (no up), 7, the no-op ones, credentials and port
 selftest_queue "wizardfilter self-test OK" wizardfilter
 
 selftest_run_queued

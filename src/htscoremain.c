@@ -105,8 +105,7 @@ static int datadir_has_templates(const char *dir) {
 /* htsbacktrace.c copies the Linux branch: it is program-side and cannot reach
    this hidden symbol, so a fix here belongs there too (#997). */
 const char *hts_self_path(char *dst, size_t dstsize) {
-  /* No byte to write a terminator into, and readlink() below would otherwise
-     be handed dstsize - 1 as SIZE_MAX. */
+  /* An empty dst holds no terminator, and readlink() would get SIZE_MAX. */
   if (dstsize == 0)
     return NULL;
 #if defined(_WIN32)
@@ -145,10 +144,8 @@ const char *hts_self_path(char *dst, size_t dstsize) {
     return dst;
   }
 #endif
-  /* GetModuleFileNameA() and sysctl() both copy a clipped path into dst before
-     they report the clipping, and Windows terminates that copy, so a refusal
-     would otherwise read back as a shorter path. Emptying dst covers it, and
-     the other two arms share the exit so a fifth cannot forget the contract. */
+  /* GetModuleFileNameA() and sysctl() leave a clipped path on failure, so
+     empty dst. */
   dst[0] = '\0';
   return NULL;
 }
@@ -532,12 +529,8 @@ static int cmdl_cluster_params(cmdl_argv *cmd, const char *word, int argc,
   return next - first;
 }
 
-/* Whether the option at NA may take the word after it though it begins with
-   '-': only where that word was put there as an option's parameter, which
-   optalias_check() emits having refused an option name in that position itself.
-   A clustered (-q%A) or quoted ("-%A") spelling resolves through none of that,
-   and the URL pass above reads the word after it as short options, so there it
-   stays the next option it always was (#1425). */
+/* May the option at NA take a '-' word that optalias_check() put there as its
+   parameter? A clustered or quoted spelling may not (#1425). */
 static hts_boolean optparam_dash_ok(const cmdl_argv *cmd, int na) {
   return na + 1 < cmd->argc && cmd->param[na + 1];
 }
@@ -1549,9 +1542,8 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                   opt->savename_type = 0;       // -N "" : par défaut
               }
             } else {
-              /* A glued run is a preset, never userdef: sscanf("%d") past
-                 INT_MAX is negative on LP64 but INT_MAX on ILP32, so no clamp
-                 on its result is portable. */
+              /* A glued run is a preset, never userdef, because sscanf("%d")
+                 past INT_MAX differs between LP64 and ILP32. */
               const char *digits = com + 1;
               int ndigits;
 
@@ -1914,7 +1906,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                     const char *const why = http_custom_header_warning(
                         StringBuff(opt->headers), argv[na]);
 
-                    // with the -%H log's redaction of a login header
+                    // redact a login header as the -%H log does
                     if (why != NULL) {
                       char shown[HTS_URLMAXSIZE * 2];
 
@@ -2254,8 +2246,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                 char *end;
                 LLint secs;
 
-                /* strtoll, not sscanf("%d"): the upper bound used to reject an
-                   overflowed value by accident, and clipping loses that. */
+                /* strtoll reports overflow, which sscanf("%d") would clip. */
                 errno = 0;
                 secs = strtoll(com + 1, &end, 10);
                 if (end == com + 1 || errno == ERANGE || secs < 0) {
@@ -2417,9 +2408,8 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
               switch (*com) {
 #ifdef HTS_CRASH_TEST
               case 'c':
-                /* Read by the -#c pre-pass above, which may have armed a
-                   worker. This exact form only: anything else never reached the
-                   pre-pass, so it keeps the verdict it always had. */
+                /* The -#c pre-pass above already read this exact form and may
+                   have armed a worker. Other forms never reached it. */
                 if (com == argv[na] + 2 && (com[1] == '\0' || com[1] == '=')) {
                   while (com[1] != '\0')
                     com++;
@@ -2456,10 +2446,8 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                     char BIGSTK url[CACHE_ENTRYNAME_SIZE + 8];
 
                     cache_init(&cache, opt);    /* load cache */
-                    /* cache_init() indexed every ZIP member into
-                       cache.hashtable, keyed by the stored entry name minus any
-                       "http://"; walk that index rather than the .ndx dropped
-                       after 3.31 */
+                    /* Walk cache.hashtable, where cache_init() indexed every
+                       ZIP member by entry name minus any "http://". */
                     if (cache.zipInput != NULL) {
                       struct_coucal_enum e = coucal_enum_new(cache.hashtable);
                       coucal_item *item;
@@ -2874,9 +2862,8 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
       }
       // petit message dans le lock
       strcpybuff(n_lock_staged, hts_logpath(opt, "hts-in_progress.tmp"));
-      /* The lock is written aside and moved on, so it is already dated back
-         when it appears under the name scripts watch. A move that fails falls
-         back to writing it in place, which is what the engine always did. */
+      /* Write the lock aside and move it on, so it is already dated back when
+         scripts see it. A failed move falls back to writing it in place. */
       if (!write_progress_lock(opt, n_lock_staged, t, argc, argv) ||
           !hts_rename_over(opt, n_lock_staged, n_lock)) {
         UNLINK(n_lock_staged);
@@ -3054,9 +3041,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
       }
     }
 
-    /* Only the exit status tells a wrapper the engine gave up mid-mirror. The
-       fault flag is read too, because a dozen sites write exit_xh = 1 for a
-       stop the user asked for and any of them can land after the abort. */
+    /* Also read the fault flag, as a user stop may overwrite exit_xh's -1. */
     if (hts_load_acquire_int(&opt->state.exit_xh) == -1 ||
         hts_worker_faulted()) {
       exit_code = HTS_EXIT_MIRROR_ABORTED;
@@ -3074,14 +3059,12 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
       }
     }
 
-    /* The lock goes at the end of this block, and the startup arm needs it, so
-       an abort that returns normally has to reconcile here or never. A cap or a
-       ^C leaves exit_xh at 0, so ask the engine's verdict instead. */
+    /* Reconcile before the lock goes at the end of this block, as the startup
+       arm needs it. A cap or a ^C leaves exit_xh at 0, so test `completed`. */
     if (!completed)
       hts_cache_reconcile(opt, CACHE_RECONCILE_INTERRUPTED);
 
-    /* Not or cleanly interrupted; erase hts-cache/ref temporary directory.
-       A ^C or a cap leaves exit_xh at 0, so keep the ref when either cut a
+    /* Erase the hts-cache/ref temporary directory unless a ^C or a cap cut a
        transfer mid-body (#1595). */
     if (hts_load_acquire_int(&opt->state.exit_xh) == 0 &&
         !opt->abort_left_partial) {

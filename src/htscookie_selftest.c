@@ -35,9 +35,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscookie_selftest.h"
 #include "htsbundle.h"
 
-/* True if a Cookie header line is a whole RFC 6265 list of `count` pairs and
-   nothing else. A dropped cookie must take its separator with it, because a
-   trailing "a; " reads as part of the next value. */
+/* Is the Cookie line a whole RFC 6265 list of `count` pairs, nothing else? */
 static hts_boolean cookie_line_is_whole(const char *line, int count) {
   const char *end = strstr(line, H_CRLF);
   const char *p;
@@ -121,8 +119,7 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
   if (strstr(hdr, "junk") != NULL) // wrong-domain cookie leaked
     err = 1;
 
-  /* cookie_line_is_whole is the only barrier between a clipped line and a
-     pass below, so what it refuses is asserted rather than assumed. */
+  /* cookie_line_is_whole guards the checks below, so test what it refuses. */
   {
     static const struct {
       const char *line;
@@ -154,7 +151,7 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
     ST_FAIL_IF(err, !cookie_line_is_whole("Cookie: a=1; b=2" H_CRLF, 2));
   }
 
-  /* #101: every matching cookie is sent, not a fixed few. */
+  /* #101: every matching cookie is sent. */
   {
     static t_cookie many;
     char tight[64];
@@ -213,12 +210,12 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
 
     (void) UNLINK(jar);
     assertf(cookie_save(NULL, &cookie, jar) == 0);
-    // check the opened file, not its name, so nothing can swap it in between
+    // fstat the opened file so nothing can swap it in between
     assertf((fp = FOPEN(jar, "rb")) != NULL && fstat(fileno(fp), &st) == 0);
     fclose(fp);
     assertf((st.st_mode & 07777) == HTS_PROTECT_FILE);
     assertf(st.st_size > 0); /* mode-only checks would pass an empty jar */
-    /* a pre-existing world-readable jar must be tightened, not kept */
+    /* a pre-existing world-readable jar must be tightened */
     assertf((fp = FOPEN(jar, "ab")) != NULL && fchmod(fileno(fp), 0644) == 0);
     fclose(fp);
     assertf(cookie_save(NULL, &cookie, jar) == 0);
@@ -378,9 +375,8 @@ static int st_cookieport(httrackp *opt, int argc, char **argv) {
        "::1 must not reach example.com"},
       {":8080", "Set-Cookie: pwn=OWNED; path=/", "victim.example", "pwn=OWNED",
        HTS_FALSE, "a host that is only a port must not reach victim.example"},
-      // a bracketed single-colon literal is the one spelling whose normalised
-      // form still holds a colon, so normalising it twice would file it under
-      // "x" while every query still asks for "x:1"
+      // a bracketed single-colon literal keeps a colon when normalised, so a
+      // second pass would file it under "x" while queries ask for "x:1"
       {"[x:1]:80", "Set-Cookie: odd=O; path=/", "[x:1]:80", "odd=O", HTS_TRUE,
        "the store side normalised the host twice"},
       // a link-local host reaches the zone id spelling a browser exports, and
@@ -606,8 +602,7 @@ static int st_cookiedomain(httrackp *opt, int argc, char **argv) {
     hts_boolean want;
     const char *what;
   } pairs[] = {
-      /* The same host, the 99% path. An address names itself too, so the rule
-         below must refuse a parent without refusing this. */
+      /* An address names itself too, and the parent rule must not refuse it. */
       {"example.com", "example.com", HTS_TRUE, "a jar lost its own host"},
       {"EXAMPLE.com", "example.com", HTS_TRUE,
        "an identical host stopped folding case"},
@@ -666,9 +661,7 @@ static int st_cookiedomain(httrackp *opt, int argc, char **argv) {
        "3.4 leaked to the IPv6 literal ::ffff:1.2.3.4"},
       {"1", "::1", HTS_FALSE, "the jar domain 1 leaked to ::1"},
 
-      /* Longer than the host, and a trailing dot is a label of its own. These
-         three document the dom_len guard rather than pin it, because dropping
-         it leaves a read one byte short of the host that mismatches anyway. */
+      /* These mismatch even without the dom_len guard, so cannot pin it. */
       {"www.example.com", "example.com", HTS_FALSE,
        "a child domain reached its parent"},
       {"example.com", "example.com.", HTS_FALSE,
@@ -831,9 +824,7 @@ static int cookie_hostcap_rows(void) {
       cookie_find_exact(jar.data, "c000", H, "/") == NULL)
     HC_FAIL("a bigger re-set evicted the record it replaces");
 
-  /* A hand-edited jar holding c000 twice, the second one far larger: the
-     record eviction spares is the one the set replaces (the first), so the
-     set is stored, not refused after the jar was compacted. */
+  /* Eviction spares the first of two c000 cookies, so the set is stored. */
   jar.data[0] = '\0';
   if (cookie_load_host(&jar, H, 60, "v"))
     HC_FAIL("setup");
@@ -1018,15 +1009,14 @@ static int cookie_hostcap_rows(void) {
    set that to, and must leave the bytes beyond it alone. */
 static int st_cookiecap(httrackp *opt, int argc, char **argv) {
   static t_cookie cookie;
-  /* Above the COOKIE_HEADROOM bytes cookie_add reserves, or it refuses all. */
+  /* It must exceed COOKIE_HEADROOM, or cookie_add refuses all. */
   const size_t cap = 512;
   static const char NAME[] = "n", DOM[] = "www.example.com", PATH[] = "/";
   char big[1024];
   int err = 0;
   size_t i;
 
-  /* A non-zero canary: a stray NUL from an off-by-one terminator is invisible
-     against a zero fill, which is the exact bug a capacity check guards. */
+  /* A non-zero canary shows a stray NUL from an off-by-one terminator. */
   memset(cookie.data, 'C', sizeof(cookie.data));
   cookie.max_len = cap;
   cookie.data[0] = '\0';
@@ -1321,9 +1311,7 @@ static int st_cookiespandiff(httrackp *opt, int argc, char **argv) {
   return st.failures != 0;
 }
 
-/* cookiequote HEADER: what the jar keeps of HEADER and what it then sends
-   back, with the record's tabs shown as '|'. Both, because RFC 6265 5.4 sends
-   a value as stored and only the stored side shows a cookie-av's own bytes. */
+/* cookiequote HEADER prints what the jar stores and sends, tabs as '|'. */
 static int st_cookiequote(httrackp *opt, int argc, char **argv) {
   static t_cookie cookie;
   char line[512];

@@ -1,10 +1,7 @@
 #!/bin/bash
 #
-# --pause (#185): a fixed inter-file delay must slow a multi-file crawl. One
-# --pause value sets min and max alike, so the engine cannot launch N files in
-# less than (N-1) pauses however fast the box is. That floor is what is asserted
-# here. The old test compared two whole crawls and wanted the paused one 2s
-# slower, which a loaded box manufactures out of its own noise.
+# --pause (#185) must slow a crawl. One value sets min and max alike, so N
+# files take at least N-1 pauses. A loaded box cannot fake that floor.
 
 set -e
 

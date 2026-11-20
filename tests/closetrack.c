@@ -30,9 +30,8 @@ static void __attribute__((constructor)) closetrack_open(void) {
   }
 }
 
-/* The preload also lands on the libtool wrapper, a /bin/sh that closes -1 on
-   its own; the engine is the process holding libhttrack. Never caches a no, so
-   a close issued before the library is mapped cannot blind the rest. */
+/* The preload also lands on the libtool wrapper shell, which closes -1 itself.
+   A no is never cached, because a close may precede mapping libhttrack. */
 static int closetrack_is_engine(void) {
   if (!closetrack_engine && dlsym(RTLD_DEFAULT, "hts_init") != NULL) {
     closetrack_engine = 1;

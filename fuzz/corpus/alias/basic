@@ -1,0 +1,1 @@
+--depth=2 --sockets=8 -O /tmp/mirror http://fuzz.example/x

@@ -349,8 +349,7 @@ static void index_write(FILE *fp, int mode, char **tab, int index) {
   for (i = 0; i < index; i++) {
     char *a;
 
-    /* the width is the buffer's, not the keyword cap a hundred
-       lines up that happens to be smaller today */
+    /* the width follows the buffer, not the smaller keyword cap */
     if (sscanf(tab[i], "%" KEYW_SCAN_WIDTH "s %d", word, &hit) != 2)
       continue;
     a = strchr(tab[i], ' ');
@@ -407,8 +406,7 @@ void index_finish(const char *indexpath, int mode) {
   char *a, *b;
   int index = 0;
   const LLint fs = fpsize(indexer.tmp);
-  /* fail closed on a size size_t cannot hold: malloct() wraps short while
-     the reader and the terminator keep the 64-bit length */
+  /* refuse a size size_t cannot hold, or malloct() would wrap short */
   const size_t size = fs > 0 ? llint_to_size_t(fs) : (size_t) -1;
 
   if (size == (size_t) -1 || !indexer.tmp)

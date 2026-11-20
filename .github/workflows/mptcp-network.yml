@@ -1,8 +1,5 @@
-# The suite proves Multipath TCP negotiates over loopback, where both ends share
-# one kernel. Only a real server can show the handshake surviving a real path,
-# so this asks ut.httrack.com, which speaks it. A red here can equally mean the
-# server's own configuration changed, which is why it is scheduled and never a
-# required check.
+# This proves Multipath TCP survives a real path to ut.httrack.com. A red can
+# mean that server changed, so the job is never required.
 name: mptcp negotiation (networked)
 
 on:
@@ -46,8 +43,7 @@ jobs:
         id: probe
         run: |
           set -euo pipefail
-          # Captured, not piped: grep -q SIGPIPEs the producer, and "mptcp" is
-          # not the last line this writes. A failing probe is a red, not a skip.
+          # Capture it, because grep -q would SIGPIPE the producer.
           features=$(src/httrack -#test=features) ||
             { echo "the features probe itself failed" >&2; exit 1; }
           if grep -qx 'mptcp 1' <<<"$features" &&
@@ -91,10 +87,8 @@ jobs:
             { echo "ut.httrack.com did not negotiate; check the server's own setting" >&2
               exit 1; }
 
-          # The option reaches the engine: the same host and page with it off
-          # reports nothing. This is weaker than it looks, because accounting is
-          # gated on the same predicate that picks the protocol, so it shows the
-          # option was read and not what went on the wire.
+          # With the option off nothing is reported. This proves the option was
+          # read, but says nothing about the wire.
           crawl off --mptcp=0
           ! grep -q 'Multipath TCP' off/hts-log.txt ||
             { echo "--mptcp=0 still reported a Multipath line" >&2; exit 1; }

@@ -38,11 +38,11 @@ local_server_stop() {
     stop_server "$1"
 }
 
-# Start local-server.py in the background on an ephemeral port and wait for its
-# "PORT n" line. Sets SRV_PORT, SRV_PID, SRV_LOG and BASEURL, registers the
-# reaping cleanup and appends to SRV_PIDS. A second call overwrites all four and
-# truncates the default log, so a caller wanting two servers saves each set and
-# gives each its own --log. Options, ahead of any server argument; -- ends them:
+# Start local-server.py on an ephemeral port and wait for its "PORT n" line.
+# It sets SRV_PORT, SRV_PID, SRV_LOG and BASEURL. A second call overwrites them
+# and truncates the default log, so a caller wanting two servers saves each set
+# and passes its own --log. Options come before any server argument, and -- ends
+# them:
 #   --root DIR    tree to serve (default: the shared server-root fixture)
 #   --log FILE    where the announcement lands (default: $tmpdir/server.log)
 #   --env V=VAL   an environment variable for the server, repeatable
@@ -195,9 +195,8 @@ mtime() {
     stat -c '%Y' "$1" 2>/dev/null || stat -f '%m' "$1"
 }
 
-# The abort and pause requests obey one rule, so 436 and 459 both drive its
-# self-test: assert_lockrule_selftest abortlock|stoplock. It owns the directory
-# it runs in, because the undeletable arm leaves one read-only on purpose.
+# assert_lockrule_selftest abortlock|stoplock runs the lock rule self-test for
+# 436 and 459. It owns its directory, because one arm leaves it read-only.
 assert_lockrule_selftest() {
     local tag=$1 dir st_out coverage subsecond
     dir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_${tag}.XXXXXX") ||
@@ -230,15 +229,9 @@ assert_lockrule_selftest() {
 write_lock_request() { # write_lock_request DIR NAME PID
     local dir=$1 name=$2 pid=$3 gone='' up=$1
     local try max_tries=30 went='' staged="${1}/${2}.staged"
-    # drvfs refuses a write into a directory it still holds (#1639), so the first
-    # attempt gets 29 retries. A removal that went and came back inside the
-    # window would be waited out instead of named, so each failure re-reads the
-    # path.
-    #
-    # drvfs can also refuse a write that landed, and a second request asks the
-    # engine twice (#1712). The staging file going away says the move happened.
-    # Asking for the request cannot say it, because the engine may already have
-    # taken it.
+    # drvfs refuses a write into a directory it still holds (#1639), so retry.
+    # It can also refuse a write that landed (#1712), so only the staging file
+    # going away proves the move.
     for try in $(seq 1 "$max_tries"); do
         test "$try" -eq 1 || sleep 0.1
         # The shell reports a failing redirect before it applies the 2>/dev/null

@@ -83,8 +83,7 @@ static hts_boolean st_assume_wants(const char *only, const char *capacity) {
    of the three destinations, so one shared bound cannot pass them all. */
 static int st_assumemime(httrackp *opt, int argc, char **argv) {
   static const size_t values[] = {200, 300, 1100};
-  /* pre-fix every destination smashes and only the first assertion to fire is
-     visible, so each is selectable by its capacity */
+  /* only the first failure shows, so each capacity can run alone */
   const char *const only = argc >= 1 ? argv[0] : "";
   const int save_debug = opt->debug;
   char canary[ST_ASSUME_CANARY];
@@ -119,7 +118,7 @@ static int st_assumemime(httrackp *opt, int argc, char **argv) {
       assertf(strlen(s.dst) == (len < sizeof(s.dst) ? len : sizeof(s.dst) - 1));
       assertf(memcmp(s.canary, canary, sizeof(s.canary)) == 0);
       assertf(st_assume_clips == (len < sizeof(s.dst) ? 0u : 1u));
-      /* the frame ishtml() owns, which is where #1276 was reported */
+      /* the frame ishtml() owns (#1276) */
       assertf(ishtml(opt, "/x.cgi") == 0);
     }
 

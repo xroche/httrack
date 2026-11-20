@@ -58,8 +58,8 @@ resolve() { # resolve DIR LINK, both relative to ${stage}
     printf '%s\n' "${out}"
 }
 
-# Links that the shipped layout resolves but another --htmldir strands are
-# recorded, so a packager's choice reports a known gap rather than a failure.
+# Links that another --htmldir strands are recorded as known gaps, so a
+# packager's choice does not fail the test.
 gaps=()
 # index.html reaches history.txt, license.txt and greetings.txt with "../",
 # which is the $(docdir) they install into while htmldir sits directly below it.
@@ -143,8 +143,7 @@ test "${pages}" -gt 0 || fail "no pages staged under ${tree}"
 test "${links}" -gt 0 || fail "no relative links found across ${pages} pages"
 test "${bad}" -eq 0 || fail "${bad} of ${links} relative links dangle in ${tree}"
 
-# A gap that stopped being one has to be deleted, not left recording a link the
-# layout now resolves.
+# A recorded gap that the layout now resolves must be deleted.
 stale=0
 for ((i = 0; i < ${#gaps[@]}; i++)); do
     case ${gap_seen[i]} in

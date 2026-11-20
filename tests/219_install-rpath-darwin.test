@@ -1,7 +1,5 @@
 #!/bin/bash
-# dyld follows an rpath only for a load path spelled @rpath/..., so a relocatable
-# install on Darwin takes libhttrack's own id too (#978). Read the load commands
-# the install produced.
+# A relocatable Darwin install must give libhttrack an @rpath/ id (#978).
 
 set -euo pipefail
 

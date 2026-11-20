@@ -27,9 +27,7 @@ s.bind(("127.0.0.1", int(sys.argv[2])))
 s.close()' "$1" "$2"
 }
 
-# Off Windows a tcp-probed number binds as udp just as well, so the port alone
-# cannot say which protocol reserved it. Log "KIND PORT" per bind instead, which
-# pins the number handed back to the socket it came from.
+# Off Windows a tcp-probed port binds as udp too, so log "KIND PORT" per bind.
 spy_python() { # spy_python -c SCRIPT [PROTO...]
     local script=$2
     test "$1" = "-c" || fail "freeport no longer runs python with -c: $1"
@@ -52,8 +50,7 @@ sys.argv = sys.argv[2:]
 exec(code)' "$typelog_native" "$script" ${1+"$@"}
 }
 
-# Every socket reports one port, so the redraw freeport does on a collision runs
-# out of tries: that branch is unreachable against a real kernel.
+# Every socket reports one port, so freeport's redraw runs out of tries.
 collide_python() { # collide_python -c SCRIPT [PROTO...]
     local script=$2
     test "$1" = "-c" || fail "freeport no longer runs python with -c: $1"
@@ -150,8 +147,8 @@ proxytrack_fails() { # proxytrack_fails HTTP_ADDR ICP_ADDR: echoes its error lin
 }
 
 # Both destinations get one, or the message could name one protocol for either
-# failure; the socket that must survive can only take a freeport number, which a
-# neighbour test may bind first, so redraw and retry on that outcome (#1218).
+# failure. A neighbour test may bind the surviving socket's freeport number
+# first, so redraw and retry then (#1218).
 proxytrack_lost() { # proxytrack_lost tcp|udp HELDPORT: echoes the error line
     local proto=$1 port=$2 other alt out try
     if test "$proto" = tcp; then other=udp; else other=tcp; fi
@@ -185,7 +182,7 @@ out=$(proxytrack_lost udp "$udpheld")
 assert_match "$BIND_LOST" "$out" "the harness reads proxytrack's icp bind loss"
 assert_match "^.*cannot bind udp port $udpheld on 127\.0\.0\.1: .+ \([1-9][0-9]*\)\$" "$out"
 
-# The cause is the whole point: winsock leaves errno at "No error" (#1178).
+# Winsock leaves errno at "No error", so check a cause is named (#1178).
 case $out in
 *"No error"* | *": Success "* | *"unknown error"*) fail "no cause named: $out" ;;
 esac
