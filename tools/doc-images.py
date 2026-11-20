@@ -86,9 +86,8 @@ def convert(src, dst, max_width, fmt):
     if fmt == "webp":
         im.convert("RGB").save(dst, "WEBP", quality=88, method=6)
     else:
-        # Median cut, not max coverage: the latter spreads the palette over the
-        # colour cube whatever each entry costs in pixels, which greys out the
-        # large flat backgrounds these shots are mostly made of.
+        # Median cut keeps the large flat backgrounds of these shots. Max
+        # coverage spreads the palette over the colour cube and greys them out.
         im.convert("RGB").quantize(colors=256, dither=Image.Dither.NONE).save(
             dst, "PNG", optimize=True
         )

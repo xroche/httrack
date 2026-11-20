@@ -3,10 +3,9 @@
 # Decide whether HTTraQt upstream has moved away from the revision the canary
 # job pins; httraqt-upstream.yml does the telling.
 #
-# Prints pinned=, upstream= and status= on stdout, and to $GITHUB_OUTPUT when
-# set. status is unchanged, moved, or gone (the host answers but has no master
-# branch). An unreadable pin and a host that will not answer both exit non-zero:
-# neither is news about HTTraQt, and both mean the watch has stopped working.
+# Prints pinned=, upstream= and status= to stdout, and to $GITHUB_OUTPUT when
+# set. status is unchanged, moved, or gone (no master branch). An unreadable pin
+# or a silent host exits non-zero, because the watch has then stopped working.
 
 set -eu
 
@@ -47,9 +46,9 @@ case "$ATTEMPTS" in
 "" | 0 | *[!0-9]*) usage ;;
 esac
 
-# The pin is the state: nothing else can disagree with what the canary builds.
-# Anchored, so a quoted or suffixed value is a hard error rather than a silent
-# near-miss, and two matching lines overshoot the length check.
+# The pin is the state, because it is what the canary builds. The match is
+# anchored, so a quoted or suffixed value is a hard error, and two matching
+# lines overshoot the length check.
 pinned=$(sed -n 's/^[[:space:]]*HTTRAQT_REF:[[:space:]]*\([0-9a-f]\{40\}\)\([[:space:]].*\)\{0,1\}$/\1/p' "$WORKFLOW")
 [ "${#pinned}" -eq 40 ] || fail "no single bare 40-hex HTTRAQT_REF in $WORKFLOW"
 
@@ -67,7 +66,7 @@ while :; do
     attempt=$((attempt + 1))
 done
 
-# An answer carrying no ref at all is a half-restored host, not a rename.
+# An answer with no ref at all comes from a half-restored host.
 [ -n "$refs" ] || fail "$UPSTREAM answered, but the repository is empty"
 
 upstream=$(printf '%s\n' "$refs" | sed -n 's/^\([0-9a-f]\{40\}\)[[:space:]]*refs\/heads\/master$/\1/p')

@@ -98,12 +98,10 @@ static int check_detectedlink(t_hts_callbackarg * carg, httrackp * opt,
     }
   }
 
-  /* "link" is the engine's own buffer and its size is not passed in, so bound
-     the join by what the engine actually hands over: lien_adrfil's fields are
-     HTS_URLMAXSIZE * 2 (htscore.h). A base is capped at HTS_URLMAXSIZE / 2
-     above and the engine drops any link past HTS_URLMAXSIZE, so the sum always
-     fits and nothing is refused in practice; the bound is here so a wider
-     buffer later cannot turn this back into an overflow. */
+  /* "link" is the engine's buffer and its size is not passed in, so bound the
+     join by lien_adrfil's HTS_URLMAXSIZE * 2 (htscore.h). The base cap and the
+     engine's link limit keep the sum under it. The bound stops a wider buffer
+     later from turning this back into an overflow. */
   if (strncmp(link, "http://", 7) == 0 || strncmp(link, "https://", 8) == 0) {
     char temp[HTS_URLMAXSIZE * 2];
 

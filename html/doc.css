@@ -73,7 +73,7 @@ body {
 }
 
 @media (prefers-color-scheme: dark) {
-	/* Rings dropped, not inverted: their lavender is a light-panel tone. */
+	/* Rings are dropped, as their lavender suits only a light panel. */
 	.wrap { background-image: none; }
 
 	/* The wordmark is black on transparent, and all but vanishes on the dark field. */

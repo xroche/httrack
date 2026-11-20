@@ -1,10 +1,7 @@
-# No CI leg of ours builds against a BSD libc, and macOS is not close enough:
-# a header a platform does not carry only shows up where somebody builds it,
-# which is how the missing spawn.h of #1487 reached a packager first. This is a
-# plain configure/make/make check of master in a FreeBSD VM, deliberately not
-# their ports tree, whose drift tools/downstream-drift.sh already reports. The
-# VM is amd64, so this says nothing about a 32-bit size_t and linux-i386 stays
-# our only width guard. It blocks nothing.
+# No other leg builds against a BSD libc, and macOS is not close enough (#1487).
+# This is a plain configure/make/make check of master in a FreeBSD VM. Their
+# ports tree is left to tools/downstream-drift.sh. The VM is amd64, so
+# linux-i386 stays our only 32-bit guard. It blocks nothing.
 name: freebsd build canary
 
 on:

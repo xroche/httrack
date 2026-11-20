@@ -1,9 +1,6 @@
-# Termux is the harshest consumer we have: bionic, a cross-compile, API level 24
-# and a stripped sysroot. 3.50.0 shipped a missing spawn.h (#1487) and an install
-# that looped on an ordinary --docdir (#1488), and our own CI saw neither, so a
-# packager reported both. This builds master through their recipe instead of the
-# released tarball. Their tree, so a red here can be theirs to fix, which is why
-# it blocks nothing.
+# Termux is our harshest consumer: bionic, a cross-compile, API level 24 and a
+# stripped sysroot. This builds master through their recipe instead of the
+# released tarball. It blocks nothing, because a red can be theirs to fix.
 name: termux build canary
 
 on:

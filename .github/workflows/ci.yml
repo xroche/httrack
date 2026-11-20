@@ -16,9 +16,9 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-# The suite mostly sleeps because each test binds its own server and waits on it,
-# so the right width is not a core count. Measured on 4 cores: -j8 245s, -j16
-# 161s. Every "make check" here takes it, distcheck and deb included.
+# Tests mostly sleep while each waits on its own server, so the width exceeds
+# the core count. On 4 cores, -j8 takes 245s and -j16 161s. Every "make check"
+# here uses it, distcheck and deb included.
 env:
   CHECK_JOBS: 16
 
@@ -137,11 +137,8 @@ jobs:
         if: failure()
         run: sh tools/ci-test-log.sh
 
-  # Reproduce the Debian buildds: they build in a minimal chroot with no
-  # python3, so the local-server tests must SKIP (exit 77), not fail. GitHub
-  # runners ship python3, so every other job hides this path; here we remove it
-  # before `make check`. This is the guard that would have caught the 3.49.10-1
-  # FTBFS (28_local-pause failed instead of skipping when python3 was absent).
+  # Debian buildds have no python3, and the local-server tests must SKIP (exit
+  # 77) there. GitHub runners ship python3, so this job removes it first.
   buildd-no-python3:
     name: build (no python3, Debian buildd)
     runs-on: ubuntu-24.04
@@ -341,13 +338,10 @@ jobs:
         if: failure()
         run: sh tools/ci-test-log.sh
 
-  # Memory safety: build and run the suite under AddressSanitizer +
-  # UndefinedBehaviorSanitizer. The offline engine self-tests drive the parsers
-  # that chew on untrusted crawled input (charset, mime, HTML, entities, IDNA,
-  # filters, cache) straight through the sanitizers, so a buffer overrun,
-  # use-after-free, or signed overflow there fails the build instead of slipping
-  # past a plain -O2 build. gcc's runtimes; one job is enough (the bug class is
-  # arch-independent and the matrix already covers compile portability).
+  # Run the suite under ASan and UBSan. The offline self-tests drive the parsers
+  # of untrusted input (charset, mime, HTML, entities, IDNA, filters, cache), so
+  # an overrun, a use-after-free or a signed overflow fails the build. One gcc
+  # job is enough, because the bug class does not depend on the arch.
   sanitize:
     name: sanitize (ASan+UBSan, gcc)
     uses: ./.github/workflows/sanitizer.yml
@@ -358,26 +352,21 @@ jobs:
       ldflags: -fsanitize=address,undefined
       extra_packages: libssl-dev libbrotli-dev libzstd-dev
       # Leak detection is on, because nothing else in CI catches a dropped free.
-      # LSan only reports at a normal exit, so a test that kills the engine still
+      # LSan only reports at a normal exit, so a test that kills the engine
       # contributes nothing. Every other finding aborts the run.
       #
-      # Poison fresh allocations with 0xCA and freed blocks with 0xCB (decimal
-      # 202/203) so memory never reads back as accidental zeros: a missing-NUL
-      # fread buffer then runs strlen off into the redzone instead of stopping at
-      # a lucky zero. Distinct bytes tell the two apart in a dump (0xCA =
-      # uninitialized, 0xCB = use-after-free). ASan caps its malloc fill at 4096
-      # bytes by default, so max_malloc_fill_size lifts it to cover large cache
-      # buffers; free_fill flags use-after-free reads.
+      # Fresh blocks read 0xCA (202) and freed ones 0xCB (203), never zero, so a
+      # missing NUL runs strlen into the redzone and a dump tells the two apart.
+      # max_malloc_fill_size lifts ASan's 4096-byte fill cap for cache buffers.
       #
-      # gcc's UBSan ignores the log_path appended to both lines below and writes
-      # to stderr, which most tests redirect away, so this leg keeps the copies.
+      # gcc's UBSan ignores the log_path below and writes to stderr, which most
+      # tests redirect away, so this leg keeps the copies.
       options: |
         ASAN_OPTIONS=detect_leaks=1:abort_on_error=1:halt_on_error=1:strict_string_checks=1:malloc_fill_byte=202:max_malloc_fill_size=2147483647:free_fill_byte=203:max_free_fill_size=2147483647
         UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1
 
-  # clang checks more under the same -fsanitize=undefined name than gcc does, so
-  # the gcc leg above missed #1946, a null-pointer arithmetic bug that sat in
-  # proxytrack for years and reached us from OSS-Fuzz, which builds with clang.
+  # clang checks more under -fsanitize=undefined than gcc does. The gcc leg
+  # missed #1946, a null-pointer arithmetic bug OSS-Fuzz found with clang.
   ubsan:
     name: ubsan (UndefinedBehaviorSanitizer, clang)
     uses: ./.github/workflows/sanitizer.yml
@@ -454,11 +443,9 @@ jobs:
         319_webhttrack-addurl.test 371_webhttrack-help-reachable.test
         537_webhttrack-addfilter.test 01_engine-*.test
 
-  # libFuzzer smoke: build the fuzz/ harnesses over the pure hostile-input
-  # parsers and replay each seed corpus under ASan+UBSan+LeakSanitizer. Replay
-  # (not open-ended mutation) keeps CI deterministic -- it can't hit strjoker's
-  # catastrophic backtracking -- and pins the regression seeds for the bugs the
-  # fuzzers found. Deep discovery is a maintainer / OSS-Fuzz activity.
+  # Build the fuzz/ harnesses and replay each seed corpus under ASan, UBSan and
+  # LSan. Replay keeps CI deterministic, clear of strjoker's catastrophic
+  # backtracking, and pins the regression seeds. OSS-Fuzz does the open search.
   fuzz:
     name: fuzz (libFuzzer corpus replay, clang)
     runs-on: ubuntu-24.04
@@ -564,11 +551,9 @@ jobs:
             "$RUNNER_TEMP/out/$f" -runs=0 -timeout=25 "$RUNNER_TEMP/corpus/$f"
           done
 
-  # Optional-dependency build: compile and test with HTTPS/OpenSSL disabled --
-  # the configuration users on minimal systems build, and one libssl is not even
-  # installed here so configure cannot silently re-enable it. The matrix above
-  # always has libssl, so the #if HTS_USEOPENSSL branches would otherwise never
-  # be compiled and could rot unnoticed.
+  # Build and test with HTTPS disabled, as minimal systems do. libssl is not
+  # installed here, so configure cannot re-enable it. Every other leg has
+  # libssl, so only this one compiles the code built without HTS_USEOPENSSL.
   no-ssl:
     name: build (no openssl, --disable-https)
     runs-on: ubuntu-24.04
@@ -603,9 +588,9 @@ jobs:
         if: failure()
         run: sh tools/ci-test-log.sh
 
-  # OpenSSL 4.0 removes the API 3.x deprecated. Building with that set hidden
-  # keeps the engine ready for it: a deprecated call fails here rather than the
-  # day a distro moves. Compile-only, since the headers are what is under test.
+  # OpenSSL 4.0 removes the API 3.x deprecated. Hiding it here makes a
+  # deprecated call fail before a distro moves. This leg only compiles,
+  # because the headers are what is under test.
   openssl-no-deprecated:
     name: build (OpenSSL, no deprecated API)
     runs-on: ubuntu-24.04
@@ -671,19 +656,16 @@ jobs:
         if: failure()
         run: cat tests/672_no-selftest-build.log 2>/dev/null || true
 
-  # Validate the Debian packaging via the same script maintainers release with.
-  # One amd64/gcc run is enough: packaging (control/rules/manifest/lintian/quilt
-  # source build) is arch- and compiler-independent, and the build matrix above
-  # already covers compile portability. mkdeb.sh runs lintian as an explicit gate
-  # (debuild does not propagate lintian's exit) with --fail-on=error,warning.
+  # Validate the Debian packaging with the script maintainers release with.
+  # One amd64 gcc run is enough, because packaging does not depend on the arch
+  # or the compiler. mkdeb.sh gates on lintian --fail-on=error,warning, because
+  # debuild does not pass lintian's exit status on.
   deb:
     name: deb package (lintian)
     runs-on: ubuntu-24.04
-    # Build and gate inside Debian sid, the upload target. A Debian dpkg-deb
-    # produces archive-legal xz members (an Ubuntu host defaults to zstd, which
-    # the archive's lintian rejects), and sid's lintian carries the same
-    # data-driven checks (embedded-lib fingerprints and the like) the buildds and
-    # UDD apply -- so issues surface here instead of after upload.
+    # Build inside Debian sid, the upload target. Its dpkg-deb writes the xz
+    # members the archive accepts (Ubuntu defaults to zstd), and its lintian
+    # runs the same data-driven checks as the buildds and UDD.
     container: debian:sid
     steps:
       - name: Install packaging toolchain
@@ -700,14 +682,13 @@ jobs:
         with:
           submodules: recursive
 
-      # --unsigned: CI has no GPG key (also skips the release sig/checksums).
-      # mkdeb builds every package then runs the lintian gate (--fail-on=error,
-      # warning); debuild runs the packaged test pass.
+      # --unsigned, because CI has no GPG key. It also skips the release
+      # signature and checksums. mkdeb builds every package and then runs the
+      # lintian gate, and debuild runs the packaged test pass.
       #
-      # DEB_BUILD_OPTIONS trims work CI does not need (release builds via
-      # mkdeb.sh are untouched): noautodbgsym drops the -dbgsym packages whose
-      # LTO payloads are slow to compress and that CI never ships; parallel widens
-      # both dh_auto_build and dh_auto_test, and the test pass is nearly all of it.
+      # DEB_BUILD_OPTIONS only trims CI work. noautodbgsym drops the -dbgsym
+      # packages, whose LTO payloads are slow to compress. parallel widens
+      # dh_auto_build and dh_auto_test, and the test pass is most of the time.
       - name: Build and lint Debian packages
         run: |
           set -euo pipefail
@@ -745,11 +726,9 @@ jobs:
           export DEB_BUILD_OPTIONS="noautodbgsym parallel=$CHECK_JOBS"
           dpkg-buildpackage -b -us -uc
 
-  # Release-tarball integrity: `make distcheck` rolls the dist tarball, then
-  # configures, builds and tests it out-of-tree from a read-only source tree and
-  # checks nothing is left behind. Catches a file referenced in *_SOURCES or
-  # EXTRA_DIST but missing from the tarball -- the same "ships broken to users"
-  # class as a stale committed Makefile.in.
+  # `make distcheck` builds and tests the dist tarball out of tree from a
+  # read-only source, and checks nothing is left behind. It catches a file
+  # named in *_SOURCES or EXTRA_DIST but missing from the tarball.
   distcheck:
     name: distcheck (release tarball)
     runs-on: ubuntu-24.04

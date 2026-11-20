@@ -1,7 +1,6 @@
-# cross-arch.yml stops at compile for the ports architectures, so the Debian
-# buildd is the first machine to run the suite on one, and it reports by failing
-# the package build (#1146, #1148). This runs it under qemu-user, where a process
-# is not the shape a native one is and every step costs far more.
+# cross-arch.yml only compiles the ports architectures, so the Debian buildd
+# would run the suite there first (#1146, #1148). This runs it under qemu-user,
+# where a process looks unlike a native one and every step costs far more.
 name: Emulated suite
 
 on:
@@ -27,10 +26,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Emulation is what is under test, not parisc: the hppa that reported
-        # #1146 lives in debian-ports, with no container image and a far more
-        # fragile archive. s390x is in main, and big-endian, which nothing else
-        # here covers.
+        # This leg tests emulation itself. The hppa of #1146 lives in
+        # debian-ports with no container image. s390x is in main and is the
+        # only big-endian target here.
         arch: [s390x]
     steps:
       - name: Register the binfmt handlers

@@ -23,10 +23,9 @@ env:
   CHECK_JOBS: 16
 
 jobs:
-  # Two networks no runner has: buildds that refuse TEST-NET-1 rather than drop
-  # it (#1108), and an rpm buildroot, where a UDP connect names no source at all
-  # and #1463 read that wildcard as an address. One job, since the build is the
-  # same and neither check is worth a second three-minute compile.
+  # Two networks no runner has. Some buildds refuse TEST-NET-1 instead of
+  # dropping it (#1108), and an rpm buildroot's UDP connect names no source
+  # (#1463). One job covers both, because they share the three-minute build.
   hostile-network:
     name: build (constrained networks)
     runs-on: ubuntu-24.04
@@ -227,10 +226,9 @@ jobs:
           ! bash tools/macos-release.sh --app "$RUNNER_TEMP/moved/HTTrack.app" \
             --identity - --skip-notarize --label 'a b/c'
 
-  # --disable-auto-features is what a distribution recipe passes, and nothing
-  # else builds a tree with an optional feature off. The second configure turns
-  # off iconv alone: with every feature sharing one value, a test reading the
-  # wrong one still agrees with the right one.
+  # Distribution recipes pass --disable-auto-features, and no other leg builds
+  # with an optional feature off. The second configure disables iconv alone,
+  # because a test reading the wrong feature passes when all share one value.
   auto-features:
     name: build (--disable-auto-features, then iconv alone off)
     runs-on: ubuntu-24.04

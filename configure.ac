@@ -121,14 +121,14 @@ VERSION_INFO="3:28:0"
 AM_MAINTAINER_MODE
 AC_USE_SYSTEM_EXTENSIONS
 
-# A real bash, for "make deb" and the test harness. Not searched into BASH: bash presets
-# that to its own path, and macOS /bin/sh is a bash, so the macro never searches (#895).
-# BASH_SHELL isn't preset the way BASH is, so AC_ARG_VAR needs no guard. Kept ahead of the
-# compiler probes so a bad override dies before them.
+# Find a real bash for "make deb" and the test harness. BASH would not do, because bash
+# presets it to its own path and macOS /bin/sh is a bash, so it is never searched (#895).
+# BASH_SHELL is not preset, so AC_ARG_VAR needs no guard. This runs before the compiler
+# probes, so a bad override fails first.
 AC_ARG_VAR([BASH_SHELL], [path to a real (non-POSIX-mode) bash])
-# AC_PATH_PROGS drops a relative override and searches instead, which loses the user's intent.
-# Nothing quotes $(BASH_SHELL) in the Makefiles, and quoting could not save it anyway: make
-# splits on whitespace, expands '$' and treats '#' as a comment before any shell sees it.
+# AC_PATH_PROGS drops a relative override and searches instead, losing the user's intent.
+# The Makefiles leave $(BASH_SHELL) unquoted. Quoting would not help, because make splits
+# on whitespace, expands '$' and treats '#' as a comment before any shell sees it.
 case $BASH_SHELL in
 *[[[:space:]]]* | *'#'* | *'$'* | *'`'* | *'\'* | *'"'* | *"'"* | *';'* | *'&'* | *'|'* | \
 *'<'* | *'>'* | *'('* | *')'* | *'*'* | *'?'* | *'@<:@'* | *'@:>@'* | *'{'* | *'}'*)
@@ -139,9 +139,9 @@ esac
 hts_bash_override=$BASH_SHELL
 AC_PATH_PROGS([BASH_SHELL], [bash], [/bin/bash])
 
-# An absolute override is taken verbatim, so BASH_SHELL=/bin/sh would put #895 back and only
-# surface at "make check" or "make deb" (#908). What we found ourselves is only a warning:
-# a box with no bash still builds, it just cannot run those two.
+# An absolute override is taken verbatim, so BASH_SHELL=/bin/sh would bring #895 back at
+# "make check" or "make deb" (#908). A bad bash we found ourselves only warns, because a
+# box without bash still builds.
 AC_MSG_CHECKING([whether $BASH_SHELL is a bash outside POSIX mode])
 hts_bash_why=
 hts_bash_env=no
@@ -150,16 +150,16 @@ hts_bash_env=no
 if ! AS_EXECUTABLE_P(["$BASH_SHELL"]); then
   hts_bash_why="not an executable regular file"
 elif test -z "$("$BASH_SHELL" -c 'echo "${BASH_VERSINFO[[0]]}"' 2>/dev/null)"; then
-  # Not BASH_VERSION: that is an ordinary variable, so any shell echoes back a spoofed one.
+  # BASH_VERSION is unusable, because any shell echoes back a spoofed one.
   hts_bash_why="not a bash: it reports no BASH_VERSINFO"
 else
   # sh-mode bash reports a version too, so only SHELLOPTS tells the two apart.
   case $("$BASH_SHELL" -c 'echo ":$SHELLOPTS:"' 2>/dev/null) in
   *:posix:*)
     hts_bash_why="a bash in POSIX sh-mode"
-    # POSIXLY_CORRECT and an exported SHELLOPTS do that to every bash on the box, so no path
-    # can pass and blaming this one would send the user hunting for another. Reading them
-    # here would not do: configure puts its own shell in posix mode, which sets both.
+    # POSIXLY_CORRECT or an exported SHELLOPTS does this to every bash, so blaming
+    # this path would mislead. They cannot be read here, because configure's own
+    # posix mode sets both.
     case $(env -u POSIXLY_CORRECT -u SHELLOPTS "$BASH_SHELL" -c 'echo ":$SHELLOPTS:"' 2>/dev/null) in
     '' | *:posix:*) ;; # no "env -u", or posix whatever the environment: blame the path
     *) hts_bash_env=yes ;;
@@ -269,7 +269,7 @@ AX_CHECK_COMPILE_FLAG([-Wignored-qualifiers], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -
 AX_CHECK_COMPILE_FLAG([-Wsign-compare], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wsign-compare"], [], [-Werror])
 AX_CHECK_COMPILE_FLAG([-Wduplicated-cond], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wduplicated-cond"], [], [-Werror])
 # gcc's default level accepts a comment as the marker and clang only the
-# attribute; =5 drops the comment, so HTS_FALLTHROUGH is the one both read.
+# attribute. =5 drops the comment, so both read HTS_FALLTHROUGH.
 AX_CHECK_COMPILE_FLAG([-Wimplicit-fallthrough=5], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wimplicit-fallthrough=5"],
 	[AX_CHECK_COMPILE_FLAG([-Wimplicit-fallthrough], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wimplicit-fallthrough"], [], [-Werror])], [-Werror])
 # Implied by -Wall today; named explicitly so a truncating copy stays visible.
@@ -368,18 +368,17 @@ AS_CASE([$host_os],
 
 HTS_EXPAND_LIBDIR
 
-# Enumerated, not read from libtool's sys_lib_dlsearch_path_spec: that one is
-# only augmented when /etc/ld.so.conf exists, so a sysroot or minimal container
-# would let a distribution libdir through. Spelled out rather than globbed as
-# /lib*, which would swallow /libfoo and /usr/libexec.
+# Listed by hand, because libtool's sys_lib_dlsearch_path_spec misses a
+# distribution libdir when /etc/ld.so.conf is absent, as in a sysroot. A /lib*
+# glob would also swallow /libfoo and /usr/libexec.
 AS_CASE([$hts_libdir],
 	[/lib | /lib/* | /lib32 | /lib32/* | /lib64 | /lib64/* | /libx32 | /libx32/*], [hts_origin_sysdir=yes],
 	[/usr/lib | /usr/lib/* | /usr/lib32 | /usr/lib32/* | /usr/lib64 | /usr/lib64/* | /usr/libx32 | /usr/libx32/*], [hts_origin_sysdir=yes],
 	[hts_origin_sysdir=no])
 
-# dyld follows LC_RPATH only for a load path spelled @rpath/..., so Darwin also
-# needs libhttrack's own id. That comes from libtool's archive_cmds template and
-# not from LDFLAGS, so rewrite it; an unrecognised template leaves the gate off.
+# dyld follows LC_RPATH only for an @rpath/... load path, so Darwin also needs
+# libhttrack's own id. libtool's archive_cmds template sets it, so rewrite that.
+# An unrecognised template leaves the gate off.
 hts_origin_id=no
 if test "x$hts_origin_darwin" = xyes; then
 	hts_origin_subst='s|-install_name $rpath/|-install_name @rpath/|'
@@ -455,9 +454,8 @@ _ACEOF
 	AS_CASE([$hts_cv_origin_rpath],
 		[no], [AC_MSG_RESULT([no])],
 		[
-			# $(libdir) first, so the token only answers once the configured
-			# libdir is gone: $(bindir)/../lib is a different directory under a
-			# lib64 or split-bindir layout and must not shadow it.
+			# $(libdir) comes first, because $(bindir)/../lib differs from it
+			# under a lib64 or split-bindir layout and must not shadow it.
 			RPATH_ORIGIN_LDFLAGS='-Wl,-rpath,$(libdir)'
 			test "x$hts_cv_origin_rpath" = xorigin && RPATH_ORIGIN_LDFLAGS="$RPATH_ORIGIN_LDFLAGS -Wl,-z,origin"
 			RPATH_ORIGIN_LDFLAGS="$RPATH_ORIGIN_LDFLAGS -Wl,-rpath,$hts_origin_ref_make/../lib"
@@ -472,10 +470,10 @@ fi
 AC_SUBST([ORIGIN_RPATH])
 AC_SUBST([RPATH_ORIGIN_LDFLAGS])
 
-# The @rpath id is only safe for a consumer carrying its own LC_RPATH, so
-# libhttrack.pc hands one out -- under the gates the executables' own rpath
-# respects, so that --disable-origin-rpath and an archive-only build stay
-# rpath-free too. ${libdir} is pkg-config's own variable, expanded on query.
+# The @rpath id is only safe for a consumer with its own LC_RPATH, so
+# libhttrack.pc hands one out. It obeys the executables' rpath gates, so
+# --disable-origin-rpath and an archive-only build stay rpath-free.
+# ${libdir} is pkg-config's own variable, expanded on query.
 PKGCONFIG_RPATH=no
 PKGCONFIG_RPATH_LDFLAG=
 AS_IF([test "x$enable_origin_rpath" != xno && test "x$enable_shared" != xno &&
@@ -707,7 +705,7 @@ AS_IF([test x"$selftests" = x"no"],
 AM_CONDITIONAL([SELFTESTS], [test x"$selftests" = x"yes"])
 AC_SUBST([SELFTESTS], [$selftests])
 
-## CSPRNG for the --single-file mark; /dev/urandom is the fallback
+## Pick a CSPRNG for the --single-file mark, else /dev/urandom
 AC_CHECK_FUNCS([getrandom])
 
 ### zlib (mandatory)
@@ -789,10 +787,10 @@ AS_IF([test x"$https_support" = x"auto"],
 AC_SUBST(HTTPS_SUPPORT,$https_have)
 
 ### Support IPv6
-# HTS_INET6 picks the SOCaddr arm in the installed htsnet.h, so a probe that
-# nobody can override lets two builds of one version ship different layouts.
-# Not wired to --disable-auto-features: getaddrinfo is a libc function, not an
-# optional dependency, and defaulting it off would move that layout.
+# HTS_INET6 picks the SOCaddr arm in the installed htsnet.h, so a probe nobody
+# can override lets two builds of one version ship different layouts. It stays
+# out of --disable-auto-features, because getaddrinfo is in libc and defaulting
+# it off would move that layout.
 AC_MSG_CHECKING(whether to enable IPv6 support)
 AC_ARG_ENABLE([ipv6],
 	[AS_HELP_STRING([--enable-ipv6=@<:@yes/no/auto@:>@],[Enable IPv6 support @<:@default=auto@:>@])],
@@ -863,10 +861,10 @@ AC_CHECK_LIB(socket, socket, [SOCKET_LIBS="-lnsl -lsocket"], AC_MSG_RESULT([not 
 AC_SUBST(SOCKET_LIBS)
 
 ### Charset conversion: iconv(), or the built-in codepage tables
-## HTS_USEICONV 0 is a configuration htscharset.c already supports, so "off" is
-## the htscodepages.h fallback rather than a missing library. GNU libiconv's
-## header renames iconv_open unless LIBICONV_PLUG is defined, so a bare symbol
-## probe can say yes where the compiler would not; link what the header gives us.
+## HTS_USEICONV 0 selects the htscodepages.h fallback, which htscharset.c
+## supports. GNU libiconv's header renames iconv_open unless LIBICONV_PLUG is
+## defined, and a bare symbol probe can pass where the compiler would not, so
+## link what the header gives us.
 AC_ARG_WITH([iconv],
 	[AS_HELP_STRING([--with-iconv@<:@=DIR@:>@],[Convert charsets with iconv() rather than the built-in tables @<:@default=auto@:>@])],
 	[iconv_want=$withval
@@ -948,12 +946,12 @@ AC_SUBST(DL_LIBS)
 fi
 
 ### What libhttrack.pc tells a consumer about its private dependencies
-# A static link needs each library ahead of the ones it uses, which only a
-# dependency's own .pc gets right (and which alone carries the -L an
-# out-of-the-way prefix needs), so name the module wherever one is installed.
-# Dependents first: pkg-config emits Requires.private after Libs.private.
-# Absent the tool every dependency falls back to Libs.private, so the builder
-# decides the installed .pc; a recipe wanting a stable one build-depends on it.
+# A static link needs each library ahead of the ones it uses. Only a
+# dependency's own .pc gets that right and carries the -L an unusual prefix
+# needs, so name the module wherever one is installed. Dependents go first,
+# because pkg-config emits Requires.private after Libs.private. Without the
+# tool every dependency falls back to Libs.private, so a recipe wanting a
+# stable .pc build-depends on it.
 AC_ARG_VAR([PKG_CONFIG], [path to the pkg-config utility])
 AC_PATH_TOOL([PKG_CONFIG], [pkg-config], [false])
 PKGCONFIG_REQUIRES_PRIVATE=
@@ -975,10 +973,9 @@ hts_pc_dep "$hts_pc_openssl" "$OPENSSL_LIBS"
 hts_pc_dep libbrotlidec "$BROTLI_LIBS"
 hts_pc_dep libzstd "$ZSTD_LIBS"
 
-# An installed header includes <openssl/ssl.h>, so a consumer needs that include
-# path. Requires.private does not reliably carry it: a keg-only Homebrew prefix
-# keeps openssl.pc off the default search path, and pkg-config then resolves
-# nothing from it.
+# An installed header includes <openssl/ssl.h>, so a consumer needs its include
+# path. Requires.private cannot carry it from a keg-only Homebrew prefix, whose
+# openssl.pc is off the default search path.
 PKGCONFIG_SSL_CFLAGS=
 case " $OPENSSL_LIBS " in
 *" -lssl "*)

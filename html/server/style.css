@@ -93,7 +93,7 @@ h4 { margin: 0;  font-weight: bold;  font-size: 1.18em; }
 .hide { display: none; }
 .tableWidth { min-width: 400px; }
 
-/* The same dark-scheme exceptions as the doc pages (html/doc.css). */
+/* html/doc.css has the same dark-scheme exceptions. */
 @media (prefers-color-scheme: dark) {
 	/* The browser's own active red is too dark on the dark panel. */
 	a:active { color: var(--link-hover); }

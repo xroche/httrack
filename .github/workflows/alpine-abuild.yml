@@ -1,10 +1,7 @@
-# Alpine is the only downstream that builds us against musl, so a glibc-ism we
-# add compiles everywhere else and breaks only here. 3.50.0 shipped a missing
-# spawn.h (#1487) and an install that looped on an ordinary --docdir (#1488),
-# and both were visible only from a downstream build. Their APKBUILD sets
-# options="!check", so this proves the compile and the install rather than the
-# suite. Their tree, so a red here can be theirs to fix, which is why it blocks
-# nothing.
+# Alpine is the only downstream that builds us against musl, where a glibc-ism
+# breaks. Their APKBUILD sets options="!check", so this proves the compile and
+# the install but not the suite. It blocks nothing, because a red here can be
+# theirs to fix.
 name: alpine abuild canary
 
 on:
@@ -44,9 +41,8 @@ jobs:
           cp "$GITHUB_WORKSPACE/httrack/httrack-$ver.tar.gz" .
           sha=$(sha512sum "httrack-$ver.tar.gz" | cut -d' ' -f1)
           # abuild resolves a bare filename in source= against the APKBUILD's
-          # own directory. Pinning the sum here rather than letting abuild
-          # checksum regenerate it is what makes abuild verify our bytes, and
-          # what reds a source entry naming anything else.
+          # own directory. Pinning the sum here makes abuild verify our bytes,
+          # and reds a source entry naming anything else.
           # shellcheck disable=SC2016 # $pkgver is the APKBUILD's to expand, not ours
           sed -i -e "s/^pkgver=.*/pkgver=$ver/" \
             -e 's|^source=.*|source="httrack-$pkgver.tar.gz"|' \

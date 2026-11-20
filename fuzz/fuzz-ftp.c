@@ -21,11 +21,10 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 Please visit our Website: http://www.httrack.com
 */
 
-/* Fuzz the FTP control channel (htsftp.c): get_ftp_line() reads the server's
-   replies off a socketpair, and each reply goes through the PASV, EPSV, SIZE
-   and MDTM parsers. The same bytes, as a URL, go through the user, host and
-   command splitters. Byte 0 sets the reply buffer size; the rest is the input.
- */
+/* Fuzz the FTP control channel (htsftp.c). get_ftp_line() reads replies off a
+   socketpair into the PASV, EPSV, SIZE and MDTM parsers, and the same bytes go
+   through the user, host and command splitters as a URL. Byte 0 sets the reply
+   buffer size. */
 #include "fuzz.h"
 
 #include "htscore.h"
@@ -37,7 +36,7 @@ Please visit our Website: http://www.httrack.com
 #include <sys/socket.h>
 #include <unistd.h>
 
-/* fits the socketpair buffer, so the whole reply is written before reading */
+/* The whole reply fits the socketpair buffer before any read */
 #define FUZZ_FTP_MAXSIZE (16 * 1024)
 
 static void ftp_fail(const char *what, const char *line) {
@@ -45,7 +44,7 @@ static void ftp_fail(const char *what, const char *line) {
   abort();
 }
 
-/* every parser on one reply line, checking what each one promises */
+/* Check each parser's promise on one reply line */
 static void ftp_parse_reply(char *line) {
   char ip[16]; /* "255.255.255.255" */
   int port = -1;
@@ -66,7 +65,7 @@ static void ftp_parse_reply(char *line) {
   (void) linejmp(line);
 }
 
-/* the URL splitting run_launch_ftp() does before it connects */
+/* Split the URL as run_launch_ftp() does before connecting */
 static void ftp_split_url(char *url) {
   char user[256], pass[256];
   char host[HTS_URLMAXSIZE * 2];
@@ -101,7 +100,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
   if (size < 1 || size > FUZZ_FTP_MAXSIZE)
     return 0;
-  /* odd: the size every caller passes; even: a short one, to exercise clips */
+  /* Odd uses every caller's size. Even uses a short one, to exercise clips */
   line_size = (data[0] & 1) ? FTP_LINE_SIZE : 1 + (data[0] >> 1);
   data++, size--;
 
@@ -120,7 +119,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     abort();
   close(sv[1]);
 
-  /* heap, so ASan bounds the copy into the caller's buffer */
+  /* ASan bounds the copy into this heap buffer */
   line = malloct(line_size);
   /* each call reads at least one byte, so the bound is the input size */
   for (calls = 0; ioctl(sv[0], FIONREAD, &pending) == 0 && pending > 0;

@@ -31,8 +31,8 @@ EMPTY = {"absent", "literal", "unresolved", ""}
 def parse(path):
     """Rows of the TSV, or exit naming the first row that is malformed."""
     rows, seen = [], set()
-    # Bytes, not text: a stray non-ASCII byte must name its line rather than
-    # arrive as a decode traceback.
+    # Read bytes, so a stray non-ASCII byte names its line instead of raising
+    # a decode traceback.
     with open(path, "rb") as fp:
         for n, raw in enumerate(fp, 1):
             bad = [b for b in raw.rstrip(b"\n") if not 0x20 <= b <= 0x7E and b != 0x09]
@@ -78,8 +78,8 @@ def parse(path):
                         "%s: %s.%s names %s, which has no row"
                         % (path, r["key"], col, ref)
                     )
-    # composed_with is a relation, so a consumer reaching either row must find
-    # the other: a one-sided edge is invisible from the side that matters.
+    # composed_with is symmetric, because a consumer reaching either row must
+    # find the other.
     by_key = {r["key"]: r for r in rows}
     for r in rows:
         for ref in filter(None, r["composed_with"].split(",")):
@@ -108,12 +108,9 @@ def emit(rows, tsv, out):
     for c in COLUMNS:
         w("  const char *%s;\n" % c)
     w("} winprofile_key_t;\n\n")
-    # A count the consumer can assert, taken from the file rather than kept by
-    # hand: a table that shrinks silently is the failure this whole file exists
-    # to prevent.
+    # Count rows from the file, so consumers can assert the table never shrinks.
     w("#define WINPROFILE_KEY_COUNT %d\n\n" % len(rows))
-    # One row per line beats whatever a formatter would do with 11 fields, and
-    # a reflowed table is unreadable against the TSV it mirrors.
+    # Keep one row per line, so the table reads against the TSV it mirrors.
     w("/* clang-format off */\n")
     w("static const winprofile_key_t winprofile_keys[WINPROFILE_KEY_COUNT] = {\n")
     for r in rows:

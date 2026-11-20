@@ -1,7 +1,6 @@
 # Cross-compiles for the Debian architectures no GitHub runner exists for.
-# 3.49.17 failed on four of them at once and every failure was a compile or
-# assemble error that x86-64 and arm64 cannot produce, so the buildd was the
-# first thing to see the code.
+# x86-64 and arm64 cannot produce their compile and assemble errors, and
+# without this the buildd sees them first.
 name: Cross-arch
 
 on:
@@ -23,7 +22,7 @@ jobs:
   cross:
     name: cross (Debian ports)
     runs-on: ubuntu-24.04
-    # sid, not stable: the point is to predict what the sid buildds will say.
+    # sid, because this predicts what the sid buildds will say.
     container: debian:sid
     # Nine ports in series, where one leg's budget was 30.
     timeout-minutes: 60

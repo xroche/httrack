@@ -13,8 +13,7 @@
 # @FOOTER@ becomes that block (the footer is man/footer.tmpl); @DATE@ and @YEAR@
 # are replaced inline.
 #
-# httrack's OPTIONS section is derived from --help by indentation, which is what
-# makes it robust (no more prose turning into bogus options, see Debian #1061053):
+# httrack's OPTIONS section comes from --help by indentation (Debian #1061053):
 #   column 0 starting with "--"  -> long option    (.IP)
 #   column 0 otherwise           -> section header  (.SS)
 #   1-2 leading spaces           -> option          (.IP)

@@ -1,10 +1,7 @@
-# Arch builds us with the newest gcc, glibc and openssl any downstream uses, so
-# a header that moved or a warning that became an error surfaces here first.
-# 3.50.0 shipped a missing spawn.h (#1487) and an install that looped on an
-# ordinary --docdir (#1488), and both were visible only from a downstream
-# build. Their PKGBUILD has no check(), so this proves the compile and the
-# install rather than the suite. Their tree, so a red here can be theirs to
-# fix, which is why it blocks nothing.
+# Arch builds us with the newest gcc, glibc and openssl of any downstream, so a
+# moved header or a warning turned error surfaces here first. Their PKGBUILD has
+# no check(), so this proves the compile and the install but not the suite. It
+# blocks nothing, because a red here can be theirs to fix.
 name: arch makepkg canary
 
 on:
