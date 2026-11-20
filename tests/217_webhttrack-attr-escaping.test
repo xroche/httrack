@@ -41,8 +41,7 @@ printf 'Category=c%%22d\r\n' >"${projects}/p\"q/hts-cache/winprofile.ini"
 mkdir -p "${projects}/t/hts-cache"
 printf 'Category=x%%09y\r\n' >"${projects}/t/hts-cache/winprofile.ini"
 
-# Loaded on the first request. The render must keep this Windows path's
-# backslash, or the posted-back form rewrites a different file.
+# The render must keep this backslash, or the posted form writes another file.
 printf 'path=C:\\ab\r\nlang=\r\n' >"${work}/.httrack.ini"
 
 printf '[a hostile settings value is entity-escaped in its attribute] ..\t'
@@ -60,8 +59,7 @@ if not m:
     sys.exit("no session id in server/index.html")
 sid = m.group(1).decode()
 
-# A quote ends the attribute and the rest injects. Each field has its own
-# leader, so a field echoing another's value cannot pass.
+# Each field gets its own quote-led payload, so echoing another's value fails.
 BREAK = "\"><img src=q onerror=alert(1)>&'"
 
 
@@ -81,8 +79,7 @@ def render(page, fields):
     resp = urllib.request.urlopen(req, timeout=20)
     if resp.status != 200:
         sys.exit("%s answered %d" % (page, resp.status))
-    # Legacy bytes from the server must fail the assertion below, so they are
-    # replaced here instead of raising.
+    # Replace legacy bytes so the assertion below fails instead of the decode.
     body = resp.read().decode("utf-8", "replace")
     if 'lang="fr"' not in body:
         sys.exit("%s did not switch to LANGUAGE_2:\n%s" % (page, body[:2000]))
@@ -161,8 +158,7 @@ if "\r\npath=C:\\ab\r\n" not in saved:
 if '--proxy "socks5://px.example:3128"' not in body:
     sys.exit("step4.html drops the template's \\3A escape:\n%s" % body[:4000])
 
-# No template edit reaches the options ${liststr:} emits. The two static
-# categories it prepends are not user data.
+# The two static categories ${liststr:} prepends are not user data.
 body = render("step2.html", {"path": projects})
 options = re.findall(r"<option value=\"([^\"]*)\">", body)
 for want in ("p&#34;q", "c&#34;d"):

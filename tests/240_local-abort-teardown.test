@@ -1,7 +1,6 @@
 #!/bin/bash
 # An aborted mirror (-#L limit, then a dead server) must still commit its WARC
-# and .cdx, and leave the previous change report alone, since it never ran the
-# index pass (#1061).
+# and .cdx, and leave the previous change report alone (#1061).
 set -euo pipefail
 
 # shellcheck source=tests/crawllib.sh
@@ -69,8 +68,7 @@ local_crawl --log "${tmpdir}/log3" "${common[@]}" -O "$out" --retries=1 --update
     "${BASEURL}/changes/index.html" || rc3=$?
 expect "the dead pass rolled the session back" \
     grep -aq "restoring previous one" "${out}/hts-log.txt"
-# A rollback restores the last good session. It is not the abort pass 2
-# reports, though both set exit_xh.
+# A rollback is not the abort pass 2 reports, though both set exit_xh.
 expect "the rollback is not reported as an abort" test "$rc3" -eq 0
 expect "the rollback kept the previous change report" \
     cmp -s "${tmpdir}/report1.json" "$report"

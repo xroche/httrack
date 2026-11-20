@@ -49,8 +49,7 @@ build_arc "$dir/legacy.arc" 10
 test "$(convert "$dir/legacy.arc" "$dir/c.arc")" = 1 ||
     fail "an archive whose length counts the blank line no longer loads"
 
-# Exactly two newlines go outside the declared length, because an older
-# proxytrack reads nothing otherwise and a third puts the record out of reach.
+# Exactly two newlines sit outside the declared length, as old readers need.
 hdrlen=$(head -1 "$dir/a.arc" | wc -c)
 declared=$(head -1 "$dir/a.arc" | awk '{print $NF}')
 # od seeks for itself: piping the archive into `head -c` leaves the writer with

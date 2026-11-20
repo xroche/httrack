@@ -1,8 +1,6 @@
 #!/bin/bash
-# Issue #198: a resumed download may get a 206 starting before the requested
-# offset. httrack must honor the returned Content-Range instead of appending,
-# or the overlap is duplicated. Pass 1 interrupts flaky.bin mid-body, and pass 2
-# resumes against a 206 that backs up 8 bytes. The result must equal full.bin.
+# Issue #198: a resumed download must honor a 206 Content-Range that starts
+# before the requested offset, instead of appending the overlap.
 set -eu
 
 # shellcheck source=tests/crawllib.sh
@@ -29,8 +27,7 @@ common=(-O "$out" --quiet --disable-security-limits --robots=0 --timeout=30 --re
 refdir="${out}/hts-cache/ref"
 
 # pass 1: interrupt once flaky.bin's prefix is streaming (partial + temp-ref).
-# The stop is hts-abort.lock (436), because no signal from a WSL2 shell reaches
-# a native httrack.exe, and the Linux leg then runs what Windows runs.
+# Stop through hts-abort.lock (436), since no WSL2 signal reaches httrack.exe.
 printf '[pass 1: interrupt flaky.bin] ..\t'
 httrack "${common[@]}" "${BASEURL}/overlap/index.html" >"${tmpdir}/log1" 2>&1 &
 crawlpid=$!

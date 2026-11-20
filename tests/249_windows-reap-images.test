@@ -119,8 +119,7 @@ grep -q 'proxytrack.exe' <<<"$out" || fail "the leftover proxytrack was not name
 for e in $ENGINE_EXES; do
     grep -qxF "/F /IM $e.exe" "$tmp/killed" || fail "reap_leftover_processes leaves $e.exe running"
 done
-# Spared because the runner may run its own python.exe, which tasklist cannot
-# tell from a leaked fixture server.
+# python.exe is spared, since the runner may run its own.
 if grep -qxF '/F /IM python.exe' "$tmp/killed"; then fail "the reap killed an unrelated python.exe"; fi
 
 # Near misses are what a widened image matcher lets through.
@@ -143,9 +142,7 @@ grep -q 'htsserver.exe' <<<"$out" || fail "the stray listing dropped an engine: 
 grep -q 'python.exe' <<<"$out" || fail "the stray listing dropped python: $out"
 if grep -q 'trackpad' <<<"$out"; then fail "the stray listing caught an unrelated process: $out"; fi
 
-# Fail on any engine name still written by hand inside a taskkill or a
-# process-matching grep. Both files must be readable, or the sweep checks
-# nothing.
+# No taskkill or process grep may spell an engine name by hand.
 for f in testlib.sh proclib.sh; do
     test -r "$top_srcdir/tests/$f" || fail "no $f to sweep for hand-written engine names"
 done

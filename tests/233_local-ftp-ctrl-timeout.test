@@ -41,14 +41,12 @@ crawl() {
     run_with_timeout "$cap" httrack "$url" -O "$out" --quiet \
         --disable-security-limits --robots=0 --timeout="$to" -c1 \
         >"${tmpdir}/log${tag}" 2>&1 || rc=$?
-    # Only the cap and a signal count as the crawl's failure. The server is
-    # broken on purpose, so the assertions below judge the rest.
+    # Only the cap or a signal fails here. The server is broken on purpose.
     test "$rc" -ne 124 || fail "the ${tag} run was still going at ${cap}s"
     test "$rc" -lt 128 || fail "the ${tag} run died on signal $((rc - 128))"
 }
 
-# Every case checks the timeout it saw, since htsftp.c prints the value in
-# force. That catches a hardcoded constant better than a timing bound.
+# Each case checks the timeout htsftp.c prints, to catch a hardcoded one.
 logged() {
     grep -aq "$2" "${tmpdir}/out${1}/hts-log.txt" ||
         fail "no '$2' in the log: $(grep -a Error "${tmpdir}/out${1}/hts-log.txt" || true)"

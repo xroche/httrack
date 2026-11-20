@@ -1,6 +1,5 @@
 #!/bin/bash
-# Issue #17: with -o0, 4xx/5xx bodies must not be written, but a 0-byte 200
-# stays. -o1 writes the error page. #17's purge half is not exercised here.
+# Issue #17: -o0 must not write 4xx/5xx bodies but keeps a 0-byte 200.
 set -e
 
 : "${top_srcdir:=..}"

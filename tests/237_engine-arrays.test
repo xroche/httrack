@@ -32,8 +32,7 @@ case "$err" in
     ;;
 esac
 
-# Room of SIZE_MAX. Doubling must not wrap the capacity to 0, and the failed
-# allocation must fail just the page instead of aborting the process.
+# Doubling a SIZE_MAX room must not wrap to 0 or abort the process.
 # ASan kills the process on an over-large request unless told to return NULL.
 err=$(ASAN_OPTIONS="${ASAN_OPTIONS-}${ASAN_OPTIONS:+:}allocator_may_return_null=1" \
     run_bounded httrack -O /dev/null -#test=arrays overflow-loop 2>&1) || true

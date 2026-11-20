@@ -1,6 +1,5 @@
 #!/bin/bash
-# proxytrack reads .arc archives it does not own. It must survive a record whose
-# body cannot be read (#931), and one declaring a body larger than the archive.
+# proxytrack must survive an unreadable .arc record (#931) or an oversized one.
 
 set -euo pipefail
 

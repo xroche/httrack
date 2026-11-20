@@ -34,8 +34,7 @@ stage=${work}/stage
 stage_install_target install "${stage}" "${work}/install.log" . ||
     fail "make install DESTDIR=${stage}"
 
-# Fold the configured directories back to tokens so the pin survives any
-# --prefix or --libdir. Longest path first, so a nested directory wins.
+# Fold configured directories into tokens, longest first so a nested one wins.
 : >"${work}/dirs"
 for var in DOCDIR HTMLDIR MANDIR INCLUDEDIR LIBDIR BINDIR DATADIR; do
     name=CONFIGURED_${var}

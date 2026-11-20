@@ -80,8 +80,7 @@ ran "-%v2" v2
 expect "-%v2 into a pipe writes no escape" "$(count v2 "$esc")" eq 0 v2
 expect "-%v2 into a pipe writes no CR" "$(count v2 "$cr")" eq 0 v2
 
-# The spinner is the default display. Only Windows reaches the gate this
-# asserts, because POSIX forces quiet off a tty.
+# Only Windows reaches this gate, because POSIX forces quiet off a tty.
 crawl v0 -%v0
 ran "-%v0" v0
 expect "the spinner writes no CR into a pipe" "$(count v0 "$cr")" eq 0 v0

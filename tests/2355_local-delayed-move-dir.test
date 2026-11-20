@@ -1,8 +1,6 @@
 #!/bin/bash
 #
-# A placeholder moved to its final name in another directory must keep the
-# file (#2249). The type is in the path, so the .delayed placeholder sits in
-# delayed/ and the page in html/. Setup as in test 39.
+# A placeholder moved into another directory must keep its file (#2249).
 
 set -euo pipefail
 

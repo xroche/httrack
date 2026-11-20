@@ -45,9 +45,7 @@ def textarea(name):
     return m.group(1)
 
 
-# Match whole tokens, because "--single-file" is a substring of
-# "--single-file-max-size=5000" and a one-sided anchor matches 50000 or a
-# fusion like --near--single-file-max-size=5000.
+# Match whole tokens, since --single-file prefixes --single-file-max-size.
 cmd = textarea("command")
 if "--single-file" not in cmd.split():
     sys.exit("FAIL: --single-file missing from the command line\n%s" % cmd)

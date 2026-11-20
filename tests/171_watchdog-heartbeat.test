@@ -1,10 +1,7 @@
 #!/bin/bash
 #
-# Unit-tests ci_suite_heartbeat (ci-windows-suite.sh) on a virtual clock in both
-# regimes the Windows workflow uses. Scaled-down timings merge sleep
-# granularity, annotation cadence and staticness window into one number, and a
-# watchdog that confuses them kills healthy runs (#795). The stub times the
-# kill.
+# Unit-tests ci_suite_heartbeat (ci-windows-suite.sh) on a virtual clock, in
+# both regimes the Windows workflow uses (#795).
 
 set -euo pipefail
 
@@ -54,8 +51,8 @@ ticks=0
 sleep() {
     local step=$1
     ticks=$((ticks + 1))
-    # Every fourth sleep overshoots fourfold, as starvation does. A perfect
-    # sleep would hide the difference between a measured clock and a summed one.
+    # Every fourth sleep overshoots fourfold, or a summed clock would match a
+    # measured one.
     test $((ticks % 4)) -ne 0 || step=$((step * 4))
     vnow=$((vnow + step))
     if test "$vnow" -ge 5600 && test "$vnow" -lt 5700; then

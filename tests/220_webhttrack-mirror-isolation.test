@@ -147,8 +147,7 @@ check_sandboxed("/website/site.example/deep.html", b"MIRROR-SUB-OK")
 check_sandboxed("/website/probe.svg", b"MIRROR-SVG-OK")
 check_sandboxed("/website/data.bin", b"MIRROR-BLOB-OK")
 
-# Repeated with a project bound, because a gate keyed on server state instead
-# of the /website/ prefix only sandboxes the panel from here.
+# Repeat with a project bound, so a gate keyed on server state is caught.
 check_unsandboxed("/server/ping.js", b"function", "after the save")
 check_unsandboxed("/server/finished.html", b"/website/index.html", "after the save")
 

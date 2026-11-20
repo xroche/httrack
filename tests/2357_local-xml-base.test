@@ -1,9 +1,7 @@
 #!/bin/bash
 #
 # xml:base sets the base of later relative links in a feed, as <base href>
-# does, but browsers ignore it in HTML. It is never fetched, and is written out
-# empty so the saved file resolves links against itself. An empty base stays,
-# an unquoted one keeps the '>', and a fragment in the value is dropped.
+# does. httrack never fetches it and writes it out empty.
 
 set -euo pipefail
 

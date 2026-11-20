@@ -10,8 +10,7 @@ set -eu
 . "${0%"${0##*/}"}./testlib.sh"
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_poll.XXXXXX") || exit 1
-# A colon-free root for the PATH shim, because MSYS gives a drive-letter TMPDIR
-# and a PATH entry with a colon reads as two.
+# MSYS gives a drive-letter TMPDIR, and a colon in a PATH entry splits it.
 shim=$(mktemp -d /tmp/httrack_pollshim.XXXXXX 2>/dev/null) || shim="$tmp/count"
 cleanup_push rm -rf "$tmp" "$shim"
 
@@ -22,8 +21,7 @@ count_sleeps() { # count_sleeps <dir> <log>: a sleep shim recording each call
     chmod +x "$1/sleep"
     PATH="$1:$PATH"
     export PATH
-    # An unreachable shim counts zero sleeps, which would pass the assertions
-    # below as "nothing forked".
+    # An unreachable shim counts zero sleeps and would pass as "nothing forked".
     : >"$2"
     sleep 0
     test -s "$2" || fail "the sleep shim is not on PATH (entry '$1')"
@@ -41,9 +39,7 @@ ticks() { # ticks <label> <secs> <count> <floor>: polls, counting the sleeps for
     test "$((SECONDS - began))" -ge "$4" || fail "$1: $3 polls of ${2}s took under ${4}s"
 }
 sleeps() { wc -l <"$tmp/sleeps" | tr -d ' '; }
-# A host that cannot make a fifo, and Windows, which opts out, may use the
-# forked tick. A host that can must not. The override counts as opting out, so
-# a host whose fd tick misbehaves can still escape.
+# Only a host without fifos, or one that opts out, may use the forked tick.
 canfifo=
 if test -z "${HTTRACK_POLL_SLEEP:-}" && ! shell_is_msys && mkfifo "$tmp/probe" 2>/dev/null; then
     canfifo=1
@@ -102,8 +98,7 @@ kill "$writer" 2>/dev/null || true
 wait "$writer" 2>/dev/null || true
 
 # --- a half-written line is not a port ---------------------------------------
-# The announcement is usually one write, but reading it in two would hand the
-# crawl a truncated port number, which names another server or none.
+# Read the whole announcement, since a split read truncates the port number.
 log="$tmp/split.log"
 printf 'PORT 40' >"$log"
 (
@@ -132,8 +127,8 @@ case "$err" in
 *"exited early"*) ;;
 *) fail "a dead server reported '$err'" ;;
 esac
-# 2 is the deadline, the announce race 72 and 105 skip on. A crashed server must
-# not share it, or local-crawl.sh skips instead of failing.
+# Exit 2 is the announce deadline, which local-crawl.sh skips on. A crashed
+# server must not use it.
 test "$rc" -eq 2 || fail "a dead server exited $rc, want 2"
 
 echo "poll helpers OK"

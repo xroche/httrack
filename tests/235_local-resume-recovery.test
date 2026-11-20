@@ -115,9 +115,7 @@ test "$restarts" -eq 1 || fail "${restarts} free restarts, expected exactly 1 (l
 echo "OK (1 free restart, then bounded)"
 
 # --- the latch rides a re-record, and the budget survives the restart --------
-# A redirect to a case-different alias re-records the link under a new entry.
-# A latch left there buys a free restart every hop, and this server never ends.
-# --retries=1 also checks the budget survives for the real failure after.
+# A redirect to a case-different alias must not re-arm the free restart.
 printf '[alias redirect cannot reset the latch] ..\t'
 out="${tmpdir}/alias"
 mkdir "$out"

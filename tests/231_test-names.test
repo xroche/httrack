@@ -68,8 +68,7 @@ control dupext 'claimed by more than one test' ': >389_a.test; : >389_b.counts'
 # .data, so a checker that grew an allowlist of .test and .counts fails here
 # rather than passing as if it read every extension.
 control dupany 'claimed by more than one test' ': >389_a.test; : >389_b.data'
-# The exemption is by family name. Exempting the number would let an unrelated
-# test share 01 with 01_engine-.
+# Exempt by family name, or any test could share 01 with 01_engine-.
 control dupnumber 'claimed by more than one test' ': >01_bogus-one.test; : >01_bogus-two.test'
 # A .log with no .test of its own name is a file claiming that number, so the
 # build-output skip must not swallow it.
@@ -96,8 +95,7 @@ done
 out=$(bash "$checker" "$built_dir" 2>&1) ||
     fail "the checker read its own build output as a duplicate: $out"
 
-# A git that errors must report that the oracle did not run. The stub keeps
-# PATH intact for the checker's other tools.
+# A failing git must report that the oracle did not run.
 mkdir -p "$work/stub"
 printf '#!/bin/sh\nexit 1\n' >"$work/stub/git"
 chmod +x "$work/stub/git"
