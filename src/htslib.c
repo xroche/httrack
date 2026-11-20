@@ -62,13 +62,11 @@ Please visit our Website: http://www.httrack.com
 
 #include <limits.h>
 
-/* macOS reaches Multipath TCP through connectx() on an AF_MULTIPATH socket
-   rather than through a protocol, so it also differs at connect time. */
+/* macOS reaches Multipath TCP through connectx() on an AF_MULTIPATH socket. */
 #if HTS_INET_MPTCP && defined(__APPLE__)
 #define HTS_INET_MPTCP_DARWIN 1
 #ifndef AF_MULTIPATH
-/* The macOS SDK does not declare this. hts_mptcp_probe() tries it at startup,
-   and a wrong value only leaves Multipath TCP off. */
+/* The macOS SDK lacks it, and a wrong value only leaves Multipath TCP off. */
 #define AF_MULTIPATH 39
 #endif
 #else
@@ -297,11 +295,10 @@ static void print_buffer(buff_struct*const str, const char *format, ...) {
 }
 
 /* Append a "Cookie:" request line for every stored cookie matching adr/path.
-   adr may carry its scheme, and only "https://" gets a Secure cookie. The port
-   is ignored (see cookie_host). Pairs use the RFC 6265 form, because servers
-   reject the RFC 2965 $Version/$Path attributes (#151). A pair that does not
-   fit is dropped whole and counted in *skipped (may be NULL). reserve is the
-   room the caller still needs after this line. Returns the number emitted. */
+   Only an "https://" adr gets Secure cookies, and its port is ignored. Pairs
+   use the RFC 6265 form (#151). A pair that does not fit is dropped whole and
+   counted in *skipped (may be NULL). reserve is the room the caller still
+   needs after this line. Returns the number emitted. */
 static int append_cookie_header(buff_struct *bstr, t_cookie *cookie,
                                 const char *adr, const char *path,
                                 size_t reserve, int *skipped) {
@@ -654,8 +651,7 @@ void http_append_custom_headers(char *dst, size_t dst_size,
   append_custom_headers(&bstr, headers);
 }
 
-/* See htslib.h. A body bigger than the request block is clipped, because an
-   abort would lose the mirror. */
+/* See htslib.h. Clip an oversized body, because aborting loses the mirror. */
 size_t http_postfile_body(char *buffer, size_t buffer_size, size_t pos,
                           FILE *fp) {
   size_t room;
@@ -2417,8 +2413,7 @@ static long hts_mptcp_sysctl(const char *path) {
 }
 
 /* Can the kernel recover from a SYN a middlebox dropped for its MPTCP option?
-   It needs the retry and blackhole detection on, or such a host costs the full
-   connect timeout. A zero value turns the detection off. */
+   Without the retry and blackhole detection, such a host costs a timeout. */
 static hts_boolean hts_mptcp_kernel_recovers(void) {
   static const char retrans[] =
       "/proc/sys/net/mptcp/syn_retrans_before_tcp_fallback";
@@ -2474,8 +2469,7 @@ T_SOC hts_socket_client(int family, const httrackp *opt,
   T_SOC soc = INVALID_SOCKET;
 
 #if HTS_INET_MPTCP_DARWIN
-  /* The address family comes from the address given to connectx(). macOS
-     cannot bind an AF_MULTIPATH socket, so a caller that binds gets TCP. */
+  /* AF_MULTIPATH cannot bind on macOS, so a caller that binds gets TCP. */
   if (!will_bind && hts_mptcp_enabled(opt))
     soc = (T_SOC) socket(AF_MULTIPATH, SOCK_STREAM, 0);
 #elif HTS_INET_MPTCP
@@ -3845,8 +3839,7 @@ static const char *hts_query_strip_keys_match(const char *rules,
   char BIGSTK url[HTS_URLMAXSIZE * 4];
 
   /* Match the normalized host/path without the query, so read and write agree.
-     A longer one is hostile input and is clipped, because it only changes
-     which rule matches. */
+     A longer one is clipped, because it only changes which rule matches. */
   (void) strclipbuff(url, sizeof(url), jump_normalized_const(adr));
   if (fil[0] != '/')
     (void) strclipbuff(&url[strlen(url)], sizeof(url) - strlen(url), "/");

@@ -99,9 +99,8 @@ skip_if_static() {
     test -r "$lib" || test -r "${lib%.so}.dylib" || skip "static build: $*"
 }
 
-# Does RLIMIT_FSIZE stop a write here? GNU/Hurd accepts the limit and ignores
-# it. The bytes on disk give the answer, because only an enforcing host kills
-# the writer with SIGXFSZ.
+# Does RLIMIT_FSIZE stop a write here? GNU/Hurd ignores it, and only the bytes
+# on disk tell, because only an enforcing host kills the writer with SIGXFSZ.
 fsize_limit_binds() {
     local probe got
     # A failure here must not read as "the host does not enforce it", which
@@ -157,10 +156,9 @@ assert_steps_ran() { # assert_steps_ran WANT GOT
     assert_eq "$1" "$2" "steps the budget is paced against"
 }
 
-# Strip trailing newlines and CRs from a captured run into STRIPPED. Windows
-# ends lines CRLF, which MSYS drops and wsl2 keeps. Interior CRs are lines
-# mode's business. No echo, because bash 3.2 has no namerefs and a command
-# substitution forks (#795).
+# Strip trailing newlines and CRs from a captured run into STRIPPED, because
+# MSYS drops a Windows CRLF and wsl2 keeps it. No echo, because bash 3.2 has no
+# namerefs and a command substitution forks (#795).
 STRIPPED=
 strip_trailing_eol() { # strip_trailing_eol TEXT
     STRIPPED=$1
@@ -185,10 +183,9 @@ assert_selftest() { # assert_selftest WANT NAME [ARGS...]
     test "$got" = "$want" || fail "-#test=$name $*: expected [$want], got [$got]"
 }
 
-# Batched assert_selftest: selftest_queue records a case, and
-# selftest_run_queued runs a file's cases in ONE httrack to spare the Windows
-# legs (#795). A mismatch shows at the flush. A case whose output shell logic
-# reads, or that uses an htsmain() argv rewrite, stays on assert_selftest.
+# selftest_queue batches assert_selftest, and selftest_run_queued runs a file's
+# cases in ONE httrack for the Windows legs (#795). A case whose output shell
+# logic reads, or that uses an htsmain() argv rewrite, stays on assert_selftest.
 SELFTEST_RS=$(printf '\036')
 SELFTEST_CR=$(printf '\r')
 SELFTEST_SCRIPT=${SELFTEST_SCRIPT:-}
@@ -224,9 +221,8 @@ selftest_queue_head() { # selftest_queue_head WANT NAME [ARGS...]
     selftest_queue_mode head "$@"
 }
 
-# Queue NAME once per base-dir length across a full segment period, because a
+# Queue NAME once per base-dir length across a segment period, because a
 # length-blind stop bound lands on MAX_PATH for some bases only (#1409).
-# st_mkdeep's assertf catches that. WANT only pins that each length got there.
 selftest_queue_base_lengths() { # selftest_queue_base_lengths MODE WANT NAME DIR
     local mode=$1 want=$2 name=$3 dir=$4 pad i
     # 41 is st_mkdeep's ASCII segment, so this covers every residue.
@@ -272,11 +268,10 @@ selftest_queue_mode() { # selftest_queue_mode exact|lines|tail|head WANT NAME [A
     }
 }
 
-# Run every queued case and assert each. Args travel on stdin through a file,
-# because the engine parses argv first and would take a case's '-*' as a filter.
-# The queued arguments, NUL-separated, for -#test=batch to read back. Under
-# wsl2 their drvfs paths are translated here, because the shim never sees this
-# file.
+# Run every queued case and assert each. Args go on stdin, because the engine
+# parses argv first and would take a case's '-*' as a filter.
+# Write the queued arguments NUL-separated for -#test=batch. Under wsl2 their
+# drvfs paths are translated here, because the shim never sees this file.
 selftest_write_argv() {
     local a
     if test "$(suite_backend)" != wsl2; then
@@ -315,9 +310,8 @@ selftest_run_queued() {
             fail "-#test=batch: framing lost at case $((i + 1)) of $n, output: $out"
             ;;
         esac
-        # Strip the whole trailing run with its CRs, as a command substitution
-        # does around a lone case, so every platform agrees. Interior CRs are
-        # lines mode's business.
+        # Strip the trailing run with its CRs, as a command substitution does
+        # around a lone case, so every platform agrees.
         strip_trailing_eol "$got"
         got=$STRIPPED
         test "${SELFTEST_MODE[i]}" != lines ||
@@ -351,10 +345,8 @@ selftest_run_queued() {
     SELFTEST_LABEL=()
 }
 
-# Absolute path to httrack, because make check's relative ../src breaks after a
-# cd. assert_selftest runs the bare name. selftest_run_queued runs the
-# HTTRACK_PATH memo, so a test that cd's and queues must set
-# HTTRACK_PATH=$(httrack_path) before it moves.
+# Echo httrack's absolute path, because make check's relative ../src breaks
+# after a cd. A test that cd's and queues must set HTTRACK_PATH from it first.
 HTTRACK_PATH=${HTTRACK_PATH:-}
 httrack_path() {
     local p dir
@@ -409,10 +401,9 @@ run_cleanups() {
 # "python" may be 2.x or the Store stub.
 find_python() {
     local py names='python3 python' probe='sys.version_info[0] == 3'
-    # Windows-side under wsl2, so the fixture servers and httrack.exe share one
-    # side of the boundary and native paths. The bare names come first, because
-    # the driver puts a drvfs-converting shim there. The .exe names serve a
-    # hand-run. Either way the probe demands a Windows interpreter.
+    # Under wsl2 a Windows python keeps the fixture servers and httrack.exe on
+    # one side of the boundary. The bare names come first for the driver's
+    # drvfs shim, and the .exe names serve a hand-run.
     if test "$(suite_backend)" = wsl2; then
         names='python3 python python3.exe python.exe'
         probe="$probe and sys.platform == 'win32'"
@@ -587,10 +578,9 @@ expect_ok() {
     esac
 }
 
-# A staged install runs make in the ONE shared build tree, where "make install"
-# relinks each libtest plugin in place. Two at once can lose a .so that make
-# will not rebuild. The lock is a file naming its holder's pid, because macOS
-# has no flock(1).
+# Two "make install" runs in the ONE shared build tree relink each libtest
+# plugin in place and can lose a .so. macOS has no flock(1), so the lock is a
+# file naming its holder's pid.
 : "${INSTALL_LOCK:=${abs_top_builddir:-.}/.install-lock}"
 # Seconds one holder may keep the lock before a waiter calls the run broken. Per
 # holder, not per wait: a queue of legitimate installs is not a fault.
@@ -627,10 +617,8 @@ install_lock_release() {
     rm -f "${INSTALL_LOCK}"
 }
 
-# Return non-zero with a reason rather than delete another holder's lock. Only
-# the process named inside removes it, so an abandoned lock is reported to be
-# cleared by hand. A waiter cannot reclaim it safely, because rm and mv name a
-# path, not the file it read.
+# Return non-zero with a reason, never deleting another holder's lock, because
+# rm and mv name a path, not the file read. Clear an abandoned lock by hand.
 install_lock_acquire() {
     local held_by=- since=$SECONDS
     until install_lock_stamp "$$"; do
@@ -806,10 +794,9 @@ poll_open() {
 }
 
 # One poll tick of at most $1 seconds, forking nothing where bash can time out a
-# read on that fd, because a `sleep` per tick is costly under MSYS (#795). The
-# fd tick returns every 0.1s, so callers re-check their own deadline.
-# HTTRACK_POLL_SLEEP=1 forces the forked tick, re-read per tick so a test can
-# starve the poll mid-run.
+# read on that fd, because a `sleep` per tick is costly under MSYS (#795).
+# Callers re-check their own deadline. HTTRACK_POLL_SLEEP=1, re-read per tick,
+# forces the forked tick so a test can starve the poll mid-run.
 poll_wait() {
     local rc=0
     test -n "$POLL_STATE" || poll_open
@@ -841,10 +828,9 @@ stop_server() {
     return 0
 }
 
-# Free loopback ports, one per protocol in $@ (tcp/udp, default one tcp), all
-# distinct and closed on return. A port is only a hint, so the caller retries
-# its bind (start_proxytrack) or uses hold_port (#1218). Each is probed in the
-# caller's protocol, because Windows excludes port ranges per protocol (#1178).
+# Echo free loopback ports, one per protocol in $@ (tcp/udp, default one tcp),
+# distinct and closed. A port is a hint, so retry the bind or use hold_port
+# (#1218). Windows excludes port ranges per protocol (#1178).
 freeport() { # freeport [PROTO...]
     local out
     # Captured, not piped into tr, which would swallow a failed probe's status.
@@ -945,10 +931,9 @@ start_proxytrack() { # start_proxytrack LOGBASE LAUNCH
     fail "proxytrack bound none of 3 port pairs: $(<"$ptlog")"
 }
 
-# Echo the port local-server.py announces in log $1 (pid $2). Return 2 if the
-# server died and 1 on the deadline, the only race a caller may skip on. Any
-# line may match, because a warning merged via 2>&1 can come first. The deadline
-# is a minute, because a cold Python start under `make check -jN` can pass 5s.
+# Echo the port local-server.py announces in log $1 (pid $2), on any line,
+# because a 2>&1 warning can come first. Return 2 if the server died and 1 on
+# the deadline, which a caller may skip on. A cold Python start can pass 5s.
 discover_server_port() {
     local log=$1 pid=$2 line start=$SECONDS
     while :; do
@@ -1027,11 +1012,9 @@ dump_crawl_logs() {
     done
 }
 
-# The substring identifying ONE launch among every Windows process on the host,
-# taken from the relay's cmdline because WSL2 has no /proc/<pid>/winpid. Skip
-# argv[0] and the flags, because every test shares them, and local-crawl.sh's
-# --user-agent is longer than the output directory. Empty when nothing is
-# distinctive, which callers treat as "unknown" (#1228).
+# Echo the cmdline substring identifying ONE Windows launch, because WSL2 has
+# no winpid. It skips argv[0] and the flags, which every test shares. Empty
+# means "unknown" (#1228).
 win_marker() { # win_marker <path to a NUL-separated cmdline>
     test -r "$1" || return 0
     { tr '\0' '\n' <"$1"; } 2>/dev/null |
@@ -1069,10 +1052,9 @@ win_pid() {
     fi
 }
 
-# Set WIN_PID and WIN_IMAGE for MSYS pid $1 while it is alive, because /proc
-# keeps a dead entry whose number Windows reissues at once (#1228). Not for a
-# job just backgrounded, which names the forking shell until its exec lands.
-# No echo, because a command substitution forks (#795).
+# Set WIN_PID and WIN_IMAGE for MSYS pid $1 while it lives, because Windows
+# reissues a dead pid at once (#1228). A job just backgrounded still names the
+# forking shell. No echo, because a command substitution forks (#795).
 win_capture() { # win_capture <pid>
     WIN_PID='' WIN_IMAGE=''
     target_is_windows || return 0
@@ -1119,13 +1101,10 @@ kill_pid() {
     kill -9 "$pid" 2>/dev/null || true
 }
 
-# Kill a backgrounded job and its whole descendant tree. On POSIX this signals
-# the job's process group, which the caller must have set (run_with_timeout
-# does). On Windows taskkill /T ends the native tree by Windows PID, with single
-# slashes because the workflow turns MSYS argument conversion off.
-# $2 is that Windows PID, read while the job was alive, because winpid vanishes
-# with the job and only the host-wide sweep below is left. $3 is the image it
-# ran then, so a reissued number is not taken for the job (#1228).
+# Kill a backgrounded job and its whole tree. POSIX signals the job's process
+# group, which the caller must set (run_with_timeout does). Windows runs
+# taskkill /T, with single slashes because MSYS argument conversion is off.
+# $2 is the Windows PID and $3 its image, read while the job lived (#1228).
 kill_tree() {
     local pid=$1 winpid=${2:-} image=${3:-}
     if target_is_windows; then
@@ -1185,17 +1164,15 @@ EOF
     chmod +x "$dir/sleep" || return 1
     PATH="$dir:$PATH"
     export PATH
-    # MSYS gives a drive-letter TMPDIR, and a PATH entry with a colon reads as
-    # two, so check the shim is really reached.
+    # An MSYS drive-letter TMPDIR can split the PATH entry, so check the shim.
     test "$(command -v sleep)" = "$dir/sleep" || return 1
 }
 
 # Skip when the next of $1 remaining steps, at 1.5x the $2 seconds the last one
-# took, no longer fits the wedge budget (hppa spends ~150s on one configure).
-# Projecting one step ahead needs callers to run expensive steps first, so no
-# step left can outrun the reserve (#1146).
-# The budget test-timeout.sh enforces, in seconds, 0 meaning off. A bad value
-# falls back to the default, and a leading zero still reads as decimal.
+# took, no longer fits the wedge budget. Callers run expensive steps first
+# (#1146).
+# Echo the budget test-timeout.sh enforces in seconds, 0 meaning off. A bad
+# value falls back to the default, and a leading zero reads as decimal.
 budget_secs() {
     local budget=${HTTRACK_TEST_TIMEOUT:-600}
     case "$budget" in '' | *[!0-9]* | ???????*) budget=600 ;; esac
@@ -1247,19 +1224,17 @@ budget_left() {
     echo "$left"
 }
 
-# Collect a killed job, giving up after REAP_GRACE seconds. kill_tree can fail
-# to reap a native Windows descendant, and a bare `wait` would then wedge the
-# watchdog and the whole suite.
+# Collect a killed job, giving up after REAP_GRACE seconds, because a bare
+# `wait` on a native Windows survivor would wedge the whole suite.
 #
 # Non-zero means a host that answers for this pid called it running. Where no
 # route answers, nothing saw a survivor and none is reported.
 REAP_GRACE=${REAP_GRACE:-10}
 
 # The state letter for pid $1, in PID_STATE, empty when this host will not say.
-# It uses a global and reads /proc first to fork nothing, because reap_bounded
-# polls this at full speed under the broken tick of #1038. macOS takes the ps
-# route. Never infer death from a failed read, because Hurd returns EIO for a
-# suspended task. No route answers for a GNU/Hurd zombie (#1718).
+# It forks nothing, because reap_bounded polls it under the broken tick of
+# #1038. A failed read is not death, because Hurd gives EIO for a suspended
+# task. Nothing answers for a GNU/Hurd zombie (#1718).
 pid_state() { # pid_state PID
     local proc=${TESTLIB_PROC:-/proc} st=''
     # The whole file and the line it gave, never read's status: comm is unescaped,
@@ -1380,14 +1355,12 @@ dump_overrun() { # dump_overrun <pid> <secs> <label>
 }
 
 # Run "$@" under a wall-clock deadline of $1 seconds. Return its exit status, or
-# 124 if it overran and was killed. timeout(1) is absent on macOS and cannot
-# reap httrack.exe on Windows, so we poll and kill_tree. The deadlines compare
-# strictly, because $SECONDS is floored and firing early kills healthy work.
+# 124 if it was killed. timeout(1) is absent on macOS and cannot reap
+# httrack.exe. The deadlines compare strictly, because $SECONDS is floored.
 # One option, ahead of the deadline:
-#   --stdin FILE   read FILE, or nothing at all with the word "closed". A
-#                  caller's redirect does not reach here, because without job
-#                  control bash gives a background job /dev/null (#1258). The
-#                  redirect stays on the job, so kill_tree still signals it.
+#   --stdin FILE   read FILE, or nothing with the word "closed", because
+#                  without job control bash gives a background job /dev/null
+#                  (#1258). The job keeps the redirect, so kill_tree signals it.
 run_with_timeout() {
     local stdin=''
     if test "${1:-}" = --stdin; then

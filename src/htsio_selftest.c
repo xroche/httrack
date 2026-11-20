@@ -379,10 +379,9 @@ static int st_addlink(httrackp *opt, int argc, char **argv) {
   str.ptr_ = &ptr;
   str.addLink = htsAddLink;
 
-  /* [0] is the underflow, and [1] and [2] check the trim is unchanged. Only a
-     query-only link sees the trim. [3] to [5] give a class an applet codebase
-     (http, https, too long) and an absolute link, which a long codebase does
-     not already stop. */
+  /* [0] is the underflow and [1], [2] check the trim, which only a query-only
+     link sees. [3] to [5] give a class an http, https or too-long codebase and
+     an absolute link, which a long codebase does not already stop. */
   memset(longcod, 'a', sizeof(longcod) - 1);
   longcod[0] = longcod[sizeof(longcod) - 2] = '/';
   longcod[sizeof(longcod) - 1] = '\0';
@@ -492,8 +491,7 @@ static void makeindex_template_contract(const char *name, const char *tmpl,
 // makeindex_links==1, and clears *fp / sets *done. argv[0] is a writable dir,
 // argv[1] is an optional templates/ whose on-disk footer is rendered too.
 static int st_makeindex(httrackp *opt, int argc, char **argv) {
-  /* the minimal template is a control, so a failure on the real one means it
-     lost a slot */
+  /* the minimal template is the control for a slot the real one lost */
   const char *footers[] = {"%s%s", HTS_INDEX_FOOTER, NULL};
   size_t nfooters = sizeof(footers) / sizeof(*footers) - 1;
   char *ondisk = NULL;
@@ -824,8 +822,7 @@ static int st_topindex(httrackp *opt, int argc, char **argv) {
   assertf(strstr(buf, "???") == NULL);
 
 #ifndef _WIN32
-  /* #1329: a reader holding the old index still reads it whole after a
-     rebuild. Windows cannot rename over an open file, so this is POSIX only. */
+  /* #1329: a reader of the old index still reads it whole after a rebuild. */
   {
     FILE *const held = fopen(path, "rb");
 
@@ -1576,8 +1573,7 @@ static int st_refetchbackup(httrackp *opt, int argc, char **argv) {
     err++;
   }
 
-  /* #758: only a killed run leaves something there. Replace it, or the backup
-     stays disabled. */
+  /* #758: replace what a killed run left, or the backup stays disabled. */
   if (structcheck(want) != 0) {
     fprintf(stderr, "refetchbackup: cannot create %s\n", want);
     freet(back);
@@ -1602,8 +1598,7 @@ static int st_refetchbackup(httrackp *opt, int argc, char **argv) {
     err++;
   }
 
-  /* An aborted transfer restores. The resume reference goes with the partial,
-     or the next run asks past the restored copy's end (#1595). */
+  /* An aborted transfer restores and drops the resume reference (#1595). */
   {
     String saved = STRING_EMPTY;
 
