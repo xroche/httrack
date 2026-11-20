@@ -67,12 +67,12 @@ out=$("$httrack_bin" -O /dev/null -#test=savename /x.html text/html type=-1 2>&1
 assert_match "needs a userdef" "$out" "type=-1 guard"
 keeps_ext 900 '/*/x.html' 'userdef=%h%p/%n%q.%t'
 
-# adrpad=N expands '*' in adr= the same way. With urlhack off, the lookup key is
-# the host as stored: an unknown scheme finds its link, a long one cannot abort.
-selftest_queue 'savename: kept/x.html' savename /x text/html 'adr=gopher://h' \
-    urlhack=0 'prior=gopher://h|/x|kept/x.html'
-for pad in 1022 2030; do
-    selftest_queue_tail '/x.html' savename /x text/html 'adr=*://h' \
+# adrpad=N expands '*' in adr= the same way. With urlhack off, the scheme stays
+# in the key when it fits, and a scheme too long to fit cannot abort.
+selftest_queue 'savename: /dev/null/Ex.com/x.html' savename /x text/html \
+    'adr=https://Ex.com' urlhack=0 'prior=https://ex.com|/x|/dev/null/Ex.com/x.html'
+for pad in 1020 1022 2030; do
+    selftest_queue_tail '/x.html' savename /x text/html 'adr=*://hh' \
         "adrpad=$pad" urlhack=0
 done
 # A host longer than any crawled one leaves room for the type's directories.
