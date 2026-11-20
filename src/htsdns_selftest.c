@@ -124,8 +124,8 @@ static mock_host mock_hosts[] = {
    worker is still inside the backend while the test reads the counters. */
 static htsmutex mock_lock = HTSMUTEX_INIT;
 static int mock_finished = 0; /* backend calls that have returned */
-/* Counts backend uses that no longer read hts_resolver, because the answer was
-   freed or none came back. A swap must wait for all of them. */
+/* Counts backend uses done with hts_resolver: the answer was freed or none came
+   back. Freeing reads hts_resolver again, so a swap must wait for these. */
 static int mock_released = 0;
 static hts_boolean mock_gate_open = HTS_FALSE;
 

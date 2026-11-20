@@ -357,7 +357,8 @@ static int st_filtercap(httrackp *opt, int argc, char **argv) {
   assertf(taken && filptr == 1 && verdict == 1 && !warned);
   assertf(strcmp(filters[0], atcap) == 0);
 
-  /* the last match wins, so a stored overcap rule would forbid this */
+  /* the last match wins, so a stored overcap rule would forbid what the first
+     rule allows */
   strlcpybuff(filters[1], POISON, HTS_FILTER_SLOT_SIZE);
   TRY("one past the cap", overcap);
   REFUSED();

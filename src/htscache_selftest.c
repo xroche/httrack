@@ -832,7 +832,7 @@ static int cache_selftests(httrackp *opt, const char *dir) {
   cache_back cache;
   int i;
 
-  /* These fill htsblk.etag[256] and HTS_LOCATION_SIZE. */
+  /* These sit at the etag and location size limits. */
   static char etag_long[251];
   static char location_long[HTS_LOCATION_SIZE];
 
