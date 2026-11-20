@@ -28,13 +28,13 @@ Please visit our Website: http://www.httrack.com
 /* Fuzz the whole mirror engine (htscore.c's httpmirror() loop and everything
    it drags in: link extraction, the acceptance wizard, name generation, the
    back slots, the receive path, the cache and the indexes) end to end, over
-   a site the fuzzer generates. A server thread on 127.0.0.1 serves the
-   generated pages to the engine, which runs through hts_main2() with hard
-   bounds (-r depth, -c1 socket, -T timeout, -R0 retries, -s0 robots); when
-   the serve budget is spent the listener closes, so every run terminates. */
+   a site the fuzzer generates. A server thread on a fixed 127.0.0.1 port
+   serves the generated pages to the engine, which runs through hts_main2()
+   with hard bounds (-r2 depth, -c1 socket, -T timeout, -R0 retries, -s0 to
+   leave robots off). The main thread wakes the server with one connect when
+   the crawl returns; the server alone closes the listen socket. */
 #include "fuzz.h"
 
-#include <dirent.h>
 #include <netinet/in.h>
 #include <pthread.h>
 #include <stdio.h>
@@ -48,6 +48,8 @@ Please visit our Website: http://www.httrack.com
 #define FUZZ_MIRROR_MAXBODY 8192
 #define FUZZ_MIRROR_MAXPATH 128
 #define FUZZ_MIRROR_BUDGET 24
+/* Fixed so cache keys and mirror paths do not learn ephemeral ports. */
+#define FUZZ_MIRROR_PORT 18765
 
 struct fuzz_mirror_page {
   char path[FUZZ_MIRROR_MAXPATH];
@@ -59,25 +61,11 @@ static struct fuzz_mirror_page fuzz_mirror_pages[FUZZ_MIRROR_MAXPAGES];
 static int fuzz_mirror_npages = 0;
 static int fuzz_mirror_listen = -1;
 static int fuzz_mirror_budget = FUZZ_MIRROR_BUDGET;
-
-static const char *fuzz_mirror_type(const char *path) {
-  const size_t len = strlen(path);
-
-  if (len >= 4 && strcmp(path + len - 4, ".css") == 0)
-    return "text/css";
-  if (len >= 3 && strcmp(path + len - 3, ".js") == 0)
-    return "application/javascript";
-  if (len >= 4 && strcmp(path + len - 4, ".gif") == 0)
-    return "image/gif";
-  if (len >= 4 && strcmp(path + len - 4, ".png") == 0)
-    return "image/png";
-  if (len >= 4 && strcmp(path + len - 4, ".jpg") == 0)
-    return "image/jpeg";
-  return "text/html";
-}
+static volatile int fuzz_mirror_done = 0;
 
 /* One served connection: read the request line, answer from the generated
-   site, close. */
+   site, close. Everything is served as text/html; the type table did not
+   add coverage. */
 static void fuzz_mirror_serve_one(int c) {
   char req[1024];
   ssize_t n = recv(c, req, sizeof(req) - 1, 0);
@@ -103,11 +91,11 @@ static void fuzz_mirror_serve_one(int c) {
     }
     if (hit != NULL) {
       char hdr[256];
-      const int hl =
-          snprintf(hdr, sizeof(hdr),
-                   "HTTP/1.1 200 OK\r\nContent-Type: %s\r\nContent-Length: "
-                   "%zu\r\nConnection: close\r\n\r\n",
-                   fuzz_mirror_type(hit->path), hit->len);
+      const int hl = snprintf(
+          hdr, sizeof(hdr),
+          "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: "
+          "%zu\r\nConnection: close\r\n\r\n",
+          hit->len);
 
       (void) !write(c, hdr, (size_t) hl);
       if (hit->len > 0)
@@ -126,83 +114,40 @@ static void fuzz_mirror_serve_one(int c) {
 
 static void *fuzz_mirror_serve(void *arg) {
   (void) arg;
-  while (fuzz_mirror_budget-- > 0) {
+  while (fuzz_mirror_budget-- > 0 && !fuzz_mirror_done) {
     int c = accept(fuzz_mirror_listen, NULL, NULL);
 
     if (c < 0)
       break;
+    if (fuzz_mirror_done) {
+      (void) close(c);
+      break;
+    }
     fuzz_mirror_serve_one(c);
   }
-  /* budget spent: no more accepts, and further connects are refused */
-  (void) shutdown(fuzz_mirror_listen, SHUT_RDWR);
-  (void) close(fuzz_mirror_listen);
-  fuzz_mirror_listen = -1;
-  return NULL;
-}
-
-/* Copy the next NUL-separated field into dst (bounded); HTS_FALSE at end. */
-static hts_boolean fuzz_mirror_field(const uint8_t **data, size_t *size,
-                                     char *dst, size_t dst_size) {
-  const uint8_t *nul;
-  size_t len;
-
-  if (*size == 0)
-    return HTS_FALSE;
-  nul = (const uint8_t *) memchr(*data, 0, *size);
-  len = nul != NULL ? (size_t) (nul - *data) : *size;
-  if (len >= dst_size)
-    len = dst_size - 1;
-  memcpy(dst, *data, len);
-  dst[len] = '\0';
-  *data += len;
-  *size -= len;
-  if (*size > 0) {
-    *data += 1;
-    *size -= 1;
+  /* Only this thread closes the listen socket. */
+  if (fuzz_mirror_listen >= 0) {
+    (void) close(fuzz_mirror_listen);
+    fuzz_mirror_listen = -1;
   }
-  return HTS_TRUE;
+  return NULL;
 }
 
 static char fuzz_mirror_dir[256];
 static char fuzz_mirror_www[sizeof(fuzz_mirror_dir) + 8];
 
-/* Delete the mirror output tree, bounded. */
-static void fuzz_mirror_cleanup_tree(const char *dir, int depth) {
-  char path[sizeof(fuzz_mirror_dir) + 64];
-  DIR *d;
-  struct dirent *e;
-  int count = 0;
-
-  if (depth > 3)
-    return;
-  d = opendir(dir);
-  if (d == NULL)
-    return;
-  while ((e = readdir(d)) != NULL && count++ < 200) {
-    if (e->d_name[0] == '.')
-      continue;
-    snprintf(path, sizeof(path), "%s/%s", dir, e->d_name);
-    if (unlink(path) == 0)
-      continue;
-    fuzz_mirror_cleanup_tree(path, depth + 1);
-  }
-  closedir(d);
-  (void) rmdir(dir);
-}
-
 static void fuzz_mirror_cleanup(void) {
-  fuzz_mirror_cleanup_tree(fuzz_mirror_dir, 0);
+  fuzz_wipe_dir(fuzz_mirror_dir);
+  (void) rmdir(fuzz_mirror_dir);
 }
 
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   static int inited = 0;
   static pthread_t thread;
-  const int depth = size > 0 && (data[0] & 1) ? 2 : 1;
   char *index_html;
   size_t index_len;
   struct sockaddr_in addr;
-  socklen_t addrlen = sizeof(addr);
-  int port;
+  int one = 1;
   char url[64];
   char *argv[16];
   int argc = 0;
@@ -220,7 +165,11 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
              fuzz_mirror_dir);
     inited = 1;
   }
-  data++, size--;
+
+  /* Wipe the previous mirror so a crash reproduces from this input alone
+     (including libFuzzer's second leak-check run of the same input). */
+  fuzz_wipe_dir(fuzz_mirror_www);
+  (void) mkdir(fuzz_mirror_www, 0700);
 
   /* The site: pages[0] is /, then (path, body) pairs. The generated index
      links every path, so the crawl has somewhere to go. */
@@ -228,8 +177,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   fuzz_mirror_npages = 1;
   index_html = fuzz_mirror_pages[0].body;
   index_len = 0;
-  snprintf(fuzz_mirror_pages[0].path,
-           sizeof(fuzz_mirror_pages[0].path), "/");
+  snprintf(fuzz_mirror_pages[0].path, sizeof(fuzz_mirror_pages[0].path), "/");
   {
     char path[FUZZ_MIRROR_MAXPATH];
     char body[FUZZ_MIRROR_MAXBODY];
@@ -238,9 +186,9 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
       struct fuzz_mirror_page *const e = &fuzz_mirror_pages[fuzz_mirror_npages];
       size_t blen;
 
-      if (!fuzz_mirror_field(&data, &size, path, sizeof(path)))
+      if (!fuzz_field(&data, &size, path, sizeof(path)))
         break;
-      if (!fuzz_mirror_field(&data, &size, body, sizeof(body)))
+      if (!fuzz_field(&data, &size, body, sizeof(body)))
         break;
       if (path[0] == '\0' || path[0] != '/')
         break;
@@ -275,35 +223,35 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   }
   fuzz_mirror_pages[0].len = strlen(fuzz_mirror_pages[0].body);
 
-  /* The loopback server. */
+  /* The loopback server on a fixed port. */
   fuzz_mirror_listen = socket(AF_INET, SOCK_STREAM, 0);
   if (fuzz_mirror_listen < 0)
     return 0;
+  (void) setsockopt(fuzz_mirror_listen, SOL_SOCKET, SO_REUSEADDR, &one,
+                    sizeof(one));
   memset(&addr, 0, sizeof(addr));
   addr.sin_family = AF_INET;
   addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-  addr.sin_port = 0;
+  addr.sin_port = htons(FUZZ_MIRROR_PORT);
   if (bind(fuzz_mirror_listen, (struct sockaddr *) &addr, sizeof(addr)) != 0 ||
-      listen(fuzz_mirror_listen, 8) != 0 ||
-      getsockname(fuzz_mirror_listen, (struct sockaddr *) &addr, &addrlen) !=
-          0) {
+      listen(fuzz_mirror_listen, 8) != 0) {
     (void) close(fuzz_mirror_listen);
     fuzz_mirror_listen = -1;
     return 0;
   }
-  port = ntohs(addr.sin_port);
   fuzz_mirror_budget = FUZZ_MIRROR_BUDGET;
+  fuzz_mirror_done = 0;
   if (pthread_create(&thread, NULL, fuzz_mirror_serve, NULL) != 0) {
     (void) close(fuzz_mirror_listen);
     fuzz_mirror_listen = -1;
     return 0;
   }
 
-  /* The engine, bounded. */
-  snprintf(url, sizeof(url), "http://127.0.0.1:%d/", port);
+  /* The engine, bounded. Fixed -r2: the depth knob lost coverage. */
+  snprintf(url, sizeof(url), "http://127.0.0.1:%d/", FUZZ_MIRROR_PORT);
   argv[argc++] = (char *) "httrack";
   argv[argc++] = (char *) "-q";
-  argv[argc++] = depth == 2 ? (char *) "-r2" : (char *) "-r1";
+  argv[argc++] = (char *) "-r2";
   argv[argc++] = (char *) "-c1";
   argv[argc++] = (char *) "-T8";
   argv[argc++] = (char *) "-R0";
@@ -314,16 +262,20 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   argv[argc] = NULL;
   opt = hts_create_opt();
   if (opt != NULL) {
+    opt->log = opt->errlog = NULL;
     (void) hts_main2(argc, argv, opt);
     hts_free_opt(opt);
   }
 
-  /* The budget may not have been spent; close whatever is left so a next
-     run starts clean. */
-  if (fuzz_mirror_listen >= 0) {
-    (void) shutdown(fuzz_mirror_listen, SHUT_RDWR);
-    (void) close(fuzz_mirror_listen);
-    fuzz_mirror_listen = -1;
+  /* Wake a blocking accept; only the server thread closes the listen fd. */
+  fuzz_mirror_done = 1;
+  {
+    int poke = socket(AF_INET, SOCK_STREAM, 0);
+
+    if (poke >= 0) {
+      (void) connect(poke, (struct sockaddr *) &addr, sizeof(addr));
+      (void) close(poke);
+    }
   }
   pthread_join(thread, NULL);
   return 0;

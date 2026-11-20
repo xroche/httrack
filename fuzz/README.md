@@ -30,4 +30,6 @@ Run one target by hand: `fuzz/fuzz-url -max_total_time=300 corpusdir fuzz/corpus
 
 `fuzz-ftp` feeds its input to `get_ftp_line()` over a socketpair and runs each reply line through the PASV, EPSV, SIZE and MDTM parsers. The same bytes, read as a URL, go through the user, host and command splitters. Its first byte sets the reply buffer size: odd is the 1024 bytes every caller passes, even is a short buffer.
 
+`fuzz-mirror` runs the whole crawl through `hts_main2()` against a loopback server thread that serves a fuzzer-built site. The input is NUL-separated (path, body) pairs; the harness builds `/` with links to every path and appends any leftover bytes as hostile index HTML. Depth is fixed at `-r2`, robots are off (`-s0`), and the listen port is fixed so cache keys do not learn ephemeral ports. The output tree is wiped before each run so a crash reproduces from that input alone.
+
 OSS-Fuzz builds these harnesses with `oss-fuzz-build.sh`, so a new harness needs only a `Makefile.am` entry and a `corpus/<target>/` directory. The script links each harness with `$LIB_FUZZING_ENGINE`. When it is set, `configure` uses it in place of `-fsanitize=fuzzer`.

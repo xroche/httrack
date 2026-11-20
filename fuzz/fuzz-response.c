@@ -34,12 +34,10 @@ Please visit our Website: http://www.httrack.com
 #include "htsback.h"
 #include "coucal.h"
 
-#include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
-#include <sys/stat.h>
 #include <unistd.h>
 
 /* past TAILLE_BUFFER, so an in-memory body takes more than one full read */
@@ -68,29 +66,7 @@ Please visit our Website: http://www.httrack.com
 
 static char resp_dir[256];
 
-/* remove what dir holds, keeping dir itself */
-static void resp_wipe_dir(const char *dir) {
-  DIR *const d = opendir(dir);
-  struct dirent *e;
-
-  if (d == NULL)
-    return;
-  while ((e = readdir(d)) != NULL) {
-    char path[sizeof(resp_dir) + 512];
-    struct stat st;
-
-    if (strcmp(e->d_name, ".") == 0 || strcmp(e->d_name, "..") == 0)
-      continue;
-    snprintf(path, sizeof(path), "%s/%s", dir, e->d_name);
-    if (lstat(path, &st) == 0 && S_ISDIR(st.st_mode)) {
-      resp_wipe_dir(path);
-      (void) rmdir(path);
-    } else {
-      (void) unlink(path);
-    }
-  }
-  closedir(d);
-}
+static void resp_wipe(void) { fuzz_wipe_dir(resp_dir); }
 
 /* Write the next piece to the peer once the slot has read the last one, so
    each read comes back short. Close the peer after the last piece. */
@@ -122,8 +98,6 @@ static void resp_feed(int *peer, int soc, const uint8_t *data, size_t size,
     *peer = -1;
   }
 }
-
-static void resp_wipe(void) { resp_wipe_dir(resp_dir); }
 
 static void resp_cleanup(void) {
   resp_wipe();
