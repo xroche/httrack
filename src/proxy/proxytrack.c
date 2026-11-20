@@ -582,7 +582,8 @@ static PT_Element proxytrack_process_HTTP_List(PT_Indexes indexes,
   return NULL;
 }
 
-/* A refused body is never sent, so it must announce 0 bytes. */
+/* Returns 0 when the reader refused the body, because the send skips it and a
+   kept-alive peer would desync. */
 static size_t element_body_size(const PT_Element element) {
   return (element != NULL && element->adr != NULL) ? element->size : 0;
 }
@@ -1233,7 +1234,7 @@ static int ICP_reply(struct sockaddr *clientAddr, int clientAddrLen, T_SOC soc,
   unsigned long int BufferSize;
   unsigned char *buffer;
 
-  /* Message ends in NUL, and RFC2186's 16 KB cap fits the short */
+  /* Count the NUL. RFC2186's 16 KB cap fits Message_Length (unsigned short) */
   if (Message_Length == 0 && Message != NULL)
     Message_Length = (unsigned short) (strlen((char *) Message) + 1);
   BufferSize = 20 + Message_Length;

@@ -2206,7 +2206,8 @@ static size_t arcAppendLine(char *line, size_t len, const char *raw,
   return len;
 }
 
-/* Reading forward keeps small records from being read many times over. */
+/* A line counts by where it starts. Reading forward keeps small records from
+   being read many times over. */
 static hts_boolean arcDataHoldsARecord(PT_Index__Arc index, long int from,
                                        long int to) {
   char buffer[32768];
