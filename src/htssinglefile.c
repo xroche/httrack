@@ -722,7 +722,8 @@ static size_t sf_strip_marks(const char *intro, size_t introlen, char *body,
 /* Copy [body,body+len) to out, replacing each marked reference by its data:
    URI, or by the bare reference when it cannot be inlined. Whatever follows
    the reference (a fragment, a kept query) stays after the data: URI. The
-   substitution is in place, so an unquoted attribute gets base64 padding. */
+   substitution is in place, so an unquoted attribute gets base64 '=' padding,
+   which browsers accept but the HTML grammar forbids. */
 static void sf_expand(sf_ctx *ctx, const char *base_dir, int depth,
                       const char *body, size_t len, String *out) {
   const char *const intro = singlefile_intro(ctx->opt);

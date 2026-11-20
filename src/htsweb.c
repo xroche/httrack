@@ -214,7 +214,7 @@ static void client_ping(void *pP) {
     } else if (!anyWindow &&
                ticks - lastSeen >= pingTimeout
                /* No window ever pinged (an old browser, or none opened), so
-                  stop when the launcher dies with that browser. */
+                  stop when no request ever came or the launcher died. */
                && (!anyRequest || !parent_is_alive(ppid))) {
       why = "the interface went silent";
     }
