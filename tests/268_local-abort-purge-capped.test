@@ -1,7 +1,8 @@
 #!/bin/bash
 #
 # A run stopped by --max-time must not purge the files it never reached
-# (#1109). The cap fires mid-slow.html, so the loop sees no abort.
+# (#1109). The cap fires mid-slow.html and the parser drops its leaf links,
+# so the crawl loop sees no abort. 261 covers the signalled case.
 
 set -euo pipefail
 
