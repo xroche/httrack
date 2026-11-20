@@ -132,7 +132,8 @@ no_errors "pass 5"
 ok "the unprovable resume was re-fetched whole"
 
 # --- pass 6: a copy this engine never stamped, so dated by the local clock ---
-# Every pre-fix mirror looks like this, with a date equal to the remote's.
+# Every pre-fix mirror looks like this, dated by the local clock and so later than the remote's.
+# Resume must need a matching date, not only a later one.
 : >"$mode"
 plant_stale 4000 "$future_stamp"
 : >"$cmds"

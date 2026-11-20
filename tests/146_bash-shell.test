@@ -1,6 +1,7 @@
 #!/bin/bash
 #
-# configure must set BASH_SHELL to a real bash, because macOS BASH is /bin/sh (#895).
+# configure must set BASH_SHELL to a real bash. A search that reads the preset BASH finds
+# /bin/sh on macOS (#895, #891).
 #
 # shellcheck disable=SC2016 # the probes are for the shell under test to expand
 
