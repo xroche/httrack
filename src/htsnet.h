@@ -301,7 +301,8 @@ SOCaddr_initloopback_(SOCaddr *const addr, const char *file, const int line) {
     full sockaddr_in, a full sockaddr_in6, or a bare 4-byte IPv4 address with
     the port zeroed. A full sockaddr must carry the matching family, or the copy
     asserts. Any other size only stamps AF_INET on @p server. Returns the
-    sockaddr length. A bare IPv6 form would clash with sizeof(sockaddr_in). */
+    sockaddr length. No bare IPv6 form exists, because 16 bytes is
+    sizeof(sockaddr_in), so pass a sockaddr_in6. */
 static HTS_UNUSED socklen_t SOCaddr_copyaddr_(SOCaddr *const server,
                                               const void *data,
                                               const size_t data_size,

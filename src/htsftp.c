@@ -65,8 +65,8 @@ Please visit our Website: http://www.httrack.com
 
 #define FTP_DEBUG 0
 
-/* Live FTP workers, registered at spawn. Their slots and opt must outlive the
-   list (#1051). */
+/* Live FTP workers, registered at spawn. Do not free their slots or opt while
+   the list is non-empty (#1051). */
 static FTPDownloadStruct *ftp_workers = NULL;
 static htsmutex ftp_workers_mutex = HTSMUTEX_INIT;
 

@@ -144,7 +144,8 @@ const char *hts_self_path(char *dst, size_t dstsize) {
     return dst;
   }
 #endif
-  /* GetModuleFileNameA() and sysctl() leave a clipped path on failure. */
+  /* GetModuleFileNameA() and sysctl() leave a clipped path on failure, so
+     empty dst. */
   dst[0] = '\0';
   return NULL;
 }
