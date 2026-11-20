@@ -3262,7 +3262,8 @@ static unsigned char *ref_st_oversize(const char *field, size_t len,
   return out;
 }
 
-/* The span runs from r.cdispo to r.req, past hppa, armhf and powerpc padding.
+/* The span runs from r.cdispo to r.req, so it also covers the padding that
+   32-bit hppa, armhf and powerpc add after cdispo.
    A stray write past cdispo survives there, as crange is filled earlier. */
 #define REF_TAIL_FROM                                                          \
   (offsetof(htsblk, cdispo) + sizeof(((htsblk *) 0)->cdispo))

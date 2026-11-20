@@ -2408,7 +2408,8 @@ static int st_strerror(httrackp *opt, int argc, char **argv) {
     }
   }
 
-  /* Two messages coexist. They are named, as musl prints unknowns alike. */
+  /* Two messages must coexist. Use the named codes at index 0 and 1, because
+     musl prints every unknown code alike. */
   kept = hts_strerror(strerror_codes[0], first, sizeof(first));
   (void) hts_strerror(strerror_codes[1], second, sizeof(second));
   if (strcmp(kept, strerror_expected[0]) != 0) {
