@@ -511,7 +511,9 @@ static int string_safety_selftests(void) {
 
   /* strcpybuff into a pointer destination: routes through the unchecked
      strcpybuff_ptr_ fallback (the path the overflow warning flags). The warning
-     is intentional here; we only verify the fallback still copies correctly. */
+     is intentional here; we only verify the fallback still copies correctly.
+     The C11 path has no fallback: a pointer there does not compile. */
+#ifndef HTS_BUFF_GENERIC_
 #if defined(__GNUC__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wattribute-warning"
@@ -526,6 +528,7 @@ static int string_safety_selftests(void) {
   }
 #if defined(__GNUC__)
 #pragma GCC diagnostic pop
+#endif
 #endif
 
   /* htsbuff: bounded builder over a fixed array (append, truncating append,
