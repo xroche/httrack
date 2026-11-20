@@ -67,7 +67,7 @@ Please visit our Website: http://www.httrack.com
 #ifdef _WIN32
 #define HTS_GUI_HINT "run 'WinHTTrack.exe' to get the GUI version."
 #else
-/* Not "run it": Debian ships webhttrack in its own package. */
+/* Debian ships webhttrack apart, so do not say "run it". */
 #define HTS_GUI_HINT "the GUI version is 'webhttrack'."
 #endif
 

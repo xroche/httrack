@@ -49,8 +49,8 @@ Please visit our Website: http://www.httrack.com
 #define HTS_ZSTD_WINDOWLOG_MAX 23
 #endif
 
-/* Decoded-size budget, bounding a bomb: brotli and zstd reach a million to one.
-   Deflate cannot pass 1032x, so it only meets this at the 2 GiB ceiling. */
+/* The budget bounds a bomb, because brotli and zstd reach a million to one.
+   Deflate tops out at 1032x and meets it only at the 2 GiB ceiling. */
 #define HTS_CODEC_MAX_RATIO 4096
 #define HTS_CODEC_MIN_MAXOUT (1024 * 1024)
 /* Per-body decoded size without -m: past it a bomb is "File too big". */
@@ -138,9 +138,8 @@ hts_boolean hts_codec_is_archive_ext(hts_codec codec, const char *ext) {
 }
 
 #if HTS_USEBROTLI || HTS_USEZSTD
-/* Append produced bytes to out under the decoded-size budget, advancing *total.
-   HTS_FALSE on a short write, whose errno it leaves in *io_errno, or once the
-   budget is exceeded (a bomb); the over-budget bytes are never written. */
+/* Append produced bytes to out and advance *total. Return HTS_FALSE on a short
+   write (errno in *io_errno), or past the budget without writing them. */
 static hts_boolean codec_sink(FILE *out, const void *buf, size_t produced,
                               LLint *total, LLint maxout, int *io_errno) {
   if (produced == 0)
@@ -368,9 +367,7 @@ int hts_codec_unpack_max(hts_codec codec, const char *filename,
       ret = -1;
     }
     fclose(in);
-    /* io_errno is set only where ret is already < 0, so this is the whole
-       contract. It reads as a no-op on glibc, where the live errno already
-       equals it, but POSIX lets a successful fclose() set errno: keep it. */
+    /* A successful fclose() may still set errno, so restore the failure's. */
     errno = io_errno;
     return ret;
   }

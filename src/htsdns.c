@@ -98,8 +98,8 @@ void hts_dns_test_move_clock(httrackp *opt, const char *host, TStamp ms) {
   hts_mutexrelease(&opt->state.lock);
 }
 
-/* Doubles per consecutive failure up to the ceiling: an outage is retried
-   soon, a host that is simply gone costs a handful of lookups per crawl. */
+/* Double the wait per consecutive failure up to the ceiling, so an outage is
+   retried soon and a dead host costs only a few lookups. */
 int hts_dns_negative_wait_ms(int failures) {
   int wait = hts_dns_negative_ttl_ms;
   int i;
@@ -128,9 +128,8 @@ static int hts_ghbn_all(coucal cache, const char *const iadr,
     int i;
 
     assertf(record->host_count <= HTS_MAXADDRNUM);
-    /* An outage must not blacklist a host for the rest of the crawl, and the
-       stamps are wall-clock: a clock now behind the store time expires the
-       record too, or an NTP step delays the retry by the size of the step. */
+    /* Expire a negative record on time, and also when the wall clock went
+       back, or an NTP step would delay the retry by the step's size. */
     if (record->expiry != 0) {
       const TStamp now = mtime_local();
 
@@ -159,12 +158,9 @@ void hts_dns_set_resolver_backend(const hts_resolver_backend *backend) {
   hts_resolver = (backend != NULL) ? backend : &hts_resolver_libc;
 }
 
-/* Debug/test hook: HTTRACK_DEBUG_RESOLVE="host:ip[,ip...]" pins the resolution
-   of `host` to the listed addresses (curl --resolve style), so the connect
-   fallback can be exercised deterministically (a dead address first, a live one
-   next). Any other host resolves normally. Below: an addrinfo backend that owns
-   its chain (its own freeaddrinfo), so a synthesized and a delegated result
-   free the same way. */
+/* Test hook: HTTRACK_DEBUG_RESOLVE="host:ip[,ip...]" pins `host` to the listed
+   addresses (like curl --resolve) to test the connect fallback. The backend
+   below owns its chain, so both kinds of result free the same way. */
 
 static void HTS_RESOLVER_CALL override_freeaddrinfo(struct addrinfo *res);
 
@@ -447,8 +443,8 @@ SOCaddr *hts_dns_resolve_nocache(const char *const hostname,
   return hts_dns_resolve_nocache2(hostname, addr, NULL);
 }
 
-/* A resolve in flight. Refcounted: a timed-out resolve is abandoned, not
-   cancelled, so the last of caller/worker to leave frees the job. */
+/* A timed-out resolve keeps running, so this job is refcounted and the last of
+   caller and worker frees it. */
 typedef struct dns_resolve_job {
   htsmutex lock;
   int refcount;

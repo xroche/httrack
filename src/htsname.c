@@ -101,9 +101,8 @@ static const char *hts_tbdev[] = {
 };
 /* clang-format on */
 
-/* Directories the engine owns inside the mirror: a URL naming one lands on the
-   cache and destroys it (#774). Defence in depth; the temporaries themselves
-   live where no savename can spell them (HTS_TMPDIR in htsback.c). */
+/* Directories the engine owns inside the mirror. A URL naming one would land
+   on the cache and destroy it (#774). hts-tmp is defence in depth. */
 static const char *hts_tbreserved[] = {"hts-cache", "hts-tmp", ""};
 
 /* True once the component holds only what cleanEndingSpaceOrDot() strips. */
@@ -124,10 +123,9 @@ static size_t reservedNameAt(const char *save, const char *c,
     if (len == 0)
       continue;
     if (c == save) {
-      /* save has had its leading '/' stripped above, so the table's anchor
-         never reached the first component (#842). It usually holds the
-         hostname, so only a trailing run may end it here: '.' would rename
-         aux.example.com. */
+      /* save lost its leading '/' above, so the table's anchor never reached
+         the first component (#842). It usually holds the hostname, so only a
+         trailing run ends it here, or '.' would rename aux.example.com. */
       if (strippedToComponentEnd(c + len))
         return len;
     } else {
@@ -235,9 +233,9 @@ static void cleanEndingSpaceOrDot(char *s) {
   }
 }
 
-/* Wire Content-Type vs URL extension: a patchable wire type wins over an
-   unspecific ext, the HTS_UNKNOWN_MIME sentinel keeps a specific non-HTML ext
-   (#267 guard), a declared disagreement is CONTESTED (sniffed below). */
+/* Wire Content-Type vs URL extension. A patchable wire type beats a generic
+   ext, HTS_UNKNOWN_MIME keeps a specific non-HTML ext (#267), and a declared
+   disagreement is CONTESTED and sniffed below. */
 typedef enum wire_verdict {
   WIRE_KEEPS_EXT,
   WIRE_WINS,
@@ -430,11 +428,11 @@ static void tmpl_catc(char *d, size_t dsize, char c) {
   tmpl_catn(d, dsize, s, 1);
 }
 
-/* Appends building a savename_type -1 name from a crawled link, which is as
-   long as the server likes: they clip, never abort (#1295). URL text loses
-   its own tail (TMPL_CAT). The template's separators, extension and digest
-   collect in tmpltail, then go in through save_append_tail(), which cuts
-   the name instead. One run, or ".html" would cut away its own dot. */
+/* Appends that build a savename_type -1 name from a crawled link clip, never
+   abort (#1295). URL text loses its own tail (TMPL_CAT). The template's
+   separators, extension and digest collect in tmpltail and go in through
+   save_append_tail(), which cuts the name instead, in one run so ".html"
+   keeps its dot. */
 #define TMPL_FLUSH()                                                           \
   do {                                                                         \
     if (tmpltail[0] != '\0') {                                                 \
@@ -653,8 +651,8 @@ static hts_boolean url_savename_undelay(httrackp *opt, char *save,
   if (cut + 1 > sizeof(candidate))
     return HTS_FALSE;
   strclipbuff(candidate, cut + 1, save);
-  /* an undelayed run gives an extensionless link ".html" or probes its type, so
-     the mirror's copy of one says nothing about the name this link would get */
+  /* an undelayed run names an extensionless link by type, so its copy says
+     nothing about this link's name */
   if (name_last_dot(candidate) == NULL)
     return HTS_FALSE;
   /* back_add()'s on-disk resume skips HTML, its links having moved */
@@ -913,9 +911,8 @@ int url_savename(lien_adrfilsave *const afs,
         normadr = normadr_;
       }
     }
-    // strip still applies with urlhack off (host left untouched); no // or
-    // query-sort here, to match the hash key (norm_slash/norm_query are 0 when
-    // urlhack is off) so a URL is looked up under the key it was stored with
+    // strip applies even with urlhack off, but // and query-sort do not, to
+    // match the key the URL was stored with
     if (strip != NULL)
       normfil = fil_normalized_filtered_ex(fil_complete, normfil_, strip, 0, 0);
   }
@@ -1089,17 +1086,14 @@ int url_savename(lien_adrfilsave *const afs,
                      is_userknowntype(opt, fil)) { /* PATCH BY BRIAN SCHRÖDER.
                               Lookup mimetype not only by extension,
                               but also by filename */
-            /* Note: "foo.cgi => text/html" means that foo.cgi shall have the
-               text/html MIME file type, that is, ".html" */
+            /* "foo.cgi => text/html" gives foo.cgi the text/html MIME type,
+               that is, ".html" */
             if (user_mime_ext(opt, fil, ext, sizeof(ext))) {
               ext_chg = 1;
             }
           }
-          // note: if savename_delayed is enabled, the naming will be temporary
-          // (and slightly invalid!)
-          //
-          // note: if we are about to stop (opt->state.stop), back_add() will
-          // fail later
+          // with savename_delayed, the name is temporary and slightly invalid.
+          // When stopping, back_add() will fail later.
           else if (opt->savename_delayed != HTS_SAVENAME_DELAYED_NONE &&
                    !hts_load_acquire_int(&opt->state.stop)) {
             // Check if the file is ready in backing.
@@ -1470,8 +1464,7 @@ int url_savename(lien_adrfilsave *const afs,
               name[pos][0] = '\0';
             }
             pos = 0;
-            // The + 2 cap once left room for an appended '=', and it stays so
-            // the same names fit.
+            // The + 2 cap is kept so existing names still fit.
             while(*a != '\0' && *a != ']') {
               if (*a == ':') { // next token; past the fifth they are dropped
                 c = pos + 1 < 5 ? name[++pos] : NULL;
@@ -1861,20 +1854,16 @@ int url_savename(lien_adrfilsave *const afs,
 
   /* convert name to UTF-8 ? Note: already done while parsing. */
 
-  /* The strip above takes one slash, and cleanEndingSpaceOrDot() puts one back
-     by emptying a component made only of dots or spaces ("/.../x.html" ->
-     "/x.html"), which fil_simplifie() then keeps. Stripped here rather than up
-     there, so the reserved-name and 8.3 passes see the name master gave them:
-     the check below only needs it relative at this point. */
+  /* cleanEndingSpaceOrDot() can put a leading slash back ("/.../x.html" ->
+     "/x.html"). Strip it here, so the reserved-name and 8.3 passes above see
+     the name unchanged. */
   stripLeadingSlashes(afs->save);
 
   /* callback */
   {
-    /* Nothing sanitizes what the hook writes here, and the name is joined to
-       the output directory below, so it has to come back relative and
-       ".."-free. Checked whatever the engine handed in, because the engine's
-       own name is relative by the line above, and only a hook can break it.
-       Refused rather than collapsed, because an absolute name has no "../" to
+    /* Nothing sanitizes the hook's name, and it is joined to the output
+       directory below, so it must come back relative and ".."-free. Refuse
+       it rather than collapse it, because an absolute name has no "../" to
        drop. */
     char BIGSTK engine_save[HTS_URLMAXSIZE * 2];
 
@@ -2020,16 +2009,15 @@ int url_savename(lien_adrfilsave *const afs,
     // Re-check again ending space or dot after cut (see bug #5)
     cleanEndingSpaceOrDot(afs->save);
   }
-  // The cut above counts UTF-8 codepoints, but parent+name lands in a fixed
-  // byte buffer that aborts() on overflow (htssafe.h). A multibyte name can
-  // pass the codepoint cap yet overflow in bytes, so hard-cut on a codepoint
-  // boundary to keep parent+name inside the buffer regardless (#133).
+  // The cut above counts codepoints, but parent+name lands in a fixed byte
+  // buffer that aborts on overflow. Hard-cut on a codepoint boundary so a
+  // multibyte name fits too (#133).
   {
     const size_t parentBytes = strlen(StringBuff(opt->path_html_utf8));
     const size_t cap = HTS_SAVE_BUFSIZE - HTS_PATH_TAIL_RESERVE;
-    // Shrink only the name. A parent that alone fills the buffer is left to the
-    // existing prepend abort, not collapsed to an empty name that would collide
-    // across URLs and overrun the unbounded collision-suffix sprintf.
+    // Shrink only the name. A parent that fills the buffer alone is left to the
+    // prepend abort, because an empty name would collide across URLs and
+    // overrun the collision-suffix sprintf.
     if (parentBytes < cap) {
       const size_t budget = cap - parentBytes;
       if (strlen(afs->save) > budget) {
@@ -2136,7 +2124,7 @@ int url_savename(lien_adrfilsave *const afs,
   return 0;
 }
 
-/* md5-based name used everywhere; builds into b (capacity bsize) */
+/* Build the md5-based name into b (capacity bsize). */
 void standard_name(char *b, size_t bsize, const char *dot_pos,
                    const char *nom_pos, const char *fil, int short_ver) {
   char md5[32 + 2];
@@ -2236,7 +2224,7 @@ char *url_savename_refname_fullpath(httrackp * opt, const char *adr,
   return hts_logpath(opt, digest_filename);
 }
 
-/* remove refname if any; HTS_TRUE if it was removed */
+/* Remove any refname, and say if one was removed. */
 hts_boolean url_savename_refname_remove(httrackp *opt, const char *adr,
                                         const char *fil) {
   char *filename = url_savename_refname_fullpath(opt, adr, fil);

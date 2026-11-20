@@ -432,9 +432,8 @@ static const char *hts_mime_find(int key, const char *needle) {
 // fallback) returns 1 if a type was written to s, 0 otherwise
 HTSEXT_API hts_boolean get_httptype_sized(httrackp *opt, char *s, size_t ssize,
                                           const char *fil, hts_boolean flag) {
-  // userdef overrides get_httptype (a rule with an empty value, e.g. "--assume
-  // cgi=", matches but writes nothing: report it as "no type" like the old
-  // code, whose callers tested strnotempty(s))
+  // userdef overrides get_httptype. An empty rule such as "--assume cgi="
+  // matches but writes nothing, which reports "no type".
   if (get_userhttptype(opt, s, ssize, fil)) {
     return s[0] != '\0';
   }
@@ -532,9 +531,8 @@ hts_boolean get_userhttptype(httrackp *opt, char *s, size_t ssize,
 
                 i++;
                 len = strcspn(&mimedefs[i], "\n");
-                /* clip, don't abort: the consumers match whole strings far
-                   shorter than any destination, so a value long enough to be
-                   clipped already matched nothing (#1276) */
+                /* clip, because a value long enough to be clipped matches no
+                   consumer anyway (#1276) */
                 if (len >= ssize) {
                   hts_log_print(opt, LOG_WARNING,
                                 "--assume value for '%s' is %d bytes, clipped "
@@ -712,9 +710,9 @@ hts_boolean may_unknown(httrackp *opt, const char *st) {
   return 0;
 }
 
-/* returns 1 if the mime/filename seems to be bogus because of badly recognized
-  multiple extension ; such as "application/x-wais-source" for
-  "httrack-3.42-1.el5.src.rpm" reported by Hippy Dave 08/2008 (3.43) */
+/* returns 1 if the mime/filename seems bogus because of a badly recognized
+  multiple extension, such as "application/x-wais-source" for
+  "httrack-3.42-1.el5.src.rpm" */
 int may_bogus_multiple(httrackp *opt, const char *mime, const char *filename) {
   int j;
 
@@ -747,8 +745,7 @@ int may_bogus_multiple(httrackp *opt, const char *mime, const char *filename) {
   return 0;
 }
 
-/* filename extension should not be changed because potentially bogus ; replaces
- * may_unknown() (3.43) */
+/* returns 1 when the filename extension may be bogus and must be kept */
 int may_unknown2(httrackp *opt, const char *mime, const char *filename) {
   int ret = may_unknown(opt, mime);
 

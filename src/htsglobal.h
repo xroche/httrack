@@ -288,7 +288,7 @@ Please visit our Website: http://www.httrack.com
 #define HTS_DEFAULT_FOOTER                                                     \
   "<!-- Mirrored from {url} by HTTrack Website Copier/" HTTRACK_AFF_VERSION    \
   " " HTTRACK_AFF_AUTHORS ", {date} -->"
-/* Honest crawler User-Agent; no fake OS/browser to go stale. */
+/* The User-Agent fakes no OS or browser to go stale. */
 #define HTS_DEFAULT_USER_AGENT                                                 \
   "Mozilla/5.0 (compatible; HTTrack/" HTTRACK_AFF_VERSION                      \
   "; +https://www.httrack.com/)"
@@ -531,7 +531,7 @@ typedef int T_SOC;
 
 #define USE_BEGINTHREAD 1
 
-/* Nothing reads this any more. */
+/* Unused. */
 #ifndef NOSTRDEBUG
 #define STRDEBUG 1
 #endif

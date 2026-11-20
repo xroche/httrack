@@ -96,7 +96,7 @@ struct tm *convert_time_rfc822_pivot(struct tm *result, const char *s,
 
       strncatbuff(tok, first, (int) (last - first));
       /* classify it */
-      /* a whole three-letter name: "n" or "c" is a zone letter, not a month */
+      /* a month is a whole three-letter name, as "n" or "c" is a zone */
       if (strlen(tok) == 3 && (pos = strstr(months, tok)) != NULL &&
           (pos - months) % 4 == 0) { /* month always in letters */
         result_mm = ((int) (pos - months)) / 4;

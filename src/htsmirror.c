@@ -76,9 +76,8 @@ static void url_drop_fragment(char *const url) {
     *frag = '\0';
 }
 
-/* A copy httrack parsed as hypertext has no NUL left in it, the parse path
-   blanks them on the way to disk. One surviving proves no run read links out of
-   this file, whatever its recorded type and name claim (#1415). */
+/* The parse path blanks NULs on the way to disk, so a NUL in the copy proves
+   no run read links out of it, whatever its type and name claim (#1415). */
 static hts_boolean hts_mirrored_copy_is_binary(const char *save) {
   char head[HTS_SNIFF_LEN];
   const size_t n = hts_read_file_head(save, head, sizeof(head));
@@ -110,15 +109,14 @@ static hts_boolean hts_link_may_carry_links(httrackp *opt, cache_back *cache,
            is_hypertext_mime(opt, prev.contenttype, prev_save) &&
            !hts_mirrored_copy_is_binary(prev_save);
 
-  /* No usable status left. A redirect is stored headers-only, so naming no
-     local file invalidates it on read, but its Location survives. Below this
-     arm only, or a stray Location on an answered blob would hold too. */
+  /* With no usable status, a stored redirect still keeps its Location. Test it
+     only here, or a stray Location on an answered blob would count too. */
   if (strnotempty(prev_location))
     return HTS_TRUE;
 
-  /* A run that failed the same way stored no entry at all, so the copy it kept
-     (#746) is the only surviving record of what this page was. Both arms that
-     type a file by its name check its bytes: the name can be the sentinel's. */
+  /* A run that failed the same way stored no entry, so the kept copy (#746) is
+     the only record of this page. Its bytes are checked too, because the name
+     can be the sentinel's. */
   guessed[0] = '\0';
   return save != NULL && strnotempty(save) && fexist_utf8(save) &&
          guess_httptype_sized(opt, guessed, sizeof(guessed), save) &&
@@ -522,11 +520,10 @@ int hts_mirror_check_moved(htsmoduleStruct *str,
             opt->transport_failures++;
           }
 
-          /* No response at all, so nothing here says the site dropped the
-             links this page carries. Same predicate as the one keeping the
-             previous copy (#746), and it must stay so: every file this run
-             preserves keeps its children. An answered error is not in it and
-             needs nothing, being recovered from the cache and re-parsed. */
+          /* With no response, nothing says the site dropped this page's links.
+             This predicate must match the one keeping the previous copy (#746),
+             so every preserved file keeps its children. An answered error is
+             recovered from the cache and re-parsed. */
           if (back_transfer_failed(r->statuscode) && !heap(ptr)->testmode &&
               hts_link_may_carry_links(opt, cache, urladr(), urlfil(),
                                        savename())) {

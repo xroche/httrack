@@ -54,31 +54,28 @@ extern hts_codec hts_codec_parse(const char *encoding);
 extern const char *hts_acceptencoding(hts_boolean compressible,
                                       hts_boolean secure);
 
-/* HTS_TRUE if ext is the codec's own archive extension: a foo.gz served as
-   Content-Encoding: gzip stays packed on disk. */
+/* Is ext the codec's archive extension? A foo.gz served gzip-coded stays
+   packed on disk. */
 extern hts_boolean hts_codec_is_archive_ext(hts_codec codec, const char *ext);
 
-/* Decode filename into newfile. Returns the decoded size, or -1 on a truncated
-   or corrupt stream, an unsupported coding, a bomb over the budget, or I/O.
-   On -1, errno is the local failure's, and 0 when the coded body was the
-   problem: a caller telling a full disk from a bad stream tests it. */
+/* Decode filename into newfile. Return the decoded size, or -1 on a bad or
+   truncated stream, an unsupported coding, a bomb, or I/O. On -1, errno holds
+   the local failure, or 0 when the coded body was at fault. */
 extern int hts_codec_unpack(hts_codec codec, const char *filename,
                             const char *newfile);
 
-/* As hts_codec_unpack(), with the decoded size also capped at cap when cap > 0
-   (the user's -m limit). Returns HTS_CODEC_TOOBIG when that cap was exceeded.
- */
+/* Run hts_codec_unpack() with the decoded size also capped at cap (-m) when
+   positive. Return HTS_CODEC_TOOBIG when that cap is exceeded. */
 extern int hts_codec_unpack_max(hts_codec codec, const char *filename,
                                 const char *newfile, LLint cap);
-/* hts_codec_unpack_max() result for a body decoding past a cap that lowered the
-   budget, as opposed to -1 for a bad stream or the built-in bomb limit. */
+/* hts_codec_unpack_max() returns this when the caller's cap stopped the body.
+   A bad stream or the built-in bomb limit gives -1. */
 #define HTS_CODEC_TOOBIG (-2)
 
-/* Decoded-size budget for in_size coded bytes: hts_codec_maxout(in_size),
-   lowered to cap if cap > 0. */
+/* Return hts_codec_maxout(in_size), lowered to cap if cap > 0. */
 extern LLint hts_codec_budget(LLint in_size, LLint cap);
 
-/* Cap for one decoded body: user_cap (-m) when > 0, else 256 MiB. */
+/* Decoded bodies cap at user_cap (-m) when > 0, else 256 MiB. */
 extern LLint hts_codec_decode_cap(LLint user_cap);
 
 /* Does cap, rather than the built-in limit, set the budget for in_size? */
@@ -89,10 +86,10 @@ extern hts_boolean hts_codec_cap_binds(LLint in_size, LLint cap);
 extern size_t hts_codec_head(hts_codec codec, const void *in, size_t in_len,
                              void *out, size_t out_len);
 
-/* Ceiling on the decoded size of a body of in_size coded bytes. */
+/* Return the decoded-size ceiling for in_size coded bytes. */
 extern LLint hts_codec_maxout(LLint in_size);
 
-/* Coded size of an open stream, left rewound; -1 if unknown. */
+/* Return the size of in and rewind it, or -1 if unknown. */
 extern LLint hts_codec_coded_size(FILE *in);
 
 #endif

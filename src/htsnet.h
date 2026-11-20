@@ -154,11 +154,10 @@ typedef struct in6_addr INaddr;
 typedef struct in_addr INaddr;
 #endif
 
-/** One IPv4 or IPv6 endpoint, address and port together. Use the SOCaddr_*
-    accessors rather than m_addr, because sa_family picks the active union
-    member. HTS_INET6 decides whether the IPv6 member exists, so it sets
-    sizeof(SOCaddr) and the layout of every struct holding one, such as
-    htsblk. Build a consumer with the value htsfeatures.h publishes. */
+/** One IPv4 or IPv6 endpoint. Use the SOCaddr_* accessors, because sa_family
+    picks the active union member. HTS_INET6 sets sizeof(SOCaddr) and the
+    layout of structs holding one, such as htsblk, so build a consumer with the
+    value htsfeatures.h publishes. */
 #ifndef HTS_DEF_FWSTRUCT_SOCaddr
 #define HTS_DEF_FWSTRUCT_SOCaddr
 typedef struct SOCaddr SOCaddr;
@@ -174,9 +173,8 @@ struct SOCaddr {
 };
 
 /** Pointer to the port field of the active family, network byte order.
-    Asserts on NULL, and on any family other than AF_INET and AF_INET6. Every
-    helper here takes @p file and @p line, the caller's __FILE__ and __LINE__
-    for that assert, and the matching SOCaddr_* macro passes them. */
+    Asserts on NULL or a family other than AF_INET and AF_INET6, reporting the
+    caller's @p file and @p line, which the SOCaddr_* macros pass. */
 static HTS_INLINE HTS_UNUSED in_port_t *
 SOCaddr_sinport_(SOCaddr *const addr, const char *file, const int line) {
   assertf_(addr != NULL, file, line);
@@ -223,9 +221,9 @@ SOCaddr_clear_(SOCaddr *const addr, const char *file, const int line) {
   addr->m_addr.sa.sa_family = AF_UNSPEC;
 }
 
-/* Every macro below names a member of its server argument or takes its
-   address, so server must be an lvalue SOCaddr and not a pointer. Each
-   evaluates its arguments once unless its own comment says otherwise. */
+/* server must be an lvalue SOCaddr, because every macro below names a member
+   of it. Each evaluates its arguments once unless its comment says
+   otherwise. */
 
 /** Address family of an endpoint: AF_INET, AF_INET6, or AF_UNSPEC when
     unset. An lvalue. */
@@ -305,11 +303,9 @@ SOCaddr_initloopback_(SOCaddr *const addr, const char *file, const int line) {
 
 /** Fill @p server from @p data, whose @p data_size picks the source form: a
     full sockaddr_in, a full sockaddr_in6, or a bare 4-byte IPv4 address with
-    the port zeroed. A full sockaddr must already carry the matching family,
-    because the copy asserts on it. Any other size only stamps AF_INET on
-    @p server and leaves the address bytes as they were. Returns the resulting
-    sockaddr length. There is no bare IPv6 form, because 16 is already the size
-    of a sockaddr_in, so pass a sockaddr_in6. */
+    the port zeroed. A full sockaddr must carry the matching family, or the copy
+    asserts. Any other size only stamps AF_INET on @p server. Returns the
+    sockaddr length. A bare IPv6 form would clash with sizeof(sockaddr_in). */
 static HTS_UNUSED socklen_t SOCaddr_copyaddr_(SOCaddr *const server,
                                               const void *data,
                                               const size_t data_size,
@@ -359,9 +355,8 @@ static HTS_UNUSED socklen_t SOCaddr_copyaddr_(SOCaddr *const server,
                       __LINE__);                                               \
   } while (0)
 
-/* Export marker for the out-of-line helpers below. proxytrack compiles
-   htsnet.c in rather than linking the library, and MSVC rejects a dllimport
-   definition, so it sets HTS_NO_LIBHTTRACK. */
+/* Export marker for the helpers below. proxytrack compiles htsnet.c in and sets
+   HTS_NO_LIBHTTRACK, because MSVC rejects a dllimport definition. */
 #ifdef HTS_NO_LIBHTTRACK
 #define HTSNET_API
 #else
