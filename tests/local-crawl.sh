@@ -255,7 +255,8 @@ while test "$pos" -lt "$nargs"; do
 done
 
 # --- start the server --------------------------------------------------------
-# Tests 72 and 105 skip on the error for a server that never announced a port.
+# Tests 72 and 105 skip on the text "could not discover server port", which
+# discover_server_port (testlib.sh) writes.
 local_server_start ${tlsargs[@]+"${tlsargs[@]}"} \
     ${serverargs[@]+"${serverargs[@]}"} --root "$root"
 port=$SRV_PORT

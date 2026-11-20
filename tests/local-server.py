@@ -3041,7 +3041,7 @@ class Handler(SimpleHTTPRequestHandler):
             self.wfile.write(self.BAKNAME_SIB)
 
     # --- /tmpspace/: #842, the same collision through "hts-tmp%20", which
-    # escapes nothing and then loses its trailing space.
+    # once escaped nothing and then lost its trailing space.
     def route_tmpspace_index(self):
         self.send_html(
             '\t<a href="a.bin">a</a>\n' '\t<a href="hts-tmp%20/a.bin.bak">bak</a>\n'
@@ -3598,8 +3598,8 @@ class Handler(SimpleHTTPRequestHandler):
         if self.command != "HEAD":
             self.wfile.write(body)
 
-    # --changes (#714) gets no validators, so only a payload comparison tells
-    # stable.* from moved.*.
+    # --changes (#714): these routes send 200 with no validators, so only a
+    # payload comparison tells stable.* from moved.*.
     def route_changes_index(self):
         links = "".join(
             '\t<a href="%s">%s</a>\n' % (name, name)
