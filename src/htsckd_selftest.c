@@ -37,8 +37,8 @@ typedef hts_boolean (*ckd_fn)(size_t *r, size_t a, size_t b);
 
 struct ckd_case {
   size_t a, b;
-  size_t want;          /* the result, wrapped as C23 ckd_* wraps it */
-  hts_boolean overflow; /* expected return */
+  size_t want; /* wrapped result */
+  hts_boolean overflow;
 };
 
 /* Count the cases fn gets wrong, printing each. */
@@ -61,27 +61,10 @@ static int ckd_check(const char *name, ckd_fn fn, const struct ckd_case *cases,
   return errors;
 }
 
-static hts_boolean ckd_add_fast(size_t *r, size_t a, size_t b) {
-  return hts_ckd_add(r, a, b);
-}
-
-static hts_boolean ckd_mul_fast(size_t *r, size_t a, size_t b) {
-  return hts_ckd_mul(r, a, b);
-}
-
-static hts_boolean ckd_add_ref(size_t *r, size_t a, size_t b) {
-  return hts_ckd_add_portable(r, a, b);
-}
-
-static hts_boolean ckd_mul_ref(size_t *r, size_t a, size_t b) {
-  return hts_ckd_mul_portable(r, a, b);
-}
-
-/* -#test=ckd: both the compiler's and the portable checks at the size_t
-   boundaries, whatever the width of size_t. */
+/* -#test=ckd: checks both implementations at the size_t boundaries. */
 static int st_ckd(httrackp *opt, int argc, char **argv) {
   const size_t M = SIZE_MAX, H = M / 2;
-  /* 2^(bits/2): its square is the first to wrap */
+  /* S = 2^(bits/2) squares to the first wrap */
   const size_t S = (size_t) 1 << (sizeof(size_t) * CHAR_BIT / 2);
   const struct ckd_case add[] = {
       {0, 0, 0, HTS_FALSE},     {M, 0, M, HTS_FALSE},
@@ -100,20 +83,23 @@ static int st_ckd(httrackp *opt, int argc, char **argv) {
       {M, M, 1, HTS_TRUE},
       {2, H, M - 1, HTS_FALSE},
       {2, H + 1, 0, HTS_TRUE},
+      /* (S-1)^2 = S^2 - 2S + 1, and S^2 = M + 1 */
       {S - 1, S - 1, M - 2 * S + 2, HTS_FALSE},
-      {S + 1, S - 1, M, HTS_FALSE}, /* the largest product: exactly SIZE_MAX */
+      {S + 1, S - 1, M, HTS_FALSE},
       {S - 1, S + 1, M, HTS_FALSE},
       {S, S, 0, HTS_TRUE},
+      /* (S+1)^2 = S^2 + 2S + 1, and S^2 wraps to 0 */
       {S + 1, S + 1, 2 * S + 1, HTS_TRUE},
       {M / 3, 3, M, HTS_FALSE},
       {M / 3 + 1, 3, 2, HTS_TRUE},
   };
   const size_t nadd = sizeof(add) / sizeof(add[0]);
   const size_t nmul = sizeof(mul) / sizeof(mul[0]);
-  const int errors = ckd_check("add", ckd_add_fast, add, nadd) +
-                     ckd_check("add_portable", ckd_add_ref, add, nadd) +
-                     ckd_check("mul", ckd_mul_fast, mul, nmul) +
-                     ckd_check("mul_portable", ckd_mul_ref, mul, nmul);
+  const int errors =
+      ckd_check("add", hts_ckd_add, add, nadd) +
+      ckd_check("add_portable", hts_ckd_add_portable, add, nadd) +
+      ckd_check("mul", hts_ckd_mul, mul, nmul) +
+      ckd_check("mul_portable", hts_ckd_mul_portable, mul, nmul);
 
   printf("%s\n", errors == 0 ? "ok" : "FAIL");
   return errors == 0 ? 0 : 1;

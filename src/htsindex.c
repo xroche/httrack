@@ -39,7 +39,6 @@ Please visit our Website: http://www.httrack.com
 
 #include "htshash.h"
 #include "coucal.h"
-#include "htsckd.h"
 
 /* Keyword Indexer Parameters */
 
@@ -403,7 +402,6 @@ static void index_write(FILE *fp, int mode, char **tab, int index) {
 void index_finish(const char *indexpath, int mode) {
   char catbuff[CATBUFF_SIZE];
   char **tab = NULL;
-  size_t tabsize;
   char *blk = NULL;
   FILE *fp;
   char *a, *b;
@@ -415,9 +413,7 @@ void index_finish(const char *indexpath, int mode) {
 
   if (size == (size_t) -1 || !indexer.tmp)
     goto done;
-  if (hts_ckd_mul(&tabsize, (size_t) indexer.lines + 2, sizeof(char *)))
-    goto done;
-  tab = (char **) malloct(tabsize);
+  tab = (char **) calloct((size_t) indexer.lines + 2, sizeof(char *));
   if (!tab)
     goto done;
   blk = malloct(size + 1);

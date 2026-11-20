@@ -35,19 +35,10 @@ Please visit our Website: http://www.httrack.com
 #include <stdint.h>
 
 /** @file htsckd.h
- *  C23 ckd_add() and ckd_mul() for size_t on every compiler: *r receives the
- *  result wrapped modulo SIZE_MAX + 1, and the return is HTS_TRUE when the
- *  exact result did not fit. Engine-internal, never installed. **/
+ *  C23 ckd_add() and ckd_mul() for size_t. They store the wrapped result in *r
+ *  and return HTS_TRUE on overflow. They are engine-internal and never
+ *  installed. **/
 
-#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 202311L &&                \
-    defined(__has_include)
-#if __has_include(<stdckdint.h>)
-#include <stdckdint.h>
-#define HTS_CKD_STDC
-#endif
-#endif
-
-#if !defined(HTS_CKD_STDC)
 #if defined(__has_builtin)
 #if __has_builtin(__builtin_add_overflow) &&                                   \
     __has_builtin(__builtin_mul_overflow)
@@ -56,15 +47,8 @@ Please visit our Website: http://www.httrack.com
 #elif defined(__GNUC__) && __GNUC__ >= 5
 #define HTS_CKD_BUILTIN
 #endif
-#endif
 
-#if !defined(HTS_CKD_STDC) && !defined(HTS_CKD_BUILTIN) &&                     \
-    defined(_MSC_VER) && !defined(__clang__)
-#include <intsafe.h>
-#define HTS_CKD_INTSAFE
-#endif
-
-/** Portable a + b, also the reference the self-test checks the others by. **/
+/** Portable a + b. The self-test uses it as reference. **/
 static HTS_UNUSED HTS_CHECK_RESULT hts_boolean hts_ckd_add_portable(size_t *r,
                                                                     size_t a,
                                                                     size_t b) {
@@ -72,7 +56,7 @@ static HTS_UNUSED HTS_CHECK_RESULT hts_boolean hts_ckd_add_portable(size_t *r,
   return b > SIZE_MAX - a ? HTS_TRUE : HTS_FALSE;
 }
 
-/** Portable a * b, also the reference the self-test checks the others by. **/
+/** Portable a * b. The self-test uses it as reference. **/
 static HTS_UNUSED HTS_CHECK_RESULT hts_boolean hts_ckd_mul_portable(size_t *r,
                                                                     size_t a,
                                                                     size_t b) {
@@ -80,35 +64,19 @@ static HTS_UNUSED HTS_CHECK_RESULT hts_boolean hts_ckd_mul_portable(size_t *r,
   return a != 0 && b > SIZE_MAX / a ? HTS_TRUE : HTS_FALSE;
 }
 
-/** *r = a + b; HTS_TRUE if the sum overflowed size_t. **/
 static HTS_UNUSED HTS_CHECK_RESULT hts_boolean hts_ckd_add(size_t *r, size_t a,
                                                            size_t b) {
-#if defined(HTS_CKD_STDC)
-  return ckd_add(r, a, b) ? HTS_TRUE : HTS_FALSE;
-#elif defined(HTS_CKD_BUILTIN)
+#if defined(HTS_CKD_BUILTIN)
   return __builtin_add_overflow(a, b, r) ? HTS_TRUE : HTS_FALSE;
-#elif defined(HTS_CKD_INTSAFE)
-  if (SizeTAdd(a, b, r) == S_OK)
-    return HTS_FALSE;
-  *r = a + b; /* intsafe stores SIZE_T_ERROR, ckd_add the wrapped sum */
-  return HTS_TRUE;
 #else
   return hts_ckd_add_portable(r, a, b);
 #endif
 }
 
-/** *r = a * b; HTS_TRUE if the product overflowed size_t. **/
 static HTS_UNUSED HTS_CHECK_RESULT hts_boolean hts_ckd_mul(size_t *r, size_t a,
                                                            size_t b) {
-#if defined(HTS_CKD_STDC)
-  return ckd_mul(r, a, b) ? HTS_TRUE : HTS_FALSE;
-#elif defined(HTS_CKD_BUILTIN)
+#if defined(HTS_CKD_BUILTIN)
   return __builtin_mul_overflow(a, b, r) ? HTS_TRUE : HTS_FALSE;
-#elif defined(HTS_CKD_INTSAFE)
-  if (SizeTMult(a, b, r) == S_OK)
-    return HTS_FALSE;
-  *r = a * b;
-  return HTS_TRUE;
 #else
   return hts_ckd_mul_portable(r, a, b);
 #endif

@@ -48,7 +48,6 @@ Please visit our Website: http://www.httrack.com
 #include "htscookie_selftest.h"
 #include "htscookiefile.h"
 #include "htscharset.h"
-#include "htsckd.h"
 #ifdef _WIN32
 #include <io.h> /* _commit */
 #endif
@@ -386,7 +385,7 @@ static hts_boolean cookie_make_room(char *data, size_t max_len,
   size_t *table = NULL, *over = NULL;
   unsigned char *evict = NULL;
   char *pool = NULL, *pool_end;
-  size_t nover = 0, poolsize;
+  size_t nover = 0;
   hts_boolean ok = HTS_FALSE;
   char *a, *dst;
 
@@ -401,10 +400,7 @@ static hts_boolean cookie_make_room(char *data, size_t max_len,
   table = calloct(mask, sizeof(*table)); // host index + 1, 0 for empty
   over = calloct(n + 1, sizeof(*over));
   evict = calloct(n + 1, 1);
-  if (!hts_ckd_add(&poolsize, total, strlen(domain)) &&
-      !hts_ckd_add(&poolsize, poolsize, n) &&
-      !hts_ckd_add(&poolsize, poolsize, 2))
-    pool = calloct(poolsize, 1);
+  pool = calloct(total + strlen(domain) + n + 2, 1);
   if (recs == NULL || hosts == NULL || table == NULL || over == NULL ||
       evict == NULL || pool == NULL)
     goto done;

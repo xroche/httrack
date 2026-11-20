@@ -513,9 +513,7 @@ static int st_backswap(httrackp *opt, int argc, char **argv) {
 
   /* A ready table is a file, so its size headers are hostile input. */
   {
-    /* SIZE_MAX wrapped the guard byte's allocation to zero, and 16 is a
-       well-formed header of the wrong struct size, whose slot must be freed.
-       A merely huge size is left out, since ASan aborts on it. */
+    /* Both are cut short and fail without the record-size check too. */
     const size_t bad[] = {(size_t) -1, 16};
     size_t c;
 

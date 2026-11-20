@@ -79,8 +79,7 @@ static int hts_equalsAlphanum(const char *a, const char *b) {
 
 /* Copy the memory region [s .. s + size - 1 ] as a \0-terminated string. */
 static char *hts_stringMemCopy(const char *s, size_t size) {
-  size_t alloc;
-  char *dest = hts_ckd_add(&alloc, size, 1) ? NULL : malloct(alloc);
+  char *dest = malloct(size + 1);
 
   if (dest != NULL) {
     memcpy(dest, s, size);
@@ -265,10 +264,7 @@ LPWSTR hts_convertStringToUCS2(const char *s, int size, UINT cp, int *pwsize) {
 
   if (wsize > 0) {
     LPSTR uoutput = NULL;
-    size_t alloc;
-    LPWSTR woutput = hts_ckd_mul(&alloc, (size_t) wsize + 1, sizeof(WCHAR))
-                         ? NULL
-                         : malloct(alloc);
+    LPWSTR woutput = calloct((size_t) wsize + 1, sizeof(WCHAR));
 
     if (woutput != NULL
         && MultiByteToWideChar(cp, 0, (LPCSTR) s, size, woutput,
@@ -321,9 +317,7 @@ static char *hts_convertUCS2StringToCPEx(LPWSTR woutput, int wsize, UINT cp,
     *plossy = HTS_FALSE;
   }
   if (usize > 0) {
-    size_t alloc;
-    char *uoutput =
-        hts_ckd_add(&alloc, (size_t) usize, 1) ? NULL : malloct(alloc);
+    char *uoutput = malloct(((size_t) usize + 1) * sizeof(char));
 
     if (uoutput != NULL) {
       BOOL usedDefault = FALSE;
@@ -982,7 +976,7 @@ char *hts_convertStringUTF8ToIDNA(const char *s, size_t size) {
           const size_t segSize = i - startSeg;
           const unsigned char *segData = (const unsigned char*) &s[startSeg];
           punycode_uint *segInt = NULL;
-          size_t j, utfSeq, segOutputSize, segAlloc;
+          size_t j, utfSeq, segOutputSize;
 
           punycode_uint output_length;
           punycode_status status;
@@ -994,9 +988,7 @@ char *hts_convertStringUTF8ToIDNA(const char *s, size_t size) {
           ADD_BYTE('-');
           
           /* copy utf-8 to integers. note: buffer is sufficient! */
-          segInt = hts_ckd_mul(&segAlloc, segSize, sizeof(punycode_uint))
-                       ? NULL
-                       : (punycode_uint *) malloct(segAlloc);
+          segInt = (punycode_uint *) calloct(segSize, sizeof(punycode_uint));
           if (segInt == NULL) {
             FREE_BUFFER();
             return NULL;
@@ -1116,15 +1108,12 @@ char *hts_convertStringIDNAToUTF8(const char *s, size_t size) {
         punycode_uint output_capa;
         punycode_uint output_length;
         punycode_uint *output_dest;
-        size_t output_alloc;
 
         /* encode. pre-reserve buffer. */
         for(output_capa = 16 ; output_capa < segSize 
           ; output_capa <<= 1) ;
         output_dest =
-            hts_ckd_mul(&output_alloc, output_capa, sizeof(punycode_uint))
-                ? NULL
-                : (punycode_uint *) malloct(output_alloc);
+            (punycode_uint *) calloct(output_capa, sizeof(punycode_uint));
         if (output_dest == NULL) {
           FREE_BUFFER();
           return NULL;

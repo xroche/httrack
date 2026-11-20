@@ -3855,16 +3855,14 @@ HTSEXT_API hts_boolean hts_setfilters(httrackp *opt, const char *const *rules) {
 HTSEXT_API hts_boolean hts_addfilter(httrackp *opt, const char *rule) {
   char *copy;
   char **list;
-  size_t n = 0, alloc;
+  size_t n = 0;
 
   if (opt == NULL || (copy = filter_rule_dup_(rule)) == NULL)
     return HTS_FALSE;
   hts_mutexlock(&opt->state.lock);
   while (opt->live_filters != NULL && opt->live_filters[n] != NULL)
     n++;
-  list = hts_ckd_add(&alloc, n, 2) || hts_ckd_mul(&alloc, alloc, sizeof(char *))
-             ? NULL
-             : (char **) realloct(opt->live_filters, alloc);
+  list = (char **) realloct(opt->live_filters, (n + 2) * sizeof(char *));
   if (list != NULL) {
     list[n] = copy;
     list[n + 1] = NULL;

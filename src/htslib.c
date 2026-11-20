@@ -2308,7 +2308,7 @@ LLint http_xfread1(htsblk * r, int bufl) {
                   : (char *) realloct(r->adr, alloc);
 
           if (grown == NULL) {
-            // Out of memory: keep what was read, as the size guard does.
+            // On failure, keep what was read, as the size guard does.
             return READ_ERROR;
           }
           r->adr = grown;
@@ -3757,9 +3757,7 @@ static char *fil_normalized_ex(const char *source, char *dest, int do_slash,
     while (hts_query_next(&cur, &f))
       nfields++;
     if (nfields > 1) {
-      size_t alloc;
-      hts_query_field *fields =
-          hts_ckd_mul(&alloc, nfields, sizeof(*fields)) ? NULL : malloct(alloc);
+      hts_query_field *fields = malloct(nfields * sizeof(*fields));
       const size_t qLen = strlen(query);
       char *copyBuff = malloct(qLen + 1);
       htsbuff cb;

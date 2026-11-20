@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# Checked size_t add and multiply (htsckd.h), on the compiler's path and on the
-# portable fallback, at the boundaries of whatever width size_t has here.
+# Boundary checks for htsckd.h.
 
 set -euo pipefail
 

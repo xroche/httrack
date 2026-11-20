@@ -35,7 +35,6 @@ Please visit our Website: http://www.httrack.com
 #include "htsbase.h"
 #include "htslib.h"
 #include "htsthread.h"
-#include "htsckd.h"
 
 /* The backstop: the passwords and tokens the engine has seen, hidden by value
    in every log line, behind the per-site masking. */
@@ -227,7 +226,6 @@ static char *secret_mask(httrackp *opt, const char *s, size_t len,
   hts_secret_set *const set =
       opt != NULL ? (hts_secret_set *) opt->secrets : NULL;
   char *out = NULL;
-  size_t alloc;
 
   *outlen = 1;
   if (set == NULL)
@@ -235,7 +233,7 @@ static char *secret_mask(httrackp *opt, const char *s, size_t len,
   hts_mutexlock(&set->lock);
   if (set->count != 0) {
     *outlen = secret_scan(set, s, len, NULL);
-    out = hts_ckd_add(&alloc, *outlen, 1) ? NULL : malloct(alloc);
+    out = malloct(*outlen + 1);
     if (out != NULL) {
       secret_scan(set, s, len, out);
       out[*outlen] = '\0';
@@ -338,10 +336,7 @@ static const char *const url_fields[] = {"Location", "Content-Location",
    up to end, masked. Returns HTS_FALSE, writing nothing, when out of memory. */
 static hts_boolean fprint_url_span(httrackp *opt, FILE *fp, const char *buff,
                                    size_t len, size_t keep, size_t end) {
-  size_t alloc;
-  char *line = hts_ckd_mul(&alloc, end, 2) || hts_ckd_add(&alloc, alloc, 8)
-                   ? NULL
-                   : malloct(alloc);
+  char *line = malloct(2 * end + 8);
 
   if (line == NULL)
     return HTS_FALSE;

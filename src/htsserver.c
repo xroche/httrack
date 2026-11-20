@@ -87,7 +87,6 @@ coucal NewLangList = NULL;
 #include "htscmdline.h"
 #include "htslines.h"
 #include "htsthread.h"
-#include "htsckd.h"
 
 /* This server's line readers drop TAB, form feed and NUL. */
 #define HTS_LINES_SERVER                                                       \
@@ -991,12 +990,8 @@ static char *list_themes(const char *path) {
 
       if (name != NULL && theme_in(dir, name)) {
         if (count == capacity) {
-          size_t alloc;
           char **const grown =
-              hts_ckd_add(&alloc, capacity, 16) ||
-                      hts_ckd_mul(&alloc, alloc, sizeof(names[0]))
-                  ? NULL
-                  : (char **) realloct(names, alloc);
+              (char **) realloct(names, (capacity + 16) * sizeof(names[0]));
 
           if (grown == NULL) {
             break;

@@ -42,7 +42,6 @@ Please visit our Website: http://www.httrack.com
 #include "htsencoding.h"
 #include "htssafe.h"
 #include "htsarrays.h"
-#include "htsckd.h"
 
 #include <limits.h>
 #include <stddef.h>
@@ -86,10 +85,7 @@ typedef struct hts_bundle_state {
 } hts_bundle_state;
 
 static hts_boolean strlist_add(char ***list, size_t *count, const char *s) {
-  size_t alloc;
-  char **const grown = hts_ckd_mul(&alloc, *count + 1, sizeof(char *))
-                           ? NULL
-                           : realloct(*list, alloc);
+  char **const grown = realloct(*list, (*count + 1) * sizeof(char *));
 
   if (grown == NULL)
     return HTS_FALSE;
@@ -1040,10 +1036,7 @@ HTSEXT_API int hts_bundle_names_in_use(const char *urls, const char *list_file,
   if (why == NULL && list_file != NULL)
     why = names_note_file(&list, &n, list_file, errbuf);
   if (why == NULL) {
-    size_t alloc;
-    char **const grown = hts_ckd_mul(&alloc, n + 1, sizeof(char *))
-                             ? NULL
-                             : realloct(list, alloc);
+    char **const grown = realloct(list, (n + 1) * sizeof(char *));
 
     if (grown == NULL) {
       why = "out of memory";

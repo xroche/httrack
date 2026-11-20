@@ -1666,7 +1666,7 @@ static int back_data_unserialize(back_source *s, void **str, size_t *size) {
       return 0;
     size_t alloc;
 
-    /* Untrusted, and the guard byte's extra byte must not wrap the size. */
+    /* Untrusted, and size + 1 must not wrap. */
     if (hts_ckd_add(&alloc, *size, 1) ||
         (s->fp == NULL && *size > s->len - s->pos))
       return 1; /* error */
