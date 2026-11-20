@@ -127,8 +127,8 @@ case "$err" in
 *"exited early"*) ;;
 *) fail "a dead server reported '$err'" ;;
 esac
-# Exit 2 is the announce deadline, which local-crawl.sh skips on. A crashed
-# server must not use it.
+# Exit 2 means the server died. Only the deadline (1) is an announce race that
+# local-crawl.sh may skip on.
 test "$rc" -eq 2 || fail "a dead server exited $rc, want 2"
 
 echo "poll helpers OK"
