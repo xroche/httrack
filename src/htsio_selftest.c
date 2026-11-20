@@ -380,8 +380,8 @@ static int st_addlink(httrackp *opt, int argc, char **argv) {
   str.addLink = htsAddLink;
 
   /* [0] is the underflow and [1], [2] check the trim, which only a query-only
-     link sees. [3] to [5] give a class an http, https or too-long codebase and
-     an absolute link, which a long codebase does not already stop. */
+     link sees. [3] to [5] give a class an http, https or too-long codebase,
+     plus an absolute link, because only that link gets past a too-long one. */
   memset(longcod, 'a', sizeof(longcod) - 1);
   longcod[0] = longcod[sizeof(longcod) - 2] = '/';
   longcod[sizeof(longcod) - 1] = '\0';
@@ -491,7 +491,8 @@ static void makeindex_template_contract(const char *name, const char *tmpl,
 // makeindex_links==1, and clears *fp / sets *done. argv[0] is a writable dir,
 // argv[1] is an optional templates/ whose on-disk footer is rendered too.
 static int st_makeindex(httrackp *opt, int argc, char **argv) {
-  /* the minimal template is the control for a slot the real one lost */
+  /* the minimal template is the control: an assertion can fail on the real one
+     only if it lost a slot */
   const char *footers[] = {"%s%s", HTS_INDEX_FOOTER, NULL};
   size_t nfooters = sizeof(footers) / sizeof(*footers) - 1;
   char *ondisk = NULL;
@@ -1587,7 +1588,7 @@ static int st_refetchbackup(httrackp *opt, int argc, char **argv) {
     err++;
   }
 
-  /* #775: filecreate() failed, so the commit must say so. Otherwise the caller
+  /* #775: filecreate() failed, so the commit must report failure. Otherwise the caller
      caches the response against the old body, and --update pins it by 304. */
   (void) UNLINK(back->url_sav);
   if (back_finalize_backup(opt, back, HTS_TRUE)) {

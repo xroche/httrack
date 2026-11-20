@@ -298,8 +298,9 @@ static void print_buffer(buff_struct*const str, const char *format, ...) {
    Only an "https://" adr gets Secure cookies, and its port is ignored. Pairs
    use the RFC 6265 form, because modern servers reject RFC 2965 $Version and
    $Path (#151). A pair that does not fit is dropped whole and counted in
-   *skipped (may be NULL). The line takes all of bstr's remaining room, so
-   reserve is the room the caller still needs after it. Returns the number emitted. */
+   *skipped (may be NULL), so the line never ends mid-pair. The line takes all
+   of bstr's remaining room, so reserve is the room the caller still needs
+   after it. Returns the number emitted. */
 static int append_cookie_header(buff_struct *bstr, t_cookie *cookie,
                                 const char *adr, const char *path,
                                 size_t reserve, int *skipped) {
