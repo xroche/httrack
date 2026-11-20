@@ -22,11 +22,8 @@ Please visit our Website: http://www.httrack.com
 */
 
 /* Fuzz the HTTP receive path: one back_wait() slot waits for headers on a
-   socketpair. The response reaches the peer in pieces, one per back_wait()
-   call once the last is read, then the peer closes, so every read ends in data
-   or EOF and nothing waits on a timer.
-   Byte 0 holds OPT_* flags, byte 1 the file name and resume length, byte 2 the
-   piece sizes; the rest is the server's response. */
+   socketpair, fed in pieces so no read waits on a timer. Bytes 0-2 pick flags,
+   file and piece sizes, and the rest is the server's response. */
 #include "fuzz.h"
 
 #include "httrack-library.h"
@@ -219,7 +216,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   back[0].head_request = (flags & OPT_HEAD) ? 1 : (flags & OPT_TEST) ? 2 : 0;
   back[0].is_update = (flags & OPT_UPDATE) ? 1 : 0;
   if (flags & OPT_PARTIAL) {
-    /* what an interrupted run left: the range request resumes after it */
+    /* The range request resumes after what an interrupted run left */
     const size_t have = shape & SHAPE_HAVE_MASK;
     FILE *fp;
 

@@ -129,9 +129,7 @@ done:
   return result;
 }
 
-/* The gzip/deflate verdict owed, by zlib alone: the framing the header
-   suggests, the other one, then a verbatim copy. *out stays NULL when that copy
-   is due. */
+/* Decode with zlib alone. *out stays NULL when a verbatim copy is due. */
 static int fuzz_inflate_expect(const uint8_t *body, size_t body_size, LLint cap,
                                unsigned char **out, size_t *len) {
   const hts_boolean wrapped =
@@ -170,7 +168,7 @@ static int fuzz_inflate_expect(const uint8_t *body, size_t body_size, LLint cap,
   return (LLint) body_size > budget ? bomb : (int) body_size;
 }
 
-/* Contents of the decoded file, which must be exactly size bytes. */
+/* Read the decoded file, which must be exactly size bytes. */
 static unsigned char *fuzz_read_out(int size) {
   unsigned char *const buf = malloct((size_t) size + 1);
   FILE *const fp = fopen(out_path, "rb");
@@ -218,8 +216,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     abort();
   }
   ret = hts_codec_unpack_max(codec, in_path, out_path, cap);
-  /* A size within budget, -1, or the cap verdict for a codec we decode. On a
-     healthy disk a failure is the body's, which errno 0 says. */
+  /* On a healthy disk, a failure must leave errno 0. */
   if (ret < HTS_CODEC_TOOBIG || (ret == HTS_CODEC_TOOBIG && cap == 0) ||
       (codec == HTS_CODEC_UNSUPPORTED && ret != -1) ||
       (ret < 0 && errno != 0) ||

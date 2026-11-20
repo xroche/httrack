@@ -86,18 +86,15 @@ HTSEXT_API T_SOC catch_url_init(int *port, /* 128 bytes */ char *adr) {
   SOCaddr_initport(server, *port);
   soc = hts_shared_listen(&server, SOCK_STREAM, 1, &bound, NULL);
   if (soc != INVALID_SOCKET) {
-    /* bound, not server: an ephemeral port only appears here */
+    /* only the bound address carries an ephemeral port */
     *port = ntohs(SOCaddr_sinport(bound));
     SOCaddr_inetntoa(adr, 128, bound);
   }
   return soc;
 }
 
-/* Accumulate the request headers into "data" (CATCH_URL_DATA_SIZE bytes, on
-   entry holding the request line) and feed them to treathead(). A clipped
-   header block is not the request the browser sent, so a line or block that
-   does not fit fails the capture rather than replay a prefix. Every iteration
-   charges "used", which is what ends the loop. */
+/* Accumulate the request headers into "data" (CATCH_URL_DATA_SIZE bytes) and
+   feed them to treathead(). A line or block that does not fit fails. */
 static catch_url_status catch_url_headers(T_SOC soc, char *data,
                                           htsblk *blkretour) {
   char BIGSTK line[CATCH_URL_LINE_SIZE];
@@ -106,9 +103,7 @@ static catch_url_status catch_url_headers(T_SOC soc, char *data,
   do {
     size_t need;
 
-    /* a line socinput() had to clip is not the header the browser sent, and
-       skipping one charges "used" nothing: a peer sending only such lines
-       would hold this loop open for free */
+    /* Skipping a clipped line would let a peer hold this loop open for free. */
     if (socinput(soc, line, (int) sizeof(line)))
       return CATCH_URL_ERR_HEADER;
     treathead(NULL, NULL, NULL, blkretour, line); // traiter
@@ -118,8 +113,7 @@ static catch_url_status catch_url_headers(T_SOC soc, char *data,
     strlcatbuff(data, line, CATCH_URL_DATA_SIZE);
     strlcatbuff(data, "\r\n", CATCH_URL_DATA_SIZE);
     used += need;
-    /* the empty line ending the block was appended just above, which is why no
-       final CRLF is added afterwards */
+    /* the empty line ending the block is already appended */
   } while (strnotempty(line));
   return CATCH_URL_OK;
 }

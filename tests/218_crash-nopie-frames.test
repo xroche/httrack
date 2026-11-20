@@ -42,8 +42,7 @@ build() { # $1 output binary, rest extra flags
         >"${work}/cc.log" 2>&1
 }
 
-# Control, run by absolute path so neither the load base nor argv[0] is in play:
-# it says whether this box symbolizes anything at all.
+# A control run by absolute path shows whether this box symbolizes anything.
 build "${work}/probe-pie" || {
     head -20 "${work}/cc.log" >&2
     fail "the crash printer does not build standalone"

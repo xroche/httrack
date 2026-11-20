@@ -25,8 +25,7 @@ would dishonor our work and waste the many hours we have spent on it.
 Please visit our Website: http://www.httrack.com
 */
 
-/* Fuzz the wildcard filter matcher (htsfilters.c; #148 bracket-range OOB was
-   here). Input splits on the first NUL: pattern, then subject string. */
+/* Fuzz htsfilters.c. The input is the pattern, a NUL, then the subject. */
 #include "fuzz.h"
 #include "htsfilters.h"
 
@@ -34,7 +33,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   char *buf = fuzz_strdup(data, size);
   const char *joker = buf;
   const uint8_t *sep = memchr(data, '\0', size);
-  /* subject in its own allocation so ASan bounds it apart from the pattern */
+  /* Its own allocation lets ASan bound the subject apart from the pattern */
   char *nom = sep != NULL ? fuzz_strdup(sep + 1, (data + size) - (sep + 1))
                           : fuzz_strdup(data + size, 0);
 

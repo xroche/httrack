@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# The hold #1390 put on the update purge keyed on the previous run's cache
-# entry being 2xx hypertext. A redirect hub has no such entry, and a hub
-# failing twice in a row leaves none at all, so both lost live children (#1395).
+# The purge hold covers a 2xx hypertext entry and, since #1395, a redirect hub
+# or a hub that failed twice. Both must keep their live children.
 
 set -euo pipefail
 
@@ -41,8 +40,7 @@ assert_alive "${site}/rchild.html" REDIRFAIL-CHILD
 assert_purged false "$out"
 ok "a failed redirect hub keeps the subtree only it led to"
 
-# The hub redirects again, so this pass scans the whole site and the hold ends:
-# rgone.html is off the index and must go.
+# The hub redirects again, so this pass ends the hold and rgone.html must go.
 local_crawl --log "${tmpdir}/rlog3" "${common[@]}" -O "$out" --update \
     "${BASEURL}/redirfail/index.html"
 assert_alive "${site}/rtarget.html" REDIRFAIL-TARGET
@@ -71,8 +69,7 @@ assert_gave_up "$out" '/twicefail/thub\.html'
 assert_alive "${site}/tchild.html" TWICEFAIL-CHILD
 assert_purged false "$out"
 
-# talt.html stops linking the child here, so only the hub's kept copy still
-# carries it: purging now would unlink a file that is still reachable.
+# Only the hub's kept copy links the child here, so the purge must keep it.
 local_crawl --log "${tmpdir}/tlog3" "${common[@]}" -O "$out" --update \
     "${BASEURL}/twicefail/index.html"
 assert_gave_up "$out" '/twicefail/thub\.html'

@@ -1,10 +1,6 @@
 #!/bin/bash
-# Issue #198: on a resumed download the server may answer the Range with a 206
-# that starts *before* the offset we asked for (block-aligned ranges). httrack
-# must honor the returned Content-Range, not blindly append, or the overlap
-# bytes get duplicated and the file grows (corrupt PDFs). Pass 1 interrupts
-# flaky.bin mid-body (partial + temp-ref); pass 2 resumes against a 206 that
-# backs up 8 bytes. The result must equal the same bytes fetched whole (full.bin).
+# Issue #198: a resumed download must honor a 206 Content-Range that starts
+# before the requested offset, instead of appending the overlap.
 set -eu
 
 # shellcheck source=tests/crawllib.sh
@@ -31,9 +27,7 @@ common=(-O "$out" --quiet --disable-security-limits --robots=0 --timeout=30 --re
 refdir="${out}/hts-cache/ref"
 
 # pass 1: interrupt once flaky.bin's prefix is streaming (partial + temp-ref).
-# The stop is hts-abort.lock, the file a running engine polls for (436). No
-# signal a WSL2 shell sends reaches a native httrack.exe, so every backend takes
-# that path and the Linux leg exercises what Windows runs.
+# Stop through hts-abort.lock (436), since no WSL2 signal reaches httrack.exe.
 printf '[pass 1: interrupt flaky.bin] ..\t'
 httrack "${common[@]}" "${BASEURL}/overlap/index.html" >"${tmpdir}/log1" 2>&1 &
 crawlpid=$!

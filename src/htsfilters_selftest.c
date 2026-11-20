@@ -165,7 +165,7 @@ static int st_filtermemo(httrackp *opt, int argc, char **argv) {
     else
       unmatched++;
   }
-  /* both polarities must actually occur or the test proves nothing */
+  /* both polarities must occur or the test proves nothing */
   assertf(matched > 0 && unmatched > 0);
   printf("filtermemo: %d cases OK\n", iters);
   return 0;
@@ -241,10 +241,8 @@ static int st_filterbounds(httrackp *opt, int argc, char **argv) {
     assertf(strjoker_bounds(subj, pat, &steps, &maxsteps, NULL, NULL) != NULL);
     assertf(steps < maxsteps);
   }
-  /* An unclosed class rescans its whole length on every call that reaches it,
-     so the slope across two class lengths pins it. The leading *[a-z] makes
-     the subject length the decode count, which a charge levied once per match
-     cannot fake (OSS-Fuzz 5279208050589696). */
+  /* An unclosed class rescans on every call, which the slope across two
+     lengths pins (OSS-Fuzz 5279208050589696). */
   {
     const size_t shortlen = 256, longlen = 768, decodes = 32;
     size_t steps2 = 0;
@@ -354,14 +352,13 @@ static int st_filtercap(httrackp *opt, int argc, char **argv) {
     assertf(strcmp(filters[1], POISON) == 0);                                  \
   } while (0)
 
-  /* a rule at the cap is stored, silently, and still matches; refusing one byte
-     early would be silent too */
+  /* a rule at the cap is stored and still matches */
   TRY("at the cap", atcap);
   assertf(taken && filptr == 1 && verdict == 1 && !warned);
   assertf(strcmp(filters[0], atcap) == 0);
 
-  /* last match wins, so a stored overcap rule would forbid what the first
-     allows: the verdict below is what proves it is really absent */
+  /* the last match wins, so a stored overcap rule would forbid what the first
+     rule allows */
   strlcpybuff(filters[1], POISON, HTS_FILTER_SLOT_SIZE);
   TRY("one past the cap", overcap);
   REFUSED();

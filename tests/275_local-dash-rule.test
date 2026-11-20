@@ -1,8 +1,6 @@
 #!/bin/bash
 #
-# A --strip-query key or --host-alias pattern may begin with '-' (#1179): the
-# engine read it as the next option name and aborted before the mirror, losing
-# the valid rules beside it.
+# A --strip-query key or --host-alias pattern may begin with '-' (#1179).
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
@@ -71,16 +69,15 @@ parse --strip-query=-q
 accepted "--strip-query=-q"
 echo OK
 
-# The rule reaches the grammar check, which quotes it back: proof the leading
-# '-' survived, which no crawl can show since no address begins with one.
+# The grammar check quotes the rule back, which proves the leading '-' survived.
 printf '[a malformed dash rule is named, not blamed on -%%C] ..\t'
 parse --host-alias -nope
 refused 'Rejected: -nope' "malformed --host-alias"
 ! grep -q '%C' <<<"$out" || fail "the host-alias error still names -%C: $out"
 echo OK
 
-# Both would land in the host verbatim. '\v' and not '\n': the argv filter
-# rewrites only CR, LF and TAB.
+# Both would land in the host verbatim. The argv filter rewrites CR, LF and TAB,
+# so use '\v'.
 printf '[a rule the fold could not use is refused] ..\t'
 parse --host-alias 'b.com=x://a.com'
 refused 'Rejected: b.com=x://a.com' "unknown canonical scheme"
@@ -90,8 +87,8 @@ parse --host-alias 'b.com=ftp://a.com'
 accepted "--host-alias b.com=ftp://a.com"
 echo OK
 
-# Every other option keeps the guess it has always made: relaxing it wholesale
-# would turn `-O -q url` into a silent mirror into a directory named -q.
+# Every other option keeps its guess, because relaxing it would mirror
+# `-O -q url` into a directory named -q.
 printf '[an option genuinely missing its parameter still errors] ..\t'
 parse --strip-query
 refused "$syntax_re" "--strip-query with nothing after it"
@@ -113,9 +110,8 @@ noparam "--user-structure -q" --user-structure -q
 noparam "--user-agent -q" --user-agent -q
 echo OK
 
-# The rule is stored, not merely accepted: the engine applies the last rule
-# matching an address, so the unscoped dash rule yields to the scoped one when
-# it comes first (2 files) and wins when it comes second (3 files). A rule
+# The engine applies the last matching rule, so the unscoped dash rule yields
+# to the scoped one when first (2 files) and wins when second (3 files). A rule
 # accepted and then dropped would save 2 both times.
 bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 2 \
     httrack 'BASEURL/stripquery/index.html' \
@@ -123,8 +119,8 @@ bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 2 \
 bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 3 \
     httrack 'BASEURL/stripquery/index.html' \
     --strip-query '*/stripquery/*=utm_source' --strip-query '-nokey'
-# Byte for byte: the fixture's key is utm_source, so -utm_source must strip
-# nothing. Trimming the '-' anywhere on the way in would save 2 files here.
+# The fixture's key is utm_source, so -utm_source must strip nothing. Trimming
+# the '-' anywhere on the way in would save 2 files here.
 bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 3 \
     httrack 'BASEURL/stripquery/index.html' --strip-query '-utm_source'
 

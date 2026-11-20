@@ -1,7 +1,6 @@
 #!/bin/bash
-# Issue #17: with "no error pages" (-o0), 4xx/5xx bodies must not be written;
-# a genuine 0-byte 200 stays. Default (-o1) writes the error page. (#17's purge
-# half also does not reproduce; the purge path is not exercised here.)
+# Issue #17: -o0 must not write 4xx/5xx bodies but keeps a 0-byte 200.
+# The purge half of #17 does not reproduce and is not tested here.
 set -e
 
 : "${top_srcdir:=..}"

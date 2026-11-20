@@ -79,9 +79,7 @@ TITLES = {
     "scripting.html": "Scripting HTTrack",
 }
 
-# A page-specific description, so a search result says what the page is. The old
-# pages shared one blurb (with its word-join typos) and a keyword list that still
-# advertised Windows 95 and AIX 4.0; keywords are dropped, nothing reads them.
+# Each page gets its own description, so a search result says what it is.
 DESCRIPTIONS = {
     "abuse.html": "How to mirror a site without hammering the server, and what a"
     " webmaster can do about crawlers that do.",

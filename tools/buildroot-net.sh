@@ -2,8 +2,7 @@
 #
 # Runs a command on the network an rpm buildroot has: loopback alone, with a
 # default route and no resolver. Fedora's mock builds that, and a UDP connect
-# there succeeds while naming no source, which #1463 read as an address.
-# Debian's sbuild leaves out the default route, so it lands on the skip path.
+# there succeeds while naming no source (#1463).
 #
 # Usage: tools/buildroot-net.sh <command> [args...]      (re-execs under sudo)
 
@@ -14,9 +13,8 @@ fail() {
     exit 1
 }
 
-# Second entry, inside both namespaces: mount away the resolver and drop back to
-# the invoking user, since the suite must not run as root. On an env var, not an
-# argument: as a flag, a root caller typing it by hand unmounts the real one.
+# The second entry hides the resolver and drops root. It is an env var, so a
+# root caller cannot unmount the real resolver with a typed flag.
 if [ -n "${BUILDROOT_NET_INNER:-}" ]; then
     mount --bind /dev/null /etc/resolv.conf
     run_as=${BUILDROOT_NET_INNER#user=}
@@ -40,8 +38,7 @@ ip netns add "$ns"
 ip -n "$ns" link set lo up
 ip -n "$ns" route add default via 127.0.0.1
 
-# Non-vacuity: a namespace that names a real address, or that refuses the
-# connect outright, is not the regime this leg exists to cover.
+# The leg covers a connect that succeeds without naming a real address.
 src=$(ip netns exec "$ns" python3 -c 'import socket
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 try:

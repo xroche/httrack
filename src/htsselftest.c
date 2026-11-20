@@ -31,12 +31,8 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
-/* Each test was historically a single-letter `-#` arm in htscoremain.c; they
-   now live behind one registry reached as `httrack -#test=NAME [args]` (and
-   `-#test` lists them). A handler runs over the positional args
-   (argv[0..argc-1]), prints one result line, and returns the process exit code.
-   The tests themselves sit in hts<module>_selftest.c, one file per engine
-   module, each publishing its own table. */
+/* `httrack -#test=NAME [args]` runs one self-test, and `-#test` lists them. A
+   handler prints one result line and returns the process exit code. */
 
 #include "htsselftest_int.h"
 
@@ -117,11 +113,8 @@ static char *st_batch_field(char **pos, const char *end) {
   return field;
 }
 
-/* A fresh option set per case: a handler's writes to opt must not reach the
-   next one, as they never could across separate processes. It carries the seven
-   fields htsmain() derives before the dispatch, out of the harness's own -O,
-   the data directory and the tty probe; everything else is hts_create_opt's
-   default on both routes, since the harness passes nothing else. */
+/* Give each case a fresh option set, as in its own process, carrying the
+   fields htsmain() derives before the dispatch (-O, data directory, tty). */
 static httrackp *st_batch_opt(const httrackp *from) {
   httrackp *const opt = hts_create_opt();
 
@@ -135,13 +128,10 @@ static httrackp *st_batch_opt(const httrackp *from) {
   return opt;
 }
 
-/* Run a script of self-tests in one process, so a test file costs one fork
-   rather than one per assertion (#1305). Cases must not travel in argv, where
-   the engine would parse a `-*` as one of its own filters and rewrite the rest;
-   stdin keeps them off it and out of htsmain()'s reach, so they arrive
-   verbatim. The script is NUL-separated fields repeating <argc> <name> <arg>*,
-   and each case prints its output, then RS, its exit code and RS again, which
-   is what testlib.sh's selftest_run_queued splits on. */
+/* Run a script of self-tests in one process (#1305). Cases come on stdin,
+   because argv would parse a `-*` as an engine filter. Input is NUL-separated
+   <argc> <name> <arg>* records. Each case prints its output, RS, its exit code
+   and RS, for testlib.sh's selftest_run_queued. */
 static int st_batch(httrackp *opt, int argc, char **argv) {
   char *buff, *pos;
   const char *end;

@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# Fedora, openSUSE, OpenBSD and Void each undo the libtest plugin install by
-# hand; --disable-example-libs does it for them, and must still install the
-# example sources, which are the part their doc packages ship.
+# --disable-example-libs skips the libtest plugin install but must still install
+# the example sources distro doc packages ship.
 
 set -euo pipefail
 

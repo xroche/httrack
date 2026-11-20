@@ -40,10 +40,7 @@ function ping_sid() {
   return f && f.length ? f[0].value : "";
 }
 
-// Closing the window is the common case, and waiting out the timeout for it
-// would hold the server open long after the user considers it gone. The server
-// takes this only from a request holding the session id, so it goes as a POST;
-// a page without one falls back to the timeout.
+// Tell the server the window closed, so it need not wait out the timeout.
 function ping_leaving() {
   var sid = ping_sid();
   if (!sid) {

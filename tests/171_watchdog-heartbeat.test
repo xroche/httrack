@@ -1,10 +1,7 @@
 #!/bin/bash
 #
-# Unit-tests ci_suite_heartbeat (ci-windows-suite.sh) on a virtual clock, at the values the
-# Windows workflow really passes, in both its regimes: scaled-down timings
-# collapse the sleep granularity, the annotation cadence and the staticness
-# window onto one number, and a watchdog confusing those kills healthy runs
-# (#795). The kill is timed by the stub, never by the annotation the code writes.
+# Unit-tests ci_suite_heartbeat (ci-windows-suite.sh) on a virtual clock, in
+# both regimes the Windows workflow uses (#795).
 
 set -euo pipefail
 
@@ -54,10 +51,8 @@ ticks=0
 sleep() {
     local step=$1
     ticks=$((ticks + 1))
-    # Every fourth sleep overshoots fourfold. Starvation is what makes a sleep
-    # run long, and it is the whole difference between a clock that is measured
-    # and one accumulated from what was asked for: a perfect sleep here would
-    # make the code's central invariant unobservable.
+    # Every fourth sleep overshoots fourfold, or a summed clock would match a
+    # measured one.
     test $((ticks % 4)) -ne 0 || step=$((step * 4))
     vnow=$((vnow + step))
     if test "$vnow" -ge 5600 && test "$vnow" -lt 5700; then

@@ -122,10 +122,7 @@ PYEOF
     done
     grep -q ready "$tmpdir/drop.out" ||
         fail_dump "the dropping fixture never came up" "$tmpdir/drop.out"
-    # The connect must TIME OUT, not merely fail: with
-    # net.ipv4.tcp_abort_on_overflow=1 a full queue sends a RST instead, and a
-    # refusal is the path the two cases above already cover. Reading "it failed"
-    # as "it dropped" would silently test nothing new.
+    # Skip unless the connect times out. tcp_abort_on_overflow=1 sends a RST.
     probe_rc=0
     timeout 2 bash -c "exec 3<>/dev/tcp/127.0.0.2/${SRV_PORT}" 2>/dev/null ||
         probe_rc=$?

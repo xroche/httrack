@@ -18,12 +18,8 @@ export TESTLIB
 work=$(mktemp -d "${TMPDIR:-/tmp}/installlock.XXXXXX") || fail "no tmpdir"
 cleanup_push rm -rf "${work}"
 
-# Every make install in the suite goes through the helper, deliberately wider than
-# the relink race: a data target cannot relink, but "which targets can" is a
-# libtool argument at every new test, and serialising a header copy costs nothing.
-# Candidates are judged on the whole logical line, quotes included, so a command
-# wrapped in a string cannot hide; only the vouching name is looked for outside
-# the quotes, or a helper named in a failure message would speak for its line.
+# Every make install goes through the helper. The vouching name must sit outside
+# quotes, or a helper named in a failure message would vouch for its line.
 lint=${work}/lint.awk
 cat >"${lint}" <<'AWK'
 BEGIN {
@@ -139,8 +135,8 @@ rounds=3
 export BARRIER_POLL=0.05
 stale_budget=10
 
-# One process per worker, not a subshell: the lock is owned by a pid, and a
-# subshell inherits $$.
+# Use a process per worker, because the lock is owned by a pid and a subshell
+# inherits $$.
 worker="${work}/worker.sh"
 cat >"${worker}" <<'EOF'
 set -u
@@ -182,8 +178,7 @@ serialised() {
            if (!want) exit 1 }' "${SECTIONS}"
 }
 
-# The control first, and never gated behind the lint above: a probe blind to the
-# unlocked interleaving would pass on a lock that does not lock.
+# Run the control first, so a probe blind to the unlocked interleaving fails.
 run_workers 0
 serialised &&
     skip "${workers} unlocked sections did not overlap, so this box cannot show the race"
@@ -195,10 +190,8 @@ for ((round = 1; round <= rounds; round++)); do
 done
 ok "the lock serialises ${workers} holders, ${rounds} rounds"
 
-# A holder killed outright leaves a lock nobody is allowed to remove, since only
-# the process named inside one removes it. Every waiter must refuse and name the
-# file, none may enter, and the lock must still be there afterwards: each of the
-# three reclaim designs tried here handed that lock to two waiters at once.
+# A holder killed outright leaves a lock only it may remove. Every waiter must
+# refuse and name the file, and the lock must stay.
 for ((round = 1; round <= rounds; round++)); do
     rm -f "${BARRIER}" "${work}/stale.log"
     : >"${SECTIONS}"

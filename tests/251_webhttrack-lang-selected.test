@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# The language menu must mark the language the page is actually rendered in,
-# index 1 included: the first option is opened before the loop carrying the
-# default. Asserting the menu alone cannot tell that from echoing the request.
+# The language menu must mark the language the page renders in, index 1
+# included, because the first option is opened before the loop.
 
 set -euo pipefail
 
@@ -23,10 +22,8 @@ serve() { # $1 = tag, $2.. = extra htsserver args
     htsserver_start --home "${work}/h${tag}" --log "${work}/srv${tag}.log" "$@"
 }
 
-# Indexes come from lang.indexes and labels from each catalog's LANGUAGE_NAME,
-# entity-escaped by the menu emitter, not from observed output.
-# The heading word is that language's own greeting, so it proves which language
-# the body was rendered in.
+# Indexes come from lang.indexes and labels from LANGUAGE_NAME, entity-escaped.
+# Each heading is the language's own greeting, which proves the body language.
 check() { # $1 = lang index, $2 = expected label, $3 = word in the page heading
     serve "$1" lang "$1"
     "${HTS_PYTHON}" - "${HTS_URL}" "$1" "$2" "$3" <<'PY' || fail "wrong menu or body for language $2"

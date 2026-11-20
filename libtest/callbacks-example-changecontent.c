@@ -138,8 +138,7 @@ static size_t apply_pair(const t_my_userdef *userdef, char *dst,
   return out;
 }
 
-/* What apply_pair will write for these bytes. apply_pair must never write more
-   than this, so the two walk the bytes the same way. */
+/* Return what apply_pair writes for these bytes, walking them the same way. */
 static size_t apply_pair_size(const t_my_userdef *userdef, const char *src,
                               size_t size) {
   size_t in, matches = 0;
@@ -179,8 +178,7 @@ static int postprocess(t_hts_callbackarg * carg, httrackp * opt, char **html,
   size = (size_t) *len;
 
   if (userdef->own) {
-    /* One spare byte, so a page rewritten to nothing still answers with a
-       buffer rather than with NULL. */
+    /* A spare byte keeps a page rewritten to nothing from answering NULL. */
     char *const grown = (char *) hts_realloc(
         userdef->buffer, apply_pair_size(userdef, page, size) + 1);
 

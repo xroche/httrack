@@ -1,9 +1,7 @@
 #!/bin/bash
 #
-# A SIGTERM'd --update purged against the truncated new.lst of what it had
-# reached, deleting everything it never got to (#1109). Pass 2 is a complete
-# crawl that still purges, so a fix that only silences the purge fails here.
-# 268 covers the same loss without a signal.
+# A SIGTERM'd --update must not purge the files it never reached (#1109). Pass
+# 2 is a complete crawl that must still purge.
 
 set -euo pipefail
 
@@ -94,8 +92,7 @@ httrack "${urls[@]}" -O "$out" "${common[@]}" --update --timeout=0 --max-time=0 
     >"${tmpdir}/log3" 2>&1 &
 crawlpid=$!
 
-# Observed, not slept for: the stalled RETR is what says a.bin is done and the
-# crawl is parked with c, d and e still unreached.
+# The stalled RETR of b.bin shows a.bin is done and c, d and e are unreached.
 deadline=$((SECONDS + 120))
 until grep -aq 'RETR .*b\.bin' "$cmds" 2>/dev/null; do
     test "$SECONDS" -lt "$deadline" || fail "the crawl never reached b.bin"
@@ -114,9 +111,8 @@ grep -q 'Exit requested by shell or user' <<<"$log" ||
     fail "the crawl did not end through the engine's exit path: ${log}"
 ! grep -q 'restoring previous one' <<<"$log" ||
     fail "the abort rolled the session back, which skips the purge anyway: ${log}"
-# And the run must really have left links behind, or there is nothing to purge.
-# The server's own command log, not new.lst: an aborted run now leaves the
-# generation the reconcile restored, which lists what pass 2 mirrored (#1636).
+# The server's command log proves links were left behind, because after an
+# abort new.lst lists what pass 2 mirrored (#1636).
 for name in c d e; do
     ! grep -aq "${name}\.bin" "$cmds" ||
         fail "${name}.bin was reached after all; the abort came too late"

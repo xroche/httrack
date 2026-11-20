@@ -1,13 +1,7 @@
 # HTS_ADD_FORTIFY_SOURCE
 #
 # Append -D_FORTIFY_SOURCE=3 (else =2) to CPPFLAGS, once the compiler has been
-# seen to emit a checked entry point for it. Replaces autoconf-archive's
-# AX_ADD_FORTIFY_SOURCE, which got this wrong twice: it only asked whether the
-# define links, so an unoptimized build -- where glibc gates the checked builtins
-# behind __OPTIMIZE__ and, since 2.41, no longer warns -- reported "yes" and
-# fortified nothing; and its body assigns a string literal to a char*, so a
-# CFLAGS carrying -Wwrite-strings failed the probe under the -Werror it
-# force-added, taking the =2 fallback (same body) down with it.
+# seen to emit a checked entry point, because glibc gates it on __OPTIMIZE__.
 #
 # Sets FORTIFY_SOURCE_LEVEL to the level chosen, empty if none.
 AC_DEFUN([HTS_ADD_FORTIFY_SOURCE], [

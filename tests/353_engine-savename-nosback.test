@@ -5,10 +5,8 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-# -#C lists a legacy hts-cache/new.ndx with no crawl behind it, so it names each
-# entry through url_savename() with a NULL backing (#1393). nosback=1 is that
-# call; the name must come out as it does with a backing, since nothing on this
-# path has one to consult anyway.
+# nosback=1 names a file with a NULL backing, as -#C does for a legacy
+# new.ndx (#1393). The name must match the one built with a backing.
 both() { # both FIL CTYPE WANT [ARGS...]
     local fil=$1 ctype=$2 want=$3
     shift 3
@@ -24,8 +22,7 @@ both '/foo' 'text/html' 'foo.html'
 both '/x.jpg' 'image/jpeg' 'x.jpg'
 
 # delayed=0 is -%N0, the one policy that sends an unresolved type to a HEAD
-# request rather than to a delayed name. That request is the last thing on this
-# path to read the backing, so with none it must be skipped, not issued.
+# request. That request reads the backing, so with none it must be skipped.
 selftest_queue 'savename: /dev/null/www.example.com/x.zzz' savename \
     /x.zzz text/html nosback=1 delayed=0
 

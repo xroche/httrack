@@ -60,7 +60,7 @@ run_with_timeout 120 httrack "ftp://127.0.0.1:${FTP_PORT}/f.bin" -O "$out" --qui
 elapsed=$((SECONDS - start))
 assert_clean_run "trickle"
 test "$rc" -ne 124 || fail "trickle crawl overran its 120s cap"
-# Faults reliably only while the backlog array stays mmap-sized: free() unmaps it.
+# It faults reliably only while free() unmaps the mmap-sized backlog array.
 test "$rc" -lt 128 || fail "trickle crawl died on signal $((rc - 128)) (#1051)"
 assert_capped "$out" "trickle"
 # A drain that waits the transfer out instead of cancelling it also exits 0, and

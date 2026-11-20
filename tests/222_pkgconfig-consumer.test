@@ -45,8 +45,7 @@ shared=$(find "${staged_libdir}" -maxdepth 1 \( -name 'libhttrack.so*' -o -name 
     skip "configure did not enable a binary-relative rpath in this build"
 
 export PKG_CONFIG_PATH=${staged_libdir}/pkgconfig
-# --define-variable OVERRIDES the file's own assignment, so every relocated query
-# below would pass on a .pc naming the wrong directory. Read the raw values first.
+# Read raw values first, since --define-variable hides a wrong .pc directory.
 expect_variable() { # <variable> <what configure was given>
     local got
     got=$("${pkgconfig}" --variable="$1" libhttrack) || fail "pkg-config --variable=$1 failed"
