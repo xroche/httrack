@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# A field typed into the extra-headers box (-%X) replaces the engine's (#1337).
+# A field typed into the extra-headers box (-%X) replaces the engine's own line (#1337).
 
 set -euo pipefail
 

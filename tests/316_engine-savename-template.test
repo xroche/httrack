@@ -29,8 +29,8 @@ name=$(printf '%0100d' 0 | tr '0' a)
 selftest_queue "savename: /dev/null/$host/dir/$name.html" savename \
     '/dir/*.html' text/html filpad=100 "adr=$host" 'userdef=%h%p/%n.%t'
 
-# Past save[] only the link's own bytes are cut. The 2048-byte buffer starts
-# with a 1000-byte host, so only the host's first bytes are asserted.
+# Past save[] only the link's own bytes are cut. The shortener cuts the
+# 1000-byte host, so only its first bytes are asserted.
 for pad in 2000 2030; do
     leads_with "$host/dir/" "$pad" "$host" '%h%p/%n.%t'
     ends_with_name_and_ext "$pad" "$host" '%h%p/%n.%t'
