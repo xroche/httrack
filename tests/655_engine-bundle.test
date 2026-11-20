@@ -412,7 +412,8 @@ selftest_queue "refused: /alphasid.hts, line 6: a cookie has another value in an
     bundle "$dir" 'https://www.alpha.test/#httrack-bundle=alpha' \
     'https://alpha.test/#httrack-bundle=alphasid'
 
-# 2000 chained bundles may cost 64 times 250 (linear is ~8, cubic 512).
+# 2000 chained bundles may cost at most 64 times what 250 cost (linear ~8,
+# cubic ~512). The bound is relative, so slow legs pass.
 now_ms() {
     if perl -MTime::HiRes=time -e 1 2>/dev/null; then
         perl -MTime::HiRes=time -e 'printf "%d", time * 1000'

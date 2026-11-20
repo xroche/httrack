@@ -1,6 +1,7 @@
 #!/bin/bash
 # A resume that repairs the cache must still reject an unusable 206 and refetch.
 # Truncating new.zip past its last entry drops the directory, so repair runs.
+# Does not cover #581 (POSIX restart drops the partial itself); test 235 does.
 set -u
 
 # shellcheck source=tests/crawllib.sh
