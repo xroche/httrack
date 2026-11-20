@@ -1,10 +1,7 @@
 #!/bin/bash
 #
-# 205, 206, 207 and 269 all gate on abs_top_builddir, so the MSVC job, which runs
-# the scripts with no automake around them, exits 77 on all four and never
-# compiles the installed headers on the preprocessor least like ours (#1153).
-# A sweep cannot see its own step get dropped, so audit the wiring here, and
-# drive the staging path only that step uses.
+# 205, 206, 207 and 269 skip without automake, so the MSVC job never compiles
+# the headers (#1153). This audits the wiring and drives its staging path.
 
 set -euo pipefail
 
@@ -26,8 +23,8 @@ cleanup_push rm -rf "$tmp"
 # The MSVC step stages DevIncludes_DATA out of the source tree rather than
 # through the install rule 269 drives, so nothing else exercises that half.
 read -r -a cc_argv <<<"${CC:-cc}"
-# Both halves are gated, so count them: with neither run, only two
-# file-existence checks stand behind the pass.
+# Count the gated halves: with neither run, only two file-existence checks
+# stand behind the pass.
 staged=0
 if ! command -v "${cc_argv[0]}" >/dev/null 2>&1; then
     echo "note: no C compiler (${cc_argv[0]}), the staging path was not driven" >&2
@@ -42,8 +39,7 @@ else
     cpp_argv=()
     [ -z "${TEST_CPPFLAGS:-}" ] || read -r -a cpp_argv <<<"$TEST_CPPFLAGS"
 
-    # Counts, not the literal. The message is the only window on what was staged,
-    # and a grep for it passes on a sweep that staged half the set.
+    # Compare counts, because a bare grep passes on a half-staged set.
     declared=$(declared_header_count)
     [ "$declared" -ge 10 ] || fail "read only $declared headers out of DevIncludes_DATA"
     selftest() { # selftest WANT_HEADERS EXTRA_ARG...
@@ -80,8 +76,7 @@ if test -z "$py" || ! "$py" -c 'import yaml' 2>/dev/null; then
     exit 0
 fi
 
-# Parsed, not grepped. The step has to be read out of the job that owns it, and
-# reformatting the workflow must move no verdict.
+# Parse the workflow, because a reformat must move no verdict.
 cat >"$tmp/wf.py" <<'PY'
 import sys
 

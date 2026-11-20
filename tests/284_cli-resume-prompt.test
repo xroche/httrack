@@ -1,9 +1,7 @@
 #!/bin/bash
 #
-# Re-run in a mirror directory and the engine offers to resume, quoting the
-# command line it would run (#1204). The obvious way to print it aborts:
-# HT_PRINT appends into a 2 KB buffer whose helper dies on overflow, which a
-# real command line outgrows.
+# The resume prompt quotes the command line it would run (#1204), and must clip
+# it to the 2 KB HT_PRINT buffer, whose helper aborts on overflow.
 
 set -eu
 
@@ -48,8 +46,7 @@ assert_match 'zzzmarker' "$out" "the offer dropped the options"
 ! grep -qF -- "$bin" <<<"$out" || fail "the offer still quotes the program path"
 echo OK
 
-# Teeth for the clip: doit.log replays up to 8000 bytes, so a command line built
-# from many filters outruns the 2 KB buffer several times over.
+# doit.log replays up to 8000 bytes, so many filters outrun the 2 KB buffer.
 printf '[a command line too long to fit is clipped, not fatal] ..\t'
 long=()
 for i in $(seq 1 40); do

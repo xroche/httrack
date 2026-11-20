@@ -3,8 +3,7 @@
 # crawllib's launch and crawl helpers, exercised from a subject process: a
 # firing assertion, and the library's own reaping, each end that process.
 
-# The subject snippets below are deliberately unexpanded: they run in the
-# subject, against its own tmpdir and the variables the library sets there.
+# The subject snippets stay unexpanded because they run inside the subject.
 # shellcheck disable=SC2016
 
 set -euo pipefail
@@ -71,8 +70,7 @@ assert_match "picked-this-root" "$body" "served from --root"'
 ok "--root is what gets served"
 
 ## --tls serves HTTPS, and BASEURL says so
-# Fetched over TLS, not read off BASEURL: an option that set the scheme and left
-# the server plain would pass on the string alone.
+# Fetch over TLS, because a plain server would pass a BASEURL string check.
 holds 'local_server_start --tls
 assert_eq "https://127.0.0.1:${SRV_PORT}" "$BASEURL" "--tls scheme"
 body=$("$(find_python)" - "$SRV_PORT" <<PY
@@ -199,28 +197,26 @@ SH
 chmod +x "${shim}/httrack"
 local_crawl --log "${tmpdir}/crawl.log" -O /dev/null "$url"
 assert_eq "crawl-said-this" "$(<"${tmpdir}/crawl.log")" "--log took stdout"
-# Truncated, not appended: every call site it replaced used a plain > redirect.
+# --log truncates because each call site it replaced used a plain > redirect.
 local_crawl --log "${tmpdir}/crawl.log" -O /dev/null "$url"
 assert_eq "crawl-said-this" "$(<"${tmpdir}/crawl.log")" "--log truncates per crawl"
 ok "--log takes the crawl output, one crawl at a time"
 
 ## --stdin feeds the engine, which a redirect on the call cannot be trusted to do
-# Three outcomes on one line, so a closed descriptor is told apart from the empty
-# read /dev/null gives.
-# Written straight out, never through $(cat): with fd 0 closed a command
-# substitution takes the free slot 0 for its pipe and the read blocks forever.
+# Write straight out, because with fd 0 closed $(cat) takes slot 0 for its pipe
+# and the read blocks forever.
 cat >"${shim}/httrack" <<'SH'
 #!/bin/bash
 printf 'stdin=['
-# uutils cat does not fail on a closed fd, so ask the shell; the subshell keeps
-# an exec redirection error from taking bash 3.2 down with it
+# uutils cat does not fail on a closed fd, so ask the shell. The subshell keeps
+# an exec redirection error from killing bash 3.2.
 if (exec 3<&0) 2>/dev/null; then cat 2>/dev/null; else printf closed; fi
 printf ']\n'
 SH
 chmod +x "${shim}/httrack"
 
 printf answer >"${tmpdir}/answers"
-# Against a call redirected elsewhere: --stdin is on the engine, so it wins.
+# --stdin wins over a redirect on the call because it feeds the engine.
 local_crawl --stdin "${tmpdir}/answers" --log "${tmpdir}/crawl.log" \
     -O /dev/null "$url" </dev/null
 assert_eq "stdin=[answer]" "$(<"${tmpdir}/crawl.log")" "--stdin FILE"
@@ -258,7 +254,7 @@ test -e "${tmpdir}/out/hts-stop.lock"'
 assert_eq "" "$out" "what the first attempt printed"
 ok "write_lock_request writes the request, silently, on the first attempt"
 
-# A grandparent, since the old helper already named the parent.
+# Remove a grandparent of the target directory.
 fires 'mkdir -p "${tmpdir}/ht.1/req.AAA/fresh"
 rm -rf "${tmpdir}/ht.1"
 write_lock_request "${tmpdir}/ht.1/req.AAA/fresh" hts-stop.lock $$' '/ht.1 is gone'
@@ -266,7 +262,7 @@ write_lock_request "${tmpdir}/ht.1/req.AAA/fresh" hts-stop.lock $$' '/ht.1 is go
 assert_eq 1 "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" "lines the helper printed"
 ok "a vanished grandparent is named, not the parent"
 
-# The real #1639 shape, where only the crawl output went.
+# Only the crawl output goes, as in #1639.
 fires 'mkdir -p "${tmpdir}/ht.2"
 write_lock_request "${tmpdir}/ht.2/fresh" hts-stop.lock $$' '/fresh is gone'
 assert_match '/ht\.2 survives\)' "$out" "the deepest surviving directory"
