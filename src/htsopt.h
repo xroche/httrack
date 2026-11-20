@@ -77,10 +77,8 @@ typedef struct String String;
 #ifndef HTS_DEF_STRUCT_String
 #define HTS_DEF_STRUCT_String
 
-/** A growable string, owned by the String and released by StringFree(). Read
-    it with StringBuff() and never write these fields yourself. htsstrings.h
-    defines the same struct and carries the field contract, so it is the one to
-    read. */
+/** A growable string, released by StringFree(). Read it with StringBuff() and
+    never write its fields. htsstrings.h holds the field contract. */
 struct String {
   char *buffer_;
   size_t length_;
@@ -416,10 +414,9 @@ typedef struct lien_buffers lien_buffers;
 #endif
 
 /** Per-mirror options and live state: hts_create_opt() builds one and
-    hts_main2() runs it. Callers normally configure it through the command-line
-    argv vector rather than by writing fields, and the only fields real
-    consumers set themselves are log and errlog. An hts_tristate option left at
-    HTS_DEFAULT is unspecified, so copy_htsopt() leaves such a field alone. */
+    hts_main2() runs it. Callers set it through an argv vector, and write only
+    log and errlog directly. copy_htsopt() skips an hts_tristate field left at
+    HTS_DEFAULT. */
 #ifndef HTS_DEF_FWSTRUCT_httrackp
 #define HTS_DEF_FWSTRUCT_httrackp
 typedef struct httrackp httrackp;
@@ -468,15 +465,13 @@ struct httrackp {
   hts_savename_83 savename_83; /**< saved-name length layout (-LN) */
   /** Saved-name layout preset (-N), or -1 for the savename_userdef template.
       `% 100` picks the tree: 0 site structure, 1 splits off images/, 2 splits
-      off both images/ and html/, 4 and 5 split by extension, 99 gives random
-      names, and every other value keeps the file name alone. An odd hundreds
-      digit names the top directory after the host rather than "web", and an
-      odd thousands digit drops that top directory. Site structure has no
-      "web", so it reads no hundreds digit beyond the literal 100, which drops
-      the host directory. An extensionless name is forced to ".html" for every
-      preset but -1, and only while savename_delayed is not
-      HTS_SAVENAME_DELAYED_HARD, which is the default, so a default run forces
-      nothing. */
+      off images/ and html/, 4 and 5 split by extension, 99 gives random
+      names, and other values keep the file name alone. An odd hundreds digit
+      names the top directory after the host instead of "web", and an odd
+      thousands digit drops it. For site structure, 100 drops the host
+      directory. Presets other than -1 add ".html" to an extensionless name,
+      but only when savename_delayed is not the default
+      HTS_SAVENAME_DELAYED_HARD. */
   int savename_type;
   String savename_userdef; /**< name template, e.g. %h%p/%n%q.%t (-N) */
   hts_savename_delayed savename_delayed; /**< delayed type-check policy (-%N) */

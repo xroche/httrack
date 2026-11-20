@@ -35,14 +35,12 @@ Please visit our Website: http://www.httrack.com
  * Safe string helpers, the fatal-assert machinery, and the "t" allocator
  * wrappers the engine uses instead of raw libc.
  *
- * Pick a helper by its overflow behaviour. The buff() family ABORTS the process
- * on overflow, though only when the destination is an array and not a bare
- * char*, for the reason the size contract below gives. The htsbuff builder
- * aborts either way. Aborting is right for data we built ourselves and wrong
- * for a value read off the wire, out of a cache or out of a header, because it
- * turns a memory smash into a crash on malformed input. Clip such a value
- * instead, with strclipbuff() or slprintfbuff(). Both still abort on a NULL
- * buffer or a zero size, so check a computed size first.
+ * The buff() family aborts on overflow when the destination is an array (see
+ * the size contract below), and the htsbuff builder always aborts. That suits
+ * data we built. Clip a value read off the wire, a cache or a header with
+ * strclipbuff() or slprintfbuff() instead, because malformed input must not
+ * crash. Both still abort on a NULL buffer or a zero size, so check a
+ * computed size first.
  */
 
 #ifndef HTSSAFE_DEFH
@@ -201,23 +199,18 @@ static char *strncatbuff_ptr_(char *dest, const char *src, size_t n) {
 #endif
 
 /*
- * SIZE CONTRACT shared by strcpybuff/strcatbuff/strncatbuff (the "buff"
- * family): the destination bound is taken from sizeof(A), so A MUST be a real
- * char[] array in scope. The bound is the full array size in bytes, INCLUDING
- * the terminating NUL. On overflow the *_safe_ helpers do NOT truncate: they
- * abort() (assertf). The destination must already be NUL-terminated inside its
- * capacity, because its length is measured first, and an unterminated one
- * aborts too. On success the result is always NUL-terminated.
+ * SIZE CONTRACT of strcpybuff/strcatbuff/strncatbuff (the "buff" family): the
+ * bound is sizeof(A), the full array size including the NUL, so A must be a
+ * char[] array in scope. On overflow the *_safe_ helpers abort() (assertf)
+ * instead of truncating. The destination must already be NUL-terminated
+ * within its capacity, or the call aborts. A successful result is always
+ * NUL-terminated.
  *
- * CRITICAL CAVEAT: if A is a bare char* pointer (not an array), sizeof(A) is
- * the pointer size, not the buffer capacity. There is no way to recover the
- * real capacity, so these macros SILENTLY DEGRADE to the unbounded raw
- * strcpy()/strcat()/strncat() while still looking like a checked call. The
- * bound is lost. On GCC/Clang (C) the pointer case routes through the
- * *_ptr_ stubs above, which carry a 'warning' attribute to flag the site at
- * compile time; on other compilers it is silent. When the destination is a
- * pointer of known capacity, call the explicit-size strlcpybuff/strlcatbuff
- * (passing the capacity, NUL included) instead.
+ * If A is a bare char* pointer, sizeof(A) is the pointer size, and these
+ * macros fall back to the unbounded strcpy()/strcat()/strncat(). On GCC/Clang
+ * (C) the *_ptr_ stubs above flag such a site with a 'warning' attribute, but
+ * other compilers say nothing. For a pointer of known capacity, call
+ * strlcpybuff/strlcatbuff with that capacity, NUL included.
  */
 
 /**
@@ -284,11 +277,10 @@ static char *strncatbuff_ptr_(char *dest, const char *src, size_t n) {
 #endif
 
 /*
- * Explicit-size variants (strlcatbuff/strlncatbuff/strlcpybuff): the
- * destination capacity is the caller-supplied S (total bytes, NUL included),
- * NOT derived from sizeof(A). Use these when A is a pointer or its capacity is
- * not its sizeof. Same abort-on-overflow, always-NUL-terminated contract; no
- * silent pointer degradation since the bound is passed in.
+ * Explicit-size variants (strlcatbuff/strlncatbuff/strlcpybuff) take the
+ * capacity S from the caller (total bytes, NUL included) instead of sizeof(A).
+ * Use them when A is a pointer or its capacity is not its sizeof. They keep
+ * the abort-on-overflow, always-NUL-terminated contract.
  */
 
 /** Append all of B to A, whose capacity is S bytes including the NUL. ABORTS
@@ -520,12 +512,11 @@ hts_path_is_contained(const char *path) {
 }
 
 /**
- * True if path is a relative name that no ".." component can walk out of: what
- * a filename read back out of a cache has to be before it is joined to a root.
- * Refusing ".." alone is not enough, because with no -O that root is "" and an
- * absolute cached name is then used verbatim. Spelled as ProxyTrack's own
- * readers already spell it, plus the backslash Windows also takes. Letters are
- * ranged rather than isalpha() so this header needs no <ctype.h>.
+ * True if path is a relative name that no ".." component can walk out of, as a
+ * filename read from a cache must be before it is joined to a root. Absolute
+ * names are refused too, because with no -O that root is "". It matches
+ * ProxyTrack's readers plus the Windows backslash. Letters are ranged so this
+ * header needs no <ctype.h>.
  */
 static HTS_INLINE HTS_UNUSED hts_boolean
 hts_path_is_relative_contained(const char *path) {
@@ -673,11 +664,10 @@ static HTS_INLINE HTS_UNUSED hts_boolean hts_choplastchar(char *s) {
   return HTS_FALSE;
 }
 
-/** The character sets matching htslib.h's is_space(), is_realspace(),
-    is_taborspace() and is_retorsep(), for hts_rtrim() and for the strspn() and
-    strcspn() skips that replaced the hand-written loops. The -#test=rtrim
-    self-test keeps each set and its macro in sync. HTS_RETORSEP has no skip
-    caller yet, and is here so each class has one spelling as a set. */
+/** These sets match htslib.h's is_space(), is_realspace(), is_taborspace()
+    and is_retorsep(), for hts_rtrim() and the strspn()/strcspn() skips. The
+    -#test=rtrim self-test keeps each set in sync with its macro. HTS_RETORSEP
+    has no skip caller yet. */
 #define HTS_SPACES " \"\n\r\t\f\v'"
 #define HTS_REALSPACES " \n\r\t\f\v"
 /* The blanks that separate tokens in line formats: SPACE, TAB, CR, LF. */

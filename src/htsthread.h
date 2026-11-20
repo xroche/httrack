@@ -124,18 +124,16 @@ static HTS_INLINE HTS_UNUSED void hts_store_relaxed_llint(volatile LLint *dst,
 #endif
 }
 
-/* Read a lock hts_mutexlock() may be publishing right now. It builds the lock
-   on first use and publishes it with a compare-and-swap, which is a release, so
-   this read has to be the matching acquire, or a thread sees the pointer and
-   still reads stale bytes inside the lock body. x86 never reorders two loads
-   and so hides that, but arm64 does reorder them. */
+/* Read a lock hts_mutexlock() may be publishing right now. Its
+   compare-and-swap is a release, so this read must be the matching acquire,
+   or a thread can see the pointer and still read stale bytes inside the lock.
+   arm64 reorders such loads, though x86 does not. */
 static HTS_INLINE HTS_UNUSED htsmutex hts_load_acquire_mutex(htsmutex *src) {
 #ifdef _MSC_VER
-  /* Every lock and unlock runs this, so take the free form. The caller reads
-     the lock body through the pointer this returns, so that load depends on
-     this one and no compiler or x86 core may hoist it above: the ordering
-     rests on the address dependency, not on /volatile:ms, which no macro can
-     even test for. ARM reorders dependent loads, hence the fence there. */
+  /* Every lock and unlock runs this, so take the free form. The caller's read
+     of the lock body depends on the returned pointer, which keeps compilers
+     and x86 cores from hoisting it, with no help from /volatile:ms. ARM
+     reorders dependent loads, hence the fence there. */
   htsmutex const value = *(htsmutex volatile *) src;
 
 #if defined(_M_ARM) || defined(_M_ARM64)

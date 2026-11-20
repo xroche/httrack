@@ -141,9 +141,8 @@ static hts_boolean sitemap_root_is(const char *doc, size_t size,
   return HTS_FALSE;
 }
 
-/* Decompress a gzip-framed body into a fresh buffer. The 64 MiB cap is what
-   binds in practice; deflate tops out near 1032:1, so the tree's codec budget
-   only matters as the shared policy for a coding that could go further. */
+/* Decompress a gzip-framed body into a fresh buffer. The 64 MiB cap binds
+   first, because deflate tops out near 1032:1. */
 static char *sitemap_gunzip(const char *body, size_t size, size_t *outsize) {
   const LLint budget = hts_codec_maxout((LLint) size);
   size_t cap = budget < (LLint) HTS_SITEMAP_MAX_BYTES
@@ -271,9 +270,9 @@ static sitemap_doc *sitemap_find(httrackp *opt, const char *adr,
   return NULL;
 }
 
-/* Who asked for this document decides how far it is gated. The wizard proper
-   is not usable here: it wants a referring link, and its up/down travel rules
-   would judge a child sitemap against the parent sitemap's directory. */
+/* Who asked for this document decides how far it is gated. The wizard cannot
+   serve, because it wants a referring link and would judge a child sitemap
+   against the parent sitemap's directory. */
 static hts_boolean sitemap_fetch_allowed(httrackp *opt, const char *adr,
                                          const char *fil,
                                          hts_sitemap_source src) {
@@ -466,11 +465,10 @@ typedef struct sitemap_ingest_ctx {
   int accepted; /* URLs seeded or documents queued, not merely parsed */
 } sitemap_ingest_ctx;
 
-/* A <loc> of a <urlset>: hand it to the wizard as a top-level seed.
-   The wizard is pointed at the crawl's own start URL, not at the sitemap: the
-   site picks where its sitemap lives, so anchoring travel there would let a
-   root sitemap widen a subtree crawl to the whole host. The URL then becomes
-   its own anchor, exactly as a command-line seed does. */
+/* A <loc> of a <urlset> goes to the wizard as a top-level seed, judged
+   against the crawl's start URL. The site picks where its sitemap lives, and
+   anchoring there would let a root sitemap widen a subtree crawl to the whole
+   host. The URL then becomes its own anchor, like a command-line seed. */
 static hts_boolean sitemap_seed_url(void *arg, const char *url) {
   sitemap_ingest_ctx *const c = (sitemap_ingest_ctx *) arg;
   httrackp *const opt = c->opt;

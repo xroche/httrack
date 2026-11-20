@@ -150,10 +150,9 @@ static hts_boolean is_embed_pair(const htspair_t *table, const char *tag,
   return HTS_FALSE;
 }
 
-/* The engine's robots.txt verdict for (adr,fil). Under HTS_ROBOTS_SOMETIMES an
-   explicit filter acceptance overrides the ban, which is why the filter outcome
-   is an input; the sitemap fetcher asks the same question outside the wizard.
- */
+/* The engine's robots.txt verdict for (adr,fil). The filter outcome is an
+   input because under HTS_ROBOTS_SOMETIMES an explicit filter acceptance
+   overrides the ban. The sitemap fetcher asks this outside the wizard. */
 hts_boolean hts_robots_forbids(httrackp *opt, const char *adr, const char *fil,
                                hts_boolean filters_decided,
                                hts_boolean filters_refused) {
@@ -197,8 +196,8 @@ void hts_wizard_prompt_url(char *dst, size_t dstsize, const char *adr,
                            const char *fil) {
   if (dst == NULL || dstsize == 0)
     return;
-  /* clipped, never aborting: adr and fil are cut from a crawled link and
-     together outgrow any prompt buffer */
+  /* clip, because adr and fil come from a crawled link and together can
+     outgrow any prompt buffer */
   strclipbuff(dst, dstsize, adr);
   if (*fil != '/')
     strlncatbuff(dst, "/", dstsize, dstsize - 1 - strlen(dst));
@@ -228,7 +227,7 @@ HTSEXT_API hts_boolean hts_wizard_host_scope(const char *question, int k,
     slash = port;
   else
     slash = end;
-  /* a fully-qualified "foo.com." ends on the root label, which is not one */
+  /* drop the root label that ends a fully-qualified "foo.com." */
   if (slash > host && slash[-1] == '.')
     slash--;
   if (slash == host || *host == '[') /* no host, or an IPv6 literal */
@@ -273,8 +272,8 @@ static hts_boolean wizard_answer_scope(const char *adr, int n, char *dst,
   return hts_wizard_host_scope(adr, k, dst, dstsize);
 }
 
-/* The subdomain form of the scope in slot 0, its apex in slot 1: the starred
-   one does not match the apex, so a whole-domain answer needs both. */
+/* Slot 0 gets the scope's subdomain form, slot 1 its apex, because the
+   starred form does not match the apex. */
 static void wizard_cat_scope(htsbuff *f, const char *sign, const char *adr,
                              int n, int slot) {
   char scope[HTS_URLMAXSIZE];
@@ -501,9 +500,8 @@ static int travel_same_domain(const char *a, const char *b) {
 }
 
 /* Does "adr" + '/' + "fil" fit the HTS_URLMAXSIZE*2 pair (l, lfull) that
-   hts_acceptlink_() and hts_testlinksize() build? Those two buffers gate what
-   url_savename_addstr may later append (#1269), so a link that overruns them is
-   refused rather than clipped into a URL nobody linked to. */
+   hts_acceptlink_() and hts_testlinksize() build? Those buffers gate what
+   url_savename_addstr may append (#1269), so an overrun refuses the link. */
 static hts_boolean hts_wizard_url_fits(const char *adr, const char *fil) {
   const size_t size = HTS_URLMAXSIZE * 2;
   const size_t sep = (*fil != '/') ? 1 : 0;
@@ -557,8 +555,8 @@ static int hts_acceptlink_(httrackp *opt, int ptr, const char *adr,
   }
   // -------------------- PRELUDE OF PHASE 3-BIS --------------------
 
-  /* Built-in tags (<img src=..>) and every stylesheet url(), which names a
-     font or image but carries no tag to match (#139) */
+  /* Match built-in tags (<img src=..>) and every stylesheet url(), which
+     names a font or image but has no tag (#139) */
   if (forbidden_url != 0 && opt->nearlink) {
     if (in_css_file ||
         (tag != NULL && attribute != NULL &&

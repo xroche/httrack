@@ -65,17 +65,16 @@ hts_boolean hts_robots_forbids(httrackp *opt, const char *adr, const char *fil,
 #define HTS_WIZARD_FILTER_SUFFIX "*[file]"
 
 /* Builds into `f` the `slot`-th filter answer `n` adds for the link (adr,fil),
-   and leaves `f` empty past the last one. Only the host-scope answers emit a
-   second, because their starred form misses the apex. `seeker_up` is the
-   HTS_SEEKER_UP bit of opt->seeker, read by answer 5. `f` must have a full
-   HTS_FILTER_SLOT_SIZE of capacity, so no pattern is ever truncated. */
+   and leaves `f` empty past the last one. Only host-scope answers emit a
+   second, because their starred form misses the apex. `seeker_up` is
+   opt->seeker's HTS_SEEKER_UP bit, read by answer 5. `f` needs a full
+   HTS_FILTER_SLOT_SIZE so no pattern is truncated. */
 void hts_wizard_answer_filter(htsbuff *f, int slot, int n, const char *adr,
                               const char *fil, hts_boolean seeker_up);
 
 /* Writes into `dst` (capacity `dstsize`, NUL included) the "<host>/<path>" the
-   wizard prompt asks about. Clips rather than aborting, so the prompt can lose
-   its tail on a link longer than `dstsize`; the answer is still recorded
-   against the whole (adr,fil). */
+   wizard prompt asks about, clipped to fit. The answer still applies to the
+   whole (adr,fil). */
 void hts_wizard_prompt_url(char *dst, size_t dstsize, const char *adr,
                            const char *fil);
 /* Returns the answer code in the front end's reply `s`: 0 for NULL or empty,
@@ -84,11 +83,11 @@ void hts_wizard_prompt_url(char *dst, size_t dstsize, const char *adr,
 int hts_wizard_parse_reply(const char *s);
 
 /* Records the filters answer `n` leaves behind for the link (adr,fil), on top
-   of the wizard's block at the low indices of opt->filters: last match wins, so
-   a later answer outranks an earlier one and the command-line filters above the
-   block outrank every answer. Returns the number inserted, which sit at the
-   tail of the block, ending at opt->wizard_filters; a rule too long for the
-   matcher is dropped, so that can fall short of what the answer emits. */
+   of the wizard's block at the low indices of opt->filters. Last match wins,
+   so the command-line filters above the block outrank every answer. Returns
+   the number inserted at the tail of the block, ending at
+   opt->wizard_filters. A rule too long for the matcher is dropped, so the
+   count can fall short of what the answer emits. */
 int hts_wizard_insert_filters(httrackp *opt, int n, const char *adr,
                               const char *fil, hts_boolean seeker_up);
 
@@ -97,10 +96,9 @@ int hts_wizard_insert_filters(httrackp *opt, int n, const char *adr,
 hts_tristate hts_wizard_scope_answer(int n);
 
 /* Applies the verdict half of answer `n` for the link (adr,fil): refuses it,
-   stops the questions, or bans recursion from it. It never overturns a verdict
-   already computed, but resolves an undecided (-1) link: refused, or
-   authorized. The filter half is hts_wizard_answer_filter(), and a new answer
-   needs both. */
+   stops the questions, or bans recursion from it. It resolves an undecided
+   (-1) link but never overturns a computed verdict. The filter half is
+   hts_wizard_answer_filter(), and a new answer needs both. */
 void hts_wizard_apply_verdict(httrackp *opt, int n, const char *adr,
                               const char *fil, int *forbidden_url,
                               int *set_prio_to);
@@ -122,10 +120,9 @@ hts_boolean hts_cmp_tag_token(const char *tag, const char *cmp);
    referer: its URL does not look like hypertext, and the hosts differ. */
 hts_boolean hts_link_is_foreign_asset(httrackp *opt, int ptr);
 
-/* Writes into `dst` (capacity `dstsize`) the end-of-mirror note saying that
-   links were refused for sitting above the start directory, and what lifts the
-   refusal. Returns HTS_FALSE and empties `dst` when no link was refused above
-   the start directory. */
+/* Writes into `dst` (capacity `dstsize`) the end-of-mirror note that links
+   above the start directory were refused, and what lifts the refusal. Returns
+   HTS_FALSE with `dst` empty when no such link was refused. */
 hts_boolean hts_upper_links_note(httrackp *opt, char *dst, size_t dstsize);
 
 /* `tag` and `attribute` name the markup the link came from, or are NULL where

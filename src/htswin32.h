@@ -31,9 +31,8 @@ Please visit our Website: http://www.httrack.com
 /* ------------------------------------------------------------ */
 
 /** @file htswin32.h
-    Include this rather than <windows.h>: windows.h pulls the 1.1 winsock.h, so
-    a unit that later reaches winsock2.h (through htsnet.h) gets sockaddr and
-    every socket call redefined. winsock2.h first suppresses winsock.h. */
+    Include this instead of <windows.h>, whose 1.1 winsock.h clashes with a
+    later winsock2.h. Including winsock2.h first suppresses winsock.h. */
 
 #ifndef HTS_DEFWIN32
 #define HTS_DEFWIN32

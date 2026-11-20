@@ -216,8 +216,8 @@ static int socks5_fail(char *msg, size_t msgsize, const char *text) {
   return 0;
 }
 
-/* Read exactly n bytes, or fail: SOCKS frames are not self-delimiting, so a
-   short read would desync the stream shared with the origin traffic. */
+/* Read n bytes or fail. SOCKS frames are not self-delimiting, and a short
+   read would desync the stream shared with the origin traffic. */
 static int socks5_read_n(socks5_stream *st, unsigned char *buf, size_t n) {
   size_t got = 0;
   int stalls = 0;
@@ -435,7 +435,7 @@ static int socks5_credentials(httrackp *opt, const char *proxy_name, char *user,
               pass_size);
   *userlen = strlen(user);
   *passlen = strlen(pass);
-  // reject, never truncate: a clipped secret would authenticate as another one
+  // a clipped secret would authenticate as another one, so reject it
   if (*userlen > SOCKS5_MAXFIELD || *passlen > SOCKS5_MAXFIELD)
     return socks5_fail(msg, msgsize, "SOCKS5: credentials too long");
   if (*userlen == 0)
@@ -465,9 +465,7 @@ static int socks5_handshake_stream(httrackp *opt, socks5_stream *st,
                        "SOCKS5: IPv6 literal origin is not supported");
   if (!hts_is_control_free_sized(host, hostlen))
     return socks5_fail(msg, msgsize, "SOCKS5: invalid origin host");
-  // the old range check ran after sscanf("%d") had wrapped a huge value into a
-  // plausible port (#614). An empty "host:" stays refused here, unlike the
-  // direct path, as it was before #614.
+  // An empty "host:" is refused here, unlike on the direct path.
   if (portsep != NULL && !hts_parse_url_port(portsep + 1, &port))
     return socks5_fail(msg, msgsize, "SOCKS5: invalid origin port");
   if (link_has_authorization(proxy_name)) {
