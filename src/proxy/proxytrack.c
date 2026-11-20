@@ -582,8 +582,7 @@ static PT_Element proxytrack_process_HTTP_List(PT_Indexes indexes,
   return NULL;
 }
 
-/* Returns 0 for a body the reader refused, because the send skips it and
-   announcing it would desync a kept-alive peer. */
+/* A refused body is never sent, so it must announce 0 bytes. */
 static size_t element_body_size(const PT_Element element) {
   return (element != NULL && element->adr != NULL) ? element->size : 0;
 }
@@ -1305,8 +1304,7 @@ static int proxytrack_start_ICP(PT_Indexes indexes, T_SOC soc) {
         unsigned int Request_Number = READ_NET32(&buffer[4]); /* Session ID */
         unsigned char *Payload = &buffer[20];
 
-        /* Clear past the datagram, or strlen() runs into the previous one
-           and the reply echoes it back. */
+        /* Clear past the datagram, or strlen() reads the previous one */
         memset(&buffer[n], 0, (size_t) (bufferSize + 1 - n));
         if (Message_Length <= bufferSize - 20) {
           if (Opcode >= ICP_OP_MIN && Opcode <= ICP_OP_MAX) {

@@ -204,8 +204,8 @@ static void exit_wait_thread(void *arg) {
   hts_mutexrelease(&exit_wait_lock);
 }
 
-/* Waits up to --max-time plus a grace, as a stuck getaddrinfo() never
-   returns. Returns HTS_FALSE if threads still run, and then opt must stay. */
+/* Waits at most --max-time plus a grace, because getaddrinfo() can hang.
+   HTS_FALSE means threads still run, so opt must stay. */
 static hts_boolean exit_wait_threads(const httrackp *opt) {
   TStamp left, deadline;
 
@@ -233,8 +233,7 @@ static hts_boolean exit_wait_threads(const httrackp *opt) {
 }
 
 #ifdef _WIN32
-/* Windows writes \n as \r\n on a text-mode stdout, and a WSL2 shell keeps
-   the CR. Only tests/ci-windows-suite.sh sets HTS_BINARY_STDIO. */
+/* A text-mode stdout writes \r\n, and a WSL2 test shell keeps the CR. */
 static void hts_binary_stdio(void) {
   if (getenv("HTS_BINARY_STDIO") != NULL) {
     _setmode(_fileno(stdout), _O_BINARY);
@@ -552,8 +551,7 @@ static const char *__cdecl htsshow_query3(t_hts_callbackarg * carg,
     printf(">> ");
     io_flush;
     linput(stdin, line, 200);
-    /* linput() hides EOF and read errors (a closed stdin sets only ferror).
-       Check the stream, or this prompt loops forever. */
+    /* linput() hides EOF, so check the stream or this prompt loops forever */
     if (!strnotempty(line) && (feof(stdin) || ferror(stdin)))
       strcpybuff(line, "*"); /* refuse this link and ask nothing more */
   } while(!strnotempty(line));
@@ -598,9 +596,8 @@ static int linput(FILE * fp, char *s, int max) {
 
 // Signal handlers (SIGHUP & co, Unix)
 //
-/* A handler may only call write() and touch a volatile sig_atomic_t, because
-   printf and hts_log_print take locks the interrupted thread may hold. Each
-   handler also restores errno for the interrupted code. */
+/* Handlers may only write() and set a volatile sig_atomic_t, because printf
+   takes locks the interrupted thread may hold. Each one restores errno. */
 #define SIG_FD_OUT 1
 #define SIG_FD_ERR 2
 
@@ -634,8 +631,7 @@ static void sig_ignore(int code) { // ignore the signal
 
 static void sig_term(int code) { // quit at once (never returns)
   SIG_PRINT_CODE(SIG_FD_ERR, "\nProgram terminated (signal ", code);
-  /* exit() would run OpenSSL's atexit teardown, whose free() can deadlock on
-     the malloc lock the interrupted thread holds. */
+  /* exit() runs OpenSSL's teardown, which can deadlock on a held malloc lock */
   _exit(0);
 }
 

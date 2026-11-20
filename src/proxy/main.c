@@ -48,8 +48,7 @@ Please visit our Website: http://www.httrack.com
 /* HTS_LOG, the engine's own debug switch. */
 static hts_boolean proxytrack_verbose = HTS_FALSE;
 
-/* Without a handler, coucal prints its statistics to stderr on every WebDAV
-   request (#918). */
+/* Without a handler, coucal prints statistics on every WebDAV request (#918) */
 static HTS_PRINTF_FUN(3, 0) void proxytrack_coucal_loghandler(
     coucal_opaque arg, coucal_loglevel level, const char *format,
     va_list args) {
@@ -91,8 +90,7 @@ static hts_boolean scanHostPort(const char *str, char *host, int *port) {
 }
 
 #ifdef _WIN32
-/* Windows writes \n as \r\n on a text-mode stdout, and a WSL2 shell keeps
-   the CR. Only tests/ci-windows-suite.sh sets HTS_BINARY_STDIO. */
+/* A text-mode stdout writes \r\n, and a WSL2 test shell keeps the CR. */
 static void hts_binary_stdio(void) {
   if (getenv("HTS_BINARY_STDIO") != NULL) {
     _setmode(_fileno(stdout), _O_BINARY);

@@ -282,8 +282,7 @@ static int binput(char *buff, char *s, int max, hts_boolean *cut) {
   }
   s[destCount] = '\0';
 
-  /* Step over a newline only. Past the NUL is outside the buffer, and past a
-     truncated field's next byte would eat that byte. */
+  /* Step over a newline only, never the NUL or a truncated field's byte */
   return buff[count] == '\n' ? count + 1 : count;
 }
 
@@ -935,8 +934,7 @@ static void index_base_path(char *path, size_t size, const char *filename) {
   }
 }
 
-/* Returns where the URL's host occurs in a legacy save name, or NULL. Case is
-   ignored because the engine lowercases the host directory and not the key.
+/* The engine lowercases the host directory but not the key, so ignore case.
    ProxyTrack does not link strstrcase(). */
 static const char *save_find_host(const char *save, const char *host) {
   const char *p;
@@ -949,9 +947,8 @@ static const char *save_find_host(const char *save, const char *host) {
   return NULL;
 }
 
-/* Join a cache's save name onto the store root. The root can be empty, so an
-   absolute name is refused. A clipped join names another file and is refused
-   too. dst is empty after a refusal. */
+/* The root can be empty, so an absolute name is refused, as is a clipped
+   join. dst is empty after a refusal. */
 static HTS_CHECK_RESULT hts_boolean index_join_root(char *dst, size_t size,
                                                     const char *root,
                                                     const char *name) {
@@ -973,8 +970,7 @@ static HTS_CHECK_RESULT hts_boolean index_join_root(char *dst, size_t size,
   return HTS_TRUE;
 }
 
-/* Refuse the record with this save name. Each caller logs why, because a
-   later handler overwrites the element's message. */
+/* Each caller logs why, because a later handler overwrites this message. */
 static void PT_Element_refuse_save(PT_Element r, const char *save) {
   PT_Element_failf(r, "Cache filename leaving the store: %s", save);
   r->statuscode = STATUSCODE_INVALID;
@@ -1191,7 +1187,7 @@ static PT_Element PT_ReadCache__New(PT_Index index_, const char *url,
         char headerBuff[8192 + 2];
         int readSizeHeader;
         int dataincache = 0;
-        /* Signed, to judge a corrupt value before it becomes a size_t */
+        /* Signed, it catches a corrupt value before the size_t cast */
         LLint declared_size = 0;
 
         /* For BIG comments */
@@ -1242,9 +1238,8 @@ static PT_Element PT_ReadCache__New(PT_Index index_, const char *url,
                                    index->path, previous_save_, r, url,
                                    &index->fixedPath, &index->safeCache);
 
-          /* A size is corrupt when negative, wider than size_t, or at least
-             INT_MAX for an in-cache body, which the 32-bit zip writer cannot
-             store. */
+          /* The 32-bit zip writer cannot store an in-cache body of INT_MAX
+             or more. */
           if (declared_size < 0 ||
               (LLint) (size_t) declared_size != declared_size ||
               (dataincache && declared_size >= INT_MAX)) {
@@ -1495,8 +1490,7 @@ static int cache_brstr(char *adr, char *s, size_t s_size) {
           ? (int) len
           : 0;
   if (i > 0) {
-    /* A corrupt cache may declare a length past the buffer end, so bound the
-       copy and the advance to the bytes present */
+    /* A corrupt length may pass the buffer end, so bound by what is there */
     const size_t avail = strnlen(adr + off, (size_t) i);
     const size_t store = avail < s_size ? avail : s_size - 1;
 
@@ -1509,9 +1503,7 @@ static int cache_brstr(char *adr, char *s, size_t s_size) {
   return off;
 }
 
-/** Read a field's length prefix. Returns HTS_FALSE on a truncated line, or on
-    a length that is bad or runs past the end of the file, because the fields
-    after it can no longer be aligned. **/
+/** Returns HTS_FALSE on a bad length, because the next fields cannot align. **/
 static hts_boolean cache_rlen(FILE *fp, long int datSize, size_t *len) {
   LLint i;
   char buff[256 + 4];
@@ -1615,8 +1607,7 @@ static int PT_LoadCache__Old(PT_Index index_, const char *filename) {
 
     cache->filenameDat[0] = '\0';
     cache->filenameNdx[0] = '\0';
-    /* Init before any early return, because readers lock it and the
-       destructor frees it even when no file opened */
+    /* Init before any early return, as readers and the destructor use it */
     MutexInit(&cache->fileLock);
 
     index_base_path(cache->path, sizeof(cache->path), filename);
@@ -1792,8 +1783,7 @@ static PT_Element PT_ReadCache__Old(PT_Index index_, const char *url,
 
   if (hash_pos_return) {
     const int pos = (int) hash_pos; /* simply */
-    /* The sign flags "body on disk" and the magnitude is the offset. INT_MIN
-       has no magnitude, so it is invalid. */
+    /* The sign flags "body on disk", and INT_MIN has no positive offset */
     const long int offset = pos == INT_MIN ? -1 : (pos > 0 ? pos : -pos);
 
     if (offset >= 0 && fseek(cache->dat, offset, SEEK_SET) == 0) {
@@ -1929,8 +1919,7 @@ static PT_Element PT_ReadCache__Old(PT_Index index_, const char *url,
           } else {
             // lire fichier (d'un coup)
             if (flags & FETCH_BODY) {
-              /* INT_MAX caps the 32-bit size field, as in the zip reader. The
-                 body must also fit in what is left of the .dat, which catches
+              /* INT_MAX caps the 32-bit size field. The .dat bound catches
                  corruption before the allocation. */
               if (r->size >= (size_t) INT_MAX ||
                   !cache_fits(cache->dat, cache->datSize, r->size)) {
@@ -2122,8 +2111,7 @@ static hts_boolean arcPastRecordEnd(FILE *file, long int end) {
   return (end >= 0 && ftell(file) > end) ? HTS_TRUE : HTS_FALSE;
 }
 
-/* The most characters hts_shared_linput() returns for one walk line. The scan
-   must match it, or the two read a long line differently. */
+/* The scan must clip a long line exactly as the walk's linput does. */
 #define ARC_LINE_MAX ((int) sizeof(((PT_Index__Arc) NULL)->line) - 2)
 
 /* Bytes hts_shared_linput() with HTS_LINPUT_SKIP_NUL, unlike linput(), never
@@ -2174,9 +2162,8 @@ static hts_boolean arcHasRecordShape(const char *line) {
   return (pos != NULL && arcDigitField(pos) > 0) ? HTS_TRUE : HTS_FALSE;
 }
 
-/* Accept every record PT_LoadCache__Arc indexes, so no served record hides.
-   The shape test adds records it does not serve, such as Heritrix "dns:" ones,
-   because they still bound their neighbour. */
+/* Accepts every record PT_LoadCache__Arc indexes, plus unserved ones such as
+   Heritrix "dns:", because they still bound their neighbour. */
 static hts_boolean arcIsRecordLine(const char *line) {
   if (PT_CompatibleScheme(line) && getArcLength(line) >= 0)
     return HTS_TRUE;
@@ -2219,9 +2206,7 @@ static size_t arcAppendLine(char *line, size_t len, const char *raw,
   return len;
 }
 
-/* Answers whether a record line starts inside the declared data, read forward
-   from the current position so small records are not read many times over.
-   A line counts where it starts, since the declared end may cut into it. */
+/* Reading forward keeps small records from being read many times over. */
 static hts_boolean arcDataHoldsARecord(PT_Index__Arc index, long int from,
                                        long int to) {
   char buffer[32768];
@@ -2339,8 +2324,7 @@ int PT_LoadCache__Arc(PT_Index index_, const char *filename) {
                           "Cache data entry #%d reaches into the next record,"
                           " skipped" LF,
                           (int) entries);
-                  /* Skip only this record and resume the walk at its declared
-                     end */
+                  /* Skip only this record and resume at its end */
                   if (fseek(index->file, dataEnd, SEEK_SET) != 0)
                     break;
                   continue;
