@@ -60,6 +60,7 @@ const char *m = "by construction", *e = "q\" // load-bearing";
 /* neither, not quite: lowercase */
 C
 printf '%s\n' "DOC = '''" '# the whole point' "'''" >"${work}/clean.py"
+printf '%s\n' 'var t = `a' '// in practice`;' >"${work}/clean.js"
 cat >"${work}/clean.css" <<'CSS'
 a { background: url(//example.com/load-bearing.png); }
 CSS
@@ -76,7 +77,8 @@ for want in 'dirty.c:1: slogan' "dirty.c:2: 'load-bearing'" "dirty.c:4: 'by cons
 done
 printf '%s\n' 'x = """' '# a comment' >"${work}/broken.py"
 "${python}" "${lint}" "${work}/broken.py" >/dev/null 2>&1 && fail "an untokenizable file passed"
-out=$("${python}" "${lint}" "${work}/clean.c" "${work}/clean.py" "${work}/clean.css") ||
+out=$("${python}" "${lint}" "${work}/clean.c" "${work}/clean.py" "${work}/clean.css" \
+    "${work}/clean.js") ||
     fail "clean file flagged: ${out}"
 
 # --base reports what the change adds, and not what was already there.

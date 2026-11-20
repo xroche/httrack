@@ -57,7 +57,7 @@ def c_comments(text, line_comments=True):
 
     while i < n:
         c = text[i]
-        word = word_before(i) if c in "\"'" else ""
+        word = word_before(i) if c in "\"'`" else ""
         if c == '"' and word in ("R", "LR", "uR", "UR", "u8R"):
             m = re.match(r'"([^()\\\s]{0,16})\(', text[i:])
             if m:
@@ -66,9 +66,10 @@ def c_comments(text, line_comments=True):
                 continue
         if c == "'" and word[:1].isdigit():
             i += 1  # digit separator, as in 1'000
-        elif c in "\"'":
+        elif c in "\"'`":
+            stop = (c,) if c == "`" else (c, "\n")
             i += 1
-            while i < n and text[i] not in (c, "\n"):
+            while i < n and text[i] not in stop:
                 i += 2 if text[i] == "\\" else 1
             i += 1
         elif text.startswith("/*", i):
