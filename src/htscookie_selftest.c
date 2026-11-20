@@ -35,8 +35,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscookie_selftest.h"
 #include "htsbundle.h"
 
-/* Is the Cookie line a whole RFC 6265 list of `count` pairs and nothing else?
-   A dropped cookie takes its separator, or "a; " joins the next value. */
+/* Is the Cookie line a whole RFC 6265 list of `count` pairs, nothing else? */
 static hts_boolean cookie_line_is_whole(const char *line, int count) {
   const char *end = strstr(line, H_CRLF);
   const char *p;
@@ -120,8 +119,7 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
   if (strstr(hdr, "junk") != NULL) // wrong-domain cookie leaked
     err = 1;
 
-  /* cookie_line_is_whole alone keeps a clipped line from passing below, so
-     check what it refuses. */
+  /* cookie_line_is_whole guards the checks below, so test what it refuses. */
   {
     static const struct {
       const char *line;
@@ -604,8 +602,7 @@ static int st_cookiedomain(httrackp *opt, int argc, char **argv) {
     hts_boolean want;
     const char *what;
   } pairs[] = {
-      /* The same host, the 99% path. An address names itself too, and the
-         parent rule below must not refuse it. */
+      /* An address names itself too, and the parent rule must not refuse it. */
       {"example.com", "example.com", HTS_TRUE, "a jar lost its own host"},
       {"EXAMPLE.com", "example.com", HTS_TRUE,
        "an identical host stopped folding case"},
@@ -664,9 +661,7 @@ static int st_cookiedomain(httrackp *opt, int argc, char **argv) {
        "3.4 leaked to the IPv6 literal ::ffff:1.2.3.4"},
       {"1", "::1", HTS_FALSE, "the jar domain 1 leaked to ::1"},
 
-      /* These are longer than the host, or end in a dot that is a label. They
-         document the dom_len guard but cannot pin it, because they mismatch
-         without it. */
+      /* These mismatch even without the dom_len guard, so cannot pin it. */
       {"www.example.com", "example.com", HTS_FALSE,
        "a child domain reached its parent"},
       {"example.com", "example.com.", HTS_FALSE,
@@ -829,8 +824,7 @@ static int cookie_hostcap_rows(void) {
       cookie_find_exact(jar.data, "c000", H, "/") == NULL)
     HC_FAIL("a bigger re-set evicted the record it replaces");
 
-  /* A hand-edited jar holds c000 twice, the second far larger. Eviction
-     spares the first, which the set replaces, so the set is stored. */
+  /* Eviction spares the first of two c000 cookies, so the set is stored. */
   jar.data[0] = '\0';
   if (cookie_load_host(&jar, H, 60, "v"))
     HC_FAIL("setup");
@@ -1317,9 +1311,7 @@ static int st_cookiespandiff(httrackp *opt, int argc, char **argv) {
   return st.failures != 0;
 }
 
-/* cookiequote HEADER prints what the jar keeps of HEADER and what it sends
-   back, tabs shown as '|'. RFC 6265 5.4 sends a value as stored, and only the
-   stored side shows a cookie-av's bytes. */
+/* cookiequote HEADER prints what the jar stores and sends, tabs as '|'. */
 static int st_cookiequote(httrackp *opt, int argc, char **argv) {
   static t_cookie cookie;
   char line[512];

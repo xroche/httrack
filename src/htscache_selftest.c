@@ -206,9 +206,7 @@ static void gen_body(char *buf, size_t len, int kind) {
   }
 }
 
-/* Exercise the disk-fallback read path. A record stored with X-In-Cache: 0
-   keeps its body on disk, and cache_readex must load it from there. No crawl
-   test re-reads such a body into memory. */
+/* cache_readex must load an X-In-Cache: 0 body from disk. */
 static int disk_fallback_selftest(httrackp *opt) {
   int fail = 0;
   cache_back cache;
@@ -834,8 +832,7 @@ static int cache_selftests(httrackp *opt, const char *dir) {
   cache_back cache;
   int i;
 
-  /* The etag fills htsblk.etag[256], and the location fills
-     HTS_LOCATION_SIZE. */
+  /* These fill htsblk.etag[256] and HTS_LOCATION_SIZE. */
   static char etag_long[251];
   static char location_long[HTS_LOCATION_SIZE];
 
@@ -1024,8 +1021,7 @@ typedef struct {
   int statuscode;
 } golden_entry;
 
-/* A string-literal body and its length without the terminator. The binary
-   array passes its length itself. */
+/* GBODY passes a literal body and its length without the NUL. */
 #define GBODY(s) (s), (sizeof(s) - 1)
 
 static const golden_entry golden_entries[] = {
@@ -1065,10 +1061,8 @@ static void selftest_setup_dir(httrackp *opt, const char *dir) {
   opt->cache = HTS_CACHE_PRIORITY;
 }
 
-/* Read the committed fixture <dir>/hts-cache/new.zip and check each entry
-   field by field. An earlier build wrote it, so this catches format drift.
-   regen!=0 first rewrites the fixture from the table. Returns the failed-check
-   count. */
+/* Checks each entry of the committed <dir>/hts-cache/new.zip for format drift.
+   regen!=0 rewrites it first. Returns the failed-check count. */
 static int cache_golden_selftest(httrackp *opt, const char *dir, int regen) {
   int failures = 0;
   size_t k;
@@ -1145,8 +1139,7 @@ static void reconcile_put(httrackp *opt, const char *name, LLint size) {
   fclose(fp);
 }
 
-/* Write a valid cache generation of `entries` files of `body` stored bytes.
-   Storing lets a case make the shallower generation the larger file. */
+/* Write a cache generation of `entries` stored files of `body` bytes. */
 static void reconcile_put_zip(httrackp *opt, const char *name, LLint entries,
                               size_t body) {
   zipFile zf = hts_zipOpen_utf8(reconcile_st_path(opt, name), 0);
@@ -1459,8 +1452,7 @@ static int cache_reconcile_selftest(httrackp *opt, const char *dir) {
   failures += reconcile_expect(opt, "hts-cache/new.lst", -1,
                                "interrupted-orphan-sidecar");
 
-  /* INTERRUPTED: the entry count decides. new.zip has fewer entries in a
-     larger file and still loses, where a byte comparison would keep it. */
+  /* INTERRUPTED: the entry count decides, even when new.zip is larger. */
   reconcile_wipe(opt);
   reconcile_put(opt, "hts-in_progress.lock", 0);
   reconcile_put_zip(opt, "hts-cache/new.zip", PARTIAL, 65536);
@@ -1899,8 +1891,7 @@ static void corrupt_victim_crc(httrackp *opt) {
   freet(data);
 }
 
-/* Read the corrupt /victim.html, then /canary.html in the same session. The
-   victim must be rejected with wantmsg, and the canary must decode intact. */
+/* The victim must be rejected with wantmsg and the canary decode intact. */
 static int corrupt_expect_victim_fil(httrackp *opt, const char *fil,
                                      const char *wantmsg, const char *what) {
   cache_back cache;
@@ -2044,8 +2035,8 @@ static int cache_corruption_selftest(httrackp *opt, const char *dir) {
   failures += corrupt_case_zip(
       opt, "X-Save: victim.html", "X-Save: ../vic.html", 1, 1,
       "Cache Read Error : Bad Filename", "X-Save escaping the mirror");
-  /* An absolute name must be refused too, because with no -O the root is ""
-     and the name is used verbatim. Both are 11 bytes, for corrupt_patch. */
+  /* With no -O the root is "", so an absolute name must be refused too.
+     Both names are 11 bytes, for corrupt_patch. */
   failures += corrupt_case_zip(
       opt, "X-Save: victim.html", "X-Save: /etc/passwd", 1, 1,
       "Cache Read Error : Bad Filename", "X-Save naming an absolute path");
@@ -2089,9 +2080,8 @@ static int cache_corruption_selftest(httrackp *opt, const char *dir) {
       opt, (size_t) -1, sizeof(((htsblk *) 0)->lastmodified) - 1,
       "over-long Last-Modified");
 
-  /* An X-Size above INT_MAX passes a sign check but goes negative in the
-     (int) cast for malloc. Only a corrupt cache carries one, so a same-length
-     X-Size line replaces the long Etag. The parser keeps the last X-Size. */
+  /* An X-Size above INT_MAX goes negative in the (int) cast for malloc.
+     A same-length X-Size line replaces the long Etag. */
   corrupt_build(opt, "AAAAAAAAAAAAAAAAAAAA");
   corrupt_patch(opt, "Etag: AAAAAAAAAAAAAAAAAAAA", 26,
                 "X-Size: 2147483648AAAAAAAA", 1, 1);
@@ -2156,8 +2146,7 @@ static void fill_str(char *s, size_t size, size_t len, char c) {
   s[len] = '\0';
 }
 
-/* A value read back must be a prefix of what was written, at least `least`
-   long, because the reader may only clip a line to its parse buffer. */
+/* The reader may only clip, so a value must read back as a long prefix. */
 static int check_prefix(const char *what, const char *got, const char *want,
                         size_t least) {
   const size_t len = strlen(got);
@@ -2172,9 +2161,8 @@ static int check_prefix(const char *what, const char *got, const char *want,
   return 0;
 }
 
-/* Every field sits at its cap, so the header block outgrows its buffer. The
-   writer must drop whole fields and round-trip all fields before the block
-   filled. Returns the failed-check count. */
+/* With every field at its cap, the writer must drop whole fields and
+   round-trip the rest. Returns the failed-check count. */
 static int cache_header_bounds_selftest(httrackp *opt, const char *dir) {
   int failures = 0;
   cache_back cache;
@@ -2258,8 +2246,7 @@ static int cache_header_bounds_selftest(httrackp *opt, const char *dir) {
         fprintf(stderr, "cache-hdrbounds: header block ends mid-line\n");
         failures++;
       }
-      /* X-Fil is written last, so its absence proves the block filled. If it
-         survives, the case needs rebuilding. */
+      /* X-Fil is written last, so its absence proves the block filled. */
       if (strstr(extra, "X-Fil: ") != NULL) {
         fprintf(stderr,
                 "cache-hdrbounds: the maxed entry no longer fills the %d-byte "
@@ -2376,8 +2363,7 @@ static int cache_url_bounds_selftest(httrackp *opt, const char *dir) {
      byte: a key clipped anywhere on the path aliases the two together */
   static char big_adr[HTS_URLMAXSIZE * 2], big_fil[HTS_URLMAXSIZE * 2];
   static char twin_fil[HTS_URLMAXSIZE * 2];
-  /* These pass every buffer on the path. The cache API takes plain pointers,
-     so it must drop the entry. One overshoots url_fil, the other url_adr. */
+  /* These pass every buffer on the path, so the cache must drop them. */
   static char huge_fil[CACHE_ENTRYNAME_SIZE * 2];
   static char huge_adr[CACHE_ENTRYNAME_SIZE * 2];
   /* the key a writer that clipped huge_fil would have stored it under */
@@ -2443,8 +2429,7 @@ static int cache_url_bounds_selftest(httrackp *opt, const char *dir) {
   failures += expect_miss(opt, &cache, huge_adr, "/short.html");
   selftest_close(&cache);
 
-  /* An entry name past every buffer on the path must be skipped. Only the
-     sanitizer legs see an unterminated read. */
+  /* An entry name past every buffer on the path must be skipped. */
   {
     char zippath[HTS_URLMAXSIZE];
     /* no pair of lien_back fields reaches this key, so look it up as one */
@@ -2575,8 +2560,7 @@ static int savebounds_expect_refused(httrackp *opt, const char *path,
   return savebounds_expect(opt, path, adr, fil, NULL, NULL);
 }
 
-/* Store one entry. A non-NULL path_prefix strips the html path off X-Save,
-   and NULL leaves the name absolute. */
+/* Store one entry. A NULL path_prefix leaves X-Save absolute. */
 static void savebounds_store(httrackp *opt, cache_back *cache, const char *adr,
                              const char *fil, const char *save,
                              const char *path_prefix, const char *body) {
@@ -2664,8 +2648,7 @@ static int cache_savename_bounds_selftest(httrackp *opt, const char *dir) {
   return failures;
 }
 
-/* CANARY fills the field a msg overrun lands in, and FILL the long reason.
-   Both are non-zero, so a stray NUL shows up. */
+/* Both fills are non-zero, so a stray NUL shows up. */
 #define READFAIL_CANARY 'C'
 #define READFAIL_FILL 'W'
 
@@ -2747,8 +2730,7 @@ static int readfail_write_source(const char *save, const char *body,
   return 0;
 }
 
-/* A source cache_add sizes and opens but cannot read. On Linux /proc/self/mem
-   reads return EIO. It is NULL elsewhere, and the case skips. */
+/* Returns /proc/self/mem on Linux, which opens but reads EIO, else NULL. */
 static const char *readfail_unreadable_source(void) {
   static const char path[] = "/proc/self/mem";
   char catbuff[HTS_URLMAXSIZE * 2];
@@ -2821,8 +2803,7 @@ static int cache_readfail_selftest(httrackp *opt, const char *dir) {
     fail++;
   }
 
-  /* cache_add drops an entry with an unreadable body, and charges the failure
-     streak once per entry */
+  /* an unreadable body drops the entry and counts once in the streak */
   if (unreadable == NULL) {
     fprintf(stderr,
             "cache-readfail: no unreadable source here, case skipped\n");
@@ -2952,8 +2933,7 @@ static int cache_readfail_selftest(httrackp *opt, const char *dir) {
     selftest_close(&cache);
   }
 
-  /* r.msg is 80 bytes in an installed struct, and the reason and strerror()
-     are unbounded, so the message must clip. */
+  /* r.msg is 80 bytes in an installed struct, so the message must clip. */
   {
     static const int errs[] = {0, ENOENT, EIO, EACCES};
     char what[512];
@@ -2997,9 +2977,7 @@ static int cache_readfail_selftest(httrackp *opt, const char *dir) {
 
 /* --- the portable resume reference (.ref) --------------------------------- */
 
-/* The record ref_put_record() writes, one row per field, in order. A reviewer
-   reads the format here instead of decoding hex. Distinct values and bytes
-   expose a swapped field or a wrong byte order. */
+/* Each row is one field of the ref_put_record() record, in write order. */
 typedef enum {
   REF_F_RAW, /* verbatim bytes, no length prefix (the magic) */
   REF_F_U32, /* 4 bytes, little-endian */
@@ -3284,16 +3262,13 @@ static unsigned char *ref_st_oversize(const char *field, size_t len,
   return out;
 }
 
-/* The span from r.cdispo to r.req holds padding, the crange fields and
-   debugid. The reader fills crange earlier, so a stray write past cdispo
-   survives. The span spares the padding that hppa, armhf and powerpc add. */
+/* The span runs from r.cdispo to r.req, past hppa, armhf and powerpc padding.
+   A stray write past cdispo survives there, as crange is filled earlier. */
 #define REF_TAIL_FROM                                                          \
   (offsetof(htsblk, cdispo) + sizeof(((htsblk *) 0)->cdispo))
 #define REF_TAIL_TO offsetof(htsblk, req)
 
-/* The span must hold the record's three values and calloct's zeros. A second
-   read would hide a stray write, so the image is built. The clipped length
-   below catches a stray NUL in the padding. */
+/* The image is built, because a second read would hide a stray write. */
 static int ref_st_tail(const lien_back *back) {
   const size_t len = REF_TAIL_TO - REF_TAIL_FROM;
   const char *const got = (const char *) &back->r + REF_TAIL_FROM;
@@ -3598,8 +3573,8 @@ static int nul_write_zip(const char *zippath) {
   return err;
 }
 
-/* A NUL inside an entry's header block makes the entry corrupt. The zip stays
-   in <dir>/hts-cache/new.zip for the ProxyTrack half. */
+/* A NUL in an entry's header block makes it corrupt. The zip stays in
+   <dir>/hts-cache/new.zip for the ProxyTrack half. */
 static int st_cache_nul(httrackp *opt, int argc, char **argv) {
   char zippath[HTS_URLMAXSIZE];
   cache_back cache;
@@ -3802,8 +3777,7 @@ static int st_cache_readfail(httrackp *opt, int argc, char **argv) {
   return st_verdict("cache-readfail", err);
 }
 
-/* Drives unzRepair over a damaged local file header whose CRC field has bit
-   31 set. Repair must recover the entry without a signed shift overflow. */
+/* unzRepair must recover an entry whose CRC has bit 31 set, with no UB. */
 static int st_zip_repair_shift(httrackp *opt, int argc, char **argv) {
   static const unsigned char zip[] = {
       0x50, 0x4b, 0x03, 0x04, /* local file header signature */
@@ -4208,9 +4182,7 @@ static int zip_abandon_check_members(unzFile uf) {
   return 0;
 }
 
-/* A member abandoned mid-write must leave the archive as if it never opened.
-   A rewind without truncate leaves a tail that can hide the directory from a
-   reader's 64KB backscan. */
+/* A member abandoned mid-write must leave the archive as if it never opened. */
 static int st_zip_abandon(httrackp *opt, int argc, char **argv) {
   static const size_t doomed[] = {
       70000,  /* one 64KB flush: a leftover tail a reader still scans past */
@@ -4277,8 +4249,7 @@ static int st_zip_abandon(httrackp *opt, int argc, char **argv) {
   return st_verdict("zip-abandon", fail);
 }
 
-/* A rollback that could only rewind must say so (#1402), because its archive
-   may have a directory no reader finds. */
+/* A rewind-only rollback must say so, as readers may miss its dir (#1402). */
 static int st_zip_abandon_notrunc(httrackp *opt, int argc, char **argv) {
   static const size_t doomed = 200000; /* a tail past unzip.c's 64KB backscan */
   char refpath[HTS_URLMAXSIZE], path[HTS_URLMAXSIZE];

@@ -241,9 +241,8 @@ static int st_filterbounds(httrackp *opt, int argc, char **argv) {
     assertf(strjoker_bounds(subj, pat, &steps, &maxsteps, NULL, NULL) != NULL);
     assertf(steps < maxsteps);
   }
-  /* An unclosed class rescans its length on every call, and the slope across
-     two lengths pins that. The leading *[a-z] makes the decode count follow
-     the subject length (OSS-Fuzz 5279208050589696). */
+  /* An unclosed class rescans on every call, which the slope across two
+     lengths pins (OSS-Fuzz 5279208050589696). */
   {
     const size_t shortlen = 256, longlen = 768, decodes = 32;
     size_t steps2 = 0;
@@ -358,8 +357,7 @@ static int st_filtercap(httrackp *opt, int argc, char **argv) {
   assertf(taken && filptr == 1 && verdict == 1 && !warned);
   assertf(strcmp(filters[0], atcap) == 0);
 
-  /* the last match wins, so a stored overcap rule would forbid what the first
-     allows */
+  /* the last match wins, so a stored overcap rule would forbid this */
   strlcpybuff(filters[1], POISON, HTS_FILTER_SLOT_SIZE);
   TRY("one past the cap", overcap);
   REFUSED();

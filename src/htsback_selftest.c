@@ -36,9 +36,8 @@ Please visit our Website: http://www.httrack.com
 #include "htsselftest_int.h"
 #include "htsstats.h"
 
-/* hts_mirror_completed() answers HTS_DEFAULT until a mirror has run, because a
-   GUI must not read an early hts_main2() exit as an abort. copy_htsopt() must
-   not carry this live verdict between opts. */
+/* The verdict is HTS_DEFAULT until a mirror runs, so a GUI does not read an
+   early exit as an abort. copy_htsopt() must not copy it. */
 static int st_mirrorcompleted(httrackp *opt, int argc, char **argv) {
   httrackp *from = hts_create_opt();
   httrackp *to = hts_create_opt();
@@ -63,9 +62,8 @@ static int st_mirrorcompleted(httrackp *opt, int argc, char **argv) {
   return st_verdict("mirror-completed", err);
 }
 
-/* stat_errors counts a 404 and a timeout alike. A front end that decides on a
-   resume needs failed transfers counted apart, per mirror. copy_htsopt() must
-   not carry the count between opts. */
+/* Failed transfers count apart from stat_errors, which also counts a 404.
+   copy_htsopt() must not copy the count. */
 static int st_transportfailures(httrackp *opt, int argc, char **argv) {
   httrackp *from = hts_create_opt();
   httrackp *to = hts_create_opt();
@@ -93,8 +91,7 @@ static int st_transportfailures(httrackp *opt, int argc, char **argv) {
 static int st_pause(httrackp *opt, int argc, char **argv) {
   int err = 0, i, seen_low = 0, seen_high = 0;
 
-  /* Launch timestamps a few ms apart must stay in range and spread out. A
-     weak low-bit mixer collapses them to a bound. */
+  /* Launches ms apart must spread out, which a weak low-bit mixer fails. */
   for (i = 0; i < 10000; i++) {
     int t = hts_pause_target_ms((TStamp) (1719500000000LL + i), 5000, 10000);
 
@@ -116,10 +113,8 @@ static int st_pause(httrackp *opt, int argc, char **argv) {
   return st_verdict("pause", err);
 }
 
-/* #747: a thread is outstanding once hts_newthread() returns, or a wait right
-   after the spawn joins nothing. One thread per round keeps the race open,
-   because a batch gives earlier threads time to raise the counter. Many rounds
-   make the failure reliable. */
+/* #747: a thread is outstanding once hts_newthread() returns. One thread per
+   round keeps the race open, because a batch lets earlier threads catch up. */
 #define THREADWAIT_N 8
 #define THREADWAIT_ROUNDS 16
 #define THREADWAIT_SLEEP_MS 50
@@ -146,9 +141,7 @@ static void threadwait_thread(void *arg) {
   hts_mutexrelease(&threadwait_lock);
 }
 
-/* The thread stays outstanding until the gate clears, so wait_n() can leave a
-   known number behind. The bound makes a wait_n() that drains them fail
-   instead of hang. */
+/* The thread waits for the gate, and a bound turns a hang into a failure. */
 static void threadwait_gated_thread(void *arg) {
   int waited;
 
@@ -509,9 +502,8 @@ static int st_backswap(httrackp *opt, int argc, char **argv) {
 
   /* A ready table is a file, so its size headers are hostile input. */
   {
-    /* SIZE_MAX wraps the guard byte's allocation to zero. 16 is a valid
-       header of the wrong struct size, whose slot must be freed. ASan aborts
-       on a merely huge size, so it is left out. */
+    /* SIZE_MAX wraps the guard byte's allocation to zero, and 16 is a header
+       of the wrong struct size. ASan aborts on a merely huge size. */
     const size_t bad[] = {(size_t) -1, 16};
     size_t c;
 
@@ -659,8 +651,7 @@ static int st_spoolrecord(httrackp *opt, int argc, char **argv) {
   }
   freet(back->r.adr);
 
-  /* With every string field full, the copy must match. Bytes past a
-     terminator come back zero, so the slot starts zeroed. */
+  /* The slot starts zeroed, because bytes past a terminator read back 0. */
   memset(back, 0, sizeof(lien_back));
   back->r.adr = strdupt(body);
   back->r.size = (LLint) sizeof(body) - 1;
@@ -1507,14 +1498,11 @@ static hts_boolean st_backstop_arm(httrackp *opt, struct_back *sback,
   return HTS_TRUE;
 }
 
-/* Checks back_delete_all(), the shutdown every exit reaches. A capped mirror
-   can end in the link loop before either sweep runs, with the partial on disk.
+/* Checks back_delete_all(), which a capped mirror reaches before any sweep.
    Returns 77 on an allocation failure, as st_backstop() does. */
 static int st_backstop_check_shutdown(httrackp *opt) {
-  /* back_delete_all() flags only a live slot writing its own file.
-     back_is_live() is the range 0 < status < STATUS_FTP_TRANSFER. The rows
-     sit one on each side and two inside, far enough apart to catch a range
-     narrowed to its first status. */
+  /* back_is_live() is 0 < status < STATUS_FTP_TRANSFER. Two rows inside
+     catch a range narrowed to its first status. */
   static const struct {
     const char *what;
     int status;
@@ -1616,10 +1604,8 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
     goto cleanup;
   }
 
-  /* Control: with the mirror running, back_wait ends nothing. An
-     unconditional sweep would strand every connect. Only the states back_wait
-     leaves alone are checked, because it advances the resolution and handshake
-     waits by itself. */
+  /* Control: with the mirror running, back_wait ends nothing. Only states it
+     does not advance by itself are checked. */
   back_wait(sback, opt, &cache, 0);
   CHECK(back[SLOT_CONNECT].status == STATUS_CONNECTING);
   for (i = SLOT_HEADERS; i < SLOTS; i++)
@@ -1631,9 +1617,8 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
     CHECK(strcmp(back[i].r.msg, "untouched") == 0);
   }
 
-  /* The sweep runs on every wait, so this waits twice and re-arms between.
-     The flag goes up after the slots are in place, as when the user hits ^C
-     mid-connect. */
+  /* Wait twice, re-arming between. The flag goes up after the slots are in
+     place, as a ^C mid-connect does. */
   for (round = 0; round < 2 && !err; round++) {
     opt->state.stop = 0;
     if (!st_backstop_arm(opt, sback, status, r, SLOTS)) {
@@ -1646,8 +1631,7 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
 
     back_wait(sback, opt, &cache, 0);
 
-    /* every slot but the FTP one is gone, its socket closed, and reported as
-       fatal so the link is not queued again */
+    /* every slot but FTP is closed and fatal, so its link is not requeued */
     for (i = SLOT_CONNECT; i < SLOT_FTP; i++) {
       CHECK(back[i].status == STATUS_READY);
       CHECK(back[i].r.soc == INVALID_SOCKET);
@@ -1665,9 +1649,8 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
     CHECK(strcmp(back[SLOT_FTP].r.msg, "untouched") == 0);
   }
 
-  /* Check back_abort_stopped() in grace. A cap gives running transfers a
-     grace (#77, #481), so the sweep takes only pre-connect slots and
-     back_abort_limit() ends the rest. */
+  /* A cap gives running transfers a grace (#77, #481), so the sweep takes
+     only pre-connect slots. */
   if (!err) {
     const LLint recv_was = hts_stat_recv_get();
 
@@ -1704,8 +1687,7 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
     hts_stat_recv_set(recv_was);
   }
 
-  /* back_abort_stopped() keeps hts-cache/ref only for a partial that outlives
-     the stop (#1595). A .delayed placeholder goes with its own ref. */
+  /* Only a partial that outlives the stop keeps hts-cache/ref (#1595). */
   {
     static const struct {
       const char *what;
@@ -1757,8 +1739,7 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
     back[SLOT_XFER].r.is_write = 1;
     strcpybuff(back[SLOT_XFER].url_sav, "hts-backstop-selftest.tmp");
     opt->abort_left_partial = HTS_FALSE;
-    /* this is well past any grace, so the limit block ends every live slot
-       whatever back_maxsize_grace() returns */
+    /* this is past any grace, so the limit block ends every live slot */
     opt->maxsite = ST_BACKSTOP_CAP;
     hts_stat_recv_set(ST_BACKSTOP_CAP * 2);
     hts_request_stop(opt, 0);
@@ -1799,8 +1780,7 @@ cleanup:
   return st_verdict("backstop self-test", err);
 }
 
-/* back_new() sizes its table from -cN and returns NULL when it does not fit,
-   because httpmirror() logs that and stops, where an abort loses the log. */
+/* back_new() returns NULL when -cN does not fit, so httpmirror() can log. */
 static int st_backnew(httrackp *opt, int argc, char **argv) {
   /* Too big to serve without the allocator asking the kernel for more. */
   enum { slots = 4096 };
@@ -1824,9 +1804,7 @@ static int st_backnew(httrackp *opt, int argc, char **argv) {
     return 1;
   }
 
-  /* The clamped -cN must always be something back_new() can express. Check
-     the clamp itself, because --bypass-limits skips it and each platform
-     refuses a huge table its own way. */
+  /* Check the clamp, because platforms refuse a huge table differently. */
   {
     static const int maxsocs[] = {
         -1, 0, 1, 8, 67108830, 67108831, 67108832, 2000000000, INT_MAX};
@@ -2116,8 +2094,7 @@ static void threadrunner_body_fn(void *arg) {
   hts_mutexrelease(&threadrunner_lock);
 }
 
-/* Leaves the body the way a fault recovery does, so nothing after the jump
-   runs. */
+/* Leaves the body as a fault recovery does, so nothing after the jump runs. */
 static void threadrunner_cut_fn(void *arg) {
   (void) arg;
   hts_mutexlock(&threadrunner_lock);
@@ -2390,8 +2367,7 @@ static int st_ftphandoff(httrackp *opt, int argc, char **argv) {
 #define STRERROR_THREADS 8
 #define STRERROR_ROUNDS 20000
 
-/* Four errno values every libc names, then four codes none does. A libc
-   formats an unknown code into the buffer. */
+/* Every libc names the first four codes, and none names the last four. */
 static const int strerror_codes[STRERROR_THREADS] = {
     EACCES, ENOENT, EINVAL, EPERM, 4001, 4002, 4003, 4004};
 
@@ -2432,8 +2408,7 @@ static int st_strerror(httrackp *opt, int argc, char **argv) {
     }
   }
 
-  /* A caller can hold two messages at once. Use two named codes, because
-     musl answers every unknown code alike. */
+  /* Two messages coexist. They are named, as musl prints unknowns alike. */
   kept = hts_strerror(strerror_codes[0], first, sizeof(first));
   (void) hts_strerror(strerror_codes[1], second, sizeof(second));
   if (strcmp(kept, strerror_expected[0]) != 0) {
@@ -2631,8 +2606,7 @@ static int st_hostban(httrackp *opt, int argc, char **argv) {
             sback->lnk[SLOT_FTP].r.statuscode, sback->lnk[SLOT_FTP].r.msg);
     err++;
   }
-  /* Control: an http slot of the same host IS ended, so a host_ban() that
-     ends nothing fails. */
+  /* Control: an http slot of the same host IS ended. */
   if (sback->lnk[SLOT_HTTP].status != STATUS_READY) {
     fprintf(stderr, "hostban: the http slot was left at status %d\n",
             sback->lnk[SLOT_HTTP].status);

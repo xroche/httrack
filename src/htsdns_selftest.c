@@ -124,8 +124,7 @@ static mock_host mock_hosts[] = {
    worker is still inside the backend while the test reads the counters. */
 static htsmutex mock_lock = HTSMUTEX_INIT;
 static int mock_finished = 0; /* backend calls that have returned */
-/* Counts backend uses done with hts_resolver. A worker reads it again to free
-   its answer, and a swap must wait for that. */
+/* Counts backend uses whose answer was freed, which a swap must wait for. */
 static int mock_released = 0;
 static hts_boolean mock_gate_open = HTS_FALSE;
 
@@ -393,8 +392,7 @@ static int dns_selftests(httrackp *opt) {
     CHECK(mock_find("nodns.test")->calls == 1); /* resolved once, then cached */
   }
 
-  /* A failure the resolver could not answer expires, so one outage cannot
-     kill the crawl. The test moves the clock instead of sleeping. */
+  /* An unanswered failure expires, so one outage cannot kill the crawl. */
   mock_reset_calls();
   hts_dns_set_negative_ttl_ms(100000);
   {
@@ -424,8 +422,7 @@ static int dns_selftests(httrackp *opt) {
     CHECK(mock_read_calls("flaky.test") == 3); /* the answer does not expire */
   }
 
-  /* The stamps are wall-clock. A backward step must expire them too, or it
-     delays the retry by the step, up to the rest of the crawl. */
+  /* A backward clock step must expire the wall-clock stamps too. */
   mock_reset_calls();
   {
     SOCaddr a;
@@ -441,9 +438,7 @@ static int dns_selftests(httrackp *opt) {
     mock_find("stepped.test")->gai_err = EAI_AGAIN; /* leave the row as found */
   }
 
-  /* The wait doubles per failure, up to the ceiling. Android reports every
-     failure this way, NXDOMAIN included, and a dead host must not be
-     re-asked all crawl. */
+  /* The wait doubles per failure up to the ceiling, NXDOMAIN included. */
   {
     const int first = 1000;
 
@@ -535,8 +530,7 @@ static int dns_selftests(httrackp *opt) {
     CHECK(strcmp(ip, "1.2.3.4") == 0);
   }
 
-  /* newhttp_addr() must connect to the addr_index-th address, because
-     back_connect_next relies on it to reach the fallback. */
+  /* back_connect_next needs newhttp_addr() to use the addr_index-th one. */
   {
     htsblk r;
     int count = -1;
@@ -565,8 +559,7 @@ static int dns_selftests(httrackp *opt) {
       deletesoc(s);
   }
 
-  /* A URL port outside 1..65535 must refuse the link (#614). *addr_count is 0
-     when it is refused before the resolve, and 2 when it is truncated. */
+  /* A URL port outside 1..65535 must refuse the link (#614). */
   {
     /* an empty "dual.test:" means the default port (WHATWG, curl): keep it */
     static const char *const good[] = {"dual.test:1",    "dual.test:80",
@@ -668,8 +661,7 @@ static int dns_timeout_selftests(httrackp *opt) {
   elapsed = mtime_monotonic() - start;
   finished = mock_read_finished();
 
-  /* the resolve returns on opt->timeout, so --max-time and --timeout fire
-     (#606) */
+  /* the resolve returns on opt->timeout, so --max-time fires (#606) */
   CHECK(finished == 0);
   CHECK(elapsed >= (TStamp) opt->timeout * 1000);
   CHECK(count == 0); /* a timeout is reported as "does not resolve" */
@@ -702,8 +694,7 @@ static int dns_timeout_selftests(httrackp *opt) {
       return failures;
   }
 
-  /* A raised cancel flag ends the wait, so a stopped FTP worker can leave a
-     black-holed resolver (#1059). */
+  /* A raised cancel flag ends the wait for a stopped FTP worker (#1059). */
   {
     hts_boolean cancel = HTS_TRUE;
 

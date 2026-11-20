@@ -108,7 +108,7 @@ static int st_syscharset(httrackp *opt, int argc, char **argv) {
    back a path separator for it. */
 static int st_nobestfit(httrackp *opt, int argc, char **argv) {
 #ifdef _WIN32
-  /* not in htscharset.h; it ties cp below to cs by name */
+  /* this maps cs to cp by name and is not in htscharset.h */
   extern UINT hts_getCodepage(const char *name);
   static const char *const yen = "\xC2\xA5";      /* U+00A5 */
   static const char *const micro = "\xC2\xB5";    /* U+00B5, best-fit 83 CA */
@@ -132,8 +132,7 @@ static int st_nobestfit(httrackp *opt, int argc, char **argv) {
     printf("nobestfit: CP932 is not installed\n");
     return 77;
   }
-  /* left to itself, the codepage returns a path separator and reports no
-     substitution */
+  /* by default the codepage returns a path separator and reports nothing */
   wn = MultiByteToWideChar(CP_UTF8, 0, yen, (int) strlen(yen), wide,
                            (int) (sizeof(wide) / sizeof(wide[0])));
   assertf(wn == 1);
@@ -147,8 +146,7 @@ static int st_nobestfit(httrackp *opt, int argc, char **argv) {
   assertf(wn == 1);
   n = WideCharToMultiByte(cp, 0, wide, wn, raw, (int) sizeof(raw), NULL, NULL);
   assertf(n == 2);
-  /* Banning best-fit sizes for the substitute, so converting without the ban
-     needs more room than was sized. */
+  /* The ban sizes for the substitute, so a ban-less conversion overflows. */
   n = WideCharToMultiByte(cp, WC_NO_BEST_FIT_CHARS, wide, wn, NULL, 0, NULL,
                           NULL);
   assertf(n == 1);
@@ -181,8 +179,7 @@ static int st_nobestfit(httrackp *opt, int argc, char **argv) {
   assertf(s != NULL);
   assertf(s[0] == (char) cpi.DefaultChar[0] && s[1] == '\0');
   freet(s);
-  /* A wrong buffer size or a wrong flag gate changes the mixed string's
-     bytes. */
+  /* A wrong size or flag gate changes the mixed string's bytes. */
   s = hts_convertStringFromUTF8Strict(mixed, strlen(mixed), cs);
   assertf(s == NULL); /* yen and micro are both lossy */
   s = hts_convertStringFromUTF8(mixed, strlen(mixed), cs);
@@ -613,8 +610,7 @@ static int st_utf8_strict(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* unescapeEntities and unescapeUrl must reserve one byte of a 'max'-byte dest
-   for the trailing NUL. */
+/* The unescapers must keep one byte of a 'max'-byte dest for the NUL. */
 static int st_unescape_bounds(httrackp *opt, int argc, char **argv) {
   char dest[4];
 
@@ -698,8 +694,7 @@ static int st_unescape_form(httrackp *opt, int argc, char **argv) {
 
 /* escape_remove_control() compacts in place, so it has to terminate at the new
    end or the caller reads the compacted head plus the original tail (#974). */
-/* append_escape_*() passes on what is left of dest, which can equal
-   sizeof(void *) without being a caller mistake. */
+/* The room left in dest can equal sizeof(void *) without a caller bug. */
 static int st_escape_append_room(httrackp *opt, int argc, char **argv) {
   char buf[64];
   size_t room;
