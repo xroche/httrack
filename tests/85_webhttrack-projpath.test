@@ -13,8 +13,7 @@ htsserver_require
 base=$(mktemp -d)
 cleanup_push htsserver_cleanup_dir "${base}"
 
-# GET $1 into ${reply}, requiring status $2. Captured, not piped: a dead request
-# reads as marker-absent, and so do a truncated body and a 302 to the file.
+# GET $1 into ${reply} and require status $2, with no pipe to hide a failure.
 reply=
 fetch() {
     reply=$(htsserver_get "$1") || fail "the request for $1 failed"
@@ -35,9 +34,8 @@ echo "SECRETMARKER" >"${base}/secret.txt"
 mkdir -p "${base}/proj"
 echo "LOGMARKER" >"${base}/proj/hts-log.txt"
 
-# error_redirect is the branch that skipped the fsfile clearing, so fail the save
-# with a component over NAME_MAX (mkdir refuses it whatever the uid). Must precede
-# any successful save: commandEnd then swaps the error page for the finished one.
+# A component over NAME_MAX fails the save and reaches error_redirect. It must
+# run before any successful save, which changes the page commandEnd shows.
 htsserver_get /server/style.css >/dev/null # leaves a path behind in fsfile
 saved=$(htsserver_post "sid=${sid}&command=httrack&command_do=save&winprofile=x&path=${base}/$(printf '%0300d' 0)&projname=p")
 grep -q '^Location: /server/error.html' <<<"${saved}" ||
@@ -49,9 +47,7 @@ fetch /website/secret.txt 404
 grep -q SECRETMARKER <<<"${reply}" &&
     fail "a posted projpath served a file outside any project"
 
-# Positive control: step4's "save settings" flow registers the project without
-# crawling, and browsing its mirror keeps working. Without it the assertions
-# around it would pass on a server that never serves /website/ at all.
+# A save without a crawl must still let /website/ serve the mirror.
 body="sid=${sid}&command=httrack&command_do=save&winprofile=x"
 body="${body}&path=${base}&projname=proj&projpath=${base}/proj/"
 htsserver_post "${body}" >/dev/null
@@ -72,8 +68,7 @@ fetch /website/passwd 404
 grep -q '^root:' <<<"${reply}" &&
     fail "a posted projpath read an arbitrary system file"
 
-# A ".." anywhere in the recorded root would escape the mirror on every later
-# request, so the save must be refused and the previous root kept.
+# A ".." in the root must be refused, and the previous root kept.
 htsserver_post "sid=${sid}&command=httrack&command_do=save&winprofile=x&path=${base}/proj&projname=.." >/dev/null
 fetch /website/secret.txt 404
 grep -q SECRETMARKER <<<"${reply}" &&
@@ -82,8 +77,7 @@ fetch /website/hts-log.txt 200
 grep -q LOGMARKER <<<"${reply}" ||
     fail "rejecting the '..' root also lost the previous one"
 
-# The root is now the server's own, but it is still built from two posted
-# fields: 800-odd bytes of them used to be sprintf'd into a 1024-byte buffer.
+# 800-odd bytes of the two root fields must not overflow a 1024-byte buffer.
 seg=$(printf '%0200d' 0)
 longpath="${base}/${seg}/${seg}/${seg}/${seg}"
 fspath="${longpath}/proj"

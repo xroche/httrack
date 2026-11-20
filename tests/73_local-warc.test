@@ -1,14 +1,7 @@
 #!/bin/bash
 #
-# A --warc crawl writes a standards-conformant WARC/1.1 archive, and a re-crawl
-# of an unchanged (all-304) site emits revisit records. The stdlib validator (no
-# warcio) is the real gate: it byte-compares the fresh page.html response body
-# against what the server served, asserts the encoding headers were stripped and
-# the payload digest matches, then checks the second pass turned the unchanged
-# assets into revisits (no full response).
-#
-# That second pass archives under a name of its own, which is also the recovery
-# the engine points at when it refuses to strand a previous archive (#759).
+# A --warc crawl writes a valid WARC/1.1 archive, and an unchanged re-crawl
+# writes revisit records. The second pass uses its own name (#759).
 
 set -eu
 

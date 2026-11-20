@@ -72,9 +72,7 @@ save "${path}" x p >/dev/null
 htsserver_alive || fail "an unwritable init file crashed the server: $(<"${HTS_LOG}")"
 check_clipped "Unable to create the init file " "${path}/p"
 
-# The init file opens, then the write fails: the profile is past both stdio's
-# buffer, so fwrite() reaches the descriptor, and the server's file-size limit.
-# That last part is the host's to provide, and GNU/Hurd does not, so ask.
+# A large profile hits the file-size limit, which Hurd ignores, so probe first.
 if ! fsize_limit_binds; then
     echo "RLIMIT_FSIZE does not stop a write on this host, so the refused-write case cannot be built"
 else

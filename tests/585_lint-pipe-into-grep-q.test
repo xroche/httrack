@@ -54,8 +54,7 @@ while IFS= read -r f; do
     files+=("$top/$f")
 done < <(git -C "$top" ls-files \
     '*.sh' '*.test' bootstrap .githooks/pre-commit src/webhttrack.in '.github/workflows/*.yml')
-# A count cannot see a dropped glob, so pin the half that cannot shrink and name
-# the files no extension glob reaches (the shape ci.yml uses for the same list).
+# Pin the half of the count that cannot shrink, plus the files no glob reaches.
 test "${#files[@]}" -ge "$(git -C "$top" ls-files '*.sh' '*.test' | wc -l)" ||
     fail "the scan read only ${#files[@]} files"
 for must in .github/workflows/ci.yml bootstrap .githooks/pre-commit src/webhttrack.in; do

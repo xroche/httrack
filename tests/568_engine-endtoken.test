@@ -19,9 +19,8 @@ tok 20 'alternate stylesheet' '"alternate stylesheet">'
 tok 20 'alternate stylesheet' "'alternate stylesheet'>"
 tok 9 "it's here" '"it'"'"'s here">'
 tok 20 'alternate stylesheet' '   "alternate stylesheet">'
-# Leading whitespace is trimmed on both sides of the opening quote, and the two
-# runs below hold every byte of the class, not just the space a mutant would
-# keep. The batch path carries them raw; argv rewrites them to a space.
+# Whitespace is trimmed on both sides of the opening quote. The runs hold every
+# byte of the class, because a mutant could trim only the space.
 WSRUN=$(printf '\011\013\014\015\012 ')
 tok 20 'alternate stylesheet' "${WSRUN}\"alternate stylesheet\">"
 tok 20 'alternate stylesheet' "\"${WSRUN}alternate stylesheet\">"

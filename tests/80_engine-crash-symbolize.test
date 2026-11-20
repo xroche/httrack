@@ -47,9 +47,8 @@ grep -q "$rawframe" "$out" ||
 build_names_frames || skip "built without <spawn.h>, so frames stay module+offset"
 command -v addr2line >/dev/null || skip "addr2line not installed"
 
-# Control: resolve the same frames ourselves, so a stripped build cannot turn
-# the assertion below into a vacuous pass. Second form: glibc drops the "+0x"
-# when the load bias is zero, and the bracketed address is then the file one.
+# Resolve the frames ourselves, so a stripped build cannot pass the check.
+# With a zero load bias, glibc shows the file offset with no "+0x".
 oracle="${tmpdir}/oracle"
 frames="${tmpdir}/frames"
 sed -n -e 's/^\([^(]*\)(+\(0x[0-9a-f]*\)).*$/\1 \2/p' \
@@ -65,8 +64,7 @@ while read -r mod off; do
     addr2line -Cfip -e "$mod" "$off" 2>/dev/null >>"$oracle" || true
 done <"$frames"
 if ! grep -qE 'st_strsafe|strcpy_safe_' "$oracle"; then
-    # Which stage came up empty, because the skip alone names no suspect and
-    # this is the form the emulated s390x leg has been reporting.
+    # Say which stage came up empty, because the skip alone names no suspect.
     echo "parsed $(wc -l <"$frames") frames, resolved ${resolved} of them to a file" >&2
     dump_file "$out"
     dump_file "$oracle"
@@ -78,9 +76,8 @@ if ! grep -qE 'st_strsafe|strcpy_safe_' "$oracle"; then
     skip "addr2line names no hidden symbol in this build"
 fi
 
-# The payload. Dropping the raw frames first is what makes it specific: both
-# names are static, so .dynsym could never have carried them. Not anchored on
-# the "0xOFF:" line, the inline chain puts the name on either half.
+# Drop raw frames first, because .dynsym never holds these static names. The
+# inline chain puts the name on either half, so the match is unanchored.
 symbolized=$(grep -v "$rawframe" "$out" || true)
 grep -qE 'st_strsafe|strcpy_safe_' <<<"$symbolized" ||
     fail_dump "the handler did not name the hidden frames:" "$out"

@@ -1,10 +1,6 @@
 #!/bin/bash
 #
-# The same keep/replace rule under --warc-max-size, where the archive is several
-# segments: a cache-served pass must leave every one alone, a cacheless pass must
-# swap every one in. Half a swap is the corruption one rename loop can produce,
-# and only a rotated archive exposes it (#759). --archive-min-files pins the two
-# segments plus the .cdx, so a shrinking crawl cannot quietly stop rotating.
+# A cache-served pass keeps every segment and a cacheless one swaps all (#759).
 
 set -eu
 

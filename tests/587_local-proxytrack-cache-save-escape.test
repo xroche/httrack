@@ -1,8 +1,5 @@
 #!/bin/bash
-# A ProxyTrack store is someone else's file, and the save name it holds is
-# joined to the store's own directory. That directory is empty whenever the
-# store was named with no parent, so an absolute save name was opened verbatim
-# and its bytes went into the archive.
+# An absolute save name in a ProxyTrack store must not reach the archive.
 
 set -euo pipefail
 
@@ -81,9 +78,7 @@ with open(os.path.join(store, "hostile.ndx"), "wb") as f:
 EOF
 }
 
-# --convert reads every entry with FETCH_BODY, so it opens the save name and
-# copies what it finds. Naming the store relatively is what leaves the joined
-# root empty.
+# Naming the store relatively leaves the joined root empty.
 convert() {
     (
         cd "$1" || exit 1
@@ -97,8 +92,7 @@ secret=$(cat "$dir/secret.txt")
 abs=$(nativepath "$dir/secret.txt")
 nsecret=$abs
 
-# The narrowing control first: a contained relative name must be served, or
-# every refusal below would pass on a reader that stopped reading bodies.
+# A contained name must be served, which proves the reader still reads bodies.
 mkdir -p "$dir/ok/example.com"
 printf 'INSIDE-THE-STORE-%s\n' "$$" >"$dir/ok/example.com/p.html"
 inside=$(cat "$dir/ok/example.com/p.html")
@@ -115,9 +109,7 @@ test -s "$dir/esc/out.arc" || fail "no archive was written for the escape"
 if grep -qaF -- "$secret" "$dir/esc/out.arc"; then
     fail "an absolute save name read a file outside the store"
 fi
-# The record must be PARSED and then refused by the guard this case is for:
-# one the reader could not read at all would leave the archive equally free of
-# the secret, and three different guards can refuse a name.
+# The refusal must come from this guard, because three guards can refuse a name.
 grep -qaF 'holds no path to reduce' "$dir/log" ||
     fail "the escape was not refused by the fallback: $(cat "$dir/log")"
 if grep -qaF 'Truncated or corrupt cache record' "$dir/log"; then
@@ -150,9 +142,8 @@ subshell_ok $?
 grep -qaF 'does not fit under the store root' "$dir/log" ||
     fail "a clipped join was not refused: $(cat "$dir/log")"
 
-# A contained name first marks the store safe, and the sticky flag then sends
-# an absolute one down a different join than the fallback above. The reader
-# walks the entries in .ndx order, so the contained one has to come first.
+# A contained name marks the store safe, which sends a later absolute name down
+# another join. Entries are read in .ndx order, so it comes first.
 mkdir -p "$dir/sticky/example.com"
 cp "$dir/ok/example.com/p.html" "$dir/sticky/example.com/p.html"
 make_store "$dir/sticky" \
@@ -167,8 +158,7 @@ grep -qaF 'is not a contained relative name' "$dir/log" ||
 grep -qaF -- "$inside" "$dir/sticky/out.arc" ||
     fail "the refusal cost the contained entry its body: $(cat "$dir/log")"
 
-# The host guess on the first absolute name sets fixedPath, which then reduces
-# a second name whose host the guess cannot find.
+# The host guessed from the first absolute name must also reduce a second one.
 mkdir -p "$dir/fixed/example.com" "$dir/fixed/other.org"
 cp "$dir/ok/example.com/p.html" "$dir/fixed/example.com/p.html"
 printf 'REDUCED-BY-FIXEDPATH-%s\n' "$$" >"$dir/fixed/other.org/q.html"

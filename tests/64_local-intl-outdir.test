@@ -1,10 +1,6 @@
 #!/bin/bash
 #
-# A non-ASCII -O output dir must receive the mirror, not a double-encoded twin
-# (#621). argv is UTF-8 on Windows, so path_html was re-encoded as if it were
-# the ANSI codepage, prefixing every saved file with a mangled directory. Only
-# path_html is the non-ASCII "café"; path_log stays ASCII so the harness reads
-# hts-log.txt/hts-cache normally and this isolates the -O encoding path.
+# A non-ASCII -O dir must receive the mirror, not an ANSI-mangled twin (#621).
 
 : "${top_srcdir:=..}"
 

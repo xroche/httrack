@@ -1,11 +1,6 @@
 #!/bin/bash
 #
-# An <applet> or robots <meta> tag with no '>' and many code= or name=
-# attributes was rescanned to the end of the page once per attribute
-# (OSS-Fuzz 578272899). So were an http-equiv <meta> with no '>', a '>' in a
-# comment with no "-->" and an unclosed CSS url(. Each hostile page is crawled
-# beside a well-formed twin of its size, and must take about as long, so the
-# test does not depend on the host speed.
+# A hostile tag must crawl as fast as its well-formed twin (OSS-Fuzz 578272899).
 
 # TEST_TIMEOUT_AT_LEAST: 900
 
