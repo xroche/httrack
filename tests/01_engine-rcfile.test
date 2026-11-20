@@ -1,14 +1,7 @@
 #!/bin/bash
 #
 
-# Config-file alias loading (no network). A .httrackrc in the working directory
-# is read by optinclude_file(), whose cmdl_ins() inserts each alias-expanded
-# token into the token block. Two properties are checked:
-#   1. No truncation: a long user-agent alias reaches doit.log intact.
-#      user-agent expands to two tokens (-F <value>), so it exercises both
-#      cmdl_ins insertions.
-#   2. The block grows: an rc file whose expansions outrun the first chunk many
-#      times over is read to the end, and its tokens still reach doit.log.
+# A long alias and a many-chunk .httrackrc must both reach doit.log whole.
 
 # set -e with the intentional-nonzero httrack runs guarded explicitly (their
 # status is inspected by hand).
@@ -85,9 +78,7 @@ test "$rc" -eq 0 || {
     exit 1
 }
 assert_file "$d2/hts-cache/doit.log" "no doit.log, so the rc file was not processed"
-# Clipping a token to the room left, instead of growing, would keep both
-# markers: only the tokens straddling a chunk boundary lose bytes. Line 1 alone
-# is the command line, so the prose below it cannot answer for a token.
+# Only line 1 is the command line. Markers alone would miss a clipped token.
 short=$(sed -n '1p' "$d2/hts-cache/doit.log" | tr ' ' '\n' |
     awk -v n="${#val}" '/^a+$/ && length($0) != n {c++} END {print c + 0}')
 test "$short" -eq 0 || fail "$short user-agent value(s) reached doit.log clipped"

@@ -33,7 +33,7 @@ test "$out" = "crashannounce self-test OK" ||
     fail_dump "the log channel said [$out]:" "$tmp/err"
 grep -q '^\*\* crash announce 42$' "$tmp/err" ||
     fail_dump "the marker did not reach stderr:" "$tmp/err"
-# Terminated, or the marker runs into whatever stderr writes next.
+# An unterminated marker runs into whatever stderr writes next.
 test -z "$(tail -c 1 "$tmp/err")" ||
     fail_dump "the stderr marker ends without a newline:" "$tmp/err"
 

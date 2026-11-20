@@ -1,9 +1,6 @@
 #!/bin/bash
 #
-# FTP resumed with REST whenever the mirrored file merely existed, so an
-# --update over a complete copy spliced the old body into the new one and the
-# result matched the remote length (#798). Pass 1 is cut short to leave a real
-# partial, pass 2 must still resume it, pass 3 must not.
+# An --update over a complete copy must not REST-resume and splice (#798).
 
 set -euo pipefail
 
