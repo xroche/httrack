@@ -354,7 +354,7 @@ if ! target_is_windows && test -r /proc/self/stat; then
             fail "no-ps engine list lost emulated pid $emul"
         ! grep -qx "$outside" <<<"$engines" ||
             fail "no-ps engine list reached outside the group (pid $outside)"
-        # A platform with no stack mechanism must say so. Only Hurd lacks one.
+        # A platform with no stack mechanism must say so. A uname shim fakes GNU, which no CI leg is.
         # shellcheck disable=SC2016 # the shim reads them, not us
         printf '#!/bin/sh\ncase "$1" in -s) echo GNU;; *) exec %s "$@";; esac\n' \
             "$(command -v uname)" >"$tmp/nops/uname"
