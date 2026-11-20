@@ -1,14 +1,11 @@
 #!/bin/bash
 #
-# Every exported call must be declared exactly once, in a header the install
-# carries. Two things break that, and one scan finds both. A call two headers
-# declare has two signatures that nothing keeps in step, so an embedder can
-# compile against one while the engine uses the other (#1663). A call only an
-# uninstalled header declares is a symbol the linker reaches and the compiler
-# cannot see, so the embedder writes the prototype by hand (#1713). Each list
-# below may only shrink. The scan reads HTSEXT_API and HTSNET_API. It does not
-# read COUCAL_EXTERN, which exports 36 coucal_* calls from an uninstalled
-# header, because that surface belongs to the vendored xroche/coucal.
+# Every exported call must be declared exactly once, in an installed header.
+# A call two headers declare has two signatures nothing keeps in step (#1663).
+# A call only an uninstalled header declares makes embedders write the
+# prototype by hand (#1713). Each list below may only shrink. The scan reads
+# HTSEXT_API and HTSNET_API but not COUCAL_EXTERN, whose surface belongs to the
+# vendored xroche/coucal.
 
 set -euo pipefail
 

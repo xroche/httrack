@@ -74,7 +74,7 @@ blob_size() { # blob_size <out>
 
 # --- #1052: --retries=0 must still recover -----------------------------------
 # The restart is the same transfer asked for differently, so it must not be
-# charged to the retry budget. Before the fix this deleted the file.
+# charged to the retry budget.
 printf '[--retries=0 recovers the whole file] ..\t'
 out="${tmpdir}/retry0"
 mkdir "$out"
@@ -115,10 +115,9 @@ test "$restarts" -eq 1 || fail "${restarts} free restarts, expected exactly 1 (l
 echo "OK (1 free restart, then bounded)"
 
 # --- the latch rides a re-record, and the budget survives the restart --------
-# A redirect to a case-different alias re-records the link under a new heap
-# entry; a latch left behind there buys a free restart every hop, so this
-# server (206, redirect, 206, ...) never ends. --retries=1 also shows the free
-# restart left the budget for the genuine failure that follows.
+# A redirect to a case-different alias re-records the link under a new entry.
+# A latch left there buys a free restart every hop, and this server never ends.
+# --retries=1 also checks the budget survives for the real failure after.
 printf '[alias redirect cannot reset the latch] ..\t'
 out="${tmpdir}/alias"
 mkdir "$out"

@@ -1,10 +1,9 @@
 #!/bin/bash
 #
 # xml:base sets the base of later relative links in a feed, as <base href>
-# does, but not in HTML, where browsers ignore it. It is never fetched, and is
-# written out empty so the saved file resolves its rewritten links against
-# itself. An empty base is left as it is, and an unquoted one keeps the '>',
-# and a fragment in the value is dropped with it.
+# does, but browsers ignore it in HTML. It is never fetched, and is written out
+# empty so the saved file resolves links against itself. An empty base stays,
+# an unquoted one keeps the '>', and a fragment in the value is dropped.
 
 set -euo pipefail
 

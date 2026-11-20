@@ -1,8 +1,8 @@
 #!/bin/bash
 #
-# The credentials an URL carries must reach the control channel whole: a clip
-# logged in as a different account (#1032). The engine test only ever probes a
-# dead port, so nothing there reads what the login actually sends.
+# The credentials an URL carries must reach the control channel whole, since a
+# clip logs in as another account (#1032). The engine test only probes a dead
+# port.
 
 set -euo pipefail
 

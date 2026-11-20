@@ -1,10 +1,9 @@
 #!/bin/bash
 #
-# The online crawl gates must resolve their helper scripts against the script's
-# own directory: an out-of-tree build tree holds no copy, so a bare relative
-# path fails to open and the tests skip claiming the network is unavailable
-# (#1016). Everything here runs from an unrelated directory with the flag off,
-# so it never touches the network.
+# The online crawl gates must resolve helper scripts against their own
+# directory, because an out-of-tree build holds no copy and the tests would skip
+# as offline (#1016). Everything runs from an unrelated directory with the flag
+# off, so the network is never touched.
 
 set -euo pipefail
 
@@ -55,9 +54,8 @@ test "$rc" -eq 0 || fail "check-network.sh exited $rc with the flag on, expected
 
 ## no helper anywhere in tests/ is invoked through the caller's cwd
 #
-# The gate above cannot see this class: with the flag off check-network.sh exits
-# before a test's own crawl-test.sh line is ever reached, so the sweep is the
-# only thing standing between #1016 and a rerun of it.
+# The gate above cannot see this class, because with the flag off
+# check-network.sh exits before a test's crawl-test.sh line runs (#1016).
 
 # An invocation is safe when its operand resolves the same from any cwd: an
 # absolute path, or one built from a variable holding a directory. Quotes and a
@@ -100,9 +98,8 @@ sweep() {
         command grep -qxF "${file##*/} $script" <<<"$allowed" || echo "cwd-relative: $hit"
     done < <(code_lines "$literal_re" "$@")
 
-    # A variable operand is only as good as what it holds, so resolve it: an
-    # assignment that is not itself anchored, or that cannot be found in the
-    # file at all, is reported rather than assumed innocent.
+    # Resolve a variable operand. An assignment that is not itself anchored, or
+    # that cannot be found in the file, is reported.
     while IFS= read -r hit; do
         test -n "$hit" || continue
         file=${hit%%:*}

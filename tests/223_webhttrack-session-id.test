@@ -17,9 +17,9 @@ launch() { # $1 = tag, $2 = port; leaves the URL in ${HTS_URL}
     htsserver_start --port "$2" --home "${work}/$1" --log "${work}/$1.log"
 }
 
-# Both servers have to read the same second off the clock, or the id they used
-# to derive from it would differ for a reason that is not entropy. Launching
-# just after a tick leaves a whole second to get there; the bracket confirms it.
+# Both servers start in the same clock second, so ids derived from the clock
+# alone would match. Launching just after a tick leaves a whole second for
+# that, and the bracket checks it.
 urla=
 urlb=
 lost=0

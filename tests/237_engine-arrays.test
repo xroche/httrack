@@ -18,7 +18,7 @@ run_bounded() {
     if command -v timeout >/dev/null; then timeout 60 "$@"; else "$@"; fi
 }
 
-# Room whose byte size cannot fit a size_t: capa*width used to wrap short.
+# Room whose capa*width overflows a size_t.
 err=$(run_bounded httrack -#test=arrays overflow-capa 2>&1) || true
 case "$err" in
 *"arrays: NOT aborted"*)
@@ -32,9 +32,8 @@ case "$err" in
     ;;
 esac
 
-# Room of SIZE_MAX: doubling used to wrap the capacity to 0 and spin forever,
-# and the allocation it ends on used to abort the process instead of letting
-# the caller fail just the page it was building.
+# Room of SIZE_MAX. Doubling must not wrap the capacity to 0, and the failed
+# allocation must fail just the page instead of aborting the process.
 # ASan kills the process on an over-large request unless told to return NULL.
 err=$(ASAN_OPTIONS="${ASAN_OPTIONS-}${ASAN_OPTIONS:+:}allocator_may_return_null=1" \
     run_bounded httrack -O /dev/null -#test=arrays overflow-loop 2>&1) || true

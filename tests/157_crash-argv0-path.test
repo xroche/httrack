@@ -27,8 +27,8 @@ build_names_frames || skip "built without <spawn.h>, so frames stay module+offse
 work=$(mktemp -d "${TMPDIR:-/tmp}/httrack_argv0.XXXXXX") || exit 1
 cleanup_push rm -rf "${work}"
 
-# The installed ELF, not the build tree's libtool wrapper: the wrapper re-execs
-# its binary by absolute path, which is the argv[0] this test must not have.
+# Run the installed ELF because the libtool wrapper re-execs its binary by an
+# absolute path, the argv[0] this test must not have.
 stage=${work}/stage
 stage_install_exec "${stage}" "${work}/install.log" ||
     fail "make install-exec DESTDIR=${stage}"

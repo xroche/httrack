@@ -1,9 +1,8 @@
 #!/bin/bash
 #
-# A %0d%0a in an FTP URL decoded into a command line of its own (#1010). The
-# run has to end on an error: send_line() alone drops the command and leaves
-# the engine on a 300s read. A bare listing argument had the same shape, a
-# space in it giving the server a second token.
+# A %0d%0a in an FTP URL must not decode into its own command line (#1010), and
+# a space in a listing argument must not give the server a second token. The run
+# must end on an error, since send_line() alone leaves a 300s read.
 
 set -euo pipefail
 

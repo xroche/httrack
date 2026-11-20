@@ -1,8 +1,8 @@
 #!/bin/bash
 #
-# --assume under the default delayed type check (-%N2), issue #56. A user type
-# pinned with --assume must be honored immediately, not lost to the delayed
-# name: photo.png served as image/png but assumed text/html is saved as .html.
+# --assume under the default delayed type check (-%N2), issue #56. A type pinned
+# with --assume applies at once, so photo.png served as image/png but assumed
+# text/html is saved as .html.
 
 : "${top_srcdir:=..}"
 

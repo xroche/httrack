@@ -66,8 +66,8 @@ until test -s "$log" && grep -aq "FTP: connecting to ${blackhole}:" "$log"; do
     poll_wait 1
 done
 
-# Nothing bounds this run, so a crawl that ended by itself never reached the
-# wait under test: an engine failing the connect outright would pass below.
+# Nothing bounds this run, so a crawl that ends by itself never reached the
+# wait. Otherwise an engine failing the connect at once would pass below.
 sleep 5
 kill -0 "$crawlpid" 2>/dev/null ||
     fail "the crawl ended on its own, so ^C is not what stopped it"

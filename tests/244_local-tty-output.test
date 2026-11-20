@@ -72,7 +72,7 @@ crawl v1 --quiet -%v1
 ran "-%v1" v1
 expect "-%v1 into a pipe writes no escape" "$(count v1 "$esc")" eq 0 v1
 expect "-%v1 into a pipe writes no CR" "$(count v1 "$cr")" eq 0 v1
-# Teeth: the completion lines must actually be there, each ending its own line.
+# The completion lines must be there, each ending its own line.
 expect "-%v1 keeps one line per file" "$(count v1 ' - OK$')" ge 2 v1
 
 crawl v2 --quiet -%v2
@@ -80,9 +80,8 @@ ran "-%v2" v2
 expect "-%v2 into a pipe writes no escape" "$(count v2 "$esc")" eq 0 v2
 expect "-%v2 into a pipe writes no CR" "$(count v2 "$cr")" eq 0 v2
 
-# The spinner is the default display. POSIX forces quiet off a tty and silences
-# it there anyway, so only Windows, which never probed the terminal, reaches the
-# gate this asserts.
+# The spinner is the default display. Only Windows reaches the gate this
+# asserts, because POSIX forces quiet off a tty.
 crawl v0 -%v0
 ran "-%v0" v0
 expect "the spinner writes no CR into a pipe" "$(count v0 "$cr")" eq 0 v0

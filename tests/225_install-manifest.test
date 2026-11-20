@@ -34,9 +34,8 @@ stage=${work}/stage
 stage_install_target install "${stage}" "${work}/install.log" . ||
     fail "make install DESTDIR=${stage}"
 
-# Fold the configured directories back to tokens so the pin survives any --prefix
-# or --libdir. Longest path first, so a nested directory beats the one it sits in
-# whatever the layout puts where.
+# Fold the configured directories back to tokens so the pin survives any
+# --prefix or --libdir. Longest path first, so a nested directory wins.
 : >"${work}/dirs"
 for var in DOCDIR HTMLDIR MANDIR INCLUDEDIR LIBDIR BINDIR DATADIR; do
     name=CONFIGURED_${var}
@@ -79,7 +78,7 @@ fold() {
         -e 's|\(\.so\.[0-9][0-9]*\)\.[0-9][0-9]*\.[0-9][0-9]*$|\1.@revision@|' |
     LC_ALL=C sort >"${work}/actual"
 
-# An install that staged nothing matches nothing; say that, not a 300-line diff.
+# Report an empty install plainly instead of as a 300-line diff.
 grep -qx '@BINDIR@/httrack' "${work}/actual" || fail "nothing staged under ${stage}"
 
 # Named one by one, not by their directory: dropping all of @LIBDIR@/httrack

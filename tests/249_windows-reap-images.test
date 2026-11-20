@@ -119,11 +119,11 @@ grep -q 'proxytrack.exe' <<<"$out" || fail "the leftover proxytrack was not name
 for e in $ENGINE_EXES; do
     grep -qxF "/F /IM $e.exe" "$tmp/killed" || fail "reap_leftover_processes leaves $e.exe running"
 done
-# Deliberately spared: the runner may run a python.exe of its own, and tasklist
-# cannot tell it from a leaked fixture server.
+# Spared because the runner may run its own python.exe, which tasklist cannot
+# tell from a leaked fixture server.
 if grep -qxF '/F /IM python.exe' "$tmp/killed"; then fail "the reap killed an unrelated python.exe"; fi
 
-# Near misses, not an idle host, are what a widened image matcher lets through.
+# Near misses are what a widened image matcher lets through.
 tasklist() {
     printf 'System Idle Process              0 Services\n'
     printf 'notepad-httrack-notes.exe      77 Console\n'
@@ -143,9 +143,9 @@ grep -q 'htsserver.exe' <<<"$out" || fail "the stray listing dropped an engine: 
 grep -q 'python.exe' <<<"$out" || fail "the stray listing dropped python: $out"
 if grep -q 'trackpad' <<<"$out"; then fail "the stray listing caught an unrelated process: $out"; fi
 
-# The bug was a second engine list drifting from the first, so fail on any name
-# still written by hand inside a taskkill or a process-matching grep. Both files
-# must be readable, or the sweep below is a silent pass over nothing.
+# Fail on any engine name still written by hand inside a taskkill or a
+# process-matching grep. Both files must be readable, or the sweep checks
+# nothing.
 for f in testlib.sh proclib.sh; do
     test -r "$top_srcdir/tests/$f" || fail "no $f to sweep for hand-written engine names"
 done

@@ -49,9 +49,8 @@ build_arc "$dir/legacy.arc" 10
 test "$(convert "$dir/legacy.arc" "$dir/c.arc")" = 1 ||
     fail "an archive whose length counts the blank line no longer loads"
 
-# And the blank line must stay outside the declared length, or a proxytrack
-# predating the fix reads nothing from what we now write. Two newlines exactly:
-# a third would put the record out of its reach again.
+# Exactly two newlines go outside the declared length, because an older
+# proxytrack reads nothing otherwise and a third puts the record out of reach.
 hdrlen=$(head -1 "$dir/a.arc" | wc -c)
 declared=$(head -1 "$dir/a.arc" | awk '{print $NF}')
 # od seeks for itself: piping the archive into `head -c` leaves the writer with
@@ -63,7 +62,7 @@ test "$sep" = '\n\nh' || fail "version block ends on '$sep', expected two newlin
 inner=$(od -An -c -j $((hdrlen + declared - 2)) -N 2 "$dir/a.arc" | tr -d ' ')
 test "$inner" != '\n\n' || fail "declared length still counts the blank line"
 
-# An empty archive is not a corrupt one...
+# An empty archive must load.
 {
     printf 'filedesc://t.arc 0.0.0.0 %s text/plain 200 - - 0 t.arc 9\n' "$ARC_DATE"
     printf '2 0 test\n'

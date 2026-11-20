@@ -1,10 +1,9 @@
 #!/bin/bash
 #
-# Content-Type vs URL-extension naming (#267 family, default -%N2). A MISSING
-# type keeps a specific non-HTML ext; a DECLARED disagreeing type is trusted
-# unless magic bytes prove the ext right (lie/wrongtype/packed keep theirs),
-# so a real HTML body (report.pdf) still becomes .html. Wrong names are
-# asserted absent so a regression in either direction fails.
+# Content-Type vs URL-extension naming (#267 family, default -%N2). A missing
+# type keeps a specific non-HTML extension. A declared type that disagrees wins
+# unless magic bytes prove the extension right (lie/wrongtype/packed), so a real
+# HTML body (report.pdf) becomes .html. Wrong names are asserted absent.
 
 : "${top_srcdir:=..}"
 
