@@ -934,7 +934,8 @@ fi
 ### What libhttrack.pc tells a consumer about its private dependencies
 # Only a dependency's own .pc orders a static link right, so name the module
 # wherever one is installed. Keep dependents first, because pkg-config emits
-# Requires.private after Libs.private.
+# Requires.private after Libs.private. Without pkg-config all deps go to
+# Libs.private, so the installed .pc depends on the builder.
 AC_ARG_VAR([PKG_CONFIG], [path to the pkg-config utility])
 AC_PATH_TOOL([PKG_CONFIG], [pkg-config], [false])
 PKGCONFIG_REQUIRES_PRIVATE=

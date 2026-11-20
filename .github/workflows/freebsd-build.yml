@@ -1,4 +1,4 @@
-# This is our only BSD libc build (#1487). It blocks nothing, and the VM is
+# This is our only FreeBSD build (#1487). It blocks nothing, and the VM is
 # amd64, so linux-i386 stays our only 32-bit leg.
 name: freebsd build canary
 
