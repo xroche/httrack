@@ -204,8 +204,8 @@ static void exit_wait_thread(void *arg) {
   hts_mutexrelease(&exit_wait_lock);
 }
 
-/* Bounded by --max-time plus a grace, because a stuck getaddrinfo() never
-   returns. HTS_FALSE when threads were left running, so opt must stay. */
+/* Waits up to --max-time plus a grace, as a stuck getaddrinfo() never
+   returns. Returns HTS_FALSE if threads still run, and then opt must stay. */
 static hts_boolean exit_wait_threads(const httrackp *opt) {
   TStamp left, deadline;
 
@@ -233,10 +233,8 @@ static hts_boolean exit_wait_threads(const httrackp *opt) {
 }
 
 #ifdef _WIN32
-/* Windows opens stdout in text mode, so every \n leaves as \r\n. A shell
-   reading that pipe sees the CR: MSYS folds it away, a Linux one under WSL2
-   does not, and the test suite then compares against a byte it never wrote.
-   Set by tests/ci-windows-suite.sh, so nothing changes for anyone else. */
+/* Windows writes \n as \r\n on a text-mode stdout, and a WSL2 shell keeps
+   the CR. Only tests/ci-windows-suite.sh sets HTS_BINARY_STDIO. */
 static void hts_binary_stdio(void) {
   if (getenv("HTS_BINARY_STDIO") != NULL) {
     _setmode(_fileno(stdout), _O_BINARY);
@@ -554,8 +552,8 @@ static const char *__cdecl htsshow_query3(t_hts_callbackarg * carg,
     printf(">> ");
     io_flush;
     linput(stdin, line, 200);
-    /* linput() reports neither EOF nor a read error, so an unanswerable prompt
-       would spin here; a closed stdin sets only ferror */
+    /* linput() hides EOF and read errors (a closed stdin sets only ferror).
+       Check the stream, or this prompt loops forever. */
     if (!strnotempty(line) && (feof(stdin) || ferror(stdin)))
       strcpybuff(line, "*"); /* refuse this link and ask nothing more */
   } while(!strnotempty(line));
@@ -600,10 +598,9 @@ static int linput(FILE * fp, char *s, int max) {
 
 // Signal handlers (SIGHUP & co, Unix)
 //
-/* A handler may only write(), and may only touch a volatile sig_atomic_t: both
-   printf and hts_log_print take a lock and allocate, so a signal arriving
-   while the interrupted thread holds the stdout lock deadlocks. Each one also
-   puts errno back, because the interrupted code was about to read it. */
+/* A handler may only call write() and touch a volatile sig_atomic_t, because
+   printf and hts_log_print take locks the interrupted thread may hold. Each
+   handler also restores errno for the interrupted code. */
 #define SIG_FD_OUT 1
 #define SIG_FD_ERR 2
 
@@ -614,7 +611,7 @@ static void sig_print(int fd, const char *msg, size_t len) {
 
 #define SIG_PRINT(fd, lit) sig_print((fd), (lit), sizeof(lit) - 1)
 
-/* "<prefix><code>)\n", the shape the two handlers below used to printf. */
+/* Writes "<prefix><code>)\n" without printf. */
 static void sig_print_code(int fd, const char *prefix, size_t len, int code) {
   char buffer[256];
   unsigned int size;
@@ -637,8 +634,8 @@ static void sig_ignore(int code) { // ignore the signal
 
 static void sig_term(int code) { // quit at once (never returns)
   SIG_PRINT_CODE(SIG_FD_ERR, "\nProgram terminated (signal ", code);
-  /* _exit, not exit: exit() runs OpenSSL's atexit teardown here, whose free
-     can deadlock on the malloc lock the interrupted thread holds. */
+  /* exit() would run OpenSSL's atexit teardown, whose free() can deadlock on
+     the malloc lock the interrupted thread holds. */
   _exit(0);
 }
 

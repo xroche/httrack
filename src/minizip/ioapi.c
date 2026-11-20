@@ -71,8 +71,7 @@ ZPOS64_T call_ztell64 (const zlib_filefunc64_32_def* pfilefunc, voidpf filestrea
 
 int call_ztruncate64(const zlib_filefunc64_32_def *pfilefunc, voidpf filestream,
                      ZPOS64_T size) {
-  /* a backend with no truncate keeps its tail: better than failing a rollback
-     the caller has already performed, but the caller has to hear about it */
+  /* Without truncate the tail stays, and 1 warns the caller without failing */
   if (pfilefunc->zfile_func64.ztruncate64_file == NULL)
     return 1;
   /* a backend may report failure as an errno rather than -1 (_chsize_s) */
