@@ -1307,7 +1307,7 @@ static int st_warc_teardown_case(httrackp *opt, const char *name,
   (void) UNLINK(fconv(catbuff, sizeof(catbuff), tmp));
   StringCopy(opt->warc_file, path);
 
-  /* this test reuses the dispatcher's opt, unlike the engine */
+  /* the dispatcher's opt is reused, so reset it as hts_create_opt() would */
   opt->state.warc = NULL;
   st_warc_emit(opt, run1);
   warc_close_opt(opt);

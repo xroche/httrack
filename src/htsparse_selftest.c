@@ -1868,7 +1868,8 @@ static int st_sitemap(httrackp *opt, int argc, char **argv) {
     freet(big);
   }
 
-  /* Deflate tops out near 1032:1, so neither cap stops this document. */
+  /* Deflate tops out near 1032:1, so neither the 4096:1 budget nor the 64 MiB
+     cap binds and this tests only the decompression path. */
   {
     const char *const one = "<url><loc>http://h.test/bomb</loc></url>";
     const size_t reps = 40000;
