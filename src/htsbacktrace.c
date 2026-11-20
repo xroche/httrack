@@ -379,7 +379,7 @@ void hts_backtrace_altstack_release(void *stack) {
 unsigned int hts_print_num(char *buffer, int num) {
   const int neg = num < 0;
   /* negate in unsigned: INT_MIN has no positive counterpart */
-  unsigned int val = neg ? -(unsigned int) num : (unsigned int) num;
+  unsigned int val = neg ? 0u - (unsigned int) num : (unsigned int) num;
   unsigned int i, j;
 
   if (neg) {
