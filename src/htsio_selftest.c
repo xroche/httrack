@@ -1283,7 +1283,8 @@ static int st_longpath(httrackp *opt, int argc, char **argv) {
 }
 
 // -#test=mirrorio <dir>: round-trip a file through a long AND non-ASCII path
-// via fexist/fsize_utf8, FOPEN/RENAME/UNLINK and hts_rmdir_utf8 (#133, #630).
+// via fexist_utf8/fsize_utf8, FOPEN/RENAME/UNLINK and hts_rmdir_utf8
+// (#133, #630).
 static int st_mirrorio(httrackp *opt, int argc, char **argv) {
   char path[HTS_URLMAXSIZE * 2];
   size_t base = 0;
@@ -1588,8 +1589,9 @@ static int st_refetchbackup(httrackp *opt, int argc, char **argv) {
     err++;
   }
 
-  /* #775: filecreate() failed, so the commit must report failure. Otherwise the caller
-     caches the response against the old body, and --update pins it by 304. */
+  /* #775: filecreate() failed, so the commit must report failure. Otherwise
+     the caller caches the response against the old body, and --update pins it
+     by 304. */
   (void) UNLINK(back->url_sav);
   if (back_finalize_backup(opt, back, HTS_TRUE)) {
     fprintf(stderr, "refetchbackup: a commit that restored reported success\n");

@@ -99,8 +99,8 @@ skip_if_static() {
     test -r "$lib" || test -r "${lib%.so}.dylib" || skip "static build: $*"
 }
 
-# Does RLIMIT_FSIZE stop a write here? GNU/Hurd ignores it, and only the bytes
-# on disk tell, because only an enforcing host kills the writer with SIGXFSZ.
+# Does RLIMIT_FSIZE stop a write here? GNU/Hurd ignores it. The probe writes
+# 64 KB under a 1 KB cap, so the file stays short only where the cap holds.
 fsize_limit_binds() {
     local probe got
     # A failure here must not read as "the host does not enforce it", which
@@ -270,8 +270,6 @@ selftest_queue_mode() { # selftest_queue_mode exact|lines|tail|head WANT NAME [A
     }
 }
 
-# Run every queued case and assert each. Args go on stdin, because the engine
-# parses argv first and would take a case's '-*' as a filter.
 # Write the queued arguments NUL-separated for -#test=batch. Under wsl2 their
 # drvfs paths are translated here, because the shim never sees this file.
 selftest_write_argv() {
@@ -289,6 +287,8 @@ selftest_write_argv() {
     done
 }
 
+# Run every queued case and assert each. Args go on stdin, because the engine
+# parses argv first and would take a case's '-*' as a filter.
 selftest_run_queued() {
     local n=${#SELFTEST_WANT[@]} out rest got want rc=0 i
     test "$n" -gt 0 || return 0

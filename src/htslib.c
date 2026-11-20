@@ -2532,7 +2532,7 @@ hts_boolean hts_socket_is_mptcp(T_SOC soc) {
 }
 
 void hts_mptcp_account(httrackp *opt, T_SOC soc) {
-  /* Where a fallback cannot be seen, every connection would count as one. */
+  /* Where a fallback cannot be seen, every connection would be counted as multipath. */
   if (!hts_mptcp_reports() || !hts_mptcp_enabled(opt))
     return;
   if (hts_socket_is_mptcp(soc))
