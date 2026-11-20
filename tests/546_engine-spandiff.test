@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# The span iterator, and the rule-list parsers moved onto it against frozen
-# copies of the old ones (-#test=spandiff in htslib_selftest.c).
+# This tests the span iterator, and the rule-list parsers built on it against
+# frozen copies of the old ones (-#test=spandiff).
 
 set -euo pipefail
 

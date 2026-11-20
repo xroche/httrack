@@ -1,9 +1,7 @@
 #!/bin/bash
 #
-# Dependabot's vcpkg ecosystem tracks vcpkg's release tags, so a baseline pinned
-# to a newer commit reads as behind and is bumped backwards. #1614 reverted a
-# security pin that way, unattended, so those bumps must not auto-merge. The
-# gate only runs on GitHub, so this audits the condition rather than the merge.
+# Dependabot's vcpkg bumps move a commit-pinned baseline backwards (#1614), so
+# they must not auto-merge.
 
 set -euo pipefail
 
@@ -18,9 +16,7 @@ if ! test -r "$wf"; then
     skip "no .github under $top (dist tarball), so the audit has nothing to read"
 fi
 
-# Read the gate itself, not the whole file: a substring can sit in a comment or
-# in a second job and prove nothing about what arms. The condition is a folded
-# scalar, so its own lines are the ones indented under it.
+# The gate's condition is a folded scalar, so read the lines indented under it.
 cond=$(awk '/^    if: >-$/ {inif=1; next} inif && /^      / {print; next} inif {exit}' "$wf")
 [ -n "$cond" ] || fail "could not read the auto-merge condition out of $wf"
 
@@ -39,15 +35,13 @@ case $cond in
 *"||"*) fail "the gate is not a pure conjunction, so one term can arm it alone" ;;
 esac
 
-# The author check is what makes this dependabot-only. github.actor is the
-# event sender, so swapping to it would widen the gate silently.
+# github.actor is the event sender, so it would widen this dependabot gate.
 case $cond in
 *"github.event.pull_request.user.login == 'dependabot[bot]'"*) ;;
 *) fail "the gate no longer checks the pull request author" ;;
 esac
 
-# The prefix above assumes dependabot's default branch separator. Configuring
-# another one renames the branches and the exclusion stops matching, silently.
+# The prefix assumes dependabot's default branch separator.
 conf="$top/.github/dependabot.yml"
 [ -r "$conf" ] || fail "cannot read $conf"
 if grep -q 'pull-request-branch-name' "$conf"; then

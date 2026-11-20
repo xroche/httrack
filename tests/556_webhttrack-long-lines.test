@@ -13,10 +13,8 @@ htsserver_require
 work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_lines.XXXXXX") || fail "no tmpdir"
 cleanup_push htsserver_cleanup_dir "${work}"
 
-# The served tree, with pairs ahead of English.txt's own. The catalog reader
-# keeps 7999 bytes, so of the 8000- and 7999-byte values only the second
-# applies, and the first definition of a key wins. Split at that
-# size, the long key would be three lines and shift every later pair.
+# The catalog reader keeps 7999 bytes and a key's first definition wins, so a
+# long key split at that size would shift later pairs.
 htsserver_distroot
 root="${work}/root"
 mkdir -p "${root}/lang"

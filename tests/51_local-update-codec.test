@@ -1,13 +1,7 @@
 #!/bin/bash
 #
-# A coded re-fetch that fails to decode must not destroy the mirrored file (#557).
-# Pass 1 mirrors from valid gzip; pass 2 (--update) serves an undecodable body for
-# mem.html (in-memory), disk.bin (direct-to-disk) and unsup.html (a coding we have
-# no decoder for). All three must keep their pass-1 content. fresh.html and
-# freshdisk.bin decode on both passes: they are the controls that a good update
-# still lands, in memory and direct-to-disk (the latter renaming the decoded temp
-# over an existing file). Unfixed, the decode target is the mirror itself, so the
-# first three are lost.
+# A coded re-fetch that fails to decode must not destroy the mirrored file
+# (#557). fresh.html and freshdisk.bin are controls where a good update lands.
 
 set -euo pipefail
 

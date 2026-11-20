@@ -1,7 +1,5 @@
 #!/bin/bash
-# A .dat field declaring more bytes than the file holds used to abort
-# proxytrack ("fread_cache_failed"). A cache is untrusted input, so a record
-# that does not read back must be refused, not taken down the process.
+# Proxytrack must refuse a .dat field longer than the file without aborting.
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
@@ -153,15 +151,9 @@ if grep -qaF "$BODY" "$dir/hugebody.arc"; then
     fail_dump "a body larger than the .dat still came back" "$dir/hugebody.log"
 fi
 
-# Here the .dat is long enough, so the bytes-remaining bound passes it and the
-# declared size is refused on the format's ceiling alone. Without that ceiling
-# the allocator refuses it instead, and reports a bad size as a memory failure.
-#
-# A build whose long int is 32 bits cannot size a .dat that large: filesize()
-# wraps it negative and the record is refused before the ceiling is consulted,
-# so the case has nothing to observe there. The probe carries an honest body
-# and its verdict says which of the two this build is; a third answer is a
-# regression, not a reason to skip.
+# Here only the format's ceiling refuses the declared size, or the allocator
+# would report it as a memory failure. A 32-bit long wraps it negative first,
+# and any third verdict is a regression.
 if test "$sparse" != sparse; then
     echo "no sparse files here; skipping the 2 GB .dat case" >&2
 else
