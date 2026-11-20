@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# The purge holds back only after a 2xx hypertext entry. A redirect hub, or a
-# hub that failed twice in a row, must still keep its live children (#1395).
+# The purge hold covers a 2xx hypertext entry and, since #1395, a redirect hub
+# or a hub that failed twice. Both must keep their live children.
 
 set -euo pipefail
 

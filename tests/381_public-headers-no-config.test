@@ -116,7 +116,8 @@ probe "$tmp/wrong.out" || fail "the wrong-HTS_INET6 consumer did not build, so t
     fail "HTS_INET6=$wrong changed no size or offset, so this test cannot see the bug it guards"
 
 # The downstream patch drops the header and its include. The consumer must then
-# fail to compile, because htsnet.h redefines in_addr_t.
+# fail to compile where the platform declares in_addr_t (htsnet.h redefines it),
+# and lay out differently elsewhere.
 grep -qx '#define HTS_DO_NOT_REDEFINE_in_addr_t /\*\*/' "$inc/htsfeatures.h" &&
     want=nocompile || want=differs
 rm -f "$inc/htsfeatures.h"

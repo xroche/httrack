@@ -9,7 +9,7 @@ set -euo pipefail
 : "${top_srcdir:=..}"
 
 # Sixteen connections on a one-processor VM lose files this counts. #1785 is
-# wontfix, because nothing blamed the engine.
+# wontfix, because nothing showed the loss was the engine's and not the VM's.
 case "$HTS_OS" in
 GNU | GNU/*)
     echo "GNU/Hurd: a -c16 crawl does not land every file here (#1785, wontfix); skipping" >&2
