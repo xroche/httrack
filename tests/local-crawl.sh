@@ -2,14 +2,12 @@
 #
 # Launcher for httrack crawl tests against the local Python test server.
 #
-# Starts tests/local-server.py on an ephemeral port, discovers the port from
-# the server's stdout, then runs httrack against http(s)://127.0.0.1:$PORT and
-# audits the mirror. The server is always killed and the tmpdir removed on exit.
+# Starts tests/local-server.py on an ephemeral port, runs httrack against it
+# and audits the mirror. The server is always killed and the tmpdir removed.
 #
-# The token BASEURL in any httrack argument is replaced with the discovered
-# http(s)://127.0.0.1:$PORT base, and BASEHOST with the bare 127.0.0.1:$PORT. --found/--directory paths are relative to the
-# discovered host root (127.0.0.1_<port>/), since the random port leaks into
-# the mirror directory name.
+# In httrack arguments, BASEURL becomes http(s)://127.0.0.1:$PORT and BASEHOST
+# becomes 127.0.0.1:$PORT. --found/--directory paths are relative to the
+# 127.0.0.1_<port>/ host root, because the port is in the mirror directory name.
 #
 # Usage:
 #   bash local-crawl.sh [--tls] [--root DIR] [--cookie NAME=VALUE ...] \
@@ -258,8 +256,7 @@ while test "$pos" -lt "$nargs"; do
 done
 
 # --- start the server --------------------------------------------------------
-# local_server_start reaps the server and reports one that never announced its
-# port. 72 and 105 skip on that wording, which discover_server_port writes.
+# Tests 72 and 105 skip on the error for a server that never announced a port.
 local_server_start ${tlsargs[@]+"${tlsargs[@]}"} \
     ${serverargs[@]+"${serverargs[@]}"} --root "$root"
 port=$SRV_PORT
@@ -312,10 +309,9 @@ fi
 declare -a moreargs=(--quiet "--max-time=$CRAWL_MAX_TIME" --timeout=30 --disable-security-limits --robots=0)
 console="${tmpdir}/console"
 
-# One pass: $1 where its console output goes, $2 its name in the diagnostics,
-# the rest extra httrack arguments. Backgrounded here, not through local_crawl,
-# whose own process group would hide the engine from the suite watchdog's stack
-# dump (105).
+# One pass: $1 gets its console output, $2 names it in diagnostics, the rest
+# are httrack arguments. local_crawl would hide the engine from the watchdog's
+# stack dump (105), so the pass is backgrounded here.
 function run_pass {
     local passout=$1 label=$2 deadline rc=0
     shift 2
@@ -610,9 +606,8 @@ if test -n "$wacz_validate"; then
 fi
 
 # No crawl, even a cancelled one, may leave engine temporaries: .delayed (#107,
-# #483), the .z/.u content-coding temps (#557), or the ~hts-tmp directory those
-# and the re-fetch backup live in (#774). Only a test that planted something in
-# ~hts-tmp itself owns what is left there, so only that case skips the scan.
+# #483), the .z/.u content-coding temps (#557), or their ~hts-tmp directory
+# (#774). A test that planted something in ~hts-tmp skips the scan.
 info "checking for leftover engine temporaries"
 scan_tmpdir=1
 i=0

@@ -26,9 +26,8 @@ ROOT = (
 
 
 def reply_to(request, secret):
-    # A redirect reaches the token with no link carrying it. The target is not
-    # HTML on purpose: that is the arm which re-records the link, and the one
-    # that used to hand it the grandparent's referer.
+    # A redirect reaches the token with no link carrying it. A non-HTML target
+    # takes the arm that re-records the link and sets its referer.
     if request.startswith(b"GET /redir.html"):
         target = ("/leak2.gif?&gt;postfile:%s" % secret).replace("&gt;", ">")
         return (

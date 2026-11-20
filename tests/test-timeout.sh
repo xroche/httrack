@@ -1,13 +1,11 @@
 #!/bin/bash
 #
-# automake TEST_LOG_COMPILER: run one .test under a wall-clock budget. A wedged
-# test otherwise hangs the whole job until CI cancels it, and a cancelled step
-# keeps neither its log nor its artifacts -- so nobody ever learns which test
-# hung. On expiry this names the test, dumps what is still running, and exits
-# 124, which makes the step FAIL instead: logs survive a failure.
+# automake TEST_LOG_COMPILER: run one .test under a wall-clock budget. CI
+# cancels a wedged job, and a cancelled step keeps no log. On expiry this names
+# the test, dumps what still runs, and exits 124 so the step fails with logs.
 #
-# Output goes to the test's own tests/NN_*.log (automake redirects us there) and
-# from there into test-suite.log, which CI prints.
+# Output goes to the test's own tests/NN_*.log and from there into
+# test-suite.log, which CI prints.
 
 set -u
 
@@ -17,11 +15,10 @@ testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/proclib.sh
 . "${testdir}/proclib.sh"
 
-# 600s is what the Windows leg already bounded each test at, and it clears the
-# 540s that local-crawl.sh's own watchdogs tolerate for a three-pass crawl
-# (CRAWL_DEADLINE, 180s a pass) -- budget below that and a slow-but-legitimate
-# run would be killed. The slowest healthy test measures 39s. A non-numeric or
-# absurd value falls back; 0 disables the guard, for use under a debugger.
+# 600s clears the 540s that local-crawl.sh's watchdogs allow a three-pass crawl
+# (CRAWL_DEADLINE, 180s a pass). The slowest healthy test takes 39s. A
+# non-numeric or absurd value falls back, and 0 disables the guard for use
+# under a debugger.
 budget=$(budget_secs)
 
 # The test script is the last argument; automake passes no others today.
@@ -40,11 +37,9 @@ if test -n "${HTTRACK_STDERR_CAPTURE_DIR:-}" && test -d "${HTTRACK_STDERR_WRAP_D
     export PATH HTTRACK_STDERR_CAPTURE_TAG
 fi
 
-# A test whose work legitimately outlasts the wedge budget says so in its header
-# (269 sweeps n^2 compiles and paces itself inside it). The name carries the rule the
-# reader cannot see: it raises the budget, so no test can disarm the guard. Read with
-# the shell to keep it off the per-test fork bill, and bounded, since bash's `test`
-# errors rather than compares past intmax and would leave the guard unarmed.
+# A test whose work outlasts the budget raises it in its header. Nothing can
+# lower it, so no test can disarm the guard. The shell reads it to save a fork
+# per test, and caps its length because bash's `test` errors past intmax.
 if test "$budget" -gt 0 && test -r "$path"; then
     read_lines=0
     while test "$read_lines" -lt 40 && IFS= read -r line; do
@@ -86,14 +81,12 @@ fi
 export TESTLIB_DONE_FILE
 rm -f "$TESTLIB_DONE_FILE" 2>/dev/null || true
 
-# bash before 4.2 patch 23 forgets the exit status when an EXIT trap runs after a
-# fatal expansion error under errexit, so an aborted test reports 0 and automake
-# records a PASS. macOS ships 3.2.57. So the test marks its own end, and a zero
-# status with no mark is an abort. Sourcing it from `bash -c` keeps $0 the test's
-# own path, which many tests derive $testdir from, writes nothing beside a
-# read-only srcdir and leaves stdin alone. A subshell's exit is not the test's.
-# Two shapes would lose the mark and fail a healthy test: an `exec` at top level,
-# and removing the driver's TMPDIR before exiting. No test does either today.
+# bash before 4.2 patch 23 loses the exit status when an EXIT trap follows a
+# fatal expansion error under errexit, and macOS ships 3.2.57. So the test
+# marks its own end, and a zero status with no mark is an abort. Sourcing from
+# `bash -c` keeps $0 the test's path, writes nothing in a read-only srcdir and
+# leaves stdin alone. A subshell's exit is not the test's. A top-level `exec`,
+# or removing the driver's TMPDIR, would lose the mark.
 # shellcheck disable=SC2016 # the child expands it, not us
 TESTLIB_RUNNER='exit() {
     if test "$BASH_SUBSHELL" -eq 0; then : >"$TESTLIB_DONE_FILE" 2>/dev/null || true; fi

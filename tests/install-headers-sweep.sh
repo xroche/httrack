@@ -1,11 +1,10 @@
 #!/bin/bash
 #
 # Compile every installed header on its own and in each ordered pair, in both
-# HTS_INTERNAL_BYTECODE states. One compiler run per batch: a spawn per unit
-# costs more than the compile on the Windows runner. 269 sweeps what automake
-# installed; the MSVC job has no automake and stages the same DevIncludes_DATA
-# list out of the source tree (#1153). Units carry the names of the headers they
-# include, so the compiler's own diagnostic says which pair broke.
+# HTS_INTERNAL_BYTECODE states. One compiler run covers a batch, because a spawn
+# per unit costs more than the compile on Windows. The MSVC job stages the
+# DevIncludes_DATA list from the source tree (#1153). Each unit is named after
+# its headers, so a diagnostic names the pair that broke.
 
 set -euo pipefail
 
@@ -279,8 +278,8 @@ for lang in "${langs[@]}"; do
         done
     done
 done
-# What reached the compiler, not what was generated: a slice loop that steps past a unit
-# would otherwise report the full set and pass.
+# Count what reached the compiler, because a slice loop that skips a unit would
+# still generate the full set.
 want=$((${#langs[@]} * ${#modes[@]} * ${#units[@]}))
 [ "$swept" -eq "$want" ] || fail "compiled $swept units of $want, the slicing lost some"
 echo "swept $n headers standalone and pairwise x ${#modes[@]} bytecode modes x ${langs[*]}" \

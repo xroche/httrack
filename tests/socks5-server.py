@@ -21,8 +21,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from proxytestlib import bind_ephemeral, logfile, pipe  # noqa: E402
 
-# The one name the proxy answers for; a .invalid TLD never resolves (RFC 6761),
-# so a locally-resolving client could not reach us -- success proves remote DNS.
+# The one name the proxy answers for. A .invalid TLD never resolves (RFC 6761),
+# so success proves the client used remote DNS.
 REMOTE_HOST = b"socks-origin.invalid"
 AUTH_VERSION = 0x01  # RFC 1929 sub-negotiation version
 # index links the subpages so an -r3 crawl reuses one keep-alive socket

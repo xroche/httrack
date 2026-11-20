@@ -275,9 +275,8 @@ def main():
                     body_hits[sub] = True
         elif wtype == b"revisit":
             revisits += 1
-            # WARC 1.1 5.12: a revisit names the capture it stands for. Without it
-            # the record is well-formed and unreplayable, since pywb raises
-            # ArchiveLoadFailed and wabac.js answers Not Found.
+            # WARC 1.1 5.12: a revisit names the capture it stands for. Without
+            # it pywb raises ArchiveLoadFailed and wabac.js answers Not Found.
             refers = field(header, b"WARC-Refers-To-Target-URI")
             shown = uri.decode("utf-8", "replace")
             if not refers:
