@@ -1,9 +1,8 @@
 #!/bin/bash
 #
-# A stopped FTP transfer against a silent server waited out --timeout twice:
-# once on the data socket, then again on the QUIT reply nobody was going to
-# send (#1096). One window is the bound; the transfer still gets to spend it,
-# which is what 255's single-^C leg pins.
+# A stopped FTP transfer against a silent server must wait out --timeout once
+# and skip the second wait on a QUIT reply (#1096). The transfer may still
+# spend that window, as 255's single-^C leg pins.
 
 set -euo pipefail
 
@@ -13,8 +12,8 @@ set -euo pipefail
 skip_on_windows "MSYS cannot signal a native httrack.exe"
 require_httrack
 
-# Long enough that a second window stands well clear of the measuring noise,
-# short enough to keep the test under half a minute.
+# A second 8s window stands clear of timing noise, and the test stays under
+# half a minute.
 TIMEOUT=8
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ftpstop.XXXXXX")
@@ -26,7 +25,7 @@ out="${tmpdir}/crawl"
 cmds="${tmpdir}/cmds"
 modes="${tmpdir}/modes"
 mkdir -p "$root"
-# 800 KB, of which stall mode sends an eighth: past the 32768 bytes below which
+# Stall mode sends an eighth of these 800 KB, past the 32768 bytes below which
 # the engine calls the session dead and rolls the mirror back.
 awk 'BEGIN { s = sprintf("%0999d", 0); for (i = 0; i < 800; i++) print s }' \
     >"${root}/big.bin"
@@ -69,9 +68,9 @@ await_exit() {
     test "$rc" -eq 0 || fail "$2 exited $rc instead of unwinding cleanly"
 }
 
-# Leaving the wait is only half of it: a stop that abandoned the worker, dropped
-# the link or crashed the unwind is also fast. What the mirror ends up holding
-# is the other half, and it is the same either way the run was ended.
+# Speed alone proves nothing, because abandoning the worker, dropping the link
+# or crashing the unwind is fast too. The mirror must hold the same content
+# either way the run ended.
 assert_outcome() {
     local reply htslog
     reply=$(<"${tmpdir}/log")
@@ -80,8 +79,8 @@ assert_outcome() {
     test -s "$partial" ||
         fail "$1 dropped the received prefix: $(find "$out" -type f)"
     htslog=$(<"${out}/hts-log.txt")
-    # The worker's own wait is what has to expire, not some outer bound: only
-    # that wait writes this line, with the timeout it was given.
+    # The worker's own wait must expire, because only it writes this line with
+    # the timeout it was given.
     grep -q "Time out (${TIMEOUT})" <<<"$htslog" ||
         fail "$1 did not end on the transfer's own timeout: ${htslog}"
 }
@@ -105,16 +104,16 @@ test "$stopped" -ge $((TIMEOUT / 2)) ||
 ok "^C ended the stalled transfer in ${stopped}s, one ${TIMEOUT}s window"
 
 # --- the same stall, unsignalled ---------------------------------------------
-# The control the measurement needs: without the ^C the crawl ends the same way
-# on its own, so the timing above is the stop's cost and nothing else.
+# Without the ^C the crawl ends the same way on its own, which shows the timing
+# above is the stop's cost alone.
 start_crawl
 await_transfer
 started=$SECONDS
 await_exit 90 "the plain stalled crawl"
 plain=$((SECONDS - started))
 assert_outcome "the plain stalled crawl"
-# And it pays both windows, where the ^C paid one: the clip belongs to the
-# stop, it is not a blanket shortening of the QUIT reply.
+# It pays both windows where the ^C paid one, so only the stop clips the QUIT
+# wait.
 test "$plain" -ge $((TIMEOUT + TIMEOUT / 2)) ||
     fail "the unsignalled crawl took ${plain}s, under two ${TIMEOUT}s windows"
 ok "an unsignalled stalled crawl pays both windows, ${plain}s"

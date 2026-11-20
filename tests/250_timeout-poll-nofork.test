@@ -11,16 +11,14 @@ set -euo pipefail
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_nofork.XXXXXX")
 cleanup_push rm -rf "$tmp"
 
-# A tick that cannot exec is what bash reports as 126/127, so a stub returning one
-# models it exactly. The flaky stub fails every other call, which no counter that
-# resets on a good tick can ever accumulate into a verdict.
+# A stub returning 126/127 models a tick that cannot exec. The flaky stub fails
+# every other call, which a counter reset by a good tick never accumulates.
 mkdir -p "$tmp/dead" "$tmp/flaky"
 cat >"$tmp/dead/sleep" <<'EOF'
 #!/bin/sh
-# Hold the first tick until the child has announced: the guard counts ticks, not
-# time, so this changes nothing it measures, and without it ten instant ticks can
-# outrun the child's first line and leave no pid to reap (#1092). Bounded, or a
-# child that dies before writing would wedge the run instead of failing it.
+# Hold the first tick until the child announces, or ten instant ticks can outrun
+# its first line and leave no pid to reap (#1092). The guard counts ticks, so
+# this wait changes nothing it measures. A bound lets a dead child fail the run.
 n=0
 while test ! -s "$PIDFILE" && test "$n" -lt 100000; do n=$((n + 1)); done
 exit 126
@@ -60,13 +58,12 @@ run_timeout() {
 
 # --- control: the probe the give-up assertion rests on ----------------------
 #
-# The wedged child is killed but never waited on, since the guard exits without
-# reaping and this test is not its parent. reap_bounded must read that as stopped
-# and a running process as not, or the assertion below holds for any run at all.
-# The parent waits for a file rather than a clock: a fixture that outlives the
-# grading by a fixed margin is the wall-clock assumption that caused this bug.
-# Spin loops, not sleeps, since the stubbed sleep is on the PATH; the minutes
-# below are leak insurance and a healthy run never reaches them.
+# The guard exits without reaping the killed child, and this test is not its
+# parent. reap_bounded must read that child as stopped and a running one as not,
+# or the assertion below holds for any run.
+# The parent waits for a file because a fixed delay can end before grading does.
+# Loops spin because the stubbed sleep is on the PATH. The minutes below are
+# leak insurance that a healthy run never reaches.
 cat >"$tmp/zombie.sh" <<'EOF'
 #!/bin/bash
 bash -c 'end=$((SECONDS + 120)); while test "$SECONDS" -lt "$end"; do :; done' &
@@ -90,8 +87,7 @@ if ! pid_state_readable "$zombie"; then
 else
     REAP_GRACE=1 reap_bounded "$zombie" ||
         fail "reap_bounded waited out its grace on a killed process nobody had collected"
-    # Named, not assumed: a parent that had already exited would make the arm below
-    # pass for the wrong reason.
+    # An exited parent would let the arm below pass for the wrong reason.
     kill -0 "$live" 2>/dev/null || fail "the live half of the fixture died before it was graded"
     rc=0
     REAP_GRACE=1 reap_bounded "$live" || rc=$?
@@ -102,11 +98,10 @@ fi
 
 # --- pid_state: what each route answers, and what neither may invent ---------
 #
-# A directory stands in for an entry that is not the file pid_state expects,
-# and for the nothing Hurd yields for a task it cannot summarise. Neither may
-# count as death, because Hurd answers the same way for a suspended live task.
-# The pids are ones no host allocates, so a seam that failed open would grade a
-# live kernel thread instead of the fixture.
+# A directory stands in for an entry that is not the file pid_state expects, and
+# for the empty answer Hurd gives a task it cannot summarise. Neither counts as
+# death, because Hurd answers that way for a suspended live task. The pids are
+# ones no host allocates, so a seam that failed open cannot grade a live thread.
 running=9999992 exited=9999993 unterminated=9999994 chardev=9999995
 absent=9999996 splitcomm=9999997 unreadable_live=$$
 mkdir -p "$tmp/proc/$running" "$tmp/proc/$exited" "$tmp/proc/$unterminated" \
@@ -126,8 +121,7 @@ pid_is_zombie "$running" && fail "a stat line naming state S was read as exited"
 pid_is_zombie "$exited" || fail "a stat line naming state Z was read as running"
 pid_is_zombie "$unterminated" || fail "a stat line with no trailing newline was read as running"
 pid_is_zombie "$splitcomm" && fail "a process name holding a newline forged state Z"
-# The one the arm this test used to carry got wrong: an entry that answers
-# nothing says nothing, and this shell is running.
+# An entry that answers nothing says nothing, and this shell is running.
 pid_is_zombie "$unreadable_live" && fail "an entry that yields nothing was read as an exit"
 pid_state_readable "$running" || fail "a stat line the host gave was called unreadable"
 # A device answers a read with bytes on every host, which is what the Hurd does
@@ -141,9 +135,9 @@ pid_state_readable "$chardev" && fail "bytes read from a device were called a st
 noise=$(pid_is_zombie "$absent" 2>&1 >/dev/null) || true
 test -z "$noise" || fail "a failed open reached the caller's stderr: $noise"
 
-# The ps route, which no host with a working /proc reaches. Padded, since a
-# column with spaces around it used to read as neither state. Two stubs, because
-# Hurd's ps rejects -p and takes the pid positionally.
+# The ps route, which only a host without a working /proc reaches. The column
+# is padded because spaces around it must still parse. Hurd's ps rejects -p and
+# takes the pid positionally, hence two stubs.
 mkdir -p "$tmp/psposix" "$tmp/pshurd" "$tmp/psnone" "$tmp/psmulti"
 cat >"$tmp/psposix/ps" <<'STUB'
 #!/bin/sh
@@ -177,9 +171,9 @@ PATH=$path_was
 PATH=$tmp/psnone
 pid_is_zombie "$unreadable_live" && nops_exit=yes || nops_exit=no
 pid_state_readable "$unreadable_live" && nops_read=yes || nops_read=no
-# And the reap that rests on them. This shell is running, so a host that answers
-# says 1, and one that answers for nothing must report no survivor. The call is
-# timed, because silence must not cost a grace (#1718).
+# The reap below uses these answers. A host that answers says 1 for this running
+# shell, and one that answers nothing must report no survivor. The call is
+# timed because silence must not cost a grace (#1718).
 nops_reap=0
 nops_began=$SECONDS
 REAP_GRACE=3 reap_bounded "$unreadable_live" || nops_reap=$?
@@ -214,8 +208,8 @@ grep -q '^DUMP ' "$tmp/progress" && fail "the loop ran to its 60s deadline, not 
 test "$spent" -lt 30 || fail "took ${spent}s to give up on a tick that returns at once"
 childpid=$(<"$tmp/childpid")
 test -n "$childpid" || fail "the child never started"
-# Bounded, not instantaneous: the give-up branch skips reap_bounded on purpose, so
-# it returns with the kill barely delivered and the child not yet reaped (#1092).
+# The give-up branch skips reap_bounded on purpose, so it returns before the
+# child is reaped (#1092). Give the child a bounded grace here.
 REAP_GRACE=5 reap_bounded "$childpid" ||
     fail "giving up left the wedged test running as $childpid"
 

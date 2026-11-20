@@ -1,9 +1,8 @@
 #!/bin/bash
 #
-# back_wait() discarded select()'s return. EINTR leaves the fd sets as filled,
-# so every socket read back as an exception and the slot died as "Receive
-# Error" (#1110). A ^C ended a download quickly through that same accident, so
-# the stop check that replaces it is asserted here too.
+# A signal during back_wait()'s select() must not kill a slot as "Receive
+# Error" (#1110), because EINTR leaves the fd sets as filled. The stop check
+# that ends a download on ^C is asserted here too.
 
 set -euo pipefail
 
@@ -21,7 +20,7 @@ cleanup() {
 }
 cleanup_push cleanup
 
-# Verbose, so a request line in the server log says a body is in flight.
+# The verbose server logs a request line when a body is in flight.
 local_server_start --env LOCAL_SERVER_VERBOSE=1
 
 out="${tmpdir}/crawl"
@@ -55,7 +54,7 @@ await_requests() {
     done
 }
 
-# How many of the eight bodies the server has been asked for so far.
+# Count the bodies the server has been asked for so far.
 bodies_requested() { count_matching_lines 'GET /dcancel/p' "$SRV_LOG"; }
 
 # --- a benign signal must cost nothing ---------------------------------------
@@ -71,16 +70,14 @@ for _ in $(seq 1 40); do
 done
 await_exit 120 "the signalled crawl"
 
-# Bodies still to be asked for when the burst began: without this a loaded box
-# can signal a crawl that is already done, and the leg passes having proved
-# nothing.
+# Some bodies must still be unrequested when the burst begins, or a loaded box
+# can signal a crawl that is already done and pass having proved nothing.
 test "$started" -lt 8 ||
     fail "all eight bodies were already fetched before the first signal"
 
 ! grep -q 'Receive Error' "${out}/hts-log.txt" ||
     fail "a benign signal was reported as a socket error: $(<"${out}/hts-log.txt")"
-# And what the retry queue makes of it afterwards is not the engine's choice to
-# make: the bodies have to arrive whole.
+# Whatever the retry queue does afterwards, the bodies have to arrive whole.
 mirror="${out}/127.0.0.1_${SRV_PORT}/dcancel"
 for i in 0 1 2 3 4 5 6 7; do
     size=$(wc -c <"${mirror}/p${i}.bin" 2>/dev/null || echo 0)

@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# An asset a stylesheet reaches by url() has to be both installed and
-# distributed: dropping either rule styles the docs from a 404, and no build
-# step complains.
+# An asset a stylesheet reaches by url() must be installed and distributed.
+# Without either rule the docs get a 404 and no build step complains.
 
 set -euo pipefail
 

@@ -1,12 +1,10 @@
 #!/bin/bash
 #
-# Grow the rebuilt command line past the slot count that used to be fixed
-# (#1189). Its three writers are separate call sites and need separate
-# coverage: cmdl_add for the command line, where an option spelled
-# --opt=value expands to two tokens, and cmdl_ins for the hts-cache/doit.log
-# replay and for the config file. Each run ends in a self-test dispatched
-# from the rebuilt argv, so it checks the tail tokens for order as well as
-# survival, and costs no crawl.
+# Grow the rebuilt command line past a fixed slot count (#1189). Each of its
+# three writers needs its own coverage: cmdl_add for the command line, where
+# --opt=value expands to two tokens, and cmdl_ins for the doit.log replay and
+# the config file. Each run ends in a self-test from the rebuilt argv, which
+# checks the tail tokens for order and survival without a crawl.
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
@@ -20,7 +18,7 @@ cleanup_push rm -rf "$tmp"
 want="barfoobar does match *foo*"
 
 # --- 1. command line: two-token expansion outruns the slots ------------------
-# 2000 arguments become 4001 tokens, past the 3028 the old sizing allowed.
+# 2000 arguments become 4001 tokens, past 3028 slots.
 args=()
 for ((i = 0; i < 2000; i++)); do
     args+=("--why=$i")

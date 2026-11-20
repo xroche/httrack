@@ -1,10 +1,9 @@
 #!/bin/bash
 #
-# A -mime: exclusion must abort the transfer on the response Content-Type, not
-# fetch the whole 1 MB body then discard it (#58). The bytes-received guard is
-# the real one: the file is absent either way, but only the fix keeps the count
-# tiny (header only) instead of pulling the body. Match it positively (a small,
-# <=4-digit count) so a vanished/reworded summary line fails rather than passes.
+# A -mime: exclusion must abort the transfer on the response Content-Type
+# instead of fetching the whole 1 MB body (#58). The file is absent either way,
+# so the guard is the bytes-received count, which stays tiny only with the fix.
+# Match a count of at most 4 digits, so a missing summary line fails.
 
 : "${top_srcdir:=..}"
 

@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# --check tolerates a footer year older than the generator's, and nothing else
-# reaches that branch: the tree ships the year it was generated in, so the
-# comparison only diverges once a New Year has rolled the generator forward.
+# --check must accept a footer year older than the generator's. Nothing else
+# reaches that branch, because the tree ships the year it was generated in.
 
 set -euo pipefail
 
@@ -28,7 +27,7 @@ page="${work}/html/index.html"
 
 shipped=$(grep -o '&copy; 1998-[0-9]\{4\}' "${page}" | head -1 | grep -o '[0-9]\{4\}$')
 test -n "${shipped}" || fail "no footer copyright year in ${page}"
-# Derived, not pinned: a literal pair goes red the January the tree ships it.
+# Derive the years, because a literal pair goes red in the January it ships.
 later=$((shipped + 1))
 epoch=$(python3 -c \
     "import datetime;print(int(datetime.datetime(${later},7,1,tzinfo=datetime.timezone.utc).timestamp()))")
@@ -37,7 +36,7 @@ pristine="${work}/pristine"
 cp -a "${work}/html" "${pristine}"
 restore() { rm -rf "${work}/html" && cp -a "${pristine}" "${work}/html"; }
 
-# The assertion this test exists for: a lagging year is in sync.
+# A lagging year must count as in sync.
 SOURCE_DATE_EPOCH="${epoch}" python3 "${chrome}" --check >/dev/null 2>&1 ||
     fail "--check rejects a footer year of ${shipped} when the generator is at ${later}"
 

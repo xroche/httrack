@@ -1,7 +1,7 @@
 #!/bin/bash
 # Issue #121: a URL that looks like an asset (".../distorted.jpg") on a foreign
-# host, answered with text/html, must be stored and not scanned. The unfixed
-# engine mirrored 3 files of that host under -n and 7 under +*.jpg, against 1.
+# host, answered with text/html, must be stored and not scanned. Only that one
+# file of the host may land, under -n and under +*.jpg.
 set -eu
 
 # shellcheck source=tests/crawllib.sh
@@ -140,8 +140,8 @@ check userinfo "$bport" "$kept"
 local_crawl --log "${tmpdir}/crawl-seed.log" "http://127.0.0.1:${aport}/index.html" "http://127.0.0.1:${bport}/foreign/s/xxx/distorted.jpg" -O "${tmpdir}/out-seed" --quiet --max-time=120 --timeout=30 --robots=0 || fail "crawl seed failed"
 check seed "$bport" "$scanned"
 
-# A foreign asset honestly typed is still parsed for what it references: the
-# clamp is for an HTML page, not for every content type httrack scans.
+# A foreign asset served with its own type is still parsed for its links,
+# because the clamp applies only to an HTML page.
 crawl assets /assets.html '+*.css' '+*.js' '+*.svg' '+*.png'
 for f in asset/style.css asset/script.js asset/vector.svg \
     asset/bg.png asset/inner.png; do

@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# Two html/ defects that render invisibly: a misspelt target keyword is a named
-# context, so every such link reuses one tab; and a print block that resets only
+# Two html/ defects render invisibly. A misspelt target keyword is a named
+# context, so every such link reuses one tab. A print block that resets only
 # body leaves the dark palette live on paper.
 
 set -euo pipefail
@@ -22,7 +22,7 @@ done < <(find "${htmldir}" -type f \
     \( -name '*.html' -o -name '*.css' -o -name '*.js' -o -name '*.xml' -o -name '*.svg' \) |
     LC_ALL=C sort)
 
-# A silently empty candidate list would pass the scan below proving nothing.
+# An empty candidate list would pass the scan below proving nothing.
 test "${#pages[@]}" -ge 60 || fail "only ${#pages[@]} markup files under html/"
 listing=$(printf '%s\n' "${pages[@]}")
 for want in faq.html cache.html server/index.html server/finished.html server/step2.html; do
@@ -42,8 +42,8 @@ values=$(tr -d "\"' \\t" <<<"${values}" | sed 's/^[Tt][Aa][Rr][Gg][Ee][Tt]=//' |
 seen=$(count_matching_lines . <<<"${values}")
 test "${seen}" -ge 50 || fail "only ${seen} target attributes found under html/"
 
-# Anything but the four keywords is a named context: _new and new_ both were.
-# Nothing here wants a named one, so the keywords are the whole allowlist.
+# Anything but the four keywords, _new and new_ included, is a named context.
+# Nothing here wants one, so the keywords are the whole allowlist.
 bad=$(grep -vxE '_blank|_self|_parent|_top' <<<"${values}" | LC_ALL=C sort -u || true)
 test -z "${bad}" || fail "not a target keyword: $(tr '\n' ' ' <<<"${bad}")"
 

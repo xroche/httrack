@@ -1,11 +1,9 @@
 #!/bin/bash
 #
-# End-to-end --host-alias (#16). The fixture reaches a second hostname once per
-# engine path that has to fold it: a page the crawled host also links (dedup), a
-# page nothing else links (scope), a redirect to it, a page whose type is known
-# only after a probe (the probe re-requests the URL), and a sitemap entry
-# (recorded without being named first). The control fetches none of them and
-# keeps the alias URL absolute in the page.
+# End-to-end --host-alias (#16). A second hostname reaches each engine path that
+# must fold it: a page the crawled host also links (dedup), a page nothing else
+# links (scope), a redirect, a page typed only by a probe that re-requests it,
+# and a sitemap entry. The control fetches none and keeps the alias absolute.
 
 set -e
 
@@ -55,8 +53,8 @@ bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 3 \
     --sitemap-url 'BASEURL/hostalias/sitemap.xml' \
     --host-alias 'alias.example.invalid=BASEHOST'
 
-# over TLS the alias links, spelled http://, would reach a port that speaks
-# only TLS: the canonical side names the scheme the host really answers on
+# over TLS the alias links, spelled http://, would reach a TLS-only port, so the
+# canonical side names the scheme the host answers on
 if test "$HTTPS_SUPPORT" != "no"; then
     bash "$top_srcdir/tests/local-crawl.sh" --tls --errors 0 --files 5 \
         --found hostalias/b.html --found hostalias/c.html \
@@ -74,8 +72,7 @@ bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 5 \
     httrack 'BASEURL/hostalias/index.html' \
     --host-alias 'http://alias.example.invalid=http://BASEHOST'
 
-# One throwaway -O for the parse probes below: none of them crawls, and an
-# inline $(mktemp -d) per probe leaked a directory per run.
+# The parse probes below share one throwaway -O, because none of them crawls.
 odir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_hostalias.XXXXXX")
 trap 'set +e; rm -rf "$odir"' EXIT
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# The offline suite's worker pool (ci-windows-suite.sh): the requested width really
+# The offline suite's worker pool (ci-windows-suite.sh): the requested width
 # runs at once, the tally still counts every test, and each gets its own TMPDIR.
 
 set -euo pipefail
@@ -13,8 +13,8 @@ set -euo pipefail
 unset WATCHDOG_TOKEN WATCHDOG_REPO WATCHDOG_SHA WATCHDOG_URL
 
 driver="$testdir/ci-windows-suite.sh"
-# Asked of the bash the driver will run under, not of this one: the pool needs
-# its wait -n (4.3), and macOS runs the tests with a 3.2 that has none.
+# Probe the bash on PATH, which the driver runs under. The pool needs its
+# wait -n (4.3), and macOS runs the tests with a 3.2 that has none.
 bash -c 'test "${BASH_VERSINFO[0]}" -ge 5 ||
     { test "${BASH_VERSINFO[0]}" -eq 4 && test "${BASH_VERSINFO[1]}" -ge 3; }' ||
     skip "the bash on PATH has no wait -n, so the driver runs one test at a time"
@@ -92,8 +92,8 @@ assert_tally() {
 # Tests handed a TMPDIR that is not the suite.<name> dir of their own name.
 strays() { awk '{ n = $1; sub(/.*\//, "", n); if (index($2, "/suite." n) == 0) print }' \
     "$share/tmpdirs"; }
-# Deepest overlap the markers below recorded: a pool silently capped narrower than
-# it was asked for cannot reach the width, where a timing ratio still would.
+# peak is the deepest overlap the markers recorded. A pool capped narrower than
+# asked cannot reach the width, where a timing ratio still could.
 peak() { awk '$0 == "+" { if (++n > m) m = n } $0 == "-" { n-- } END { print m + 0 }' "$share/conc"; }
 
 # The six the driver dispatches first, each marking the window it is in flight
@@ -123,9 +123,9 @@ test "$records" -eq 13 ||
 stray=$(strays)
 test -z "$stray" || fail "a test was handed a TMPDIR that is not its own: $stray"
 
-# Serial, on the same stubs: it says the sleeps really cost what the comparison
-# above rests on, it drives the fallback a bash without wait -n takes, and it is
-# the control on the marker file, which must read 1 where the pool read 6.
+# A serial run on the same stubs shows the sleeps cost what the comparison above
+# assumes. It also drives the fallback for a bash without wait -n, and its
+# marker file must read 1 where the pool read 6.
 : >"$share/tmpdirs"
 : >"$share/conc"
 run_suite "$par" 1
@@ -149,8 +149,8 @@ run_suite "$mut" 6
 stray=$(strays)
 test -n "$stray" || fail "a suite sharing one TMPDIR passed the check above"
 
-# What a shared TMPDIR costs: dump_crawl_logs empties the one it is given, so two
-# tests sharing it is one deleting the other's evidence.
+# dump_crawl_logs empties the TMPDIR it is given, so two tests sharing one
+# delete each other's evidence.
 mkdir -p "$tmp/mine/httrack_local.a/crawl" "$tmp/theirs/httrack_local.b/crawl"
 echo MINECRAWL >"$tmp/mine/httrack_local.a/crawl/hts-log.txt"
 echo THEIRSCRAWL >"$tmp/theirs/httrack_local.b/crawl/hts-log.txt"

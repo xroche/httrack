@@ -87,16 +87,16 @@ run --errors 0 --file-not-matches 'simple/basic.html' 'NOT-HERE' httrack "$url"
 test "$rc" -eq 0 || fail "a negative file audit failed on a present file: $out"
 ok "a negative file audit still passes on a file lacking the marker"
 
-# A 0-byte mirrored file lacks every marker, so it must pass rather than read
-# as absent. errpage/empty.html is the fixture's genuine zero-length 200.
+# A 0-byte mirrored file lacks every marker, so it must pass and not read as
+# absent. errpage/empty.html is the fixture's zero-length 200.
 run --errors 1 --file-not-matches 'errpage/empty.html' 'x' \
     httrack 'BASEURL/errpage/index.html'
 test "$rc" -eq 0 || fail "a negative file audit failed on an empty file: $out"
 ok "a negative file audit passes on an empty mirrored file"
 
-# The mirror bounds share the vacuity, because an empty mirror is under every
-# ceiling and only a floor says anything landed. Both runs use the healthy crawl
-# and bounds no platform can straddle, since how much a crawl saves varies.
+# An empty mirror is under every ceiling, so only a floor proves anything
+# landed. Both runs use the healthy crawl with bounds far from any platform's
+# mirror size, because that size varies.
 run --errors 0 --min-mirror-bytes 99999999 httrack "$url"
 test "$rc" -ne 0 || fail "a mirror floor passed under the bound: $out"
 assert_match "mirror too small" "$out" "the floor names what it wanted"
@@ -122,9 +122,8 @@ run --errors 0 --log-not-found 'Information, Warnings and Errors' httrack "$url"
 test "$rc" -ne 0 || fail "a log audit matched nothing in the body: $out"
 ok "a log audit still sees what the mirror wrote"
 
-# And the banner, which only the echo below it is skipped: dropping both is the
-# mistake this fix was written twice to avoid. 14_local-https covers it only
-# where TLS is built.
+# The log audit must still see the launch banner when only the echo below it is
+# skipped. 14_local-https covers this only where TLS is built.
 run --errors 0 --log-found 'launched on' httrack "$url"
 test "$rc" -eq 0 || fail "a log audit stopped seeing the banner: $out"
 ok "a log audit still sees the launch banner"

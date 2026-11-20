@@ -1,9 +1,8 @@
 #!/bin/bash
 #
 # An early exit from hts_main_internal must release the rebuilt command line,
-# the token chunks plus the slot array (#1206). Only a leak checker sees this,
-# so this pins it on any sanitized build rather than relying on the CI leg's
-# own options: two runs that bail out after the block is allocated.
+# the token chunks plus the slot array (#1206). Only a leak checker sees this.
+# Two runs bail out after the allocation, with leak checking forced on.
 
 set -eu
 
@@ -25,8 +24,8 @@ esac
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_cmdlleak.XXXXXX") || exit 1
 cleanup_push rm -rf "$tmp"
 
-# Last value wins in the sanitizer flag parser, so this overrides the job's
-# settings; the report file, not the exit status, is the verdict.
+# The sanitizer flag parser takes the last value, so this overrides the job's
+# settings. The report file is the verdict.
 asan_base="${ASAN_OPTIONS:+$ASAN_OPTIONS:}detect_leaks=1:abort_on_error=0:exitcode=0"
 
 # The port is never dialled: each run aborts while still parsing options.
@@ -48,7 +47,7 @@ bail() { # bail LABEL WANT_RE ARG...
     printf '[%s] ..\t' "$label"
     out=$(ASAN_OPTIONS="${asan_base}:log_path=$tmp/asan" \
         httrack -O "$tmp/out" "$@" "$url" 2>&1 || true)
-    # Teeth: a run that never reached the early exit would report clean without
+    # A run that never reached the early exit would report clean without
     # exercising the leak.
     assert_match "$want" "$out" "$label"
     no_leak "$label"
@@ -81,8 +80,8 @@ early() { # early LABEL DIR WANT_RC WANT_RE ARG...
     local rc=0
     out=$(ASAN_OPTIONS="${asan_base}:log_path=$tmp/asan" \
         httrack -O "$dir" "$@" "$url" 2>&1) || rc=$?
-    # Teeth: the message pins the handler and the status pins which return ran,
-    # while the missing sign-off proves the run never reached the exit that frees.
+    # The message pins the handler and the status pins which return ran. The
+    # missing sign-off proves the run never reached the exit that frees.
     assert_match "$want" "$out" "$label"
     assert_eq "$want_rc" "$rc" "$label exit status"
     if [[ $out =~ Thanks\ for\ using ]]; then
@@ -130,9 +129,9 @@ else
     chmod 755 "$d/hts-cache"
 fi
 
-# Only a run on a terminal reports an aborted mirror, because htscoremain.c sets
-# opt->quiet when stdout is not one. script(1) hands a terminal over, and its two
-# spellings do not overlap, so probe each with a command only a terminal passes.
+# Only a run on a terminal reports an aborted mirror, because the engine is
+# quiet otherwise. script(1) provides one, and its two spellings do not
+# overlap, so probe each with a command only a terminal passes.
 tty_form=
 for form in linux bsd; do
     rm -f "$tmp/ttyprobe"
@@ -161,11 +160,10 @@ else
     linux) script -qec "$cmd" "$d/typescript" >/dev/null 2>&1 || true ;;
     bsd) script -q "$d/typescript" /bin/sh -c "$cmd" >/dev/null 2>&1 || true ;;
     esac
-    # BSD script(1) reports its own status, not the command's, so the notice and
-    # the missing sign-off carry the teeth here.
+    # BSD script(1) reports its own status, so only the notice and the missing
+    # sign-off are checked here.
     out=$(cat "$d/typescript")
     assert_match 'aborted mirror has been detected' "$out" 'aborted mirror'
-    # Which cache it means, so a revert to the old restore-it advice reds here.
     assert_match 'old.ndx' "$out" 'aborted mirror names the legacy cache'
     if [[ $out =~ Thanks\ for\ using ]]; then
         fail 'aborted mirror: reached the end of the run, not the early exit'
