@@ -1,9 +1,7 @@
 #!/bin/bash
 #
 # A run stopped by --max-time must not purge the files it never reached
-# (#1109). The cap fires while slow.html is in flight, so the parser drops that
-# page's leaf links and the loop ends with no abort the cursor can see. 261
-# covers the signalled half.
+# (#1109). The cap fires mid-slow.html, so the loop sees no abort.
 
 set -euo pipefail
 
@@ -43,11 +41,9 @@ local_crawl --log "${tmpdir}/log2" "${common[@]}" -O "$out" --timeout=0 \
 test "$rc" -ne 124 || fail "the capped crawl overran its deadline"
 
 log=$(<"${out}/hts-log.txt")
-# Match the cap's message, because a fatal write error also prints "giving up"
-# and an ENOSPC crawl would pass while the cap never fired.
+# Match the cap's message, because an ENOSPC crawl also prints "giving up".
 grep -q 'seconds passed\.\. giving up' <<<"$log" || fail "the time cap never fired: ${log}"
-# Fewer links than pass 1 saw shows some were dropped. Without this check, a
-# mirror that simply finished passes.
+# Fewer links than pass 1 saw shows some were dropped.
 scanned=$(sed -n 's/.* : \([0-9][0-9]*\) links scanned.*/\1/p' <<<"$log" | tail -1)
 test "${scanned:-99}" -lt 8 ||
     fail "the stop dropped no link, so nothing was left unreached (${scanned} scanned)"

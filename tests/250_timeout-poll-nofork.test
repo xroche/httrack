@@ -16,9 +16,8 @@ cleanup_push rm -rf "$tmp"
 mkdir -p "$tmp/dead" "$tmp/flaky"
 cat >"$tmp/dead/sleep" <<'EOF'
 #!/bin/sh
-# Hold the first tick until the child announces, or ten instant ticks can outrun
-# its first line and leave no pid to reap (#1092). The guard counts ticks, so
-# this wait changes nothing it measures. A bound lets a dead child fail the run.
+# Hold the first tick until the child announces, or ten instant ticks can leave
+# no pid to reap (#1092). The bound lets a dead child fail the run.
 n=0
 while test ! -s "$PIDFILE" && test "$n" -lt 100000; do n=$((n + 1)); done
 exit 126
@@ -58,12 +57,9 @@ run_timeout() {
 
 # --- control: the probe the give-up assertion rests on ----------------------
 #
-# The guard exits without reaping the killed child, and this test is not its
-# parent. reap_bounded must read that child as stopped and a running one as not,
-# or the assertion below holds for any run.
-# The parent waits for a file because a fixed delay can end before grading does.
-# Loops spin because the stubbed sleep is on the PATH. The minutes below are
-# leak insurance that a healthy run never reaches.
+# reap_bounded must read the guard's unreaped child as stopped and a running one
+# as not. The parent waits for a file because a fixed delay can end too early.
+# Loops spin because the stubbed sleep is on the PATH.
 cat >"$tmp/zombie.sh" <<'EOF'
 #!/bin/bash
 bash -c 'end=$((SECONDS + 120)); while test "$SECONDS" -lt "$end"; do :; done' &
@@ -98,10 +94,8 @@ fi
 
 # --- pid_state: what each route answers, and what neither may invent ---------
 #
-# A directory stands in for an entry that is not the file pid_state expects, and
-# for the empty answer Hurd gives a task it cannot summarise. Neither counts as
-# death, because Hurd answers that way for a suspended live task. The pids are
-# ones no host allocates, so a seam that failed open cannot grade a live thread.
+# A directory stands in for an unreadable entry and for Hurd's empty answer on
+# a suspended live task. Neither counts as death. No host allocates these pids.
 running=9999992 exited=9999993 unterminated=9999994 chardev=9999995
 absent=9999996 splitcomm=9999997 unreadable_live=$$
 mkdir -p "$tmp/proc/$running" "$tmp/proc/$exited" "$tmp/proc/$unterminated" \
@@ -135,9 +129,8 @@ pid_state_readable "$chardev" && fail "bytes read from a device were called a st
 noise=$(pid_is_zombie "$absent" 2>&1 >/dev/null) || true
 test -z "$noise" || fail "a failed open reached the caller's stderr: $noise"
 
-# The ps route, which only a host without a working /proc reaches. The column
-# is padded because spaces around it must still parse. Hurd's ps rejects -p and
-# takes the pid positionally, hence two stubs.
+# Only a host without /proc takes the ps route. Hurd's ps rejects -p, hence two
+# stubs. The column is padded because surrounding spaces must still parse.
 mkdir -p "$tmp/psposix" "$tmp/pshurd" "$tmp/psnone" "$tmp/psmulti"
 cat >"$tmp/psposix/ps" <<'STUB'
 #!/bin/sh
@@ -171,9 +164,8 @@ PATH=$path_was
 PATH=$tmp/psnone
 pid_is_zombie "$unreadable_live" && nops_exit=yes || nops_exit=no
 pid_state_readable "$unreadable_live" && nops_read=yes || nops_read=no
-# The reap below uses these answers. A host that answers says 1 for this running
-# shell, and one that answers nothing must report no survivor. The call is
-# timed because silence must not cost a grace (#1718).
+# A host that answers says 1 for this running shell. One that answers nothing
+# reports no survivor, and its silence must not cost a grace (#1718).
 nops_reap=0
 nops_began=$SECONDS
 REAP_GRACE=3 reap_bounded "$unreadable_live" || nops_reap=$?
@@ -208,8 +200,7 @@ grep -q '^DUMP ' "$tmp/progress" && fail "the loop ran to its 60s deadline, not 
 test "$spent" -lt 30 || fail "took ${spent}s to give up on a tick that returns at once"
 childpid=$(<"$tmp/childpid")
 test -n "$childpid" || fail "the child never started"
-# The give-up branch skips reap_bounded on purpose, so it returns before the
-# child is reaped (#1092). Give the child a bounded grace here.
+# The give-up branch returns before reaping the child (#1092), so wait a bit.
 REAP_GRACE=5 reap_bounded "$childpid" ||
     fail "giving up left the wedged test running as $childpid"
 

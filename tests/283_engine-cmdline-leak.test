@@ -24,8 +24,7 @@ esac
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_cmdlleak.XXXXXX") || exit 1
 cleanup_push rm -rf "$tmp"
 
-# The sanitizer flag parser takes the last value, so this overrides the job's
-# settings. The report file is the verdict.
+# The sanitizer takes the last value, so this overrides the job's settings.
 asan_base="${ASAN_OPTIONS:+$ASAN_OPTIONS:}detect_leaks=1:abort_on_error=0:exitcode=0"
 
 # The port is never dialled: each run aborts while still parsing options.
@@ -47,8 +46,7 @@ bail() { # bail LABEL WANT_RE ARG...
     printf '[%s] ..\t' "$label"
     out=$(ASAN_OPTIONS="${asan_base}:log_path=$tmp/asan" \
         httrack -O "$tmp/out" "$@" "$url" 2>&1 || true)
-    # A run that never reached the early exit would report clean without
-    # exercising the leak.
+    # A run that never reached the early exit reports clean.
     assert_match "$want" "$out" "$label"
     no_leak "$label"
     echo "OK"
@@ -129,9 +127,8 @@ else
     chmod 755 "$d/hts-cache"
 fi
 
-# Only a run on a terminal reports an aborted mirror, because the engine is
-# quiet otherwise. script(1) provides one, and its two spellings do not
-# overlap, so probe each with a command only a terminal passes.
+# Only a terminal run reports an aborted mirror, so probe both script(1)
+# spellings.
 tty_form=
 for form in linux bsd; do
     rm -f "$tmp/ttyprobe"
@@ -160,8 +157,7 @@ else
     linux) script -qec "$cmd" "$d/typescript" >/dev/null 2>&1 || true ;;
     bsd) script -q "$d/typescript" /bin/sh -c "$cmd" >/dev/null 2>&1 || true ;;
     esac
-    # BSD script(1) reports its own status, so only the notice and the missing
-    # sign-off are checked here.
+    # BSD script(1) hides the status, so check the notice and the sign-off.
     out=$(cat "$d/typescript")
     assert_match 'aborted mirror has been detected' "$out" 'aborted mirror'
     assert_match 'old.ndx' "$out" 'aborted mirror names the legacy cache'

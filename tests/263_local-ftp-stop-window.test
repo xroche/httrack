@@ -1,8 +1,7 @@
 #!/bin/bash
 #
 # A stopped FTP transfer against a silent server must wait out --timeout once
-# and skip the second wait on a QUIT reply (#1096). The transfer may still
-# spend that window, as 255's single-^C leg pins.
+# and skip the second wait on a QUIT reply (#1096).
 
 set -euo pipefail
 
@@ -12,8 +11,7 @@ set -euo pipefail
 skip_on_windows "MSYS cannot signal a native httrack.exe"
 require_httrack
 
-# A second 8s window stands clear of timing noise, and the test stays under
-# half a minute.
+# An 8s window stands clear of timing noise and keeps the test under 30s.
 TIMEOUT=8
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ftpstop.XXXXXX")
@@ -68,9 +66,8 @@ await_exit() {
     test "$rc" -eq 0 || fail "$2 exited $rc instead of unwinding cleanly"
 }
 
-# Speed alone proves nothing, because abandoning the worker, dropping the link
-# or crashing the unwind is fast too. The mirror must hold the same content
-# either way the run ended.
+# Speed alone proves nothing, because abandoning the worker is fast too. The
+# mirror must hold the same content either way the run ended.
 assert_outcome() {
     local reply htslog
     reply=$(<"${tmpdir}/log")
@@ -79,8 +76,7 @@ assert_outcome() {
     test -s "$partial" ||
         fail "$1 dropped the received prefix: $(find "$out" -type f)"
     htslog=$(<"${out}/hts-log.txt")
-    # The worker's own wait must expire, because only it writes this line with
-    # the timeout it was given.
+    # Only the worker's own expired wait writes this line with its timeout.
     grep -q "Time out (${TIMEOUT})" <<<"$htslog" ||
         fail "$1 did not end on the transfer's own timeout: ${htslog}"
 }
@@ -104,16 +100,14 @@ test "$stopped" -ge $((TIMEOUT / 2)) ||
 ok "^C ended the stalled transfer in ${stopped}s, one ${TIMEOUT}s window"
 
 # --- the same stall, unsignalled ---------------------------------------------
-# Without the ^C the crawl ends the same way on its own, which shows the timing
-# above is the stop's cost alone.
+# The plain crawl ends the same way, which isolates the stop's cost above.
 start_crawl
 await_transfer
 started=$SECONDS
 await_exit 90 "the plain stalled crawl"
 plain=$((SECONDS - started))
 assert_outcome "the plain stalled crawl"
-# It pays both windows where the ^C paid one, so only the stop clips the QUIT
-# wait.
+# It pays both windows where the ^C paid one.
 test "$plain" -ge $((TIMEOUT + TIMEOUT / 2)) ||
     fail "the unsignalled crawl took ${plain}s, under two ${TIMEOUT}s windows"
 ok "an unsignalled stalled crawl pays both windows, ${plain}s"

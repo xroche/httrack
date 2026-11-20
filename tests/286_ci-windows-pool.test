@@ -13,8 +13,7 @@ set -euo pipefail
 unset WATCHDOG_TOKEN WATCHDOG_REPO WATCHDOG_SHA WATCHDOG_URL
 
 driver="$testdir/ci-windows-suite.sh"
-# Probe the bash on PATH, which the driver runs under. The pool needs its
-# wait -n (4.3), and macOS runs the tests with a 3.2 that has none.
+# Probe the PATH bash, because the pool needs wait -n (4.3) and macOS has 3.2.
 bash -c 'test "${BASH_VERSINFO[0]}" -ge 5 ||
     { test "${BASH_VERSINFO[0]}" -eq 4 && test "${BASH_VERSINFO[1]}" -ge 3; }' ||
     skip "the bash on PATH has no wait -n, so the driver runs one test at a time"
@@ -92,8 +91,7 @@ assert_tally() {
 # Tests handed a TMPDIR that is not the suite.<name> dir of their own name.
 strays() { awk '{ n = $1; sub(/.*\//, "", n); if (index($2, "/suite." n) == 0) print }' \
     "$share/tmpdirs"; }
-# peak is the deepest overlap the markers recorded. A pool capped narrower than
-# asked cannot reach the width, where a timing ratio still could.
+# peak is the deepest overlap the markers recorded.
 peak() { awk '$0 == "+" { if (++n > m) m = n } $0 == "-" { n-- } END { print m + 0 }' "$share/conc"; }
 
 # The six the driver dispatches first, each marking the window it is in flight
@@ -123,9 +121,8 @@ test "$records" -eq 13 ||
 stray=$(strays)
 test -z "$stray" || fail "a test was handed a TMPDIR that is not its own: $stray"
 
-# A serial run on the same stubs shows the sleeps cost what the comparison above
-# assumes. It also drives the fallback for a bash without wait -n, and its
-# marker file must read 1 where the pool read 6.
+# A serial run shows the sleeps cost what the comparison assumes. It drives the
+# fallback for a bash without wait -n, whose marker file must read 1.
 : >"$share/tmpdirs"
 : >"$share/conc"
 run_suite "$par" 1
@@ -149,8 +146,7 @@ run_suite "$mut" 6
 stray=$(strays)
 test -n "$stray" || fail "a suite sharing one TMPDIR passed the check above"
 
-# dump_crawl_logs empties the TMPDIR it is given, so two tests sharing one
-# delete each other's evidence.
+# dump_crawl_logs empties its TMPDIR, so two tests sharing one lose evidence.
 mkdir -p "$tmp/mine/httrack_local.a/crawl" "$tmp/theirs/httrack_local.b/crawl"
 echo MINECRAWL >"$tmp/mine/httrack_local.a/crawl/hts-log.txt"
 echo THEIRSCRAWL >"$tmp/theirs/httrack_local.b/crawl/hts-log.txt"

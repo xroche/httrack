@@ -3,8 +3,7 @@
 # crawllib's launch and crawl helpers, exercised from a subject process: a
 # firing assertion, and the library's own reaping, each end that process.
 
-# The subject snippets below stay unexpanded because they run in the subject,
-# against its own tmpdir and the variables the library sets there.
+# The subject snippets stay unexpanded because they run inside the subject.
 # shellcheck disable=SC2016
 
 set -euo pipefail
@@ -71,8 +70,7 @@ assert_match "picked-this-root" "$body" "served from --root"'
 ok "--root is what gets served"
 
 ## --tls serves HTTPS, and BASEURL says so
-# The page is fetched over TLS, because a server left plain would pass a check
-# on the BASEURL string alone.
+# Fetch over TLS, because a plain server would pass a BASEURL string check.
 holds 'local_server_start --tls
 assert_eq "https://127.0.0.1:${SRV_PORT}" "$BASEURL" "--tls scheme"
 body=$("$(find_python)" - "$SRV_PORT" <<PY
@@ -205,9 +203,8 @@ assert_eq "crawl-said-this" "$(<"${tmpdir}/crawl.log")" "--log truncates per cra
 ok "--log takes the crawl output, one crawl at a time"
 
 ## --stdin feeds the engine, which a redirect on the call cannot be trusted to do
-# Three outcomes on one line tell a closed descriptor from the empty read of
-# /dev/null. Write straight out, because with fd 0 closed $(cat) takes slot 0
-# for its pipe and the read blocks forever.
+# Write straight out, because with fd 0 closed $(cat) takes slot 0 for its pipe
+# and the read blocks forever.
 cat >"${shim}/httrack" <<'SH'
 #!/bin/bash
 printf 'stdin=['

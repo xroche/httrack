@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# --check must accept a footer year older than the generator's. Nothing else
-# reaches that branch, because the tree ships the year it was generated in.
+# --check must accept a footer year older than the generator's.
 
 set -euo pipefail
 

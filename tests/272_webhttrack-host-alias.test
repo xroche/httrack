@@ -74,9 +74,8 @@ def emitted_rules(value):
             if flag in line]
 
 
-# Any run of whitespace separates two rules, and the parser trims a run beside
-# a ',' or an '=' inside a rule. The engine refuses an empty rule, so neither a
-# blank line nor an empty box may emit --host-alias "".
+# Whitespace separates rules and is trimmed beside ',' or '='. The engine
+# refuses an empty rule, so nothing may emit --host-alias "".
 for value, want in [(" ".join(RULES), RULES),
                     ("\r\n" + "\r\n\r\n".join(RULES) + "\r\n", RULES),
                     ("a=b  c=d", ["a=b", "c=d"]),

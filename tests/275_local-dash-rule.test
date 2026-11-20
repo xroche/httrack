@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# A --strip-query key or --host-alias pattern may begin with '-' (#1179), and
-# must not be read as the next option name.
+# A --strip-query key or --host-alias pattern may begin with '-' (#1179).
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
@@ -71,7 +70,6 @@ accepted "--strip-query=-q"
 echo OK
 
 # The grammar check quotes the rule back, which proves the leading '-' survived.
-# No crawl can show it because no address begins with one.
 printf '[a malformed dash rule is named, not blamed on -%%C] ..\t'
 parse --host-alias -nope
 refused 'Rejected: -nope' "malformed --host-alias"

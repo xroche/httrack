@@ -1,9 +1,7 @@
 #!/bin/bash
 #
 # End-to-end --host-alias (#16). A second hostname reaches each engine path that
-# must fold it: a page the crawled host also links (dedup), a page nothing else
-# links (scope), a redirect, a page typed only by a probe that re-requests it,
-# and a sitemap entry. The control fetches none and keeps the alias absolute.
+# must fold it: dedup, scope, a redirect, a probe re-request and a sitemap.
 
 set -e
 

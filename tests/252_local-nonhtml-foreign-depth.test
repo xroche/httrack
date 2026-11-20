@@ -140,8 +140,7 @@ check userinfo "$bport" "$kept"
 local_crawl --log "${tmpdir}/crawl-seed.log" "http://127.0.0.1:${aport}/index.html" "http://127.0.0.1:${bport}/foreign/s/xxx/distorted.jpg" -O "${tmpdir}/out-seed" --quiet --max-time=120 --timeout=30 --robots=0 || fail "crawl seed failed"
 check seed "$bport" "$scanned"
 
-# A foreign asset served with its own type is still parsed for its links,
-# because the clamp applies only to an HTML page.
+# The clamp applies only to an HTML page, so other foreign assets are parsed.
 crawl assets /assets.html '+*.css' '+*.js' '+*.svg' '+*.png'
 for f in asset/style.css asset/script.js asset/vector.svg \
     asset/bg.png asset/inner.png; do

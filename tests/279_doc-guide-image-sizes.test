@@ -15,8 +15,7 @@ python=$(find_python) || skip "python3 not found"
 # In EXTRA_DIST, so an absent checker is a packaging bug, not an environment.
 test -r "${checker}" || fail "no ${checker}"
 
-# This also pins the IHDR reader, which must reproduce to the digit the sizes
-# of 55 PNGs written by Pillow.
+# This also pins the IHDR reader against the sizes of 55 Pillow-written PNGs.
 "${python}" "${checker}" "${srcdir}/html" ||
     fail "guide.html's declared image sizes are out of sync with html/img/"
 

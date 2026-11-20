@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# Re-run in a mirror directory, the engine offers to resume and quotes the
-# command line it would run (#1204). That line can outgrow the 2 KB HT_PRINT
-# buffer, whose helper aborts on overflow, so it must be clipped.
+# The resume prompt quotes the command line it would run (#1204), and must clip
+# it to the 2 KB HT_PRINT buffer, whose helper aborts on overflow.
 
 set -eu
 
@@ -47,8 +46,7 @@ assert_match 'zzzmarker' "$out" "the offer dropped the options"
 ! grep -qF -- "$bin" <<<"$out" || fail "the offer still quotes the program path"
 echo OK
 
-# doit.log replays up to 8000 bytes, so a command line built from many filters
-# outruns the 2 KB buffer several times over.
+# doit.log replays up to 8000 bytes, so many filters outrun the 2 KB buffer.
 printf '[a command line too long to fit is clipped, not fatal] ..\t'
 long=()
 for i in $(seq 1 40); do

@@ -43,7 +43,6 @@ seen=$(count_matching_lines . <<<"${values}")
 test "${seen}" -ge 50 || fail "only ${seen} target attributes found under html/"
 
 # Anything but the four keywords, _new and new_ included, is a named context.
-# Nothing here wants one, so the keywords are the whole allowlist.
 bad=$(grep -vxE '_blank|_self|_parent|_top' <<<"${values}" | LC_ALL=C sort -u || true)
 test -z "${bad}" || fail "not a target keyword: $(tr '\n' ' ' <<<"${bad}")"
 

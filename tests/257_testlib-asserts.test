@@ -120,8 +120,7 @@ fires "$armed
 fail boom" 'FAIL: boom'
 fires "$armed
 fail boom" '  | first line'
-# Naming the variable makes a test that retargets its log mid-run dump the new
-# log.
+# Naming the variable lets a test that retargets its log dump the new one.
 fires "$armed
 out=$tmpdir/log2
 fail boom" '  | other'
@@ -164,8 +163,7 @@ cd /
 fires 'PATH= httrack_path' 'no httrack in PATH'
 ok "httrack_path returns an absolute path that still runs from elsewhere"
 
-## HTS_OS. It is exported so a child reads it instead of forking uname, and
-# every platform skip gate decides on it.
+## HTS_OS is exported so a child need not fork uname.
 # shellcheck disable=SC2016 # a subject is shell source, expanded by the subject
 holds 'test "$HTS_OS" = "$(uname -s)"'
 # shellcheck disable=SC2016
@@ -179,8 +177,7 @@ for pre in "-u HTS_OS" "HTS_OS="; do
 done
 ok "HTS_OS resolves to uname -s, unset or inherited empty"
 
-## A uname -s that says nothing is fatal. Guessing not-Windows would run a test
-# excluded from Windows there, and the leg would still go green.
+## An empty uname -s is fatal, because a guess could run Windows-excluded tests.
 mkdir "$tmpdir/shim"
 printf '#!/bin/sh\nexit 0\n' >"$tmpdir/shim/uname"
 chmod +x "$tmpdir/shim/uname"
@@ -246,8 +243,7 @@ posix Linux win=no msys=no linux=yes
 EOF
 ok "under wsl2 the binary is Windows while the shell is not"
 
-# IS_WINDOWS forces the Windows paths on a non-Windows host
-# (249_windows-reap-images.test), and it must answer both questions. It is set
+# IS_WINDOWS forces the Windows paths and must answer both questions. It is set
 # AFTER testlib is sourced, so nothing may cache the backend it implies.
 while read -r override want; do
     got=$(env -u HTTRACK_SUITE_BACKEND IS_WINDOWS="$override" HTS_OS=Linux \
@@ -334,12 +330,9 @@ mkcmdline "$tmpdir/cl" httrack.exe -O "C:/t/httrack_local.AbCdEf" \
 assert_eq "C:/t/httrack_local.AbCdEf" "$(win_marker "$tmpdir/cl")" "a shared --user-agent"
 ok "win_marker picks the launch's own output directory, never argv[0]"
 
-## The wsl2 PATH shim lets the tests name a Windows program bare, and turns a
-# drvfs argument into one a native exe can open. It is copied rather than
-# linked, as the driver does, because this tree may sit on a noexec mount.
-# MSYS needs no shim because it resolves a bare name to the .exe itself. It
-# cannot run this fixture either, because it hands a script named .exe to
-# Windows as a PE binary, which fails with 127.
+## The wsl2 PATH shim lets tests name a Windows program bare. It is copied
+# rather than linked, because this tree may sit on a noexec mount.
+# MSYS cannot run this fixture, because it treats a script named .exe as a PE.
 if shell_is_msys; then
     echo "MSYS resolves the .exe itself, so it runs no shim" >&2
 else
@@ -384,13 +377,9 @@ ENVEOF
     ok "the shim names the caller's variables in WSLENV, and not PATH"
 fi
 
-## win_capture under wsl2 has no /proc/<pid>/winpid. It asks Windows which
-# process carries the relay's own cmdline instead.
+## Under wsl2, win_capture asks Windows which process has the relay's cmdline.
 # Real interop passes a variable only when WSLENV names it, so the stub refuses
-# an unlisted one. Otherwise dropping WSLENV passes here and fails on a runner.
-# This needs a real procfs and a shell that can run the fake powershell.exe,
-# which MSYS cannot provide. The cmdline file is tested rather than the
-# directory, because FreeBSD ships /proc as an empty mount point.
+# an unlisted one. Test the cmdline file, because FreeBSD's /proc can be empty.
 if test -r "/proc/$$/cmdline" && ! shell_is_msys; then
     cat >"$tmpdir/pathbin/powershell.exe" <<'PSEOF'
 #!/bin/sh
@@ -406,9 +395,8 @@ PSEOF
     cat >"$tmpdir/cap.sh" <<EOF
 set -euo pipefail
 . "$testdir/testlib.sh"
-# win_marker returns the longest argv element, the earlier on a tie, so the
-# marker must beat the 11-byte "sleep 30; :". The ':' stops bash (/bin/sh on
-# Fedora) from exec'ing a lone command and dropping this cmdline.
+# win_marker returns the longest argv element, so the marker must beat the
+# 11-byte "sleep 30; :". The ':' stops bash from exec'ing a lone command.
 /bin/sh -c 'sleep 30; :' "\$1" &
 v=\$!
 # Until the exec lands the child still carries this script's argv, whose cap.sh

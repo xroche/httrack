@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# Cancelling a link mid-FTP-transfer must close the data socket once. The
-# interposer catches a second close as EBADF.
+# A link cancelled mid-FTP-transfer must close its data socket exactly once.
 
 set -euo pipefail
 
@@ -64,8 +63,7 @@ httrack "ftp://127.0.0.1:${FTP_PORT}/f.bin" -O "$out" --quiet \
 crawlpid=$!
 unset LD_PRELOAD
 
-# Cancel once the partial file appears, which shows the data connection is up.
-# The engine only flags a transfer it is still running.
+# Cancel after the partial file appears, since only a live transfer is flagged.
 deadline=$((SECONDS + 60))
 partial=
 until test -n "$partial"; do
@@ -82,8 +80,7 @@ mv "${trigger}.tmp" "$trigger"
 wait_bounded "$crawlpid" 90 || fail "the cancelled crawl never ended"
 crawlpid=
 
-# Without these floors a crawl that never reached the halt path passes.
-# stop_ftp() writes this message, so it stands for the cleanup that follows.
+# stop_ftp() writes this message, so it proves the crawl reached the halt path.
 grep -aq 'Cancelled by User' "${out}/hts-log.txt" ||
     fail "the cancel never reached the transfer: $(grep -a Error "${out}/hts-log.txt" || true)"
 test -s "$closes" || fail "the interposer logged no close() at all"

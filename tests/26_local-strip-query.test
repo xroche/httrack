@@ -22,8 +22,7 @@ bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 3 \
 bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 2 \
     httrack 'BASEURL/stripquery/index.html' -%u0 --strip-query 'utm_source'
 
-# several flags accumulate, as the wizard's rules box emits them. One rule of
-# each pair matches, so either order needs both to survive
+# several flags accumulate. One rule of each pair matches, so both must survive
 bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 2 \
     httrack 'BASEURL/stripquery/index.html' \
     --strip-query 'other.invalid/*=utm_source' --strip-query '*/stripquery/*=utm_source'
@@ -35,8 +34,7 @@ bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 2 \
 bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 3 \
     httrack 'BASEURL/stripquery/index.html' --strip-query 'other.invalid/*=utm_source'
 
-# the last matching rule replaces the earlier one. A union, or first-match-wins,
-# would strip utm_source here and save 2 files
+# the last matching rule wins. A union would strip utm_source and save 2 files
 bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 3 \
     httrack 'BASEURL/stripquery/index.html' \
     --strip-query '*=utm_source' --strip-query '*/stripquery/*=nokey'

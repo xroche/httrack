@@ -1,10 +1,8 @@
 #!/bin/bash
 #
-# Grow the rebuilt command line past a fixed slot count (#1189). Each of its
-# three writers needs its own coverage: cmdl_add for the command line, where
-# --opt=value expands to two tokens, and cmdl_ins for the doit.log replay and
-# the config file. Each run ends in a self-test from the rebuilt argv, which
-# checks the tail tokens for order and survival without a crawl.
+# Grow the rebuilt command line past a fixed slot count (#1189) through each
+# writer: cmdl_add for argv, cmdl_ins for the doit.log replay and the config.
+# A self-test from the rebuilt argv checks the tail tokens without a crawl.
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh

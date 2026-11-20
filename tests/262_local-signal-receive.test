@@ -1,8 +1,7 @@
 #!/bin/bash
 #
 # A signal during back_wait()'s select() must not kill a slot as "Receive
-# Error" (#1110), because EINTR leaves the fd sets as filled. The stop check
-# that ends a download on ^C is asserted here too.
+# Error" (#1110), because EINTR leaves the fd sets as filled.
 
 set -euo pipefail
 

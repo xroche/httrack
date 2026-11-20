@@ -73,8 +73,7 @@ ok "the script's own exit status survives the teardown"
 
 ## the trap list is the one this test knows
 #
-# This reads the names on the trap line. Which of them a shell accepts is bash's
-# business, and the legs below prove the ones they send.
+# This checks the names on the trap line, and the legs below prove delivery.
 trapped=(HUP INT QUIT TERM)
 want=$(printf '%s\n' "${trapped[@]}" | sort | tr '\n' ' ')
 got=$(sed -n "s/.*run_cleanups; exit 1' //p" "$testdir/testlib.sh" | tr ' ' '\n' | sort | tr '\n' ' ')
@@ -83,12 +82,9 @@ ok "cleanup_push traps no signal unknown to this test"
 
 ## a signal drains once, and through the library's own trap
 #
-# Status 1 is the trap's own exit. An untrapped fatal signal also drains the
-# stack through the EXIT trap but leaves 128+n, so "non-zero" would prove
-# nothing. Each signal is sent, because a trap covering TERM alone passes a
-# TERM-only check.
-# MSYS bash delivers only TERM and HUP to a script. A Linux shell under wsl2
-# keeps all four.
+# Status 1 is the trap's own exit, and an untrapped signal leaves 128+n.
+# Each signal is sent, because a trap covering TERM alone passes a TERM check.
+# MSYS bash delivers only TERM and HUP to a script, and wsl2 keeps all four.
 sigs=("${trapped[@]}")
 ! shell_is_msys || sigs=(TERM HUP)
 

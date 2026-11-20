@@ -5,9 +5,8 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-# htsarena.h is the pool the link records and the rebuilt command line hold raw
-# pointers into ('httrack -#test=arena'). The self-test re-reads every address
-# across thousands of allocations, so a pool that moves its bytes fails here.
+# Link records and the rebuilt command line hold raw pointers into htsarena.h,
+# so the self-test fails a pool that moves its bytes.
 assert_selftest "arena self-test OK" arena
 
 exit 0

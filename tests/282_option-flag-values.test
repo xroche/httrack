@@ -45,9 +45,8 @@ indexed yes --index
 indexed yes --index=1
 indexed yes -I
 
-# A value the option cannot take must stop the run. The message must name the
-# reason, or a mangled flag the engine happens to reject would read as a
-# refusal. Status 134 would be an abort.
+# A value the option cannot take must stop the run with a message naming the
+# reason. Status 134 would be an abort.
 refused() { # refused WANTED-MESSAGE ARG...
     local want=$1
     shift
@@ -111,9 +110,7 @@ for name in $(awk '{print $2}' <<<"${rows}" | sort | uniq -d); do
         fail "--${name} has ${n} classes in the table; the first row silently wins"
 done
 
-# --structure takes a preset number, and the engine reads a DETACHED -N value
-# as a user template, so presets must stay glued (#1380). A dropped value falls
-# back to -N0's layout, so assert the layout each preset produces.
+# A detached -N value reads as a user template, so presets stay glued (#1380).
 structure_layout() { # structure_layout PRESET RELATIVE-PATH
     crawl "--structure=$1"
     test "${RC}" -eq 0 || fail "--structure=$1 exited ${RC}"
@@ -136,8 +133,7 @@ for name in list filelist urllist filterlist; do
 done
 
 # The sweep above reads the table it checks, so control it from step4.html.
-# Every --name=0 the wizard writes must be a row that takes a value, or the
-# flag means the opposite of the box (#1195, #1200).
+# Every --name=0 the wizard writes must name a row that takes a value (#1195).
 literals=$(grep -o -- '--[a-z0-9-]*=0' "${distdir}/html/server/step4.html" |
     sed -e 's/^--//' -e 's/=0$//' | sort -u)
 test "$(grep -c . <<<"${literals}")" -ge 10 || fail "step4.html scan came up short"

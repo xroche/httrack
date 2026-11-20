@@ -79,8 +79,7 @@ from webtestlib import Session, field, textarea
 s, work = Session(sys.argv[1]), sys.argv[2]
 sid = s.sid
 
-# Control before anything is loaded. A fresh session ticks the cache box, so
-# the assertions below measure the profile.
+# A fresh session ticks the cache box, so the checks below measure the profile.
 tag = re.findall(r'<input[^>]*type="checkbox"[^>]*name="cache"[^>]*>',
                  s.get("option3.html?sid=" + sid))
 if len(tag) != 1 or "checked" not in tag[0]:
@@ -135,8 +134,7 @@ if maxrate is None or maxrate.group(1) != "0":
              % (maxrate and maxrate.group(1)))
 
 # The writer spells a cleared checkbox as 0, which must not come back as a
-# flag. Wacz is the ungated control on the same page, because --wacz names its
-# own archive.
+# flag. Wacz is the ungated control on the same page.
 want("--debug-headers")
 reject("--warc")
 reject("--replace-external")
@@ -170,8 +168,7 @@ reject("--keep-alive")
 if ini.get("UserID") != "" or ini.get("KeepAlive") != "0":
     sys.exit("the cleared fields came back as %r / %r"
              % (ini.get("UserID"), ini.get("KeepAlive")))
-# A cleared box must reach the engine. The file spells all four 0, the reader
-# empties them, and each one must still emit its disabling flag.
+# Each of the four cleared boxes must still emit its disabling flag.
 want("--cookies=0")
 want("--index=0")
 want("--cache=0")
