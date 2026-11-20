@@ -2759,7 +2759,8 @@ static int st_strsprintf(httrackp *opt, int argc, char **argv) {
     }
   }
 
-  /* WebDAV pops a '/' off the String that a give-up leaves empty. */
+  /* WebDAV pops a trailing '/', so a give-up that empties the String must
+     not underflow its length. */
   {
     String never = STRING_EMPTY;
     String cleared = STRING_EMPTY;

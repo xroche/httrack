@@ -673,7 +673,8 @@ static int st_sigpipe(httrackp *opt, int argc, char **argv) {
   r.soc = sv[1];
   /* This is the only cover on macOS, where HTS_MSG_NOSIGNAL is 0. */
   socket_set_nosigpipe(sv[1]);
-  /* Wait for the peer to go, because Darwin reads loopback elsewhere. */
+  /* Wait for the peer to go, because Darwin hands loopback input to another
+     thread. */
   assertf(check_readinput_t(sv[1], 10) == 1);
   n = (int) recv(sv[1], discard, sizeof(discard), 0);
   assertf(n <= 0);
