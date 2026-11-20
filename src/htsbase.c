@@ -53,15 +53,15 @@ const char *hts_strerror(int err, char *buf, size_t size) {
   if (size == 1)
     return buf;
 #if !HTS_STRERROR_REENTRANT
-  /* No reentrant form here, so this build stays as racy as it was. */
+  /* This build has no reentrant form, so it stays racy. */
   (void) strclipbuff(buf, size, strerror(err));
 #elif defined(_MSC_VER)
   (void) strerror_s(buf, size, err);
 #elif defined(__USE_GNU)
   {
-    /* The GNU variant's return is the message and buf may stay untouched,
-       where the XSI one's return is a status. Only __USE_GNU tells them apart
-       here, since configure's probe sets _GNU_SOURCE and this tree does not. */
+    /* The GNU variant returns the message and may leave buf untouched. The
+       XSI one returns a status. Only __USE_GNU tells them apart, because
+       configure's probe sets _GNU_SOURCE and this tree does not. */
     const char *const msg = strerror_r(err, buf, size);
 
     if (msg != NULL && msg != buf)

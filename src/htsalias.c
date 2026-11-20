@@ -70,13 +70,12 @@ Please visit our Website: http://www.httrack.com
   paramn : glues a preset or on/off onto -N, detaches a %-carrying template, refuses the rest, a cluster tail (1L0) included
 
   A glued class shares one HTS_CDLMAXSIZE buffer with its short form, so the
-  value's budget is that size less strlen(short form). Only param1, and paramn
-  where it detaches, give the value the whole buffer. A front end bounding a
-  glued value at HTS_CDLMAXSIZE therefore accepts lengths this refuses.
+  value gets that size less strlen(short form). Only param1, and paramn where
+  it detaches, give the value the whole buffer.
 
-  A name may appear twice; the FIRST row wins, for the expansion and the help
-  text. Later rows exist so a reverse lookup by short option finds a name, and
-  that lookup takes the first row too, so -N's class is "structure"'s.
+  A name may appear twice, and the FIRST row wins. Later rows let a reverse
+  lookup by short option find a name, and that lookup also takes the first
+  row, so -N's class is "structure"'s.
 */
 const char *hts_optalias[][4] = {
   /*   {"","","",""}, */
@@ -400,11 +399,10 @@ static const char *optalias_prefix_count(const char *name) {
    0: apply the alias without the count and warn. 1: refuse the option. */
 #define OPTALIAS_PREFIX_STRICT 0
 
-/* Whether the alias expands to a plain cluster a count can be glued onto
-   (-w -> -wc32). The rest is refused rather than glued blind: a value sharing
-   the word (-N <template>, -c8) or holding it alone (-O <path>), a long form,
-   the -% and -# families (-%r plus a c is the -%rc of --warc-cdx), a cluster
-   already carrying -c, and -h, which the caller matches as a whole word. */
+/* Can a count be glued onto the alias, as in -w -> -wc32? It refuses a value
+   sharing the word (-N <template>, -c8) or alone (-O <path>), a long form, the
+   -% and -# families (-%r plus c is --warc-cdx's -%rc), a cluster already
+   carrying -c, and -h, which the caller matches as a whole word. */
 static hts_boolean optalias_clusters(hts_optclass type, const char *command) {
   size_t i;
 
@@ -510,13 +508,11 @@ static LLint optalias_param_max(const char *command) {
   return INT_MAX;
 }
 
-/* Whether the short form COMMAND can read VALUE glued onto it: the on/off
-   mapping, or a number carrying at most one separator with a digit right after
-   it, each digit run within what the option's own parser holds. What it
-   converts short of, or not at all, leaves the option at a value nobody asked
-   for (--sockets=1234567890123456 asks for 1015724736 sockets) and spills the
-   tail into the cluster loop as further short options (--sockets=8I0 reaches
-   -I0). */
+/* Can the short form COMMAND read VALUE glued onto it? It takes the on/off
+   mapping, or a number with at most one separator followed by a digit, each
+   digit run within the option parser's range. Anything else sets a value
+   nobody asked for and spills the tail into the cluster loop (--sockets=8I0
+   reaches -I0). */
 static hts_boolean optalias_param_takes(const char *command,
                                         const char *value) {
   const char sep = optalias_param_separator(command);
@@ -557,12 +553,10 @@ static const char *optalias_help_line(char *dest, size_t dest_size,
   return dest;
 }
 
-/* Why the option the user wrote as SPELLING did not get the parameter REAL
-   needs, in the terms the code decided it: calling a parameter missing when one
-   was passed, or naming the internal short option, leaves the user nothing to
-   work back from, and the run dies here, before any log file exists to say
-   more. No spelling is suggested: --name=value passes an option name through,
-   but a '--' value dies unrecognized. */
+/* Tell the user, in their own words, why SPELLING did not get the parameter
+   REAL needs. The run dies here, before any log file exists. No spelling is
+   suggested, because --name=value passes an option name through and a '--'
+   value dies unrecognized. */
 static void optparam_error(optparam_state state, const char *spelling,
                            const char *real, const char *next,
                            char *return_error, size_t return_error_size) {

@@ -55,9 +55,8 @@ Please visit our Website: http://www.httrack.com
 
 typedef struct hts_changes hts_changes;
 
-/* One mirrored file. The mirror-relative path is the key, not the URL: a
-   redirect and its target can share a save name, and counting that file twice
-   would put it in two buckets. */
+/* One mirrored file, keyed by its mirror-relative path. A redirect and its
+   target can share a save name, and keying by URL would count it twice. */
 typedef struct {
   char *url;               /* absolute URL, "" for an engine-generated file */
   char *file;              /* mirror-relative path, as listed in new.lst */
@@ -157,9 +156,8 @@ static intptr_t changes_slot(hts_changes *changes, const char *file,
   return slot;
 }
 
-/* MD5 of the file at `path`; not a security boundary. Never call it holding
-   changes_mutex: hashing a large file would stall every other connection.
-   HTS_FALSE if it cannot be read. */
+/* MD5 of the file at `path`, not a security boundary. HTS_FALSE if unreadable.
+   Never call it holding changes_mutex, because hashing would stall others. */
 static hts_boolean digest_file(const char *path,
                                unsigned char digest[DIGEST_SIZE]) {
   struct MD5Context ctx;
@@ -253,8 +251,8 @@ void hts_changes_notify(httrackp *opt, const char *adr, const char *fil,
     if (slot >= 0 && !is_new) {
       changes_entry *const entry = &TypedArrayNth(changes->entries, slot);
 
-      /* Retry, or a second call site for the same file: the pre-run state was
-         already sampled and the copy on disk may no longer be it. */
+      /* A retry or a second call site keeps the first sample, because the
+         copy on disk may no longer be the pre-run state. */
       entry->rewritten = entry->rewritten || rewritten;
     }
   }
@@ -268,15 +266,15 @@ void hts_changes_notify(httrackp *opt, const char *adr, const char *fil,
   strlcatbuff(url, adr, sizeof(url));
   strlcatbuff(url, fil, sizeof(url));
 
-  /* Unlocked: hashing a large file would stall every other connection. Hash
-     it only when it is about to be overwritten, the last moment it exists. */
+  /* Hash unlocked, because a large file would stall every other connection.
+     Hash it just before it is overwritten, the last moment it exists. */
   prev_size = fsize_utf8(save);
   if (prev_size >= 0 && rewritten)
     has_prev = digest_file(save, prev_digest);
 
   hts_mutexlock(&changes_mutex);
   changes = changes_get(opt);
-  /* The slot index is stable, entries being append-only; the array is not. */
+  /* Append-only entries keep the slot index stable, but the array moves. */
   if (changes != NULL && (size_t) slot < TypedArraySize(changes->entries)) {
     changes_entry *const entry = &TypedArrayNth(changes->entries, slot);
 
@@ -307,15 +305,14 @@ void hts_changes_html(httrackp *opt, cache_back *cache, const htsblk *r,
   intptr_t slot;
   htsblk prev;
 
-  /* Ahead of the digest and the cache read: off must cost nothing. */
+  /* Return early, so --changes off costs nothing. */
   if (!opt->changes)
     return;
   if (r->adr == NULL || r->size < 0 || save == NULL || !strnotempty(save))
     return;
 
-  /* On disk this is the payload plus rewritten links and a footer dated by the
-     crawl, so it differs every run; compare payloads, the previous one being
-     the body the cache kept. */
+  /* On disk the page carries rewritten links and a crawl-dated footer, so
+     compare payloads against the body the cache kept. */
   digest_mem(r->adr, (size_t) r->size, new_digest);
   prev = cache_read_ro(opt, cache, adr, fil, "", location);
   if (HTTP_IS_OK(prev.statuscode) && prev.adr != NULL && prev.size >= 0) {
@@ -324,8 +321,8 @@ void hts_changes_html(httrackp *opt, cache_back *cache, const htsblk *r,
   }
   freet(prev.adr);
 
-  /* Only now take the lock and look the entry up: cache_read_ro() can itself
-     reach file_notify(), which would move the entries array. */
+  /* Lock only now, because cache_read_ro() can reach file_notify(), which
+     would move the entries array. */
   hts_mutexlock(&changes_mutex);
   changes = changes_get(opt);
   /* file_notify() records the entry; this call only refines it. */
@@ -418,18 +415,17 @@ static void changes_resolve(hts_changes *changes, httrackp *opt) {
     if (entry->bucket == HTS_CHANGE_GONE)
       continue;
 
-    /* The previous mirror's index is the authority on what was there before:
-       a partial left by this crawl's own failed attempt is on disk but was
-       never part of the previous mirror. Without an index, fall back to what
-       the first notify saw on disk. */
+    /* The previous mirror's index decides what existed, because a partial
+       from this crawl's failed attempt is on disk but was never mirrored.
+       Without an index, use what the first notify saw on disk. */
     entry->existed = changes->old_index ? entry->listed_prev : entry->on_disk;
     path = fconcat(catbuff, sizeof(catbuff), StringBuff(opt->path_html),
                    entry->file);
     entry->size = fsize_utf8(path);
     if (entry->rewritten && entry->existed) {
-      /* The size shortcut only holds when both digests describe the file on
-         disk; has_new means they are payload digests, and a parsed page's
-         rendered size moves with its links and footer. */
+      /* The size shortcut holds only when both digests describe the file on
+         disk. has_new means payload digests, and a parsed page's size moves
+         with its links and footer. */
       if (!entry->has_new && entry->size >= 0 && entry->prev_size >= 0 &&
           entry->size != entry->prev_size) {
         have_digests = HTS_TRUE; /* different lengths: no need to hash */
@@ -548,9 +544,8 @@ void hts_changes_close_opt(httrackp *opt) {
 
   hts_mutexlock(&changes_mutex);
   {
-    /* changes_get(), not the raw field: a crawl that mirrored nothing still
-       owes the user a report, and a stale one from the previous run must not
-       survive on disk as if it described this one. */
+    /* A crawl that mirrored nothing still owes a report, which replaces the
+       previous run's stale one. */
     hts_changes *const changes = changes_get(opt);
     size_t i;
 

@@ -141,9 +141,8 @@ typedef void (*hts_cache_field_other)(void *arg, const char *name,
                                       const char *value);
 
 /* Read the header block buff[0..size) of one ZIP cache entry into fields,
-   matching names case-insensitively, until the first empty line. HTS_FALSE
-   when the block holds a NUL: the writers store strlen(headers), so it is
-   damage and the entry must be refused. */
+   matching names case-insensitively, until the first empty line. Returns
+   HTS_FALSE on a NUL, which is damage because writers store strlen(headers). */
 static HTS_UNUSED hts_boolean hts_cache_read_fields(
     const char *buff, size_t size, const hts_cache_field *fields, size_t count,
     hts_cache_field_other other, void *arg) {

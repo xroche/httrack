@@ -45,9 +45,8 @@ Please visit our Website: http://www.httrack.com
 
 /* Longest request header line the catcher keeps. It clears Apache's
    LimitRequestFieldSize (8190) and sits a byte under nginx's 8k header buffer,
-   so an authenticated Cookie: or Bearer those servers accept fits here too.
-   The buffer stays a quarter of the block above, which bounds the header
-   loop. */
+   so a Cookie: or Bearer those servers accept fits. The buffer stays a
+   quarter of the block above, which bounds the header loop. */
 #define CATCH_URL_LINE_MAX 8191
 #define CATCH_URL_LINE_SIZE (CATCH_URL_LINE_MAX + 1)
 
@@ -64,11 +63,11 @@ typedef enum {
   CATCH_URL_ERR_BLOCK    /* the headers did not fit CATCH_URL_DATA_SIZE */
 } catch_url_status;
 
-/* catch_url(), reporting why the capture failed rather than that it did. */
+/* Like catch_url(), but returns why the capture failed. */
 catch_url_status catch_url_capture(T_SOC soc, char *url, char *method,
                                    char *data);
 
-/* One line naming a catch_url_capture() status, for the user. */
+/* Describes a catch_url_capture() status to the user. */
 const char *catch_url_strerror(catch_url_status status);
 
 // Fonctions

@@ -35,7 +35,7 @@ Please visit our Website: http://www.httrack.com
 #define HTSCACHE_DEFH
 
 /* Cache key: url_adr followed by url_fil, each lien_back-sized. Write, index
-   load and lookup must each hold one whole -- a clipped key aliases another. */
+   load and lookup must hold it whole, or a clipped key aliases another. */
 #define CACHE_KEY_SIZE (HTS_URLMAXSIZE * 4)
 /* The ZIP entry name is the key behind a "http://" the index load strips. */
 #define CACHE_ENTRYNAME_SIZE (CACHE_KEY_SIZE + 8)
@@ -71,23 +71,20 @@ void cache_add(httrackp * opt, cache_back * cache, const htsblk * r,
                int all_in_cache, const char *path_prefix);
 htsblk cache_read(httrackp * opt, cache_back * cache, const char *adr,
                   const char *fil, const char *save, char *location);
-/* Re-store the previous run's entry for a link this run failed to fetch, so the
-   next one recomputes the same save name: nothing else maps the URL to it
-   (#1421). `url_save` is the copy that survived, which the caller has just
-   checked is on disk. The entry goes back marked kept, readable only through
-   cache_read_including_broken(): it names a file, it does not stand in for a
-   fetch. */
+/* Re-store the previous run's entry for a link this run failed to fetch, so
+   the next run recomputes the same save name, which nothing else maps the URL
+   to (#1421). `url_save` is the surviving copy, checked on disk by the caller.
+   The entry is marked kept, and only cache_read_including_broken() reads it. */
 void cache_keep_previous(httrackp *opt, cache_back *cache, const char *url_adr,
                          const char *url_fil, const char *url_save);
 htsblk cache_read_ro(httrackp * opt, cache_back * cache, const char *adr,
                      const char *fil, const char *save, char *location);
-/* Like cache_read, but also yields entries whose transfer broke; return_save
-   (optional, HTS_URLMAXSIZE*2) receives the entry's recorded save name and
-   return_location (optional, HTS_LOCATION_SIZE) its Location, which outlives
-   the status an entry naming no local file is invalidated to. Header fields
-   only: adr and headers come back NULL, so the caller owns and frees nothing,
-   and the location is the one to read, not r.location. This is also the one
-   reader that sees a kept entry (#1421). */
+/* Like cache_read, but also yields entries whose transfer broke. return_save
+   (optional, HTS_URLMAXSIZE*2) receives the recorded save name, and
+   return_location (optional, HTS_LOCATION_SIZE) the Location, which outlives
+   the status of an entry naming no local file. adr and headers come back NULL.
+   Read return_location rather than r.location. This is the one reader that
+   sees a kept entry (#1421). */
 htsblk cache_read_including_broken(httrackp *opt, cache_back *cache,
                                    const char *adr, const char *fil,
                                    char *return_save, char *return_location);

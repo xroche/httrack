@@ -218,9 +218,8 @@ static int cookie_set_impl(t_cookie *cookie, const char *cook_name,
                   attr->secure ? "TRUE" : "FALSE", (LLint) attr->expires,
                   cook_name, cook_value,
                   attr->http_only ? "\t" COOKIE_HTTPONLY_FIELD : "");
-  /* Backstop, not a live gate: the check above reserves COOKIE_HEADROOM and
-     this record adds ~30 of literals, so it fires only if that assembly ever
-     outgrows the headroom. Overflow-safe form regardless. */
+  /* The check above reserves COOKIE_HEADROOM and this record adds ~30 bytes,
+     so this fires only if the assembly outgrows the headroom. */
   if (used >= cookie->max_len || strlen(cook) >= cookie->max_len - used)
     return -1; // no room to add it
   if (old != NULL)
@@ -366,12 +365,10 @@ static int cookie_rec_cmp(const void *x, const void *y) {
 }
 
 /* Evict the oldest records of the largest host over its share until a record
-   of `need` bytes fits. One pass tallies every host, with the new record
-   added to the setter's, and the victims are picked from that tally and cut
-   out of the jar in one more pass. The oldest is the first record of the
-   shortest path: the jar keeps no age, and records of one path length are
-   stored oldest first. The record being replaced stays, and counts in its
-   host. The jar is untouched unless the record then fits. */
+   of `need` bytes fits. The setter's host counts the new record. The oldest is
+   the first record of the shortest path, because the jar keeps no age and
+   stores each path length oldest first. The record being replaced stays and
+   counts in its host. The jar is untouched unless the record then fits. */
 static hts_boolean cookie_make_room(char *data, size_t max_len,
                                     const char *domain, const char *cook_name,
                                     const char *path, size_t need) {
