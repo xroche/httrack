@@ -28,8 +28,9 @@ Please visit our Website: http://www.httrack.com
 /* ------------------------------------------------------------ */
 /* --single-file: post-mirror pass embedding each page's assets as data: URIs.
    Unlike -%M, it rewrites pages in place and keeps page links relative. An
-   asset linked from an inlined stylesheet no longer resolves, because a
-   data: URL's path is opaque. */
+   asset that stayed a link (over the cap) no longer resolves inside an inlined
+   stylesheet, because a data: URL's path is opaque. Raise
+   --single-file-max-size to inline it. */
 /* ------------------------------------------------------------ */
 
 #ifndef HTS_SINGLEFILE_DEFH
