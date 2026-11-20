@@ -138,8 +138,7 @@ static size_t apply_pair(const t_my_userdef *userdef, char *dst,
   return out;
 }
 
-/* Return what apply_pair will write for these bytes. Both walk the bytes the
-   same way, so apply_pair never writes more. */
+/* Return what apply_pair writes for these bytes, walking them the same way. */
 static size_t apply_pair_size(const t_my_userdef *userdef, const char *src,
                               size_t size) {
   size_t in, matches = 0;

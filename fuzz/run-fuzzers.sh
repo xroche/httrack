@@ -10,11 +10,8 @@ srcdir=$(cd "$(dirname "$0")" && pwd)
 bld=${1:?usage: run-fuzzers.sh <build-fuzz-dir> [check|seconds]}
 mode=${2:-20}
 
-# libFuzzer raises its length limit from the largest seed only after long
-# stretches with no new coverage, so a slow target stays short of what its
-# transforms need (past 2048 bytes for fuzz-htsparse). -len_control=0 takes the
-# limit at once but spends the short-input budget, so only the two targets
-# measured as needing it get the flags.
+# libFuzzer grows its length limit slowly, so only the targets measured as
+# needing long inputs get -len_control=0.
 fuzz_len_flags() {
     case "$1" in
     fuzz-htsparse | fuzz-cachendx)

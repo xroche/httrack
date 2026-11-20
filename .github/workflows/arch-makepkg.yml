@@ -1,7 +1,5 @@
-# Arch builds us with the newest gcc, glibc and openssl of any downstream, so a
-# moved header or a warning turned error surfaces here first. Their PKGBUILD has
-# no check(), so this proves the compile and the install but not the suite. It
-# blocks nothing, because a red here can be theirs to fix.
+# Arch has the newest gcc, glibc and openssl, so new warnings show here first.
+# This blocks nothing, because a red can be theirs to fix.
 name: arch makepkg canary
 
 on:

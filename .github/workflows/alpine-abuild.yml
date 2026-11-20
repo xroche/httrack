@@ -1,7 +1,5 @@
-# Alpine is the only downstream that builds us against musl, where a glibc-ism
-# breaks. Their APKBUILD sets options="!check", so this proves the compile and
-# the install but not the suite. It blocks nothing, because a red here can be
-# theirs to fix.
+# Alpine is our only musl downstream, and its APKBUILD skips the suite. This
+# blocks nothing, because a red can be theirs to fix.
 name: alpine abuild canary
 
 on:
@@ -40,9 +38,7 @@ jobs:
             https://git.alpinelinux.org/aports/plain/testing/httrack/APKBUILD
           cp "$GITHUB_WORKSPACE/httrack/httrack-$ver.tar.gz" .
           sha=$(sha512sum "httrack-$ver.tar.gz" | cut -d' ' -f1)
-          # abuild resolves a bare filename in source= against the APKBUILD's
-          # own directory. Pinning the sum here makes abuild verify our bytes,
-          # and reds a source entry naming anything else.
+          # The pinned sum makes abuild verify our tarball.
           # shellcheck disable=SC2016 # $pkgver is the APKBUILD's to expand, not ours
           sed -i -e "s/^pkgver=.*/pkgver=$ver/" \
             -e 's|^source=.*|source="httrack-$pkgver.tar.gz"|' \

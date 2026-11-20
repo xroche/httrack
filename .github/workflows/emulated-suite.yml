@@ -1,6 +1,5 @@
-# cross-arch.yml only compiles the ports architectures, so the Debian buildd
-# would run the suite there first (#1146, #1148). This runs it under qemu-user,
-# where a process looks unlike a native one and every step costs far more.
+# This runs the suite under qemu-user, because cross-arch.yml only compiles
+# the ports architectures (#1146, #1148).
 name: Emulated suite
 
 on:
@@ -26,9 +25,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # This leg tests emulation itself. The hppa of #1146 lives in
-        # debian-ports with no container image. s390x is in main and is the
-        # only big-endian target here.
+        # s390x is our only big-endian target, and hppa (#1146) has no image.
         arch: [s390x]
     steps:
       - name: Register the binfmt handlers

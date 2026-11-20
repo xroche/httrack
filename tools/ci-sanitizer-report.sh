@@ -1,8 +1,6 @@
 #!/bin/sh
-# Surface sanitizer findings automake swallows in a green run, because it keeps
-# only failing tests in test-suite.log and most test scripts lack `set -e`.
-# The log_path files hold what a test's stderr redirect hides, and the stderr
-# copies hold gcc's UBSan findings, because gcc ignores log_path.
+# Report the sanitizer findings a green run hides, from the log_path files and
+# from the stderr copies of gcc's UBSan, which ignores log_path.
 #
 # Usage: ci-sanitizer-report.sh [-s STDERR_DIR] LOG_PATH_DIR [TEST_LOG_DIR...]
 # Exits 1 on a hit.

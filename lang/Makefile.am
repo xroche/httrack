@@ -11,11 +11,8 @@ langhtmldir = $(langrootdir)/html
 EXTRA_DIST = $(lang_DATA) $(langroot_DATA)
 
 # The link is relative, because an absolute $(docdir) dangles under DESTDIR or
-# relocation (#885). htsserver answers a dangling link, as stripped docs leave,
-# with a 404. Making $(docdir) first leaves a real directory at the link path
-# where the two coincide, and a $(docdir) holding the link path is refused, or
-# htsserver would serve /doc/doc/doc/... Both paths are folded first, because a
-# "//", "/." or trailing "/" defeats the prefix test.
+# relocation (#885). A $(docdir) holding the link path is refused, or htsserver
+# would serve /doc/doc/doc/... Folding the paths first keeps that test exact.
 #
 # lang precedes html in SUBDIRS, so an older install's served-root symlink is
 # dropped before html writes through it. Test 385 pins that order.

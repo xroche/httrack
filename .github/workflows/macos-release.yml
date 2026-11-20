@@ -140,8 +140,7 @@ jobs:
           grep -q "source=Notarized Developer ID" "$log"
           # spctl alone can be answered online; this is the offline-launch proof.
           xcrun stapler validate "$app"
-          # This proves the hardened runtime did not break the dylib loads. The
-          # stub is a script and skips LaunchServices, so Gatekeeper is untested.
+          # This proves the dylibs still load. Gatekeeper stays untested.
           bash tests/webhttrack-smoke.sh "$app/Contents/Resources" "$app/Contents/MacOS/HTTrack"
 
       - name: Upload the DMG

@@ -31,8 +31,7 @@ EMPTY = {"absent", "literal", "unresolved", ""}
 def parse(path):
     """Rows of the TSV, or exit naming the first row that is malformed."""
     rows, seen = [], set()
-    # Read bytes, so a stray non-ASCII byte names its line instead of raising
-    # a decode traceback.
+    # Read bytes, so a stray non-ASCII byte names its line.
     with open(path, "rb") as fp:
         for n, raw in enumerate(fp, 1):
             bad = [b for b in raw.rstrip(b"\n") if not 0x20 <= b <= 0x7E and b != 0x09]
@@ -78,8 +77,7 @@ def parse(path):
                         "%s: %s.%s names %s, which has no row"
                         % (path, r["key"], col, ref)
                     )
-    # composed_with is symmetric, because a consumer reaching either row must
-    # find the other.
+    # composed_with is symmetric, so either row finds the other.
     by_key = {r["key"]: r for r in rows}
     for r in rows:
         for ref in filter(None, r["composed_with"].split(",")):

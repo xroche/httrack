@@ -25,8 +25,7 @@ would dishonor our work and waste the many hours we have spent on it.
 Please visit our Website: http://www.httrack.com
 */
 
-/* Fuzz the wildcard filter matcher (htsfilters.c). Input splits on the first
-   NUL into the pattern and the subject string. */
+/* Fuzz htsfilters.c. The input is the pattern, a NUL, then the subject. */
 #include "fuzz.h"
 #include "htsfilters.h"
 

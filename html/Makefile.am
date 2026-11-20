@@ -23,9 +23,7 @@ WebIconScalabledir = $(datadir)/icons/hicolor/scalable/apps
 VFolderEntrydir = $(datadir)/applications
 MetaInfodir = $(datadir)/metainfo
 
-# Wildcards are globbed against $(srcdir), because a bare "*.html" stays
-# unexpanded in an out-of-tree build and breaks "make". Explicit filenames
-# resolve via VPATH. They install into $(docdir), one level above the pages.
+# Wildcards name $(srcdir), because a bare "*.html" breaks an out-of-tree build.
 HelpHtmlroot_DATA = ../httrack-doc.html ../history.txt ../greetings.txt ../license.txt ../license-psl.txt
 HelpHtml_DATA = $(srcdir)/*.html $(srcdir)/*.js $(srcdir)/*.css
 HelpHtmldiv_DATA = div/search.sh

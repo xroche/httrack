@@ -42,8 +42,7 @@ ip -n "$peer" addr add 192.0.2.1/32 dev lo
 ip netns exec "$ns" tc qdisc add dev veth-h root netem delay 30ms
 ip -n "$ns" route add 192.0.2.0/24 via 10.53.0.2
 
-# A namespace that drops, or one where the peer answers, would make every
-# fixture below skip for the wrong reason.
+# A dropping namespace or an answering peer would make every fixture skip.
 probe=0
 ip netns exec "$ns" timeout 5 bash -c 'exec 3<>/dev/tcp/192.0.2.1/80' 2>/dev/null ||
     probe=$?

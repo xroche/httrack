@@ -21,10 +21,8 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 Please visit our Website: http://www.httrack.com
 */
 
-/* Fuzz the FTP control channel (htsftp.c). get_ftp_line() reads replies off a
-   socketpair into the PASV, EPSV, SIZE and MDTM parsers, and the same bytes go
-   through the user, host and command splitters as a URL. Byte 0 sets the reply
-   buffer size. */
+/* Fuzz the FTP reply parsers and URL splitters (htsftp.c) over a socketpair.
+   Byte 0 sets the reply buffer size. */
 #include "fuzz.h"
 
 #include "htscore.h"

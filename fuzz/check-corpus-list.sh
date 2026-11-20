@@ -1,8 +1,7 @@
 #!/bin/bash
 #
 # configure globs fuzz/corpus/*/* into FUZZ_CORPUS_LIST, the only thing that
-# ships the vectors in a tarball. The glob misses a file nobody git-added, one
-# a level deeper, and one whose name make would split, so this checks for them.
+# ships the vectors in a tarball. This checks for files the glob misses.
 # It also checks that every tracked file directly under fuzz/ ships.
 
 set -euo pipefail

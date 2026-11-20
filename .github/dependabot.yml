@@ -1,8 +1,7 @@
 version: 2
 updates:
   # Bumps builtin-baseline in src/vcpkg.json so the pinned OpenSSL/zlib can't rot.
-  # windows-build.yml validates each bump, and the pin keeps what ships
-  # reproducible. These are not auto-merged (see dependabot-automerge.yml).
+  # The pin keeps builds reproducible. A human merges these bumps.
   - package-ecosystem: vcpkg
     directory: /src
     schedule:

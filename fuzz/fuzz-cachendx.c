@@ -25,9 +25,7 @@ would dishonor our work and waste the many hours we have spent on it.
 Please visit our Website: http://www.httrack.com
 */
 
-/* Fuzz proxytrack's .ndx/.dat cache reader (store.c), the last one left. The
-   loader seeks the .dat on offsets read out of the .ndx, so both files come
-   from the input:
+/* Fuzz proxytrack's .ndx/.dat cache reader (store.c). The input holds both:
 
      bytes 0..1   big-endian length of the .ndx part
      then         the .ndx, then the rest as the .dat

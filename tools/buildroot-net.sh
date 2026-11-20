@@ -2,8 +2,7 @@
 #
 # Runs a command on the network an rpm buildroot has: loopback alone, with a
 # default route and no resolver. Fedora's mock builds that, and a UDP connect
-# there succeeds while naming no source (#1463). Debian's sbuild has no default
-# route, so it lands on the skip path.
+# there succeeds while naming no source (#1463).
 #
 # Usage: tools/buildroot-net.sh <command> [args...]      (re-execs under sudo)
 
@@ -14,9 +13,8 @@ fail() {
     exit 1
 }
 
-# Second entry, inside both namespaces. Mount away the resolver and drop back to
-# the invoking user, because the suite must not run as root. It is an env var,
-# because a root caller typing a flag by hand would unmount the real one.
+# The second entry hides the resolver and drops root. It is an env var, so a
+# root caller cannot unmount the real resolver with a typed flag.
 if [ -n "${BUILDROOT_NET_INNER:-}" ]; then
     mount --bind /dev/null /etc/resolv.conf
     run_as=${BUILDROOT_NET_INNER#user=}

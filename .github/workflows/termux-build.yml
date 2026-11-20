@@ -1,6 +1,5 @@
-# Termux is our harshest consumer: bionic, a cross-compile, API level 24 and a
-# stripped sysroot. This builds master through their recipe instead of the
-# released tarball. It blocks nothing, because a red can be theirs to fix.
+# This builds master through Termux's bionic cross-compile recipe. It blocks
+# nothing, because a red can be theirs.
 name: termux build canary
 
 on:

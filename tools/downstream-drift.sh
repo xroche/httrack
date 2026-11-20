@@ -1,8 +1,6 @@
 #!/bin/bash
 #
-# Fetches the live downstream recipes we cannot build and reports which of
-# their assumptions about our tree (a patch's context, a path a sed rewrites, a
-# string an ebuild greps for) no longer hold, before a packager hits one.
+# Check the downstream recipes we cannot build against our tree.
 #
 # Usage: tools/downstream-drift.sh        (needs network)
 
@@ -66,8 +64,7 @@ fetch() {
     [ -s "$2" ] || die "$1 came back empty"
 }
 
-# False when the recipe has deleted the patch, so a 404 ends nothing. Any other
-# failure aborts, because an unreachable host must not read as a dropped patch.
+# False when the recipe dropped the patch. Any other fetch failure aborts.
 recipe_carries_patch() {
     local code
     code=$(curl -sSL --retry 3 --retry-delay 5 -o "$2" -w '%{http_code}' "$1") ||
@@ -95,10 +92,8 @@ expect() {
     fi
 }
 
-# A patch that applies with fuzz, or far from where it was written, can land
-# somewhere its author never saw. OpenBSD's SSL patch matches a generic block
-# 307 lines past its target. Real drift is single digits, so 50 separates the
-# two. Recipes disagree on strip level, so take the first that applies.
+# A patch applying over 50 lines off can hit the wrong block, as OpenBSD's SSL
+# patch does. Take the first strip level that applies.
 carried_patch() {
     local id=$1 url=$2 p out off
     if ! recipe_carries_patch "$url" "$work/patch"; then

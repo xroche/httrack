@@ -1,7 +1,5 @@
-# openSUSE lists every installed file in an explicit %files and deletes the
-# installed config.h, so a file we add or move breaks their build. Their spec is
-# on 3.49.2, the oldest record of our install layout. It blocks nothing,
-# because a red here can be theirs to fix.
+# openSUSE lists every installed file, so a file we add or move breaks their
+# build. It blocks nothing, because a red can be theirs.
 name: opensuse spec canary
 
 on:

@@ -22,10 +22,8 @@ Please visit our Website: http://www.httrack.com
 */
 
 /* Fuzz the HTTP receive path: one back_wait() slot waits for headers on a
-   socketpair. The peer sends the response in pieces, each once the last is
-   read, then closes, so every read ends in data or EOF and none waits on a
-   timer. Byte 0 holds OPT_* flags, byte 1 the file name and resume length,
-   byte 2 the piece sizes, and the rest is the server's response. */
+   socketpair, fed in pieces so no read waits on a timer. Bytes 0-2 pick flags,
+   file and piece sizes, and the rest is the server's response. */
 #include "fuzz.h"
 
 #include "httrack-library.h"

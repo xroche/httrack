@@ -1,7 +1,5 @@
-# Fifteen distributions carry recipes that assume things about our tree: a
-# patch's context, a path a sed rewrites, a string an ebuild greps for. Without
-# this, a packager finds a broken one at the next version bump. A finding is
-# usually theirs to fix, so it blocks nothing.
+# This checks fifteen distributions' recipes against our tree. It blocks
+# nothing, because a finding is usually theirs to fix.
 name: distro packaging recipe canary
 
 on:

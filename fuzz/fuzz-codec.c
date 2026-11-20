@@ -129,8 +129,7 @@ done:
   return result;
 }
 
-/* Decode with zlib alone: the header's framing, then the other one, then a
-   verbatim copy. *out stays NULL when the copy is due. */
+/* Decode with zlib alone. *out stays NULL when a verbatim copy is due. */
 static int fuzz_inflate_expect(const uint8_t *body, size_t body_size, LLint cap,
                                unsigned char **out, size_t *len) {
   const hts_boolean wrapped =
@@ -217,8 +216,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     abort();
   }
   ret = hts_codec_unpack_max(codec, in_path, out_path, cap);
-  /* Want a size within budget, -1, or the cap verdict for a codec we decode.
-     On a healthy disk, errno 0 blames the body. */
+  /* On a healthy disk, a failure must leave errno 0. */
   if (ret < HTS_CODEC_TOOBIG || (ret == HTS_CODEC_TOOBIG && cap == 0) ||
       (codec == HTS_CODEC_UNSUPPORTED && ret != -1) ||
       (ret < 0 && errno != 0) ||

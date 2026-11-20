@@ -25,19 +25,12 @@ would dishonor our work and waste the many hours we have spent on it.
 Please visit our Website: http://www.httrack.com
 */
 
-/* Fuzz httrack's own codepage decoder, hts_codepageToUTF8() and the
-   htscodepages.h tables. An iconv build compiles none of it, yet Windows and
-   every iconv-less distro ship it, so this harness links its own copy of
-   htscharset.c forced onto the tables.
-
-   hts_equalsCodepageName() matches a label loosely, so "windows-1252" and
-   "IBM850" name cp1252 and cp850. The input picks a fixed label or one made
-   of its own bytes. */
+/* Fuzz hts_codepageToUTF8() and the htscodepages.h tables, which iconv builds
+   skip, so this links its own htscharset.c forced onto the tables. */
 #include "fuzz.h"
 #include "htscharset.h"
 
-/* IANA and IBM spellings must resolve to the same table as the name. The last
-   two must resolve to none. */
+/* Aliases must resolve to their name's table, and the last two to none. */
 static const char *const labels[] = {
     "iso88591", "iso885915", "cp1252",    "windows-1252", "windows1252",
     "IBM850",   "cp850",     "koi8r",     "koi8-r",       "cp037",

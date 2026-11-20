@@ -60,8 +60,7 @@ static void sf_cleanup(void) {
   (void) remove(sf_root);
 }
 
-/* One httrackp serves the whole run, because the mark secret lives on it and
-   a fresh one per input would void every mark in the corpus. */
+/* One httrackp serves the run, because the corpus marks need its secret. */
 static httrackp *sf_opt = NULL;
 
 /* A missing asset would reduce the target to its parser half. */
@@ -80,8 +79,7 @@ static void sf_text(const char *name, const char *data) {
   sf_write(name, data, strlen(data));
 }
 
-/* Append ref and a valid mark for it. A fixture cannot spell a mark, because
-   the secret is drawn per httrackp. */
+/* Append ref and a valid mark, which a fixture cannot spell. */
 static void sf_marked(String *out, const char *ref, char cls) {
   char mark[SINGLEFILE_MARK_MAX];
 
@@ -140,8 +138,7 @@ static void sf_init(void) {
   sf_write("a.png", png, sizeof(png) - 1);
   sf_write("big.png", big, sizeof(big));
   sf_text("j.js", "var x=1;\n");
-  /* Marks make an inlined stylesheet recurse into its own marks and rebase
-     its un-inlinable reference. Unmarked, the target reaches nothing. */
+  /* Marks let an inlined stylesheet recurse and rebase its references. */
   {
     String css = STRING_EMPTY;
 
@@ -172,8 +169,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   }
   sf_expand_input((const char *) data, size, &in);
   html_len = StringLength(in);
-  /* The copy is unterminated. The rewriter is span-based, so ASan catches a
-     read past html_len instead of it landing on a terminator. */
+  /* The copy is unterminated, so ASan catches a read past html_len. */
   html = malloct(html_len != 0 ? html_len : 1);
   memcpy(html, StringBuff(in), html_len);
   StringFree(in);

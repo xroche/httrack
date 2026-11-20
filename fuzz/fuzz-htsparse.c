@@ -150,8 +150,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
   sback = back_new(opt, opt->maxsoc * 32 + 1024);
 
-  /* ptr=1, the parsed page, selects full HTML parsing and the rewriter.
-     urladr(), urlfil() and savename() alias heap(ptr). save is /dev/null. */
+  /* ptr=1 selects full HTML parsing and the rewriter. */
   hts_record_link(opt, "example.com", "/", "/dev/null", "", "", NULL);
   hts_record_link(opt, "example.com", modes[mode].file, "/dev/null", "", "",
                   NULL);

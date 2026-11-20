@@ -21,11 +21,8 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 Please visit our Website: http://www.httrack.com
 */
 
-/* Fuzz the SOCKS5 client handshake (htsproxy.c) against a hostile proxy that
-   socks5_handshake_scripted() replays from a buffer. The input is
-   "origin\nproxy\nreply". The first two lines feed the port parser and the
-   RFC 1929 credential decoder, and the rest is what the proxy sends back.
-   Without two newlines the whole input is the reply. */
+/* Fuzz the SOCKS5 handshake (htsproxy.c) against a scripted proxy. The input
+   is "origin\nproxy\nreply", and without two newlines it is all reply. */
 #include "fuzz.h"
 
 #include <stdlib.h>

@@ -1,9 +1,7 @@
 # HTS_ADD_FORTIFY_SOURCE
 #
 # Append -D_FORTIFY_SOURCE=3 (else =2) to CPPFLAGS, once the compiler has been
-# seen to emit a checked entry point for it. Linking the define proves nothing,
-# because glibc gates the checked builtins behind __OPTIMIZE__. The probe body
-# must also pass -Wwrite-strings under -Werror.
+# seen to emit a checked entry point, because glibc gates it on __OPTIMIZE__.
 #
 # Sets FORTIFY_SOURCE_LEVEL to the level chosen, empty if none.
 AC_DEFUN([HTS_ADD_FORTIFY_SOURCE], [

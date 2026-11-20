@@ -28,8 +28,7 @@ COMMENT_OR_LITERAL = re.compile(
 )
 LITERAL = re.compile(r"'(?:\\.|[^'\\])*'" r'|"(?:\\.|[^"\\])*"', re.S)
 
-# A name that #define, #undef or #ifdef introduces is not a use, as in the usual
-# "#ifndef SIZE_MAX / #define SIZE_MAX ..." shim.
+# A name that #define, #undef or #ifdef introduces is not a use.
 DECLARED = re.compile(r"^[ \t]*#[ \t]*(?:define|undef|ifdef|ifndef)[ \t]+\w+", re.M)
 
 CONDITIONAL = re.compile(r"^\s*#\s*(if|ifdef|ifndef|endif)\b")

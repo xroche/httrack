@@ -3,9 +3,8 @@
 # Decide whether HTTraQt upstream has moved away from the revision the canary
 # job pins; httraqt-upstream.yml does the telling.
 #
-# Prints pinned=, upstream= and status= to stdout, and to $GITHUB_OUTPUT when
-# set. status is unchanged, moved, or gone (no master branch). An unreadable pin
-# or a silent host exits non-zero, because the watch has then stopped working.
+# Prints pinned=, upstream= and status= (unchanged, moved or gone), also to
+# $GITHUB_OUTPUT. A broken watch exits non-zero.
 
 set -eu
 
@@ -46,9 +45,8 @@ case "$ATTEMPTS" in
 "" | 0 | *[!0-9]*) usage ;;
 esac
 
-# The pin is the state, because it is what the canary builds. The match is
-# anchored, so a quoted or suffixed value is a hard error, and two matching
-# lines overshoot the length check.
+# The pin is what the canary builds. The anchored match rejects a quoted or
+# suffixed value.
 pinned=$(sed -n 's/^[[:space:]]*HTTRAQT_REF:[[:space:]]*\([0-9a-f]\{40\}\)\([[:space:]].*\)\{0,1\}$/\1/p' "$WORKFLOW")
 [ "${#pinned}" -eq 40 ] || fail "no single bare 40-hex HTTRAQT_REF in $WORKFLOW"
 

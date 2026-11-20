@@ -88,8 +88,8 @@ static int process_file(t_hts_callbackarg * carg, httrackp * opt, char *html,
   }
 
   /* Process */
-  /* Each half can fill this buffer alone and the value is only printed, so
-     clip. sizeof() names the field, because the local is a pointer alias. */
+  /* Clip, because each half can fill this buffer. The local is a pointer, so
+     sizeof() names the field. */
   printf("now parsing %s%s..\n", url_address, url_file);
   snprintf(currentURLBeingParsed, sizeof(userdef->currentURLBeingParsed),
            "%s%s", url_address, url_file);

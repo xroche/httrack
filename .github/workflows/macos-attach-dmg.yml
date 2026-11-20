@@ -1,5 +1,4 @@
-# Attaches on the publish event, because releases are cut by hand and the tag
-# can land half an hour before the release exists.
+# This runs on publish, because the tag can land long before the release.
 name: attach the macOS DMG
 
 on:

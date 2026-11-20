@@ -80,7 +80,6 @@ TITLES = {
 }
 
 # Each page gets its own description, so a search result says what it is.
-# Keywords are dropped, because nothing reads them.
 DESCRIPTIONS = {
     "abuse.html": "How to mirror a site without hammering the server, and what a"
     " webmaster can do about crawlers that do.",

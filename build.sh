@@ -10,8 +10,7 @@
 #
 # On a noexec filesystem, run the script with sh:  sh build.sh
 #
-# bootstrap needs autoconf, automake and libtool. A release tarball ships
-# ./configure, so there just run ./configure && make.
+# bootstrap needs autoconf, automake and libtool. A release tarball does not.
 
 set -e
 
