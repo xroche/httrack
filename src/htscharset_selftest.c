@@ -146,7 +146,8 @@ static int st_nobestfit(httrackp *opt, int argc, char **argv) {
   assertf(wn == 1);
   n = WideCharToMultiByte(cp, 0, wide, wn, raw, (int) sizeof(raw), NULL, NULL);
   assertf(n == 2);
-  /* The ban sizes for the substitute, so a ban-less conversion overflows. */
+  /* The ban sizes for the substitute, so a buffer sized under the ban overflows
+     when converted without it. */
   n = WideCharToMultiByte(cp, WC_NO_BEST_FIT_CHARS, wide, wn, NULL, 0, NULL,
                           NULL);
   assertf(n == 1);

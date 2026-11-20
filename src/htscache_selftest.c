@@ -2069,7 +2069,8 @@ static int cache_corruption_selftest(httrackp *opt, const char *dir) {
       corrupt_expect_victim_clipped(opt, sizeof(((htsblk *) 0)->msg) - 1,
                                     (size_t) -1, "over-long X-StatusMessage");
 
-  /* lastmodified[64] is narrower than msg[80], so one clip length fails one. */
+  /* lastmodified[64] is narrower than msg[80], so a single hardcoded clip
+     length cannot fit both. */
   corrupt_build(opt, CORRUPT_LONG_ETAG);
   corrupt_patch(opt, "Etag: " CORRUPT_LONG_ETAG, 106,
                 "Last-Modified: " /* 15 + 91 = 106 */
@@ -2146,7 +2147,8 @@ static void fill_str(char *s, size_t size, size_t len, char c) {
   s[len] = '\0';
 }
 
-/* The reader may only clip, so a value must read back as a long prefix. */
+/* The reader may only clip, so a value must read back as a prefix of
+   the written one, at least `least` bytes long. */
 static int check_prefix(const char *what, const char *got, const char *want,
                         size_t least) {
   const size_t len = strlen(got);
@@ -2363,7 +2365,7 @@ static int cache_url_bounds_selftest(httrackp *opt, const char *dir) {
      byte: a key clipped anywhere on the path aliases the two together */
   static char big_adr[HTS_URLMAXSIZE * 2], big_fil[HTS_URLMAXSIZE * 2];
   static char twin_fil[HTS_URLMAXSIZE * 2];
-  /* These pass every buffer on the path, so the cache must drop them. */
+  /* These exceed every buffer on the path, so the cache must drop them. */
   static char huge_fil[CACHE_ENTRYNAME_SIZE * 2];
   static char huge_adr[CACHE_ENTRYNAME_SIZE * 2];
   /* the key a writer that clipped huge_fil would have stored it under */
@@ -2977,7 +2979,9 @@ static int cache_readfail_selftest(httrackp *opt, const char *dir) {
 
 /* --- the portable resume reference (.ref) --------------------------------- */
 
-/* Each row is one field of the ref_put_record() record, in write order. */
+/* Each row is one field of the ref_put_record() record, in write order.
+   Keep every value distinct and every multi-byte number's bytes all different,
+   so a swap or byte-order error shows. */
 typedef enum {
   REF_F_RAW, /* verbatim bytes, no length prefix (the magic) */
   REF_F_U32, /* 4 bytes, little-endian */
