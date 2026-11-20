@@ -49,13 +49,11 @@ for good in "127.0.0.1" "127.0.0.1:${HTS_PORT}" "localhost" "localhost:${HTS_POR
 done
 echo "ok: the panel answers at every authority it is reachable at"
 
-# This host's name, which a browser presents for `htsserver --bind <lan ip>`
-# at http://myhost.lan:8080/. It is dropped when another rule accepts it too.
+# A browser presents this name for `htsserver --bind <lan ip>`.
 selfname=$(htsserver_python -c 'import socket, sys
 sys.stdout.reconfigure(newline="\n")  # this name goes out in a Host header
 print(socket.gethostname())')
-# Succeeds for localhost or an address-shaped name, which other rules accept
-# (host_is_address()).
+# Succeeds for a name other rules accept, such as localhost or an address.
 covered_elsewhere() {
     case $(printf '%s' "$1" | tr '[:upper:]' '[:lower:]') in
     localhost | '') return 0 ;;
@@ -103,8 +101,7 @@ for bad in "${bad_hosts[@]}"; do
 done
 echo "ok: a foreign authority is refused, on every method"
 
-# A refused reply must also refuse the write, because the body lands in a
-# global key store that later pages render. step3 interpolates ${projname}.
+# A refused reply must also refuse the write, because later pages render it.
 store_page() {
     page=$(htsserver_get /server/step3.html) || fail "the key store probe failed"
     grep -q '^HTTP/1\.0 200 ' <<<"${page}" ||

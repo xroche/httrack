@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# Unticking a cache box must clear the stored "1", so each box needs a hidden
-# companion that posts when the box does not.
+# Unticking a cache box must clear the stored "1" through a hidden companion.
 
 set -euo pipefail
 
@@ -91,9 +90,7 @@ for box, page, flag, on_when_clear in BOXES:
     check((flag in cmdline()) is on_when_clear,
           "%s unticked %s %s" % (box, "emits" if on_when_clear else "drops", flag))
 
-# step2.html copies the Cache profile key onto the box on every render, and a
-# seeded key would turn the cache back on. Only the session's first render sees
-# it, because ${do:copy} consumes its source.
+# A seeded Cache key would retick the box, but only on step2's first render.
 s.get("step2.html")
 check("--cache=0" in cmdline(), "an unticked cache survives the step2 pass")
 check(not checked(s.get("option3.html"), "cache"),

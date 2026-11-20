@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# The Visual Studio projects carry their own hand-written source lists, so a new
-# .c added to Makefile.am alone breaks only the MSVC link (#1376).
+# A .c added to Makefile.am alone breaks only the MSVC link (#1376).
 
 set -euo pipefail
 

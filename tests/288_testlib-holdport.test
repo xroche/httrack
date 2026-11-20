@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# freeport can return a port it has released (#1218). hold_port keeps the port
-# from a competing bind until release, and htsserver_start redraws one taken in
-# between. An unbound port refuses a dial too, so refusal alone proves nothing.
+# hold_port must keep a released freeport port from a competing bind (#1218).
+# An unbound port refuses a dial too, so refusal alone proves nothing.
 
 set -euo pipefail
 
@@ -80,8 +79,7 @@ test "$rc" -eq 2 || fail "htsserver_start returned $rc on a port it cannot bind:
 assert_match "could not bind port $taken" "$out" "htsserver_start --port"
 ok "a caller-owned port that is taken returns 2 to the caller"
 
-# Hand out the taken port once, as a neighbour winning the race would. The flag
-# is a file because the draw runs in a subshell, which loses variables.
+# Hand out the taken port once. A subshell draws it, so the flag is a file.
 : >"$tmpdir/steal"
 htsserver_freeport() {
     if test -f "$tmpdir/steal"; then

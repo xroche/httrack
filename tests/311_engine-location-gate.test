@@ -38,9 +38,8 @@ kept 2047 2047
 refused 2048
 refused 3000
 
-# Each case reads four lines from a header block. A cut line must be reported,
-# and the next line must be the next header, not the cut line's tail. "over"
-# means the cursor walked past the block's end, which must never happen.
+# A cut line must be reported, and the next read must start at the next
+# header. "over" means the cursor passed the block's end.
 line() { # line READSIZE BLOCK WANT
     if [ -n "$2" ]; then
         selftest_queue_lines "$3" headerline "$1" "$2"

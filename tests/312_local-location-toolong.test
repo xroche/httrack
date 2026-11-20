@@ -1,7 +1,5 @@
 #!/bin/bash
-# A Location past the header-line read buffer arrives cut, so the redirect
-# must be dropped (#1291). A second mirrored file means the cut target was
-# fetched.
+# A Location cut by the header-line buffer must not be followed (#1291).
 set -e
 
 : "${top_srcdir:=..}"
@@ -12,8 +10,7 @@ bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
     --log-found 'Over-long header dropped for .*/longloc/go\.php' \
     httrack 'BASEURL/longloc/index.html'
 
-# Control: a Location short enough to read whole is followed, so the refusal
-# above comes from the header length.
+# Control: a Location that fits is followed.
 bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
     --files 2 \
     --found 'shortloc/index.html' \

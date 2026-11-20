@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# A field typed into the extra-headers box (-%X) replaces the engine's own line
-# (#1337). A self-test checks the predicate, then a crawl checks the wire.
+# A field typed into the extra-headers box (-%X) replaces the engine's (#1337).
 
 set -euo pipefail
 
@@ -97,8 +96,7 @@ probe() { # probe TAG [extra httrack args...]
     assert_eq "$nreq" "$(count_lines '^=== REQUEST ===$' "$wire")" "$tag: requests logged"
     # the server's own byte-for-byte copy, never the log split by a text tool
     cp "$wire.$nreq" "$tmpdir/$tag.req"
-    # The request ends with two CRLFs, because the fixture appends nothing to a
-    # per-request file. Strip od's padding, which differs between GNU and BSD.
+    # Strip od's padding, which differs between GNU and BSD.
     assert_eq 0d0a0d0a \
         "$(tail -c 4 "$tmpdir/$tag.req" | od -An -t x1 | tr -d '[:space:]')" \
         "$tag: the CRLF CRLF ending the request"
@@ -119,8 +117,7 @@ assert_value() { # assert_value TAG FIELD VALUE
     assert_eq "$3" "$(value_of "$2" "$tmpdir/$1.req")" "$1: $2"
 }
 
-# Apart from lines matching RE, the request is byte-identical to the one with
-# no box. Compare files, because $(...) would hide a lost trailing newline.
+# Compare files, because $(...) would hide a lost trailing newline.
 assert_same_but() { # assert_same_but TAG RE
     local base=$tmpdir/$1.base got=$tmpdir/$1.got
     grep -Ev "$2" "$tmpdir/plain.req" >"$base" || true

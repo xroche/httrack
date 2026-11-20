@@ -6,8 +6,7 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-# Checks where the *[...] class scan stops, terminated or not, against the
-# behavior from before joker_class_end().
+# The *[...] scan must stop where it did before joker_class_end().
 
 match() { selftest_queue "$2 does match $1" filter "$1" "$2"; }
 nomatch() { selftest_queue "$2 does NOT match $1" filter "$1" "$2"; }
@@ -37,8 +36,7 @@ nomatch '*[' 'abc'
 nomatch '*(a' 'abc'
 nomatch '*(file' 'abc'
 
-# A terminated class makes the returned index observable, because it decides
-# where the pattern resumes.
+# A terminated class makes the returned index observable.
 match '*[file]x' 'abcx'
 nomatch '*[file]x' 'abc'
 nomatch '*[file]x' 'a/bx'

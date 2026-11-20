@@ -22,9 +22,8 @@ rec() { # rec DOMAIN PATH NAME VALUE
     printf '%s\tTRUE\t%s\tFALSE\t1999999999\t%s\t%s\n' "$1" "$2" "$3" "$4"
 }
 
-# Each field sits at the first byte that must not fit and the byte below, to
-# catch a > for >=. The message pins each capacity: domain[256], path[256],
-# cook_name[4097].
+# Each field is probed at its capacity and one byte past it. The capacities
+# are domain[256], path[256] and cook_name[4097].
 jar="$tmp/jar.txt"
 {
     rec www.example.com / GOODFIRST v1
@@ -37,8 +36,7 @@ jar="$tmp/jar.txt"
     rec www.example.com / "NAME2000$(repeat_chars 1992 A)" v
     rec www.example.com / "NAME4500$(repeat_chars 4492 A)" v
     rec www.example.com / "NAME4097$(repeat_chars 4089 A)" v
-    # fits cook_name but its line exceeds the jar's 4096-byte cap, which the
-    # log must report too
+    # this fits cook_name but exceeds the jar's 4096-byte line cap
     rec www.example.com / "JARCAP$(repeat_chars 4090 A)" v
     # cook_value[8192] is out of reach behind the line gate, so it is pinned
     # from below: neither of these may be refused for its value

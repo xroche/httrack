@@ -1,12 +1,7 @@
 #!/bin/bash
 #
-# An external script is link-scanned under any JavaScript type the server
-# sends: text/javascript (with or without charset), application/javascript,
-# application/x-javascript, and a .mjs module (#302).
-#
-# The link-free quiet/q.js must come out byte-identical to quiet/q.bin, the same
-# bytes under a type nothing scans. json/d.json holds a link-shaped string under
-# a non-script type and must stay unscanned.
+# An external script is link-scanned under every JavaScript type (#302).
+# quiet/q.js must match q.bin, and json/d.json must stay unscanned.
 
 set -euo pipefail
 

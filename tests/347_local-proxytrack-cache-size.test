@@ -1,7 +1,6 @@
 #!/bin/bash
-# X-Size is a signed 64-bit cache value that the proxy passes to malloc(). A
-# negative one becomes SIZE_MAX, and the body then overflows a 1-byte buffer.
-# Cases mirror htscache_selftest.c's.
+# A negative X-Size must not reach malloc() as SIZE_MAX.
+# The cases mirror htscache_selftest.c's.
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh

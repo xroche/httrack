@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# --pause (#185) must slow a multi-file crawl. One --pause value sets min and
-# max alike, so N files take at least (N-1) pauses on any box. The test asserts
-# that floor, which a loaded box cannot fake.
+# --pause (#185) must slow a crawl. One value sets min and max alike, so N
+# files take at least N-1 pauses. A loaded box cannot fake that floor.
 
 set -e
 

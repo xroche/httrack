@@ -27,8 +27,7 @@ unknown_opt() { # unknown_opt TOTALLEN
 assert_match 'Unknown option' "$(unknown_opt 1023)" 'argv at the limit'
 assert_match 'argument too long' "$(unknown_opt 1024)" 'argv over the limit'
 
-# doit.log is replayed into argv after the pre-check with an 8000-byte line
-# budget, which lets it oversize a diagnostic argument.
+# doit.log is replayed after the length pre-check, so it can oversize argv.
 mirror=$(mktemp -d)
 cleanup_push rm -rf "$mirror"
 mkdir -p "$mirror/hts-cache"
@@ -36,9 +35,8 @@ printf 'http://x/ --%s\n' "$(repeat_chars 3000 B)" >"$mirror/hts-cache/doit.log"
 reply=$(cd "$mirror" && HOME=$mirror "$h" 2>&1) || true
 line=$(firstline "$reply")
 
-# The clip fills the 1280-byte buffer with the token and drops the
-# " not recognized" suffix. Unclipped, the write overflows and the engine aborts
-# before printing anything.
+# The clip fills the 1280-byte buffer and drops the " not recognized" suffix.
+# Unclipped, the engine aborts before printing anything.
 case $line in
 *"not recognized"*) fail "message was not clipped: $line" ;;
 esac

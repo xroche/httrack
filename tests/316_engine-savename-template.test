@@ -5,10 +5,8 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-# -N '<template>' selects url_savename()'s savename_type -1 branch, which must
-# not abort once a crawled link outgrows save[] (#1295). filpad=N expands the
-# '*' in the path into N bytes, past what argv can carry. -#test=savename
-# poisons the bytes behind save[] and fails if naming reached them.
+# -N '<template>' must not abort once a crawled link outgrows save[] (#1295).
+# -#test=savename fails if naming wrote past save[].
 
 # 40 bytes, so the host survives the downstream shortener as one whole segment
 # on every platform: its per-segment ceiling is 48 on Windows. Every name
@@ -31,10 +29,8 @@ name=$(printf '%0100d' 0 | tr '0' a)
 selftest_queue "savename: /dev/null/$host/dir/$name.html" savename \
     '/dir/*.html' text/html filpad=100 "adr=$host" 'userdef=%h%p/%n.%t'
 
-# Past the end of save[] only the link's own bytes are cut. The host, path and
-# separator still lead the name, and the link's tail and extension end it. The
-# pads build 2050 and 2080 bytes against a 2048-byte buffer. The 1000-byte host
-# fills it before the name starts, so only its first bytes are asserted.
+# Past save[] only the link's own bytes are cut. The 2048-byte buffer starts
+# with a 1000-byte host, so only the host's first bytes are asserted.
 for pad in 2000 2030; do
     leads_with "$host/dir/" "$pad" "$host" '%h%p/%n.%t'
     ends_with_name_and_ext "$pad" "$host" '%h%p/%n.%t'
@@ -70,10 +66,8 @@ selftest_queue \
     "savename: /dev/null/$host/page8803cb530daebc650716593bdaf77b8a.html" \
     savename '/dir/page.html?id=7' text/html "adr=$host" 'userdef=%h/%n%Q.%t'
 
-# A %[param] value is crawled text, copied into a 256-byte token. This one
-# reaches the third token past it, which holds the suffix, so the extension
-# arrives only if the value stayed in its own. Both ends are asserted short,
-# because Windows cuts this one-segment name to 48 bytes.
+# A %[param] value must stay in its 256-byte token, or the suffix three tokens
+# on is lost. Windows cuts this name to 48 bytes, so both ends are short.
 value=$(printf '%0600d' 0 | tr '0' v)
 selftest_queue_head "savename: /dev/null/($(printf '%040d' 0 | tr '0' v)" \
     savename "/p?q=$value" text/html "adr=$host" 'userdef=%[q:(:).x]'

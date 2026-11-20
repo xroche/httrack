@@ -9,9 +9,7 @@ set -euo pipefail
 # #1117: the self-test asserts the scopes and the patterns; this feeds the pair
 # a scope answer emits back through the matcher that authorizes a link.
 
-# The front end enumerates by looping until the engine stops answering. Strip
-# the CRs, because MSYS writes a text-mode stdout and $(...) keeps the CRs of
-# interior lines.
+# Strip the CRs, because MSYS writes a text-mode stdout.
 want="0 download.example.co.uk
 1 example.co.uk
 2 co.uk"

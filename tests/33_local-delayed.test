@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# Degenerate delayed-type paths (#5/#107 family). A redirect that never
-# resolves a name must leave no .delayed file (local-crawl.sh checks) and no
-# "not cached" warning, and resolvable links must still land.
+# A redirect that never resolves a name must leave no .delayed file and no
+# "not cached" warning (#5, #107), and resolvable links must still land.
 
 set -euo pipefail
 

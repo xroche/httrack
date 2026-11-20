@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# A size clause carries two bounds (#1303). *[<80>1], *[>1<80] and *[>1,<80]
-# all mean "over 1 KB and under 80 KB", so the second bound must apply.
+# A size clause's second bound must apply (#1303).
 
 set -euo pipefail
 

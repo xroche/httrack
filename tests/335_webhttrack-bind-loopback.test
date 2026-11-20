@@ -13,8 +13,7 @@ htsserver_require
 work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_bind.XXXXXX") || fail "no tmpdir"
 cleanup_push htsserver_cleanup_dir "${work}"
 
-# Prints "ok" or the errno name. Only a refusal proves nothing is listening,
-# because a filtered address times out.
+# Prints "ok" or the errno name. A timeout proves nothing, unlike a refusal.
 probe() { # $1 = host, $2 = port
     htsserver_python - "$1" "$2" <<'PY'
 import socket, sys
@@ -27,9 +26,8 @@ except OSError as e:
 PY
 }
 
-# Prints the primary outbound IPv4, picked by a UDP connect() that sends
-# nothing, or classifies $1 when given, so the guard below can be tested.
-# bash 3.2 runs a heredoc inside $() as commands, hence a function.
+# Prints the primary outbound IPv4, or classifies $1 when given. bash 3.2 runs
+# a heredoc inside $() as commands, so this is a function.
 primary_ipv4() { # [address]
     htsserver_python - ${1+"$1"} <<'PY'
 import ipaddress, socket, sys

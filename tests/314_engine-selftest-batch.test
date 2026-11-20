@@ -81,8 +81,7 @@ and its local type is '.gif'" mime a.gif
 selftest_run_queued
 rejects 'lines' selftest_queue_lines 'a.gif is only one line' mime a.gif
 
-# The CR half of lines mode needs an interior CRLF from the case itself. On
-# Windows text mode doubles that CR, so 311 and mime cover it there instead.
+# Windows doubles this interior CR, so 311 and mime cover lines mode there.
 if ! target_is_windows; then
     selftest_queue_lines 'A
 B' charset iso-8859-1 hex:410d0a42
@@ -106,8 +105,7 @@ rejects 'a case that exits non-zero' selftest_queue '' filter
 rejects 'an unknown compare mode' \
     selftest_queue_mode bogus 'z does NOT match y' filter y z
 
-# A case's exit code rides the framing, not the process status. A failing case
-# (filter with no pattern) in the middle must report and not hide the next one.
+# A failing case mid-batch must report without hiding the next one.
 script=$(mktemp)
 cleanup_push rm -f "$script"
 printf '%s\0' 1 mime 'a.gif' 0 filter 1 mime 'a.html' >"$script"
@@ -132,9 +130,8 @@ refuses 'a non-numeric argument count' x filter '*' y
 refuses 'an argument count past the cap' 4096 filter '*'
 refuses 'a negative argument count' -1 filter
 
-# A file that queues cases and never flushes passes on any engine output. The
-# EXIT trap cannot fail the test (#773), so this is a static check.
-# Sets SCANNED and UNDRAINED, because a command substitution would lose them.
+# A file that queues cases and never flushes always passes, and the EXIT trap
+# cannot fail the test (#773). It sets globals, because $(...) would lose them.
 undrained_in() { # undrained_in DIR
     local f
     SCANNED=0

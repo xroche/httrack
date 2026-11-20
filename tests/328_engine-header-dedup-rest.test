@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# Of the six headers #1337 left out, the box wins for Proxy-Authorization,
-# Referer and Cookie, and the engine for xsend's lines. The box never sends a
-# framing field such as Content-length or Connection (#1340).
+# The box wins for Proxy-Authorization, Referer and Cookie, and the engine for
+# xsend's lines. The box never sends a framing field (#1340).
 
 set -euo pipefail
 
@@ -17,9 +16,8 @@ TAB=$'\t'
 # without -v, od folds a run of identical lines into a "*"
 tohex() { printf '%s' "$1" | od -An -v -t x1 | tr -d '[:space:]'; }
 
-# WANT is what the box appends to a request carrying REQ, CR and LF escaped.
-# Both arguments go as hex, because Windows reads the batch script in text mode
-# and would turn each CRLF into LF.
+# WANT is what the box appends to REQ, CR and LF escaped. Both go as hex,
+# because Windows reads the batch script in text mode.
 hd() { # hd WANT REQ BLOCK
     selftest_queue "$1" headerdedup "hex:$(tohex "$2")" "hex:$(tohex "$3")"
 }
@@ -33,8 +31,7 @@ hd '' "$req" "Connection: keep-alive$CRLF"
 hd 'X-A: 1\r\n' "$req" "Connection: keep-alive${CRLF}X-A: 1$CRLF"
 # field names are case-insensitive, and the engine spells this one "length"
 hd '' "GET /p HTTP/1.1${CRLF}Content-length: 0$CRLF" "Content-Length: 99$CRLF"
-# a dropped line takes its folded continuations with it, or they would attach
-# to the header before them
+# a dropped line takes its folded continuations with it
 hd 'X-B: 2\r\n' "$req" "Connection: keep-alive$CRLF X-Injected: yes${CRLF}X-B: 2$CRLF"
 hd 'X-B: 2\r\n' "$req" "Connection: x$CRLF${TAB}folded${CRLF}X-B: 2$CRLF"
 hd '' "$req" "Connection: x${CRLF} one${CRLF}${TAB}two$CRLF"
@@ -142,8 +139,7 @@ probe() { # probe TAG COUNT URL [extra httrack args...]
     done
     nreq=$((nreq + count))
     cp "$tmpdir/$tag.$count.req" "$tmpdir/$tag.req"
-    # The request ends with two CRLFs, because the fixture appends nothing to a
-    # per-request file. Strip od's padding, which differs between GNU and BSD.
+    # Strip od's padding, which differs between GNU and BSD.
     assert_eq 0d0a0d0a \
         "$(tail -c 4 "$tmpdir/$tag.req" | od -An -t x1 | tr -d '[:space:]')" \
         "$tag: the CRLF CRLF ending the request"
@@ -165,7 +161,6 @@ assert_same() { # assert_same BASE TAG
         fail "$2: the request differs from $1's"
 }
 
-# Apart from lines matching RE, the request is byte-identical to BASE's.
 # Compare files, because $(...) would hide a lost trailing newline.
 assert_same_but() { # assert_same_but BASE TAG RE
     local base=$tmpdir/$2.base got=$tmpdir/$2.got
@@ -213,8 +208,7 @@ assert_once boxcookie Cookie
 assert_value boxcookie Cookie box=1
 assert_same_but cookie boxcookie '^Cookie:'
 
-# a jar from an older httrack or a hand edit may hold host:port, and the send
-# side queries the bare host, so cookie_load must strip the port
+# an old or hand-edited jar may hold host:port, which cookie_load must strip
 printf '127.0.0.1:%s\tTRUE\t/\tFALSE\t1999999999\tsess\tPERSIST\n' \
     "$port" >"$jar"
 probe portjar 1 "$base" --cookies-file "$jar"
@@ -255,8 +249,7 @@ assert_same_but plain range '^Range:'
 
 # --- a dropped line takes its continuations with it --------------------------
 
-# Control for the drop probe below. It also checks that argv keeps the leading
-# space, or that probe would test a header nobody folded.
+# The drop probe below needs argv to keep this leading space.
 probe keptfold 1 "$base" -%X 'X-Fold: a' -%X ' zzfold'
 assert_eq 'Connection Host From User-Agent Accept Accept-Language Accept-Encoding X-Fold' \
     "$(fields_of "$tmpdir/keptfold.req")" 'keptfold: the field order'

@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# gcc's UBSan ignores log_path and reports on stderr, which most tests discard,
-# so the harness keeps a copy (stderrwrap.c). The copy must exist, the test's
-# own stderr must be untouched, and both must be complete when the shim exits.
+# The harness copies stderr for gcc's UBSan, which ignores log_path. The copy
+# and the test's own stderr must both be whole when the shim exits.
 
 set -euo pipefail
 
@@ -26,8 +25,8 @@ export HTTRACK_STDERR_CAPTURE_TAG=349_probe
 # write to either stream and pick its own exit status.
 run_wrapped() { "$wrap" /bin/sh -c "$1"; }
 
-# Counts the lines in $1 without forking, because a fork would give a lagging
-# writer time to finish. macOS's bash 3.2 has no readarray.
+# Counts lines in $1 without forking, which would let a lagging writer finish.
+# macOS's bash 3.2 has no readarray.
 count_lines_here() { # count_lines_here FILE
     lines_here=0
     while IFS= read -r _; do lines_here=$((lines_here + 1)); done <"$1"
@@ -92,8 +91,7 @@ for bad in "$tmp/absent" "$tmp/plainfile"; do
     assert_eq 2 "$rc" "collector took a trailing TEST_LOG_DIR of $bad"
 done
 
-# 4c. Each runtime's own header, alone, because a fixture with two arms'
-# markers would stay caught by the arm not under test.
+# 4c. Each runtime's header is tested alone, or the other arm would catch it.
 hit() { # hit LABEL LINE... -- LABEL's log must be a match with today's pattern
     label=$1
     shift
@@ -156,9 +154,8 @@ hit msan-full '==29418==WARNING: MemorySanitizer: use-of-uninitialized-value' \
     '' \
     'SUMMARY: MemorySanitizer: use-of-uninitialized-value umr.cc:5 in main'
 
-# 5. The caller's stderr file must be whole when the shim exits (#1374). One
-# run can pass by luck, so run concurrent batches, which also checks that
-# shims do not collide.
+# 5. The caller's stderr file must be whole when the shim exits (#1374).
+# Concurrent batches also check that shims do not collide.
 race=$tmp/race
 mkdir -p "$race/cap"
 LINES_PER_RUN=50
@@ -186,8 +183,7 @@ for f in "$race"/cap/349_race.*.log; do
 done
 assert_eq $((BATCH * ROUNDS)) "$copies_kept" "capture copies from concurrent shims"
 
-# 6. The shim is a parent process, so it must pass through the exit status
-# (above), death by signal, signals sent to its pid, stdin, and argv unchanged.
+# 6. The shim must pass through signals both ways, stdin, and argv.
 rc=0
 run_wrapped 'kill -TERM $$; sleep 30' || rc=$?
 assert_eq 143 "$rc" "a program killed by SIGTERM"

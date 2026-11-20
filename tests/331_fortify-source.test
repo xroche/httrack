@@ -1,8 +1,6 @@
 #!/bin/bash
 #
-# _FORTIFY_SOURCE does nothing without -O, and glibc no longer warns about it.
-# Check the built products for checked calls, because configure can say "yes"
-# when there are none.
+# configure can say yes with no fortified call built, so check the binaries.
 
 set -euo pipefail
 
@@ -56,8 +54,7 @@ compile() { # compile OUT FLAGS...
     }
 }
 
-# Controls: the build's flags must produce a checked call, and the same flags
-# without the define must not.
+# Control: the define, and only the define, must produce a checked call.
 compile "$tmp/dirty.o" ${cppflags_argv[@]+"${cppflags_argv[@]}"}
 # =0, not -U: Apple's headers re-default the level when it is merely undefined.
 compile "$tmp/clean.o" -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0

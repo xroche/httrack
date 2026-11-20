@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# The proxy a user types must reach winprofile.ini, and a stored one must come
-# back into the box.
+# A typed proxy must reach winprofile.ini and come back into the box.
 
 set -euo pipefail
 
@@ -44,8 +43,7 @@ PORT=3128
 test -n "${HOST}" || fail "the probe host is empty"
 test -n "${PORT}" || fail "the probe port is empty"
 
-# Redundant with the leg below, but it names the other user-visible half of
-# the bug when it fails.
+# Redundant with the leg below, but it names the other half of the bug.
 printf '[a typed proxy reaches the file] ..\t'
 htsserver_start --home "${work}"
 

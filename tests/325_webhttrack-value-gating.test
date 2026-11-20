@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# A value typed under a cleared checkbox must reach no flag but must survive in
-# winprofile.ini, as in WinHTTrack.
+# A value under a cleared box must reach no flag but stay in winprofile.ini.
 
 set -euo pipefail
 
@@ -94,8 +93,7 @@ for box, flag, key in (("warccdx", "--warc-cdx", "WarcCdx"),):
         if "\n%s=1\n" % key not in ini:
             sys.exit("warc=%r: the profile lost %s\n%s" % (warc, key, ini))
 
-# --wacz names an archive itself, so the Warc box does not gate it. The Wacz
-# box still does, and a one-sided probe would miss that.
+# The Wacz box gates --wacz, and the Warc box does not.
 for warc, wacz in (("on", "on"), ("", "on"), ("", "")):
     got = step4([("sid", sid), ("warc", warc), ("wacz", wacz)])
     lines = set(l.strip() for l in got["command"].split("\n"))

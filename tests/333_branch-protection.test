@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# Look for pac-ret instructions in the artifact, because the GNU property note
-# is ANDed across all linker inputs and Ubuntu's aarch64 crt objects carry none.
-# The signing instructions are what protect a return address.
+# Count pac-ret instructions, because the GNU property note is ANDed across
+# all linker inputs and Ubuntu's aarch64 crt objects carry none.
 
 set -euo pipefail
 
@@ -41,8 +40,7 @@ esac
 tmp=$(mktemp -d) || exit 1
 cleanup_push rm -rf "$tmp"
 
-# Count inside hts* functions only. A linked OpenSSL can carry paciasp while
-# the engine has none, and a whole-file count would pass.
+# Count in hts* functions only, because a linked OpenSSL can carry paciasp.
 signed() { # signed FILE -- engine functions that sign their return address
     "$objdump" -d "$1" 2>/dev/null |
         awk '/^[0-9a-fA-F]+ <hts[^>]*>:/ { ours = 1; next }
@@ -57,8 +55,7 @@ engine_syms() { # engine_syms FILE
     "$objdump" -d "$1" 2>/dev/null | grep -c '^[0-9a-fA-F]* <hts' || true
 }
 
-# The hts* name tests signed()'s scoping, and a non-leaf call gives pac-ret a
-# return address to sign.
+# The hts* name tests the scoping, and the call gives pac-ret something to sign.
 cat >"$tmp/probe.c" <<'PROBE'
 int hts_callee(int x);
 int hts_probe(int x) { return hts_callee(x) + 1; }
@@ -86,8 +83,7 @@ build "$tmp/plain.o" -mbranch-protection=none ||
 [ "$(engine_syms "$subject")" -gt 0 ] ||
     skip "$(basename "$subject") shows no hts* symbols, so it cannot be scoped"
 
-# The crt objects decide whether the note enables BTI, so report it without
-# asserting.
+# The crt objects decide whether the note enables BTI, so only report it.
 echo "$(basename "$subject"): $(signed "$subject") signed function(s), property note:" \
     "$("$readelf" -nW "$subject" 2>/dev/null | sed -n 's/.*[Ff]eature: *//p' | head -1)"
 

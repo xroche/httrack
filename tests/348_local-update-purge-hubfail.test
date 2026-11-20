@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# A page that fails to re-fetch on --update keeps its copy (#746), and the
-# purge must spare its unqueued children. A hang-up or decode failure holds the
-# purge, but a never-mirrored link, an answered error or a size skip must not.
+# On --update, a page that fails to re-fetch keeps its copy and its children
+# (#746). Only a hang-up or decode failure holds the purge.
 
 set -euo pipefail
 
@@ -86,8 +85,7 @@ assert_purged false "$out"
 ok "a mangled gzip body holds the purge like a hang-up does"
 
 # --- boundary: a hub that answers 500 needs no hold at all ------------------
-# The update recovers it from the previous copy before the give-up arm, so
-# the guard never runs. The guard relies on this ordering.
+# The update recovers it from the previous copy before the guard can run.
 out="${tmpdir}/err"
 mkdir -p "$out"
 site="${out}/127.0.0.1_${SRV_PORT}/errfail"

@@ -64,8 +64,7 @@ seed() { # seed LENGTH
         "seed of $1 bytes"
     seedwarned=$(count_matching_lines 'URL longer than' "$tmpdir/p/hts-log.txt")
 }
-# Fixed rather than derived from the rule cap, because a seed sized off the
-# wrong bound would red on a cap move with no engine bug.
+# This is fixed, because a seed sized off the rule cap would red on a cap move.
 probe=65536
 seed "$probe"
 assert_eq 1 "$seedwarned" "a seed of $probe bytes"

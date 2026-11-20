@@ -60,8 +60,7 @@ EOF
 # The save below overwrites it, and the round trip is judged against this.
 cp "${work}/proj/hts-cache/winprofile.ini" "${work}/seeded.ini"
 
-# A second pattern, its "on" key disjoint from the first. With one boolean
-# triple, the two keys that share a value can swap unseen.
+# This pattern's "on" key is disjoint, because one triple cannot see a swap.
 mkdir -p "${work}/proj2/hts-cache"
 cat >"${work}/proj2/hts-cache/winprofile.ini" <<'EOF'
 CurrentUrl=http://example.org/
@@ -212,8 +211,7 @@ for flag in ["--update", "-N2", "--priority=1", "--can-go-up-and-down",
                  % (flag, command))
 only_flag(command, "--near")
 
-# Dos=3 is WinHTTrack's alone and has no entry in the select. A blank entry
-# would re-save as 0, which WinHTTrack reads as long names.
+# Dos=3 has no select entry, and a blank one would re-save as 0 (long names).
 if selected(s.get("option2.html?sid=" + sid), "dos") != "1":
     sys.exit("a stored Dos=3 does not show as DOS names alone")
 
