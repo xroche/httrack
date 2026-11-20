@@ -6,6 +6,7 @@ With --base, checks the comment lines added since REV; with files, checks all
 their comments (used by the self-test).
 """
 import argparse
+import bisect
 import io
 import os
 import re
@@ -39,47 +40,67 @@ HASH_EXT = (".sh", ".test", ".yml", ".yaml", ".am", ".ac", ".m4")
 
 def c_comments(text, line_comments=True):
     """Map each line number to its comment text, skipping string literals."""
-    out, line, i, n = {}, 1, 0, len(text)
+    out, i, n = {}, 0, len(text)
+    newlines = [m.start() for m in re.finditer("\n", text)]
 
-    def add(at, s):
-        out[at] = (out.get(at, "") + " " + s.strip(" *\t")).strip()
+    def word_before(at):
+        j = at
+        while j > 0 and (text[j - 1].isalnum() or text[j - 1] == "_"):
+            j -= 1
+        return text[j:at]
+
+    def add(start, end):
+        line = bisect.bisect_left(newlines, start) + 1
+        for k, part in enumerate(text[start:end].split("\n")):
+            part = part.strip(" *\t\\")
+            out[line + k] = (out.get(line + k, "") + " " + part).strip()
 
     while i < n:
         c = text[i]
-        if c == "\n":
-            line += 1
-            i += 1
+        word = word_before(i) if c in "\"'" else ""
+        if c == '"' and word in ("R", "LR", "uR", "UR", "u8R"):
+            m = re.match(r'"([^()\\\s]{0,16})\(', text[i:])
+            if m:
+                end = text.find(")" + m.group(1) + '"', i)
+                i = n if end < 0 else end + len(m.group(1)) + 2
+                continue
+        if c == "'" and word[:1].isdigit():
+            i += 1  # digit separator, as in 1'000
         elif c in "\"'":
             i += 1
             while i < n and text[i] not in (c, "\n"):
                 i += 2 if text[i] == "\\" else 1
-            if i < n and text[i] == c:
-                i += 1
+            i += 1
         elif text.startswith("/*", i):
             end = text.find("*/", i + 2)
             end = n if end < 0 else end
-            for k, part in enumerate(text[i + 2 : end].split("\n")):
-                add(line + k, part)
-            line += text.count("\n", i, end)
+            add(i + 2, end)
             i = end + 2
         elif line_comments and text.startswith("//", i):
-            end = text.find("\n", i)
-            end = n if end < 0 else end
-            add(line, text[i + 2 : end])
+            end = i
+            while True:
+                end = text.find("\n", end)
+                if end < 0:
+                    end = n
+                    break
+                if text[end - 1] != "\\":
+                    break
+                end += 1
+            add(i + 2, end)
             i = end
         else:
             i += 1
     return out
 
 
-def py_comments(text):
+def py_comments(text, path):
     out = {}
     try:
         for tok in tokenize.generate_tokens(io.StringIO(text).readline):
             if tok.type == tokenize.COMMENT:
                 out[tok.start[0]] = tok.string.lstrip("#").strip()
-    except (tokenize.TokenError, SyntaxError):
-        pass
+    except (tokenize.TokenError, SyntaxError) as e:
+        sys.exit(f"{path}: cannot tokenize: {e}")
     return out
 
 
@@ -94,17 +115,18 @@ def hash_comments(text):
 
 
 def comments(path):
-    with open(path, encoding="utf-8", errors="replace") as f:
-        text = f.read()
     if path.endswith(C_EXT):
-        return c_comments(text)
-    if path.endswith(".css"):
-        return c_comments(text, line_comments=False)
-    if path.endswith(".py"):
-        return py_comments(text)
-    if path.endswith(HASH_EXT):
-        return hash_comments(text)
-    return {}
+        scan = c_comments
+    elif path.endswith(".css"):
+        scan = lambda text: c_comments(text, line_comments=False)  # noqa: E731
+    elif path.endswith(".py"):
+        scan = lambda text: py_comments(text, path)  # noqa: E731
+    elif path.endswith(HASH_EXT):
+        scan = hash_comments
+    else:
+        return {}
+    with open(path, encoding="utf-8", errors="replace") as f:
+        return scan(f.read())
 
 
 def check(path, only, findings):
@@ -131,9 +153,18 @@ def git(*args):
 
 def added_lines(base):
     """Yield each file changed since base with the set of its added lines."""
-    names = git("diff", "--name-only", "-z", "--diff-filter=AMRC", base, "--")
-    for path in filter(None, names.split("\0")):
-        hunks = git("diff", "--no-ext-diff", "-U0", base, "--", path)
+    status = git("diff", "--name-status", "-z", "-M", "--ignore-submodules", base)
+    fields = iter(status.split("\0"))
+    for kind in fields:
+        if not kind:
+            continue
+        paths = [next(fields)]
+        if kind[0] in "RC":
+            paths.append(next(fields))
+        path = paths[-1]
+        if kind[0] == "D" or os.path.islink(path):
+            continue
+        hunks = git("diff", "--no-ext-diff", "-M", "-U0", base, "--", *paths)
         added = set()
         for m in re.finditer(r"^@@ -\S+ \+(\d+)(?:,(\d+))? @@", hunks, re.M):
             start, count = int(m.group(1)), int(m.group(2) or 1)
