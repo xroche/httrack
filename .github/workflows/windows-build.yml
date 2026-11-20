@@ -29,7 +29,8 @@ jobs:
       matrix:
         platform: [x64, Win32, ARM64]
         configuration: [Release]
-    # Test 226 sizes the step timeouts, so the job has no cap (#1228).
+    # No job cap: #1228 showed the starvation it guarded against was not real (#1213).
+    # Test 226 sizes the step timeouts.
     # vcpkg's binary cache lives in the workspace so actions/cache can save it.
     env:
       VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}\vcpkg_cache
@@ -438,7 +439,7 @@ jobs:
             exit 1
             ;;
           esac
-          # The path goes in the environment, because `wsl -- sh -c` drops $1.
+          # The path goes in the environment, because `wsl -- sh -c '...' _ "$ws"` gave an empty $1.
           # A failed bring-up arrives here as exit 127.
           # Capture wsl -l, because grep -q would SIGPIPE tr under pipefail.
           distros=$(wsl -l -q | tr -d '\0\r')

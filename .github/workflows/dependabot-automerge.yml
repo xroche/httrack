@@ -20,6 +20,7 @@ jobs:
   automerge:
     name: Arm auto-merge
     # This checks the PR author, because github.actor is whoever pushed last.
+    # The head-repo clause is a guard for if the author check loosens.
     # vcpkg bumps can go backwards (#1614), so a human merges those.
     if: >-
       github.repository == 'xroche/httrack'

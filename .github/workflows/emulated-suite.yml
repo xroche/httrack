@@ -25,7 +25,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # s390x is the only big-endian leg that runs the suite, and hppa (#1146) has no image.
+        # s390x is big-endian and has a container image, which hppa (#1146) lacks.
         arch: [s390x]
     steps:
       - name: Register the binfmt handlers
