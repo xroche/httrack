@@ -102,8 +102,7 @@ struct warc_writer {
   char *main_date; /* its WARC-Date (mainPageDate) */
 };
 
-/* A 32-bit offset misindexes every record past 4GB, and `unsigned long` is
-   that narrow on LLP64: pin the width, not the spelling. */
+/* A 32-bit offset misindexes records past 4GB, as on LLP64 `unsigned long`. */
 HTS_STATIC_ASSERT(sizeof(((struct warc_writer *) 0)->offset) >= 8,
                   warc_offset_is_64bit);
 
@@ -293,13 +292,10 @@ static void base32_20(const unsigned char in[20], char out[33]) {
 }
 #endif
 
-/* Stream a block to a sink. When http_section, the HTTP header bytes (may be
-   empty) plus their terminating CRLF are emitted first; the separator is bound
-   to http_section, not to http_hdr being non-NULL, so an empty header still
-   emits (and is counted in) the 2-byte separator (F3). The on-disk body is
-   written as EXACTLY body_len octets — capped if the file grew, zero-padded if
-   it shrank — so the declared Content-Length always equals the bytes written
-   across every pass (F2). region 0=header, 1=body. Returns 0 on success. */
+/* Stream a block to a sink, where region 0 is the header and 1 the body. When
+   http_section, the header (maybe empty) and its CRLF go first. The body is
+   capped or zero-padded to body_len, so Content-Length always matches.
+   Returns 0 on success. */
 typedef int (*warc_sink)(void *ctx, int region, const void *p, size_t n);
 
 static int stream_body_pad(warc_sink sink, void *ctx, size_t remaining) {
@@ -799,9 +795,7 @@ static int cdx_lines_add(warc_writer *w, char *line) {
   return 0;
 }
 
-/* PRIu64 straight off the uint64_t: an `(unsigned long)` cast compiles clean
-   and truncates past 4GB on LLP64 Windows, where only that leg's run of
-   -#test=warc-offset would ever see the wrong offset. */
+/* Use PRIu64, because an `(unsigned long)` cast truncates on LLP64. */
 int warc_cdx_extent(char *out, size_t outsz, uint64_t length, uint64_t offset) {
   const int n = snprintf(
       out, outsz, ", \"length\": \"%" PRIu64 "\", \"offset\": \"%" PRIu64 "\"",
@@ -1164,14 +1158,10 @@ static void warc_wacz_package(warc_writer *w) {
 /* Close the current segment and open the next; writes its warcinfo. */
 static int warc_rotate(warc_writer *w);
 
-/* Emit one full WARC record. When http_section, the block carries an HTTP
-   header block (http_hdr, possibly empty) + a CRLF separator; body follows when
-   has_body. block_len is derived here (single source of truth: separator and
-   payload are counted exactly as stream_block emits them), so a declared
-   Content-Length can never desync from the written bytes. The payload digest
-   (body-only) is passed in when already known. truncated is a WARC-Truncated
-   reason token or NULL. On success the record id is copied to out_id (may be
-   NULL). */
+/* Emit one full WARC record. When http_section, the block holds http_hdr
+   (maybe empty) and a CRLF, then body when has_body. block_len is counted the
+   way stream_block emits. truncated is a WARC-Truncated reason or NULL, and
+   out_id (may be NULL) receives the record id. */
 static int warc_emit(warc_writer *w, const char *type, const char *content_type,
                      const char *target_uri, const char *ip,
                      const char *concurrent_to, const char *refers_uri,
@@ -1317,9 +1307,8 @@ done:
   return rc;
 }
 
-/* Byte offset of f, for the CDXJ index and the segment-rotation cap. ftello,
-   never ftell: long tops out at 2GB, and is 32-bit even on 64-bit Windows, so
-   every offset past the cap would be indexed wrong. `current` on failure. */
+/* Return the byte offset of f for the CDXJ index and the rotation cap, or
+   `current` on failure. It uses ftello, because long is 32-bit on Windows. */
 uint64_t warc_stream_offset(FILE *f, uint64_t current) {
   const LLint pos = ftello(f);
 
@@ -1625,8 +1614,8 @@ static hts_boolean warc_commit(warc_writer *w) {
   if (!w->protect_prev)
     return HTS_TRUE; /* nothing was there to lose: written in place */
 
-  /* All or nothing: a swap stopping halfway would mix this run's segments with
-     the previous one's, so require every temp before renaming any. */
+  /* Require every temp before renaming any, because a swap stopping halfway
+     would mix this run's segments with the previous one's. */
   swap = w->opened && !w->failed && w->unbacked_revisits == 0;
   for (s = 0; s < nseg && swap; s++) {
     snprintf(tmpbuf, sizeof(tmpbuf), "%s" WARC_TMP_SUFFIX,
@@ -1773,21 +1762,20 @@ int warc_write_transaction(warc_writer *w, const char *target_uri,
     is_revisit = 1;
     profile = "http://netpreserve.org/warc/1.1/revisit/server-not-modified";
     /* Replay resolves a revisit by this field alone, and a 304 stands in for
-       the same URL. No WARC-Refers-To-Date to go with it: the cache keeps the
-       document's Last-Modified, never the previous capture time. */
+       the same URL. WARC-Refers-To-Date is absent because the cache keeps the
+       document's Last-Modified, not the previous capture time. */
     refers_uri = target_uri;
     /* Served from cache: the payload sits in the previous archive, not here. */
     w->unbacked_revisits++;
   } else if (unchanged_kind == WARC_UNCHANGED_ENGINE_FORCED) {
-    /* has_payload requires body_len>0, so a genuinely empty body looks
-       digest-less too; it still has a well-defined digest (sha1 of nothing),
-       so compute it here rather than treat it as a missing-crypto case. */
+    /* An empty body looks digest-less to has_payload, but sha1 of nothing is
+       a valid digest, so compute it here. */
     if (!have_pdig && body_len == 0 && (body != NULL || body_path != NULL))
       have_pdig = payload_digest_b32(body, body_len, body_path, pdig);
     /* Served from cache with no exchange either way: still unbacked. */
     w->unbacked_revisits++;
-    /* No digest (no OpenSSL) means nothing to point a revisit at, and there
-       was no real exchange to record as a response; write nothing (#839). */
+    /* Without OpenSSL there is no digest for a revisit to point at and no
+       exchange to record as a response, so write nothing (#839). */
     if (!have_pdig)
       return 0;
     is_revisit = 1;
@@ -1827,9 +1815,8 @@ int warc_write_transaction(warc_writer *w, const char *target_uri,
     return -1;
   }
 
-  /* Response first: its id links the request via WARC-Concurrent-To. A revisit
-     is a deliberate dedup, not a truncation, so tag WARC-Truncated only on a
-     full (body-carrying) response. */
+  /* Response first, because its id links the request via WARC-Concurrent-To.
+     Tag WARC-Truncated only on a full response, since a revisit is a dedup. */
   resp_id[0] = '\0';
   if (warc_emit(w, is_revisit ? "revisit" : "response",
                 "application/http;msgtype=response", target_uri, ip, NULL,

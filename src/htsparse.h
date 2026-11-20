@@ -222,11 +222,8 @@ const char *hts_dirty_attr_name(const char *quote, const char *tag_start,
 
 /*
   Non-zero if a redirect (cur_adr,cur_fil)->(moved_adr,moved_fil) saves to the
-  same local file, so it must be followed rather than turned into a
-  self-pointing "moved" stub (#159). Mirrors the savename: scheme+userinfo
-  stripped, www kept (www dedup is the crawl layer's job), path
-  slash/query-normalized per the URL-hack flags. Not hash_url_equals: that keys
-  on the dedup hash, which folds www and never collapses http<->https.
+  same local file, where a "moved" stub would point at itself (#159).
+  hash_url_equals folds www and splits http/https, so it cannot replace this.
 */
 hts_boolean hts_redirect_same_savefile(httrackp *opt, const char *cur_adr,
                                        const char *cur_fil,
@@ -234,12 +231,9 @@ hts_boolean hts_redirect_same_savefile(httrackp *opt, const char *cur_adr,
                                        const char *moved_fil);
 
 /*
-  Did a postprocess-html callback's reply come out of the engine's own storage?
-  "html" is what it returned, "buffer" and "capa" the storage. Any pointer
-  inside it edited that storage in place, at offset "html - buffer": a reply
-  skipping a BOM comes back at buffer+3 and is no less in place than one at
-  buffer itself. The engine must move such bytes down rather than append them
-  onto themselves.
+  Did a postprocess-html callback's reply come out of the engine's own storage
+  (buffer, capa)? Such a reply, maybe offset past a BOM, was edited in place
+  and must be moved down rather than appended onto itself.
 */
 hts_boolean hts_postprocess_reply_inplace(const char *html, const char *buffer,
                                           size_t capa);

@@ -218,7 +218,7 @@ void robots_parse(httrackp *opt, robots_wizard *robots, const char *adr,
     }
     hts_rtrim(line, HTS_REALSPACES);
     if (sitemaps != NULL && strfield(line, "sitemap:")) {
-      // group-independent record (RFC 9309): collected whatever the group
+      // Sitemap belongs to no group (RFC 9309), so always collect it
       char *a = line + strfield(line, "sitemap:");
 
       a += strspn(a, HTS_REALSPACES);
@@ -264,8 +264,8 @@ void robots_parse(httrackp *opt, robots_wizard *robots, const char *adr,
         if (is_disallow && !keep_root_disallow && strcmp(a, "/") == 0) {
           // dropped: site-wide disallow ignored by option
         } else {
-          /* A cut Allow would permit more than the site wrote, so it goes;
-             a cut Disallow can only forbid more, so it stays. */
+          /* Drop a cut Allow, which would permit more than the site wrote.
+             Keep a cut Disallow, which can only forbid more. */
           const hts_boolean kept =
               (cut && is_allow)
                   ? HTS_FALSE
@@ -277,7 +277,7 @@ void robots_parse(httrackp *opt, robots_wizard *robots, const char *adr,
               strclipbuff(dropped, sizeof(dropped), a);
             }
           }
-          /* info reports what we honour, not what we read. */
+          /* info lists only the rules we honour. */
           if (kept && is_disallow && info != NULL &&
               strlen(a) + 2 < infosize - strlen(info)) {
             if (strnotempty(info))
