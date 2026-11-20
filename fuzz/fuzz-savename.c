@@ -109,10 +109,12 @@ static void fuzz_line(const char *line, httrackp *opt, cache_back *cache,
     const char *nom;
 
     strlcpybuff(fil, afs.af.fil, sizeof(fil));
-    dot = strrchr(fil, '.');
-    nom = strrchr(fil, '/');
-    standard_name(b, sizeof(b), dot != NULL ? dot : fil + strlen(fil),
-                  nom != NULL ? nom : fil, fil, flags & 1);
+    /* as url_savename: the last segment, and its dot or NULL */
+    nom = fil + strlen(fil);
+    while (nom > fil && nom[-1] != '/' && nom[-1] != '\\')
+      nom--;
+    dot = strrchr(nom, '.');
+    standard_name(b, sizeof(b), dot, nom, fil, flags & 1);
     savename_sink += (unsigned long) strlen(b);
   }
 
