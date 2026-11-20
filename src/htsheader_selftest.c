@@ -79,10 +79,8 @@ static int st_retryafter_gate(httrackp *opt) {
     GATE_CHECK(sback->retry_after_until == held);
   }
 
-  /* the cap, not the server, decides: 100000s clips to opt->max_retry_after.
-     The upper bounds sit far above what was armed because mtime_local() is the
-     wall clock: a scale error at least doubles the hold, so slack costs no kill
-     and a backward clock step cannot red them. */
+  /* 100000s clips to opt->max_retry_after. The upper bounds are loose because
+     mtime_local() is the wall clock, and a scale error doubles the hold. */
   GATE_CHECK(sback->retry_after_until - mtime_local() <= 45 * 1000);
   back_set_retry_after(sback, opt, 100000);
   GATE_CHECK(sback->retry_after_until - mtime_local() > 55 * 1000);
@@ -281,9 +279,9 @@ static int st_statusline(httrackp *opt, int argc, char **argv) {
 }
 
 /* A header line that does not fit must be reported as cut and skipped whole,
-   so the line after it is the server's next header and not its own tail. The
-   block defaults to two headers and the blank line; \n and \r arrive escaped,
-   since the command line filters both out. */
+   so its tail is not read as the next header. The block defaults to two
+   headers and the blank line. \n and \r arrive escaped, because the command
+   line filters both out. */
 static int st_headerline(httrackp *opt, int argc, char **argv) {
   static const char fixture[] = "X-First: 0123456789abcdefghij\r\n"
                                 "X-Second: ok\r\n"
@@ -515,11 +513,9 @@ static void st_decode_size_case(const char *name, int is_write, LLint size) {
   freet(r.adr);
 }
 
-/* http_xfread1 must refuse an in-memory buffer whose size would exceed a 32-bit
-   index (hostile Content-Length or endless stream) rather than allocate it.
-   The guard returns before any socket read, so no real connection is needed.
-   The same bound must hold on the two paths that fill r->adr without it: a
-   chunk stream, and a decoded content coding. */
+/* http_xfread1 must refuse an in-memory buffer past a 32-bit index before any
+   socket read. The bound also holds for a chunk stream and a decoded content
+   coding. */
 static int st_xfread_limit(httrackp *opt, int argc, char **argv) {
   static const LLint sizes[] = {
       0, 1000, (LLint) INT32_MAX - 1, (LLint) INT32_MAX, (LLint) INT32_MAX + 1,
@@ -630,10 +626,8 @@ static int st_xfread_limit(httrackp *opt, int argc, char **argv) {
   st_decode_size_case("decode_mem_ok", 0, (LLint) INT32_MAX - 1);
   st_decode_size_case("decode_disk_max", 1, (LLint) INT32_MAX);
 
-  /* Given a file at or past the bound, the reader must refuse on the stat that
-     would size its own allocation, so nothing appended after a caller's own
-     check can carry the body past it. The second file is the control: a bound
-     that refuses everything reads the same as one that works. */
+  /* The reader must refuse a file at or past the bound on the stat that sizes
+     its allocation. The second file is the control. */
   for (i = 0; (int) i < argc && i < 2; i++) {
     LLint got = -1;
     char *adr = readfile2_inmem(argv[i], &got);
@@ -709,8 +703,7 @@ static int st_useragent(httrackp *opt, int argc, char **argv) {
   const char *ua = StringBuff(opt->user_agent);
   assertf(ua != NULL);
   assertf(strcmp(ua, HTS_DEFAULT_USER_AGENT) == 0);
-  /* Teeth independent of the macro: honest token + self-identifier, and no
-     legacy Mozilla/4.x fake-browser string (rejects the whole relic family). */
+  /* Check the string itself: an HTTrack token, our URL, and no Mozilla/4.x. */
   assertf(strstr(ua, "HTTrack/") != NULL);
   assertf(strstr(ua, "+https://www.httrack.com/") != NULL);
   assertf(strstr(ua, "Mozilla/4.") == NULL);
@@ -1124,8 +1117,8 @@ static int st_contentcodings(httrackp *opt, int argc, char **argv) {
       /* truncated: must fail, not fall back to a verbatim copy */
       assertf(ae_write_raw(inpath, cc_br_text, sizeof(cc_br_text) - 4) == 0);
       assertf(hts_codec_unpack(HTS_CODEC_BROTLI, inpath, outpath) < 0);
-      /* cc_br_bomb is a valid stream that expands to 4 MiB; the budget, not a
-         corrupt frame, is what must reject it. */
+      /* cc_br_bomb is a valid stream that expands to 4 MiB, so only the budget
+         can reject it. */
       assertf((LLint) (4 * 1024 * 1024) >
               hts_codec_maxout((LLint) sizeof(cc_br_bomb)));
       assertf(ae_write_raw(inpath, cc_br_bomb, sizeof(cc_br_bomb)) == 0);
