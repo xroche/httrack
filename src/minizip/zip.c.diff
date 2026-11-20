@@ -4,7 +4,7 @@
  #endif
  } curfile64_info;
  
-+/* httrack addition: room for deflate's five blocks per stream */
++/* httrack addition: deflate allocates five blocks per stream, 8 leaves room */
 +#define ZIP_ZBUF_SLOTS 8
 +
  typedef struct
@@ -124,8 +124,8 @@
      if (err==Z_OK)
          zi->in_opened_file_inzip = 1;
 +    else {
-+      /* httrack addition: free here, because nothing closes or abandons a
-+         member that failed to open */
++      /* httrack addition: no close or abandon runs on a member that never
++         opened, so this call owns what it allocated */
 +      if (zi->ci.stream_initialised == Z_DEFLATED)
 +        (void) deflateEnd(&zi->ci.stream);
 +#ifdef HAVE_BZIP2
@@ -139,13 +139,14 @@
      return err;
  }
  
-@@ -1980,6 +2056,45 @@
+@@ -1980,6 +2056,47 @@
      return zipCloseFileInZipRaw (file,0,0);
  }
  
-+/* httrack addition: drop the member being written by truncating the file to
-+   its local header. It must run before zipCloseFileInZipRaw64() adds the
-+   central-directory record. */
++/* httrack addition: abandon the member being written instead of committing it.
++   Rewinding and truncating to its local header is the only rollback minizip can
++   offer: once zipCloseFileInZipRaw64() has appended the central-directory
++   record there is no API to take it back. */
 +extern int ZEXPORT zipAbandonFileInZip(zipFile file) {
 +  zip64_internal *zi;
 +  int truncate_err;
@@ -169,7 +170,7 @@
 +  zi->ci.central_header = NULL;
 +  zi->in_opened_file_inzip = 0;
 +
-+  /* The member never existed, so zi->number_entry stays */
++  /* not counted in zi->number_entry: the member never existed */
 +  if (ZSEEK64(zi->z_filefunc, zi->filestream, zi->ci.pos_local_header,
 +              ZLIB_FILEFUNC_SEEK_SET) != 0)
 +    return ZIP_ERRNO;
@@ -177,15 +178,16 @@
 +      ZTRUNCATE64(zi->z_filefunc, zi->filestream, zi->ci.pos_local_header);
 +  if (truncate_err < 0)
 +    return ZIP_ERRNO;
-+  /* Without truncation the member's bytes follow the end record written
-+     later, which readers miss once that tail exceeds their 64KB backscan */
++  /* the rewind alone leaves what the member flushed past the end-of-central-
++     directory written later, which no reader finds once that tail outgrows the
++     64KB backscan */
 +  return truncate_err == 0 ? ZIP_OK : ZIP_NOTRUNCATED;
 +}
 +
  local int Write_Zip64EndOfCentralDirectoryLocator(zip64_internal* zi, ZPOS64_T zip64eocd_pos_inzip) {
    int err = ZIP_OK;
    ZPOS64_T pos = zip64eocd_pos_inzip - zi->add_position_when_writing_offset;
-@@ -2104,6 +2219,18 @@
+@@ -2104,6 +2221,18 @@
    return err;
  }
  
@@ -204,7 +206,7 @@
  extern int ZEXPORT zipClose(zipFile file, const char* global_comment) {
      zip64_internal* zi;
      int err = 0;
-@@ -2169,92 +2296,8 @@
+@@ -2169,92 +2298,8 @@
  #ifndef NO_ADDFILEINEXISTINGZIP
      free(zi->globalcomment);
  #endif

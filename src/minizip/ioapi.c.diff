@@ -13,13 +13,14 @@
  voidpf call_zopen64 (const zlib_filefunc64_32_def* pfilefunc, const void*filename, int mode) {
      if (pfilefunc->zfile_func64.zopen64_file != NULL)
          return (*(pfilefunc->zfile_func64.zopen64_file)) (pfilefunc->zfile_func64.opaque,filename,mode);
-@@ -63,13 +69,28 @@
+@@ -63,13 +69,29 @@
      }
  }
  
 +int call_ztruncate64(const zlib_filefunc64_32_def *pfilefunc, voidpf filestream,
 +                     ZPOS64_T size) {
-+  /* Without truncate the tail stays, and 1 warns the caller without failing */
++  /* a backend with no truncate keeps its tail: better than failing a rollback
++     the caller has already performed, but the caller has to hear about it */
 +  if (pfilefunc->zfile_func64.ztruncate64_file == NULL)
 +    return 1;
 +  /* a backend may report failure as an errno rather than -1 (_chsize_s) */
@@ -42,7 +43,7 @@
      p_filefunc64_32->zfile_func64.zclose_file = p_filefunc32->zclose_file;
      p_filefunc64_32->zfile_func64.zerror_file = p_filefunc32->zerror_file;
      p_filefunc64_32->zfile_func64.opaque = p_filefunc32->opaque;
-@@ -193,6 +214,27 @@
+@@ -193,6 +215,27 @@
      return ret;
  }
  
@@ -70,7 +71,7 @@
  
  static int ZCALLBACK fclose_file_func(voidpf opaque, voidpf stream) {
      int ret;
-@@ -214,6 +256,7 @@
+@@ -214,6 +257,7 @@
      pzlib_filefunc_def->zwrite_file = fwrite_file_func;
      pzlib_filefunc_def->ztell_file = ftell_file_func;
      pzlib_filefunc_def->zseek_file = fseek_file_func;
@@ -78,7 +79,7 @@
      pzlib_filefunc_def->zclose_file = fclose_file_func;
      pzlib_filefunc_def->zerror_file = ferror_file_func;
      pzlib_filefunc_def->opaque = NULL;
-@@ -225,6 +268,8 @@
+@@ -225,6 +269,8 @@
      pzlib_filefunc_def->zwrite_file = fwrite_file_func;
      pzlib_filefunc_def->ztell64_file = ftell64_file_func;
      pzlib_filefunc_def->zseek64_file = fseek64_file_func;
