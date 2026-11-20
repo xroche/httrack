@@ -1,6 +1,5 @@
 #!/bin/bash
-# Only --enable-werror puts -Werror in DEFAULT_CFLAGS, because a distribution
-# toolchain we do not pin must build despite a warning.
+# Only --enable-werror adds -Werror, because distro toolchains are not pinned.
 
 # TEST_TIMEOUT_AT_LEAST: 900
 
@@ -19,8 +18,7 @@ command -v "${cc_argv[0]}" >/dev/null 2>&1 || skip "no C compiler (${cc_argv[0]}
 work=$(mktemp -d "${TMPDIR:-/tmp}/werror.XXXXXX") || fail "no tmpdir"
 cleanup_push rm -rf "${work}"
 
-# automake refuses an out-of-tree configure when srcdir holds a config.status
-# from an in-tree build. A symlink farm without that file configures the same.
+# A symlink farm keeps automake from refusing a srcdir that has config.status.
 shadow=${work}/srcdir
 mkdir -p "${shadow}"
 for entry in "${srcdir}"/*; do
@@ -86,8 +84,7 @@ run_configure "${work}/on" --enable-werror ||
 assert_state "${work}/on" on
 pace 1 "$((SECONDS - t0))" "the bad-value run"
 
-# A value that is neither yes nor no must stop configure. Leaving the switch
-# off would read the same as a plain run.
+# A value other than yes or no must stop configure.
 if run_configure "${work}/bogus" --enable-werror=sometimes; then
     fail_dump "configure accepted --enable-werror=sometimes" "${work}/bogus/configure.log"
 fi

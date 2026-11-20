@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# A file whose descriptor is still open gets its mode set through it, because
-# chmod() re-resolves the name and a swapped-in symlink would redirect it.
-# 51_local-update-codec.test pins the mode itself.
+# An open file's mode is set through its descriptor, because chmod() follows a
+# swapped-in symlink.
 #
 # Named outside the Windows CI suite's globs, like the other source scans.
 

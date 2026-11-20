@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# The update purge must read each old.lst line whole. A split tail such as
-# "Znotes.txt]" names a file the site chose, and --update would delete the
-# user's notes.txt. The empty-directory clean-up must stay inside the mirror.
+# The update purge must read each old.lst line whole, or a split tail deletes a
+# user's file. The empty-directory clean-up must stay inside the mirror.
 
 set -euo pipefail
 

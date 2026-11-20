@@ -1,13 +1,9 @@
 #!/bin/bash
 #
-# A 100 Continue is not the response that follows it. When that response has
-# no headers of its own, the WARC record must not describe the interim block
-# (#1740).
+# A WARC record must not take a 100 Continue's headers as its own (#1740).
 #
-# /warc100/plain.html is the same reply without the 100, and both records must
-# carry byte-equal header blocks. /warc100/normal.html puts a 100 ahead of a
-# real response, whose own headers the record keeps. The last two cases probe
-# the validator: a response block with no header terminator is an error.
+# plain.html must match the same reply without a 100, byte for byte. The last
+# two cases feed the validator a block with no header terminator.
 
 set -euo pipefail
 

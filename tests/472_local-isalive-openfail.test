@@ -12,9 +12,8 @@ cleanup() {
 }
 cleanup_push cleanup
 
-# The engine deletes hts-autopsy on the tick that fires. A read-only log
-# directory makes that unlink fail, so every tick is a triggered one. Root and
-# some filesystems ignore the mode, so measure it.
+# A read-only log directory makes the hts-autopsy unlink fail, so every tick
+# fires. Root and some filesystems ignore the mode, so measure it.
 unlink_blocked() { # unlink_blocked DIR
     local kept=0
     : >"${1}/probe"
@@ -52,9 +51,7 @@ crawl() {
         fail "$1: the trigger was deleted, so some ticks were untriggered"
 }
 
-# Control: with the file opening, a triggered tick writes nothing to stdout. A
-# stdout tick below is then a fallback write, and hts-isalive filling proves a
-# tick fired.
+# Control: when the file opens, a triggered tick writes nothing to stdout.
 logdir="${tmpdir}/opens-log"
 mkdir -p "$logdir"
 : >"${logdir}/hts-autopsy"

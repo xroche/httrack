@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# htsdefines.h promises that a sendhead hook returning anything but 1 fails the
-# transfer. The request must not be sent, or over HTTPS SSL_write() gets a
-# freed handle.
+# A sendhead hook returning anything but 1 must fail before the request is
+# sent, or SSL_write() gets a freed handle.
 
 set -euo pipefail
 

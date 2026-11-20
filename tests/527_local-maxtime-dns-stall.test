@@ -10,8 +10,7 @@ set -euo pipefail
 if ! target_is_linux; then
     skip "maxtime-dns-stall: LD_PRELOAD interposition is Linux-only here"
 fi
-# A --disable-shared build has nothing to preload. Anything else missing is a
-# build problem and fails the leg.
+# Only a --disable-shared build may lack the preload library.
 if [ ! -r "${GAISTALL_LA:-}" ]; then
     echo "maxtime-dns-stall: ${GAISTALL_LA:-\$GAISTALL_LA} was not built" >&2
     exit 1

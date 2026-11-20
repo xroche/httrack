@@ -9,16 +9,14 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-# These are Linux-only, so the Hurd never reaches their faults. They are named
-# because the four spell the gate three ways, and a match would take a fourth.
+# These Linux-only tests are named because they spell the gate three ways.
 exempt="143_engine-backtrace-empty.test
 181_altstack-honoured.test
 182_crash-fork-safety.test
 218_crash-nopie-frames.test"
 
 # Does this file make the fatal-signal handler run? `-#c=bogus` is refused
-# before anything faults, so the scan strips it. The bare `-#c` counts only on
-# a line that runs httrack, so a message naming the option is not a crash.
+# before anything faults, and a bare `-#c` counts only where httrack runs.
 faults() { # faults FILE
     local line
     while IFS= read -r line; do
@@ -80,8 +78,7 @@ probe guarded 'skip_crash_on_hurd
 httrack -#c=segv' ''
 probe bare 'httrack -#c' 99_probe.test
 probe strsafe 'httrack -#test=strsafe overflow x' 99_probe.test
-# Narrowing control. A refused kind must not read as a fault, or every file
-# naming the option would count.
+# Narrowing control: a refused kind must not read as a fault.
 probe refused 'httrack -#c=bogus' ''
 # The option named in a message, and the cache lister, whose letter differs
 # from the crash option only in case.

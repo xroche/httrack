@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# One ^C must keep the in-flight transfer's partial file and its hts-cache/ref
-# entry, so --continue resumes it instead of refetching from zero (#1595).
+# One ^C must keep the partial file and its cache entry for --continue (#1595).
 
 set -euo pipefail
 

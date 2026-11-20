@@ -1,9 +1,7 @@
 #!/bin/bash
 #
-# Three things the tree defines but does not act on. HTS_DLOPEN has a value on
-# both arms, so a build without dlopen must still tell the web UI DLOPEN=0 (the
-# #1552 class). A bad -@ option must not be named under the '%' prefix. And
-# --help must print the [compiled: ...] line from HTS_PLATFORM_NAME.
+# A build without dlopen tells the web UI DLOPEN=0 (#1552), a bad -@ option is
+# not named under '%', and --help prints HTS_PLATFORM_NAME.
 
 set -euo pipefail
 
@@ -66,8 +64,7 @@ fi
 "${cc_argv[@]}" "${cpp_argv[@]}" "$web" >"$tmp/nodl.i" 2>"$tmp/nodl.err" ||
     skip "cannot preprocess htsweb.c here: $(firstline "$(cat "$tmp/nodl.err")")"
 
-# HTS_DLOPEN is 0 in this shadow and the block was reached. An empty or
-# truncated preprocessor output would satisfy the DLOPEN check alone.
+# Require the block, or empty preprocessor output would pass the DLOPEN check.
 printf '#include "htsglobal.h"\nPROBE HTS_DLOPEN\n' >"$tmp/probe.c"
 "${cc_argv[@]}" "${cpp_argv[@]}" "$tmp/probe.c" >"$tmp/probe.i" 2>/dev/null ||
     fail "the probe TU did not preprocess"

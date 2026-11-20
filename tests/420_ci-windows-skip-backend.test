@@ -27,10 +27,8 @@ ci_expected_skips_for_backend wsl2 || fail "wsl2 was rejected as an unknown back
 test "$ci_skip_list" = "$expected_skips_wsl2" || fail "wsl2 did not select its own list"
 
 # --- the lists' CONTENT, not just which one is chosen ---------------------
-# This spot-checks the names that moved. The driver's set compare on a live
-# Windows leg catches a rename elsewhere, but neither sees a listed test that in
-# fact runs. "neither" marks a name that left a list, and it must not go back
-# without a new measurement.
+# This spot-checks the names that moved. A "neither" name left a list and must
+# not go back without a new measurement.
 ci_expected_skips_for_backend msys || fail "msys was rejected"
 msys_list=$ci_skip_list
 ci_expected_skips_for_backend wsl2 || fail "wsl2 was rejected"
@@ -73,8 +71,7 @@ done <<'EOF'
 EOF
 ok "the two lists hold the names the runs measured moving"
 
-# While the lists differ, the checks above already tell "read the right
-# variable" from "always read msys". This one holds when they are identical.
+# This check still tells the backends apart once the real lists are identical.
 expected_skips_wsl2="99_sentinel-only.test"
 ci_skip_list=''
 ci_expected_skips_for_backend wsl2 || fail "wsl2 was rejected as an unknown backend"

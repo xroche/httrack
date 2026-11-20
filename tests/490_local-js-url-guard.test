@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# A name ending in "url" must not have its string fetched as a link (#1739).
-# CSS is the risk here, because url() is how a stylesheet names every asset,
-# so each spelling of it must still mirror its asset below.
+# A name ending in "url" must not have its string fetched (#1739), but every
+# CSS url() spelling below must still mirror its asset.
 
 set -euo pipefail
 

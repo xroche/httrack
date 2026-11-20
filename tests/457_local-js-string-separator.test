@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# Inside a script, a quoted string ending in a slash is a separator, so
-# split("/") stays as written. "/#top" and "/?q=1" are URLs and are rewritten.
-# The evidence comes from the source bytes, because unescape_amp decodes
+# Inside a script, split("/") stays as written but "/#top" and "/?q=1" are
+# rewritten. Assertions read the source bytes, because unescape_amp decodes
 # "&num;" to a '#' before the parser looks.
 
 set -euo pipefail
@@ -55,10 +54,8 @@ for d in subdir a/b api/v1 assets/img cdir fragdir deep/sub; do
     printf 'reached\n' >"$root/$d/index.html"
 done
 
-# The cdir case reaches the parser through CSS url(), not the helper. data-x
-# catches a fix that drops the inscript test. The index* matches pin the
-# rewritten "/", which may gain a collision suffix. The anch case reaches the
-# leading-marker path, where sanitizer legs catch a dropped length guard.
+# cdir goes through CSS url() and anch through the leading-marker path. data-x
+# catches a dropped inscript test, and index* allows a collision suffix.
 bash "$top_srcdir/tests/local-crawl.sh" --root "$root" --errors 0 \
     --file-matches 'app.js' 'split\("/"\)' \
     --file-matches 'app.js' '"image/"' \

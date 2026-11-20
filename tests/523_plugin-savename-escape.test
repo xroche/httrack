@@ -1,9 +1,7 @@
 #!/bin/bash
 #
-# The savename hook rewrites the name after url_savename() collapses "../", so
-# its result must be checked before open(). "../../X" must stay inside the
-# mirror root, an absolute name is not used verbatim when there is no -O, and
-# -N100 on a "//path" URL must not slip past the check.
+# The savename hook runs after url_savename() collapses "../", so its result
+# must be checked again before open().
 
 set -e
 # shellcheck source=tests/crawllib.sh

@@ -16,8 +16,7 @@ skip_on_windows "Windows has no Multipath TCP protocol"
 have_feature mptcp || skip "no Multipath TCP on this system"
 have_feature mptcpinfo || skip "this build cannot tell a fallback from a negotiation"
 
-# A value that is neither on nor off is refused. Port 1 refuses at once, so a
-# regression costs no traffic. The message shows the option was judged.
+# A value other than on or off is refused. Port 1 keeps a regression offline.
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_mptcp.XXXXXX")
 cleanup_push rm -rf "$tmp"
 rc=0
@@ -30,8 +29,7 @@ python=$(find_python) || skip "python3 not found"
 "$python" -c 'import socket; socket.IPPROTO_MPTCP' 2>/dev/null ||
     skip "this python cannot listen with Multipath TCP"
 
-# Every connection counts. Without --keep-alive=0 one socket carries every
-# file, and a mirror that counted once would read the same.
+# --keep-alive=0 gives each file its own connection, so each one is counted.
 many='Multipath TCP: [2-9][0-9]* HTTP connections negotiated it, 0 fell back'
 
 # A peer that speaks it.
@@ -49,9 +47,8 @@ bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 5 \
     --log-not-found 'Multipath TCP' \
     httrack 'BASEURL/simple/basic.html' --mptcp=0
 
-# With no option the engine turns MPTCP on only where the kernel recovers from
-# a blackholed SYN. Read that from the kernel, or the check would agree with
-# whatever the code does.
+# By default MPTCP is on only where the kernel recovers from a blackholed SYN.
+# Read that from the kernel rather than from the code.
 retrans=$(cat /proc/sys/net/mptcp/syn_retrans_before_tcp_fallback 2>/dev/null || echo -1)
 blackhole=$(cat /proc/sys/net/mptcp/blackhole_timeout 2>/dev/null || echo 0)
 if test "$retrans" -ge 0 && test "$blackhole" -gt 0; then

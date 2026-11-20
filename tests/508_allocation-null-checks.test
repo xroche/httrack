@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# These four build something from a fresh allocation and use it on the next
-# line, so each needs a NULL check. RLIMIT_AS cannot reach allocations this
-# small, so this reads the source.
+# These four use a fresh allocation on the next line and need a NULL check.
+# RLIMIT_AS cannot fail allocations this small, so this reads the source.
 #
 # Named outside the Windows CI suite's globs, like the other source scans.
 
@@ -16,8 +15,8 @@ top="${abs_top_srcdir:?not run under make check}"
 work=$(mktemp -d "${TMPDIR:-/tmp}/allocnull.XXXXXX") || fail "no tmpdir"
 cleanup_push rm -rf "$work"
 
-# An allocation counts as checked only if one of the next few lines tests THAT
-# variable against NULL or asserts it. Any nearby "NULL" would blind the scan.
+# A check must test THAT variable against NULL, because any nearby "NULL"
+# would blind the scan.
 unchecked() { # unchecked FILE -> the allocation lines with no answer after them
     awk '
     { line[NR] = $0 }

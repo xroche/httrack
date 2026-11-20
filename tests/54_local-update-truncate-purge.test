@@ -1,10 +1,7 @@
 #!/bin/bash
 #
 # An --update re-fetch that comes in short must not delete the mirrored file
-# (#562). Pass 2 serves page.html (in memory) and file.bin (direct to disk)
-# with the full Content-Length but half the body. httrack refuses the partial,
-# and the end-of-update purge must keep the pass-1 copy. stay.html is the
-# control and must update to V2.
+# (#562). stay.html is the control that must update to V2.
 
 set -euo pipefail
 

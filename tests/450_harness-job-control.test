@@ -1,9 +1,7 @@
 #!/bin/bash
 #
 # run_with_timeout must resolve the backend before it turns job control on. A
-# fork between "set -m" and "set +m" makes bash print "[1]+ Done" on stderr,
-# which local_crawl points at the crawl log. Only some bash builds print it
-# (5.2.21 on Ubuntu 24.04 does, 5.2.37 does not), so the test checks the call.
+# fork after "set -m" writes "[1]+ Done" into the crawl log on bash 5.2.21.
 
 set -euo pipefail
 

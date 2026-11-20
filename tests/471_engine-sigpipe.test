@@ -1,9 +1,8 @@
 #!/bin/bash
 #
 # A library must not kill the process that embedded it. The engine writes to
-# sockets whose peer may be gone, and an embedder with no SIGPIPE disposition
-# died mid-crawl (#1689). The self-test restores the default action before it
-# writes, so a regression reaches this script as a signal.
+# sockets whose peer may be gone (#1689). The self-test restores SIG_DFL, so a
+# regression arrives as a signal.
 
 set -euo pipefail
 
@@ -11,8 +10,7 @@ set -euo pipefail
 . "${0%"${0##*/}"}./testlib.sh"
 
 skip_on_windows "Windows raises no SIGPIPE, so none of the three mechanisms exists there"
-# The engine dies there. #1784 is wontfix, because every binary we ship sets
-# its own SIGPIPE handler before it crawls.
+# #1784 is wontfix, because every binary we ship sets its own SIGPIPE handler.
 skip_on_hurd "the engine dies on SIGPIPE here (#1784, wontfix)"
 
 rc=0
@@ -24,8 +22,7 @@ test "$rc" = 0 || fail "-#test=sigpipe exited $rc: $out"
 assert_eq "sigpipe self-test OK" "$out" "the self-test's own verdict"
 ok "a write to a vanished peer leaves the process alive"
 
-# The self-test cannot reach the TLS calls, which need a TLS peer that
-# vanishes. This checks that each one still carries the mask.
+# The self-test cannot reach the TLS writes, so check that each keeps the mask.
 src=${top_srcdir:-..}/src
 for call in SSL_write SSL_connect SSL_shutdown SSL_read; do
     while IFS=: read -r file line _; do

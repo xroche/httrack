@@ -1,7 +1,6 @@
 #!/bin/bash
-# HTS_INET6 picks which arm of SOCaddr the installed htsnet.h declares. A probe
-# that only warns must not decide it, or two builds of one version can ship
-# different layouts under the same soname.
+# HTS_INET6 picks the SOCaddr layout in the installed htsnet.h. A probe that
+# only warns must not decide it, or one soname ships two layouts.
 
 # TEST_TIMEOUT_AT_LEAST: 900
 
@@ -33,8 +32,7 @@ n=0
 cases=9
 last_dir=
 
-# The two rejections below give up early, so a full configure's cost cannot be
-# projected from them.
+# The two rejections below exit early and cannot project a configure's cost.
 
 # Seeding the cache variable is the answer a host without getaddrinfo gives, and
 # AC_CHECK_LIB takes the same action-if-not-found branch either way. "have"
@@ -62,8 +60,7 @@ run_configure() { # run_configure DIR have|hide|probe ARG...
 check_state() {
     local desc=$1 dir=$2 want=$3 hdr line
     for hdr in config.h htsfeatures.h; do
-        # An undefined HTS_INET6 lets htsglobal.h pick, and then the installed
-        # headers never say which layout they were built with.
+        # If it is undefined, the installed headers never record the layout.
         grep -qx "#define HTS_INET6 ${want}" "${dir}/${hdr}" ||
             fail_dump "${desc}: ${hdr} does not define HTS_INET6 to ${want}" \
                 "${dir}/${hdr}" "${dir}/configure.log"

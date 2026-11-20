@@ -79,8 +79,7 @@ REALFAIL=(success:Build
 expect yes "one lost runner" \
     "$(job 'libhttrack (x64, Release)' failure "${KILLED[@]}" | gated)"
 
-# Every mutant here must be refused, or a real red gets re-run until the
-# attempt cap hides it. This one also proves the gate is ignored.
+# Every mutant must be refused, or a real red is re-run until the cap hides it.
 expect no "a failing test" \
     "$(job 'libhttrack (x64, Release)' failure "${REALFAIL[@]}" | gated)"
 expect no "a failing test beside a lost runner" \
@@ -92,8 +91,7 @@ expect no "nothing failed" \
     "$(job 'libhttrack (x64, Release)' success 'success:Build' | payload)"
 expect no "a cancelled job" \
     "$(job 'libhttrack (x64, Release)' cancelled "${KILLED[@]}" | gated)"
-# A failed job whose steps all finished does not match the wedge signature,
-# so a human reads it.
+# A failed job whose steps all finished is not a wedge.
 expect no "a failure with every step finished" \
     "$(job 'libhttrack (x64, Release)' failure 'success:Build' | gated)"
 # This case alone reaches the named-step clause, because a step failed and a

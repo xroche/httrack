@@ -1,8 +1,7 @@
 #!/bin/bash
 #
 # treatfirstline() reads the first bytes a server sends, on a plain crawl with
-# no options. Each malformed shape it handles is graded on what the engine
-# recorded.
+# no options, and each malformed shape is graded on what the engine recorded.
 
 set -euo pipefail
 
@@ -118,8 +117,7 @@ assert_accepted emptyline 200 "Unknown,%20assuming%20junky%20server" unknown/unk
 assert_accepted spaces 200 "Unknown,%20assuming%20junky%20server" unknown/unknown
 assert_accepted ltjunk 200 "Unknown,%20assuming%20junky%20server" unknown/unknown
 
-# 4000 bytes of phrase overflow the 1024-byte line buffer. The code survives
-# and the phrase falls back to the table.
+# A 4000-byte phrase exceeds the 1024-byte buffer and falls back to the table.
 assert_accepted huge 200 OK unknown/unknown
 
 ok "every malformed status-line arm recorded what it should"

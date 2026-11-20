@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# Every engine header needs a whole-file include guard whose macro is its own,
-# or whichever header comes first empties the other.
+# Each engine header needs its own whole-file include guard macro.
 
 set -euo pipefail
 

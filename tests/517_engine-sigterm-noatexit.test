@@ -1,9 +1,7 @@
 #!/bin/bash
 #
-# The second ^C is the user's only way out of a mirror that will not stop. Its
-# handler must not call exit(), because the atexit chain then runs in handler
-# context, where OpenSSL's teardown can deadlock on a lock the interrupted
-# thread holds.
+# The second ^C handler must not call exit(), because OpenSSL's atexit teardown
+# can deadlock on a lock the interrupted thread holds.
 
 set -euo pipefail
 
@@ -22,9 +20,7 @@ grep -q 'sigterm self-test: OK' <<<"$out" ||
     fail "the self-test's own verdict is missing: $out"
 ok "the terminating ^C handler runs no atexit hook, and still names itself"
 
-# _exit() drops whatever stdio still holds, and the teardown's own flush sits
-# behind back_delete_all(), where a second ^C lands. So the closing verdict's
-# write must flush itself.
+# _exit() drops buffered stdio, so the closing verdict must flush itself.
 src=${top_srcdir:-..}/src
 region=$(sed -n '/afficher.*sum.*dans log/,/Close ZIP/p' "$src/htscore.c")
 test -n "$region" || fail "the closing-summary block is gone from $src/htscore.c"

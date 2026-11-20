@@ -1,8 +1,6 @@
 #!/bin/bash
 # C2: a resume whose 206 carries a Content-Range end of INT64_MAX must not
-# sign-overflow the crange+1 check. Pass 2 resumes pass 1's partial, gets the
-# hostile 206, and must refetch the whole file. Only UBSan sees the overflow,
-# because a normal build wraps to the same restart.
+# sign-overflow the crange+1 check. Only UBSan sees the overflow.
 set -u
 
 # shellcheck source=tests/crawllib.sh

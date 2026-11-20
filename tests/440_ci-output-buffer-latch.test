@@ -1,8 +1,7 @@
 #!/bin/bash
 #
 # htsparse.c's output_buffer only reports a failed growth if every macro that
-# grows it latches output_oom. It only stays inside its allocation if nothing,
-# such as a plugin's byte count, sets its size or storage directly.
+# grows it latches output_oom. Nothing else may set its size or storage.
 
 set -euo pipefail
 

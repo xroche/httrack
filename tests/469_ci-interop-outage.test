@@ -83,8 +83,7 @@ test "$rc" -eq 1 || fail "a test with no log exited $rc, want 1: $verdict"
 grep -q '::error::failing: nolog.test' <<<"$verdict" || fail "no log: $verdict"
 test -z "$noise" || fail "reading a missing log wrote to stderr: $noise"
 
-# In a mixed run the real failure decides. Otherwise a red ships as a leg to
-# repeat.
+# In a mixed run the real failure decides, or a red ships as a leg to repeat.
 rc=0
 run_verdict outage1.test realfail.test
 test "$rc" -eq 1 || fail "a failure alongside an outage exited $rc, want 1: $verdict"

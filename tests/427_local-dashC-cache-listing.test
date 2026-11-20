@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# -#C lists what the cache holds. It must read the ZIP cache that 3.31
-# introduced, because nothing writes hts-cache/new.ndx.
+# -#C must list the ZIP cache, because nothing writes hts-cache/new.ndx.
 
 set -euo pipefail
 
@@ -107,8 +106,7 @@ if grep -q 'noheaders' <<<"$listing"; then
 fi
 ok "the listing follows the ZIP index, and skips what that index refuses"
 
-# Controls: an empty result still reads as one, whether the filter matched
-# nothing or the index came back empty.
+# Controls: a filter that matches nothing and an empty index both read empty.
 rc=0
 none=$(httrack -O "$out" -#C '*no-such-url*' 2>&1) || rc=$?
 test "$rc" = 0 || fail "a filter matching nothing exited ${rc}"

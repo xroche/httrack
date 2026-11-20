@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# A signal handler may only write() and restore errno. printf takes a lock on
-# stdout, so a ^C arriving while the mirror holds it deadlocks.
+# A signal handler may only write(), because printf's stdout lock can deadlock.
 
 set -euo pipefail
 
@@ -20,9 +19,8 @@ grep -q 'sighandlers self-test: OK' <<<"$out" ||
     fail "the self-test's own verdict is missing: $out"
 ok "the signal handlers keep errno and write with no locking output"
 
-# The self-test raises the signals, so it cannot see a handler that is never
-# installed. Read the installation back, with the file's SIG_DFL and SIG_IGN
-# dispositions as controls.
+# Read the installed handlers back, because raising a signal cannot see a
+# missing one. SIG_DFL and SIG_IGN are the controls.
 src=${top_srcdir:-..}/src
 handlers=$(sed -n '/^static void signal_handlers/,/^}/p' "$src/httrack.c")
 test -n "$handlers" || fail "signal_handlers() is gone from $src/httrack.c"

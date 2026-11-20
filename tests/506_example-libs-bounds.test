@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# The shipped example wrappers must refuse arguments and engine buffers that do
-# not fit their fixed fields. The sizes below come from those fields.
+# The example wrappers must refuse input that does not fit their fixed fields.
 
 set -euo pipefail
 
@@ -47,8 +46,7 @@ test ! -s "$work/found" ||
 f2=$(resolve "${FILENAME2_LIB}") || skip "nothing built at ${FILENAME2_LIB}.so"
 cf=$(resolve "${CONTENTFILTER_LIB}") || skip "nothing built at ${CONTENTFILTER_LIB}.so"
 
-# 256 is the width of filename2's string1 and string2. Nothing longer is worth
-# trying, because htscoremain.c caps every argv element below HTS_CDLMAXSIZE.
+# 256 is the width of filename2's string1 and string2.
 long256=$(printf 'a%.0s' $(seq 256))
 
 # A URL is needed or httrack prints its usage before loading anything. The plug
@@ -86,18 +84,14 @@ bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
     httrack 'BASEURL/simple/basic.html' --wrapper "${f2},simple,plain"
 
 # ---------------------------------------------------------------------------
-# Runtime probes for the copies that take the ENGINE's buffers. No crawl can
-# overflow them, because the engine caps a link at HTS_URLMAXSIZE and both
-# destinations are twice that. These assert the engine survives the rewrite
-# and the join comes back whole.
+# No crawl can overflow the copies of engine buffers, which are twice
+# HTS_URLMAXSIZE. These probes check the rewrite survives and the join is whole.
 # ---------------------------------------------------------------------------
 
 bl=$(resolve "${BASELINKS_LIB}") || skip "nothing built at ${BASELINKS_LIB}.so"
 ll=$(resolve "${LISTLINKS_LIB}") || skip "nothing built at ${LISTLINKS_LIB}.so"
 
-# A relative href needs no BASEURL substitution, and 200 bytes still fits a
-# file name. The engine drops links past HTS_URLMAXSIZE anyway, so the probe
-# can only catch a truncated join.
+# A 200-byte relative href fits a file name and needs no BASEURL substitution.
 longseg=$(printf 'L%.0s' $(seq 200))
 probe="$work/site"
 mkdir -p "$probe"

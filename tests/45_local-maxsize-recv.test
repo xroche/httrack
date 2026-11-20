@@ -7,9 +7,8 @@ set -euo pipefail
 
 : "${top_srcdir:=..}"
 
-# The mirror bound fires while under 100 KB is saved, so the cap tripped on
-# received volume. A cap on saved bytes would fetch all 16 links. The floor
-# matters because only the 575-byte seed page is saved.
+# The bound fires with under 100 KB saved, so the cap counts received bytes.
+# A cap on saved bytes would fetch all 16 links.
 bash "$top_srcdir/tests/local-crawl.sh" \
     --log-found 'More than 500000 bytes have been transferred.. giving up' \
     --found maxrecv/index.html \

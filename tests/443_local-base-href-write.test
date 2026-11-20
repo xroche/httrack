@@ -1,11 +1,9 @@
 #!/bin/bash
 #
-# A consumed <base href> must be written back, or the mirror keeps "<base >".
-# An element with no href means "no base", and a framework requiring one refuses
-# to start (Angular throws "No base href set").
+# A consumed <base href> must be written back, because a hrefless <base> stops
+# frameworks such as Angular from starting.
 #
-# The written value is empty, because "./" makes href="#f" resolve to the
-# directory rather than the page, and in-page anchors then lead away from it.
+# The written value is empty, because "./" sends href="#f" to the directory.
 
 set -euo pipefail
 
@@ -23,19 +21,16 @@ cat >"$root/index.html" <<'EOF'
 <a href="sub/eofa.html">a</a></body></html>
 EOF
 
-# The page with the base sits below the document root, so a base of "./" and
-# one of "" pick different directories. <base href="/"> already resolves
-# correctly, so the test asserts what is written out. The applet's codebase
-# shares the write site and must keep its own value.
+# The page sits below the root, so "./" and "" pick different directories. The
+# applet's codebase shares the write site and must keep its own value.
 cat >"$root/sub/page.html" <<'EOF'
 <!DOCTYPE html><html><head><base href="/"><title>t</title></head>
 <body><a href="#f">f</a> <a href="target.html">r</a> <a name="f">A</a>
 <applet codebase="j/" code="A.class" width="1" height="1"></applet>
 </body></html>
 EOF
-# A second page carries a "./" base, the other consumed relative form and the
-# one frameworks ship. A fix that writes the attribute for a root base alone
-# leaves it hrefless. Its links are all fragments.
+# A second page carries the "./" base that frameworks ship, which a fix for the
+# root base alone would leave hrefless.
 cat >"$root/sub/dot.html" <<'EOF'
 <!DOCTYPE html><html><head><base href="./"><title>d</title></head>
 <body><a href="#f">f</a><a name="f">A</a></body></html>

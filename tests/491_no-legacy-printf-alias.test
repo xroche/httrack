@@ -15,8 +15,7 @@ work=$(mktemp -d "${TMPDIR:-/tmp}/printfalias.XXXXXX") || fail "no tmpdir"
 cleanup_push rm -rf "$work"
 
 family='v?(f|s|sn)?printf|v?asprintf'
-# A macro named as the C99 call changes the meaning of every later use. A
-# wrapper named otherwise, such as htssafe.h's sprintfbuff, is fine.
+# A macro named like the C99 call redefines every later use of it.
 source_re="^[[:space:]]*#[[:space:]]*define[[:space:]]+($family)[[:space:](]"
 # The same alias handed to the compiler instead: -Dsnprintf=_snprintf, or a
 # Visual Studio PreprocessorDefinitions entry.

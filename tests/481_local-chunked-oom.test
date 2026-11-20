@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# A chunk whose buffer cannot be allocated must end that one transfer (#1708),
-# instead of leaving the slot retrying an allocation it never gets.
+# A chunk whose buffer cannot be allocated must end its transfer (#1708).
 
 set -euo pipefail
 
@@ -14,8 +13,7 @@ skip_on_windows "RLIMIT_AS is not enforced there"
 cap=1048576 # KB; the fixture announces a chunk of 0x70000000
 python=$(find_python) || skip "python3 not found"
 
-# A sanitized build maps a shadow far larger than the cap and dies at startup,
-# and log_path keeps that report, so detect the build before capping. Same
+# so detect the build before capping, with 283's probe and detect_leaks=0.
 # probe as 283, with detect_leaks=0 so the probe leaves no leak report.
 probe=$(ASAN_OPTIONS=help=1:detect_leaks=0 httrack -O /dev/null --version 2>&1 || true)
 case "$probe" in
@@ -24,7 +22,7 @@ esac
 
 (ulimit -v "$cap" && httrack --version >/dev/null 2>&1) ||
     skip "httrack does not start under a ${cap}KB address-space cap"
-# And the cap has to bite, or every assertion below proves nothing.
+# The cap must bite, or the assertions below prove nothing.
 (ulimit -v "$cap" && "$python" -c 'import sys
 try:
     bytearray(0x70000000)

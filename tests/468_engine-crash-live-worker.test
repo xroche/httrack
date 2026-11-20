@@ -45,11 +45,9 @@ expect_segv() { # expect_segv FILE NAME
         fail "$2 caught signal $num ($(kill -l "$num" 2>/dev/null)), expected SEGV"
 }
 
-# Name the frames the handler printed as module+offset. -fvisibility=hidden
-# hides the engine's own, so only addr2line can name the faulting function.
-# LC_ALL=C because addr2line translates its own "at". Returns 1 unless the
-# unwind walked out of the engine. Under qemu it stops at the signal frame,
-# which says nothing about where the fault came from.
+# Resolve the module+offset frames with addr2line, under LC_ALL=C because it
+# translates its "at". Returns 1 unless the unwind left the engine, which qemu's
+# does not.
 name_frames() { # name_frames TRACE OUT
     local mod off
     build_names_frames && command -v addr2line >/dev/null || return 1

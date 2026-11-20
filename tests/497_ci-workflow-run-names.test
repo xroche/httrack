@@ -1,8 +1,7 @@
 #!/bin/bash
 #
 # A workflow_run trigger names the workflows it watches by their name:, and a
-# name that matches nothing raises no error. The watcher then reports nothing
-# for a canary nobody watches.
+# name that matches nothing raises no error and leaves the canary unwatched.
 
 set -euo pipefail
 

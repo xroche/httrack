@@ -1,11 +1,7 @@
 #!/bin/bash
 #
-# htsparse spots a CSS url(...) by the token "url" before a "(" and accepts an
-# unquoted operand. JavaScript's new URL(x) has the same token, and rewriting
-# its operand breaks the bundle. Inside a script an unquoted operand must
-# survive untouched, and in CSS it must still be rewritten. Each place the
-# parser decides between them has a case, because htsparse sets the "inside a
-# script" flag for text/css documents too.
+# Inside a script an unquoted new URL(x) operand stays untouched, and in CSS
+# url(x) is rewritten. Each place the parser decides this has a case.
 
 set -euo pipefail
 
@@ -17,9 +13,8 @@ cleanup_push rm -rf "$work"
 root="$work/root"
 mkdir -p "$root"
 
-# One page carries every context the parser decides between. The style=
-# attribute is the first CSS it meets, and each JavaScript context follows its
-# own <style> block, so each one must clear the CSS state itself.
+# Each JavaScript context follows its own <style> block, so each one must clear
+# the CSS state itself.
 cat >"$root/index.html" <<'EOF'
 <!DOCTYPE html><html><head>
 <link rel="stylesheet" href="sheet.css">

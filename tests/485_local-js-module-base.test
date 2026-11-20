@@ -1,9 +1,7 @@
 #!/bin/bash
 #
-# A module specifier in /assets/app.js resolves against the script, so
-# import("./chunk.js") fetches /assets/chunk.js as a browser does. Markup that
-# document.write('<img src="img/x.png">') inserts still takes the page's base.
-# The two copies of x.png tell the two apart.
+# import("./chunk.js") in /assets/app.js resolves against the script, but
+# markup from document.write() takes the page's base.
 
 set -euo pipefail
 
