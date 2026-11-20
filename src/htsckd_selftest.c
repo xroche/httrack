@@ -30,6 +30,9 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsckd.h"
 
+#include <limits.h>
+#include <stdint.h>
+
 typedef hts_boolean (*ckd_fn)(size_t *r, size_t a, size_t b);
 
 struct ckd_case {
