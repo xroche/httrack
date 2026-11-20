@@ -146,9 +146,7 @@ static int st_wizardfilter(httrackp *opt, int argc, char **argv) {
   EMITS(5, "foo.com", "page.html", HTS_FALSE, "");
   EMITS(7, "foo.com", "page.html", HTS_FALSE, "");
 
-  /* A long link must emit the same pattern as a short one, byte for byte.
-     Clipping widens the rule ("*[file]" becomes "*"), and the lengths come
-     from the wire. The sweep runs to the worst case, both buffers full. */
+  /* A long link must emit a short link's pattern, as clipping widens it. */
   {
     const size_t urlmax = HTS_URLMAXSIZE * 2 - 1; /* the engine's adr and fil */
     char *adr = malloct(urlmax + 1);
@@ -162,8 +160,7 @@ static int st_wizardfilter(httrackp *opt, int argc, char **argv) {
       wizardfilter_link(adr, adrlen, fil, fillen, HTS_TRUE);
       wizardfilter_emits(&f, expect, adr, fil);
     }
-    /* the maximum: both buffers full, no leading slash on fil to spare the
-       separator. It fills the slot, NUL included */
+    /* the maximum fills both buffers and the slot, NUL included */
     wizardfilter_link(adr, urlmax, fil, urlmax, HTS_FALSE);
     assertf(wizardfilter_emits(&f, expect, adr, fil) ==
             HTS_FILTER_SLOT_SIZE - 1);
@@ -364,8 +361,7 @@ static int st_wizardverdict(httrackp *opt, int argc, char **argv) {
     return 0;
   }
   opt->log = NULL; /* the battery walks the answers that warn */
-/* APPLIES answers `n` over a link the crawl left at `in`, then checks the
-   verdict, whether the questions stop, and the recursion cap. */
+/* APPLIES answers `n` over a link left at `in`, then checks the verdict. */
 #define APPLIES(n, in, forbidden, stop, prio)                                  \
   do {                                                                         \
     url = (in);                                                                \
@@ -499,8 +495,7 @@ static int st_wizardprompt(httrackp *opt, int argc, char **argv) {
   ASKS("foo.com", "", "foo.com/");
 #undef ASKS
 
-  /* #1251: a link too long for the prompt is clipped, and what is left still
-     names its host */
+  /* #1251: a clipped link still names its host in the prompt */
   memset(adr, 'a', sizeof(adr) - 1);
   adr[sizeof(adr) - 1] = '\0';
   memset(fil, 'b', sizeof(fil) - 1);

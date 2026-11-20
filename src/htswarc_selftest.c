@@ -85,9 +85,7 @@ static unsigned char *warc_next_member(const unsigned char **in,
   return out;
 }
 
-/* Validate a synthetic transaction's .warc.gz against WARC/1.1: one gzip
-   member per record, Content-Length, trailer, body round-trip, and the dropped
-   Transfer-Encoding (Content-Encoding is kept, see warc-verbatim). */
+/* Validate a synthetic transaction's .warc.gz against WARC/1.1. */
 /* This keeps the call sites' argument order around hts_memstr. */
 static const char *warc_memstr(const char *hay, const char *needle,
                                size_t haylen, size_t nlen) {
@@ -285,9 +283,8 @@ static int warc_rec_split(const unsigned char *rec, size_t rlen,
   return 0;
 }
 
-/* A cap-truncated body is still archived, tagged WARC-Truncated. The
-   plaintext response says "length". The gzip-coded one says "time" and keeps
-   Content-Encoding with the coded partial bytes, so label and body match. */
+/* A cap-truncated body is archived as WARC-Truncated "length", or "time"
+   when gzip-coded, which keeps Content-Encoding. */
 static int st_warc_trunc(httrackp *opt, int argc, char **argv) {
   char path[HTS_URLMAXSIZE];
   warc_writer *w;
@@ -653,9 +650,7 @@ static int st_warc_surt(httrackp *opt, int argc, char **argv) {
   return st_verdict("warc-surt", err);
 }
 
-/* The CDXJ offset is a uint64_t, and the tell behind it needs the same
-   width. A 32-bit ftell, as on 64-bit Windows, would index every record past
-   2 GB at a wrong offset. Seeking alone writes no data. */
+/* A 32-bit ftell, as on 64-bit Windows, misplaces every record past 2 GB. */
 static int st_warc_offset(httrackp *opt, int argc, char **argv) {
   static const uint64_t cases[] = {
       0,
@@ -785,8 +780,7 @@ static int st_warc_offset(httrackp *opt, int argc, char **argv) {
   return st_verdict("warc-offset", err);
 }
 
-/* A URL longer than 1024 bytes must still reach the archive (#785). The
-   sweep straddles that size so both the stack buffer and the grow path run. */
+/* A URL longer than 1024 bytes must still reach the archive (#785). */
 static int st_warc_longurl(httrackp *opt, int argc, char **argv) {
   /* "WARC-Target-URI: " + CRLF costs 19 bytes, so the old buffer failed at
      1005; 9000 forces several reallocs within one record. */
@@ -868,9 +862,7 @@ static int st_warc_longurl(httrackp *opt, int argc, char **argv) {
   return st_verdict("warc-longurl", err);
 }
 
-/* End-to-end CDXJ: the .cdx is sorted, has one line per response, revisit
-   and resource record only, and each offset/length inflates on its own to a
-   record whose WARC-Target-URI matches the line. */
+/* Checks that each sorted .cdx line inflates to the record it names. */
 static int st_warc_cdx(httrackp *opt, int argc, char **argv) {
   char wpath[HTS_URLMAXSIZE], cpath[HTS_URLMAXSIZE];
   warc_writer *w;
@@ -1112,9 +1104,8 @@ static void st_cdx_fill(warc_writer *w, int n, size_t pad) {
   }
 }
 
-/* These are the ways warc_cdx_flush can fail to leave a usable index beside
-   the archive it replaced. A first run has no previous index, so the
-   empty-index warning stays silent (#1041). */
+/* These are the ways warc_cdx_flush can fail to leave a usable index. A
+   first run has no old index, so the empty-index warning is quiet (#1041). */
 static int st_warc_cdx_errors(httrackp *opt, int argc, char **argv) {
   char path[HTS_URLMAXSIZE], cdx[HTS_URLMAXSIZE];
   static const char stale[] = "no record was indexed";
@@ -1137,8 +1128,7 @@ static int st_warc_cdx_errors(httrackp *opt, int argc, char **argv) {
   warc_close(w);
   err |= st_cdx_logged("first run", NULL);
 
-  /* This run swapped over a previous archive, so its old index now
-     describes an archive that is gone. */
+  /* This run replaced an archive, so the old index is stale. */
   fconcat(path, sizeof(path), argv[0], "cdxerr-prev.warc.gz");
   fconcat(cdx, sizeof(cdx), argv[0], "cdxerr-prev.cdx");
   st_cdx_leave(path, "previous archive");
@@ -1148,8 +1138,7 @@ static int st_warc_cdx_errors(httrackp *opt, int argc, char **argv) {
   warc_close(w);
   err |= st_cdx_logged("swap over a previous archive", stale);
 
-  /* The mirror case writes in place, then abandons, so the archive is
-     clobbered and its index is stale. */
+  /* The mirror case clobbers the archive in place, so its index is stale. */
   fconcat(path, sizeof(path), argv[0], "cdxerr-abort.warc.gz");
   fconcat(cdx, sizeof(cdx), argv[0], "cdxerr-abort.cdx");
   st_cdx_leave(cdx, "com,example)/ 20240101000000 {}\n");
@@ -1159,8 +1148,7 @@ static int st_warc_cdx_errors(httrackp *opt, int argc, char **argv) {
   warc_abort_opt(opt);
   err |= st_cdx_logged("abandoned in-place run", stale);
 
-  /* With no index left behind, a message would name a file that never
-     existed. The gate prevents that false alarm. */
+  /* With no index left behind, no message may name it. */
   fconcat(path, sizeof(path), argv[0], "cdxerr-abort-noidx.warc.gz");
   w = warc_open(opt, path);
   assertf(w != NULL);
@@ -1168,8 +1156,7 @@ static int st_warc_cdx_errors(httrackp *opt, int argc, char **argv) {
   warc_abort_opt(opt);
   err |= st_cdx_logged("abandoned run with no index", NULL);
 
-  /* An archive that never opened replaced nothing, and its index is still
-     valid. The failed open is the only error. */
+  /* An archive that never opened leaves its index valid. */
   fconcat(path, sizeof(path), argv[0], "cdxerr-noopen.warc.gz");
   fconcat(cdx, sizeof(cdx), argv[0], "cdxerr-noopen.cdx");
   st_cdx_leave(cdx, "com,example)/ 20240101000000 {}\n");
@@ -1198,9 +1185,7 @@ static int st_warc_cdx_errors(httrackp *opt, int argc, char **argv) {
   }
 
 #ifndef _WIN32
-  /* /dev/full fails every write with ENOSPC. An index under one stdio
-     buffer fails at fclose, and a larger one fails earlier with another
-     message. */
+  /* /dev/full fails a small index at fclose and a large one earlier. */
   if (access("/dev/full", W_OK) == 0) {
     fconcat(path, sizeof(path), argv[0], "cdxerr-short.warc.gz");
     fconcat(cdx, sizeof(cdx), argv[0], "cdxerr-short.cdx");
@@ -1322,8 +1307,7 @@ static int st_warc_teardown_case(httrackp *opt, const char *name,
   (void) UNLINK(fconv(catbuff, sizeof(catbuff), tmp));
   StringCopy(opt->warc_file, path);
 
-  /* the engine gives each mirror a fresh opt, but this test reuses the
-     dispatcher's */
+  /* this test reuses the dispatcher's opt, unlike the engine */
   opt->state.warc = NULL;
   st_warc_emit(opt, run1);
   warc_close_opt(opt);
@@ -1349,8 +1333,8 @@ static int st_warc_teardown_case(httrackp *opt, const char *name,
     fprintf(stderr, "warc-teardown: %s: orphan temporary %s\n", name, tmp);
     err++;
   }
-  /* abort keeps run 1 and close commits run 2. The late body guards against
-     an append, as no reopen reaches the archive without losing a run */
+  /* abort keeps run 1, close commits run 2, and the late body catches an
+     append */
   err += abort_run ? st_warc_holds(name, path, run1, run2, late)
                    : st_warc_holds(name, path, run2, run1, late);
   return err;
@@ -1408,8 +1392,7 @@ typedef struct {
   int method;
 } wacz_entry;
 
-/* Package a 2-record WARC as a WACZ, then unzip it in-process and check the
-   layout, STORE entries, sha256 digests, digest chain and pages.jsonl. */
+/* Package a 2-record WARC as a WACZ, then unzip it in-process and check it. */
 static int st_warc_wacz(httrackp *opt, int argc, char **argv) {
   char wpath[HTS_URLMAXSIZE], waczpath[HTS_URLMAXSIZE], cdxpath[HTS_URLMAXSIZE];
   warc_writer *w;
@@ -1781,8 +1764,7 @@ static const char sf_page[] =
     "<link rel=\"canonical\" href=\"\001other.html\002\">\n"
     "<title>t</title>\n"
     "<style>body { background: url(\"\001img/a%20b.png\002\"); }\n"
-    /* A fragment is document text the mark never covers, so it reaches the
-       data: URI as written, in the author's quoting. */
+    /* The mark never covers a fragment, so it reaches the URI as written. */
     "b { background: url('\001img/sprite.svg\002#w x'); }\n"
     "i { background: url('\001img/sprite.svg\002#lt<s>gt'); }\n"
     "u { background: url(\"\001img/sprite.svg\002#z'(\\\xC3\xA9\"); }</style>\n"
@@ -1792,8 +1774,7 @@ static const char sf_page[] =
     "<link rel=\"icon\" href=\"\001icon.png\002\">\n"
     "<link rel=\"preload\" as=\"font\" href=\"\001font/f.woff2\002\">\n"
     "<img src=\"data:image/gif;base64,QUJD\">\n"
-    /* Each has a file where its guard's removal would land it. Without one,
-       the link would stay a link either way. */
+    /* Each has a file where its guard's removal would land it. */
     "<img src=\"http://example.com/x.png\">\n"
     "<img src=\"//example.com/x.png\">\n"
     "<input type=\"image\" src=\"\001img/in.png\002\">\n"
@@ -1811,8 +1792,7 @@ static const char sf_page[] =
     "<source src=\"\001v.mp4\002\" type=\"video/mp4\"></video>\n"
     "<svg><image href=\"\001img/sv.png\002\"/></svg>\n"
     "<table background=\"\001img/bg.png\002\"><tr><td>x</td></tr></table>\n"
-    /* Dropping the clamp lands the second on <root>/img/a b.png through its
-       leading "..". The first can only 404 either way. */
+    /* Dropping the clamp lands the second on <root>/img/a b.png. */
     "<img src=\"\001../escape.png\002\">\n"
     "<img src=\"\001../img/a%20b.png\002\">\n"
     "<a href=\"img/a%20b.png\">link</a>\n"
@@ -1838,8 +1818,7 @@ static const char sf_page[] =
 
 /* Lay a small mirror down under root. */
 static void sf_fixture(httrackp *opt, const char *root) {
-  /* The over-cap url() drives the rebase fallback. A reference an inlined
-     stylesheet could not embed must be relative to the page, or it dangles. */
+  /* A url() an inlined stylesheet could not embed must be page-relative. */
   static const char css[] =
       "@import \"\001sub/nested.css\002\";\n"
       "@import url(\"\001sub/two.css\002\");\n"
@@ -1888,8 +1867,7 @@ static void sf_fixture(httrackp *opt, const char *root) {
   sf_put(root, "icon.png", sf_png, SF_PNG_LEN);
   sf_put(root, "font/f.woff2", "wOF2\x00\x01", 6);
   /* Each path is where a guard's removal would land a reference. Windows
-     cannot create the two with a colon, so there the scheme guard only gets
-     the weaker "the link survived" check. */
+     cannot create the two with a colon, so it checks the scheme guard less. */
   sf_put(root, "img/never.png", sf_png, SF_PNG_LEN);
   sf_put(root, "example.com/x.png", sf_png, SF_PNG_LEN);
   sf_colon_ok =
@@ -2017,9 +1995,7 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
   sf_check(strstr(out, "style='content:\"x\"; background:url(data:") != NULL,
            "style attribute re-quoted instead of substituted in place");
 
-  /* The mark covers the reference only, so what followed it comes back
-     byte-identical, escapes included. The query was inside the mark and went
-     with it. */
+  /* The mark covers only the reference, so what followed it is unchanged. */
   sf_check(strstr(out, "img/sprite.svg") == NULL,
            "a fragment-bearing reference was left a link");
   sf_check(sf_count(out, "#icon-a\"") == 1, "img src fragment dropped");
@@ -2137,8 +2113,7 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
            "asset under the raised cap still a link");
   freet(out);
 
-  /* Nothing inlines, so the rewriter must be byte transparent. The test
-     checks its output, because the file it declined to write cannot change. */
+  /* Nothing inlines, so the rewriter's output must be byte transparent. */
   fconcat(root, sizeof(root), argv[0], "mirror3/");
   sf_fixture(opt, root);
   fconcat(page, sizeof(page), root, "page.html");
@@ -2164,8 +2139,7 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
     (void) singlefile_rewrite_html(opt, root, page, StringBuff(marked),
                                    StringLength(marked),
                                    SINGLEFILE_MAX_PAGE_SIZE, &verbatim);
-    /* A reference that cannot be inlined loses its mark and keeps every
-       other byte. */
+    /* A reference that cannot inline loses its mark and nothing else. */
     sf_check(StringLength(verbatim) < StringLength(marked),
              "a page with nothing to inline kept its marks");
     sf_check(strstr(StringBuff(verbatim), singlefile_intro(opt)) == NULL,
@@ -2175,9 +2149,8 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
   }
   (void) outlen;
 
-  /* A mark the pass cannot parse stays in the page as text, so the pass must
-     read back whatever singlefile_mark writes. emit_max derives the worst
-     case apart from SINGLEFILE_MAX_SPAN, and the spans straddle it. */
+  /* The pass must read back any mark singlefile_mark writes. emit_max derives
+     the worst case apart from SINGLEFILE_MAX_SPAN. */
   {
     const size_t emit_max =
         HTS_URLMAXSIZE * 2 *
@@ -2212,8 +2185,7 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
       sf_check(hts_memstr(StringBuff(got), StringLength(got), pad, spans[k]) !=
                    NULL,
                "the reference the mark measured was lost");
-      /* Nothing resolves here, so only the mark may go. A length check
-         catches what a presence check cannot. */
+      /* Nothing resolves here, so only the mark may go. */
       sf_check(StringLength(got) == StringLength(marked) - marklen,
                "the pass removed something other than the mark");
       if (spans[k] == emit_max + 1) {
@@ -2256,8 +2228,7 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
     }
   }
 
-  /* The intro is fixed-width, so singlefile_may_mark never searches for an
-     empty needle. */
+  /* The fixed-width intro keeps singlefile_may_mark off an empty needle. */
   {
     String probe = STRING_EMPTY;
 
@@ -2275,8 +2246,8 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
     StringFree(probe);
   }
 
-  /* The per-page budget meets a self-importing stylesheet. The large-budget
-     run proves the fan-out happens, so the budget cut the small run short. */
+  /* The budget stops a self-importing stylesheet, and the large run is the
+     control. */
   {
     static const char bomb_css[] =
         "@import \"\001b.css\002\";@import \"\001b.css\002\";"

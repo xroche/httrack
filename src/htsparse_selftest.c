@@ -31,8 +31,7 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
-/* Each of the parser's three decisions about a quoted string is swept here
-   over a generated corpus. */
+/* These tests sweep the parser's quoted-string decisions over a corpus. */
 
 #include "htsselftest_int.h"
 
@@ -40,9 +39,7 @@ Please visit our Website: http://www.httrack.com
 #include <stdio.h>
 #include <string.h>
 
-/* A model of hts_dirty_link_is_url written from the parser's intent. A
-   disagreement may be a bug in either. The helpers it reuses are data or are
-   pinned by -#test=linkdir. */
+/* This models hts_dirty_link_is_url from the parser's intent. */
 static hts_boolean dirtylink_model(httrackp *opt, const char *str, char lastc,
                                    hts_boolean inscript) {
   char BIGSTK cut[HTS_URLMAXSIZE * 2];
@@ -94,8 +91,7 @@ static hts_boolean dirtylink_model(httrackp *opt, const char *str, char lastc,
         (opens_path || (slashes >= 2 && named != 0)))
       return HTS_TRUE;
   }
-  /* An address is not a link when only its extension suggests one.
-     "http://a@b/" and "//a@b/" were taken above. */
+  /* An address is not a link when only its extension suggests one. */
   return (by_ext && strchr(cut, '@') == NULL) ? HTS_TRUE : HTS_FALSE;
 }
 
@@ -138,8 +134,7 @@ static void dirtylink_case(httrackp *opt, selftest_sweep *sw, const char *str) {
   }
 }
 
-/* The sweep tries every string of up to four bytes over the alphabet the
-   predicate branches on. */
+/* This tries every string of up to four bytes over the predicate's alphabet. */
 static void dirtylink_enumerate_bytes(httrackp *opt, selftest_sweep *sw) {
   static const char alphabet[] = "/?#&.:+*<>,\"'a@ ";
   const size_t n = sizeof(alphabet) - 1;
@@ -164,8 +159,7 @@ static void dirtylink_enumerate_bytes(httrackp *opt, selftest_sweep *sw) {
   }
 }
 
-/* These tokens reach what four bytes cannot: a scheme, a name, an extension.
-   Each kills a mutant the others leave alive. */
+/* These tokens reach what four bytes cannot: a scheme, a name, an extension. */
 static void dirtylink_enumerate_tokens(httrackp *opt, selftest_sweep *sw) {
   static const char *const tok[] = {
       "",      "http:", "HTTPS:", "ftp:", "mailto:", "a",  ".gif",
@@ -270,8 +264,7 @@ static int parse_selftest_dirtylink(httrackp *opt, hts_boolean dump) {
     }
   }
 
-  /* The parser passes a slice of the page. A reader that runs past "len"
-     must fail here, because the rest of the buffer is not the link. */
+  /* The parser passes a slice, so a read past "len" must fail here. */
   if (!hts_dirty_link_is_url(opt, "a.gif*rest", 5, ')', HTS_TRUE) ||
       hts_dirty_link_is_url(opt, "a.gif*rest", 10, ')', HTS_TRUE)) {
     fprintf(stderr, "dirtylink: the verdict must read the first len bytes\n");
@@ -306,9 +299,7 @@ static int parse_selftest_dirtylink(httrackp *opt, hts_boolean dump) {
   return err;
 }
 
-/* Keywords a script assignment or call may carry a URL through, with what
-   must follow and what may close the statement. The engine takes the first
-   entry that matches. */
+/* A script may carry a URL through these keywords. The first match wins. */
 /* What must sit around a keyword for it to introduce a URL. */
 typedef enum {
   JSGUARD_NONE = 0,
@@ -344,8 +335,7 @@ static const struct jsscan_word {
     {"from", 0, NULL, HTS_FALSE, HTS_FALSE, HTS_TRUE, JSGUARD_NO_IDENT_QUOTE},
 };
 
-/* Returns the code point ending at cursor[-1], or that byte when no UTF-8
-   lead precedes it, as in a Latin-1 non-breaking space. */
+/* Returns the code point ending at cursor[-1], or that byte if not UTF-8. */
 static unsigned int model_prev_codepoint(const char *cursor,
                                          const char *buffer) {
   const unsigned char *const p = (const unsigned char *) cursor;
@@ -408,8 +398,7 @@ static hts_boolean jsscan_model(httrackp *opt, const char *cursor,
         continue;
       break;
     case JSGUARD_NO_IDENT_BYTE:
-      /* The engine matches UTF-8 byte triples and this model decodes code
-         points. They agree by coincidence, and cases[] pins membership. */
+      /* The engine matches byte triples, and cases[] pins that they agree. */
       if (isalnum((unsigned char) prev) || prev == '_' || prev == '$' ||
           prev == '.' ||
           ((unsigned char) prev >= 0x80 &&
@@ -494,8 +483,7 @@ matched:
     }
   }
   if (w->no_method) {
-    /* The engine's list is copied because a model that calls the code it
-       judges cannot see a bug inside it. */
+    /* This list is a copy, because a model cannot judge code it calls. */
     static const char *const methods[] = {"GET",    "POST",  "PUT",
                                           "DELETE", "HEAD",  "OPTIONS",
                                           "PATCH",  "TRACE", NULL};
@@ -506,8 +494,7 @@ matched:
     }
   }
 
-  /* Unlike the engine, this matches prefixes. A specifier is a URL when it
-     is a path or carries a scheme. */
+  /* A specifier is a URL when it is a path or carries a scheme. */
   if (w->url_only && strncmp(a, "/", 1) != 0 && strncmp(a, "./", 2) != 0 &&
       strncmp(a, "../", 3) != 0 && strfield(a, "http:") == 0 &&
       strfield(a, "https:") == 0 && strfield(a, "ftp:") == 0)
@@ -515,8 +502,7 @@ matched:
 
   /* a leading ',' or ';' says this is code, a quote or a control byte says the
      operand never was one string, and "${" says it is interpolated.
-     This copies the engine's loop, so an edit to both would agree. cases[]
-     and the crawl in test 490 catch that, because neither uses this model. */
+     This copies the engine's loop, and cases[] and test 490 guard both. */
   for (n = 0, i = 0; i < (size_t) len; i++) {
     if (a[i] == '$' && i + 1 < (size_t) len && a[i + 1] == '{') {
       return HTS_FALSE;
@@ -571,9 +557,7 @@ static void jsscan_case(httrackp *opt, selftest_sweep *sw, const char *text,
    operand + tail, taking one representative per class the scanner branches on
    rather than every byte. */
 static void jsscan_sweep(httrackp *opt, selftest_sweep *sw) {
-  /* The non-ASCII prefixes check that the two decoders agree, and cases[]
-     pins the byte list. U+20A0 ends in 0xA0, so an engine reading that byte
-     as a space disagrees with the model here only. */
+  /* U+20A0 ends in 0xA0, so only it catches an engine reading 0xA0 as space. */
   static const char *const prefix[] = {"",
                                        " ",
                                        "a",
@@ -750,8 +734,7 @@ static int parse_selftest_jsscan(httrackp *opt, hts_boolean dump) {
       /* the keyword stands alone, and is not a call */
       {"xfrom\"./x.js\";", 1, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
       {"x.from(\"./x.js\")", 2, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
-      /* a name ending in "from" is not the keyword, and its assignment is not a
-         link. The sweep's "_" prefix covers the other spellings. */
+      /* a name ending in "from" is not the keyword, so this is not a link */
       {"var copyFrom = \"hello world\";", 8, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0,
        0},
       /* '$' opens a name, and a byte above 127 opens a Unicode one. UTF-8
@@ -934,8 +917,7 @@ static hts_boolean tagattr_is_nodetect(const char *name, size_t len) {
   return HTS_FALSE;
 }
 
-/* Builds a tag around an attribute we chose, so the test knows the name the
-   walk must resolve. */
+/* Builds a tag around a known attribute for the walk to resolve. */
 static int tagattr_case(selftest_sweep *sw, const char *before,
                         const char *name, const char *gap, char quote,
                         hts_boolean want) {
@@ -976,11 +958,9 @@ static int tagattr_case(selftest_sweep *sw, const char *before,
   return err;
 }
 
-/* The sweep puts every string of up to four bytes over the walk's alphabet
-   between the tag and the quote. No result is a valid tag. */
+/* The sweep puts every string of up to four bytes before the quote. */
 /* Checks what the walk may claim about a tag nobody would write. The span
-   rules restate the walk's promises, so they catch a rewrite that drops them
-   but not an off-by-one. The verdict rule is independent: the name decides. */
+   rules restate the walk, so they cannot catch an off-by-one. */
 static int tagattr_probe(selftest_sweep *sw, char *text, size_t at) {
   const char *nend = NULL;
   const char *name;
@@ -1071,8 +1051,7 @@ static int tagattr_junk_bytes(selftest_sweep *sw) {
   return err;
 }
 
-/* This sweeps whole attribute names, so the verdict rule meets names that
-   carry a link and names that do not. */
+/* This sweeps whole attribute names, with and without a link. */
 static int tagattr_junk_names(selftest_sweep *sw) {
   static const char *const tok[] = {"",   "=",     " ",       "\"",
                                     "'",  "a",     "<",       "\t",
@@ -1119,8 +1098,7 @@ static int parse_selftest_tagattr(httrackp *opt) {
     for (g = 0; g < sizeof(gap) / sizeof(gap[0]); g++) {
       size_t q;
 
-      /* each quote character meets each class of name, or a walk reading
-         only one of them passes */
+      /* each quote character meets each class of name */
       for (q = 0; q < 2; q++) {
         const char quote = q ? '\'' : '"';
 
@@ -1651,8 +1629,7 @@ static int st_robots(httrackp *opt, int argc, char **argv) {
   /* No rules: everything is allowed. */
   assertf(rb_decide(&robots, "User-agent: *\nDisallow:\n", "/x") == 0);
 
-  /* #1286: rules survive up to the RFC 9309 floor. Cases sit past 4 KB, just
-     under the floor, and past it, where only the tail is dropped. */
+  /* #1286: rules up to the RFC 9309 floor survive, and only the tail drops. */
   {
     char *txt = rb_bulk(8192); /* past the old cap, well under the new one */
 
@@ -1688,9 +1665,8 @@ static int st_robots(httrackp *opt, int argc, char **argv) {
     checkrobots_free(&rb);
   }
 
-  /* A rule longer than the line buffer is read as a prefix of itself. A
-     Disallow keeps it, because it can only forbid more. An Allow drops it,
-     because it would permit more than the site wrote. */
+  /* A rule cut by the line buffer is a prefix. A Disallow keeps it, because
+     it only forbids more, and an Allow drops it. */
   {
     char BIGSTK txt[HTS_ROBOTS_LINE_SIZE * 3];
     char BIGSTK path[HTS_ROBOTS_LINE_SIZE * 2];
@@ -1706,8 +1682,7 @@ static int st_robots(httrackp *opt, int argc, char **argv) {
              path);
     assertf(rb_decide(&robots, txt, path) == -1);
 
-    /* The longest line the buffer holds whole is not cut, so this Allow wins.
-       One byte more is cut, and the Disallow it would beat stands. */
+    /* The longest whole line keeps this Allow, and one byte more drops it. */
     path[HTS_ROBOTS_LINE_SIZE - 2 - strlen("Allow: ")] = '\0';
     snprintf(txt, sizeof(txt), "User-agent: *\nDisallow: /a\nAllow: %s\n",
              path);
@@ -1739,8 +1714,7 @@ static int st_robots(httrackp *opt, int argc, char **argv) {
        become discarding the rest of the file */
     assertf(rb_decide(&robots, txt, "/next/x") == -1);
 
-    /* control: the same text on its own line is a rule we honour, which
-       proves the refusal above comes from the unread tail */
+    /* control: the same rule on its own line is honoured */
     assertf(rb_decide(&robots,
                       "User-agent: *\nDisallow: /open/\nAllow: /open/\n",
                       "/open/x") == 0);
@@ -1813,9 +1787,7 @@ static int st_sitemap(httrackp *opt, int argc, char **argv) {
                   100, &idx, &c) == 1);
   assertf(strcmp(c.url[0], "http://h.test/a?b=c") == 0);
 
-  /* A reference decoding to a control byte is dropped, because the shared
-     decoder writes the real character and the URL check refuses it. A
-     reference the decoder cannot represent (&#0;) stays verbatim. */
+  /* A reference to a control byte drops the URL, but &#0; stays verbatim. */
   assertf(sm_scan("<urlset><loc>http://h.test/a&#10;b</loc></urlset>", 100,
                   &idx, &c) == 0);
   assertf(sm_scan("<urlset><loc>http://h.test/a&#9;b</loc></urlset>", 100, &idx,
@@ -1896,9 +1868,7 @@ static int st_sitemap(httrackp *opt, int argc, char **argv) {
     freet(big);
   }
 
-  /* A highly compressible document decodes without running away. Deflate
-     tops out near 1032:1, so neither the ratio budget nor the 64 MiB
-     ceiling stops it. */
+  /* Deflate tops out near 1032:1, so neither cap stops this document. */
   {
     const char *const one = "<url><loc>http://h.test/bomb</loc></url>";
     const size_t reps = 40000;
@@ -1980,8 +1950,7 @@ static int st_sitemap(httrackp *opt, int argc, char **argv) {
     freet(z);
   }
 
-  /* robots_parse collects Sitemap: records in any case and any user-agent
-     group, strips their comments and keeps the rules working. */
+  /* robots_parse collects Sitemap: records in any case and any group. */
   {
     const char *const txt = "User-agent: *\nDisallow: /x\n"
                             "SITEMAP:  http://h.test/s1.xml  # first\n"
