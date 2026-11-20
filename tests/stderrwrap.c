@@ -1,5 +1,6 @@
 /* The sanitizer legs run the engine through this shim, which copies its stderr
-   into $HTTRACK_STDERR_CAPTURE_DIR, because gcc's UBSan reports there.
+   into $HTTRACK_STDERR_CAPTURE_DIR, because gcc's UBSan ignores log_path and
+   writes findings to stderr, which most tests discard.
 
    Usage: stderrwrap PROGRAM [ARG...]. With a capture directory, PROGRAM stays a
    child, so the stderr writer is reaped before we exit (#1374). A shell cannot

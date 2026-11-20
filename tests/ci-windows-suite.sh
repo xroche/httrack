@@ -136,8 +136,9 @@ ci_failure_verdict() { # ci_failure_verdict TEST...
 # End a wedged suite before its runner dies and loses its log (#795). It stays
 # quiet for $1s, then names the test in flight from $3 every $2s. It kills $5
 # once $3 has been static for $4s, or $6s in (0: never) to beat the workflow
-# timeout (#1126). Keep $4 above the per-test timeout. The unit test overrides
-# hb_now with a virtual clock.
+# timeout (#1126). Keep $4 above the per-test timeout. hb_now assigns hb_time
+# rather than printing, so reading the clock forks nothing. The unit test
+# overrides hb_now with a virtual clock.
 hb_time=0
 hb_now() { hb_time=$SECONDS; }
 

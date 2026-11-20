@@ -39,8 +39,10 @@ local_server_stop() {
 }
 
 # Start local-server.py on an ephemeral port and wait for its "PORT n" line.
-# It sets SRV_PORT, SRV_PID, SRV_LOG and BASEURL, and a second call overwrites
-# them. Options come before any server argument, and -- ends them:
+# It sets SRV_PORT, SRV_PID, SRV_LOG and BASEURL. A second call overwrites them
+# and truncates the default log, so a caller wanting two servers saves each set
+# and passes its own --log. Options come before any server argument, and -- ends
+# them:
 #   --root DIR    tree to serve (default: the shared server-root fixture)
 #   --log FILE    where the announcement lands (default: $tmpdir/server.log)
 #   --env V=VAL   an environment variable for the server, repeatable
