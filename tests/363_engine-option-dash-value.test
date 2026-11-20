@@ -48,9 +48,8 @@ accepted() { # accepted LABEL
     ! grep -q 'Syntax error' <<<"$stderr" || fail "$1: $stderr"
 }
 
-# A refusal leaves no mirror behind and says why on stderr, because the log and
-# WebHTTrack never see stdout. It suggests no spelling, because no spelling
-# passes a refused word through.
+# A refusal leaves no mirror and explains on stderr, because the log and
+# WebHTTrack never see stdout. It suggests no spelling, because none would pass.
 refused() { # refused LABEL RE...
     local label=$1
     shift
@@ -120,10 +119,8 @@ for opt in -%R -%E -%b -%l -%a -%w -P -V -N; do
 done
 echo OK
 
-# Only where the alias layer put the word there as the option's parameter.
-# Nothing vets a clustered spelling, and the URL pass reads the word after it as
-# short options. Left relaxed, -q%F -mirrored would mean -i and -qF --mirror
-# would send "-w" as the User-Agent. A quoted whole token is refused as quoted.
+# Nothing vets a clustered spelling, and the URL pass reads the word after it
+# as short options, so -q%F -mirrored would mean -i.
 printf '[an unvetted spelling still refuses the word after it] ..\t'
 for opt in %A %F %K %L %S %rf %X F; do
     for word in --mirror -q -dashvalue; do
@@ -151,9 +148,8 @@ parse --user-structure '-%h/%p/%n.%t'
 accepted "--user-structure -%h/%p/%n.%t"
 echo OK
 
-# Check the bytes as well as the verdict. -#test=optalias pins the alias layer
-# alone. --filterlist opens its file while parsing, so a trimmed or rewritten
-# name shows up as the open failure in the last probe.
+# Check the bytes as well as the verdict. --filterlist opens its file while
+# parsing, so a mangled name shows as an open failure in the last probe.
 printf '[the value reaches the engine byte for byte] ..\t'
 expand() { # expand OPTION [VALUE]
     "$bin" -O /dev/null '-#test=optalias' "$@"
@@ -173,8 +169,7 @@ parse --filterlist -nosuch.txt
 refused "--filterlist -nosuch.txt" 'File url list could not be opened'
 echo OK
 
-# The refusal names the option as the user spelled it, the word it choked on,
-# and which of the two tests rejected it.
+# The refusal names the option as spelled, the word, and the test that failed.
 printf '[a refusal names the option, the value and the reason] ..\t'
 parse --proxy -q
 refused "--proxy -q" 'Option --proxy takes a value' '"-q" names an option'

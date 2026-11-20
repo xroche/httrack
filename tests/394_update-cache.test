@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# The update path decides from the cache (cache_readex), which a one-shot crawl
-# never reaches. A file:// mirror writes no cache, so this crawls the local
-# server, where new.txt's status column tells a cache hit from a re-fetch.
+# The update path decides from the cache, which a one-shot crawl never reaches.
+# file:// writes no cache, so crawl the server and read new.txt's status column.
 
 set -eu
 

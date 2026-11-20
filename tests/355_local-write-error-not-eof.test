@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# A write error outside the fatal class, such as a broken pipe, must not read as
-# a body that ended cleanly. A fifo nobody holds open stands in for the save
-# name each crawl is about to write.
+# A non-fatal write error, such as a broken pipe, must not read as a clean end
+# of body. A fifo nobody holds open stands in for each save name.
 
 set -euo pipefail
 

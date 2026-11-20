@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# A "param" option takes a number and must refuse any other value. Glued onto
-# the short form, --long-names=yes writes DOS 8.3 names and --sockets=8I0
-# drops the top index, both at exit 0 (#1426).
+# A "param" option must refuse a non-numeric value. Glued on, --long-names=yes
+# writes DOS 8.3 names and --sockets=8I0 drops the top index at exit 0 (#1426).
 
 set -euo pipefail
 
@@ -65,8 +64,7 @@ for value in yes none OFF true "8I0"; do
     refused "--long-names=${value}"
 done
 
-# ...and the same on rows reaching four other short options. In --sockets=8I0
-# the I0 tail would reach -I0 and drop the top index.
+# ...and the same on rows reaching four other short options.
 refused --sockets=8I0
 refused --depth=none
 refused --cache=OFF
@@ -74,8 +72,7 @@ refused --robots=yes
 refused --max-files=none
 # a detached value is the same value: --depth ate the URL and mirrored nothing
 refused --depth "file://${tmp}/page.html"
-# -m and -%c take one separator followed by a digit. 1.2.3 would reach maxconn
-# as 1.2.
+# -m and -%c take one separator and a digit, or 1.2.3 reaches maxconn as 1.2.
 refused --connection-per-second=1.2.3
 refused --max-files=100,
 refused --max-files=,,,5
@@ -102,8 +99,7 @@ accepted --max-files=,5000
 accepted --max-files=100,5000
 accepted --connection-per-second=0.5
 
-# on/off must map to a value. off is -C0, which writes no cache, and on is the
-# bare -C, which does.
+# off must map to -C0, which writes no cache, and on to the bare -C.
 accepted --cache=off
 ! has_cache || fail_dump "--cache=off still wrote a cache" "${tmp}/log"
 accepted --cache=on
@@ -111,8 +107,7 @@ has_cache || fail_dump "--cache=on wrote no cache" "${tmp}/log"
 accepted --cache=0
 ! has_cache || fail_dump "--cache=0 still wrote a cache" "${tmp}/log"
 
-# "paramn" refuses a cluster tail like "param". refused() also wants the 8.3
-# name absent, which proves the -L0 was not applied.
+# "paramn" refuses a cluster tail too. No 8.3 name proves -L0 was skipped.
 refused --structure=1L0
 # What still separates the classes: the template, which "param" would mangle.
 accepted --structure=1

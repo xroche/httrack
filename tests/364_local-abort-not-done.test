@@ -1,10 +1,7 @@
 #!/bin/bash
 #
-# A mirror the engine gave up on must not say "Done." on stdout, and shell mode
-# (-#S) must stay silent whatever the outcome.
-# Each abort path has an arm: -#L makes httpmirror() return -1, a full disk
-# returns 1 with exit_xh set, and a cap or a ^C raises state.stop alone. Only
-# the disk and ^C arms need /dev/full or signals, so the rest run on Windows.
+# A mirror the engine gave up on must not say "Done.", and shell mode (-#S)
+# must stay silent. Only the disk and ^C arms skip on Windows.
 
 set -euo pipefail
 
@@ -76,9 +73,8 @@ assert_says aborted "a mirror the link cap stopped still claimed to be done"
 ok "a mirror the link cap stopped does not claim to be done"
 
 # --- a full disk: httpmirror() returns 1 and only exit_xh says otherwise -----
-# The engine is a native binary under MSYS, so a symlink to /dev/full is a
-# plain file to the crawl. Probe with a write, because macOS has no /dev/full
-# and the write then fails with ENOENT instead of ENOSPC.
+# Probe with a write, because MSYS reads the /dev/full link as a plain file and
+# macOS has no /dev/full.
 disk_abort_works() {
     local probe="${tmpdir}/probe" refused=1
     ! target_is_windows || return 1
@@ -151,8 +147,7 @@ assert_says finished "--why was reported as an aborted mirror"
 ok "--why still reports Done."
 
 # --- shell mode ends the same way for both, which is silently ---------------
-# The arms above prove the same two crawls print one of these lines when -#S is
-# off.
+# The arms above show the same crawls print one of these lines without -#S.
 crawl shell-complete changes/index.html -\#S
 assert_shell_silent "shell mode gained an end-of-mirror token (completed)"
 crawl shell-linkcap changes/index.html -\#S -\#L4

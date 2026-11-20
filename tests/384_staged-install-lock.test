@@ -18,11 +18,8 @@ export TESTLIB
 work=$(mktemp -d "${TMPDIR:-/tmp}/installlock.XXXXXX") || fail "no tmpdir"
 cleanup_push rm -rf "${work}"
 
-# Every make install in the suite goes through the helper, including ones that
-# cannot relink, because serialising a header copy costs nothing.
-# Candidates are judged on the whole logical line, quotes included, so a command
-# in a string cannot hide. The vouching name must sit outside the quotes, or a
-# helper named in a failure message would vouch for its line.
+# Every make install goes through the helper. The vouching name must sit outside
+# quotes, or a helper named in a failure message would vouch for its line.
 lint=${work}/lint.awk
 cat >"${lint}" <<'AWK'
 BEGIN {
@@ -181,8 +178,7 @@ serialised() {
            if (!want) exit 1 }' "${SECTIONS}"
 }
 
-# Run the control first, whatever the lint above says. A probe blind to the
-# unlocked interleaving would pass on a lock that does not lock.
+# Run the control first, so a probe blind to the unlocked interleaving fails.
 run_workers 0
 serialised &&
     skip "${workers} unlocked sections did not overlap, so this box cannot show the race"
@@ -194,9 +190,8 @@ for ((round = 1; round <= rounds; round++)); do
 done
 ok "the lock serialises ${workers} holders, ${rounds} rounds"
 
-# A holder killed outright leaves a lock nobody is allowed to remove, since only
-# the process named inside one removes it. Every waiter must refuse and name the
-# file, none may enter, and the lock must still be there afterwards.
+# A holder killed outright leaves a lock only it may remove. Every waiter must
+# refuse and name the file, and the lock must stay.
 for ((round = 1; round <= rounds; round++)); do
     rm -f "${BARRIER}" "${work}/stale.log"
     : >"${SECTIONS}"

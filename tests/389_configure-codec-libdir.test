@@ -244,9 +244,8 @@ fi
 expect zstd lib64 lib "a lib64-only zstd prefix resolves" "${zs_lib64}"
 
 expect_fail brotli "a prefix with no libbrotlidec is rejected" "${br_headers}"
-# A prefix whose lib64 holds some other library must be rejected too. Matching
-# any lib*.* there would pick a directory with no decoder, and the link would
-# fall back to the system copy.
+# A prefix whose lib64 holds another library must be rejected, or the link
+# falls back to the system copy.
 expect_fail brotli "a prefix whose lib64 holds the wrong library is rejected" "${br_wrong}"
 
 assert_steps_ran "${cases}" "${n}"

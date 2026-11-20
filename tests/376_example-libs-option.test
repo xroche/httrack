@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# --disable-example-libs skips the libtest plugin install that several distros
-# undo by hand. It must still install the example sources their doc packages
-# ship.
+# --disable-example-libs skips the libtest plugin install but must still install
+# the example sources distro doc packages ship.
 
 set -euo pipefail
 

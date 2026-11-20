@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# An update run against a dead server must not destroy the cache. The no-data
-# rollback restores the previous hts-cache generation. The live update pass
-# leaves an old.zip, so the dead pass rotates onto an existing generation.
+# An update run against a dead server must not destroy the cache. The live pass
+# leaves an old.zip, so the rollback rotates onto an existing generation.
 
 set -eu
 

@@ -97,9 +97,8 @@ serves /doc/history.txt 'HTTrack' 'a complete tree'
 # Control: the assertions above prove nothing unless a missing page really 404s.
 absent /doc/html/no-such-page.html 'a complete tree'
 
-# Read the links out of the rendered panel, because a pane linking the old
-# documentation path would 404 and still pass every assertion above. /website/
-# needs a mirror, and /server/ is the panel itself.
+# Read the links out of the rendered panel, because a pane linking the old doc
+# path would 404 unseen. /website/ needs a mirror and /server/ is the panel.
 panel=$(htsserver_get /server/index.html)
 links=$(grep -o 'href="/[^"]*"' <<<"${panel}" |
     sed -e 's|^href="||' -e 's|"$||' -e 's|#.*||' |

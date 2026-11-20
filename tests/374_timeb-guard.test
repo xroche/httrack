@@ -12,8 +12,7 @@ src="${abs_top_srcdir:-${testdir}/..}/src"
 
 # Prints "OK|BAD <file>:<line>" for every <sys/timeb.h> include, "struct timeb" and
 # ftime() call. BAD means no enclosing arm proves _WIN32 is defined, and anything the
-# grammar cannot prove reads BAD. An "#if 0" arm reads BAD too, because nobody
-# guards a header that way.
+# grammar cannot prove reads BAD, an "#if 0" arm included.
 scan() {
     LC_ALL=C awk '
     # One record per open #if level, indexed by depth:

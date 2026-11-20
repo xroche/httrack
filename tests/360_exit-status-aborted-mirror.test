@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# A wrapper script must tell a finished mirror from one the engine gave up on
-# by the exit status. A refused command line is tested too, so the aborted
-# status means only that. /dev/full stands in for the full disk, as in 350.
+# The exit status must tell a finished mirror from one the engine gave up on.
+# /dev/full stands in for a full disk, as in 350.
 
 set -euo pipefail
 
@@ -94,8 +93,7 @@ test "$rc" -eq "$ABORTED" || fail "the cache arm exited $rc, wanted $ABORTED"
 ok "a cache write failure aborts with the same status"
 
 # --- a producer that has nothing to do with the disk -------------------------
-# -#L caps the link table. The parser and htsAddLink must give the same status
-# when they reach it.
+# -#L caps the link table, and the parser and htsAddLink must give one status.
 crawl_status linklimit index.html "-#L1"
 grep -q 'Too many URLs, giving up' <<<"$log" ||
     fail "the link cap was not reached, so the status proves nothing: ${log}"

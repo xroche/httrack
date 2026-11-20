@@ -1,9 +1,7 @@
 #!/bin/bash
 #
-# The installed headers must not need config.h, because an autoconf consumer
-# has its own. They need the layout switches (HTS_INET6, HTS_USEOPENSSL) from
-# htsfeatures.h. Without them a consumer's SOCaddr and htsblk differ from the
-# library's.
+# The installed headers must not need config.h, but need htsfeatures.h's layout
+# switches, or a consumer's SOCaddr and htsblk differ from the library's.
 
 set -euo pipefail
 
@@ -117,9 +115,8 @@ probe "$tmp/wrong.out" || fail "the wrong-HTS_INET6 consumer did not build, so t
 ! diff -q "$tmp/library.out" "$tmp/wrong.out" >/dev/null ||
     fail "HTS_INET6=$wrong changed no size or offset, so this test cannot see the bug it guards"
 
-# Now try the downstream patch, which drops the header and its include. The
-# consumer must fail to compile, because HTS_DO_NOT_REDEFINE_in_addr_t goes
-# missing and htsnet.h then redefines in_addr_t.
+# The downstream patch drops the header and its include. The consumer must then
+# fail to compile, because htsnet.h redefines in_addr_t.
 grep -qx '#define HTS_DO_NOT_REDEFINE_in_addr_t /\*\*/' "$inc/htsfeatures.h" &&
     want=nocompile || want=differs
 rm -f "$inc/htsfeatures.h"

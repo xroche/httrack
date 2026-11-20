@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# --structure must accept a template as well as a numeric preset (#1380). A
-# template that falls through to the URL list leaves the default structure.
+# --structure must accept a template as well as a numeric preset (#1380).
 
 set -euo pipefail
 
@@ -13,10 +12,8 @@ tmpbase=${TMPDIR:-/tmp}
 tmp=$(mktemp -d "${tmpbase%/}/httrack_structure.XXXXXX") || fail "no tmpdir"
 cleanup_push rm -rf "${tmp}"
 
-# The engine maps what Windows forbids in a filename to '_' on every platform,
-# so a drive-letter TMPDIR lands as D_ and an 8.3 one as RUNNE_1. Use the path
-# the engine saw, because under wsl2 the shim turns /mnt/d/... into D:/....
-# Strip the leading slash last, or nativepath finds no /mnt/d to match.
+# The engine maps what Windows forbids to '_' and the wsl2 shim turns /mnt/d/
+# into D:/, so use the path it saw. Strip the leading slash last for nativepath.
 localname() { # localname ABSOLUTE-PATH
     local n
     n=$(nativepath "$1" | tr ':~' '__')
@@ -33,9 +30,8 @@ run() { # run ARG...
         >"${tmp}/out/.log" 2>&1 || RC=$?
 }
 
-# List everything the crawl saved except the engine's own files. The whole set
-# catches a value that fell through to the URL list, because the mirror then
-# holds the wanted file AND a junk one.
+# List what the crawl saved, minus engine files. A value lost to the URL list
+# then shows up as a junk file next to the wanted one.
 mirrored() {
     (cd "${tmp}/out" && find . -type f ! -path './hts-cache/*' ! -name '.log' \
         ! -name 'hts-log.txt' ! -name '*.gif' ! -name '*.lock' -print |
@@ -62,8 +58,7 @@ refused() { # refused WANTED-MESSAGE ARG...
 }
 
 # Test the presets in every spelling. 100 and 5 pin the whole value, because a
-# truncated one gives the default layout, and "no web/page.html" cannot tell
-# that from a lost option.
+# truncated one gives the default layout.
 default_layout="file/$(localname "${tmp}")/page.html"
 layout web/page.html -N1
 layout web/page.html --structure 1
@@ -73,13 +68,11 @@ layout web/html/page.html --structure=5
 layout "$(localname "${tmp}")/page.html" --structure=100
 layout "${default_layout}" --structure=0
 
-# A detached -N 1 is preset 1 in every spelling. A template named "1" would
-# collapse the mirror onto one file.
+# A detached -N 1 is preset 1, but a template "1" would collapse the mirror.
 layout web/page.html -N 1
 
-# A preset trailed by more short options is refused in either spelling, so 1L0
-# must not apply -L0. refused() also catches a value taken as a template, which
-# exits 0. That is the risk for 1%c8.
+# A preset trailed by short options is refused, so 1L0 must not apply -L0.
+# refused() also catches 1%c8 taken as a template, which exits 0.
 refused 'does not take the value' --structure=1L0
 refused 'does not take the value' --structure 1L0
 refused 'does not take the value' --structure=1c8
@@ -92,8 +85,7 @@ layout "${default_layout}" --structure=off
 layout "${default_layout}" --structure=on
 layout "${default_layout}" --structure on
 
-# A template reaches the engine in every spelling. No preset can produce the
-# literal "tpl/", so a fallback cannot pass.
+# A template reaches the engine in every spelling. No preset makes "tpl/".
 layout tpl/page.html -N tpl/%n.%t
 layout tpl/page.html --structure tpl/%n.%t
 layout tpl/page.html --structure=tpl/%n.%t
@@ -104,9 +96,8 @@ layout 2col/page.html --structure 2col/%n.%t
 layout 2col/page.html --structure=2col/%n.%t
 layout 2col/page.html -N 2col/%n.%t
 
-# The engine bounds a glued digit run itself. sscanf("%d") past INT_MAX gives a
-# negative on LP64, which crashes url_savename, and INT_MAX on ILP32, which
-# flattens the mirror. INT_MAX itself pins the ILP32 half alone.
+# The engine bounds a glued digit run. Past INT_MAX, sscanf("%d") crashes
+# url_savename on LP64 and flattens the mirror on ILP32, which INT_MAX pins.
 layout "${default_layout}" -N4294967295
 layout "${default_layout}" -N99999999999999999999
 layout "${default_layout}" -N2147483648

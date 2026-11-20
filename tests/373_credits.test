@@ -191,8 +191,7 @@ check 1 English Lagadec Klueting
 check 4 Deutsch Klueting Lagadec
 check 10 Türkçe Aksoy Lagadec
 
-# An upgrading user keeps their old CRLF catalogs, and this tree ships none, so
-# make one and read it back.
+# This tree ships no CRLF catalog but upgrades keep old ones, so make one.
 recode() { # recode <catalog> <lf|crlf>
     "${HTS_PYTHON}" - "$1" "$2" <<'PY' || fail "cannot recode $1 to $2"
 import sys
@@ -212,9 +211,8 @@ grep -q "Lagadec" <<<"${reply}" ||
     fail "a CRLF catalog did not name its translator: ${reply}"
 recode "${root}/lang/English.txt" lf
 
-# The page puts catalog text into a <pre>, so the escaper must keep a
-# translator's punctuation from becoming markup. Check both keys it reads. The
-# second holds \r\n escapes, which a mangling loader would break.
+# The page puts catalog text in a <pre>, so the escaper must keep punctuation
+# from becoming markup. The second key holds \r\n escapes a bad loader breaks.
 "${HTS_PYTHON}" - "${root}/lang/English.txt" <<'PY' || fail "cannot plant the markup probe"
 import sys
 path = sys.argv[1]

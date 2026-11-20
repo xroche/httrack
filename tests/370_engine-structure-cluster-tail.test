@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# A --structure value of digits then a tail is refused, because the tail would
-# reach the engine as more short options. --structure=8I0 would mirror with no
-# top index at exit 0.
+# A --structure digit run with a tail is refused, because the tail would reach
+# the engine as short options. --structure=8I0 would drop the top index.
 
 set -euo pipefail
 
@@ -20,8 +19,7 @@ tmp=$(mktemp -d "${tmpbase%/}/httrack_ntail.XXXXXX") || fail "no tmpdir"
 localname() { printf '%s' "$(nativepath "$1")" | sed 's|^/||' | tr ':~' '__'; }
 cleanup_push rm -rf "${tmp}"
 
-# Recognize a mirrored page by our own marker, because this host may spell its
-# path differently (macOS $TMPDIR, Windows ':' -> '_').
+# Find a mirrored page by our marker, because hosts spell its path differently.
 marker=STRUCTURE-TAIL-MARKER-370
 printf '<html><body>%s</body></html>\n' "${marker}" >"${tmp}/page.html"
 url="file://${tmp}/page.html"

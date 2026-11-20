@@ -35,8 +35,7 @@ for a in ${anchors}; do
     esac
 done
 
-# Pin every page and the section it names, because an existing id may be the
-# wrong one (#1444). The count is compared too, so a deleted link fails.
+# Pin each page's section too, because an existing id may be wrong (#1444).
 pairs=$(
     cat <<'PAIRS'
 addurl.html step-address

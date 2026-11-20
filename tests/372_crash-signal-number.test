@@ -26,9 +26,8 @@ for flags in "${TEST_CFLAGS:-}" "${TEST_CPPFLAGS:-}"; do
         cflags+=("${extra_argv[@]}")
     fi
 done
-# HTS_INTERNAL_BUILD pulls in config.h. Its HAVE_UNISTD_H gives macOS write()
-# and STDERR_FILENO, which glibc exposes anyway. Its HAVE_BACKTRACE also
-# compiles the Linux symbolizer, which needs DL_LIBS and BACKTRACE_LIBS below.
+# HTS_INTERNAL_BUILD pulls in config.h for macOS write() and STDERR_FILENO. Its
+# HAVE_BACKTRACE builds the Linux symbolizer, which needs the libs below.
 cflags+=(-DHTS_INTERNAL_BUILD
     -g -O0 -I"${builddir}" -I"${builddir}/src" -I"${srcdir}/src")
 # shellcheck disable=SC2086 # DL_LIBS/BACKTRACE_LIBS are flag lists; splitting is the point
@@ -36,8 +35,7 @@ if ! "${cc_argv[@]}" "${cflags[@]}" -o "${work}/probe" \
     "${srcdir}/tests/printnumprobe.c" "${srcdir}/src/htsbacktrace.c" \
     ${DL_LIBS:-} ${BACKTRACE_LIBS:-} >"${work}/cc.log" 2>&1; then
     head -20 "${work}/cc.log" >&2
-    # 218 pins this build on Linux. Nothing else pins it on Darwin, so it fails
-    # there too.
+    # Only 218 pins this build, on Linux, so it must fail on Darwin too.
     case "$HTS_OS" in
     Linux | Darwin) fail "the crash printer does not build standalone" ;;
     esac

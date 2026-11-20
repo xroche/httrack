@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# A "param" or "level" option's value is bounded by its magnitude (#1437).
-# Zero padding is accepted, and a value past its destination's range is refused
-# rather than wrapped by sscanf("%d").
+# A "param" or "level" value is bounded by magnitude (#1437). Zero padding is
+# accepted, and an out-of-range value is refused rather than wrapped.
 
 set -euo pipefail
 
@@ -73,9 +72,8 @@ refuses --depth=-5
 refuses --depth=+5
 refuses --generate-errors=-5
 
-# The value must still fit the buffer the expansion is glued into, which
-# aborts. Only the detached form gets that far, because the glued
-# --depth=<1022 zeros> is one argument past HTS_CDLMAXSIZE.
+# The value must still fit the expansion buffer, which aborts. Only the detached
+# form gets there, because the glued one is past HTS_CDLMAXSIZE.
 zeros=$(printf '0%.0s' $(seq 1021))
 assert_selftest "-r${zeros}" optalias --depth "${zeros}"
 refuses --depth "${zeros}0"

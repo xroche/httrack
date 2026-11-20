@@ -18,8 +18,7 @@ test -r "$src" || fail "no $src"
 # letters, and a class without them silently exempts the fixed-width spellings.
 pattern='(sscanf|readGlued[[:alnum:]_]*)[^;]*\([[:alpha:]_][[:alnum:]_ ]*\*\)[ 	]*&opt->'
 
-# The pattern must first match a known-bad line in every likely cast spelling,
-# the fixed-width ones included.
+# The pattern must first match a known-bad line in every likely cast spelling.
 for bad in 'sscanf(com + 1, "%d", (int *) &opt->urlmode);' \
     'sscanf(com + 1, "%d", (hts_urlmode *) &opt->urlmode);' \
     'sscanf(com + 1, "%d", (uint8_t *) &opt->urlmode);' \

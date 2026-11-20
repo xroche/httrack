@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# A ZIP backend with no truncate entry can only rewind an abandoned member, so
-# it must not report ZIP_OK (#1402). The tail it leaves hides the central
-# directory once it outgrows a reader's backscan.
+# A ZIP backend with no truncate can only rewind an abandoned member, so it must
+# not report ZIP_OK (#1402). The tail it leaves can hide the central directory.
 
 set -eu
 # shellcheck source=tests/testlib.sh

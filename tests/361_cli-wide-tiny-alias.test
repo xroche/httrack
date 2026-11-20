@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# --wide-mirror and --tiny-mirror must pass on the connection count they add.
-# hts-log.txt echoes the expanded command line on its second line, and the
+# --wide-mirror and --tiny-mirror must pass on their connection count. The
 # security limiter logs a count above 8, which proves it reached the option.
 
 set -euo pipefail
@@ -70,8 +69,7 @@ echoed ' -o1c1 ' 'tiny generate-errors' --tiny-generate-errors 1
 echoed ' -c8 ' 'plain sockets' --sockets 8
 ok "the prefix glues its count on, and only the prefix does"
 
-# ...and the count reaches the option. Above 8 the security limiter caps it
-# and says so. 32 is above that ceiling, the default 4 and tiny's 1 below.
+# ...and the count reaches the option, which the limiter caps above 8.
 clamped() { # clamped WANT LABEL ARG...
     local want=$1 label=$2 got=no hits
     shift 2
@@ -97,10 +95,7 @@ clamped yes 'wide mirror over --sockets 3' --sockets 3 --wide-mirror
 ok "the count applies whole, and the unprefixed alias adds none"
 
 # Where the glue would be misread, the alias drops the count, warns, and still
-# does its job. That covers a value sharing the word (-N, -c8), the -% and -#
-# families, a cluster that already has a count, and a value of its own.
-# The -N template is followed by a word break, because a glued count would land
-# inside it.
+# works. A word break follows the -N template, or the count would land in it.
 warned '%h%p/%n.%t ' 'wide structure' --wide-structure '%h%p/%n.%t'
 test -f "${tmp}/out/file${tmp}/page.html" ||
     fail "--wide-structure lost the template it warned about"

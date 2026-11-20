@@ -122,8 +122,7 @@ expect_fail() { # expect_fail DESC PREFIX
     skip_if_out_of_budget "$((cases - n))" "$((SECONDS - began))"
 }
 
-# The subdirectory names belong to the fixture, so every case below tests the
-# macro's candidate order even on a host with no real lib64.
+# The fixture names the subdirectories, so no real lib64 is needed.
 lib_only=$(fixture lib-only lib)
 lib64_only=$(fixture lib64-only lib64)
 both=$(fixture both lib lib64)

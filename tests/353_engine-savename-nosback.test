@@ -5,9 +5,8 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-# -#C names each entry of a legacy hts-cache/new.ndx through url_savename()
-# with a NULL backing (#1393), which nosback=1 reproduces. The name must match
-# the one built with a backing.
+# nosback=1 names a file with a NULL backing, as -#C does for a legacy
+# new.ndx (#1393). The name must match the one built with a backing.
 both() { # both FIL CTYPE WANT [ARGS...]
     local fil=$1 ctype=$2 want=$3
     shift 3

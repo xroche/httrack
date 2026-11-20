@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# An ICP reply echoes the queried URL back. proxytrack must terminate the
-# receive buffer at the datagram, or a URL that runs to the last byte echoes the
-# previous client's bytes (#1493).
+# proxytrack must end the ICP receive buffer at the datagram, or the echoed URL
+# leaks the previous client's bytes (#1493).
 
 set -euo pipefail
 

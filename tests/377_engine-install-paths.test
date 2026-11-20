@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# Each compiled-in install path must be the directory configure was given, so a
-# non-/usr build does not look for /etc/httrack.conf.
+# Each compiled-in path must be what configure was given, not a /usr default.
 
 set -euo pipefail
 
