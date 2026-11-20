@@ -934,13 +934,10 @@ jobs:
       - name: standard includes
         run: python3 tools/check-includes.py
 
-      # Only the lines a PR adds: the older comments are cleaned separately.
+      # Check only added lines, because older comments are cleaned in separate PRs.
       - name: comment phrasing
         if: github.event_name == 'pull_request'
         run: |
-          set -euo pipefail
-          git fetch --no-tags origin \
-            "+refs/heads/${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
           base="$(git merge-base "origin/${{ github.base_ref }}" HEAD)"
           python3 tools/check-comments.py --base "$base"
 
