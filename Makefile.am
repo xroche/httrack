@@ -16,6 +16,7 @@ EXTRA_DIST = INSTALL.Linux \
 		tools/psl-gen.py \
 		tools/doc-chrome.py \
 		tools/check-includes.py \
+		tools/check-comments.py \
 		tools/ci-sanitizer-report.sh \
 		tools/ci-test-log.sh \
 		tools/tsan-suppressions.txt \

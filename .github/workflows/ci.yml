@@ -811,6 +811,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Install linters
         run: |
@@ -931,6 +933,16 @@ jobs:
       # present (#1481).
       - name: standard includes
         run: python3 tools/check-includes.py
+
+      # Only the lines a PR adds: the older comments are cleaned separately.
+      - name: comment phrasing
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin \
+            "+refs/heads/${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
+          base="$(git merge-base "origin/${{ github.base_ref }}" HEAD)"
+          python3 tools/check-comments.py --base "$base"
 
       # MSBuild rejects a malformed .vcxproj with a bare MSB4025 and no build, so
       # catch it here in seconds rather than on a Windows runner minutes in.

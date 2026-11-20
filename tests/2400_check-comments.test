@@ -1,0 +1,57 @@
+#!/bin/bash
+#
+# tools/check-comments.py rejects slogans and banned phrases in comments, and
+# with --base only in the lines a change adds.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+srcdir="${abs_top_srcdir:?not run under make check}"
+lint="${srcdir}/tools/check-comments.py"
+python=$(find_python) || skip "python3 not found"
+test -r "${lint}" || fail "missing ${lint}"
+command -v git >/dev/null 2>&1 || skip "no git"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/cmtlint.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "${work}"
+
+cat >"${work}/dirty.c" <<'C'
+/* Measured, not assumed: the SDK lacks it. */
+int a; // this guard is load-bearing
+/* A long block whose second line
+   holds the phrase by construction. */
+C
+printf '# %s\n' 'Captured, not piped: grep -q exits early.' >"${work}/dirty.sh"
+cat >"${work}/clean.c" <<'C'
+/* The SDK lacks AF_MULTIPATH, so name it. */
+const char *u = "http://load-bearing.example/";
+int not_assumed_in_code;
+C
+
+out=$("${python}" "${lint}" "${work}/dirty.c" "${work}/dirty.sh") && fail "dirty files passed"
+for want in 'dirty.c:1: slogan' "dirty.c:2: 'load-bearing'" "dirty.c:4: 'by construction'" \
+    'dirty.sh:1: slogan'; do
+    grep -qF "${want}" <<<"${out}" || fail "missed ${want}: ${out}"
+done
+out=$("${python}" "${lint}" "${work}/clean.c") || fail "clean file flagged: ${out}"
+
+# --base reports what the change adds, and not what was already there.
+repo="${work}/repo"
+mkdir "${repo}"
+cd "${repo}"
+git init -q
+git config user.email t@example.com
+git config user.name t
+printf '%s\n' '/* Old, not new: kept as it was.' '   first line */' 'int x;' >f.c
+git add f.c
+git commit -qm base
+printf '%s\n' '/* Old, not new: kept as it was.' '   first line' \
+    '   and an added line, load-bearing. */' 'int x;' '// the whole point' >f.c
+out=$("${python}" "${lint}" --base HEAD) && fail "added phrases passed"
+grep -qF "f.c:3: 'load-bearing'" <<<"${out}" || fail "missed a continuation line: ${out}"
+grep -qF "f.c:5: 'the whole point'" <<<"${out}" || fail "missed a // comment: ${out}"
+grep -qF 'f.c:1:' <<<"${out}" && fail "reported an unchanged line: ${out}"
+git checkout -q f.c
+out=$("${python}" "${lint}" --base HEAD) || fail "an empty change failed: ${out}"
