@@ -849,8 +849,8 @@ static int back_nsoc_overall(const struct_back *sback) {
 }
 
 /* Build save's temporary in HTS_TMPDIR beside save, outside the site's name
-   space, so a site's own <path>.bak is never taken as the backup (#774). HTS_FALSE (dest emptied) if too long.
-   Note: utf-8. */
+   space, so a site's own <path>.bak is never taken as the backup (#774).
+   HTS_FALSE (dest emptied) if too long. Note: utf-8. */
 static hts_boolean back_tmpname(char *dest, size_t size, const char *save,
                                 const char *ext) {
   const char *const slash = strrchr(save, '/');
@@ -1907,12 +1907,12 @@ static hts_boolean ref_get_u64(FILE *fp, uint64_t *v) {
   return HTS_TRUE;
 }
 
-/* ref_get_int decodes two's complement by hand, because a cast back is
-   implementation-defined above the signed maximum. */
 static hts_boolean ref_put_int(FILE *fp, int v) {
   return ref_put_u32(fp, (uint32_t) v);
 }
 
+/* Decodes two's complement by hand, because a cast back is
+   implementation-defined above the signed maximum. */
 static hts_boolean ref_get_int(FILE *fp, int *v) {
   uint32_t u;
 
