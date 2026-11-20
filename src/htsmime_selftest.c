@@ -83,8 +83,7 @@ static hts_boolean st_assume_wants(const char *only, const char *capacity) {
    of the three destinations, so one shared bound cannot pass them all. */
 static int st_assumemime(httrackp *opt, int argc, char **argv) {
   static const size_t values[] = {200, 300, 1100};
-  /* each destination is selectable by its capacity, because only the first
-     assertion to fire is visible */
+  /* only the first failure shows, so each capacity can run alone */
   const char *const only = argc >= 1 ? argv[0] : "";
   const int save_debug = opt->debug;
   char canary[ST_ASSUME_CANARY];

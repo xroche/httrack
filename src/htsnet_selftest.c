@@ -33,8 +33,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsselftest_int.h"
 
-/* The two counters a front end polls, and the option beside them, reach the
-   stats surface and never another opt. No Multipath TCP kernel is needed. */
+/* The MPTCP counters and option reach the stats but not another opt. */
 static int st_mptcpstats(httrackp *opt, int argc, char **argv) {
   httrackp *from = hts_create_opt();
   httrackp *to = hts_create_opt();
@@ -263,8 +262,7 @@ static int st_socks5(httrackp *opt, int argc, char **argv) {
   assertf(socks5_handshake_scripted(opt, "origin.test:8443", proxy, &io) == 1);
   assertf(memcmp(io.sent + io.sent_len - 2, "\x20\xfb", 2) == 0);
 
-  /* a bad origin port is refused before any byte goes out (#614).
-     4294967376 overflows sscanf("%d") into a plausible 80. */
+  /* 4294967376 overflows sscanf("%d") into 80, and must be refused (#614). */
   {
     static const char *const bad[] = {"origin.test:4294967376",
                                       "origin.test:80x", "origin.test:+80",
@@ -352,8 +350,7 @@ static int st_socks5(httrackp *opt, int argc, char **argv) {
     assertf(io.sent_len == 0);
   }
 
-  /* ATYP=domain cannot carry an IPv6 literal, so a bracketed origin is refused.
-     The msg check pins that reason against a stricter host validator. */
+  /* ATYP=domain cannot carry an IPv6 literal, so a bracketed origin fails. */
   io.reply = script;
   io.reply_len = len;
   assertf(socks5_handshake_scripted(opt, "[::1]", proxy, &io) == 0);
@@ -370,8 +367,7 @@ static int st_socks5(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* Is the guard still the poison the case wrote? A zero guard would hide a
-   stray terminator. */
+/* Is the non-zero poison guard intact, so that a stray NUL shows? */
 static hts_boolean st_addrport_intact(const char *p, size_t n) {
   size_t i;
 
@@ -422,8 +418,7 @@ static void st_addrport_case(int family, unsigned int port,
   assertf(strcmp(arena, expected) == 0);
   assertf(st_addrport_intact(arena + full, guard));
 
-  /* no capacity is written past or loses the port to a host filling the
-     whole buffer */
+  /* no capacity is overrun or loses the port to a long host */
   for (size = 1; size <= full; size++) {
     const hts_boolean ok = SOCaddr_inetntoa_port(arena, size, addr);
 
@@ -658,8 +653,7 @@ static void st_kill_peer(T_SOC soc) {
   deletesoc(soc);
 }
 
-/* A library must not kill the process that embedded it (#1689). httrack's
-   main() ignores SIGPIPE, so the test restores the default action first. */
+/* The test restores SIGPIPE's default, which httrack ignores (#1689). */
 static int st_sigpipe(httrackp *opt, int argc, char **argv) {
   void (*inherited)(int);
   T_SOC sv[2];
@@ -677,17 +671,14 @@ static int st_sigpipe(httrackp *opt, int argc, char **argv) {
   st_kill_peer(sv[0]);
   memset(&r, 0, sizeof(r));
   r.soc = sv[1];
-  /* newhttp_addr does this to a real socket. It is the only cover on macOS,
-     where HTS_MSG_NOSIGNAL is 0. */
+  /* This is the only cover on macOS, where HTS_MSG_NOSIGNAL is 0. */
   socket_set_nosigpipe(sv[1]);
-  /* Wait for the peer to go, because Darwin hands loopback input to another
-     thread. Nothing was sent here, so the read takes the reset or EOF. */
+  /* Wait for the peer to go, because Darwin reads loopback elsewhere. */
   assertf(check_readinput_t(sv[1], 10) == 1);
   n = (int) recv(sv[1], discard, sizeof(discard), 0);
   assertf(n <= 0);
   fin_only = n == 0 ? HTS_TRUE : HTS_FALSE;
-  /* A FIN leaves this half open, and only the peer's answer breaks the pipe.
-     GNU/Hurd's pfinet never answers, so shut this half here (#1717). */
+  /* GNU/Hurd's pfinet never answers a FIN, so shut this half here (#1717). */
   if (fin_only)
     assertf(shutdown(sv[1], SHUT_WR) == 0);
   /* Twice, because a platform that re-reports ECONNRESET on the first still
@@ -696,8 +687,7 @@ static int st_sigpipe(httrackp *opt, int argc, char **argv) {
     errno = 0;
     assertf(sendc(&r, "GET / HTTP/1.0\r\n\r\n") < 0);
 #ifndef _WIN32
-    /* htsproxy.c reads this errno to tell a dead socket from one that would
-       block, so whatever runs after the send must restore errno. */
+    /* htsproxy.c reads this errno, so code after the send must keep it. */
     assertf(errno == EPIPE || errno == ECONNRESET || errno == ENOTCONN);
 #endif
   }
@@ -1168,8 +1158,7 @@ static void st_catchurl_client(void *varg) {
   deletesoc(cli);
 }
 
-/* The browser feeds catch_url() a header block of any size. The assertions sit
-   on the last block data[] holds and the first it does not. */
+/* The cases sit on the last block data[] holds and the first it does not. */
 static int st_catchurl(httrackp *opt, int argc, char **argv) {
   /* the request line, then each header with its CRLF, then the empty line */
   const size_t line = strlen(ST_CATCHURL_LINE);
@@ -1212,8 +1201,7 @@ static int st_catchurl(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* Sends one over-long header line in a single send(), so no later write can
-   fail after the capture hangs up. */
+/* One send() carries the over-long line, so no write follows the hang-up. */
 static void st_catchurl_over_client(void *varg) {
   const st_catchurl_arg *const arg = (const st_catchurl_arg *) varg;
   char *blk = malloct(ST_CATCHURL_LONG + 128);
@@ -1258,8 +1246,7 @@ static void st_catchurl_flood_client(void *varg) {
   freet(hdr);
 }
 
-/* A header line the line buffer cannot hold fails the capture. Skipping it
-   would drop a header and let a peer hold catch_url() open. */
+/* An over-long header line fails the capture, or a peer could hold it open. */
 static int st_catchurl_overlong(httrackp *opt, int argc, char **argv) {
   char BIGSTK url[HTS_URLMAXSIZE * 2];
   char method[32];
@@ -1327,8 +1314,7 @@ static void st_catchurl_check_bind(T_SOC srv, int port, const char *adr) {
   freet(data);
 }
 
-/* Tests both entry points. catch_url_init_std(), which the CLI calls, tries
-   8080 before an ephemeral port, and both binds must be loopback only. */
+/* Both entry points, and the CLI's 8080 and ephemeral binds, use loopback. */
 static int st_catchurl_bind(httrackp *opt, int argc, char **argv) {
   char adr[128];
   T_SOC srv;
@@ -1359,8 +1345,7 @@ static T_SOC st_mptcp_listen(int proto, struct sockaddr_in *addr) {
 
   if (srv == INVALID_SOCKET)
     return INVALID_SOCKET;
-  /* Bound the wait, or a connect that never lands wedges accept() until the
-     suite's watchdog reports a hang. */
+  /* Bound the wait, or a lost connect wedges accept() until the watchdog. */
   {
     struct timeval tv;
 
@@ -1382,8 +1367,7 @@ static T_SOC st_mptcp_listen(int proto, struct sockaddr_in *addr) {
 }
 
 #ifdef IPPROTO_MPTCP
-/* Returns a socket's protocol. SO_PROTOCOL and IPPROTO_MPTCP are Linux names,
-   so every caller sits behind one guard. */
+/* Returns a socket's protocol through the Linux-only SO_PROTOCOL. */
 static int st_mptcp_protocol(T_SOC soc) {
   int proto = -1;
   socklen_t len = (socklen_t) sizeof(proto);
@@ -1396,7 +1380,6 @@ static int st_mptcp_protocol(T_SOC soc) {
 
 #ifdef IPPROTO_MPTCP
 /* Connect a hand-made MPTCP socket to an MPTCP listener, bypassing the engine.
-   The kernel decides whether it negotiates, and emulated runners fall back.
    Returns -1 on a setup failure, otherwise whether it negotiated. */
 static int st_mptcp_reference(void) {
   struct sockaddr_in addr;
@@ -1536,8 +1519,7 @@ static int st_mptcp(httrackp *opt, int argc, char **argv) {
   }
 #endif
 
-  /* Drive the factory and connect seam against a peer without MPTCP. This
-     runs wherever the feature builds, including the macOS connectx() path. */
+  /* A TCP peer here also covers the macOS connectx() path. */
   verdict = st_mptcp_pair(opt, "tcp peer", IPPROTO_TCP);
   if (verdict < 0) {
     err = 1;
@@ -1547,9 +1529,7 @@ static int st_mptcp(httrackp *opt, int argc, char **argv) {
   }
 
 #ifdef IPPROTO_MPTCP
-  /* The other direction, against an MPTCP peer. The verdict is compared with a
-     hand-made socket's, because the kernel decides whether MPTCP negotiates and
-     an emulated runner falls back. */
+  /* Compare with a hand-made socket, as the kernel decides if MPTCP works. */
   if (hts_mptcp_reports()) {
     const int reference = st_mptcp_reference();
 

@@ -144,8 +144,7 @@ static int st_identurl(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* A 2047-byte hostless "?"-URL must not abort when the missing leading '/'
-   pushes fil to 2048 bytes. */
+/* A 2047-byte hostless "?"-URL must not abort once '/' makes fil 2048. */
 static int st_identabs(httrackp *opt, int argc, char **argv) {
   lien_adrfil af;
   const size_t len =
@@ -165,8 +164,7 @@ static int st_identabs(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* A scheme's own default port, in any spelling, is stripped and any other
-   port stays (#638, #614, #627). */
+/* Only a scheme's own default port is stripped (#638, #614, #627). */
 static int st_stripport(httrackp *opt, int argc, char **argv) {
   static const struct {
     const char *in, *out;
@@ -270,8 +268,7 @@ static hts_boolean st_getext_case(char *arena, size_t cap, size_t guard,
   return ok;
 }
 
-/* get_ext() types a URL by the extension before '?', and copies the length it
-   measured so a long query cannot write past the end (#1433). */
+/* get_ext() reads the extension before '?' and stays in bounds (#1433). */
 static int st_getext(httrackp *opt, int argc, char **argv) {
   static const struct {
     const char *fil;
@@ -321,8 +318,7 @@ static int st_getext(httrackp *opt, int argc, char **argv) {
     }
   }
 
-  /* each capacity, against extensions straddling its bound with and without a
-     query, so a one-size-fits-all bound fails on the small ones */
+  /* a one-size-fits-all bound fails on the small capacities */
   for (c = 0; c < sizeof(caps) / sizeof(caps[0]); c++) {
     const size_t cap = caps[c];
     const size_t maxext = cap + guard;
@@ -1185,8 +1181,7 @@ static int st_hostalias(httrackp *opt, int argc, char **argv) {
   assertf(strcmp(hts_host_alias("b.com=a.com\nb.com=z.com", "b.com", HTS_TRUE,
                                 dest, sizeof(dest)),
                  "z.com") == 0);
-  /* Under the www. collapse, a rule on the bare host covers its www. forms.
-     With --no-www-dedup, www.b.com and b.com stay apart. */
+  /* A bare-host rule covers its www. forms unless --no-www-dedup is set. */
   assertf(
       strcmp(hts_host_alias(rules, "www.b.com", HTS_TRUE, dest, sizeof(dest)),
              "a.com") == 0);
@@ -1289,14 +1284,12 @@ static int st_hostalias(httrackp *opt, int argc, char **argv) {
                          sizeof(dest)) == NULL);
   /* a run of trailing slashes is stripped by both the check and the fold */
   assertf(hts_host_alias_rule_ok("b.com//=a.com//"));
-  /* a trimmed canonical must still settle, because the chain compares each
-     match against the next */
+  /* a canonical with a trailing slash must still end the chain */
   assertf(strcmp(hts_host_alias("*=a.com/", "http://b.com", HTS_TRUE, dest,
                                 sizeof(dest)),
                  "http://a.com") == 0);
-  /* Credentials belong to the link. The command line refuses a rule with its
-     own, and the fold drops them for callers that skip that check, because
-     each re-fold would prepend them again until the address overflows. */
+  /* Rule credentials are refused or dropped, because each re-fold would
+     prepend them to the link's again. */
   assertf(!hts_host_alias_rule_ok("a.com=user:pw@a.com"));
   assertf(strcmp(hts_host_alias("*=u:p@b.com", "z.com", HTS_TRUE, dest,
                                 sizeof(dest)),
@@ -1324,8 +1317,7 @@ static int st_hostalias(httrackp *opt, int argc, char **argv) {
       strcmp(hts_host_alias("*=a.com", "b.com", HTS_TRUE, dest, sizeof(dest)),
              "a.com") == 0);
 
-  /* A chain resolves to its end, because url_savename re-keys a link from the
-     host it folded last and a one-hop result would land on a middle host. */
+  /* A chain resolves to its end, because url_savename re-keys from there. */
   {
     static const char *const chain = "a.com=b.com\nb.com=c.com";
     /* the www form of a canonical is a chain that does not look like one */
@@ -1738,8 +1730,7 @@ static hts_boolean st_hashkey(httrackp *opt, const char *adr, const char *fil,
   return HTS_TRUE;
 }
 
-/* The dedup key builds host and path in one buffer. Both halves at their
-   maximum must fit, and either alone must clip (#1160). */
+/* Two maximal halves fit the dedup key, and either alone must clip (#1160). */
 static int st_hashkey_bounds(httrackp *opt, int argc, char **argv) {
   /* what lien_adrfil.adr / .fil hold, and what a whole key needs */
   enum { field = HTS_URLMAXSIZE * 2, keysize = 2 * field, guard = 64 };
@@ -1786,9 +1777,8 @@ static int st_hashkey_bounds(httrackp *opt, int argc, char **argv) {
     assertf(strncmp(arena, cat, strlen(arena)) == 0);
   }
 
-  /* --strip-query builds its match string from the same halves and must not
-     abort on a maximal pair. No rule matches past STRJOKER_MAXLEN, and a
-     clipped string would match where the whole one must not. */
+  /* --strip-query must not abort on a maximal pair. No rule matches past
+     STRJOKER_MAXLEN, so the string must not be clipped to match. */
   {
     const char *const rules = "*=other\n*bbz=sid";
     char keys[64];
@@ -1808,8 +1798,7 @@ static int st_hashkey_bounds(httrackp *opt, int argc, char **argv) {
     StringCopy(opt->strip_query, rules);
     assertf(st_hashkey(opt, adr, fil, arena, keysize, guard));
 
-    /* a matching rule plus a query longer than the normalizer's scratch,
-       which the key builder must clip */
+    /* the key builder must clip a query past the normalizer's scratch */
     snprintf(fil, 2 * keysize, "/bbz?");
     memset(&fil[5], 'q', field + 64); /* past the normalizer, inside the key */
     fil[5 + field + 64] = '\0';
@@ -1853,8 +1842,7 @@ static int st_redirect_samefile(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* A path of "n" bytes with '/' at both ends. bauth_prefix() cuts its key at
-   the last slash, so it keeps the whole path. */
+/* Builds an n-byte path ending in '/', so bauth_prefix() keeps all of it. */
 static void st_urlbounds_path(char *fil, size_t n) {
   assertf(n >= 2);
   memset(fil, 'a', n);
@@ -1862,9 +1850,8 @@ static void st_urlbounds_path(char *fil, size_t n) {
   fil[n] = '\0';
 }
 
-/* Consumers appending a fil into an HTS_URLMAXSIZE*2 buffer must refuse an
-   oversized one themselves, whatever #1561 bounds upstream. Each case is the
-   last path the buffer holds and the first it does not. */
+/* Each consumer of an HTS_URLMAXSIZE*2 buffer must refuse an oversized fil
+   itself (#1561). The cases sit on that boundary. */
 static int st_urlbounds(httrackp *opt, int argc, char **argv) {
   const htsfilters savedfilters = opt->filters;
   const hts_wizard savedwizard = opt->wizard;
@@ -1900,9 +1887,8 @@ static int st_urlbounds(httrackp *opt, int argc, char **argv) {
   st_urlbounds_path(fil, wzfits + 1);
   assertf(hts_testlinksize(opt, adr, fil, 1) == -1);
 
-  /* An ordinary URL is still keyed, stored and matched. It goes first because
-     bauth_check() skips the key on an empty jar, and the refused lookups below
-     must read it to expose a missing NULL guard. */
+  /* This goes first, because bauth_check() skips the key on an empty jar and
+     the refused lookups below must read it. */
   strcpybuff(fil, "/secure/page.html?a=b");
   assertf(bauth_prefix(prefix, adr, fil) == prefix);
   assertf(strcmp(prefix, "http://www.example.com/secure/") == 0);
@@ -1963,9 +1949,7 @@ static int st_urlbounds(httrackp *opt, int argc, char **argv) {
   assertf(hts_acceptlink(opt, 0, adr, fil, NULL, NULL, HTS_FALSE, &prio,
                          NULL) == 1);
 
-  /* ident_url_absolute() still splits a path past the wizard's limit from a
-     scheme-less URL of HTS_URLMAXSIZE*2 - 1 bytes. This case fails once it
-     stops, which would make these bounds dead code. */
+  /* This fails once ident_url_absolute() stops yielding an oversized path. */
   {
     lien_adrfil af;
     char BIGSTK url[HTS_URLMAXSIZE * 2];

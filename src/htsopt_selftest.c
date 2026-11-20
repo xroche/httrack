@@ -137,8 +137,7 @@ static int st_cmdlinesplit(httrackp *opt, int argc, char **argv) {
   assertf(strcmp(args[5], "out") == 0);
   freet(args);
 
-  // whitespace padding keeps empty arguments, which the engine skips, giving
-  // one per separator
+  // padding keeps one empty argument per separator, which the engine skips
   strcpybuff(line, "httrack  --quiet");
   args = hts_split_cmdline(line, &nargs);
   assertf(nargs == 3 && args[1][0] == '\0');
@@ -196,8 +195,7 @@ static int st_cmdlinesplit(httrackp *opt, int argc, char **argv) {
   assertf(strcmp(args[2], "\"unbalanced -V x") == 0);
   freet(args);
 
-  // the arguments are distinct, so a write past the allocation cannot read
-  // back as the expected parse
+  // distinct arguments stop an overrun from reading back as the parse
   {
     const int n = 2000;
     const size_t size = 16 * (size_t) n + 16;
@@ -238,8 +236,7 @@ static int st_copyopt(httrackp *opt, int argc, char **argv) {
   httrackp *to = hts_create_opt();
   int err = 0;
 
-  /* from-values differ from both the to-values and the defaults (nearlink
-     FALSE, errpage/parseall TRUE), which catches a no-op or reset copy. */
+  /* from-values differ from to-values and defaults to catch a no-op copy. */
   from->retry = 7; /* int field: positive control */
   to->retry = 0;
   from->nearlink = HTS_TRUE;
@@ -256,15 +253,13 @@ static int st_copyopt(httrackp *opt, int argc, char **argv) {
   ST_FAIL_IF(err, to->errpage != HTS_FALSE);
   ST_FAIL_IF(err, to->parseall != HTS_FALSE);
 
-  /* copy_htsopt must skip HTS_DEFAULT (-1) and leave the target intact. Only a
-     signed field holds -1, which guards against an unsigned hts_boolean. */
+  /* copy_htsopt must skip HTS_DEFAULT (-1), which needs a signed field. */
   from->parseall = HTS_DEFAULT;
   to->parseall = HTS_TRUE;
   copy_htsopt(from, to);
   ST_FAIL_IF(err, to->parseall != HTS_TRUE);
 
-  /* A non-empty String source deep-copies and an empty one leaves the target
-     intact. No crawl test reaches this exported copy_htsopt path. */
+  /* No crawl test reaches this exported String copy path. */
   StringCopy(from->cookies_file, "/tmp/jar.txt");
   StringCopy(to->cookies_file, "");
   copy_htsopt(from, to);
@@ -413,8 +408,7 @@ static int st_logcounters(httrackp *opt, int argc, char **argv) {
   return st_verdict("log-counters", err);
 }
 
-/* The note is built twice from one buffer, and a silent run must not hand
-   back the previous mirror's text. */
+/* A silent run must not hand back the previous mirror's note. */
 static int st_upperlinksnote(httrackp *opt, int argc, char **argv) {
   httrackp *from = hts_create_opt();
   httrackp *to = hts_create_opt();
@@ -445,8 +439,7 @@ static int st_upperlinksnote(httrackp *opt, int argc, char **argv) {
   return st_verdict("upper-links-note", err);
 }
 
-/* The handler below pins the enumerator NAME, and these pin the NUMBERS, which
-   are ABI in htsopt.h and what -C prints. */
+/* These numbers are ABI in htsopt.h and are what -C prints. */
 HTS_STATIC_ASSERT(HTS_CACHE_NONE == 0, cache_none_is_0);
 HTS_STATIC_ASSERT(HTS_CACHE_PRIORITY == 1, cache_priority_is_1);
 HTS_STATIC_ASSERT(HTS_CACHE_TEST_UPDATE == 2, cache_test_update_is_2);
@@ -502,8 +495,7 @@ static int st_logcallback(httrackp *opt, int argc, char **argv) {
   }
   fclose(fp);
 
-  /* The callback runs above the level filter and with no log file, because
-     front ends that install one rarely open opt->log. */
+  /* The callback must run above the level filter and with no log file. */
   st_log_callback_seen[0] = '\0';
   hts_set_log_vprint_callback(st_log_callback);
   hts_log_print(opt, LOG_DEBUG, "%d %s", 7, "filtered");
@@ -551,9 +543,8 @@ static HTS_PRINTF_FUN(3, 0) void st_crash_file_log(httrackp *opt, int type,
   fflush(st_crash_fp);
 }
 
-/* See htscrashtest.h for why both channels carry the marker. Given a file, it
-   writes there what the log callback gets during a -#c crash, the path
-   httrack-android recovers. */
+/* Given a file, this writes the log callback's text there during a -#c
+   crash. See htscrashtest.h for why both channels carry the marker. */
 static int st_crashannounce(httrackp *opt, int argc, char **argv) {
   static const char want[] = "crash announce 42";
   int rc = 1;
@@ -598,9 +589,7 @@ static int st_crashannounce(httrackp *opt, int argc, char **argv) {
 }
 #endif
 
-/* Returns the short form optalias_check() emits for the option words, two
-   joined by a space, or NULL on refusal. *used counts words consumed, and warn
-   gets any message an accepted option drew. */
+/* Returns the short form optalias_check() emits, or NULL on refusal. */
 static const char *st_optalias_expand(char *dest, size_t dest_size,
                                       const char *word, const char *next,
                                       int *used, char *warn, size_t warn_size) {
@@ -695,8 +684,7 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
   REFUSES("--display=full", NULL);
   REFUSES("--display=99999999999999999999", NULL);
 
-  /* these rows take no following token, so a URL after --purge-old stays a
-     URL and =1 is accepted */
+  /* these rows take no following token, so =1 and a next URL both work */
   EXPANDS("-X", "--purge-old", NULL);
   EXPANDS("-X", "--purge-old", "http://foo/");
   assertf(used == 1);
@@ -777,8 +765,7 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
     EXPANDS(want, word, NULL);
     snprintf(word, sizeof(word), "--%s=on", optalias_value(i));
     EXPANDS(optreal_value(p), word, NULL);
-    /* the bound is on the value's magnitude, so zero padding passes and a run
-       past every destination does not (#1437) */
+    /* the bound is on magnitude, so zero padding passes (#1437) */
     snprintf(word, sizeof(word), "--%s=00000000000000000002",
              optalias_value(i));
     snprintf(want, sizeof(want), "%s00000000000000000002", optreal_value(p));
@@ -830,8 +817,7 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
   EXPANDS("-N %h%p/%n%q.%t", "--user-structure", "%h%p/%n%q.%t");
   /* an empty value is -N "", which the engine reads as "back to the default" */
   EXPANDS("-N ", "--structure=", NULL);
-  /* a preset trailed by more short options asks for two values and is refused
-     whatever the tail holds, even a % */
+  /* a preset trailed by more short options is refused, even with a % */
   REFUSES("--structure=1L0", NULL);
   REFUSES("--structure", "1L0");
   REFUSES("--structure=1c8", NULL);
@@ -867,8 +853,7 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
   assertf(used == 2);
   EXPANDS("-N %h%p/%n%q.%t", "-N", "%h%p/%n%q.%t");
   assertf(used == 2);
-  /* there it glues only a bare digit run, and 1L0 or an overlong run stay
-     templates */
+  /* there only a bare digit run glues, and anything else stays a template */
   EXPANDS("-N 2col/%n.%t", "-N", "2col/%n.%t");
   assertf(used == 2);
   EXPANDS("-N 4294967295", "-N", "4294967295");
@@ -888,9 +873,7 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
   EXPANDS("-N", "-N", NULL);
   assertf(used == 1);
 
-  /* each -# row maps to the arm its name describes. -#C lists the cache, -#E
-     extracts meta-data, -#T logs transfers, -#t runs the autocheck, and -#0
-     went with the single-letter tests (#427) */
+  /* each -# row maps to the arm its name describes (#427) */
   EXPANDS("-#E", "--extract-cache", NULL);
   EXPANDS("-#C *.gif", "--debug-cache", "*.gif");
   EXPANDS("-#t", "--autotest", NULL);
@@ -975,8 +958,7 @@ static int st_scantoken(httrackp *opt, int argc, char **argv) {
       hts_boolean fit;
       size_t advance, i;
 
-      /* lay out a token, whitespace, and the token to land on. Varied bytes
-         catch a copy landing on the wrong index */
+      /* varied bytes catch a copy landing on the wrong index */
       for (i = 0; i < len; i++)
         src[i] = (char) ('a' + i % 26);
       memcpy(src + len, " \tb", 4);
@@ -999,8 +981,7 @@ static int st_scantoken(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* Runs one http_postfile_body() case into a request block before a poisoned
-   guard. A missing terminator walks the returned position into the poison. */
+/* Runs one http_postfile_body() case into a block before a poisoned guard. */
 static int st_postfile_case(const char *path, size_t start, size_t expect,
                             const char *what) {
   enum { capacity = 64, guard = 16 };
@@ -1045,8 +1026,7 @@ static int st_postfile_case(const char *path, size_t start, size_t expect,
   return err;
 }
 
-/* >postfile reads bodies raw into the request block. The argv fixtures are
-   shorter and longer than the room left, one holding a NUL, and empty. */
+/* The argv fixtures are short, long, NUL-holding and empty >postfile bodies. */
 static int st_postfile(httrackp *opt, int argc, char **argv) {
   int err = 0;
 
@@ -1120,9 +1100,7 @@ static hts_boolean st_lockrule_stamp_ns(const char *path, int64_t sec,
 }
 
 /* Does hts_file_mtime() report the seconds and nanoseconds the filesystem
-   holds? That tells a reader that invents or drops either from a rounding
-   filesystem. Always true without a nanosecond STAT() field, and on Windows,
-   where nothing is independent of the reader's GetFileAttributesExW. */
+   holds? It is always true on Windows and without a nanosecond field. */
 static hts_boolean st_lockrule_time_matches_stat(const char *path, int64_t sec,
                                                  int32_t nsec) {
 #if !defined(_WIN32) && (defined(HAVE_STRUCT_STAT_ST_MTIM_TV_NSEC) ||          \
@@ -1147,14 +1125,12 @@ static hts_boolean st_lockrule_time_matches_stat(const char *path, int64_t sec,
 #endif
 }
 
-/* Tests the sub-second arm. A script asking as soon as it sees
-   hts-in_progress.lock lands in the mirror's start second. It reports what
-   covered it, because whole-second filesystems hold none of these stamps. */
+/* Tests a request in the mirror's start second. It reports what covered it,
+   because whole-second filesystems hold none of these stamps. */
 static int st_lockrule_subsecond(httrackp *opt, const char *tag,
                                  const char *name, const char *lock,
                                  const char *progress) {
-  /* The stamps sit a microsecond apart, because tests 436 and 459 write their
-     request the moment the progress lock appears. */
+  /* Tests 436 and 459 write their request a microsecond after the lock. */
   const int32_t later = 500001000, same = 500000000, earlier = 499999000;
   hts_filetime_t started, probe;
   int err = 0;
@@ -1179,8 +1155,7 @@ static int st_lockrule_subsecond(httrackp *opt, const char *tag,
     return 1;
   }
   if (probe.sec != started.sec || probe.nsec != later) {
-    /* FAT and exFAT round the stamp to even seconds, and then no case below
-       can be placed. */
+    /* FAT and exFAT round the stamp to even seconds. */
     printf("%s: same-second request: NOT COVERED (asked for %d ns, read back"
            " %d%s)\n",
            tag, (int) later, (int) probe.nsec,
@@ -1219,9 +1194,8 @@ static int st_lockrule_subsecond(httrackp *opt, const char *tag,
     err = 1;
   }
 
-  /* At the same second and an earlier nanosecond, the lock's sub-second part
-     must be read or the request looks newer than a zero. The lock is
-     re-created because the case above deletes it. */
+  /* The lock's sub-second part must be read here. The case above deleted the
+     lock, so it is re-created. */
   if (!st_lockrule_touch(lock) ||
       !st_lockrule_stamp_ns(lock, started.sec, earlier)) {
     fprintf(stderr, "%s: cannot stamp %s\n", tag, lock);
@@ -1296,8 +1270,7 @@ static hts_boolean st_lockrule_setup(const char *dir, const char *name,
          st_lockrule_touch(lock) && st_lockrule_stamp(lock, when);
 }
 
-/* A request the engine cannot remove must never be taken. Nothing portable
-   makes an unlink fail, so this reports what covered it instead of skipping. */
+/* A request the engine cannot remove must never be taken. */
 static int st_lockrule_undeletable(httrackp *opt, const char *base,
                                    const char *tag, const char *name) {
 #ifdef _WIN32
@@ -1435,9 +1408,8 @@ static int st_lockrule(httrackp *opt, int argc, char **argv, const char *tag,
     err = 1;
   }
 
-  /* An earlier mirror left this in the run's start second. With fractional
-     stamps it is the earlier-fraction case, so it pins the boundary only on
-     whole-second filesystems. */
+  /* An earlier mirror left this in the run's start second. It pins the
+     boundary only on whole-second filesystems. */
   if (!st_lockrule_stamp(lock, started)) {
     fprintf(stderr, "%s: cannot stamp %s\n", tag, lock);
     err = 1;
@@ -1672,9 +1644,8 @@ done:
   return rc;
 }
 
-/* Checks what a postprocess-html callback may claim, and from whose storage.
-   Two capacities and every offset catch a bound that ignores "size" or only
-   checks the base pointer. */
+/* Two capacities and every offset catch a postprocess-html bound that
+   ignores "size" or checks only the base pointer. */
 static int st_postprocsize(httrackp *opt, int argc, char **argv) {
   char buf[16] = {0}, own[16] = {0};
   const size_t capa = sizeof(buf);
@@ -1711,14 +1682,12 @@ static int st_postprocsize(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* Print the verdict for a -V template, then the vector the engine would hand
-   the shell, one "ARG <index> <value>" line each. The save name is a vector
-   entry, and a caller replaying it must pass it that way. */
+/* Print the verdict for a -V template, then one "ARG <index> <value>" line
+   per vector entry. A replaying caller must pass the save name as an entry. */
 static int st_usercmd(httrackp *opt, int argc, char **argv) {
   char BIGSTK dest[8192];
-  /* An optional third argument caps the room. The command line cannot reach
-     the cap, because a -V template stops at HTS_CDLMAXSIZE and the save name
-     is not part of the command. */
+  /* An optional third argument caps the room, because a -V template stops
+     at HTS_CDLMAXSIZE. */
   size_t room = sizeof(dest);
   const char *why = "unnamed";
 
@@ -1869,8 +1838,7 @@ static int st_gluedint(httrackp *opt, int argc, char **argv) {
             snprintf(in, sizeof(in), "%s%s%s%s", spaces[w], signs[g], digits[d],
                      suffixes[x]);
             st_glued_legacy(sites[s].wide, in, &old, &adv);
-            /* Only leading digits are read. The legacy sscanf() also took a
-               space or a sign, and wrapped what was too large. */
+            /* Only leading digits are read, unlike the legacy sscanf(). */
             if (adv == 0) {
               expect = HTS_SCAN_NONE;
             } else if (!hts_parse_llint(in, NULL, 0, sites[s].max, &fits)) {
