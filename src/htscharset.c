@@ -37,6 +37,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsbase.h"
 #include "punycode.h"
 #include "htssafe.h"
+#include "htsckd.h"
 
 #include <stdint.h>
 #include <stdarg.h>
@@ -263,7 +264,7 @@ LPWSTR hts_convertStringToUCS2(const char *s, int size, UINT cp, int *pwsize) {
 
   if (wsize > 0) {
     LPSTR uoutput = NULL;
-    LPWSTR woutput = malloct((wsize + 1) * sizeof(WCHAR));
+    LPWSTR woutput = calloct((size_t) wsize + 1, sizeof(WCHAR));
 
     if (woutput != NULL
         && MultiByteToWideChar(cp, 0, (LPCSTR) s, size, woutput,
@@ -315,7 +316,7 @@ static char *hts_convertUCS2StringToCPEx(LPWSTR woutput, int wsize, UINT cp,
     *plossy = HTS_FALSE;
   }
   if (usize > 0) {
-    char *uoutput = malloct((usize + 1) * sizeof(char));
+    char *uoutput = malloct(((size_t) usize + 1) * sizeof(char));
 
     if (uoutput != NULL) {
       BOOL usedDefault = FALSE;
@@ -616,10 +617,11 @@ static char *hts_convertStringCharset(const char *s, size_t size,
             const size_t used = outbufCapa - outbytesleft;
             char *grown;
 
-            outbufCapa *= 2;
             /* Reached from an exported entry point, which answers NULL rather
                than taking its embedder down. */
-            grown = realloct(outbuf, outbufCapa);
+            grown = hts_ckd_mul(&outbufCapa, outbufCapa, 2)
+                        ? NULL
+                        : realloct(outbuf, outbufCapa);
             if (grown == NULL) {
               freet(outbuf);
               break;
@@ -985,7 +987,7 @@ char *hts_convertStringUTF8ToIDNA(const char *s, size_t size) {
           ADD_BYTE('-');
           
           /* copy utf-8 to integers. note: buffer is sufficient! */
-          segInt = (punycode_uint *) malloct(segSize * sizeof(punycode_uint));
+          segInt = (punycode_uint *) calloct(segSize, sizeof(punycode_uint));
           if (segInt == NULL) {
             FREE_BUFFER();
             return NULL;
@@ -1110,7 +1112,7 @@ char *hts_convertStringIDNAToUTF8(const char *s, size_t size) {
         for(output_capa = 16 ; output_capa < segSize 
           ; output_capa <<= 1) ;
         output_dest =
-            (punycode_uint *) malloct(output_capa * sizeof(punycode_uint));
+            (punycode_uint *) calloct(output_capa, sizeof(punycode_uint));
         if (output_dest == NULL) {
           FREE_BUFFER();
           return NULL;

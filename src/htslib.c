@@ -59,6 +59,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsescape.h"
 #include "htscodec.h"
 #include "htslines.h"
+#include "htsckd.h"
 
 #include <limits.h>
 
@@ -2292,11 +2293,14 @@ LLint http_xfread1(htsblk * r, int bufl) {
           r->adr = (char *) malloct(bufl + 1);
           r->size = 0;
         } else {
+          size_t alloc;
           char *const grown =
-              (char *) realloct(r->adr, (size_t) r->size + bufl + 1);
+              hts_ckd_add(&alloc, (size_t) r->size, (size_t) bufl + 1)
+                  ? NULL
+                  : (char *) realloct(r->adr, alloc);
 
           if (grown == NULL) {
-            // Out of memory: keep what was read, as the size guard does.
+            // On failure, keep what was read, as the size guard does.
             return READ_ERROR;
           }
           r->adr = grown;

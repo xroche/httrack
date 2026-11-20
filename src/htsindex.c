@@ -411,7 +411,7 @@ void index_finish(const char *indexpath, int mode) {
 
   if (size == (size_t) -1 || !indexer.tmp)
     goto done;
-  tab = (char **) malloct(sizeof(char *) * (indexer.lines + 2));
+  tab = (char **) calloct((size_t) indexer.lines + 2, sizeof(char *));
   if (!tab)
     goto done;
   blk = malloct(size + 1);

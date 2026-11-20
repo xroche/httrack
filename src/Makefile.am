@@ -102,7 +102,7 @@ libhttrack_la_SOURCES =  htscore.c htsusercmd.c htsmhtml.c htsparse.c htsmirror.
 	htsmodules.h htsname.h htsnet.h htsshared.h htssniff.h \
 	htsopt.h htsrobots.h htsthread.h htswin32.h  \
 	htscrashtest.h htstools.h htsrandom.h htswizard.h htswrap.h htscodec.h htswarc.h htschanges.h htssinglefile.h htsfetch.h htspsl.h htssitemap.h htsproxy.h htszlib.h  \
-	htsstrings.h htsarrays.h htsarena.h httrack-library.h \
+	htsstrings.h htsarrays.h htsarena.h htsckd.h httrack-library.h \
 	htscharset.h punycode.h htsencoding.h htsescape.h \
 	htsentities.h htsentities.sh htsbasiccharsets.sh htscodepages.h \
 	winprofile-keys.h \
@@ -117,7 +117,7 @@ libhttrack_la_LDFLAGS = $(AM_LDFLAGS) -version-info $(VERSION_INFO)
 # --disable-selftests leaves these out and defines HTS_NO_SELFTEST.
 if SELFTESTS
 libhttrack_la_SOURCES += htsselftest.c htsselftest_util.c \
-	htsback_selftest.c htscache_selftest.c htscharset_selftest.c \
+	htsback_selftest.c htscache_selftest.c htsckd_selftest.c htscharset_selftest.c \
 	htscmdline_selftest.c \
 	htscookie_selftest.c htsdns_selftest.c htsfetch_selftest.c htspsl_selftest.c \
 	htsindex_selftest.c \

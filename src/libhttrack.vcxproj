@@ -136,6 +136,7 @@
     <ClCompile Include="htscookiefile.c" />
     <ClCompile Include="htscache.c" />
     <ClCompile Include="htscache_selftest.c" />
+    <ClCompile Include="htsckd_selftest.c" />
     <ClCompile Include="htscatchurl.c" />
     <ClCompile Include="htscharset.c" />
     <ClCompile Include="htscharset_selftest.c" />
