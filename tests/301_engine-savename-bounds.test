@@ -67,4 +67,19 @@ out=$("$httrack_bin" -O /dev/null -#test=savename /x.html text/html type=-1 2>&1
 assert_match "needs a userdef" "$out" "type=-1 guard"
 keeps_ext 900 '/*/x.html' 'userdef=%h%p/%n%q.%t'
 
+# adrpad=N expands '*' in adr= the same way. With urlhack off, a scheme too long
+# to prefix again keeps the lookup key unprefixed rather than aborting.
+for pad in 1022 2030; do
+    selftest_queue_tail '/x.html' savename /x text/html 'adr=*://h' \
+        "adrpad=$pad" urlhack=0
+done
+# A short scheme still finds the link stored under it.
+selftest_queue 'savename: kept/x.html' savename /x text/html 'adr=https://h' \
+    urlhack=0 'prior=https://h|/x|kept/x.html'
+# A host longer than any crawled one leaves room for the type's directories.
+for type in 0 102 105; do
+    selftest_queue_tail '/x.html' savename x text/html 'adr=*' adrpad=2047 \
+        "type=$type"
+done
+
 selftest_run_queued

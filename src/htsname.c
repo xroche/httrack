@@ -816,7 +816,8 @@ static hts_boolean user_mime_ext(httrackp *opt, const char *fil, char *ext,
 static void add_host_dir(lien_adrfilsave *const afs, const httrackp *opt,
                          const char *host, int max_char) {
   if (!opt->savename_83) {
-    strcatbuff(afs->save, host);
+    /* no crawled host is longer, and the type's directories still fit */
+    strlncatbuff(afs->save, host, sizeof(afs->save), HTS_URLMAXSIZE);
   } else if (strlen(host) > 4 && strfield(host, "www.")) {
     hts_appendStringUTF8(afs->save, host + 4, max_char);
   } else {
@@ -905,7 +906,11 @@ int url_savename(lien_adrfilsave *const afs,
     if (link_has_authority(adr_complete)) {     // https or other protocols : in "http/" subfolder
       char *pos = strchr(adr_complete, ':');
 
-      if (pos != NULL) {
+      /* normadr is only a hash key, and the hash skips a known scheme, so a
+         prefix that does not fit is dropped rather than clipped */
+      if (pos != NULL && (size_t) (pos - adr_complete) < sizeof(normadr_) - 3 &&
+          strlen(normadr) <
+              sizeof(normadr_) - 3 - (size_t) (pos - adr_complete)) {
         normadr_[0] = '\0';
         strncatbuff(normadr_, adr_complete, (int) (pos - adr_complete));
         strcatbuff(normadr_, "://");
