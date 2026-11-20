@@ -121,13 +121,9 @@ list_stray_processes() {
     fi
 }
 
-# Kill engine processes a finished test left behind, and print what was found so
-# the leak is attributed to the test that just ran: an orphaned httrack.exe spins
-# and starves the runner, which is how the Windows job dies of "lost
-# communication" rather than a clean timeout. SERIAL RUNNERS ONLY -- it matches by
-# name host-wide, so under a parallel "make check" it would kill a healthy
-# sibling's engine. Only the engine images: a runner may run python.exe of its
-# own, and tasklist alone cannot tell that one from a leaked fixture server.
+# Kill and name the engine processes a finished test left behind, because an
+# orphaned httrack.exe starves the Windows runner. Use it on
+# SERIAL RUNNERS ONLY, because it matches by name host-wide.
 reap_leftover_processes() {
     local label=${1:-} left
     if target_is_windows; then
@@ -163,20 +159,11 @@ list_engine_pids() {
 # How long a SIGABRT'd engine gets to print its stack and exit.
 ABRT_GRACE=${ABRT_GRACE:-30}
 
-# Ask the wedged test's engine processes for a stack. What is obtainable differs
-# per platform, and each branch says which one it took: a dump that silently
-# produces nothing reads as coverage when it is not.
-#
-#   Linux  httrack's own SIGABRT handler (sig_fatal in httrack.c) symbolizes via
-#          addr2line and writes to the process's OWN stderr, so the trace lands in
-#          whatever log the test gave it -- the caller must salvage those logs.
-#          It walks only the signalled thread, and it aborts the process.
-#   macOS  htsbacktrace.c gates that handler on __linux, so SIGABRT would yield
-#          "No stack trace available on this OS". sample(1) is OS-provided, needs
-#          no root, covers every thread and leaves the process running.
-#
-# gdb -p is not an option on either: it is EPERM from a sibling under yama
-# ptrace_scope=1, which is how a harness watchdog necessarily invokes it.
+# Ask the wedged test's engine processes for a stack, and say which route ran.
+#   Linux  SIGABRT makes httrack print one thread to its own stderr and abort,
+#          so the caller must salvage the test's logs.
+#   macOS  sample(1) covers every thread and leaves the process running.
+# gdb -p fails with EPERM from a sibling under yama ptrace_scope=1.
 request_engine_backtraces() {
     local p os start
     local sent='' abrt=''
@@ -220,15 +207,9 @@ request_engine_backtraces() {
     done
 }
 
-# Stack of every native engine process, through cdb. Windows has neither half of
-# the POSIX route: htsbacktrace.c is gated on __linux, and MSYS signals never
-# reach a native httrack.exe. cdb ships with the SDK on the runner image but that
-# is incidental, so probe for it and say so when it is missing. The MSVC build
-# writes PDBs beside the binaries, which the test step already puts on PATH, so
-# frames resolve to names. Opt-in (HTTRACK_EXCLUSIVE_HOST), because with no
-# process group to scope by it stacks every engine on the host: under a parallel
-# run that freezes each sibling's for up to 60s, and a cdb killed by its own
-# timeout can take its debuggee with it.
+# Dump the stack of every native engine process through cdb, if present. It is
+# opt-in (HTTRACK_EXCLUSIVE_HOST), because it freezes every engine on the host
+# for up to 60s, and a cdb killed by its timeout can take its debuggee with it.
 dump_windows_stacks() {
     local c p
     local cdb='' found=''

@@ -101,8 +101,8 @@ case "$docreal" in
     exit 1
     ;;
 esac
-# Resolving is not enough: it must land on the manual the panes link, and the UI
-# must have travelled as real files rather than through the link.
+# It must land on the manual the panes link, and the UI must have travelled as
+# real files rather than through the link.
 test -f "$docreal/html/guide.html" || {
     echo "relocated tree: $docreal holds no html/guide.html" >&2
     exit 1
@@ -129,23 +129,16 @@ exec /usr/bin/uname "$@"
 EOF
 chmod +x "$stubdir/uname"
 
-# Stub browser, named after the first entry of webhttrack's browser list. It goes in
-# $prefix/bin because webhttrack searches its own SRCHPATH before $PATH, so a real
-# /usr/bin/x-www-browser (Edge, on the GitHub Linux runners) would beat a PATH shadow.
-# It fetches the server URL and records PASS only for the working UI: the brand
-# string, the step-2 form action, and an option-page tooltip, which a
-# truncated/degraded template page would lack. htsserver only lives until webhttrack
-# exits, so the check has to happen here.
+# The stub browser goes in $prefix/bin, because webhttrack searches it before
+# $PATH and the runners ship a real x-www-browser. It checks the UI itself,
+# because htsserver exits with webhttrack.
 # -a: the UI is served ISO-8859-1, so grep must not treat it as binary.
 cat >"$browserstub" <<EOF
 #!/bin/bash
 echo "stub browser invoked with: \$1" >&2
-# Also fetch an option page and require a rendered title='' tooltip: proves the
-# option template expands and the \${html:} filter escapes into the attribute.
-# option9 additionally proves the WARC and change-report controls and
-# option2 the --single-file pair render with their expanded labels, and
-# option8 the sitemap ones. option2 also pins the absence of an
-# unexpanded key, since the default locale here is French.
+# A title='' tooltip proves the \${html:} filter escapes into the attribute.
+# option9, option8 and option2 check the WARC, sitemap and single-file controls.
+# option2 also checks for an unexpanded key under the French default locale.
 opturl="\${1%/}/server/option2.html"
 warcurl="\${1%/}/server/option9.html"
 smurl="\${1%/}/server/option8.html"
@@ -210,10 +203,8 @@ test "$(cat "$marker" 2>/dev/null || true)" = PASS || {
 }
 echo "webhttrack smoke: PASS"
 
-# The browser helper must not outlive the session: Darwin's open -W blocks until the
-# browser itself quits, and an unreaped one keeps the bundle registered with
-# LaunchServices, so its Dock icon stays up until the user force-quits it. Darwin only,
-# because everywhere else a real browser is found ahead of open in webhttrack's list.
+# Darwin's open -W blocks until the browser quits, so the helper must be reaped
+# with the session. Elsewhere a real browser is found ahead of open.
 rm -f "$stubdir/uname"
 test "$(uname -s)" = Darwin || {
     echo "not Darwin: skipping the browser-helper check"
@@ -282,9 +273,7 @@ end_session() {
     }
 }
 
-# $prefix/bin heads webhttrack's search path, so this shadows /usr/bin/open. The PATH is
-# the one launchd hands an app opened from Finder, which is why the shipped bundle finds
-# no browser and reaches open at all.
+# $prefix/bin heads webhttrack's search path, so this shadows /usr/bin/open.
 rm -f "$browserstub"
 openstub="$prefix/bin/open"
 openargs="$work/open.args"
@@ -324,8 +313,7 @@ wait_gone "$helper" 10 || {
 }
 echo "browser helper reaped on the signal path"
 
-# x-www-browser heads webhttrack's browser list, so it is chosen over open here. Reaping
-# is for the helper we asked to wait, never for a browser the user is reading in.
+# x-www-browser beats open here, and a real browser must never be reaped.
 echo "case 3: a real browser is left alone"
 browserargs="$work/browser.args"
 browserpid="$work/browser.pid"
