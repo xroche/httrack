@@ -83,6 +83,7 @@ static int fuzz_addlink(htsmoduleStruct *str, char *link) {
 
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   static int inited = 0;
+  static char empty_template[] = "";
 
   const char *charset;
   unsigned mode, bits;
@@ -150,8 +151,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
   sback = back_new(opt, opt->maxsoc * 32 + 1024);
 
-  /* ptr=1 (index 1 is the parsed page) selects full HTML parsing + the
-     rewriter; urladr()/urlfil()/savename() alias heap(ptr), save=/dev/null. */
+  /* ptr=1 selects full HTML parsing and the rewriter. */
   hts_record_link(opt, "example.com", "/", "/dev/null", "", "", NULL);
   hts_record_link(opt, "example.com", modes[mode].file, "/dev/null", "", "",
                   NULL);
@@ -203,9 +203,9 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   stre.makeindex_fp_ = &makeindex_fp;
   stre.makeindex_links_ = &makeindex_links;
   stre.makeindex_firstlink_ = makeindex_firstlink;
-  stre.template_header_ = "";
-  stre.template_body_ = "";
-  stre.template_footer_ = "";
+  stre.template_header_ = empty_template;
+  stre.template_body_ = empty_template;
+  stre.template_footer_ = empty_template;
   stre.stat_fragment_ = &stat_fragment;
   stre.makestat_time = 0;
   stre.makestat_fp = NULL;

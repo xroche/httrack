@@ -36,8 +36,7 @@ done
 command grep -q 'went down' "$verdict" ||
     fail "no wedge message in the verdict cut out of $src"
 
-# The real clock is a 900s silence read every 30s. Only those two shrink, so
-# the debounce below is tested at the value the VM runs with.
+# Only the 900s silence and 30s poll shrink, so the debounce keeps its value.
 # shellcheck disable=SC2034 # every one of these is read by the sourced block
 {
     SUITE_SILENCE=3
@@ -48,8 +47,7 @@ command grep -q 'went down' "$verdict" ||
     VM_HOME=/home/demo
 }
 
-# The VM, stubbed. Driven by the stub_* variables rather than by an eval of a
-# body, which 232 would have to pin as one more site hiding its operand.
+# Variables drive this stub, because an eval is one more site 232 must pin.
 as_user() {
     # The suite must run under its own budget, not the per-step one.
     test "$STEP_TIMEOUT" -eq "$SUITE_TIMEOUT" || return 3
@@ -112,8 +110,7 @@ run() { # run NAME WANT-RC WANT-WEDGE(y|n)
 stub_sleep=0 stub_rc=0 stub_misses=0 stub_every=0 stub_stream=0 stub_die=0
 run "a passing suite" 0 n
 
-# A failing test must stay a test failure: the watchdog may not launder it into
-# a VM fault, which is the reading that gets a real regression shrugged off.
+# A failing test must not be blamed on the VM.
 stub_sleep=0 stub_rc=2 stub_misses=0
 run "a failing test" 2 n
 
@@ -137,8 +134,7 @@ stub_every=0
 stub_sleep=0 stub_rc=124 stub_misses=0
 run "the suite times out on its own" 124 n
 
-# A VM that keeps finishing tests is alive whatever ssh does, so the clock has
-# to gate the probe rather than the probe deciding alone.
+# A VM that keeps finishing tests is alive, so the clock gates the ssh probe.
 stub_sleep=8 stub_rc=0 stub_misses=99 stub_stream=1
 run "tests keep finishing while ssh misses" 0 n
 stub_stream=0 stub_misses=0

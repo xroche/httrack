@@ -95,7 +95,7 @@ for value, want in [(" ".join(RULES), RULES),
     if got != want:
         sys.exit("%r emitted %r, wanted %r" % (value, got, want))
 
-# Hand the engine below both flags the template actually emitted, not literals.
+# Feed the engine below both flags the template emitted.
 emit = [lines[lines.index('--strip-query "%s"' % rule)] for rule in RULES]
 open(emitted, "w").write("\n".join(w for e in emit for w in shlex.split(e))
                          + "\n")

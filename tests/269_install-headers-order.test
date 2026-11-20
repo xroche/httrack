@@ -1,14 +1,11 @@
 #!/bin/bash
 #
 # A consumer picks its own include order, so every ordered pair of installed
-# headers must compile. 205 and 206 compile each one alone, where all of them
-# pass, so neither can see an order-only break. Pairs are the practical bound:
-# a break needing three headers, or a macro the consumer defined first, is out
-# of reach here. The sweep is shared with the MSVC job, which has no automake to
-# install with and so stages the same list out of DevIncludes_DATA (#1153).
+# headers must compile. Pairs only: a break needing three headers or a prior
+# consumer macro is not covered. The MSVC job stages the same list out of
+# DevIncludes_DATA (#1153).
 #
-# n^2 compiles is real work, not a wedge: the sweep paces itself against whatever
-# is left of this budget.
+# The n^2 compiles pace themselves against what is left of this budget.
 # TEST_TIMEOUT_AT_LEAST: 900
 
 set -euo pipefail

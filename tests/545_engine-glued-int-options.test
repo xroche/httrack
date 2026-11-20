@@ -88,7 +88,7 @@ for opt in -r$int_max -T2147483648 -M99999999999999999999 -%e4294967297 -@m99999
         fail "$opt was not refused: $out"
 done
 
-# A sign was never read either: it ends as an unknown option, as it did.
+# A sign is still not read, so it ends as an unknown option.
 out=$(run 255 -T-5)
 grep -q 'invalid option 5' <<<"$out" || fail "-T-5 read as: $out"
 

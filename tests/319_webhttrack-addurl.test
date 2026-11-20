@@ -77,9 +77,7 @@ assert_file "${site}/page.html" "the added URL kept a placeholder name"
 left=$(find "${site}" -name '*.delayed')
 test -z "${left}" || fail "a delayed placeholder survived: ${left}"
 
-# A rename alone is not the fix: a record still holding the placeholder makes
-# every later reference to it spin in the type waiter and get dropped. Both
-# lines reach the log at the default verbosity, as errors and warnings do.
+# A record left on the placeholder makes every later reference to it drop.
 ! grep -q "Duplicate entry in hts_wait_delayed" "${log}" ||
     fail "the added link's own record collided in the type waiter"
 ! grep -q "probably looping, type unknown" "${log}" ||

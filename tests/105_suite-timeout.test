@@ -29,10 +29,7 @@ echo "marker: the wedged test started"
 sleep 300
 EOF
 
-# $fired is the guard's own reading of when its deadline tripped, taken from the
-# progress log: a poll can miss a dump short enough to fall between two of them,
-# which is how #1242 reddened a run whose guard had done its job. The poll only
-# still answers whether the line was visible while the driver ran.
+# $fired comes from the guard's log, because a poll misses a short dump (#1242).
 rc=0
 fired=
 marked=
@@ -78,9 +75,7 @@ grep -q '^===== TIMEOUT: 90_wedged.test exceeded' "$out" ||
     fail "the diagnostics do not name the test"
 grep -q "own process tree" "$out" || fail "no process list in the diagnostics"
 
-# Announced BEFORE the dump, not merely at some point during it: the watchdog reading
-# that log takes the silence of a dump for a wedge. Only a slow dump tells the two
-# orderings apart, and the dump's own ps is what this makes slow.
+# The announcement must precede the dump, or the watchdog reads it as a wedge.
 realps=$(command -v ps) || realps= # the emulated buildds ship without one
 if target_is_windows || test -z "$realps"; then
     echo "note: no slow ps to build here, the announcement ordering is not measured"
@@ -90,8 +85,7 @@ else
     chmod +x "$shim/ps"
     run_wedged 5 "PATH=$shim:$PATH"
     rm -f "$shim/ps" # before the starve shim shares this directory
-    # Proved, not assumed: a dump whose PATH search skipped the shim ran the real
-    # ps, and the fast dump that follows reads as a late announcement below.
+    # A dump that skipped the shim ran the fast real ps, which proves nothing.
     test -e "$tmp/ps-used" || fail "the dump never ran the slow ps shim"
     test "$rc" -eq 124 || fail "the guard reported $rc under a slow dump, want 124"
     test -n "$marked" || fail "no announcement under a slow dump"
@@ -113,10 +107,8 @@ sleep 1
     fail "the wedged test survived the guard"
 
 # --- the budget is wall clock, not a count of poll iterations ----------------
-# Starve the poll and a counted budget stretches with it: 10 polls of a 0.1s tick
-# become 40s, so the guard fires long after the step it was meant to beat (#795).
-# HTTRACK_POLL_SLEEP forces the forked tick, the only one a shimmed sleep reaches;
-# the loop it stretches is the same one poll_wait's fd tick drives.
+# A starved poll stretches a counted budget far past its deadline (#795).
+# HTTRACK_POLL_SLEEP forces the forked tick, which a shimmed sleep can reach.
 (
     starve_sleep "$shim" 4 || fail "could not install the slow sleep"
     run_wedged 1 HTTRACK_POLL_SLEEP=1
@@ -167,8 +159,7 @@ HTTRACK_TEST_TIMEOUT=0 bash "$driver" "$tmp/95_budget.test" >"$out" 2>&1
 saw_budget 0 "a disabled guard"
 
 # --- a test may raise the budget, never lower it ----------------------------
-# 269's header sweep is n^2 compiles, real work that outlasts the wedge budget on an
-# emulated host; anything else asking would be disarming the guard.
+# Only 269's n^2 header sweep may outlast the wedge budget on an emulated host.
 raiser() { # raiser <asked for>
     # shellcheck disable=SC2016 # the fixture has to read the variable, not us
     printf '# TEST_TIMEOUT_AT_LEAST: %s\necho "budget=${HTTRACK_TEST_TIMEOUT-unset}"\n' \
@@ -321,8 +312,7 @@ if ! target_is_windows && test -r /proc/self/stat; then
     fake=$(cat "$tmp/fake.pid")
     outside=$(cat "$tmp/outside.pid")
     emul=$(cat "$tmp/emul.pid")
-    # Pushed, not trapped: a bare EXIT trap here would drop the stack that holds
-    # $tmp and $shim, which is how $shim used to leak.
+    # A bare EXIT trap would drop the cleanup stack holding $tmp and $shim.
     kill_probes() { kill "$fake" "$outside" "$emul" 2>/dev/null || true; }
     cleanup_push kill_probes
     # /proc holds the pid from the fork on, so a never-exec'd fake fails later,
@@ -364,9 +354,7 @@ if ! target_is_windows && test -r /proc/self/stat; then
             fail "no-ps engine list lost emulated pid $emul"
         ! grep -qx "$outside" <<<"$engines" ||
             fail "no-ps engine list reached outside the group (pid $outside)"
-        # A platform with no stack mechanism must say so and leave the engine
-        # alone. Shimmed, because no CI leg is one: the Hurd branch below runs
-        # only on the buildds that failed for want of it.
+        # A platform with no stack mechanism must say so. A uname shim fakes GNU, which no CI leg is.
         # shellcheck disable=SC2016 # the shim reads them, not us
         printf '#!/bin/sh\ncase "$1" in -s) echo GNU;; *) exec %s "$@";; esac\n' \
             "$(command -v uname)" >"$tmp/nops/uname"
@@ -433,9 +421,7 @@ EOF
 fi
 
 # --- a wedged crawl yields a symbolized engine stack ------------------------
-# The whole point of the dump: name the frame the engine is stuck in. Windows has
-# neither half (MSYS signals do not reach a native httrack.exe, and that build has
-# no backtrace()), so only assert it where the machinery exists.
+# Skip on Windows, where MSYS signals miss httrack.exe and backtrace() is gone.
 if target_is_windows; then
     echo "suite timeout OK (no stack capture on Windows)"
     exit 0

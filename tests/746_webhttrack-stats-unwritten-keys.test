@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# The progress panel publishes only the per-row fields the engine fills: a row
-# never carries info.url_adr or info.url_fil, which no code writes. A default
-# build zero-fills the stack, so only a pattern-init or sanitizer build fails.
+# The panel must not publish info.url_adr or info.url_fil, which no code writes.
+# A default build zero-fills them, so only a pattern-init build can fail.
 
 set -euo pipefail
 

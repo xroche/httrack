@@ -42,11 +42,8 @@ htsserver_announced() {
     done <"${HTS_LOG}"
 }
 
-# The install reaches the documentation through $(datadir)/httrack/html/doc,
-# which the source tree has no counterpart for, so the panes' Help links dangle
-# when the source root is served. $HTS_DISTROOT is the source tree with that one
-# link added, built once per test. It is a superset of the shipped layout rather
-# than a model of it: test 396 serves a staged install for the real shape.
+# $HTS_DISTROOT is the source tree plus the html/doc link an install has, so
+# the panes' Help links resolve. Test 396 covers the real install layout.
 htsserver_distroot() {
     test -z "${HTS_DISTROOT:-}" || return 0
     local root entry
@@ -136,9 +133,7 @@ htsserver_start() {
         HTS_LOG=${log}
         : >"${HTS_LOG}"
         if test -n "${wlimit}"; then
-            # Process substitution, not a pipeline: $! must be the server. In a
-            # pipeline it is the reader, so a start that never announces leaves the
-            # server unkilled and parks the reaping wait on the whole job.
+            # Use process substitution, because in a pipeline $! is the reader.
             htsserver_exec "$@" > >(cat >"${HTS_LOG}") &
         else
             htsserver_exec "$@" >"${HTS_LOG}" &

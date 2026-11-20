@@ -66,10 +66,7 @@ assert_eq "http://www.example.com/a.png: accepted by rule #1 (+*.png)" \
 assert_match "URL longer than $maxurl bytes, ignored: http://www.example.com/aaa" \
     "$(<"$tmpdir/p/hts-log.txt")" "refusal named in the log"
 
-# That line is written before the seed is dropped, so it cannot tell a refusal
-# from a truncation. Crawl for real and count what the refusal cost: a seed the
-# engine kept goes on to fail on a save path it cannot build, six warnings and
-# an error further on.
+# The log line precedes the drop, so count the warnings a kept seed raises.
 find_python >/dev/null || skip "python3 not found"
 doc="$tmpdir/doc"
 mkdir -p "$doc"

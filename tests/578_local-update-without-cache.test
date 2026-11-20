@@ -73,8 +73,7 @@ n=$(kept_lines "$keptout")
 test "$n" -eq "${#assets[@]}" ||
     fail "kept: the log names $n kept files, expected ${#assets[@]}:
 $(grep -aE 'complete|Kept existing' "${keptout}/hts-log.txt" || true)"
-# A count alone passes a line naming the wrong file, which is the whole value
-# of the line.
+# A count alone would pass a line naming the wrong file.
 for f in "${assets[@]}"; do
     size=$(size_of "${refout}/${host}/${f}")
     test "$(count_matching_lines -F "${f} (${size} bytes)" \

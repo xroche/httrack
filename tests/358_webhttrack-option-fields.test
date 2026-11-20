@@ -1,8 +1,6 @@
 #!/bin/bash
 #
-# The type check and the eight MIME pairs were stored and restored by the GUI
-# and never put on the command line, and a cleared browser id emitted
-# --user-agent "", which mutes the header instead of leaving the engine's own.
+# The type check, the MIME pairs and the browser id must reach the command line.
 
 set -euo pipefail
 
@@ -33,8 +31,7 @@ cport=$(discover_server_port "${clog}" "${csrv}") || fail "no content server"
 
 htsserver_start
 
-# The page that offers the pairs is the count's only source, so a ninth row
-# flows through here instead of desyncing three literals.
+# The page that offers the pairs is the only source of their count.
 pairs=$(grep -c '<input name="ext[0-9]*"' "${HTS_DISTDIR}/html/server/option11.html")
 test "${pairs}" -ge 8 || fail "option11.html offers only ${pairs} MIME pairs"
 
@@ -74,7 +71,7 @@ s.post("option8.html", [("robots", "1")])
 s.post("option11.html", [kv for n, (e, m) in enumerate(PAIRS, 1)
                          for kv in (("ext%d" % n, e), ("mime%d" % n, m))])
 
-# The type check: three list entries, three engine values, never off by one.
+# The type check maps three list entries to three engine values.
 for listid, want in (("1", "--check-type=0"), ("2", "--check-type=1"),
                      ("3", "--check-type=2")):
     s.post("option8.html", [("checktype", listid)])
@@ -85,8 +82,7 @@ cmd = cmdline()
 for n, (e, m) in enumerate(PAIRS, 1):
     check('--assume "%s=%s"' % (e, m) in cmd, "pair %d reaches the engine" % n)
 
-# An emptied extension has to take its MIME with it: left behind, the value is
-# a bare argv token and the engine reads whatever it spells as its own options.
+# An emptied extension drops its MIME too, or the engine reads it as options.
 s.post("option11.html", [("ext3", ""), ("mime3", " --user-agent INJECTED")])
 cmd = cmdline()
 check("INJECTED" not in cmd, "an emptied extension drops its MIME too")
@@ -99,8 +95,7 @@ s.post("option10.html", [("prox", ""), ("portprox", " -O /tmp/relocated")])
 check("/tmp/relocated" not in cmdline(), "a port with no proxy host emits nothing")
 s.post("option10.html", [("portprox", "")])
 
-# The browser id. A blank box must leave the engine's own default alone, so no
-# option at all; a filled one still has to emit it, or the flag simply died.
+# A blank browser id emits no option, so the engine keeps its default.
 s.post("option6.html", [("user", "Probe/1.0")])
 check('--user-agent "Probe/1.0"' in cmdline(), "a filled browser id is sent")
 s.post("option6.html", [("user", "")])
@@ -142,8 +137,7 @@ s.post("option6.html", [("acceptdefault", "x/y")])
 
 if rc:
     sys.exit(rc)
-# Start, the way the browser's button does: both textareas as rendered, with
-# the entities decoded the way the HTML parser hands them back.
+# Start as the browser's button does, with both textareas entity-decoded.
 page = s.get("step4.html")
 s.post("step4.html", [("command", html.unescape(cmdline())),
                       ("winprofile", html.unescape(textarea(page, "winprofile"))),
@@ -166,7 +160,7 @@ argv=$(head -1 "${doit}")
 grep -q -- "-u2" <<<"${argv}" || fail "the type check never reached the engine: ${argv}"
 grep -q -- "-%A foo=text/html" <<<"${argv}" ||
     fail "the first MIME pair never reached the engine: ${argv}"
-# One token per line, so grep -c counts the flags rather than the single line.
+# Put one token per line, so grep -c counts the flags.
 assume_flags=$(tr ' ' '\n' <<<"${argv}" | grep -c -- '-%A' || true)
 assert_eq "${pairs}" "${assume_flags}" "-%A flags in the recorded argv"
 ! grep -q -- "-F " <<<"${argv}" || fail "a blank browser id still sent -F: ${argv}"
@@ -174,8 +168,7 @@ grep -q -- "-%a x/y" <<<"${argv}" || fail "the default Accept never reached the 
 grep -q -- "-%a image=img/x" <<<"${argv}" ||
     fail "the image Accept never reached the engine: ${argv}"
 
-# The rule changed the crawl, not just the argv: without it data.foo stays a
-# binary the engine never opens, so deep.html is unreachable.
+# Without the rule data.foo stays an unparsed binary, and deep.html unreachable.
 mirror="${out}/127.0.0.1_${cport}"
 assert_file "${mirror}/data.html" "--assume did not retype data.foo"
 assert_file "${mirror}/deep.html" "--assume did not make data.foo parseable"

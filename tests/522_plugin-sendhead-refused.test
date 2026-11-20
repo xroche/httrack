@@ -1,9 +1,7 @@
 #!/bin/bash
 #
-# htsdefines.h promises a sendhead hook returning anything but 1 fails the
-# transfer. http_sendhead() closed the socket and sent the request down it
-# anyway, so the user got a generic transport error, and over HTTPS SSL_write()
-# got a freed handle.
+# A sendhead hook returning anything but 1 must fail before the request is
+# sent, or SSL_write() gets a freed handle.
 
 set -euo pipefail
 

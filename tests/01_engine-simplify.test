@@ -42,7 +42,7 @@ simp '/' '/'
 simp 'a/b/..' 'a/'              # trailing bare '..'
 simp 'a/../b?x=../y' 'b?x=../y' # '?' freezes simplification
 
-# depth is unbounded: 130 segments used to empty the path (#2249)
+# depth is unbounded, and 130 segments keep the path (#2249)
 deep=$(printf 'x/%.0s' $(seq 130))
 simp "/${deep}a/../b" "/${deep}b"
 

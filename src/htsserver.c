@@ -554,12 +554,9 @@ static hts_boolean host_is_address(const char *name) {
   return i != 0 ? HTS_TRUE : HTS_FALSE;
 }
 
-/** May a request presenting this authority drive the panel?
-    A page can point a name of its own at our address and have the browser call
-    us same-origin, which an unauthenticated panel must refuse. That always
-    presents a name. An address literal is whoever opened the socket, and the
-    names we vouch for are localhost, whatever --bind was given, and this
-    host's own names. */
+/** May a request presenting this authority drive the panel? A page can point
+    its own name at our address and call us same-origin. So we accept only an
+    address literal, localhost, the --bind name and this host's own names. */
 static hts_boolean host_is_self(const char *host, const char *bound) {
   char name[256];
   size_t i;
@@ -1146,9 +1143,8 @@ static void cat_attr_escaped(String *dst, const char *value) {
 }
 
 /* Append value escaped for a single-quoted JS literal inside a double-quoted
-   HTML attribute. Every escape is a \xNN group, so the only bytes it adds are
-   '\', 'x' and hex digits: nothing the attribute decode can expand back into a
-   quote, and no lone '\' for a DBCS trail byte to swallow. */
+   HTML attribute. Each escape is a \xNN group, which the attribute decode
+   cannot turn into a quote and a DBCS trail byte cannot swallow. */
 static void cat_js_escaped(String *dst, const char *value) {
   const char *a;
 
@@ -1199,10 +1195,8 @@ static void cat_cmdline_arg(String *output, const char *value) {
   cat_cmdline_argn(output, value, strlen(value));
 }
 
-/* Append FLAG "<rule>" once per rule in VALUE, the way the engine takes the
-   options it accumulates: one flag per rule. Any whitespace separates two
-   rules, as it separates two URLs in the wizard's URL box, except beside a ','
-   or '=' where it belongs to the rule the parser trims it out of. */
+/* Append FLAG "<rule>" once per rule in VALUE. Whitespace separates rules,
+   except beside a ',' or '=', where the parser trims it. */
 static void cat_cmdline_arglist(String *output, const char *value,
                                 const char *flag) {
   /* isspace()'s C-locale set, so a rules box splits the same here and in the
@@ -1307,11 +1301,9 @@ static const char *const ini_checkbox_keys[] = {
     NULL,
 };
 
-/* These hold a ${listid:} id, numbered from 1; winprofile.ini stores the
-   0-based combo index WinHTTrack writes instead. A file with no ProfileFormat
-   key is WinHTTrack's own, so it is read that way too (#1314). The name says
-   list; what membership marks is that shift, and ProxyType's ordinal already
-   agrees, so it stays out. */
+/* These hold a 1-based ${listid:} id, but winprofile.ini stores WinHTTrack's
+   0-based combo index, as does a file with no ProfileFormat key (#1314).
+   ProxyType's ordinals already agree. */
 static const char *const ini_list_keys[] = {
     "CurrentAction", "Build",     "PrimaryScan",     "Travel",  "GlobalTravel",
     "RewriteLinks",  "CheckType", "FollowRobotsTxt", "LogType", NULL,
@@ -1459,8 +1451,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
   String tmpbuff = STRING_EMPTY;
   String fspath = STRING_EMPTY;
   String profile = STRING_EMPTY;
-  /* Project directory this server set up; the only root /website/ serves from,
-     and deliberately not cleared between requests. */
+  /* /website/ serves only from this project directory, kept across requests. */
   String website = STRING_EMPTY;
   hts_boolean path_from_cmdline;
   char catbuff[CATBUFF_SIZE];
@@ -1747,21 +1738,17 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
         denied = "Foreign Host header.";
       }
 
-      /* CSP stops a mirrored page reading /server/, not posting to it blind:
-         a no-cors POST still runs the command. Origin is browser-set and script
-         cannot forge it. Absent is allowed, most non-browser clients send none.
-       */
+      /* CSP cannot stop a blind no-cors POST, but script cannot forge Origin.
+         Non-browser clients often send none, so an absent Origin passes. */
       if (meth == 2 && origin[0] != '\0' && !origin_is_self(origin, host)) {
         buffer[0] = '\0';
         meth = 0;
         denied = "Foreign origin.";
       }
 
-      /* Authenticate the body before parsing it: every field it carries is
-         written straight into the global key store below, "command" included,
-         and that one reaches the engine. Checking afterwards cannot work — the
-         damage is already done, and the pre-seeded "sid" above would compare
-         equal to itself for a request that simply omits the field. */
+      /* Authenticate the body before parsing it, because every field goes
+         straight into the global key store, and a request omitting "sid"
+         would then compare the pre-seeded value with itself. */
       if (meth && buffer[0]) {
         intptr_t expected = 0;
 
@@ -2330,10 +2317,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                         name = colon + 1;
                       }
                     } else if ((p = strfield(name, "date:"))) {
-                      /* Expanded on each request, so the footer year cannot
-                         drift from the calendar the way a stamped one does
-                         (#1165). SOURCE_DATE_EPOCH pins it, so a test can ask
-                         for another year. */
+                      /* The year follows the calendar (#1165), and
+                         SOURCE_DATE_EPOCH pins it for tests. */
                       const char *epoch = getenv("SOURCE_DATE_EPOCH");
                       struct tm tmv;
                       hts_boolean ok = HTS_FALSE;

@@ -39,8 +39,8 @@ FNR == 1 { eff = 0; heredoc = ""; dashed = 0; depth = 0; infunc = 0; split("", o
     isfunc = (line ~ /^[A-Za-z_][A-Za-z0-9_]*\(\)[ \t]*\{/)
     if (isfunc) infunc = (line !~ /\}[ \t]*$/)
     else if (infunc && line ~ /^\}/) infunc = 0
-    # What ran inside the guard is part of the guard, not evidence the subject
-    # was exercised: an "if" or a "case" remembers the tally it opened with.
+    # Code inside the guard does not count as exercising the subject. An "if"
+    # or a "case" remembers the tally it opened with.
     if (line ~ /^[ \t]*(if|case)[ \t]/) { depth++; opened[depth] = eff }
     if (line ~ /(^|[ \t;])(fi|esac)([ \t;]|$)/ && depth > 0) depth--
     if (!infunc && !isfunc && line ~ /(^|[ \t;&|(])exit[ \t]+0[ \t]*([;)}&|].*)?$/ && line !~ /printf|trap|echo/) {

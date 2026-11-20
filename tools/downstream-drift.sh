@@ -1,10 +1,6 @@
 #!/bin/bash
 #
-# Downstream recipes encode assumptions about our tree: a patch's context, a
-# path a sed rewrites, a string an ebuild greps for before editing it. Nothing
-# tells us when one stops holding -- the packager finds out at their next
-# version bump, and we hear about it as a bug. This fetches the live recipes we
-# cannot build and reports which of their assumptions our tree no longer meets.
+# Check the downstream recipes we cannot build against our tree.
 #
 # Usage: tools/downstream-drift.sh        (needs network)
 
@@ -68,9 +64,7 @@ fetch() {
     [ -s "$2" ] || die "$1 came back empty"
 }
 
-# False when the recipe has deleted the patch, so a 404 answers the question
-# rather than ending the run. Any other failure still aborts, because an
-# unreachable host must not read as a dropped patch.
+# False when the recipe dropped the patch. Any other fetch failure aborts.
 recipe_carries_patch() {
     local code
     code=$(curl -sSL --retry 3 --retry-delay 5 -o "$2" -w '%{http_code}' "$1") ||
@@ -83,8 +77,7 @@ recipe_carries_patch() {
 }
 
 # The recipe must still carry the assumption, then our tree must still meet it.
-# Order matters: a premise that is gone makes the tree test vacuous, so it is a
-# finding of its own rather than a pass.
+# A premise that is gone voids the tree test, so it is a finding of its own.
 expect() {
     local id=$1 recipe=$2 pattern=$3 msg=$4
     shift 4
@@ -99,12 +92,8 @@ expect() {
     fi
 }
 
-# A patch that still applies can still be wrong: with fuzz, or hundreds of lines
-# from where it was written, it lands somewhere its author never saw. OpenBSD's
-# SSL patch matches a generic four-line block 307 lines past its target, and
-# would silently edit the wrong AC_CHECK_LIB. Legitimate drift here is single
-# digits (-10, -5, 2), so 50 separates the two populations with room to spare.
-# Recipes disagree on strip level, so take the first that applies.
+# A patch applying over 50 lines off can hit the wrong block, as OpenBSD's SSL
+# patch does. Take the first strip level that applies.
 carried_patch() {
     local id=$1 url=$2 p out off
     if ! recipe_carries_patch "$url" "$work/patch"; then

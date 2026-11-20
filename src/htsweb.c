@@ -107,10 +107,8 @@ static void htsweb_sig_brpipe(int code) {
 /* Threads that never return; no wait may count on them draining. */
 static int nonjoinable_threads = 0;
 
-/* Session lifetime: each window pings under its own id and drops it when it
-   closes, so an abandoned server stops instead of outliving the session and
-   holding its payload open (a mounted disk image, on macOS). Windows are
-   counted, not timed: closing one of several must not end the session. */
+/* Each window pings under its own id and drops it on close, so an abandoned
+   server stops instead of holding a mounted macOS disk image open. */
 #define PING_PERIOD 5
 /* Silence tolerated from one window. Generous: a hidden tab has its timers
    throttled to as little as one wake-up a minute. */
@@ -123,8 +121,7 @@ static int pingTimeout = 120;
 #define MAX_WINDOWS 16
 
 static htsmutex pingMutex = HTSMUTEX_INIT;
-/* Seconds the watchdog has been awake, not wall-clock: time(NULL) jumps across
-   a laptop suspend, and a suspended machine must not age a session. */
+/* The watchdog counts its own seconds, because time(NULL) jumps on suspend. */
 static int ticks = 0;
 
 static struct {
@@ -155,8 +152,8 @@ static void pingHandler(void *arg, smallserver_client_event ev,
   hts_mutexlock(&pingMutex);
   lastSeen = ticks;
   anyRequest = HTS_TRUE;
-  /* A bare request names no window: any local peer can open a connection, but
-     none may cancel a real window's departure. */
+  /* A bare request names no window. Any local peer can connect, but none
+     may cancel a live window's departure. */
   if (window != NULL) {
     while (i < windowCount && strcmp(windows[i].id, window) != 0) {
       i++;
@@ -216,9 +213,8 @@ static void client_ping(void *pP) {
       why = "the interface was closed";
     } else if (!anyWindow &&
                ticks - lastSeen >= pingTimeout
-               /* No window ever pinged: a browser too old for it, or none
-                  opened. Fall back to the launcher dying with that browser,
-                  rather than to silence, which a reader also produces. */
+               /* No window ever pinged (an old browser, or none opened), so
+                  stop when no request ever came or the launcher died. */
                && (!anyRequest || !parent_is_alive(ppid))) {
       why = "the interface went silent";
     }
@@ -354,9 +350,8 @@ int main(int argc, char *argv[]) {
              "webhttrack and its library");
   }
 
-  /* Session id: the only thing authenticating a command, so it is seeded from
-     the system CSPRNG. A clock-derived one is guessable from the "Mirrored
-     from" stamp every mirrored page carries (#877). */
+  /* The session id alone authenticates a command, so draw it from the CSPRNG.
+     A clock-derived id is guessable from the "Mirrored from" stamp (#877). */
   {
     unsigned char seed[32];
     char digest[32 + 2];
@@ -374,9 +369,7 @@ int main(int argc, char *argv[]) {
   /* set commandline keys */
   for(i = 2; i < argc; i += 2) {
     if (strcmp(argv[i], "--port") == 0 && i + 1 < argc) {
-      // the range check ran after sscanf("%d") had wrapped a huge value into a
-      // plausible port, and listened there (#614). 0 (was the auto-pick) and
-      // 65535 (was refused, off by one) now both mean what they say.
+      // A huge value must not wrap into a plausible port (#614).
       if (!hts_parse_url_port(argv[i + 1], &defaultPort)) {
         fprintf(stderr, "couldn't set the port number to %s\n", argv[i + 1]);
         return -1;
@@ -395,8 +388,7 @@ int main(int argc, char *argv[]) {
         return -1;
       }
     } else if (strcmp(argv[i], "--ping-timeout") == 0 && i + 1 < argc) {
-      /* Bounded, not just parsed: %d wrapping a huge value into a plausible one
-         is what #614 cost on --port, two cases above. */
+      /* Bound it, since %d wraps a huge value into a plausible one (#614). */
       char *end = NULL;
       const long v = strtol(argv[i + 1], &end, 10);
 

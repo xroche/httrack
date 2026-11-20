@@ -1,8 +1,6 @@
 #!/bin/bash
 # A running engine takes a request as a file in its output directory. Under the
-# wsl2 backend the shell that writes one is Linux and the engine that reads it is
-# a native exe on the other side of drvfs, and nothing had measured that crossing.
-# 24_local-resume-overlap.test now cuts its pass 1 through that crossing.
+# wsl2 backend a Linux shell writes it and a native exe reads it across drvfs.
 set -eu
 
 # shellcheck source=tests/crawllib.sh
@@ -77,5 +75,5 @@ while test -e "${out}/${STOPLOCK}"; do
         fail "the engine exited with ${STOPLOCK} still there, $tenths tenths of a second after it was written: it either never read the request or never reached the check"
     sleep 0.1
 done
-# Printed, not asserted: a bound tight enough to be interesting would flake.
+# A tight bound would flake, so the time is only printed.
 echo "OK (read within $((tenths + 1)) tenths of a second)"

@@ -1,9 +1,5 @@
 #!/bin/bash
-# Issue #982: a control byte inside a link used to end the URL where it stood,
-# or, for VT and FF, be deleted from it, so the crawler fetched a URL the page
-# never wrote. It must percent-encode instead, as a browser does. Each hostile
-# href also has its old truncation and deletion targets on the server, so a
-# mirror holding either one names which rewrite came back.
+# Issue #982: a control byte inside a link must be percent-encoded.
 set -eu
 
 # shellcheck source=tests/crawllib.sh
@@ -37,10 +33,8 @@ for f in clean.html abc.html def.html s d strip.html page.html lead.html \
     "$vt" "$ff" "$soh"; do
     printf 'body of %s\n' "$f" >"${doc}/${f}"
 done
-# Stripping both ends empties this one, which resolves to "./" and mirrors the
-# directory as index-2.html. The leading strip has to stop on the terminator the
-# trailing strip just wrote, or it reads on into the last link's leftovers and
-# fetches those.
+# Stripping both ends empties this link. The leading strip must stop at the
+# trailing strip's terminator, or it reads into the last link's leftovers.
 allctrl=$(printf '\013\013\013')
 printf '<html><body>\n<a href="clean.html">c</a>\n<a href="%s">v</a>\n<a href="%s">f</a>\n<a href="%s">s</a>\n<a href="%s">t</a>\n<a href="%s">e</a>\n<a href="%s">l</a>\n<a href="%s">a</a>\n<a href="big.html">b</a>\n</body></html>\n' \
     "$vt" "$ff" "$soh" "$strip" "$trail" "$lead" "$allctrl" >"${doc}/index.html"
@@ -72,10 +66,8 @@ bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$doc")" \
     --log-found 'link rejected \(control bytes do not fit\)' \
     httrack 'BASEURL/index.html' --debug-log
 
-# The query is escaped separately and appended back, so its own growth has to
-# fit too. Absolute, because a clipped relative link dies on the URL-length gate
-# anyway while a clipped absolute one lands just under it and gets fetched. The
-# port is only known once the server is up, hence a second crawl of our own.
+# The escaped query's growth must fit too. The link is absolute, because a
+# clipped one fits under the URL-length gate and is fetched.
 qdoc="${tmpdir}/qdoc"
 mkdir -p "$qdoc"
 printf 'placeholder\n' >"${qdoc}/index.html"

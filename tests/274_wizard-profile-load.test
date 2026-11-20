@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# Reloading a saved project must run the winprofile.ini reader: nothing else in
-# the suite reaches it, so unescapeini() and the "0" coercion were unguarded.
+# Reloading a saved project runs the winprofile.ini reader, and with it
+# unescapeini() and the "0" coercion, which no other test reaches.
 
 set -euo pipefail
 
@@ -79,8 +79,7 @@ from webtestlib import Session, field, textarea
 s, work = Session(sys.argv[1]), sys.argv[2]
 sid = s.sid
 
-# Control, before anything is loaded: a fresh session ticks the cache box, so
-# the assertions below measure the profile rather than an absent default.
+# A fresh session ticks the cache box, so the checks below measure the profile.
 tag = re.findall(r'<input[^>]*type="checkbox"[^>]*name="cache"[^>]*>',
                  s.get("option3.html?sid=" + sid))
 if len(tag) != 1 or "checked" not in tag[0]:
@@ -134,9 +133,8 @@ if maxrate is None or maxrate.group(1) != "0":
     sys.exit("option5.html shows %r in the rate box"
              % (maxrate and maxrate.group(1)))
 
-# A checkbox field: the writer spells "cleared" as 0, so it must not come back
-# as a flag. Wacz is the control, on the same page and the same shape, and it
-# is ungated: --wacz names its own archive.
+# The writer spells a cleared checkbox as 0, which must not come back as a
+# flag. Wacz is the ungated control on the same page.
 want("--debug-headers")
 reject("--warc")
 reject("--replace-external")
@@ -158,8 +156,8 @@ for key, value in [("Warc", "0"), ("Wacz", "1"), ("NoExternalPages", "0"),
     if ini.get(key) != value:
         sys.exit("%s saved back as %r, wanted %r" % (key, ini.get(key), value))
 
-# A key in the file wins over the startup default even when it holds nothing
-# (#1186); the box is the observable, since an empty -F now emits nothing (#1386).
+# A key in the file wins over the startup default even when empty (#1186). Read
+# the box, because an empty -F emits nothing (#1386).
 box = field(s.get("option6.html?sid=" + sid), "user")
 if box != "":
     sys.exit("the emptied browser id came back as %r" % box)
@@ -170,8 +168,7 @@ reject("--keep-alive")
 if ini.get("UserID") != "" or ini.get("KeepAlive") != "0":
     sys.exit("the cleared fields came back as %r / %r"
              % (ini.get("UserID"), ini.get("KeepAlive")))
-# A cleared box has to reach the engine, not just untick: the file spells all
-# four 0, the reader empties them, and each one still emits its disabling flag.
+# Each of the four cleared boxes must still emit its disabling flag.
 want("--cookies=0")
 want("--index=0")
 want("--cache=0")
@@ -206,8 +203,8 @@ want('--footer "x%y"')
 if ini.get("Footer") != "x%%y":
     sys.exit("Footer round-tripped as %r" % ini.get("Footer"))
 
-# The form body decodes through unescapehttp() rather than unescapeini(), and
-# only a raw % reaches it: urlencoding one would defeat the probe.
+# The form body decodes through unescapehttp(), and the probe needs a raw % to
+# reach it, so the % is not urlencoded.
 want('--sitemap-url "http://example.com/s.xml%"')
 posted = s.post_raw("step4.html", "sid=%s&cookiesfile=z%%&x=1" % s.sid)
 if '--cookies-file "z%"' not in textarea(posted, "command"):

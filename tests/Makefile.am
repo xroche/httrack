@@ -231,14 +231,7 @@ clean-local:
 	-rm -rf $(STDERR_WRAP_DIR)
 
 TEST_EXTENSIONS = .test
-# Run each .test through bash instead of execve()ing it. This lets "make check"
-# work when the source tree sits on a noexec filesystem (the driver would
-# otherwise fail with "Permission denied"), and removes any reliance on the
-# scripts' executable bit. The scripts are #!/bin/bash and use bash features.
-#
-# test-timeout.sh wraps that in a wall-clock budget: a wedged test must fail
-# named, with diagnostics, rather than hang the job until CI cancels it -- a
-# cancelled step keeps neither its log nor its artifacts, so today a hang tells
-# us nothing at all. HTTRACK_TEST_TIMEOUT overrides the budget; 0 disables it.
+# Run tests through bash, so they work on a noexec tree without an exec bit.
+# test-timeout.sh fails a wedged test by name, unless HTTRACK_TEST_TIMEOUT=0.
 TEST_LOG_COMPILER = $(BASH_SHELL) $(srcdir)/test-timeout.sh
 CLEANFILES = check-network_sh.cache 62_lang-untranslated.counts.new

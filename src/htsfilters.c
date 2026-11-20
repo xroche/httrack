@@ -122,9 +122,7 @@ int fa_strjoker_dual(int type, char **filters, int nfil, const char *nom1,
 /* STRJOKER_MAXLEN alone still allows ~2000 frames, ~900KB of stack, which
    overflows the 1MB a Windows thread gets (#574). */
 #define STRJOKER_MAXDEPTH 256u
-/* Work quanta, not calls, because one call can rescan its whole class. A
-   scanned byte costs one; a call costs far more than that, so it is weighed
-   against the same budget rather than counted. */
+/* A scanned byte costs one step and a call costs STRJOKER_CALLCOST. */
 #define STRJOKER_MAXSTEPS 24000000u
 #define STRJOKER_CALLCOST 16u
 
@@ -161,8 +159,8 @@ static const char *strjoker_rec(strjoker_memo *memo, const char *chaine,
 
   if (depth > memo->maxdepth)
     memo->maxdepth = depth;
-  /* Charge the budget before the depth cap: cut disables the memo, so uncounted
-     deep calls would let the sub-cap search explode (OSS-Fuzz 535114376). */
+  /* Charge the budget before the depth cap, because cut disables the memo and
+     uncounted deep calls would explode the search (OSS-Fuzz 535114376). */
   if (memo->nsteps != NULL &&
       (*memo->nsteps += STRJOKER_CALLCOST) > STRJOKER_MAXSTEPS)
     return NULL; /* work budget spent: fail the match safely */
@@ -405,8 +403,7 @@ static const char *strjoker_impl(strjoker_memo *memo, const char *chaine,
             if ((joker[i] == ',') || (joker[i] == ';'))
               i++;
           }
-          // every bound held: match here and skip what follows ']', as a
-          // single bound already did
+          // all bounds held, so match here and skip what follows ']'
           if (nbounds != 0 && size != NULL) {
             *size = slimit;
             return chaine;

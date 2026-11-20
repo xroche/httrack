@@ -259,12 +259,14 @@ typedef struct buff_struct {
   hts_boolean overflow;
 } buff_struct;
 
-static void print_buffer(buff_struct*const str, const char *format, ...)
-  HTS_PRINTF_FUN(2, 3);
+static void print_buffer(buff_struct *const str,
+                         HTS_FORMAT_STRING const char *format, ...)
+    HTS_PRINTF_FUN(2, 3);
 
 /* Prints on a static buffer, raising str->overflow rather than writing past
    its end; what to do about a partial buffer is the caller's call. */
-static void print_buffer(buff_struct*const str, const char *format, ...) {
+static void print_buffer(buff_struct *const str,
+                         HTS_FORMAT_STRING const char *format, ...) {
   size_t result;
   va_list args;
   size_t remaining;
@@ -5078,7 +5080,8 @@ void cut_path(char *fullpath, char *path, size_t path_size, char *pname,
 
 int hts_realloct_fault_selftest = 0;
 
-static void hts_debug_log_print(const char *format, ...) HTS_PRINTF_FUN(1, 2);
+static void hts_debug_log_print(HTS_FORMAT_STRING const char *format, ...)
+    HTS_PRINTF_FUN(1, 2);
 
 static int hts_dgb_init = 0;
 static FILE *hts_dgb_init_fp = NULL;
@@ -5103,7 +5106,7 @@ static FILE *hts_dgb_(void) {
   return hts_dgb_init_fp;
 }
 
-static void hts_debug_log_print(const char *format, ...) {
+static void hts_debug_log_print(HTS_FORMAT_STRING const char *format, ...) {
   if (hts_dgb_init > 0) {
     const int error = errno;
     FILE *const fp = hts_dgb_();
@@ -5335,7 +5338,9 @@ HTSEXT_API void hts_set_log_vprint_callback(void (*callback)(httrackp * opt,
 
 char hts_log_quiet_tag;
 
-HTSEXT_API void hts_log_vprint(httrackp * opt, int type, const char *format, va_list args) {
+HTSEXT_API void hts_log_vprint(httrackp *opt, int type,
+                               HTS_FORMAT_STRING const char *format,
+                               va_list args) {
   assertf(format != NULL);
   if (opt == HTS_LOG_QUIET)
     return;
@@ -5399,7 +5404,8 @@ HTSEXT_API void hts_log_vprint(httrackp * opt, int type, const char *format, va_
   }
 }
 
-HTSEXT_API void hts_log_print(httrackp * opt, int type, const char *format, ...) {
+HTSEXT_API void hts_log_print(httrackp *opt, int type,
+                              HTS_FORMAT_STRING const char *format, ...) {
   va_list args;
   assertf(format != NULL);
   va_start(args, format);

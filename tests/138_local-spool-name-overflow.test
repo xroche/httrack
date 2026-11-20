@@ -1,9 +1,6 @@
 #!/bin/bash
 #
-# A frozen backlog slot spools to disk under a path_html-derived name, into a
-# buffer once sized from the save name. -N '%n' shortens the save name enough
-# to overrun it. -Z pins that a slot really was spooled,
-# so a build with neither fortify nor ASan still tests something.
+# The spool name, built from path_html, must not overflow under -N '%n'.
 
 set -e
 # shellcheck source=tests/crawllib.sh

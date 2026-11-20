@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# A rolled-back session must leave the previous archive and its index whole, not
-# a leftover temporary and a stale .cdx (#1041). --archive-min-files pins both
+# A rolled-back session must leave the previous archive and its .cdx whole
+# (#1041). --archive-min-files pins both
 # files into existence, so the keep check cannot pass on an empty set.
 
 set -eu

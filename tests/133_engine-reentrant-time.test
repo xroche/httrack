@@ -20,12 +20,7 @@ cleanup_push rm -rf "$tmpdir"
 expect_ok "localtime self-test" httrack -O "${tmpdir}/o1" \
     -#test=localtime "${tmpdir}/data"
 
-# time_gmt_rfc822()/get_filetime_rfc822() must never format local time and
-# still label it GMT: on a gmtime() failure they must fail, not fall back to
-# (hts_)localtime() (#806). gmtime() failure is not reproducible at runtime
-# (it needs an out-of-range time_t, and neither function's input can be
-# pushed out of range from the outside), so this is a source guard against
-# the fallback creeping back in, not a dynamic probe.
+# No input fails gmtime(), so grep the source for a localtime fallback (#806).
 for fn in time_gmt_rfc822 get_filetime_rfc822; do
     body=$(awk "/^[a-z ]*${fn}\\(/,/^}/" "$top_srcdir/src/htslib.c")
     case "$body" in

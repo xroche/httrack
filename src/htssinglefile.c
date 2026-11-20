@@ -27,11 +27,8 @@ Please visit our Website: http://www.httrack.com
 
 /* ------------------------------------------------------------ */
 /* --single-file asset inliner. See htssinglefile.h.
-   htsparse marked every inlinable reference while saving, so this is a
-   substitution over those marks: no HTML and no CSS is parsed here. Resolving
-   a mark is path arithmetic clamped to the mirror root; anything the mark
-   cannot be resolved to keeps its link, which is what makes a second --update
-   run a no-op. */
+   This pass substitutes the marks htsparse left while saving, and parses no
+   HTML or CSS. An unresolvable mark keeps its link, so a rerun is a no-op. */
 /* ------------------------------------------------------------ */
 
 #include "htssinglefile.h"
@@ -148,10 +145,8 @@ const char *singlefile_mark(httrackp *opt, char *buf, size_t bufsize, char cls,
   return buf;
 }
 
-/* (tag, attribute) pairs htsparse detects that name a page or a media stream
-   rather than an asset; a NULL tag matches any. Everything else it detects is
-   offered to the pass, which decides from the referenced file's own MIME
-   type, so a new row in hts_attrs[] is covered without a change here. */
+/* These (tag, attribute) pairs name a page or media stream, never an asset.
+   A NULL tag matches any. Other references go by MIME type alone. */
 static const htspair_t sf_deny_rules[] = {
     {"a", "href"},      {"area", "href"},   {"iframe", "src"},
     {"frame", "src"},   {"applet", "code"}, {NULL, "longdesc"},
@@ -203,8 +198,7 @@ static int sf_rel_is_stylesheet(const char *tag_name) {
   return -1;
 }
 
-/* This table's own matcher, not htswizard's: here a NULL tag means "any tag",
-   there it ends the table. */
+/* A NULL tag means "any tag" here, but ends htswizard's table. */
 static hts_boolean sf_denied(const char *tag_name, const char *attr) {
   size_t i;
 
@@ -295,8 +289,7 @@ static void sf_dirname(const char *path, String *out) {
     StringMemcat(*out, path, (size_t) (last - path));
 }
 
-/* Append the path of to_path as seen from from_dir; both '/'-separated and
-   under the same root. */
+/* Append to_path as seen from from_dir, both '/'-separated under one root. */
 static void sf_relative_from(const char *from_dir, const char *to_path,
                              String *out) {
   size_t common = 0, i = 0, j, nup = 0;
@@ -326,11 +319,10 @@ static void sf_relative_from(const char *from_dir, const char *to_path,
 
 /* Resolve the mirrored reference [ref,ref+reflen) against base_dir into out, a
    '/'-separated path under ctx->root naming an existing regular file. Returns
-   HTS_FALSE for anything not resolvable that way: a fragment, an absolute or
-   scheme-bearing URL (which covers data:), a reference climbing out of the
-   mirror, or a missing target. Containment is lexical, so a symlink planted in
-   the output directory beforehand is followed; no fetched content can create
-   one. */
+   HTS_FALSE for a fragment, an absolute or scheme-bearing URL (data:
+   included), a reference climbing out of the mirror, or a missing target.
+   Containment is lexical, so a symlink planted in the output directory is
+   followed. Fetched content cannot create one. */
 static hts_boolean sf_resolve(const sf_ctx *ctx, const char *base_dir,
                               const char *ref, size_t reflen, String *out) {
   char raw[SF_MAX_REF];
@@ -501,8 +493,7 @@ static void sf_append_escaped(String *out, const char *p, size_t len,
   }
 }
 
-/* The context said one type and the file is another: a marked reference that
-   resolved to the wrong thing, which is a bug rather than a policy decision. */
+/* A marked reference resolved to a file of another type, which is a bug. */
 static void sf_warn_mismatch(sf_ctx *ctx, const char *path, char want,
                              const char *mime) {
   if (*ctx->warn_budget <= 0)
@@ -540,9 +531,8 @@ static size_t sf_strip_marks(const char *intro, size_t introlen, char *body,
 
 /* Replace the reference [ref,ref+reflen), resolved against base_dir, with its
    data: URI appended to out. rebase_dir re-expresses an un-inlinable asset
-   relative to that directory: a data: URL's path is opaque, so nothing
-   relative inside an inlined stylesheet resolves anyway; this only aims it at
-   a lenient resolver's base. Returns HTS_TRUE if out received a data: URI. */
+   relative to that directory, for a lenient resolver's base. Returns HTS_TRUE
+   if out received a data: URI. */
 static hts_boolean sf_inline(sf_ctx *ctx, const char *base_dir, const char *ref,
                              size_t reflen, const char *rebase_dir, int depth,
                              char want, hts_boolean *resolved, String *out) {
@@ -560,9 +550,8 @@ static hts_boolean sf_inline(sf_ctx *ctx, const char *base_dir, const char *ref,
     return HTS_FALSE;
   }
   cls = sf_mime_class(ctx->opt, StringBuff(path), mime, sizeof(mime));
-  /* The referencing context is the authority when the name carries no usable
-     type, and a contradiction between the two is a bug, not something to
-     paper over by inlining whatever was found. */
+  /* The referencing context decides when the name carries no usable type.
+     A contradiction between the two is a bug and is not inlined. */
   if (want != SINGLEFILE_CLASS_ANY) {
     const int wanted = want == SINGLEFILE_CLASS_CSS ? SF_C_CSS : SF_C_JS;
 
@@ -593,8 +582,7 @@ static hts_boolean sf_inline(sf_ctx *ctx, const char *base_dir, const char *ref,
   /* Charged before the nested expansion: an @import chain otherwise spends
      what its ancestors already claimed, and the budget ends up negative. */
   ctx->budget -= size;
-  /* Encode into a scratch String: a failed encode must leave out untouched,
-     not a truncated "data:...;base64," with no payload. */
+  /* Encode into a scratch String, so a failed encode leaves out unchanged. */
   {
     String payload = STRING_EMPTY;
 
@@ -668,9 +656,8 @@ static void sf_warn_unresolved(sf_ctx *ctx, const char *ref, size_t reflen) {
 }
 
 /* Parse the mark at [p,end): "<intro>.<class>.<len>". Returns its length, or 0
-   if it is not one. A NULL intro matches any well-formed secret, which is what
-   lets a later run clear marks an interrupted one left behind: expanding a mark
-   needs the secret, recognising one to delete it does not. */
+   if it is not one. A NULL intro matches any well-formed secret, so a later
+   run can delete marks an interrupted one left behind without its secret. */
 static size_t sf_parse_mark(const char *intro, size_t introlen, const char *p,
                             size_t avail, char *cls, size_t *reflen) {
   size_t i = introlen;
@@ -733,13 +720,10 @@ static size_t sf_strip_marks(const char *intro, size_t introlen, char *body,
 }
 
 /* Copy [body,body+len) to out, replacing each marked reference by its data:
-   URI, or by the bare reference when it cannot be inlined. The mark carries
-   the reference's byte length, so nothing here has to guess where it begins;
-   whatever follows the mark (an author's fragment, a kept query string) is
-   left untouched and so survives onto the data: URI. Substitution is in place,
-   so a value keeps the quoting htsparse gave it -- an unquoted attribute
-   therefore ends up holding base64 padding, which every parser reads back but
-   the HTML grammar does not allow. */
+   URI, or by the bare reference when it cannot be inlined. Whatever follows
+   the reference (a fragment, a kept query) stays after the data: URI. The
+   substitution is in place, so an unquoted attribute gets base64 '=' padding,
+   which browsers accept but the HTML grammar forbids. */
 static void sf_expand(sf_ctx *ctx, const char *base_dir, int depth,
                       const char *body, size_t len, String *out) {
   const char *const intro = singlefile_intro(ctx->opt);
@@ -832,8 +816,7 @@ static hts_boolean sf_replace_file(httrackp *opt, const char *path,
   if (len > 0 && !hts_fwrite_exact(body, len, fp))
     ok = HTS_FALSE;
 #ifndef _WIN32
-  /* The spool bypassed filecreate(), which is what chmods every other mirrored
-     file; without this the file keeps the umask's mode. */
+  /* The spool bypassed filecreate(), so set the mode it would have. */
   if (ok)
     (void) fchmod(fileno(fp), HTS_ACCESS_FILE);
 #endif
@@ -907,11 +890,8 @@ void singlefile_process_mirror(httrackp *opt) {
     if (singlefile_rewrite_file(opt, root, link->sav))
       pages++;
   }
-  /* Only once every page has been through the pass: a stylesheet is expanded
-     from the marks in the copy on disk, so stripping it earlier would cost the
-     pages that had not read it yet. Pages are swept too, for whatever the pass
-     could not expand: a page it declined, or one an interrupted earlier run
-     left behind, whose secret died with it. */
+  /* Strip marks only after every page is done, because a stylesheet expands
+     from the marks in its copy on disk. */
   for (i = 0; i < opt->lien_tot; i++) {
     const lien_url *const link = opt->liens[i];
 

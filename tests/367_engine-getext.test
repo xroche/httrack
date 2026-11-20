@@ -5,16 +5,13 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-# get_ext() must stop at the '?' and copy the length it measured, not the
-# destination size: the query would otherwise come back glued to the extension,
-# and a long enough one would put a terminator one byte past the buffer (#1433).
+# get_ext() must stop at '?' and copy the length it measured, or a long query
+# writes a terminator one byte past the buffer (#1433).
 
 assert_selftest "getext self-test OK" getext
 
-# Downstream of that: url_savename() strips at the literal '?' before it
-# percent-decodes, so a %3F in a path reaches get_ext() as a real '?'. The
-# extension now stops there, is recognized, and gets cut, where it used to be
-# kept whole as an unknown one. Mirrors holding such a name rename once.
+# url_savename() strips '?' before it percent-decodes, so a %3F reaches
+# get_ext() as '?'. Mirrors holding such a name rename once.
 selftest_queue 'savename: /dev/null/www.example.com/x.html' savename \
     '/x.php%3Fid=3' text/html
 selftest_queue 'savename: /dev/null/www.example.com/a.html' savename \

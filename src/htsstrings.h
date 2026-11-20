@@ -32,14 +32,9 @@ Please visit our Website: http://www.httrack.com
 
 /**
  * @file htsstrings.h
- * Growable string (String) that owns its buffer, so a caller never has to size
- * a destination in advance. Every operation here is a macro or a static
- * function, so there is nothing to link against. Release a String with
- * StringFree(), or hand its buffer over with StringAcquire().
- *
- * A macro names the String itself, not a pointer to it, and may evaluate that
- * argument several times. So pass a plain variable, never an expression with
- * side effects. Every length and capacity counts bytes, not characters.
+ * A growable String owns its buffer. Release it with StringFree(), or hand the
+ * buffer over with StringAcquire(). Macros take the String itself and may
+ * evaluate it several times, so pass a plain variable.
  */
 
 #ifndef HTS_STRINGS_DEFSTATIC
@@ -200,8 +195,8 @@ HTS_STATIC char *StringBuffN_(String *blk, int size) {
     conversion error, or a length past STRING_SPRINTF_MAX). **/
 #define StringSprintf(BLK, ...) StringSprintf_(&(BLK), __VA_ARGS__)
 
-HTS_STATIC HTS_PRINTF_FUN(2, 3) void StringSprintf_(String *blk,
-                                                    const char *fmt, ...) {
+HTS_STATIC HTS_PRINTF_FUN(2, 3) void StringSprintf_(
+    String *blk, HTS_FORMAT_STRING const char *fmt, ...) {
   size_t capacity = StringCapacity(*blk) > 256 ? StringCapacity(*blk) : 256;
 
   for (;;) {

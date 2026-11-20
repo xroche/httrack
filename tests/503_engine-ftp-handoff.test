@@ -8,9 +8,7 @@ set -euo pipefail
 
 : "${top_srcdir:=..}"
 
-# A real worker thread hands its backlog slot back and back_wait() reaps it. The
-# run catches the lifetime failures: a worker left on the live list, a slot never
-# handed back, and a handoff that slipped past a held list.
+# A real worker thread hands its backlog slot back for back_wait() to reap.
 assert_selftest "ftp-handoff-selftest: OK" ftphandoff
 
 # The run cannot see a missing release or acquire on x86, which never reorders

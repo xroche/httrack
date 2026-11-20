@@ -1,16 +1,5 @@
-/* Says what happened to the alternate signal stack a process was handed, for
-   181_altstack-honoured.test. ALTSTACK_MODE picks the state main() inherits:
-   "keep" installs one first, "none" leaves none installed.
-
-   ALTSTACK_TRACE names a file to log the per-thread lifecycle to, for
-   183_altstack-worker.test, Linux only as that leg is: "<pid> <tid> query|set
-   on|off|own <sp>" for every sigaltstack(), "<pid> <tid> munmap - <sp>" for
-   every unmap of a stack seen installed. Only the ordering across those two
-   syscalls can show that a worker gives its stack back, disabled first.
-
-   "own" is an install of a mapping this shim watched mmap() hand out, which is
-   what tells httrack's stacks apart from a sanitizer runtime's: those come from
-   a raw syscall no interposer sees, though installed the same way. */
+/* Reports the alternate signal stack state for 181_altstack-honoured.test.
+   ALTSTACK_TRACE logs stack syscalls per thread for 183_altstack-worker. */
 
 #define _GNU_SOURCE
 
@@ -192,9 +181,8 @@ static void *trace_mapped(void *sp) {
   return sp;
 }
 
-/* The fallback when dlsym() failed, so it has to be right: 32-bit arches have
-   no SYS_mmap and i386's wants an argument block, so prefer SYS_mmap2, whose
-   offset is in 4096-byte units whatever the page size. */
+/* Fallback for a failed dlsym(). It uses SYS_mmap2, whose offset counts
+   4096-byte units whatever the page size. */
 static void *raw_mmap(void *addr, size_t len, int prot, int flags, int fd,
                       off_t off) {
 #ifdef SYS_mmap2
@@ -234,9 +222,7 @@ SHIM_EXPORT void *mmap64(void *addr, size_t len, int prot, int flags, int fd,
 SHIM_EXPORT int munmap(void *addr, size_t len);
 
 SHIM_EXPORT int munmap(void *addr, size_t len) {
-  /* Only the stacks: a process unmaps plenty else, and the trace is read as an
-     unbroken per-thread sequence. Logged before the call, so a stack the kernel
-     is still pointed at leaves its record behind. */
+  /* Log before the call, so a stack the kernel still uses keeps its record. */
   if (trace_fd >= 0 && trace_is_stack(addr)) {
     trace_line("munmap", "-", addr);
   }

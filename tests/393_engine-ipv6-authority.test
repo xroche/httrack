@@ -13,7 +13,7 @@ set -euo pipefail
 
 toport() { selftest_queue "$2" toport "$1"; }
 
-# a scheme-carrying URL is the case that regressed: CONNECT lost its port
+# a scheme-carrying URL must keep its CONNECT port
 toport 'https://[::1]' '(none)'
 toport 'https://[::1]:8080' ':8080'
 toport 'https://[::1]/x' '(none)'

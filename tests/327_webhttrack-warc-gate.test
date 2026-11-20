@@ -65,7 +65,7 @@ for name in ("warc", "warccdx", "wacz"):
     check('id="%s_box"' % name in tag(page, name),
           "the %s box carries id=\"%s_box\"" % (name, name))
 
-# Both rendered states; the re-grey on untick is warc_gate()'s, and never runs here.
+# Both rendered states. warc_gate() re-greys on untick, which runs only in JS.
 for warc, greyed in (("", True), ("on", False), ("", True)):
     s.post("step4.html", [("warc", warc), ("warccdx", "on")])
     page = s.get("option9.html?sid=" + s.sid)
@@ -79,7 +79,7 @@ for warc, greyed in (("", True), ("on", False), ("", True)):
     check(companion(page) == ("1" if greyed else ""),
           "%s: the companion holds %r" % (label, "1" if greyed else ""))
 
-# What a browser posts from that greyed page: the two companions, no box.
+# A browser posts the two companions and no box from that greyed page.
 rendered = s.post("step4.html",
                   [("warc", ""), ("warccdx", ""), ("warccdx", companion(page))])
 check("WarcCdx=1" in textarea(rendered, "winprofile").splitlines(),

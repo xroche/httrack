@@ -1,8 +1,6 @@
 #!/bin/bash
 #
-# The credentials an URL carries must reach the control channel whole: a clip
-# logged in as a different account (#1032). The engine test only ever probes a
-# dead port, so nothing there reads what the login actually sends.
+# URL credentials must reach the FTP control channel whole (#1032).
 
 set -euo pipefail
 

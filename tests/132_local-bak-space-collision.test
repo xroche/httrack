@@ -1,8 +1,6 @@
 #!/bin/bash
 #
-# #842/#774 end to end: the site serves a.bin and a sibling at "hts-tmp /",
-# which used to resolve to the very path the re-fetch backup of a.bin is
-# renamed to, so the update destroyed the sibling and reported success.
+# A sibling at "hts-tmp /" must not collide with a.bin's backup (#842, #774).
 
 set -euo pipefail
 

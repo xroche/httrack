@@ -47,10 +47,8 @@ int hts_mirror_check_moved(htsmoduleStruct *str, htsmoduleStructExtended *stre);
 
 /*
   Take the pending request NAME (HTS_ABORT_LOCKNAME or HTS_PAUSE_LOCKNAME) in
-  the output directory, deleting the file, and answer whether the mirror must
-  act on it. True only for a request newer than this run's own
-  hts-in_progress.lock and deletable, so neither one inherited from an earlier
-  run nor one the engine cannot remove ever reaches the mirror.
+  the output directory and delete it. Return true only for a deletable request
+  newer than this run's hts-in_progress.lock.
 */
 hts_boolean hts_take_lock_request(httrackp *opt, const char *name);
 

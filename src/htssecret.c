@@ -272,8 +272,8 @@ static hts_boolean secrets_known(httrackp *opt) {
 }
 
 /* vfprintf() to fp, with each secret of opt as ***. */
-void secret_vfprintf(httrackp *opt, FILE *fp, const char *format,
-                     va_list args) {
+void secret_vfprintf(httrackp *opt, FILE *fp,
+                     HTS_FORMAT_STRING const char *format, va_list args) {
   va_list args_copy;
   int n;
   char *line;
@@ -297,7 +297,8 @@ void secret_vfprintf(httrackp *opt, FILE *fp, const char *format,
   freet(line);
 }
 
-void hts_secret_fprintf(httrackp *opt, FILE *fp, const char *format, ...) {
+void hts_secret_fprintf(httrackp *opt, FILE *fp,
+                        HTS_FORMAT_STRING const char *format, ...) {
   va_list args;
 
   va_start(args, format);
@@ -323,8 +324,7 @@ void fprint_redacted(FILE *fp, size_t len) {
   fprintf(fp, "<redacted, %lu bytes>", (unsigned long) len);
 }
 
-/* The -%H log hides the value of these fields because they carry logins.
-   This list governs the -%H log, not the wire. */
+/* Only the -%H log hides these fields, because they carry logins. */
 static const char *const secret_fields[] = {
     "Authorization", "Proxy-Authorization", "Cookie", "Set-Cookie"};
 

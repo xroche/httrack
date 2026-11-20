@@ -1,10 +1,7 @@
 #!/bin/bash
 #
-# Three AC_MSG_ERROR() calls in configure.ac passed an unquoted message
-# containing a comma, so m4 read everything after it as a second argument
-# and printed only the tail (e.g. "yes/no/auto" instead of the full
-# sentence), alongside bash errors from the mangled macro expansion.
-# Checks the full message, not just that configure fails: it fails either way.
+# AC_MSG_ERROR() messages with a comma must be quoted, or m4 prints only the
+# tail after it. Check the full message, because configure fails either way.
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh

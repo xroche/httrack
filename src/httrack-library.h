@@ -242,12 +242,14 @@ HTSEXT_API hts_boolean hts_log(httrackp *opt, const char *prefix,
 /** printf-style log at level @p type (an hts_log_type, optionally |LOG_ERRNO).
     Forwards to the registered log callback, and when the level is <= opt->debug
     also to opt->log. @p format must be non-NULL. */
-HTSEXT_API void hts_log_print(httrackp *opt, int type, const char *format, ...)
+HTSEXT_API void hts_log_print(httrackp *opt, int type,
+                              HTS_FORMAT_STRING const char *format, ...)
     HTS_PRINTF_FUN(3, 4);
 
 /** va_list form of hts_log_print(). @p opt may be NULL (only the callback
    runs). Preserves errno. @p format must be non-NULL. */
-HTSEXT_API void hts_log_vprint(httrackp *opt, int type, const char *format,
+HTSEXT_API void hts_log_vprint(httrackp *opt, int type,
+                               HTS_FORMAT_STRING const char *format,
                                va_list args) HTS_PRINTF_FUN(3, 0);
 
 /** Install the process-global log callback invoked by hts_log_vprint() for
@@ -1072,7 +1074,7 @@ HTSEXT_API hts_boolean hts_bundle_cookie_in_scope(const char *const *urls,
     Returns -1 with *names NULL when list_file cannot be read (the crawl only
     logs that), or when the crawl would refuse an address. It refuses an
     option, a quoted or too long word in urls, and an invalid bundle name.
-    error, of error_size bytes, then holds why, and may be NULL. */
+    error, when not NULL, gets the reason in error_size bytes. */
 HTSEXT_API int hts_bundle_names_in_use(const char *urls, const char *list_file,
                                        char ***names, char *error,
                                        size_t error_size);

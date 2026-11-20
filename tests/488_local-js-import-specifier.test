@@ -1,10 +1,7 @@
 #!/bin/bash
 #
-# The scanner knew only the bare "import './mod.js'" form, so it missed
-# "import x from './mod.js'". A path specifier is now followed. A bare one such
-# as "jquery" names a module, not a file, and stays untouched. The two copies of
-# mod.js tell the script base from the page base apart, and plain.js holds the
-# names that merely end in "from".
+# The path in "import x from './mod.js'" is followed, but a bare specifier such
+# as "jquery" is not. plain.js holds names that end in "from".
 
 set -euo pipefail
 

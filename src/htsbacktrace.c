@@ -95,10 +95,8 @@ static hts_boolean symbolize_crash = HTS_TRUE;
 static posix_spawn_file_actions_t spawn_actions;
 static posix_spawn_file_actions_t *spawn_redirect = NULL;
 
-/* dladdr() names the main program after argv[0], which the symbolizer cannot
-   open when the binary came off PATH; /proc/self/exe always names the file.
-   hts_self_path() (htscoremain.c) resolves the same path, out of reach here:
-   it is library-side and hidden by -fvisibility=hidden (#997). */
+/* dladdr() names the main program after argv[0], which fails off PATH, but
+   /proc/self/exe always names the file (#997). */
 static char main_path[BT_PATH_SIZE];
 /* Main program's mapped range, and the bias to subtract for addr2line (0 on an
    ET_EXEC). */
@@ -158,10 +156,8 @@ static void find_main_object(void) {
      names another file, and the symbolizer would happily open that one. */
   if (len > 0 && (size_t) len < sizeof(main_path)) {
     main_path[len] = '\0';
-    /* Started through the loader, /proc/self/exe is ld.so, which the link map
-       carries under its own name (#996). Identity, not dladdr()'s name: that is
-       argv[0] verbatim, so a symlinked or renamed program would lose its
-       module. */
+    /* Started through the loader, /proc/self/exe is ld.so (#996). Match by
+       identity, because a renamed program would lose a match by name. */
     if (stat(main_path, &self) == 0 &&
         dl_iterate_phdr(names_a_shared_object, &self) == 0)
       return;
@@ -201,11 +197,8 @@ static hts_boolean copy_bounded(char *dest, size_t size, const char *src) {
   return src[i] == '\0' ? HTS_TRUE : HTS_FALSE;
 }
 
-/* Run the symbolizer on argv within *budget ticks; HTS_FALSE only if none could
-   be run at all. Not fork(): it runs the pthread_atfork handlers, and glibc's
-   malloc registers one taking every arena lock a signal inside malloc holds
-   (#968). posix_spawn() clones with CLONE_VFORK instead, and counts as
-   async-signal-safe as of POSIX.1-2024. */
+/* Run the symbolizer on argv within *budget ticks. HTS_FALSE if none ran.
+   fork() would deadlock on glibc's malloc atfork handler (#968). */
 static hts_boolean spawn_symbolizer(char **argv, int *budget) {
   static char llvm_prog[] = "llvm-symbolizer";
   static char llvm_opts[] = "-p";
@@ -230,9 +223,7 @@ static hts_boolean spawn_symbolizer(char **argv, int *budget) {
   return HTS_TRUE;
 }
 
-/* Name the frames backtrace_symbols_fd() leaves as module+offset:
-   -fvisibility=hidden keeps them out of .dynsym, but DWARF has them. dladdr()
-   is not formally async-signal-safe; accepted, this path is already fatal. */
+/* Name the frames backtrace_symbols_fd() leaves as module+offset. */
 static void symbolize_backtrace(void *const *stack, int size) {
   static char prog[] = "addr2line";
   static char opts[] = "-Cfipa";
@@ -337,8 +328,7 @@ void *hts_backtrace_altstack(void) {
      own and sizes it for its own handlers (ASan: 32kB, ours needs ~10kB). */
   if (sigaltstack(NULL, &ss) == 0 && (ss.ss_flags & SS_DISABLE) == 0)
     return NULL;
-  /* Mapped, not allocated: a stack for the handler must not live in the heap
-     whose corruption we may be reporting. */
+  /* Map the handler's stack, because the heap may be what is corrupt. */
   sp = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1,
             0);
   if (sp == MAP_FAILED)
@@ -379,7 +369,7 @@ void hts_backtrace_altstack_release(void *stack) {
 unsigned int hts_print_num(char *buffer, int num) {
   const int neg = num < 0;
   /* negate in unsigned: INT_MIN has no positive counterpart */
-  unsigned int val = neg ? -(unsigned int) num : (unsigned int) num;
+  unsigned int val = neg ? 0u - (unsigned int) num : (unsigned int) num;
   unsigned int i, j;
 
   if (neg) {

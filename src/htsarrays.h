@@ -31,16 +31,8 @@ Please visit our Website: http://www.httrack.com
 /* ------------------------------------------------------------ */
 
 /** @file htsarrays.h
- *  Header-only typed dynamic array. Every operation is a macro taking the
- *  array lvalue A, and the element type is fixed by the struct TypedArray(T)
- *  declares. Counts and capacities are in elements, not bytes. The array owns
- *  its store, so grow it with the Add, Append and EnsureRoom macros and release
- *  it with TypedArrayFree.
- *
- *  A is evaluated once only by TypedArraySize, TypedArrayCapa, TypedArrayElts,
- *  TypedArrayPtr and TypedArrayNth, and not at all by TypedArrayWidth. Every
- *  other macro evaluates it several times, so A must be a plain lvalue with no
- *  side effect. The other arguments are evaluated once. */
+ *  Header-only typed dynamic array over the lvalue A, counted in elements.
+ *  Most macros evaluate A several times, so A must have no side effect. */
 #ifndef HTS_ARRAYS_DEFSTATIC
 #define HTS_ARRAYS_DEFSTATIC
 
@@ -114,10 +106,8 @@ static HTS_UNUSED void hts_record_assert_memory_failed(const size_t size) {
 
 /**
  * Ensure at least 'ROOM' more elements can be put in the array.
- * On success TypedArrayRoom(A) is at least 'ROOM'. An allocation failure leaves
- * contents, size and capacity as they were, for the caller to notice with
- * TypedArrayHasRoom(). It aborts when 'ROOM' more elements could not be
- * addressed in bytes at all, which is a caller bug, not a memory shortage.
+ * A failed allocation leaves the array unchanged (check TypedArrayHasRoom()).
+ * A byte-count overflow aborts.
  **/
 #define TypedArrayEnsureRoom(A, ROOM)                                          \
   do {                                                                         \
@@ -128,8 +118,7 @@ static HTS_UNUSED void hts_record_assert_memory_failed(const size_t size) {
     size_t capa_ = TypedArrayCapa(A);                                          \
     void *newPtr_;                                                             \
     assertf(room_ <= maxCapa_ - TypedArraySize(A));                            \
-    /* Leaves the enclosing do/while: a realloc to the capacity the block      \
-       already has copies the whole store under ASan. */                       \
+    /* ASan copies the whole store on a same-size realloc. */                  \
     if (TypedArrayHasRoom(A, room_))                                           \
       break;                                                                   \
     /* Saturating: a plain capa_*2 wraps to 0 and the loop never ends. */      \

@@ -9,8 +9,7 @@ set -euo pipefail
 . "${0%"${0##*/}"}./testlib.sh"
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_cleanup.XXXXXX")
-# Hand-written, not cleanup_push: this test must not lose its own teardown to
-# the bug it is looking for.
+# The teardown avoids cleanup_push, so the bug under test cannot lose it.
 trap 'set +e; rm -rf "$tmpdir"' EXIT
 
 # Runs the written subject and reports its status. It has to be its own process,
@@ -74,8 +73,7 @@ ok "the script's own exit status survives the teardown"
 
 ## the trap list is the one this test knows
 #
-# The names on the trap line, not what a shell installed off it: which of them it
-# accepts is bash's business, and the legs below already prove the ones they send.
+# This checks the names on the trap line, and the legs below prove delivery.
 trapped=(HUP INT QUIT TERM)
 want=$(printf '%s\n' "${trapped[@]}" | sort | tr '\n' ' ')
 got=$(sed -n "s/.*run_cleanups; exit 1' //p" "$testdir/testlib.sh" | tr ' ' '\n' | sort | tr '\n' ' ')
@@ -84,17 +82,14 @@ ok "cleanup_push traps no signal unknown to this test"
 
 ## a signal drains once, and through the library's own trap
 #
-# Status 1 is the trap's own exit. An untrapped fatal signal also reaches the EXIT
-# trap, so it would drain the stack too, but leaves 128+n -- asserting "non-zero"
-# would hold with no signal trap at all. Each signal is sent, since a trap
-# covering TERM alone passes a TERM-only check.
-# MSYS bash never delivers INT or QUIT to a script; TERM and HUP arrive. The
-# question is about the shell, so a real Linux shell under wsl2 keeps all four.
+# Status 1 is the trap's own exit, and an untrapped signal leaves 128+n.
+# Each signal is sent, because a trap covering TERM alone passes a TERM check.
+# MSYS bash delivers only TERM and HUP to a script, and wsl2 keeps all four.
 sigs=("${trapped[@]}")
 ! shell_is_msys || sigs=(TERM HUP)
 
-# Every leg is reported rather than the first to break: they fail one platform at
-# a time, and the elapsed time tells a signal never delivered from one ignored.
+# Report every leg, because they fail one platform at a time. The elapsed time
+# tells a signal never delivered from one ignored.
 bad=
 for sig in "${sigs[@]}"; do
     write_subject <<EOF

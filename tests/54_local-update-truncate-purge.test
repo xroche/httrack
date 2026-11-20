@@ -1,11 +1,7 @@
 #!/bin/bash
 #
-# An --update re-fetch that comes in short must not delete the mirrored file (#562).
-# Pass 1 mirrors page.html (in-memory) and file.bin (direct-to-disk); pass 2 serves
-# both with the full declared Content-Length but half the body, then closes. httrack
-# refuses the partial ("will be retried") — and unfixed, the end-of-update purge then
-# deletes the good pass-1 copy, which was never overwritten. stay.html is the control:
-# fully served both passes, it must update to V2.
+# An --update re-fetch that comes in short must not delete the mirrored file
+# (#562). stay.html is the control that must update to V2.
 
 set -euo pipefail
 

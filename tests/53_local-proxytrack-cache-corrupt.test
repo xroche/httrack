@@ -9,8 +9,7 @@ set -euo pipefail
 dir=$(mktemp -d)
 cleanup_push rm -rf "$dir"
 
-# The first length-prefixed field declares far more than firstline[256] holds;
-# cache_brstr must clamp the copy to the destination, not the declared length.
+# cache_brstr must clamp a field longer than firstline[256] to its size.
 {
     printf '4000\n'
     head -c 4000 /dev/zero | tr '\0' 'A'

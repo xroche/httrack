@@ -74,8 +74,6 @@ assert_eq 0 "$(count_matching_lines '^GET /leak2\.gif' "$wire")" \
     "requests for the target of a redirect naming a post token"
 assert_eq 0 "$(leaked)" "lines of the secret file after a redirect"
 
-# Control: the same token on the command line still sends the file, so the gate
-# turns on where the URL came from rather than removing the feature. 328 covers
-# the command-line >post: half.
+# Control: the same token on the command line still sends the file (see 328).
 crawl cli "http://127.0.0.1:$port/leak.html?>postfile:$(nativepath "$secret")"
 test "$(leaked)" -ne 0 || fail "a command-line >postfile: sent nothing"

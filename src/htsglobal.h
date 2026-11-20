@@ -96,6 +96,16 @@ Please visit our Website: http://www.httrack.com
 #endif
 #endif
 
+/* Marks a printf-style format parameter so MSVC /analyze checks callers. */
+#ifndef HTS_FORMAT_STRING
+#ifdef _MSC_VER
+#include <sal.h>
+#define HTS_FORMAT_STRING _Printf_format_string_
+#else
+#define HTS_FORMAT_STRING
+#endif
+#endif
+
 /* Where the build switches come from. Windows hard-codes them because MSVC
    runs no configure, and every other build reads the generated header below. */
 #ifdef _WIN32
@@ -288,7 +298,7 @@ Please visit our Website: http://www.httrack.com
 #define HTS_DEFAULT_FOOTER                                                     \
   "<!-- Mirrored from {url} by HTTrack Website Copier/" HTTRACK_AFF_VERSION    \
   " " HTTRACK_AFF_AUTHORS ", {date} -->"
-/* Honest crawler User-Agent; no fake OS/browser to go stale. */
+/* The User-Agent fakes no OS or browser to go stale. */
 #define HTS_DEFAULT_USER_AGENT                                                 \
   "Mozilla/5.0 (compatible; HTTrack/" HTTRACK_AFF_VERSION                      \
   "; +https://www.httrack.com/)"
@@ -531,7 +541,7 @@ typedef int T_SOC;
 
 #define USE_BEGINTHREAD 1
 
-/* Nothing reads this any more. */
+/* Unused. */
 #ifndef NOSTRDEBUG
 #define STRDEBUG 1
 #endif
