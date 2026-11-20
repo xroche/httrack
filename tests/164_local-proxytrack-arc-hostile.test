@@ -1,8 +1,5 @@
 #!/bin/bash
-# .arc records carry their own lengths, and proxytrack reads archives it does
-# not own: a record whose body it could not read reached the writer as a size
-# with a NULL pointer (#931), and one declaring a body larger than the archive
-# was allocated in full before the read could fail.
+# proxytrack must survive an unreadable .arc record (#931) or an oversized one.
 
 set -euo pipefail
 
@@ -62,8 +59,7 @@ if grep -aq 'stored without' "$dir/log"; then
     fail "the second hop still lost a body"
 fi
 
-# A length no archive this size can hold: refused, not allocated. The reader
-# used to malloc it and report whatever the short read left behind.
+# A length no archive this size can hold must be refused before allocation.
 {
     arc_filedesc
     printf 'http://example.com/q.html 0.0.0.0 %s text/html 200 - - 0 t.arc 2000000000\n' "$ARC_DATE"
