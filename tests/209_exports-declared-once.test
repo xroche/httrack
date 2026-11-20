@@ -1,7 +1,8 @@
 #!/bin/bash
 #
 # Every exported call must be declared exactly once, in an installed header
-# (#1663, #1713). Each list below may only shrink.
+# (#1663, #1713). Each list below may only shrink. The scan reads HTSEXT_API
+# and HTSNET_API, not COUCAL_EXTERN (vendored coucal owns that surface).
 
 set -euo pipefail
 
