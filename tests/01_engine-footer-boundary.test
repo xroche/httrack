@@ -28,7 +28,7 @@ make_page() { # make_page SEGLEN, leaving an LF page at $page
     write_page '<html><body>hi</body></html>'
 }
 
-# The CR makes the emitter copy a "\r\n" line ending, two bytes wider.
+# The CR makes the emitter copy a "\r\n" ending, which moves the boundary two bytes.
 write_page() { printf '%s' "$1" >"$page"; }
 
 crawl() { # crawl FOOTER [LABEL], leaving the mirrored page in $body
