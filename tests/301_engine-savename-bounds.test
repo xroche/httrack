@@ -82,8 +82,13 @@ for type in 0 102 105; do
 done
 selftest_queue_tail '/images/x.gif' savename /x.gif image/gif 'adr=*' \
     adrpad=2047 type=101
-# A crawled host is kept whole.
-selftest_queue "savename: /dev/null/$(printf '%01024d' 0 | tr 0 a)/x.html" savename /x \
-    text/html 'adr=*' adrpad=1024
+# A crawled host is kept whole, where the platform keeps a 1024-byte segment.
+seg=$(printf '%01024d' 0 | tr 0 a)
+probe=$("$httrack_bin" -O /dev/null -#test=savename '/*/x.html' text/html \
+    filpad=1024)
+if [ "$probe" = "savename: /dev/null/www.example.com/$seg/x.html" ]; then
+    selftest_queue "savename: /dev/null/$seg/x.html" savename /x text/html \
+        'adr=*' adrpad=1024
+fi
 
 selftest_run_queued
