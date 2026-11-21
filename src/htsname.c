@@ -947,7 +947,7 @@ int url_savename(lien_adrfilsave *const afs,
     || protocol == PROTOCOL_HTTPS \
     )\
     /* and contains IDNA */\
-    && hts_isStringIDNA(adr_complete, strlen(print_adr))\
+    && hts_isStringIDNA(print_adr, strlen(print_adr))\
     ? hts_convertStringIDNAToUTF8(print_adr, strlen(print_adr))\
     : NULL;\
   /* Punycode can quadruple the host, and a clipped one names another host,\
