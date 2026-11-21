@@ -854,6 +854,7 @@ HTSEXT_API hts_boolean is_dyntype(const char *fil);
     into caller scratch @p catbuff (capacity @p size) and return it. Returns ""
     (a literal, not @p catbuff) when there is no extension or it does not fit.
  */
+HTS_ARG_ACCESS_WO(1, 2)
 HTSEXT_API const char *get_ext(char *catbuff, size_t size, const char *fil);
 
 /** 1 if MIME type @p st must not be reclassified or renamed (hypertext types
@@ -879,19 +880,23 @@ HTSEXT_API void guess_httptype(httrackp *opt, char *s, const char *fil);
    at compile time), not a pointer. */
 /** Concatenate @p a and @p b into @p catbuff (NULL or empty operands are
  * skipped). */
-HTSEXT_API char *concat(char *catbuff, size_t size, const char *a,
-                        const char *b);
+HTS_ARG_ACCESS_WO(1, 2)
+HTSEXT_API
+    char *concat(char *catbuff, size_t size, const char *a, const char *b);
 
 /** Like concat(a, b) but convert '/' to the platform path separator (Windows).
  */
-HTSEXT_API char *fconcat(char *catbuff, size_t size, const char *a,
-                         const char *b);
+HTS_ARG_ACCESS_WO(1, 2)
+HTSEXT_API
+    char *fconcat(char *catbuff, size_t size, const char *a, const char *b);
 
 /** Copy @p a into @p catbuff, converting '/' to the platform path separator
     (Windows). */
+HTS_ARG_ACCESS_WO(1, 2)
 HTSEXT_API char *fconv(char *catbuff, size_t size, const char *a);
 
 /** Copy @p a into @p catbuff, converting every '\\' to '/' on all platforms. */
+HTS_ARG_ACCESS_WO(1, 2)
 HTSEXT_API char *fslash(char *catbuff, size_t size, const char *a);
 
 /* Debugging */

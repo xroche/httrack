@@ -502,15 +502,12 @@ static const char *strjoker_impl(strjoker_memo *memo, const char *chaine,
   return NULL;
 }
 
-// recherche multiple
-// exemple: find dans un texte de strcpybuff(*[A-Z,a-z],"*[0-9]"); va rechercher la première occurence
-// d'un strcpy sur une variable ayant un nom en lettres et copiant une chaine de chiffres
-// ATTENTION!! Eviter les jokers en début, où gare au temps machine!
+// First match of joker anywhere in chaine; a leading wildcard is slow.
 const char *strjokerfind(const char *chaine, const char *joker) {
   size_t nsteps = 0; /* one budget for the whole scan */
   const char *adr;
 
-  if (chaine != NULL && strlen(chaine) > STRJOKER_MAXLEN)
+  if (chaine == NULL || strlen(chaine) > STRJOKER_MAXLEN)
     return NULL;
   while(*chaine) {
     if ((adr = strjoker_bounded(chaine, joker, NULL, NULL, &nsteps,

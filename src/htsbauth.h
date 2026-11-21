@@ -186,11 +186,12 @@ int cookie_save(httrackp *opt, t_cookie *cookie, const char *name);
 void cookie_save_replacing(httrackp *opt, t_cookie *cookie, const char *name);
 
 /** Insert ins in front of the string at s, whose buffer holds s_size bytes. */
+HTS_ARG_ACCESS_RW(1, 2)
 void cookie_insert(char *s, size_t s_size, const char *ins);
 
 /** Drop the first pos bytes of the string at s, whose buffer holds s_size
     bytes. */
-void cookie_delete(char *s, size_t s_size, size_t pos);
+HTS_ARG_ACCESS_RW(1, 2) void cookie_delete(char *s, size_t s_size, size_t pos);
 
 /** Return tab-separated field param (0-based) of the jar record at
     cookie_base, copied into buffer, or "" when the record has no such field.

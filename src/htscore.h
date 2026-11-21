@@ -456,6 +456,7 @@ void mimehtml_add_file(httrackp *opt, const char *save, const char *adr,
 #define USERCOMMAND_EXPAND_REFUSED (-1)
 /* Rewrite a -V template's $0. On POSIX "file" is ignored: usercommand_exe()
    passes it to the shell as $1, so the rewrite does not depend on it. */
+HTS_ARG_ACCESS_WO(1, 2)
 int usercommand_expand(char *dest, size_t size, const char *cmd,
                        const char *file, const char **why);
 /* Run a -V template against a save name; returns the shell's exit status, or

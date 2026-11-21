@@ -200,6 +200,7 @@ static int st_filterbounds(httrackp *opt, int argc, char **argv) {
   /* '*' matches anything, but an over-length subject trips the length cap */
   assertf(strjoker(subj, "*", NULL, NULL) == NULL);
   assertf(strjokerfind(subj, "*") == NULL);
+  assertf(strjokerfind(NULL, "*") == NULL);
   /* Star-heavy dead-end at the length cap: unbounded it runs ~1.26e9 memo-steps
      (~6s). */
   for (i = 0; i < stars; i++) {
