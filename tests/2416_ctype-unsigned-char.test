@@ -1,0 +1,30 @@
+#!/bin/bash
+#
+# A ctype call on a plain char is UB for a negative value, so src/ must cast.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+src="${testdir}/../src"
+test -d "$src" || skip "no src/ (dist tarball)"
+
+# Calls whose argument is neither cast to unsigned char nor the unsigned-char variable "c".
+scan() {
+    command grep -nE '(^|[^[:alnum:]_])(isalnum|isalpha|isdigit|isspace|isxdigit|isupper|islower|ispunct|isprint|iscntrl|isgraph|tolower|toupper)[[:space:]]*\(' "$@" |
+        command grep -vE '^[^:]*:[0-9]+:[[:space:]]*(/\*|\*|//)' |
+        command grep -vE '(isalnum|isalpha|isdigit|isspace|isxdigit|isupper|islower|ispunct|isprint|iscntrl|isgraph|tolower|toupper)[[:space:]]*\(([[:space:]]*\((const )?unsigned char\)|[[:space:]]*c[[:space:]]*\))' || true
+}
+
+bad=$(scan "$src"/*.c "$src"/proxy/*.c)
+test -z "$bad" || fail "ctype call without an unsigned char cast:
+$bad"
+
+# control: the scan must fire on a planted bad line
+plant=$(mktemp "${TMPDIR:-/tmp}/ctype_plant.XXXXXX")
+cleanup_push rm -f "$plant"
+printf 'int f(const char *s) { return isspace(s[0]); }\n' >"$plant"
+test -n "$(scan "$plant")" || fail "the scan missed a planted isspace(s[0])"
+printf 'int f(const char *s) { return isspace((unsigned char) s[0]); }\n' >"$plant"
+test -z "$(scan "$plant")" || fail "the scan flagged a cast call"

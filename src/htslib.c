@@ -3687,7 +3687,7 @@ HTSEXT_API const char *jump_normalized_const(const char *source) {
     } else {                    // www-4.foo.com -> foo.com
       const char *a = source + 3;
 
-      while(*a && (isdigit(*a) || *a == '-'))
+      while (*a && (isdigit((unsigned char) *a) || *a == '-'))
         a++;
       if (*a == '.') {
         source = a + 1;
