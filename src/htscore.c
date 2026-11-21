@@ -171,6 +171,7 @@ RUN_CALLBACK0(opt, end); \
       template_footer = NULL;                                                  \
     }                                                                          \
     hash_free(&hash);                                                          \
+    opt->hash = NULL;                                                          \
   } while (0)
 #define XH_uninit do { XH_extuninit; if (r.adr) { freet(r.adr); r.adr=NULL; } } while(0)
 

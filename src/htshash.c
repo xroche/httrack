@@ -301,11 +301,9 @@ void hash_init(httrackp *opt, hash_struct *hash, hts_boolean normalized) {
                           ? strdupt(StringBuff(opt->strip_query))
                           : NULL;
   /* host-alias rules apply whatever urlhack says */
-  {
-    const char *const rules = hts_host_alias_rules(opt);
-
-    hash->host_alias = rules != NULL ? strdupt(rules) : NULL;
-  }
+  hash->host_alias = StringNotEmpty(opt->host_alias)
+                         ? strdupt(StringBuff(opt->host_alias))
+                         : NULL;
   hts_mutexrelease(&opt->state.lock);
 
   hts_set_hash_handler(hash->sav, opt);

@@ -1254,7 +1254,7 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
         char accept_buf[HTS_ACCEPT_MAXSIZE];
         const char *accept;
 
-        /* copy_htsopt() may rewrite accept_kinds from another thread */
+        /* held until printed: accept may point into accept_kinds */
         hts_mutexlock(&opt->state.lock);
         accept = hts_accept_lookup(StringBuff(opt->accept_kinds),
                                    retour->req.accept, opt->accept_given,
@@ -3899,7 +3899,16 @@ const char *hts_query_strip_keys(const char *rules, const char *adr,
 
 /* see htscore.h */
 const char *hts_host_alias_rules(httrackp *opt) {
+  if (opt->hash != NULL)
+    return opt->hash->host_alias;
   return StringNotEmpty(opt->host_alias) ? StringBuff(opt->host_alias) : NULL;
+}
+
+/* see htslib.h */
+const char *hts_strip_query_rules(httrackp *opt) {
+  if (opt->hash != NULL)
+    return opt->hash->strip_query;
+  return StringNotEmpty(opt->strip_query) ? StringBuff(opt->strip_query) : NULL;
 }
 
 /* Split RULE "alias[,alias...]=canonical" at its first '=', both sides

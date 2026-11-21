@@ -852,11 +852,11 @@ int url_savename(lien_adrfilsave *const afs,
   const char *normfil = fil_complete;
   /* query keys to strip for this URL (NULL = none); decoupled from urlhack */
   char BIGSTK stripkeys[HTS_URLMAXSIZE];
+  const char *const strip_rules = hts_strip_query_rules(opt);
   const char *const strip =
-      StringNotEmpty(opt->strip_query)
-          ? hts_query_strip_keys(StringBuff(opt->strip_query), adr,
-                                 fil_complete, stripkeys, sizeof(stripkeys))
-          : NULL;
+      strip_rules != NULL ? hts_query_strip_keys(strip_rules, adr, fil_complete,
+                                                 stripkeys, sizeof(stripkeys))
+                          : NULL;
   const char *const print_adr = jump_protocol_const(adr);
   const char *start_pos = NULL, *nom_pos = NULL, *dot_pos = NULL;     // Position nom et point
 
