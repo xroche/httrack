@@ -703,8 +703,7 @@ A project folder (doit.log, hts-cache) and a ./.httrackrc can carry
 .B httrack
 only on folders and in directories you trust. Your own \(ti/.httrackrc is yours and fine.
 .PP
-In a URL login, write ? as %3F, # as %23, / as %2F, \e as %5C and @ as %40.
-A raw ?, # or \e ends the host name, so a start URL whose password holds one is refused.
+In a URL you type, the login runs up to the last @ before the first /. Inside a page, a raw ?, # or \e ends the host name, as in browsers.
 .SH LIMITS
 These are the principals limits of HTTrack for that moment. Note that we did not heard about any other utility
 that would have solved them.

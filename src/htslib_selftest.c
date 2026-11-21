@@ -4270,41 +4270,54 @@ static int st_userinfo(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* Check which start URLs hts_login_cut_short() refuses. */
-static int st_logincut(httrackp *opt, int argc, char **argv) {
+/* Check how hts_escape_typed_login() rewrites a typed URL. */
+static int st_typedlogin(httrackp *opt, int argc, char **argv) {
   static const struct {
     const char *url;
-    hts_boolean refused;
+    const char *want;
   } rows[] = {
-      {"http://u:p?w@h/", HTS_TRUE},
-      {"ftp://user:pa#ss@host/x", HTS_TRUE},
-      {"http://u:a?b#c\\d@h/", HTS_TRUE},
-      {"http://u:p\\w@h", HTS_TRUE},
-      {"u:p?w@h:80/x", HTS_TRUE},
-      {"http://u:8a?w@h/", HTS_TRUE},
-      {"http://host:8099?e=a@b.com", HTS_FALSE},
-      {"http://host?e=a@b.com", HTS_FALSE},
-      {"http://tok?en@h/", HTS_FALSE},
-      {"http://[::1]:80?x@y", HTS_FALSE},
-      {"http://u:?w@h/", HTS_FALSE},
-      {"http://h:abc?x", HTS_FALSE},
-      {"http://u:p?w/x@h/", HTS_FALSE},
-      {"http://u:p@h/x?a:b@c", HTS_FALSE},
-      {"http://u:p%3Fw@h/", HTS_FALSE},
+      {"http://u:p?w@h/", "http://u:p%3Fw@h/"},
+      {"http://u:a?b#c\\d@h/", "http://u:a%3Fb%23c%5Cd@h/"},
+      {"http://u:4471?Wv3m@h/", "http://u:4471%3FWv3m@h/"},
+      {"http://u:?x@h/", "http://u:%3Fx@h/"},
+      {"http://admin:Zq9x@ss?Wv3m@h/x?y#z",
+       "http://admin:Zq9x@ss%3FWv3m@h/x?y#z"},
+      {"u:p?w@h:80/x?q", "u:p%3Fw@h:80/x?q"},
+      {"//u:p#w@h", "//u:p%23w@h"},
+      {"ftp://u:p?w@h", "ftp://u:p%3Fw@h"},
+      {"http://host:8099?e=a@b.com", "http://host:8099%3Fe=a@b.com"},
+      {"http://u:p%3Fw@h/", "http://u:p%3Fw@h/"},
+      {"http://u:p%3Fw@h/?a#b", "http://u:p%3Fw@h/?a#b"},
+      {"http://h/x?a@b#c", "http://h/x?a@b#c"},
+      {"http://h?a#b\\c", "http://h?a#b\\c"},
+      {"http://u:p@h/x?a@b", "http://u:p@h/x?a@b"},
+      {"http://u:p?w@[::1]:8080/x?y", "http://u:p%3Fw@[::1]:8080/x?y"},
+      {"http://[::1]:80/x?a@b", "http://[::1]:80/x?a@b"},
   };
 
+  char out[256];
   size_t i;
   int failures = 0;
 
   for (i = 0; i < sizeof(rows) / sizeof(rows[0]); i++) {
-    const hts_boolean got = hts_login_cut_short(rows[i].url);
+    const hts_boolean ok =
+        hts_escape_typed_login(rows[i].url, out, sizeof(out));
 
-    if (got != rows[i].refused) {
-      printf("FAIL %s: refused=%d\n", rows[i].url, got);
+    if (!ok || strcmp(out, rows[i].want) != 0) {
+      printf("FAIL %s: %s\n", rows[i].url, out);
+      failures++;
+    } else if (!hts_escape_typed_login(rows[i].want, out, sizeof(out)) ||
+               strcmp(out, rows[i].want) != 0) {
+      printf("FAIL twice %s: %s\n", rows[i].want, out);
       failures++;
     }
   }
-  printf("logincut: %d failure(s)\n", failures);
+  // an escape that does not fit is dropped whole
+  if (hts_escape_typed_login("u:ab?@h", out, 6) || strcmp(out, "u:ab") != 0) {
+    printf("FAIL short: %s\n", out);
+    failures++;
+  }
+  printf("typedlogin: %d failure(s)\n", failures);
   return failures != 0;
 }
 
@@ -4452,8 +4465,8 @@ const struct selftest_entry selftests_lib[] = {
      st_libhandlesoom},
     {"userinfo", "<url>...", "the host each login parser finds in a URL",
      st_userinfo},
-    {"logincut", "", "start URLs refused for a raw ?, # or \\ in a password",
-     st_logincut},
+    {"typedlogin", "", "escape the ?, # and \\ of a typed URL's login",
+     st_typedlogin},
     {"clienthints", "<user-agent>",
      "the client hints a browser sending this User-Agent adds", st_clienthints},
     {"headerverdict", "<line> [earlier...]",

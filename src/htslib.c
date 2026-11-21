@@ -3622,22 +3622,12 @@ const char *login_end(const char *adr) {
   return at != NULL ? at : start;
 }
 
-hts_boolean hts_login_cut_short(const char *adr) {
-  const char *const start = login_start(adr);
-  const char *const host = login_end(adr);
-  const char *const end = hts_authority_end(host);
-  const char *const bracket = strrchr_limit(host, ']', end);
-  const char *const colon =
-      memchr(bracket != NULL ? bracket : host, ':',
-             (size_t) (end - (bracket != NULL ? bracket : host)));
-  const char *const slash = start + strcspn(start, "/");
+hts_boolean hts_escape_typed_login(const char *url, char *dst, size_t size) {
+  const char *const start = login_start(url);
+  const char *const at = strrchr_limit(start, '@', strchr(start, '/'));
 
-  if (colon == NULL || colon + 1 == end ||
-      strspn(colon + 1, "0123456789") >= (size_t) (end - (colon + 1)))
-    return HTS_FALSE;
-  return end < slash && memchr(end, '@', (size_t) (slash - end)) != NULL
-             ? HTS_TRUE
-             : HTS_FALSE;
+  return hts_escape_span(url, strlen(url), start, at != NULL ? at - 1 : start,
+                         "?#\\", dst, size);
 }
 
 /* Returns HTS_TRUE when adr has a login, a user alone included. */
@@ -4463,7 +4453,7 @@ static int parse_proxy_port(const char *a, const char *arg) {
 void hts_parse_proxy(const char *arg, char *name, size_t name_size, int *port) {
   const char *authority = strstr(arg, "://");
   const char *a, *at;
-  size_t namelen, len, i;
+  size_t namelen, i;
 
   if (name_size == 0)
     return;
@@ -4486,19 +4476,30 @@ void hts_parse_proxy(const char *arg, char *name, size_t name_size, int *port) {
     if (arg[i] == '@')
       at = arg + i;
   // escape what would end the authority early: the login is unescaped later
-  len = 0;
-  for (i = 0; i < namelen && len < name_size - 1; i++) {
-    if (arg + i >= authority && arg + i < at &&
-        strchr("/?#\\", arg[i]) != NULL) {
-      if (name_size - len <= 3) // arg is user-controlled: truncate
+  (void) hts_escape_span(arg, namelen, authority, at, "/?#\\", name, name_size);
+}
+
+hts_boolean hts_escape_span(const char *src, size_t n, const char *from,
+                            const char *to, const char *set, char *dst,
+                            size_t size) {
+  size_t i, len = 0;
+
+  if (size == 0)
+    return HTS_FALSE;
+  for (i = 0; i < n; i++) {
+    if (src + i >= from && src + i < to && strchr(set, src[i]) != NULL) {
+      if (size - len <= 3)
         break;
-      snprintf(name + len, 4, "%%%02X", (unsigned char) arg[i]);
+      snprintf(dst + len, 4, "%%%02X", (unsigned char) src[i]);
       len += 3;
     } else {
-      name[len++] = arg[i];
+      if (size - len <= 1)
+        break;
+      dst[len++] = src[i];
     }
   }
-  name[len] = '\0';
+  dst[len] = '\0';
+  return i == n ? HTS_TRUE : HTS_FALSE;
 }
 
 // codage base 64 a vers b

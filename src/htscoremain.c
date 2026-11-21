@@ -660,57 +660,64 @@ static void cmdl_print_cache_entry(httrackp *opt, cache_back *cache,
   freet(r.adr);
 }
 
-/* Copies the next blank-separated start URL of *u to word, which holds
-   HTS_URLMAXSIZE * 2 bytes, past the +/- filters, and moves *u past it.
-   Returns HTS_FALSE at the end. */
-static hts_boolean next_start_url(const char **u, char *word) {
-  while (**u != '\0') {
-    const char *const w = *u;
-    const size_t n = strcspn(w, HTS_BLANKS);
-
-    *u += n != 0 ? n : 1;
-    // a start URL never exceeds the URL buffers, so a longer word is no URL
-    if (n != 0 && *w != '+' && *w != '-' && n < HTS_URLMAXSIZE * 2) {
-      memcpy(word, w, n);
-      word[n] = '\0';
-      return HTS_TRUE;
-    }
-  }
-  return HTS_FALSE;
-}
-
 /* Feeds the log backstop the passwords of the blank-separated start URLs,
    but not of the +/- filters among them, of the proxy and --why, and the
    secret -%X values. */
 static void hts_secret_learn_options(httrackp *opt, const char *urls) {
-  char word[HTS_URLMAXSIZE * 2];
+  const char *u = urls;
 
-  while (next_start_url(&urls, word))
-    hts_secret_add_login(opt, word);
+  while (*u != '\0') {
+    const size_t n = strcspn(u, HTS_BLANKS);
+
+    // a start URL never exceeds the URL buffers, so a longer word is no URL
+    if (n != 0 && *u != '+' && *u != '-' && n < HTS_URLMAXSIZE * 2) {
+      char word[HTS_URLMAXSIZE * 2];
+
+      memcpy(word, u, n);
+      word[n] = '\0';
+      hts_secret_add_login(opt, word);
+    }
+    u += n != 0 ? n : 1;
+  }
   hts_secret_add_login(opt, StringBuff(opt->proxy.name));
   hts_secret_add_login(opt, StringBuff(opt->why_url));
   hts_secret_add_headers(opt, StringBuff(opt->headers));
 }
 
-/* Returns HTS_FALSE, with the error set, when a blank-separated start URL of
-   urls has a password with a raw '?', '#' or '\'. */
-static hts_boolean hts_check_start_logins(httrackp *opt, const char *urls) {
-  char word[HTS_URLMAXSIZE * 2];
+/* Rewrites each blank-separated start URL of *url, which holds *url_sz bytes,
+   but not the +/- filters, with hts_escape_typed_login(). Returns HTS_FALSE
+   when out of memory. */
+static hts_boolean hts_escape_start_logins(char **url, size_t *url_sz) {
+  char *u = *url;
+  const size_t cap = strlen(u) * 3 + 1; // an escape is three bytes
+  char *const out = (char *) malloct(cap);
+  size_t len = 0;
 
-  while (next_start_url(&urls, word)) {
-    if (hts_login_cut_short(word)) {
-      char *masked = hts_mask_passwords(word, HTS_MASK_ADDR);
-      char s[sizeof(opt->state._hts_errmsg)];
+  if (out == NULL)
+    return HTS_FALSE;
+  while (*u != '\0') {
+    const size_t n = strcspn(u, HTS_BLANKS);
 
-      snprintf(s, sizeof(s),
-               "The password of %s holds a raw '?', '#' or '\\', which ends"
-               " the host name: write it as %%3F, %%23 or %%5C",
-               masked != NULL ? masked : "a start URL");
-      freet(masked);
-      HTS_PANIC_PRINTF(s);
-      return HTS_FALSE;
+    if (n == 0) {
+      out[len++] = *u++;
+    } else if (*u == '+' || *u == '-') {
+      memcpy(out + len, u, n);
+      len += n;
+      u += n;
+    } else {
+      const char c = u[n];
+
+      u[n] = '\0';
+      (void) hts_escape_typed_login(u, out + len, cap - len);
+      len += strlen(out + len);
+      u[n] = c;
+      u += n;
     }
   }
+  out[len] = '\0';
+  freet(*url);
+  *url = out;
+  *url_sz = cap;
   return HTS_TRUE;
 }
 
@@ -2730,9 +2737,11 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
     if (prev_opt != 0)
       x_cmd->span[prev_opt] = na - prev_opt;
   }
-  // before any file or log echoes the URL
-  if (!hts_check_start_logins(opt, *url))
+  // a typed login reads up to the last '@' before the first '/'
+  if (!hts_escape_start_logins(url, &url_sz)) {
+    HTS_PANIC_PRINTF("Not enough memory");
     return -1;
+  }
 
 #ifdef _WIN32
 #else

@@ -609,10 +609,16 @@ void secret_vfprintf(httrackp *opt, FILE *fp,
 /* Skip adr's blanks and scheme, then its login. */
 const char *login_start(const char *adr);
 const char *login_end(const char *adr);
-/* Does adr have a host part whose port holds a non-digit, and an '@' past
-   the end of that host part and before the first '/'? Its password then holds
-   a raw '?', '#' or '\', and a start URL so written is refused. */
-hts_boolean hts_login_cut_short(const char *adr);
+/* Copies url, a URL a user typed, to dst of size bytes with each '?', '#'
+   and '\' before the last '@' preceding the first '/' written as %XX, so its
+   login reads as it always has. Returns HTS_FALSE when dst was too small. */
+hts_boolean hts_escape_typed_login(const char *url, char *dst, size_t size);
+/* Copies the n bytes of src to dst of size bytes, writing each byte of set
+   that lies in [from, to) as %XX. An escape that does not fit is dropped
+   whole. Returns HTS_FALSE when dst was too small. */
+hts_boolean hts_escape_span(const char *src, size_t n, const char *from,
+                            const char *to, const char *set, char *dst,
+                            size_t size);
 
 /* Header line helpers shared by the request writer and the redaction code. */
 size_t header_name_len(const char *line);

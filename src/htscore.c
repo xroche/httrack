@@ -1267,8 +1267,12 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
             continue;
           }
           if (line[0]) {
+            char BIGSTK typed[HTS_URLLIST_LINE_SIZE * 3];
+
+            // a typed login reads up to the last '@' before the first '/'
+            (void) hts_escape_typed_login(line, typed, sizeof(typed));
             n++;
-            seed_append(&primarybuff, line);
+            seed_append(&primarybuff, typed);
           }
         }
         hts_log_print(opt, LOG_NOTICE, "%d links added from %s", n,
