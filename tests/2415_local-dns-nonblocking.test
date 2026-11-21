@@ -1,0 +1,60 @@
+#!/bin/bash
+#
+# A host whose DNS never answers must not hold up the other slots: pages of a
+# fast host finish while its resolve is still pending.
+
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+if ! target_is_linux; then
+    skip "dns-nonblocking: LD_PRELOAD interposition is Linux-only here"
+fi
+if [ ! -r "${GAISTALL_LA:-}" ]; then
+    echo "dns-nonblocking: ${GAISTALL_LA:-\$GAISTALL_LA} was not built" >&2
+    exit 1
+fi
+if grep -q "^dlname=''" "$GAISTALL_LA"; then
+    skip "dns-nonblocking: static-only build, nothing to preload"
+fi
+
+tmpdir=$(mktemp -d)
+cleanup() {
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+root="$tmpdir/root"
+mkdir -p "$root"
+local_server_start --root "$root" --log "$tmpdir/srv.out" --bind 127.0.0.1
+base="http://127.0.0.1:${SRV_PORT}"
+links=""
+for n in 1 2 3 4 5 6; do
+    echo "page $n" >"$root/p$n.html"
+    links="$links<a href=\"p$n.html\">$n</a>"
+done
+# the stalled link comes last, so the crawl never has to wait for it in order
+echo "$links<a href=\"http://stall.invalid:${SRV_PORT}/s.html\">s</a>" >"$root/index.html"
+
+export ASAN_OPTIONS="${ASAN_OPTIONS:+$ASAN_OPTIONS:}verify_asan_link_order=0"
+export GAISTALL_HOST=stall.invalid
+
+# The resolve stalls 60s and --timeout allows 30, so only a crawl that goes on
+# around it can fetch the pages before --max-time.
+out="$tmpdir/o1"
+rc=0
+GAISTALL=60 LD_PRELOAD="$GAISTALL_LIB" \
+    local_crawl --log "$tmpdir/log1" "$base/index.html" "+stall.invalid*" -O "$out" -c8 --timeout=30 --max-time=8 --robots=0 --quiet || rc=$?
+for n in 1 2 3 4 5 6; do
+    test -f "$out/127.0.0.1_${SRV_PORT}/p$n.html" ||
+        fail_dump "p$n.html waited on the stalled resolve (rc=$rc)" "$out/hts-log.txt"
+done
+
+# A resolve past --timeout fails its own link, and the others still land.
+out="$tmpdir/o2"
+GAISTALL=6 LD_PRELOAD="$GAISTALL_LIB" \
+    local_crawl --log "$tmpdir/log2" "$base/index.html" "+stall.invalid*" -O "$out" -c8 --timeout=2 --retries=0 --robots=0 --quiet
+grep -q "host name resolution timed out" "$out/hts-log.txt" ||
+    fail_dump "no resolve timeout reported" "$out/hts-log.txt"
+test -f "$out/127.0.0.1_${SRV_PORT}/p6.html" || fail_dump "p6.html missing" "$out/hts-log.txt"

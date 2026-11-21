@@ -455,6 +455,7 @@ typedef struct dns_resolve_job {
   int count;
   const char *error;
   hts_boolean permanent; /* a zero count that was about the name itself */
+  hts_boolean stored;    /* hts_dns_poll() put the answer in the cache */
 } dns_resolve_job;
 
 /* Copy the first min(count, max) addresses of src into dest. */
@@ -512,6 +513,23 @@ static void dns_resolve_done(void *arg) {
   dns_job_release(job);
 }
 
+/* Start resolving hostname on a worker thread, holding one reference for the
+   caller. NULL when no thread could start. */
+static dns_resolve_job *dns_job_start(const char *hostname) {
+  dns_resolve_job *const job = calloct(1, sizeof(*job));
+
+  assertf(job != NULL);
+  hts_mutexinit(&job->lock);
+  job->hostname = strdupt(hostname);
+  job->refcount = 2; /* this caller + the worker */
+  if (hts_newthread_tail(dns_resolve_thread, job, dns_resolve_done) != 0) {
+    job->refcount = 1;
+    dns_job_release(job);
+    return NULL;
+  }
+  return job;
+}
+
 /* Resolve hostname on a worker thread, giving up after timeout seconds or as
    soon as *cancel (optional) is raised. Returns the address count, or -1 on
    timeout -- distinct from 0 ("does not resolve"), which is a real answer and
@@ -529,16 +547,9 @@ static int hts_dns_resolve_nocache_list_bounded(
   if (timeout <= 0 && cancel == NULL)
     return hts_dns_resolve_nocache_list(hostname, out, max, error, permanent);
 
-  job = calloct(1, sizeof(*job));
-  assertf(job != NULL);
-  hts_mutexinit(&job->lock);
-  job->hostname = strdupt(hostname);
-  job->refcount = 2; /* this caller + the worker */
-  if (hts_newthread_tail(dns_resolve_thread, job, dns_resolve_done) != 0) {
-    job->refcount = 1; /* no worker: fall back to resolving inline */
-    dns_job_release(job);
+  job = dns_job_start(hostname);
+  if (job == NULL) /* no worker: fall back to resolving inline */
     return hts_dns_resolve_nocache_list(hostname, out, max, error, permanent);
-  }
 
   /* timeout <= 0 got here only for a cancellable resolve: no deadline then */
   deadline = timeout > 0 ? mtime_monotonic() + (TStamp) timeout * 1000 : 0;
@@ -631,6 +642,45 @@ void hts_dns_set_preferred(httrackp *opt, const char *iadr,
   hts_mutexrelease(&opt->state.lock);
 }
 
+/* Store a resolve's answer for host. Must hold no lock. */
+static void dns_cache_store(httrackp *opt, const char *host, SOCaddr *resolved,
+                            int count, hts_boolean permanent) {
+  coucal cache;
+  int i;
+
+  hts_mutexlock(&opt->state.lock);
+  cache = hts_cache(opt);
+  { /* store the full list (coucal owns the record and dups the host key; a
+       concurrent resolve of the same host replaces, and frees, this one) */
+    t_dnscache *const record = malloct(sizeof(t_dnscache));
+    void *previous;
+    const int failures =
+        (count == 0 && coucal_read_pvoid(cache, host, &previous))
+            ? ((const t_dnscache *) previous)->failures + 1
+            : 1;
+
+    if (record != NULL) {
+      memset(record, 0, sizeof(*record));
+      record->host_count = count;
+      record->failures = count == 0 ? failures : 0;
+      /* The resolver saying the name does not exist stands for the crawl;
+         it being unable to answer is only as good as the network it asked. */
+      if (count == 0 && !permanent) {
+        record->stored = mtime_local();
+        record->expiry = record->stored + hts_dns_negative_wait_ms(failures);
+      }
+      for (i = 0; i < count; i++) {
+        record->host_length[i] = SOCaddr_size(resolved[i]);
+        assertf(record->host_length[i] <= sizeof(record->host_addr[i]));
+        memcpy(record->host_addr[i], &SOCaddr_sockaddr(resolved[i]),
+               record->host_length[i]);
+      }
+      coucal_add_pvoid(cache, host, record);
+    }
+  }
+  hts_mutexrelease(&opt->state.lock);
+}
+
 int hts_dns_resolve_all(httrackp *opt, const char *iadr, SOCaddr *out, int max,
                         const char **error) {
   assertf(opt != NULL);
@@ -648,7 +698,7 @@ int hts_dns_resolve_all_bounded(httrackp *opt, const char *iadr, SOCaddr *out,
   SOCaddr resolved[HTS_MAXADDRNUM];
   hts_boolean permanent = HTS_FALSE;
   coucal cache;
-  int count, i;
+  int count;
 
   assertf(opt != NULL);
   assertf(out != NULL);
@@ -682,39 +732,79 @@ int hts_dns_resolve_all_bounded(httrackp *opt, const char *iadr, SOCaddr *out,
     return 0;
   }
 
-  hts_mutexlock(&opt->state.lock);
-  { /* store the full list (coucal owns the record and dups the host key; a
-       concurrent resolve of the same host replaces, and frees, this one) */
-    t_dnscache *const record = malloct(sizeof(t_dnscache));
-    void *previous;
-    const int failures =
-        (count == 0 && coucal_read_pvoid(cache, host, &previous))
-            ? ((const t_dnscache *) previous)->failures + 1
-            : 1;
-
-    if (record != NULL) {
-      memset(record, 0, sizeof(*record));
-      record->host_count = count;
-      record->failures = count == 0 ? failures : 0;
-      /* The resolver saying the name does not exist stands for the crawl;
-         it being unable to answer is only as good as the network it asked. */
-      if (count == 0 && !permanent) {
-        record->stored = mtime_local();
-        record->expiry = record->stored + hts_dns_negative_wait_ms(failures);
-      }
-      for (i = 0; i < count; i++) {
-        record->host_length[i] = SOCaddr_size(resolved[i]);
-        assertf(record->host_length[i] <= sizeof(record->host_addr[i]));
-        memcpy(record->host_addr[i], &SOCaddr_sockaddr(resolved[i]),
-               record->host_length[i]);
-      }
-      coucal_add_pvoid(cache, host, record);
-    }
-  }
-  hts_mutexrelease(&opt->state.lock);
+  dns_cache_store(opt, host, resolved, count, permanent);
 
   /* copy result to caller (cache store may have failed; result still valid) */
   dns_copy_addrs(out, resolved, count, max);
+  return count;
+}
+
+hts_boolean hts_dns_cached(httrackp *opt, const char *iadr) {
+  char BIGSTK host[HTS_URLMAXSIZE * 2];
+  SOCaddr scratch[HTS_MAXADDRNUM];
+  int count;
+
+  assertf(opt != NULL);
+  if (!strnotempty(iadr))
+    return HTS_TRUE; /* nothing to resolve */
+  dns_cache_key(host, sizeof(host), iadr);
+  hts_mutexlock(&opt->state.lock);
+  count = hts_ghbn_all(hts_cache(opt), host, scratch, HTS_MAXADDRNUM);
+  hts_mutexrelease(&opt->state.lock);
+  return count >= 0 ? HTS_TRUE : HTS_FALSE;
+}
+
+hts_dns_job *hts_dns_start(httrackp *opt, const char *iadr) {
+  char BIGSTK host[HTS_URLMAXSIZE * 2];
+
+  assertf(opt != NULL);
+  dns_cache_key(host, sizeof(host), iadr);
+#if HTS_INET6 != 0
+  hts_mutexlock(&opt->state.lock);
+  hts_resolver_check_env(); /* settle the backend before a worker reads it */
+  hts_mutexrelease(&opt->state.lock);
+#endif
+  return dns_job_start(host);
+}
+
+hts_boolean hts_dns_job_is(const hts_dns_job *job, const char *iadr) {
+  char BIGSTK host[HTS_URLMAXSIZE * 2];
+
+  dns_cache_key(host, sizeof(host), iadr);
+  return strcmp(job->hostname, host) == 0 ? HTS_TRUE : HTS_FALSE;
+}
+
+hts_dns_job *hts_dns_job_ref(hts_dns_job *job) {
+  hts_mutexlock(&job->lock);
+  job->refcount++;
+  hts_mutexrelease(&job->lock);
+  return job;
+}
+
+void hts_dns_job_release(hts_dns_job *job) { dns_job_release(job); }
+
+int hts_dns_poll(httrackp *opt, hts_dns_job *job, const char **error) {
+  SOCaddr resolved[HTS_MAXADDRNUM];
+  hts_boolean store;
+  hts_boolean permanent;
+  int count;
+
+  hts_mutexlock(&job->lock);
+  if (!job->done) {
+    hts_mutexrelease(&job->lock);
+    return HTS_DNS_PENDING;
+  }
+  count = job->count;
+  permanent = job->permanent;
+  if (error != NULL)
+    *error = job->error;
+  /* the first poller of a shared job stores it, so failures count once */
+  store = count >= 0 && !job->stored;
+  job->stored = HTS_TRUE;
+  dns_copy_addrs(resolved, job->addr, count, HTS_MAXADDRNUM);
+  hts_mutexrelease(&job->lock);
+  if (store)
+    dns_cache_store(opt, job->hostname, resolved, count, permanent);
   return count;
 }
 

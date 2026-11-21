@@ -161,6 +161,7 @@ typedef struct hts_connect_fallback {
   int addr_index;       /**< attempts made before this one (0-based) */
   int addr_count;       /**< resolved addresses; -1 = not yet probed */
   int addr_first;       /**< list index of the first attempt */
+  struct dns_resolve_job *dns_job; /**< resolve under STATUS_WAIT_DNS */
 } hts_connect_fallback;
 
 /** The download-slot ring: the set of concurrent transfers in flight.
