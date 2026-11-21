@@ -3860,6 +3860,8 @@ HTSEXT_API hts_boolean hts_addfilter(httrackp *opt, const char *rule) {
 
 // copier nouveaux paramètres si besoin
 HTSEXT_API int copy_htsopt(const httrackp * from, httrackp * to) {
+  /* the engine reads the strings below under this lock */
+  hts_mutexlock(&to->state.lock);
   if (from->maxsite > -1)
     to->maxsite = from->maxsite;
 
@@ -3968,6 +3970,7 @@ HTSEXT_API int copy_htsopt(const httrackp * from, httrackp * to) {
       to->travel &= HTS_TRAVEL_SCOPE_MASK;
   }
 
+  hts_mutexrelease(&to->state.lock);
   return 0;
 }
 
