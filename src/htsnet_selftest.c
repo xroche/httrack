@@ -178,8 +178,16 @@ static int st_proxyurl(httrackp *opt, int argc, char **argv) {
   int port = -1;
 
   // a smaller size shows where a long name is cut
-  if (argc > 1 && atoi(argv[1]) > 0 && (size_t) atoi(argv[1]) < size)
-    size = (size_t) atoi(argv[1]);
+  if (argc > 1) {
+    char *end;
+    const unsigned long n = strtoul(argv[1], &end, 10);
+
+    if (*end != '\0' || n == 0 || n >= size) {
+      fprintf(stderr, "proxyurl: size must be 1 to %u\n", (unsigned) size - 1);
+      return 1;
+    }
+    size = (size_t) n;
+  }
   hts_parse_proxy(argv[0], name, size, &port);
   // host= is the resolved host (scheme/userinfo stripped); kind= the transport
   printf("name=%s port=%d host=%s kind=%s\n", name, port,

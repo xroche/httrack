@@ -1867,10 +1867,6 @@ static int st_secrets(httrackp *opt, int argc, char **argv) {
   err |= secrets_row(o, fp,
                      "GET /download/file.html ftp://download@h u:download@h",
                      "GET /download/file.html ftp://***@h u:***@h", NULL);
-  // a password a raw '?' cuts off its login: each piece, as a word, any case
-  hts_secret_add_login(o, "http://u:Mir?ror@h/");
-  err |= secrets_row(o, fp, "u:mir/?ror@h mirrored mir ror port: Mir",
-                     "u:***/?***@h mirrored *** *** port: ***", NULL);
   // an address is no login
   err |= secrets_row(o, fp,
                      "mailto:index@h MAILTO:index@h news:index@h "
@@ -4274,6 +4270,44 @@ static int st_userinfo(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Check which start URLs hts_login_cut_short() refuses. */
+static int st_logincut(httrackp *opt, int argc, char **argv) {
+  static const struct {
+    const char *url;
+    hts_boolean refused;
+  } rows[] = {
+      {"http://u:p?w@h/", HTS_TRUE},
+      {"ftp://user:pa#ss@host/x", HTS_TRUE},
+      {"http://u:a?b#c\\d@h/", HTS_TRUE},
+      {"http://u:p\\w@h", HTS_TRUE},
+      {"u:p?w@h:80/x", HTS_TRUE},
+      {"http://u:8a?w@h/", HTS_TRUE},
+      {"http://host:8099?e=a@b.com", HTS_FALSE},
+      {"http://host?e=a@b.com", HTS_FALSE},
+      {"http://tok?en@h/", HTS_FALSE},
+      {"http://[::1]:80?x@y", HTS_FALSE},
+      {"http://u:?w@h/", HTS_FALSE},
+      {"http://h:abc?x", HTS_FALSE},
+      {"http://u:p?w/x@h/", HTS_FALSE},
+      {"http://u:p@h/x?a:b@c", HTS_FALSE},
+      {"http://u:p%3Fw@h/", HTS_FALSE},
+  };
+
+  size_t i;
+  int failures = 0;
+
+  for (i = 0; i < sizeof(rows) / sizeof(rows[0]); i++) {
+    const hts_boolean got = hts_login_cut_short(rows[i].url);
+
+    if (got != rows[i].refused) {
+      printf("FAIL %s: refused=%d\n", rows[i].url, got);
+      failures++;
+    }
+  }
+  printf("logincut: %d failure(s)\n", failures);
+  return failures != 0;
+}
+
 /* -#test=clienthints <user-agent>: the Sec-CH-UA* values it implies. */
 static int st_clienthints(httrackp *opt, int argc, char **argv) {
   hts_client_hints ch;
@@ -4418,6 +4452,8 @@ const struct selftest_entry selftests_lib[] = {
      st_libhandlesoom},
     {"userinfo", "<url>...", "the host each login parser finds in a URL",
      st_userinfo},
+    {"logincut", "", "start URLs refused for a raw ?, # or \\ in a password",
+     st_logincut},
     {"clienthints", "<user-agent>",
      "the client hints a browser sending this User-Agent adds", st_clienthints},
     {"headerverdict", "<line> [earlier...]",

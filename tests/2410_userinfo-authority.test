@@ -25,6 +25,7 @@ split 'http://h1\u=a@h2/x.html' 'adr=h1 fil=/\u=a@h2/x.html'
 split 'http://h1:81?u@h2:82/x' 'adr=h1:81 fil=/?u@h2:82/x'
 split 'http://h\a\b.html' 'adr=h fil=/\a\b.html'
 selftest_queue 'http://h1' fetchorigin 'http://h1\u=a@h2/x'
+selftest_queue 'logincut: 0 failure(s)' logincut
 
 # controls: a login before the authority ends is still one
 ui 'http://u:p@h1/x?a@b' 'host=h1/x?a@b end=h1/x?a@b login=1'
@@ -78,17 +79,38 @@ grep -q "GET /?u=a@${h2}/x.html" <<<"$srv1" || fail "h1 missed the ?-link: $srv1
 grep -q "GET /@${h2}/x.html" <<<"$srv1" || fail "h1 missed the \\-link: $srv1"
 ! grep -q 'GET ' <<<"$srv2" || fail "h2 was contacted: $srv2"
 
-# A start URL whose password holds a raw '?', '#' or '\': the log warns, and
-# neither piece of the password reaches it.
-for t in '?' '#' "\\"; do
-    out="${tmpdir}/out-stray"
+# A start URL whose password holds a raw '?', '#' or '\' is refused with the
+# fix, and no password byte reaches any output.
+for u in "http://u:Hd7k?Zq9x@${h2}/" "ftp://user:Hd7k#Zq9x@${h2}/x" \
+    "http://u:Hd7k?Zq9x#Wv3m\\Pp2r@${h2}/"; do
+    out="${tmpdir}/out-refused"
     rm -rf "$out"
-    httrack -O "$out" --robots=0 --timeout=5 --retries=0 \
-        "http://u:Hd7k${t}Zq9x@${h1}/a/b.html" >"${tmpdir}/stray.out" \
-        2>"${tmpdir}/stray.err" || true
-    log=$(<"${out}/hts-log.txt")
-    shown="$log$(<"${tmpdir}/stray.out")$(<"${tmpdir}/stray.err")"
-    grep -q 'write it as %' <<<"$log" || fail "no warning for '${t}': $log"
-    grep -q 'Invalid port: \*\*\*' <<<"$log" || fail "no masked error: $log"
-    ! grep -q -e Hd7k -e Zq9x <<<"$shown" || fail "password shown: $shown"
+    rc=0
+    httrack -O "$out" --robots=0 --timeout=5 --retries=0 "$u" \
+        >"${tmpdir}/refused.out" 2>"${tmpdir}/refused.err" || rc=$?
+    [ "$rc" -ne 0 ] || fail "accepted $u"
+    err=$(<"${tmpdir}/refused.err")
+    grep -q 'write it as %3F, %23 or %5C' <<<"$err" || fail "no hint: $err"
+    grep -q ':\*\*\*@' <<<"$err" || fail "URL not masked: $err"
+    if [ -d "$out" ]; then
+        files=$(find "$out" -type f)
+    else
+        files=
+    fi
+    # shellcheck disable=SC2086
+    if grep -q -e Hd7k -e Zq9x -e Wv3m -e Pp2r "${tmpdir}/refused.out" \
+        "${tmpdir}/refused.err" $files; then
+        fail "password shown for $u"
+    fi
 done
+srv2=$(<"${tmpdir}/srv2.log")
+! grep -q 'GET ' <<<"$srv2" || fail "a refused URL reached h2: $srv2"
+
+# an '@' in the query of a URL with a port and no path is no login
+rm -rf "${tmpdir}/out-query"
+httrack -O "${tmpdir}/out-query" --robots=0 --timeout=5 --retries=0 -r1 \
+    "http://${h1}?e=a@b.com" >"${tmpdir}/query.out" 2>&1 || true
+query=$(<"${tmpdir}/query.out")
+! grep -q 'write it as' <<<"$query" || fail "refused a query: $query"
+srv1=$(<"${tmpdir}/srv1.log")
+grep -q 'GET /?e=a@b.com' <<<"$srv1" || fail "h1 missed the query: $srv1"

@@ -660,33 +660,58 @@ static void cmdl_print_cache_entry(httrackp *opt, cache_back *cache,
   freet(r.adr);
 }
 
+/* Copies the next blank-separated start URL of *u to word, which holds
+   HTS_URLMAXSIZE * 2 bytes, past the +/- filters, and moves *u past it.
+   Returns HTS_FALSE at the end. */
+static hts_boolean next_start_url(const char **u, char *word) {
+  while (**u != '\0') {
+    const char *const w = *u;
+    const size_t n = strcspn(w, HTS_BLANKS);
+
+    *u += n != 0 ? n : 1;
+    // a start URL never exceeds the URL buffers, so a longer word is no URL
+    if (n != 0 && *w != '+' && *w != '-' && n < HTS_URLMAXSIZE * 2) {
+      memcpy(word, w, n);
+      word[n] = '\0';
+      return HTS_TRUE;
+    }
+  }
+  return HTS_FALSE;
+}
+
 /* Feeds the log backstop the passwords of the blank-separated start URLs,
    but not of the +/- filters among them, of the proxy and --why, and the
-   secret -%X values. Returns the '?', '#' or '\' before the stray '@' of a
-   start URL, or '\0'. */
-static char hts_secret_learn_options(httrackp *opt, const char *urls) {
-  const char *u = urls;
-  char stray = '\0';
+   secret -%X values. */
+static void hts_secret_learn_options(httrackp *opt, const char *urls) {
+  char word[HTS_URLMAXSIZE * 2];
 
-  while (*u != '\0') {
-    const size_t n = strcspn(u, HTS_BLANKS);
-
-    // a start URL never exceeds the URL buffers, so a longer word is no URL
-    if (n != 0 && *u != '+' && *u != '-' && n < HTS_URLMAXSIZE * 2) {
-      char word[HTS_URLMAXSIZE * 2];
-
-      memcpy(word, u, n);
-      word[n] = '\0';
-      hts_secret_add_login(opt, word);
-      if (stray == '\0' && hts_stray_login(word) != NULL)
-        stray = *hts_authority_end(login_start(word));
-    }
-    u += n != 0 ? n : 1;
-  }
+  while (next_start_url(&urls, word))
+    hts_secret_add_login(opt, word);
   hts_secret_add_login(opt, StringBuff(opt->proxy.name));
   hts_secret_add_login(opt, StringBuff(opt->why_url));
   hts_secret_add_headers(opt, StringBuff(opt->headers));
-  return stray;
+}
+
+/* Returns HTS_FALSE, with the error set, when a blank-separated start URL of
+   urls has a password with a raw '?', '#' or '\'. */
+static hts_boolean hts_check_start_logins(httrackp *opt, const char *urls) {
+  char word[HTS_URLMAXSIZE * 2];
+
+  while (next_start_url(&urls, word)) {
+    if (hts_login_cut_short(word)) {
+      char *masked = hts_mask_passwords(word, HTS_MASK_ADDR);
+      char s[sizeof(opt->state._hts_errmsg)];
+
+      snprintf(s, sizeof(s),
+               "The password of %s holds a raw '?', '#' or '\\', which ends"
+               " the host name: write it as %%3F, %%23 or %%5C",
+               masked != NULL ? masked : "a start URL");
+      freet(masked);
+      HTS_PANIC_PRINTF(s);
+      return HTS_FALSE;
+    }
+  }
+  return HTS_TRUE;
 }
 
 /* The caller frees x_cmd and *url, the start URLs, on every return. */
@@ -2705,6 +2730,9 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
     if (prev_opt != 0)
       x_cmd->span[prev_opt] = na - prev_opt;
   }
+  // before any file or log echoes the URL
+  if (!hts_check_start_logins(opt, *url))
+    return -1;
 
 #ifdef _WIN32
 #else
@@ -2793,7 +2821,6 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
       char t[256];
       char *masked_url;
       const char *shown_url;
-      char stray;
 
       time_local_rfc822(t);     // faut bien que ca serve quelque part l'heure RFC1945 arf'
 
@@ -2879,7 +2906,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                         "engine: could not create hts-in_progress.lock, so"
                         " this mirror cannot be stopped or paused by a file");
       }
-      stray = hts_secret_learn_options(opt, *url);
+      hts_secret_learn_options(opt, *url);
       masked_url = hts_mask_passwords(*url, HTS_MASK_LIST);
       shown_url = masked_url != NULL ? masked_url : "(out of memory)";
       // hts-log.txt
@@ -2944,12 +2971,6 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
         }
       }
       freet(masked_url);
-      if (stray != '\0')
-        hts_log_print(opt, LOG_WARNING,
-                      "a start URL has an '@' after a '%c', which ends the host"
-                      " name, so no login is sent: if the '%c' is part of the"
-                      " login, write it as %%%02X",
-                      stray, stray, (unsigned char) stray);
     }
 
     io_flush;

@@ -118,37 +118,15 @@ void hts_secret_add(httrackp *opt, const char *s, size_t len,
                   HTS_SECRET_MAXLEN);
 }
 
-/* Adds the password before the stray '@' of url, cut at the end of the
-   authority into the pieces the log prints apart. */
-static void secret_add_stray_login(httrackp *opt, const char *url) {
-  const char *const start = login_start(url);
-  const char *const host = hts_stray_login(url);
-  const char *const cut = hts_authority_end(start);
-  const char *pass;
-
-  if (host == NULL)
-    return;
-  pass = memchr(start, ':', (size_t) (host - 1 - start));
-  if (pass == NULL)
-    return;
-  pass++;
-  // the log may rewrite or drop the character at the cut
-  if (cut >= pass) {
-    hts_secret_add(opt, pass, (size_t) (cut - pass), HTS_SECRET_PIECE);
-    pass = cut + 1;
-  }
-  hts_secret_add(opt, pass, (size_t) (host - 1 - pass), HTS_SECRET_PIECE);
-}
-
 void hts_secret_add_login(httrackp *opt, const char *url) {
   const char *start, *host, *colon;
 
   if (url == NULL)
     return;
-  secret_add_stray_login(opt, url);
   start = login_start(url);
-  host = login_end(url);
-  if (host <= start)
+  // up to the first '/', so a password with a raw '?', '#' or '\' is learnt
+  host = strrchr_limit(start, '@', strchr(start, '/'));
+  if (host == NULL)
     return;
   colon = memchr(start, ':', (size_t) (host - 1 - start));
   if (colon == NULL)
@@ -199,25 +177,8 @@ static hts_boolean login_at(const char *s, size_t len, size_t i, size_t n) {
   return word_start(s, u);
 }
 
-/* Is c an ASCII letter or digit? */
-static hts_boolean is_alnum(char c) {
-  return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') ||
-                 (c >= 'A' && c <= 'Z')
-             ? HTS_TRUE
-             : HTS_FALSE;
-}
-
-/* Do the n bytes at s + i stand with no letter or digit on either side? */
-static hts_boolean piece_at(const char *s, size_t len, size_t i, size_t n) {
-  return (i == 0 || !is_alnum(s[i - 1])) &&
-                 (i + n == len || !is_alnum(s[i + n]))
-             ? HTS_TRUE
-             : HTS_FALSE;
-}
-
 /* Returns the length of the longest secret of set standing at s + i, or 0. A
-   URL password counts only as a login, a piece only as a whole word, and a
-   header token anywhere. */
+   URL password counts only as a login, a header token anywhere. */
 static size_t secret_at(const hts_secret_set *set, const char *s, size_t len,
                         size_t i) {
   size_t best = 0;
@@ -225,16 +186,10 @@ static size_t secret_at(const hts_secret_set *set, const char *s, size_t len,
 
   for (k = 0; k < set->count; k++) {
     const size_t n = set->len[k];
-    const hts_boolean piece = set->kind[k] == HTS_SECRET_PIECE;
 
-    if (n <= best || n > len - i)
+    if (n <= best || n > len - i || memcmp(s + i, set->item[k], n) != 0)
       continue;
-    // a piece in the host name is printed lowercased
-    if (piece ? strncasecmp(s + i, set->item[k], n) != 0
-              : memcmp(s + i, set->item[k], n) != 0)
-      continue;
-    if (piece ? piece_at(s, len, i, n)
-              : set->kind[k] == HTS_SECRET_HEADER || login_at(s, len, i, n))
+    if (set->kind[k] == HTS_SECRET_HEADER || login_at(s, len, i, n))
       best = n;
   }
   return best;

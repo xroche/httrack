@@ -3613,11 +3613,22 @@ const char *login_end(const char *adr) {
   return at != NULL ? at : start;
 }
 
-const char *hts_stray_login(const char *adr) {
+hts_boolean hts_login_cut_short(const char *adr) {
   const char *const start = login_start(adr);
-  const char *const at = strrchr_limit(start, '@', start + strcspn(start, "/"));
+  const char *const host = login_end(adr);
+  const char *const end = hts_authority_end(host);
+  const char *const bracket = strrchr_limit(host, ']', end);
+  const char *const colon =
+      memchr(bracket != NULL ? bracket : host, ':',
+             (size_t) (end - (bracket != NULL ? bracket : host)));
+  const char *const slash = start + strcspn(start, "/");
 
-  return at != NULL && at - 1 > hts_authority_end(start) ? at : NULL;
+  if (colon == NULL || colon + 1 == end ||
+      strspn(colon + 1, "0123456789") >= (size_t) (end - (colon + 1)))
+    return HTS_FALSE;
+  return end < slash && memchr(end, '@', (size_t) (slash - end)) != NULL
+             ? HTS_TRUE
+             : HTS_FALSE;
 }
 
 /* Returns HTS_TRUE when adr has a login, a user alone included. */
