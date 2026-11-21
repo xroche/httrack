@@ -271,6 +271,39 @@ static int st_statsrows(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* A slot finished or deleted while it waits for its resolve lets go of it. */
+static int st_dnsdrop(httrackp *opt, int argc, char **argv) {
+  struct_back *sback = back_new(opt, 2);
+  int err = 0;
+  int p;
+
+  if (sback == NULL) {
+    printf("dnsdrop: SKIP (no slot table)\n");
+    return 77;
+  }
+  for (p = 0; p < 2; p++) {
+    hts_dns_job *const job = hts_dns_start(opt, "localhost");
+
+    if (job == NULL) {
+      back_free(&sback);
+      printf("dnsdrop: SKIP (no resolver worker)\n");
+      return 77;
+    }
+    sback->lnk[p].status = STATUS_WAIT_DNS;
+    sback->lnk[p].r.soc = INVALID_SOCKET;
+    sback->connect_fallback[p].dns_job = job;
+  }
+  back_set_finished(opt, sback, 0);
+  ST_FAIL_IF(err, sback->connect_fallback[0].dns_job != NULL);
+  back_delete(opt, NULL, sback, 1);
+  ST_FAIL_IF(err, sback->connect_fallback[1].dns_job != NULL);
+
+  back_free(&sback);
+  if (!err)
+    printf("dnsdrop: OK\n");
+  return err;
+}
+
 /* back_slot_fail() clips a reason too long for r.msg, where a copy aborted;
    back_slot_fail_nonfatal() closes and keeps a reason already set. */
 static int st_slotfail(httrackp *opt, int argc, char **argv) {
@@ -3536,6 +3569,8 @@ const struct selftest_entry selftests_back[] = {
      st_spoolrecord},
     {"slotfail", "", "a failed slot clips a reason too long for its message",
      st_slotfail},
+    {"dnsdrop", "", "a slot that ends while it resolves lets go of the job",
+     st_dnsdrop},
     {"statsrows", "",
      "the progress rows survive an empty table and show a known size of 0",
      st_statsrows},

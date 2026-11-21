@@ -436,6 +436,9 @@ void back_free(struct_back ** sback) {
    last candidate gets the full timeout. */
 #define HTS_CONNECT_FALLBACK_TIMEOUT 10
 
+/* Milliseconds between two looks at a pending resolve. */
+#define HTS_DNS_POLL_MS 10
+
 int back_connect_fallback_due(int addr_index, int addr_count, int elapsed,
                               int timeout) {
   int deadline;
@@ -2388,12 +2391,23 @@ static int back_search(httrackp *opt, struct_back *sback) {
   return -1;
 }
 
+/* Let go of slot p's pending resolve, if any. */
+static void back_dns_drop(struct_back *sback, const int p) {
+  hts_connect_fallback *const cf = &sback->connect_fallback[p];
+
+  if (cf->dns_job != NULL) {
+    hts_dns_job_release(cf->dns_job);
+    cf->dns_job = NULL;
+  }
+}
+
 void back_set_finished(httrackp *opt, struct_back *sback, const int p) {
   lien_back *const back = sback->lnk;
   const int back_max = sback->count;
 
   assertf(p >= 0 && p < back_max);
   if (p >= 0 && p < sback->count) {     // we never know..
+    back_dns_drop(sback, p);
     /* status: finished (waiting to be validated) */
     back[p].status = STATUS_READY;      /* finished */
     /* close open r/w streams, if any */
@@ -2614,6 +2628,7 @@ int back_delete(httrackp * opt, cache_back * cache, struct_back * sback,
     // flush output buffers
     (void) back_flush_output(opt, cache, sback, p);
 
+    back_dns_drop(sback, p);
     return back_clear_entry(&back[p]);
   }
   return 0;
@@ -2672,6 +2687,98 @@ int back_add_if_not_exists(struct_back *sback, httrackp *opt, cache_back *cache,
                     test, HTS_FALSE, fetch);
   }
   return 0;
+}
+
+/* Open slot p's connection, or its local file, and set its status. */
+static void back_open(httrackp *opt, struct_back *sback, const int p) {
+  lien_back *const back = &sback->lnk[p];
+  const T_SOC soc = http_xfopen(opt, back->url_adr, back->url_fil, &back->r);
+
+  if (soc == INVALID_SOCKET) {
+    back_set_finished(opt, sback, p);
+  } else if (!back->r.is_file) {
+    back->status = STATUS_CONNECTING;
+  } else {
+    back->status = 1; // file
+  }
+}
+
+/* Park slot p in STATUS_WAIT_DNS while a worker resolves the host it will
+   connect to, so other slots go on. HTS_FALSE when the DNS cache answers or
+   no worker starts, and the caller connects at once. */
+static hts_boolean back_dns_defer(httrackp *opt, struct_back *sback,
+                                  const int p) {
+  lien_back *const back = sback->lnk;
+  // the proxy resolves the origin, so resolve the proxy
+  const char *const host =
+      back[p].r.req.proxy.active ? back[p].r.req.proxy.name : back[p].url_adr;
+  hts_dns_job *job = NULL;
+  int i;
+
+  if (host == NULL || strcmp(back[p].url_adr, "file://") == 0 ||
+      hts_dns_cached(opt, host))
+    return HTS_FALSE;
+  BACK_FOR_EACH_BUSY(sback, i) { // one resolve per host
+    hts_dns_job *const other = sback->connect_fallback[i].dns_job;
+
+    if (i != p && other != NULL && hts_dns_job_is(other, host)) {
+      job = hts_dns_job_ref(other);
+      break;
+    }
+  }
+  if (job == NULL && (job = hts_dns_start(opt, host)) == NULL)
+    return HTS_FALSE;
+  sback->connect_fallback[p].dns_job = job;
+  sback->connect_fallback[p].dns_deadline =
+      opt->timeout > 0 ? mtime_monotonic() + (TStamp) opt->timeout * 1000 : 0;
+  back[p].status = STATUS_WAIT_DNS;
+  return HTS_TRUE;
+}
+
+/* Connect slot p once its resolve is answered and the connect pacing allows,
+   or fail it. *budget is the connects this pass may still open, -1 until the
+   pacing is asked, as back_fill() asks it once per call. */
+static void back_dns_poll(httrackp *opt, struct_back *sback, const int p,
+                          int *budget) {
+  lien_back *const back = &sback->lnk[p];
+  hts_connect_fallback *const cf = &sback->connect_fallback[p];
+  const char *error = NULL;
+  // no job left: resolved, and waiting for the pacing
+  const int count =
+      cf->dns_job != NULL ? hts_dns_poll(opt, cf->dns_job, &error) : 1;
+
+  if (count > 0) {
+    back_dns_drop(sback, p);
+    if (*budget < 0) {
+      const hts_boolean may_wait = !hts_load_acquire_int(&opt->state.stop);
+
+      // Retry-After may have been set after this slot was admitted
+      if (may_wait && sback->retry_after_until > 0) {
+        if (mtime_local() < sback->retry_after_until)
+          *budget = 0;
+        else
+          sback->retry_after_until = 0;
+      }
+      if (*budget < 0)
+        *budget = hts_connect_pace(opt, opt->maxsoc, may_wait);
+    }
+    if (*budget == 0)
+      return;
+    (*budget)--;
+    if (back->timeout > 0) // the connect gets the full timeout
+      back->timeout_refresh = time_local();
+    back_open(opt, sback, p);
+    return;
+  }
+  if (count == HTS_DNS_PENDING &&
+      (cf->dns_deadline == 0 || mtime_monotonic() < cf->dns_deadline))
+    return;
+  if (count == HTS_DNS_PENDING)
+    error = "host name resolution timed out";
+  back->r.statuscode = STATUSCODE_NON_FATAL;
+  htsblk_failf(&back->r, "Unable to get server's address: %s",
+               error != NULL ? error : "host name resolution failed");
+  back_set_finished(opt, sback, p);
 }
 
 int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
@@ -3205,15 +3312,8 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
       }
 
       if (!back_trylive(opt, cache, sback, p)) {
-        const T_SOC soc = http_xfopen(opt, adr, fil, &back[p].r);
-
-        if (soc == INVALID_SOCKET) {
-          back_set_finished(opt, sback, p);
-        } else if (!back[p].r.is_file) {
-          back[p].status = STATUS_CONNECTING; // connecting
-        } else {
-          back[p].status = 1; // file
-        }
+        if (!back_dns_defer(opt, sback, p))
+          back_open(opt, sback, p);
       } else {
         hts_log_print(opt, LOG_DEBUG,
                       "(Keep-Alive): successfully linked #%d (for %s%s)",
@@ -3550,6 +3650,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
   int gestion_timeout = 0;
   int busy_recv = 0;            // pas de données pour le moment   
   int busy_state = 0;           // pas de connexions
+  int dns_wait = 0;             // a slot waits for its resolve
+  int dns_budget;               // see back_dns_poll()
   int max_loop;                 // nombre de boucles max à parcourir..
   int max_loop_chk = 0;
   const unsigned int mod_random =
@@ -3593,6 +3695,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
     int max_c;
 
     busy_state = busy_recv = 0;
+    dns_wait = 0;
+    dns_budget = -1;
 
     // inscrire les sockets actuelles, et rechercher l'ID la plus élevée
     FD_ZERO(&fds);
@@ -3604,9 +3708,14 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
     max_c = 1;
     BACK_FOR_EACH_BUSY_FROM(sback, start, i) {
+      // before st, so a socket it opens is selected in this pass
+      if (back_status(&back[i]) == STATUS_WAIT_DNS)
+        back_dns_poll(opt, sback, i, &dns_budget);
       // One status read serves every branch below.
       const int st = back_status(&back[i]);
 
+      if (st == STATUS_WAIT_DNS && sback->connect_fallback[i].dns_job != NULL)
+        dns_wait = 1; // only a pending resolve needs the short wake
       /* clang-format off: an edit reindents this whole #if-split chain. */
       /* clang-format off */
       if (st == STATUS_CONNECTING) {        // connecting
@@ -3691,7 +3800,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
     if (do_wait) {              // attendre
       // temps d'attente max: 2.5 seconde
       tv.tv_sec = HTS_SOCK_SEC;
-      tv.tv_usec = HTS_SOCK_MS;
+      tv.tv_usec = dns_wait ? HTS_DNS_POLL_MS * 1000 : HTS_SOCK_MS;
 
       // poller les sockets-attention au noyau sous Unix..
       /* Discard the sets select() did not write: on EINTR they still hold
@@ -3981,7 +4090,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
           hts_log_print(opt, LOG_TRACE, "finalizing ftp");
           back_finalize(opt, cache, sback, i);
         }
-      } else if ((st > 0) && (st < 1000)) { // receiving http
+      } else if (st > 0 && st < 1000 && st != STATUS_WAIT_DNS) { // receiving
         int dispo = 0;
 
         // vérifier l'existance de timeout-check
@@ -5188,7 +5297,9 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
       act = time_local();       // temps en secondes
       BACK_FOR_EACH_BUSY_FROM(sback, start, i) {
-        if (back_is_live(back_status(&back[i]))) { // receiving, connecting, ..
+        // back_dns_poll() times out STATUS_WAIT_DNS
+        if (back_is_live(back_status(&back[i])) &&
+            back_status(&back[i]) != STATUS_WAIT_DNS) {
           if (back[i].timeout > 0) {
             // The fallback to the next address runs before the timeout below,
             // so it wins the tie.
@@ -5400,7 +5511,7 @@ void back_infostr(struct_back *sback, int i, int j, char *s, size_t size) {
       const char *tag = NULL;
 
       /* the connect tag is not shown with the URL, and INFOSC has no space */
-      if (status == STATUS_CONNECTING) {
+      if (status == STATUS_CONNECTING || status == STATUS_WAIT_DNS) {
         strlcatbuff(s, "CONNECT ", size);
       } else if (status == STATUS_WAIT_HEADERS) {
         tag = "INFOS ";

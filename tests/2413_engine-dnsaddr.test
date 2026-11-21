@@ -11,3 +11,10 @@ test "$out" = "dns-addr-selftest: OK" || {
     echo "expected 'dns-addr-selftest: OK', got: $out" >&2
     exit 1
 }
+
+# A slot that ends while it resolves lets go of the job.
+out=$(httrack -#test=dnsdrop)
+test "$out" = "dnsdrop: OK" || {
+    echo "expected 'dnsdrop: OK', got: $out" >&2
+    exit 1
+}
