@@ -684,6 +684,44 @@ static void hts_secret_learn_options(httrackp *opt, const char *urls) {
   hts_secret_add_headers(opt, StringBuff(opt->headers));
 }
 
+/* Rewrites each blank-separated start URL of *url, which holds *url_sz bytes,
+   but not the +/- filters, with hts_escape_typed_login(). Returns HTS_FALSE
+   when out of memory. */
+static hts_boolean hts_escape_start_logins(char **url, size_t *url_sz) {
+  char *u = *url;
+  const size_t cap = strlen(u) * 3 + 1; // an escape is three bytes
+  char *const out = (char *) malloct(cap);
+  size_t len = 0;
+
+  if (out == NULL)
+    return HTS_FALSE;
+  while (*u != '\0') {
+    const size_t n = strcspn(u, HTS_BLANKS);
+
+    if (n == 0) {
+      out[len++] = *u++;
+    } else if (*u == '+' || *u == '-') {
+      memcpy(out + len, u, n);
+      len += n;
+      u += n;
+    } else {
+      const char c = u[n];
+
+      u[n] = '\0';
+      // cap holds three bytes per input byte, so the escape cannot clip
+      (void) hts_escape_typed_login(u, out + len, cap - len);
+      len += strlen(out + len);
+      u[n] = c;
+      u += n;
+    }
+  }
+  out[len] = '\0';
+  freet(*url);
+  *url = out;
+  *url_sz = cap;
+  return HTS_TRUE;
+}
+
 /* The caller frees x_cmd and *url, the start URLs, on every return. */
 static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                         char **url) {
@@ -2699,6 +2737,11 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
     }                           // for
     if (prev_opt != 0)
       x_cmd->span[prev_opt] = na - prev_opt;
+  }
+  // a typed login reads up to the last '@' before the first '/'
+  if (!hts_escape_start_logins(url, &url_sz)) {
+    HTS_PANIC_PRINTF("Not enough memory");
+    return -1;
   }
 
 #ifdef _WIN32

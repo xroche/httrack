@@ -266,6 +266,9 @@ refused 'the paste holds no cookie for bad.test' "curl https://bad.test/ -H 'Acc
 refused 'the address is not an http or https URL' "curl ftp://bad.test/ -b a=$sec"
 refused 'the address holds a user name or password' "curl 'https://user:$sec@www.bad.test:81/x' -b a=1"
 refused 'the address holds a user name or password' "curl 'http://$sec@bad.test/' -b a=1"
+# the start URL reads a typed login, so a '?' or '\' does not end it
+refused 'the address holds a user name or password' "curl 'http://bad.test?$sec@evil.test/' -b a=1"
+refused 'the address holds a user name or password' "curl 'http://bad.test\\$sec@evil.test/' -b a=1"
 # IDNA would encode a capital outside ASCII, or malformed UTF-8, as another host.
 refused 'write the host in lowercase' "curl 'https://www.BÜCHER.de/' -b a=$sec"
 refused 'the host is not valid UTF-8' "curl 'https://$(printf '\300\257').test/' -b a=$sec"
@@ -321,8 +324,8 @@ selftest_queue_head "refused: cannot write $dir/missing/nofolder.test.hts: " \
 put "curl https://words.test/ -b a=1$(for _ in $(seq 1 1020); do printf ' -k'; done)"
 selftest_queue_head "name=words.test cookies=1" paste "$dir/dry" "$in" dry
 
-test "${#SELFTEST_WANT[@]}" -eq 119 ||
-    fail "expected 119 queued rows, got ${#SELFTEST_WANT[@]}"
+test "${#SELFTEST_WANT[@]}" -eq 121 ||
+    fail "expected 121 queued rows, got ${#SELFTEST_WANT[@]}"
 selftest_run_queued
 
 # A host list too long to show ends with ",...", not with a cut name.

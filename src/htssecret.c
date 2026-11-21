@@ -124,8 +124,9 @@ void hts_secret_add_login(httrackp *opt, const char *url) {
   if (url == NULL)
     return;
   start = login_start(url);
-  host = login_end(url);
-  if (host <= start)
+  // up to the first '/', so a password with a raw '?', '#' or '\' is learnt
+  host = strrchr_limit(start, '@', strchr(start, '/'));
+  if (host == NULL)
     return;
   colon = memchr(start, ':', (size_t) (host - 1 - start));
   if (colon == NULL)
@@ -383,9 +384,10 @@ static hts_boolean fprint_request_line(httrackp *opt, FILE *fp,
                          (size_t) (version - buff));
 }
 
-/* Finds the secret of the userinfo at the authority a, which ends at the last
-   '@' before the first '/', the split jump_identification_const() makes: the
-   password after the first ':', or a user alone. A token also ends at a
+/* Finds the secret of the userinfo at the authority a: the password after the
+   first ':', or a user alone, up to the last '@' before the first '/'. That
+   reaches past the '?', '#' or '\' where jump_identification_const() stops,
+   so a password a user typed with one is masked too. A token also ends at a
    blank. Returns HTS_FALSE when there is no userinfo. */
 static hts_boolean userinfo_password(const char *a, hts_boolean token,
                                      const char **pass, const char **at) {

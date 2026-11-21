@@ -556,6 +556,9 @@ int may_bogus_multiple(httrackp * opt, const char *mime, const char *filename);
 int may_unknown2(httrackp * opt, const char *mime, const char *filename);
 
 const char *strrchr_limit(const char *s, char c, const char *limit);
+/* Returns the end of the authority at s, which must be past the scheme: its
+   first '/', '?', '#' or '\'. */
+const char *hts_authority_end(const char *s);
 char *jump_protocol(char *source);
 const char *jump_protocol_const(const char *source);
 
@@ -629,6 +632,16 @@ void secret_vfprintf(httrackp *opt, FILE *fp,
 /* Skip adr's blanks and scheme, then its login. */
 const char *login_start(const char *adr);
 const char *login_end(const char *adr);
+/* Copies url, a URL a user typed, to dst of size bytes with each '?', '#'
+   and '\' before the last '@' preceding the first '/' written as %XX, so its
+   login reads as it always has. Returns HTS_FALSE when dst was too small. */
+hts_boolean hts_escape_typed_login(const char *url, char *dst, size_t size);
+/* Copies the n bytes of src to dst of size bytes, writing each byte of set
+   that lies in [from, to) as %XX. An escape that does not fit is dropped
+   whole. Returns HTS_FALSE when dst was too small. */
+hts_boolean hts_escape_span(const char *src, size_t n, const char *from,
+                            const char *to, const char *set, char *dst,
+                            size_t size);
 
 /* Header line helpers shared by the request writer and the redaction code. */
 size_t header_name_len(const char *line);

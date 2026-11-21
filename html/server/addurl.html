@@ -42,9 +42,9 @@ function do_add() {
 		}
 		str="http://";
 		if (document.form.urllogin.value.length > 0) {
-			str += document.form.urllogin.value;
+			str += escape_login(document.form.urllogin.value);
 			str += ":";
-			str += document.form.urlpass.value;
+			str += escape_login(document.form.urlpass.value);
 			str += "@";
 		}
 		str += document.form.urladr.value;
@@ -54,6 +54,11 @@ function do_add() {
 		alert('Javascript error, or parent window lost');
 	}
 	return 0;
+}
+// escapes what ends a login, but keeps a %XX the user typed
+function escape_login(s) {
+	return s.replace(/%(?![0-9A-Fa-f]{2})|[?#\/\\@:]|[^\x21-\x7e]/gu,
+		encodeURIComponent);
 }
 function info(str) {
 	window.status = str;

@@ -1,0 +1,154 @@
+#!/bin/bash
+# An '@' after the authority's first '/', '?', '#' or '\' is not a login: the
+# link is fetched from the host before it, with no credentials.
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+ui() { selftest_queue "$2" userinfo "$1"; }
+split() { selftest_queue "$2" identurl "$1"; }
+sni() { selftest_queue "$2" sniname "$1"; }
+auth() { selftest_queue "$2" proxyauth "$1"; }
+proxy() { selftest_queue "$2" proxyurl "$1"; }
+
+for t in '?' '#' "\\"; do
+    ui "http://h1${t}u=a@h2/x" "host=h1${t}u=a@h2/x end=h1${t}u=a@h2/x login=0"
+    sni "http://h1${t}u=a@h2/x" 'sni=h1'
+    auth "http://h1${t}u=a@h2/x" 'auth=none'
+    auth "h1${t}u=a@h2" 'auth=none'
+done
+split 'http://h1?u=a@h2/x.html' 'adr=h1 fil=/?u=a@h2/x.html'
+split 'http://h1#u=a@h2/x.html' 'adr=h1 fil=/#u=a@h2/x.html'
+# the parser turns a page link's '\' into '/', so only a start URL keeps one
+split 'http://h1\u=a@h2/x.html' 'adr=h1 fil=/\u=a@h2/x.html'
+split 'http://h1:81?u@h2:82/x' 'adr=h1:81 fil=/?u@h2:82/x'
+split 'http://h\a\b.html' 'adr=h fil=/\a\b.html'
+selftest_queue 'http://h1' fetchorigin 'http://h1\u=a@h2/x'
+selftest_queue 'typedlogin: 0 failure(s)' typedlogin
+
+# controls: a login before the authority ends is still one
+ui 'http://u:p@h1/x?a@b' 'host=h1/x?a@b end=h1/x?a@b login=1'
+ui 'https://u:p@q@h1:8/x' 'host=h1:8/x end=h1:8/x login=1'
+ui 'u:p@h1:3128' 'host=h1:3128 end=h1:3128 login=1'
+split 'http://u:p@h1/x?a@b' 'adr=u:p@h1 fil=/x?a@b'
+sni 'http://u:p@h1/x' 'sni=h1'
+auth 'u:p@h1' 'auth=dTpw'
+
+# -P escapes the terminators in a proxy password, so the login still reaches it
+proxy 'u:p#w@proxy:3128' 'name=u:p%23w@proxy port=3128 host=proxy kind=http'
+proxy 'connect://u:p?w@proxy:8080' 'name=connect://u:p%3Fw@proxy port=8080 host=proxy kind=connect'
+proxy 'u:a/b\c@proxy' 'name=u:a%2Fb%5Cc@proxy port=8080 host=proxy kind=http'
+proxy 'u:p@q#w@proxy' 'name=u:p@q%23w@proxy port=8080 host=proxy kind=http'
+# an escape that does not fit the name buffer is dropped whole
+selftest_queue 'name=u:ab%3F port=8080 host=u:ab%3F kind=http' proxyurl 'u:ab?@proxy' 8
+selftest_queue 'name=u:abc port=8080 host=u:abc kind=http' proxyurl 'u:abc?@proxy' 8
+auth 'u:p%23w@proxy' 'auth=dTpwI3c='
+
+selftest_run_queued
+
+# The crawl: h2 must see no request at all.
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_userinfo.XXXXXX") || exit 1
+cleanup() {
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+doc1="${tmpdir}/doc1"
+doc2="${tmpdir}/doc2"
+mkdir -p "$doc1" "$doc2"
+printf 'h2 page\n' >"${doc2}/x.html"
+local_server_start --root "$doc2" --log "${tmpdir}/srv2.log" \
+    --env LOCAL_SERVER_VERBOSE=1
+port2=$SRV_PORT
+local_server_start --root "$doc1" --log "${tmpdir}/srv1.log" \
+    --env LOCAL_SERVER_VERBOSE=1
+h1="127.0.0.1:${SRV_PORT}"
+h2="127.0.0.1:${port2}"
+printf '<a href="http://%s?u=a@%s/x.html">q</a>\n<a href="http://%s\\@%s/x.html">b</a>\n' \
+    "$h1" "$h2" "$h1" "$h2" >"${doc1}/index.html"
+
+require_httrack
+local_crawl --log "${tmpdir}/crawl.log" -O "${tmpdir}/out" --quiet --robots=0 \
+    --timeout=30 --retries=0 -r2 "http://${h1}/index.html" || true
+
+srv1=$(<"${tmpdir}/srv1.log")
+srv2=$(<"${tmpdir}/srv2.log")
+grep -q 'GET /index.html' <<<"$srv1" || fail "h1 never served the page: $srv1"
+grep -q "GET /?u=a@${h2}/x.html" <<<"$srv1" || fail "h1 missed the ?-link: $srv1"
+grep -q "GET /@${h2}/x.html" <<<"$srv1" || fail "h1 missed the \\-link: $srv1"
+! grep -q 'GET ' <<<"$srv2" || fail "h2 was contacted: $srv2"
+
+# A typed login reads up to the last '@' before the first '/', on the command
+# line and in a -%L list, and no password byte reaches the log or the console.
+creds=('u:p?w' 'u:a?b#c\d' 'u:4471?Wv3m' 'u:?x' 'admin:Zq9x@ss?Wv3m'
+    'u:Hd7k?Zq9x#Wv3m\Pp2r')
+i=0
+for c in "${creds[@]}"; do
+    want="Authorization: Basic $("$SRV_PYTHON" -c 'import base64, sys
+print(base64.b64encode(sys.argv[1].encode()).decode())' "$c")"
+    pass=${c#*:}
+    esc=$("$SRV_PYTHON" -c 'import sys, urllib.parse
+print(urllib.parse.quote(sys.argv[1], safe=""))' "$pass")
+    u="http://${c}@${h2}/reqheaders/echo.txt"
+    for mode in cmd list; do
+        i=$((i + 1))
+        out="${tmpdir}/typed$i"
+        if [ "$mode" = cmd ]; then
+            set -- "$u"
+        else
+            printf '%s\n' "$u" >"${out}.lst"
+            set -- -%L "${out}.lst"
+        fi
+        httrack -O "$out" --robots=0 --timeout=5 --retries=0 -r1 "$@" \
+            >"${out}.out" 2>"${out}.err" || true
+        echo_txt="${out}/${h2/:/_}/reqheaders/echo.txt"
+        [ -f "$echo_txt" ] || fail "$mode $c: not fetched: $(<"${out}.err")"
+        headers=$(<"$echo_txt")
+        grep -qF "$want" <<<"$headers" || fail "$mode $c: wrong login: $headers"
+        for f in "${out}/hts-log.txt" "${out}.out" "${out}.err"; do
+            if grep -qF -e "$pass" -e "$esc" "$f"; then
+                fail "$mode $c: password shown in ${f##*/}: $(<"$f")"
+            fi
+        done
+    done
+done
+
+# --why takes a typed URL: the login is masked and the host is the right one.
+# A filter matches the stored login, which spells a raw '?' as %3F.
+why_url="http://u:Pq3?Lk5@${h2}/a.html"
+for sign in + -; do
+    out="${tmpdir}/why${sign}"
+    httrack -O "$out" --robots=0 "http://u:Pq3?Lk5@${h2}/page" \
+        "${sign}*u:Pq3%3FLk5@127.0.0.1*a.html" --why "$why_url" \
+        >"${out}.out" 2>"${out}.err" || true
+    reply=$(<"${out}.out")
+    grep -qF "u:***@${h2}/a.html: " <<<"$reply" || fail "why $sign: $reply"
+    if [ "$sign" = + ]; then verdict=accepted; else verdict=rejected; fi
+    grep -qF "$verdict by rule" <<<"$reply" || fail "why $sign verdict: $reply"
+    ! grep -qF "Pq3?Lk5@${h2}/a.html" <<<"$reply" || fail "why $sign: login shown: $reply"
+done
+
+# A login bundle's url line is typed too: it logs in to h2, and the other one
+# goes to nohost.invalid rather than to h1.
+out="${tmpdir}/bundle"
+mkdir -p "${out}.d"
+printf '%s\n' '# HTTrack bundle 1' \
+    "url http://u:Zz9?Yq7@${h2}/reqheaders/echo.txt" \
+    "url http://${h1}?Wk4X@nohost.invalid/q.html" >"${out}.d/b.hts"
+httrack -O "$out" --robots=0 --timeout=5 --retries=0 -r1 \
+    --bundle-dir "${out}.d" "http://${h2}/x.html#httrack-bundle=b" \
+    >"${out}.out" 2>"${out}.err" || true
+echo_txt="${out}/${h2/:/_}/reqheaders/echo.txt"
+[ -f "$echo_txt" ] || fail "bundle: not fetched: $(<"${out}.err")"
+headers=$(<"$echo_txt")
+grep -qF "Authorization: Basic $(printf 'u:Zz9?Yq7' | base64)" <<<"$headers" ||
+    fail "bundle: wrong login: $headers"
+for f in "${out}/hts-log.txt" "${out}.out" "${out}.err"; do
+    if grep -qF -e 'Zz9?Yq7' -e 'Zz9%3FYq7' "$f"; then
+        fail "bundle: password shown in ${f##*/}: $(<"$f")"
+    fi
+done
+srv1=$(<"${tmpdir}/srv1.log")
+! grep -qF 'Wk4X' <<<"$srv1" || fail "bundle: h1 was sent the url line: $srv1"
+grep -qF nohost.invalid "${out}/hts-log.txt" || fail "bundle: nohost.invalid not tried: $(<"${out}/hts-log.txt")"

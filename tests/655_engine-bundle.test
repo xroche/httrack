@@ -106,6 +106,12 @@ http://mixed.test ua=M headers=global" bundle "$dir" \
 bundle plainm '# HTTrack bundle 1' 'ua M' 'header X-M: 1'
 selftest_queue "http://mixed.test ua=M headers=X-M: 1|" bundle "$dir" \
     'http://mixed.test/#httrack-bundle=plainm' host:http://mixed.test
+# a typed login ends at the last '@', so the scope is the host after it
+bundle tq '# HTTrack bundle 1' 'ua TQ'
+selftest_queue_lines "http://h2.test ua=TQ headers=global
+http://h1.test ua=global headers=global" bundle "$dir" \
+    'http://h1.test?x@h2.test/#httrack-bundle=tq' host:http://h2.test \
+    host:http://h1.test
 # Bundles that merge share the rule, whichever is listed first.
 for pair in 'plainm mixed2' 'mixed2 plainm'; do
     read -r u1 u2 <<<"$pair"
@@ -195,10 +201,10 @@ if touch -d '2026-01-01T10:00:00.5' "$tmpdir/subsecond" 2>/dev/null &&
     test "$tmpdir/subsecond" -nt "$tmpdir/order3.txt"; then
     order order4 202601011000.00 202601011000.00 jar
     touch -d '2026-01-01T10:00:00.5' "$tmpdir/order4.txt"
-    want_rows=140
+    want_rows=141
 else
     echo "skipping the sub-second jar order row: touch cannot set fractions" >&2
-    want_rows=139
+    want_rows=140
 fi
 
 # A control byte in a -%K or cookies.txt jar loads as it always did.

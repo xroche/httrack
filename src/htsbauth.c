@@ -1022,7 +1022,7 @@ static hts_boolean cookie_is_flat(FILE *fp, int *quote) {
 /* See htsbundle.h. */
 hts_boolean cookie_url_host(const char *url, char *dst, size_t dst_size) {
   const char *const rest = jump_protocol_const(url);
-  const size_t len = strcspn(rest, "/?#");
+  const size_t len = (size_t) (hts_authority_end(rest) - rest);
   char adr[HTS_URLMAXSIZE];
 
   if (len >= sizeof(adr))

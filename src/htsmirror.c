@@ -717,12 +717,22 @@ void hts_mirror_process_user_interaction(htsmoduleStruct *str,
 
     for (next = addurl; next != NULL && *next != NULL; next++) {
       char BIGSTK add_url[HTS_URLMAXSIZE * 2];
+      char BIGSTK typed[HTS_URLMAXSIZE * 2];
 
       add.af.adr[0] = add.af.fil[0] = add_url[0] = '\0';
       if (!link_has_authority(*next))
         strcpybuff(add_url, "http://"); // ajouter http://
       strcatbuff(add_url, *next);
-      if (ident_url_absolute(add_url, &add.af) >= 0) {
+      // a typed login reads up to the last '@' before the first '/'
+      const hts_boolean escaped =
+          hts_escape_typed_login(add_url, typed, sizeof(typed));
+
+      if (!escaped)
+        hts_log_print(
+            opt, LOG_WARNING,
+            "URL too long once its login is escaped, ignored: %.64s...",
+            url_nologin(opt, add_url));
+      if (escaped && ident_url_absolute(typed, &add.af) >= 0) {
         // ----Ajout----
         lien_adrfil former;
         int forbidden_url = 0;

@@ -1174,10 +1174,15 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
       char BIGSTK url[HTS_URLMAXSIZE * 2];
       lien_adrfil af;
 
+      char BIGSTK typed[HTS_URLMAXSIZE * 2];
+
       if (seed_needs_scheme(StringBuff(opt->why_url)))
-        snprintf(url, sizeof(url), "http://%s", StringBuff(opt->why_url));
+        snprintf(typed, sizeof(typed), "http://%s", StringBuff(opt->why_url));
       else
-        strcpybuff(url, StringBuff(opt->why_url));
+        snprintf(typed, sizeof(typed), "%s", StringBuff(opt->why_url));
+      // a typed login reads up to the last '@' before the first '/'
+      if (!hts_escape_typed_login(typed, url, sizeof(url)))
+        strcpybuff(url, typed);
       if (ident_url_absolute(url, &af) < 0) {
         printf("--why: unable to parse URL %s" LF,
                adr_nologin(opt, StringBuff(opt->why_url)));
@@ -1267,8 +1272,12 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
             continue;
           }
           if (line[0]) {
+            char BIGSTK typed[HTS_URLLIST_LINE_SIZE * 3];
+
+            // sized so the escape cannot clip
+            (void) hts_escape_typed_login(line, typed, sizeof(typed));
             n++;
-            seed_append(&primarybuff, line);
+            seed_append(&primarybuff, typed);
           }
         }
         hts_log_print(opt, LOG_NOTICE, "%d links added from %s", n,

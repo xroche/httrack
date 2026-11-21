@@ -4260,6 +4260,67 @@ static int st_contentid_tail(httrackp *opt, int argc, char **argv) {
   return failures != 0;
 }
 
+/* Print the host each login parser finds in a URL address. */
+static int st_userinfo(httrackp *opt, int argc, char **argv) {
+  int i;
+
+  for (i = 0; i < argc; i++)
+    printf("host=%s end=%s login=%d\n", jump_identification_const(argv[i]),
+           login_end(argv[i]), link_has_authorization(argv[i]));
+  return 0;
+}
+
+/* Check how hts_escape_typed_login() rewrites a typed URL. */
+static int st_typedlogin(httrackp *opt, int argc, char **argv) {
+  static const struct {
+    const char *url;
+    const char *want;
+  } rows[] = {
+      {"http://u:p?w@h/", "http://u:p%3Fw@h/"},
+      {"http://u:a?b#c\\d@h/", "http://u:a%3Fb%23c%5Cd@h/"},
+      {"http://u:4471?Wv3m@h/", "http://u:4471%3FWv3m@h/"},
+      {"http://u:?x@h/", "http://u:%3Fx@h/"},
+      {"http://admin:Zq9x@ss?Wv3m@h/x?y#z",
+       "http://admin:Zq9x@ss%3FWv3m@h/x?y#z"},
+      {"u:p?w@h:80/x?q", "u:p%3Fw@h:80/x?q"},
+      {"//u:p#w@h", "//u:p%23w@h"},
+      {"ftp://u:p?w@h", "ftp://u:p%3Fw@h"},
+      {"http://host:8099?e=a@b.com", "http://host:8099%3Fe=a@b.com"},
+      {"http://u:p%3Fw@h/", "http://u:p%3Fw@h/"},
+      {"http://u:p%3Fw@h/?a#b", "http://u:p%3Fw@h/?a#b"},
+      {"http://h/x?a@b#c", "http://h/x?a@b#c"},
+      {"http://h?a#b\\c", "http://h?a#b\\c"},
+      {"http://u:p@h/x?a@b", "http://u:p@h/x?a@b"},
+      {"http://u:p?w@[::1]:8080/x?y", "http://u:p%3Fw@[::1]:8080/x?y"},
+      {"http://[::1]:80/x?a@b", "http://[::1]:80/x?a@b"},
+  };
+
+  char out[256];
+  size_t i;
+  int failures = 0;
+
+  for (i = 0; i < sizeof(rows) / sizeof(rows[0]); i++) {
+    const hts_boolean ok =
+        hts_escape_typed_login(rows[i].url, out, sizeof(out));
+
+    if (!ok || strcmp(out, rows[i].want) != 0) {
+      printf("FAIL %s: %s\n", rows[i].url, out);
+      failures++;
+    } else if (!hts_escape_typed_login(rows[i].want, out, sizeof(out)) ||
+               strcmp(out, rows[i].want) != 0) {
+      printf("FAIL twice %s: %s\n", rows[i].want, out);
+      failures++;
+    }
+  }
+  // an escape that does not fit is dropped whole
+  if (hts_escape_typed_login("u:ab?@h", out, 6) || strcmp(out, "u:ab") != 0) {
+    printf("FAIL short: %s\n", out);
+    failures++;
+  }
+  printf("typedlogin: %d failure(s)\n", failures);
+  return failures != 0;
+}
+
 /* -#test=clienthints <user-agent>: the Sec-CH-UA* values it implies. */
 static int st_clienthints(httrackp *opt, int argc, char **argv) {
   hts_client_hints ch;
@@ -4402,6 +4463,10 @@ const struct selftest_entry selftests_lib[] = {
      st_plugoom},
     {"libhandlesoom", "", "a module that cannot be recorded changes nothing",
      st_libhandlesoom},
+    {"userinfo", "<url>...", "the host each login parser finds in a URL",
+     st_userinfo},
+    {"typedlogin", "", "escape the ?, # and \\ of a typed URL's login",
+     st_typedlogin},
     {"clienthints", "<user-agent>",
      "the client hints a browser sending this User-Agent adds", st_clienthints},
     {"headerverdict", "<line> [earlier...]",
