@@ -328,33 +328,6 @@ static int ftp_handoff_check_reaped(const lien_back *slot, int round) {
 }
 
 /* See htsftp.h. */
-static hts_boolean ftp_may_resume(httrackp *opt, const lien_back *back,
-                                  time_t remote_mtime);
-
-int ftp_scratch_selftests(httrackp *opt) {
-  const int before = opt->state.concat.index;
-  lien_back *back = calloct(1, sizeof(lien_back));
-  int err = 0;
-
-  if (back == NULL)
-    return 1;
-  strcpybuff(back->url_adr, "ftp://user:secret@example.com");
-  strcpybuff(back->url_fil, "/f");
-  back->r.totalsize = 10;
-  back->range_req_size = 5;
-  /* both "not resuming" log lines name the address */
-  (void) ftp_may_resume(opt, back, (time_t) -1);
-  back->r.totalsize = 0;
-  (void) ftp_may_resume(opt, back, (time_t) 1);
-  if (opt->state.concat.index != before) {
-    fprintf(stderr,
-            "ftp-scratch-selftest: the worker took a rotating buffer\n");
-    err++;
-  }
-  freet(back);
-  return err;
-}
-
 int ftp_handoff_selftests(httrackp *opt) {
   struct_back *sback = back_new(opt, 1);
   cache_back cache;
@@ -682,6 +655,31 @@ static hts_boolean ftp_may_resume(httrackp *opt, const lien_back *back,
     return HTS_FALSE;
   }
   return HTS_TRUE;
+}
+
+/* See htsftp.h. */
+int ftp_scratch_selftests(httrackp *opt) {
+  const int before = opt->state.concat.index;
+  lien_back *back = calloct(1, sizeof(lien_back));
+  int err = 0;
+
+  if (back == NULL)
+    return 1;
+  strcpybuff(back->url_adr, "ftp://user:secret@example.com");
+  strcpybuff(back->url_fil, "/f");
+  back->r.totalsize = 10;
+  back->range_req_size = 5;
+  /* both "not resuming" log lines name the address */
+  (void) ftp_may_resume(opt, back, (time_t) -1);
+  back->r.totalsize = 0;
+  (void) ftp_may_resume(opt, back, (time_t) 1);
+  if (opt->state.concat.index != before) {
+    fprintf(stderr,
+            "ftp-scratch-selftest: the worker took a rotating buffer of opt\n");
+    err++;
+  }
+  freet(back);
+  return err;
 }
 
 /* Clip a wait to what is left of --max-time: back_wait() can't abort this slot

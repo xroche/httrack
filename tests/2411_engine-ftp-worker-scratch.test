@@ -1,11 +1,30 @@
 #!/bin/bash
-#
+# The FTP worker thread must not take a rotating buffer of opt (a data race).
 
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
+: "${top_srcdir:=..}"
+
 require_httrack
 
 assert_selftest "ftp-scratch-selftest: OK" ftpscratch
+
+# The selftest drives one worker function, so guard the rest in the source text.
+# A function-local mutant of any worker body is caught here, not by the run.
+src="$top_srcdir/src/htsftp.c"
+test -r "$src" || skip "no src/htsftp.c in this tree"
+body_of() { # body_of FUNCTION FILE
+    awk "/^[A-Za-z_].*[ *]$1\\(/,/^}/" "$2"
+}
+for fn in run_launch_ftp ftp_may_resume ftp_dns_resolve ftp_connect \
+    get_ftp_line ftp_accept; do
+    body=$(body_of "$fn" "$src")
+    test -n "$body" || fail "$fn not found in htsftp.c"
+    if grep -Eq 'adr_nologin\(|url_nologin\(|OPT_GET_BUFF|hts_logpath\(' <<<"$body"; then
+        fail "$fn takes a rotating buffer of opt"
+    fi
+done
+ok "no FTP worker function takes a rotating buffer of opt"
