@@ -3734,8 +3734,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
           // the first connect took the preferred address, so count from it
           first =
               hts_dns_addr_index(scratch, cf->addr_count, &back[i].r.address);
-          // record replaced since the connect: newhttp_addr() took the
-          // preferred
+          // a replaced record lost it, so use the preferred index
           if (first < 0)
             first = hts_dns_preferred(opt, back[i].url_adr);
           cf->addr_first = first < cf->addr_count ? first : 0;
