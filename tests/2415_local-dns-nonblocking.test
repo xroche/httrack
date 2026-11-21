@@ -86,3 +86,22 @@ for run in 1 2 3 4 5; do
     test "$calls" -eq 1 ||
         fail_dump "run $run: $calls resolves of localhost, expected 1" "$out/hts-log.txt"
 done
+
+# A resolved slot waits for --pause like a direct connect, so three links
+# parked on one resolve connect a second apart rather than at once.
+links=""
+for n in 1 2 3; do
+    links="$links<a href=\"http://localhost:${SRV_PORT}/p$n.html\">$n</a>"
+done
+echo "$links" >"$root/three.html"
+out="$tmpdir/o4"
+start=$(date +%s%N)
+GAISTALL_HOST=localhost GAISTALL=1 LD_PRELOAD="$GAISTALL_LIB" \
+    local_crawl --log "$tmpdir/log4" "$base/three.html" "+localhost*" -O "$out" -c8 --pause 1 --robots=0 --quiet
+elapsed=$((($(date +%s%N) - start) / 1000000))
+for n in 1 2 3; do
+    test -f "$out/localhost_${SRV_PORT}/p$n.html" ||
+        fail_dump "paced localhost p$n.html missing" "$out/hts-log.txt"
+done
+test "$elapsed" -ge 3000 ||
+    fail_dump "three paced connects took ${elapsed}ms, under 3s" "$out/hts-log.txt"
