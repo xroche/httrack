@@ -1131,7 +1131,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
       r->size = cSize;
     }
   }
-  assertf(r->adr != NULL); // the caller parses only a page it holds
+  assertf(r->adr != NULL); // for the analyzer: the caller always holds a page
   if (RUN_CALLBACK4(opt, check_html, r->adr, (int) r->size, urladr(), urlfil())) {
     FILE *fp = NULL;                  // fichier écrit localement 
     const char *html = r->adr;        // pointeur (on parcours)

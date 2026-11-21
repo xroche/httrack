@@ -741,7 +741,7 @@ static HTS_INLINE HTS_UNUSED void sigpipe_release(sigpipe_mask *m) {
 static HTS_INLINE HTS_UNUSED int hts_send_nosignal(T_SOC soc, const char *s,
                                                    size_t len) {
 #ifdef __clang_analyzer__
-  // the clip would read as an INT_MAX-byte send of every buffer
+  // the analyzer reads the INT_MAX clip as a huge send
   const int ilen = (int) len;
 #else
   const int ilen = len > INT_MAX ? INT_MAX : (int) len;

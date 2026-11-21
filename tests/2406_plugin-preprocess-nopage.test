@@ -1,0 +1,21 @@
+#!/bin/bash
+#
+# A preprocess hook answering 1 with no page must leave the fetched page in
+# place, rather than hand the parser a NULL buffer.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+: "${top_srcdir:=..}"
+
+[ -n "${PREPROCESSNOPAGE_LIB:-}" ] || skip "PREPROCESSNOPAGE_LIB unset, no automake environment"
+[ -r "${PREPROCESSNOPAGE_LIB}" ] || skip "nothing built at ${PREPROCESSNOPAGE_LIB}"
+
+# The page's own title proves the engine kept the page it fetched.
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
+    --stdout-found 'preprocessnopage: no page for' \
+    --file-matches 'simple/basic.html' 'Sample test' \
+    --file-matches 'simple/basic.html' '</body>' \
+    httrack 'BASEURL/simple/basic.html' --wrapper "${PREPROCESSNOPAGE_LIB}"

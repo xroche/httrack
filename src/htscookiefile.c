@@ -136,7 +136,7 @@ static hts_boolean cookie_copy(const char *src, const char *dst) {
     ok =
         fwrite(buf, 1, (fault & COOKIE_FAULT_COPY_WRITE) ? n / 2 : n, out) == n;
     if (n < sizeof(buf))
-      break; // a short read is the end or an error
+      break;
   }
   if (in != NULL && (ferror(in) || (fault & COOKIE_FAULT_COPY_READ)))
     ok = HTS_FALSE;

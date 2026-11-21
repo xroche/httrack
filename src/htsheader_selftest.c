@@ -923,7 +923,7 @@ static int ae_check_decoded(const char *path, const unsigned char *expect,
     }
     off += n;
     if (n < sizeof(buf))
-      break; // a short read is the end or an error
+      break;
   }
   fclose(f);
   return (off == len) ? 0 : 1;

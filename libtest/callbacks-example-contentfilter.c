@@ -131,7 +131,7 @@ static int process(t_hts_callbackarg * carg, httrackp * opt, char *html,
   /* Process */
   if (strcmp(address, "primary") == 0 && strcmp(filename, "/primary") == 0)     /* primary page (list of links) */
     return 1;
-  if (stringfilters == NULL)
+  if (stringfilters == NULL) /* for the analyzer: init always sets it */
     return 1;
   while(stringfilters[i] != NULL && !getIt) {
     if ((pos = strstr(html, stringfilters[i])) != NULL) {

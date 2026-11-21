@@ -142,7 +142,7 @@ static int mysavename(t_hts_callbackarg * carg, httrackp * opt,
   }
 
   /* Process */
-  if (string1 == NULL || string2 == NULL)
+  if (string1 == NULL || string2 == NULL) /* for the analyzer: init sets them */
     return 1;
   buff = strdup(save);
   if (buff == NULL)

@@ -1,7 +1,6 @@
 #!/bin/bash
-# Run the clang static analyzer over a configured build tree, and fail on any
-# finding, or when the analyzer could not have reported one.
-# Usage: bash tools/scan-build-gate.sh SRCDIR REPORTDIR, from the build dir.
+# Fail on any clang analyzer finding, or if the analyzer could not report one.
+# Usage: bash tools/scan-build-gate.sh SRCDIR REPORTDIR (run from the build dir)
 set -euo pipefail
 
 srcdir=$(cd "$1" && pwd)
@@ -13,7 +12,7 @@ mkdir -p "$reportdir"
 # coucal and minizip are vendored, so their findings go to their upstreams.
 # Dead stores are style, and unix.Errno flags every libc call after a failed one.
 flags=(--status-bugs
-    --exclude "$srcdir/src/coucal" --exclude "$srcdir/src/minizip"
+    --exclude "$srcdir/src/coucal/" --exclude "$srcdir/src/minizip/"
     -disable-checker deadcode.DeadStores -disable-checker unix.Errno)
 
 # The verdict line scan-build prints last, or nothing.
@@ -27,8 +26,7 @@ grep -q '^CC = .*ccc-analyzer' src/Makefile ||
         exit 1
     }
 
-# A planted bug under src/ proves the analyzer, the exclusions and the verdict
-# parsing can still see a finding.
+# A planted null dereference proves the gate can still see a finding.
 probe=$(mktemp "$srcdir/src/scan-build-probe-XXXXXX.c")
 trap 'rm -f "$probe"' EXIT
 printf 'int probe(int *p) {\n  if (p == 0)\n    return *p;\n  return 0;\n}\n' >"$probe"
@@ -44,6 +42,8 @@ if test "$status" -eq 0 || test "$(verdict "$reportdir/probe.log")" != "scan-bui
 fi
 rm -rf "$reportdir/probe"
 
+# The analyzer only sees what make compiles, so an up-to-date tree reads clean.
+make clean >"$reportdir/clean.log" 2>&1
 status=0
 "$scan_build" -o "$reportdir/scan" "${flags[@]}" make -j"$jobs" \
     >"$reportdir/scan.log" 2>&1 || status=$?
@@ -51,7 +51,6 @@ summary=$(verdict "$reportdir/scan.log")
 grep -E 'warning: .*\[[a-zA-Z]+\.[a-zA-Z.]+\]$' "$reportdir/scan.log" |
     grep -v -e "^$srcdir/src/coucal/" -e "^$srcdir/src/minizip/" || true
 echo "${summary:-scan-build printed no verdict}"
-# A build that never reached the analyzer also ends without findings.
 if test -z "$summary"; then
     tail -50 "$reportdir/scan.log"
     echo "::error::scan-build printed no verdict"

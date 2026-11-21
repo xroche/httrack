@@ -113,7 +113,7 @@ static void uninit(t_hts_callbackarg *carg) {
     CALLBACKARG_PREV_FUN(carg, uninit)(CALLBACKARG_PREV_CARG(carg));
   }
 
-  /* Process */
+  /* Process. The NULL tests are for the analyzer: init always sets userdef. */
   if (userdef == NULL)
     return;
   hts_free(userdef->buffer);

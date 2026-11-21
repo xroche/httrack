@@ -171,7 +171,7 @@ static int codec_unpack_brotli(FILE *in, FILE *out, LLint maxout,
 
     if (avail_in == 0)
       break; /* EOF; a stream still hungry for input is truncated */
-    last = avail_in < sizeof(inbuf); // a short read is the end or an error
+    last = avail_in < sizeof(inbuf);
     for (;;) {
       unsigned char BIGSTK outbuf[8192];
       uint8_t *next_out = outbuf;
@@ -247,7 +247,7 @@ static int codec_unpack_zstd(FILE *in, FILE *out, LLint maxout, int *io_errno) {
     input.pos = 0;
     if (input.size == 0)
       break;
-    eof = input.size < sizeof(inbuf); // a short read is the end or an error
+    eof = input.size < sizeof(inbuf);
     while (input.pos < input.size) {
       unsigned char BIGSTK outbuf[8192];
       ZSTD_outBuffer output;

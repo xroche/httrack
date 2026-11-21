@@ -1342,7 +1342,9 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
 
   }
 
-  // backing, which every crawl needs, so a library caller's -c0 still gets it
+  /* backing: at least one socket, or nothing is ever fetched */
+  if (opt->maxsoc <= 0)
+    opt->maxsoc = 1;
   {
     /* How many HTML files may sit in memory at once. Sized generously: HTML
        takes little room and everything else is written straight to disk. */

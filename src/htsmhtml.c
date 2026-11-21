@@ -203,7 +203,7 @@ void mimehtml_add_file(httrackp *opt, const char *save, const char *adr,
               fwrite(buff, 1, len, opt->state.mimefp);
             }
             if (len < sizeof(buff))
-              break; // a short read is the end or an error
+              break;
           }
           fprintf(opt->state.mimefp, "\r\n\r\n");
         }

@@ -120,6 +120,7 @@ static void changes_free(hts_changes **pchanges) {
 static intptr_t changes_find(const hts_changes *changes, const char *file) {
   intptr_t slot = 0;
 
+  // the bounds test is for the analyzer, the index holds only valid slots
   return coucal_read(changes->index, file, &slot) && slot > 0 &&
                  (size_t) slot <= TypedArraySize(changes->entries)
              ? slot - 1
@@ -173,7 +174,7 @@ static hts_boolean digest_file(const char *path,
   do {
     nread = fread(buffer, 1, sizeof(buffer), fp);
     MD5Update(&ctx, (const unsigned char *) buffer, (unsigned int) nread);
-  } while (nread == sizeof(buffer)); // a short read is the end or an error
+  } while (nread == sizeof(buffer));
   if (ferror(fp) != 0) {
     fclose(fp);
     return HTS_FALSE;

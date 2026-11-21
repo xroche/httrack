@@ -2713,6 +2713,18 @@ static int st_strsprintf(httrackp *opt, int argc, char **argv) {
     expected[i] = (char) ('a' + (i % 26));
   expected[maxLen] = '\0';
 
+  /* a total of 0 still allocates, so StringBuff is never NULL after it */
+  {
+    String s = STRING_EMPTY;
+
+    StringRoomTotal(s, 0);
+    if (StringBuff(s) == NULL) {
+      printf("  FAIL: StringRoomTotal(0) left no buffer\n");
+      err = 1;
+    }
+    StringFree(s);
+  }
+
   /* one call on a String whose capacity is pinned to the boundary, so len ==
      capacity is reached exactly once per boundary */
   for (i = 0; !err && i < sizeof(caps) / sizeof(caps[0]); i++) {
