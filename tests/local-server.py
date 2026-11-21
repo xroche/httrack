@@ -2948,6 +2948,11 @@ class Handler(SimpleHTTPRequestHandler):
         "bom.m3u": ("audio/x-mpegurl", b"\xef\xbb\xbf#EXTM3U\nbom.cgi\n"),
         "twotok.m3u": ("audio/x-mpegurl", b"twotok.cgi twotok2.cgi\n"),
         "octet.bin": ("application/octet-stream", b"octetbin.cgi\n"),
+        # 2 MiB of blanks: hangs a parser that rescans them per byte
+        "blankrun.m3u": (
+            "audio/x-mpegurl",
+            b"#EXTM3U\n" + b" \t" * (1 << 20) + b"blankrun.cgi\n",
+        ),
     }
 
     def route_playlistmime(self):
