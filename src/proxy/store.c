@@ -1822,7 +1822,8 @@ static PT_Element PT_ReadCache__Old(PT_Index index_, const char *url,
 	|| ((unsigned char) c ) == 127 \
 	)
           urlDecoded = DecodeUrl(jump_protocol_and_auth(url));
-          strcpy(previous_save_, StringBuff(urlDecoded));
+          strclipbuff(previous_save_, sizeof(previous_save_),
+                      StringBuff(urlDecoded));
           StringFree(urlDecoded);
           for(i = 0; previous_save_[i] != '\0' && previous_save_[i] != '?'; i++) {
             if (FORBIDDEN_CHAR(previous_save_[i])) {

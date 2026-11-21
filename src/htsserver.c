@@ -2645,8 +2645,9 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                           while(*a) {
                             /* the ini writer has no inverse for it, so a lone
                                backslash in a settings value must stay one */
-                            if (literal && a[0] == '\\' && isxdigit(a[1]) &&
-                                isxdigit(a[2])) {
+                            if (literal && a[0] == '\\' &&
+                                isxdigit((unsigned char) a[1]) &&
+                                isxdigit((unsigned char) a[2])) {
                               int n;
                               char c;
 
