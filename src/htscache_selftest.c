@@ -4739,10 +4739,6 @@ static int st_changes_race(httrackp *opt, int argc, char **argv) {
   return st_verdict("changes-race self-test", err);
 }
 
-/* ------------------------------------------------------------ */
-/* Registry: this module's tests, in the order -#test lists them. */
-/* ------------------------------------------------------------ */
-
 /* zip-write-errors: one member written with each write in turn failing once */
 enum { ZW_OPEN, ZW_OPENFILE, ZW_WRITE, ZW_CLOSEFILE, ZW_CLOSE, ZW_NPHASES };
 
@@ -4936,6 +4932,10 @@ static int st_zip_write_errors(httrackp *opt, int argc, char **argv) {
   freet(data);
   return st_verdict("zip-write-errors", fail);
 }
+
+/* ------------------------------------------------------------ */
+/* Registry: this module's tests, in the order -#test lists them. */
+/* ------------------------------------------------------------ */
 
 const struct selftest_entry selftests_cache[] = {
     {"changes", "", "--changes bucket accounting and JSON escaping (#714)",
