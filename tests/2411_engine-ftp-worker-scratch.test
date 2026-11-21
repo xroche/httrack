@@ -1,0 +1,11 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+require_httrack
+
+assert_selftest "ftp-scratch-selftest: OK" ftpscratch

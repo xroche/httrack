@@ -328,6 +328,33 @@ static int ftp_handoff_check_reaped(const lien_back *slot, int round) {
 }
 
 /* See htsftp.h. */
+static hts_boolean ftp_may_resume(httrackp *opt, const lien_back *back,
+                                  time_t remote_mtime);
+
+int ftp_scratch_selftests(httrackp *opt) {
+  const int before = opt->state.concat.index;
+  lien_back *back = calloct(1, sizeof(lien_back));
+  int err = 0;
+
+  if (back == NULL)
+    return 1;
+  strcpybuff(back->url_adr, "ftp://user:secret@example.com");
+  strcpybuff(back->url_fil, "/f");
+  back->r.totalsize = 10;
+  back->range_req_size = 5;
+  /* both "not resuming" log lines name the address */
+  (void) ftp_may_resume(opt, back, (time_t) -1);
+  back->r.totalsize = 0;
+  (void) ftp_may_resume(opt, back, (time_t) 1);
+  if (opt->state.concat.index != before) {
+    fprintf(stderr,
+            "ftp-scratch-selftest: the worker took a rotating buffer\n");
+    err++;
+  }
+  freet(back);
+  return err;
+}
+
 int ftp_handoff_selftests(httrackp *opt) {
   struct_back *sback = back_new(opt, 1);
   cache_back cache;
@@ -635,11 +662,13 @@ hts_boolean ftp_parse_mdtm(const char *line, struct tm *tm_time) {
 static hts_boolean ftp_may_resume(httrackp *opt, const lien_back *back,
                                   time_t remote_mtime) {
   const time_t local_mtime = get_filetime(back->url_sav);
+  /* a worker thread must not take a rotating buffer of opt */
+  char masked[HTS_URLMAXSIZE * 2];
 
   if (back->r.totalsize <= back->range_req_size) {
-    hts_log_print(opt, LOG_DEBUG,
-                  "FTP: not resuming %s%s, the local copy is not shorter",
-                  adr_nologin(opt, back->url_adr), back->url_fil);
+    hts_log_print(
+        opt, LOG_DEBUG, "FTP: not resuming %s%s, the local copy is not shorter",
+        adr_nologin_r(masked, sizeof(masked), back->url_adr), back->url_fil);
     return HTS_FALSE;
   }
   /* Equality, not ordering: a copy this code did not stamp carries a local
@@ -648,7 +677,8 @@ static hts_boolean ftp_may_resume(httrackp *opt, const lien_back *back,
       remote_mtime != local_mtime) {
     hts_log_print(opt, LOG_DEBUG,
                   "FTP: not resuming %s%s, the copy is not dated as the remote",
-                  adr_nologin(opt, back->url_adr), back->url_fil);
+                  adr_nologin_r(masked, sizeof(masked), back->url_adr),
+                  back->url_fil);
     return HTS_FALSE;
   }
   return HTS_TRUE;
@@ -840,6 +870,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
   {
     SOCaddr server;
     char _adr[256];
+    char masked[sizeof(_adr)];
     char err[128];
     const char *error = "unknown error";
 
@@ -874,7 +905,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
 
     strcpybuff(back->info, "connect");
     hts_log_print(opt, LOG_DEBUG, "FTP: connecting to %s:%d",
-                  adr_nologin(opt, _adr), port);
+                  adr_nologin_r(masked, sizeof(masked), _adr), port);
 
     if (!ftp_connect(back, soc_ctl, &server, timeout, opt)) {
       ftp_fail(&back->r, "Unable to connect to the server");

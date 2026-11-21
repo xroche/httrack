@@ -2362,6 +2362,10 @@ static int st_ftphandoff(httrackp *opt, int argc, char **argv) {
   return st_verdict("ftp-handoff-selftest", err);
 }
 
+static int st_ftpscratch(httrackp *opt, int argc, char **argv) {
+  return st_verdict("ftp-scratch-selftest", ftp_scratch_selftests(opt));
+}
+
 /* #1697: hts_strerror() must own its output. strerror() answers with a buffer
    the next call in that thread reuses and thread exit frees, and POSIX lets it
    be one static shared by every thread. */
@@ -3353,6 +3357,8 @@ const struct selftest_entry selftests_back[] = {
     {"ftphandoff", "",
      "an FTP worker's slot handoff is ordered against the crawl thread",
      st_ftphandoff},
+    {"ftpscratch", "", "the FTP worker code takes no rotating buffer of opt",
+     st_ftpscratch},
     {"backnew", "",
      "a backing table too big to allocate is a NULL, not an abort", st_backnew},
     {"recordoom", "",

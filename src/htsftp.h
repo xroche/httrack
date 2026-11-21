@@ -79,6 +79,9 @@ int ftp_worker_selftests(void);
    failed checks. */
 int ftp_handoff_selftests(httrackp *opt);
 
+/* Self-test: the worker code leaves the rotating buffers of opt alone. */
+int ftp_scratch_selftests(httrackp *opt);
+
 int run_launch_ftp(FTPDownloadStruct * params);
 int send_line(T_SOC soc, const char *data);
 /* Read one control-channel reply into line[line_size]. Returns 0 on error.
