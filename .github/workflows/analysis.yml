@@ -1,0 +1,138 @@
+# A bounds-checked test suite and the clang static analyzer, run weekly by tier2.yml.
+name: Analysis
+
+on:
+  # Scheduled by tier2.yml, which owns every leg that builds our own source.
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A reusable workflow inherits no env from its caller.
+env:
+  CHECK_JOBS: 16
+
+jobs:
+  # ASan and FORTIFY cannot see an overflow inside a struct, and any report here is a real bug.
+  bounds-strict:
+    name: build (gcc -fsanitize=bounds-strict)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      BOUNDS_CFLAGS: -O2 -g -fsanitize=bounds-strict -fno-sanitize-recover=bounds-strict
+      BOUNDS_LDFLAGS: -fsanitize=bounds-strict
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
+          sudo apt-get install -y --no-install-recommends \
+            build-essential autoconf automake libtool autoconf-archive \
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
+
+      # The report file, not the exit status, proves the detector fires.
+      - name: Prove an in-struct overflow is reported
+        run: |
+          set -euo pipefail
+          cat >"$RUNNER_TEMP/probe.c" <<'EOF'
+          struct s { char a[8]; int next; };
+          int main(int argc, char **argv) {
+            struct s v = { { 0 }, 1 };
+            (void) argv;
+            v.a[argc + 7] = 'X';
+            return v.next == 0;
+          }
+          EOF
+          # shellcheck disable=SC2086 # flag lists, and the splitting is the point
+          gcc $BOUNDS_CFLAGS $BOUNDS_LDFLAGS -o "$RUNNER_TEMP/probe" "$RUNNER_TEMP/probe.c"
+          mkdir -p "$RUNNER_TEMP/probe-logs"
+          UBSAN_OPTIONS="halt_on_error=1:log_path=$RUNNER_TEMP/probe-logs/u" "$RUNNER_TEMP/probe" || true
+          grep -q 'out of bounds' "$RUNNER_TEMP"/probe-logs/u.* ||
+            { echo "::error::the probe overflow went unreported"; exit 1; }
+
+      - name: Configure
+        run: |
+          set -euo pipefail
+          autoreconf -fi
+          ./configure CC=gcc CFLAGS="$BOUNDS_CFLAGS" LDFLAGS="$BOUNDS_LDFLAGS"
+          grep -q -- '-fno-sanitize-recover=bounds-strict' src/Makefile
+
+      - name: Build
+        run: make -j"$(nproc)"
+
+      # An absolute log_path, because tests chdir.
+      - name: Test
+        timeout-minutes: 25
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/ubsan"
+          UBSAN_OPTIONS="halt_on_error=1:print_stacktrace=1:log_path=$RUNNER_TEMP/ubsan/u" \
+            make check -j"$CHECK_JOBS"
+
+      # A test that tolerates a failing httrack would hide the report from make check.
+      - name: Fail on any bounds report
+        if: always()
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          reports=("$RUNNER_TEMP"/ubsan/u.*)
+          if test "${#reports[@]}" -gt 0; then
+            cat "${reports[@]}"
+            echo "::error::${#reports[@]} process(es) indexed out of bounds"
+            exit 1
+          fi
+
+      - name: Print the test log on failure
+        if: failure()
+        run: sh tools/ci-test-log.sh
+
+  # About 80 findings on CI, nearly all false positives, so findings do not fail the job.
+  scan-build:
+    name: clang static analyzer (scan-build)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
+          sudo apt-get install -y --no-install-recommends \
+            build-essential autoconf automake libtool autoconf-archive \
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev clang-tools
+
+      # --disable-shared stops libtool from analyzing every file twice.
+      - name: Configure
+        run: |
+          set -euo pipefail
+          autoreconf -fi
+          scan-build ./configure --disable-shared
+          # Without the wrapper as CC, "No bugs found" would mean nothing was analyzed.
+          grep -q '^CC = .*ccc-analyzer' src/Makefile
+
+      # coucal is a submodule with its own upstream.
+      - name: Analyze
+        run: |
+          set -euo pipefail
+          scan-build -o "$RUNNER_TEMP/scan" --exclude "$GITHUB_WORKSPACE/src/coucal" \
+            make -j"$(nproc)" 2>&1 | tee "$RUNNER_TEMP/scan.log"
+          # A build that never reached the analyzer also ends without findings.
+          summary=$(grep -E '^scan-build: ([0-9]+ bugs? found|No bugs found)' "$RUNNER_TEMP/scan.log" || true)
+          test -n "$summary" || { echo "::error::scan-build printed no verdict"; exit 1; }
+          echo "$summary" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the analyzer report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: scan-build-report
+          path: ${{ runner.temp }}/scan/
+          if-no-files-found: ignore

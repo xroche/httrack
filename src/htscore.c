@@ -1144,6 +1144,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
           }
 
           if (!filters_grow(opt, 1)) {
+            freet(primary);
             XH_extuninit;
             return 0;
           }
