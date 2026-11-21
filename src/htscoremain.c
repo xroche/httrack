@@ -2594,7 +2594,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
             }
             break;
           case 'O':            // output path
-            while(isdigit(com[1])) {
+            while (isdigit((unsigned char) com[1])) {
               com++;
             }
             na++;               // sauter, déja traité

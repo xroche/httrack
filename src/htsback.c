@@ -762,8 +762,10 @@ int back_available(const struct_back * sback) {
 static LLint back_slot_incache(const lien_back *back) {
   if (back->r.adr == NULL)
     return 0;
-  return max(hts_load_relaxed_llint(&back->r.size),
-             hts_load_relaxed_llint(&back->r.totalsize));
+  const LLint size = hts_load_relaxed_llint(&back->r.size);
+  const LLint total = hts_load_relaxed_llint(&back->r.totalsize);
+
+  return max(size, total);
 }
 
 /* Estimated bytes of the pages and files held in memory. */
