@@ -428,6 +428,10 @@ jobs:
   hurd:
     uses: ./.github/workflows/hurd-suite.yml
 
+  # A bounds-trapping suite run and the static analyzer.
+  analysis:
+    uses: ./.github/workflows/analysis.yml
+
   # 496_ci-tier2-split.test fails when a job above is missing from needs: below.
   gate:
     name: tier-2 gate
@@ -448,6 +452,7 @@ jobs:
       - freebsd
       - emulated
       - hurd
+      - analysis
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7

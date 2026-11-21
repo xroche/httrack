@@ -1754,16 +1754,18 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     (r->size >= 3 && memcmp(r->adr, "\xEF\xBB\xBF", 3) == 0
                          ? 3
                          : 0);
-                const char *bol = html;
-
-                while (bol > start && (bol[-1] == ' ' || bol[-1] == '\t'))
-                  bol--;
                 // one link per line, starting at its first non-blank byte
                 // *html, not *bol: an indented # line is a comment too
-                if (html >= start && !is_realspace(*html) && *html != '#' &&
-                    (bol == start || bol[-1] == '\n' || bol[-1] == '\r')) {
-                  p = 0;
-                  valid_p = 1;
+                if (html >= start && !is_realspace(*html) && *html != '#') {
+                  // walked from a non-blank byte only, so each run once
+                  const char *bol = html;
+
+                  while (bol > start && (bol[-1] == ' ' || bol[-1] == '\t'))
+                    bol--;
+                  if (bol == start || bol[-1] == '\n' || bol[-1] == '\r') {
+                    p = 0;
+                    valid_p = 1;
+                  }
                 }
               } else if (strcmp(in_media, "AAM") == 0) {        // AAM
                 if (is_space((unsigned char) html[0])
