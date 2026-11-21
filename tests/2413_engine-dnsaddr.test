@@ -1,0 +1,13 @@
+#!/bin/bash
+#
+# A fallback's working address is tried first by the next connect, and a
+# negative-cache hit reports a real reason.
+
+set -euo pipefail
+
+out=$(httrack -#test=dnsaddr run)
+
+test "$out" = "dns-addr-selftest: OK" || {
+    echo "expected 'dns-addr-selftest: OK', got: $out" >&2
+    exit 1
+}

@@ -1593,10 +1593,13 @@ static int st_socaddr(httrackp *opt, int argc, char **argv) {
   SOCaddr_inetntoa(host, sizeof(host), addr);
   assertf(strcmp(host, "198.51.100.9") == 0);
 
-  /* an unknown size falls back to AF_INET */
-  SOCaddr_clear(addr);
+  /* an unknown size leaves no endpoint, even over a valid one */
   SOCaddr_copyaddr(addr, len, raw4, 3);
-  assertf(SOCaddr_sinfamily(addr) == AF_INET);
+  assertf(!SOCaddr_is_valid(addr));
+  assertf(len == 0);
+  SOCaddr_copyaddr(addr, len, raw4, sizeof(raw4));
+  SOCaddr_copyaddr(addr, len, raw4, 0);
+  assertf(!SOCaddr_is_valid(addr));
 
   printf("socaddr self-test OK\n");
   return 0;
