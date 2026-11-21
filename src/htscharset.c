@@ -1108,7 +1108,7 @@ char *hts_convertStringIDNAToUTF8(const char *s, size_t size) {
         punycode_uint output_length;
         punycode_uint *output_dest;
 
-        /* the doubling below would wrap output_capa past this */
+        /* no caller passes a 1 GB label, but the 32-bit capa must not wrap */
         if (segSize > ((punycode_uint) -1) / 4) {
           FREE_BUFFER();
           return NULL;
@@ -1126,16 +1126,9 @@ char *hts_convertStringIDNAToUTF8(const char *s, size_t size) {
              (status = punycode_decode((punycode_uint) segSize - 4,
                                        &s[startSeg + 4], &output_length,
                                        output_dest)) == punycode_big_output;) {
-          size_t bytes;
-
-          if (output_capa > ((punycode_uint) -1) / 2 ||
-              hts_ckd_mul(&bytes, (size_t) output_capa * 2,
-                          sizeof(punycode_uint))) {
-            status = punycode_overflow;
-            break;
-          }
           output_capa <<= 1;
-          output_dest = (punycode_uint *) realloct(output_dest, bytes);
+          output_dest = (punycode_uint *) realloct(
+              output_dest, output_capa * sizeof(punycode_uint));
           assertf(output_dest != NULL);
           output_length = output_capa;
         }
