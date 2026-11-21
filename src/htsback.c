@@ -2726,9 +2726,19 @@ static void back_dns_poll(httrackp *opt, struct_back *sback, const int p,
 
   if (count > 0) {
     back_dns_drop(sback, p);
-    if (*budget < 0)
-      *budget = hts_connect_pace(opt, opt->maxsoc,
-                                 !hts_load_acquire_int(&opt->state.stop));
+    if (*budget < 0) {
+      const hts_boolean may_wait = !hts_load_acquire_int(&opt->state.stop);
+
+      // Retry-After may have been set after this slot was admitted
+      if (may_wait && sback->retry_after_until > 0) {
+        if (mtime_local() < sback->retry_after_until)
+          *budget = 0;
+        else
+          sback->retry_after_until = 0;
+      }
+      if (*budget < 0)
+        *budget = hts_connect_pace(opt, opt->maxsoc, may_wait);
+    }
     if (*budget == 0)
       return;
     (*budget)--;
@@ -3675,8 +3685,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
       // One status read serves every branch below.
       const int st = back_status(&back[i]);
 
-      if (st == STATUS_WAIT_DNS)
-        dns_wait = 1;
+      if (st == STATUS_WAIT_DNS && sback->connect_fallback[i].dns_job != NULL)
+        dns_wait = 1; // only a pending resolve needs the short wake
       /* clang-format off: an edit reindents this whole #if-split chain. */
       /* clang-format off */
       if (st == STATUS_CONNECTING) {        // connecting
