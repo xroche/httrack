@@ -199,7 +199,7 @@ static struct addrinfo *resolver_make_ai(const char *ip, int want_family) {
   struct addrinfo *ai;
 
   if (strchr(ip, ':') != NULL) { // IPv6 literal
-    struct sockaddr_in6 sa6;
+    struct sockaddr_in6 sa6, *copy6;
 
     if (want_family != PF_UNSPEC && want_family != AF_INET6)
       return NULL;
@@ -211,15 +211,16 @@ static struct addrinfo *resolver_make_ai(const char *ip, int want_family) {
     if (ai == NULL)
       return NULL;
     ai->ai_family = AF_INET6;
-    ai->ai_addrlen = sizeof(sa6);
-    ai->ai_addr = malloct(sizeof(sa6));
-    if (ai->ai_addr == NULL) {
+    copy6 = malloct(sizeof(*copy6));
+    if (copy6 == NULL) {
       freet(ai);
       return NULL;
     }
-    memcpy(ai->ai_addr, &sa6, sizeof(sa6));
+    *copy6 = sa6;
+    ai->ai_addrlen = sizeof(sa6);
+    ai->ai_addr = (struct sockaddr *) copy6;
   } else { // IPv4 literal
-    struct sockaddr_in sa;
+    struct sockaddr_in sa, *copy4;
 
     if (want_family != PF_UNSPEC && want_family != AF_INET)
       return NULL;
@@ -231,13 +232,14 @@ static struct addrinfo *resolver_make_ai(const char *ip, int want_family) {
     if (ai == NULL)
       return NULL;
     ai->ai_family = AF_INET;
-    ai->ai_addrlen = sizeof(sa);
-    ai->ai_addr = malloct(sizeof(sa));
-    if (ai->ai_addr == NULL) {
+    copy4 = malloct(sizeof(*copy4));
+    if (copy4 == NULL) {
       freet(ai);
       return NULL;
     }
-    memcpy(ai->ai_addr, &sa, sizeof(sa));
+    *copy4 = sa;
+    ai->ai_addrlen = sizeof(sa);
+    ai->ai_addr = (struct sockaddr *) copy4;
   }
   return ai;
 }

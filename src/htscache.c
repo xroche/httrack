@@ -181,7 +181,7 @@ int cache_zip_store_stream(zipFile zf, FILE *fp) {
     nl = fread(buff, 1, sizeof(buff), fp);
     if (nl > 0 && (zErr = zipWriteInFileInZip(zf, buff, (int) nl)) != Z_OK)
       return zErr;
-  } while (nl > 0);
+  } while (nl == sizeof(buff)); // a short read is the end or an error
   return ferror(fp) ? CACHE_ZIP_READ_ERROR : Z_OK;
 }
 

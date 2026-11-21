@@ -132,9 +132,12 @@ static hts_boolean cookie_copy(const char *src, const char *dst) {
   hts_boolean ok = out != NULL;
   size_t n;
 
-  while (ok && (n = fread(buf, 1, sizeof(buf), in)) > 0)
+  while (ok && (n = fread(buf, 1, sizeof(buf), in)) > 0) {
     ok =
         fwrite(buf, 1, (fault & COOKIE_FAULT_COPY_WRITE) ? n / 2 : n, out) == n;
+    if (n < sizeof(buf))
+      break; // a short read is the end or an error
+  }
   if (in != NULL && (ferror(in) || (fault & COOKIE_FAULT_COPY_READ)))
     ok = HTS_FALSE;
   if (in != NULL)

@@ -120,7 +120,10 @@ static void changes_free(hts_changes **pchanges) {
 static intptr_t changes_find(const hts_changes *changes, const char *file) {
   intptr_t slot = 0;
 
-  return coucal_read(changes->index, file, &slot) ? slot - 1 : -1;
+  return coucal_read(changes->index, file, &slot) && slot > 0 &&
+                 (size_t) slot <= TypedArraySize(changes->entries)
+             ? slot - 1
+             : -1;
 }
 
 /* Slot of `file`, appending a fresh entry when it is new; -1 if allocation
@@ -167,8 +170,10 @@ static hts_boolean digest_file(const char *path,
   if (fp == NULL)
     return HTS_FALSE;
   hts_md5_init(&ctx);
-  while ((nread = fread(buffer, 1, sizeof(buffer), fp)) > 0)
+  do {
+    nread = fread(buffer, 1, sizeof(buffer), fp);
     MD5Update(&ctx, (const unsigned char *) buffer, (unsigned int) nread);
+  } while (nread == sizeof(buffer)); // a short read is the end or an error
   if (ferror(fp) != 0) {
     fclose(fp);
     return HTS_FALSE;

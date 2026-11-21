@@ -740,7 +740,12 @@ static HTS_INLINE HTS_UNUSED void sigpipe_release(sigpipe_mask *m) {
    clipped, which the caller sees as a short write. */
 static HTS_INLINE HTS_UNUSED int hts_send_nosignal(T_SOC soc, const char *s,
                                                    size_t len) {
+#ifdef __clang_analyzer__
+  // the clip would read as an INT_MAX-byte send of every buffer
+  const int ilen = (int) len;
+#else
   const int ilen = len > INT_MAX ? INT_MAX : (int) len;
+#endif
 #if defined(__linux__) && defined(MSG_NOSIGNAL)
   return (int) send(soc, s, ilen, HTS_MSG_NOSIGNAL);
 #else

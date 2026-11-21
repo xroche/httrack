@@ -151,7 +151,7 @@ HTS_STATIC void StringOom_(size_t size) {
 #define StringRoomTotal(BLK, CAPACITY)                                         \
   do {                                                                         \
     const size_t capacity_ = (size_t) (CAPACITY);                              \
-    while ((BLK).capacity_ < capacity_) {                                      \
+    while ((BLK).buffer_ == NULL || (BLK).capacity_ < capacity_) {             \
       const size_t maxcap_ = (size_t) -1;                                      \
       const size_t mincap_ = 16;                                               \
       const size_t cur_ = (BLK).capacity_;                                     \

@@ -1258,6 +1258,7 @@ static int cookie_load_records(httrackp *opt, t_cookie *cookie, text_src *src,
       /* curl and browser exports mark an HttpOnly cookie this way */
       static const char httponly[] = COOKIE_HTTPONLY_PREFIX;
       const hts_boolean is_httponly =
+          len >= sizeof(httponly) - 1 &&
           strncmp(line, httponly, sizeof(httponly) - 1) == 0;
       const char *const rec = is_httponly ? line + sizeof(httponly) - 1 : line;
 

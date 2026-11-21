@@ -1651,7 +1651,7 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
       strcpybuff(retour->lastmodified, rcvd + p);
     }
   } else if ((p = strfield(rcvd, "Date:")) != 0) {
-    if (strnotempty(retour->lastmodified) == 0) {       /* pas encore de last-modified */
+    if (retour->lastmodified[0] == '\0') { /* no Last-Modified yet */
       while(is_realspace(*(rcvd + p)))
         p++;                    // sauter espaces
       if ((int) strlen(rcvd + p) < 64) { // pas trop long?

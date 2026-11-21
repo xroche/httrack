@@ -113,7 +113,7 @@ static int process(t_hts_callbackarg * carg, httrackp * opt, char *html,
   t_my_userdef *userdef = (t_my_userdef *) CALLBACKARG_USERDEF(carg);
 
   /*char * const stringfilter = userdef->stringfilter; */
-  char **const stringfilters = userdef->stringfilters;
+  char **const stringfilters = userdef != NULL ? userdef->stringfilters : NULL;
 
   /* */
   int i = 0;
@@ -130,6 +130,8 @@ static int process(t_hts_callbackarg * carg, httrackp * opt, char *html,
 
   /* Process */
   if (strcmp(address, "primary") == 0 && strcmp(filename, "/primary") == 0)     /* primary page (list of links) */
+    return 1;
+  if (stringfilters == NULL)
     return 1;
   while(stringfilters[i] != NULL && !getIt) {
     if ((pos = strstr(html, stringfilters[i])) != NULL) {

@@ -313,11 +313,11 @@ static HTS_UNUSED socklen_t SOCaddr_copyaddr_(SOCaddr *const server,
 
   if (data_size == sizeof(struct sockaddr_in)) {
     memcpy(&server->m_addr.in, data, sizeof(struct sockaddr_in));
-    assertf_(server->m_addr.sa.sa_family == AF_INET, file, line);
+    assertf_(server->m_addr.in.sin_family == AF_INET, file, line);
 #if HTS_INET6 != 0
   } else if (data_size == sizeof(struct sockaddr_in6)) {
     memcpy(&server->m_addr.in6, data, sizeof(struct sockaddr_in6));
-    assertf_(server->m_addr.sa.sa_family == AF_INET6, file, line);
+    assertf_(server->m_addr.in6.sin6_family == AF_INET6, file, line);
 #endif
   } else if (data_size == 4) {
     memset(&server->m_addr.in, 0, sizeof(server->m_addr.in));

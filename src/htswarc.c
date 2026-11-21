@@ -342,6 +342,8 @@ static int stream_block(int http_section, const char *http_hdr,
           return -1;
         }
         remaining -= nl;
+        if (nl < want)
+          break; // a short read is the end or an error
       }
       fclose(fp);
       if (stream_body_pad(sink, ctx, remaining) != 0)
