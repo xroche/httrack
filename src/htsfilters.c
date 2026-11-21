@@ -510,7 +510,7 @@ const char *strjokerfind(const char *chaine, const char *joker) {
   size_t nsteps = 0; /* one budget for the whole scan */
   const char *adr;
 
-  if (chaine != NULL && strlen(chaine) > STRJOKER_MAXLEN)
+  if (chaine == NULL || strlen(chaine) > STRJOKER_MAXLEN)
     return NULL;
   while(*chaine) {
     if ((adr = strjoker_bounded(chaine, joker, NULL, NULL, &nsteps,
