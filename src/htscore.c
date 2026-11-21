@@ -3894,7 +3894,9 @@ HTSEXT_API int copy_htsopt(const httrackp * from, httrackp * to) {
 
   if (from->maxconn > 0)
     to->maxconn = from->maxconn;
-  if (from->max_retry_after >= 0)
+  /* A fresh opt holds the default, so only another value is an edit. */
+  if (from->max_retry_after >= 0 &&
+      from->max_retry_after != HTS_DEFAULT_MAX_RETRY_AFTER)
     to->max_retry_after = from->max_retry_after;
 
   if (from->mptcp > -1)
@@ -3933,14 +3935,6 @@ HTSEXT_API int copy_htsopt(const httrackp * from, httrackp * to) {
 
   if (StringNotEmpty(from->warc_file))
     StringCopyS(to->warc_file, from->warc_file);
-  to->warc_max_size = from->warc_max_size;
-  to->warc_cdx = from->warc_cdx;
-  to->warc_wacz = from->warc_wacz;
-  to->changes = from->changes;
-
-  to->single_file = from->single_file;
-  if (from->single_file_max_size > 0)
-    to->single_file_max_size = from->single_file_max_size;
   if (from->sitemap)
     to->sitemap = from->sitemap;
   if (StringNotEmpty(from->sitemap_url))
@@ -3962,6 +3956,14 @@ HTSEXT_API int copy_htsopt(const httrackp * from, httrackp * to) {
 
   if (from->parseall > -1)
     to->parseall = from->parseall;
+
+  /* delete_old is left alone, because shipped front ends send it inverted. */
+
+  if (from->external > -1)
+    to->external = from->external;
+
+  if (from->fragment > -1)
+    to->fragment = from->fragment;
 
   // test all: bit 8 de travel
   if (from->travel > -1) {
