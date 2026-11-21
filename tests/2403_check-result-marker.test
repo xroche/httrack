@@ -48,6 +48,11 @@ check() { # check LANG COMPILER-ARGV...
 }
 
 inc=(-I"$abs_top_builddir" -I"$abs_top_builddir/src" -I"$top/src")
+# Configure's CPPFLAGS carries brew's keg-only openssl include path.
+if [ -n "${TEST_CPPFLAGS:-}" ]; then
+    read -r -a extra <<<"$TEST_CPPFLAGS"
+    inc+=("${extra[@]}")
+fi
 read -r -a cc <<<"${CC:-cc}"
 command -v "${cc[0]}" >/dev/null 2>&1 || skip "no C compiler (${cc[0]})"
 printf '#ifndef __GNUC__\n#error\n#endif\n' >"$tmp/gnu.c"
