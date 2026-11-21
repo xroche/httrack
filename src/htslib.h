@@ -133,6 +133,7 @@ struct t_dnscache {
   TStamp expiry;
   TStamp stored;
   int failures; // consecutive failed resolves, which lengthen the next wait
+  int preferred; // index of the address a fallback last connected to
 };
 
 /* Break t down as UTC into the caller's buffer, HTS_FALSE if that failed.
@@ -324,8 +325,9 @@ int connect_socket_error(T_SOC soc);
 /* Start a non-blocking connect to iadr; port -1 takes it from iadr or the
    scheme default. */
 T_SOC newhttp(httrackp *opt, const char *iadr, htsblk *retour, int port);
-/* Like newhttp(), but connect to resolved address addr_index (0-based) and
-   set *addr_count, if non-NULL, to the address count. */
+/* Like newhttp(), but connect to resolved address addr_index (0-based, or -1
+   for the one hts_dns_set_preferred() last picked) and set *addr_count, if
+   non-NULL, to the address count. */
 T_SOC newhttp_addr(httrackp *opt, const char *iadr, htsblk *retour, int port,
                    int addr_index, int *addr_count);
 /* Clips the formatted failure reason into r->msg, which also round-trips
@@ -439,6 +441,14 @@ int hts_dns_resolve_all_bounded(httrackp *opt, const char *iadr, SOCaddr *out,
                                 int max, int timeout,
                                 const volatile hts_boolean *cancel,
                                 const char **error);
+/* Returns the index of addr in list[0..count-1], port included, or -1. */
+int hts_dns_addr_index(const SOCaddr *list, int count, const SOCaddr *addr);
+/* Index in iadr's cached list of the address to try first, 0 by default. */
+int hts_dns_preferred(httrackp *opt, const char *iadr);
+/* Make addr, if it is in iadr's cached list, the one new connects try first.
+   The caller must not hold opt->state.lock. */
+void hts_dns_set_preferred(httrackp *opt, const char *iadr,
+                           const SOCaddr *addr);
 HTS_INLINE SOCaddr *hts_dns_resolve2(httrackp *opt, const char *iadr,
                                      SOCaddr *const addr, const char **error);
 SOCaddr *hts_dns_resolve_nocache2(const char *const hostname,
@@ -1103,8 +1113,12 @@ const char *hts_host_alias_match(const char *rules, const char *host,
                                  const char *full, hts_boolean collapse_www,
                                  size_t *canonlen);
 
-/* The --host-alias rules of OPT, or NULL when the option was not given. */
+/* The --host-alias rules of OPT, or NULL when the option was not given.
+   While a mirror runs it returns the hash's snapshot, so names match keys. */
 const char *hts_host_alias_rules(httrackp *opt);
+
+/* Return the query-strip keys of OPT or NULL, like hts_host_alias_rules(). */
+const char *hts_strip_query_rules(httrackp *opt);
 
 /* ADR with its host replaced by the canonical one, from the '\n'-separated
    "alias[,alias...]=canonical" RULES (aliases matched with strjoker, last

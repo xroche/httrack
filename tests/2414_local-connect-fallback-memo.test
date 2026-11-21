@@ -1,0 +1,70 @@
+#!/bin/bash
+#
+# Once a fallback reaches the second address, the later connects to that host
+# start there instead of retrying the dead first one.
+
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+if test "${V6_SUPPORT:-}" == "no"; then
+    echo "no IPv6 support (resolver override is IPv6-only), skipping"
+    exit 77
+fi
+case "$HTS_OS" in
+GNU | GNU/*)
+    echo "GNU/Hurd: single loopback IP, skipping"
+    exit 77
+    ;;
+esac
+
+tmpdir=$(mktemp -d)
+cleanup() {
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+root="$tmpdir/root"
+mkdir -p "$root"
+links=""
+for n in 1 2 3 4 5 6; do
+    echo "<html><body>page $n</body></html>" >"$root/p$n.html"
+    links="$links<a href=\"p$n.html\">$n</a>"
+done
+echo "<html><body>$links</body></html>" >"$root/index.html"
+
+local_server_start --root "$root" --log "$tmpdir/srv.out" --bind 127.0.0.1
+
+out="$tmpdir/crawl"
+HTTRACK_DEBUG_RESOLVE="deadhost:127.0.0.2,127.0.0.1" \
+    local_crawl --log "$tmpdir/log" "http://deadhost:${SRV_PORT}/index.html" -O "$out" -c1 --keep-alive=0 --robots=0 --timeout=5 --retries=0 --quiet -Z
+
+log="$out/hts-log.txt"
+for n in 1 2 3 4 5 6; do
+    test -f "$out/deadhost_${SRV_PORT}/p$n.html" || fail_dump "p$n.html not mirrored" "$log"
+done
+# one fallback for the first connect, none for the six after it
+fallbacks=$(grep -c "trying next address" "$log" || true)
+test "$fallbacks" = 1 || fail_dump "expected 1 fallback, saw $fallbacks" "$log"
+
+# A fallback from the preferred address must go on to the other one: both
+# ports share one cache entry, and B listens only on the address A found dead.
+case "$HTS_OS" in
+Linux) ;;
+*)
+    echo "127.0.0.2 is not a loopback address here, skipping the rotation case"
+    exit 0
+    ;;
+esac
+mkdir -p "$tmpdir/a" "$tmpdir/b"
+echo "<html>b page</html>" >"$tmpdir/b/b.html"
+local_server_start --root "$tmpdir/b" --log "$tmpdir/b.out" --bind 127.0.0.2
+pb=$SRV_PORT
+echo "<html><a href=\"http://deadhost:$pb/b.html\">b</a></html>" >"$tmpdir/a/index.html"
+local_server_start --root "$tmpdir/a" --log "$tmpdir/a.out" --bind 127.0.0.1
+pa=$SRV_PORT
+out="$tmpdir/crawl2"
+HTTRACK_DEBUG_RESOLVE="deadhost:127.0.0.2,127.0.0.1" \
+    local_crawl --log "$tmpdir/log2" "http://deadhost:$pa/index.html" -O "$out" -c1 --keep-alive=0 --robots=0 --timeout=5 --retries=0 --quiet -Z "+deadhost:*"
+test -f "$out/deadhost_$pb/b.html" || fail_dump "b.html not mirrored: the fallback retried the preferred address" "$out/hts-log.txt"

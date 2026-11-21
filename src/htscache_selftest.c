@@ -4739,6 +4739,200 @@ static int st_changes_race(httrackp *opt, int argc, char **argv) {
   return st_verdict("changes-race self-test", err);
 }
 
+/* zip-write-errors: one member written with each write in turn failing once */
+enum { ZW_OPEN, ZW_OPENFILE, ZW_WRITE, ZW_CLOSEFILE, ZW_CLOSE, ZW_NPHASES };
+
+static const char *const zwerr_phase[ZW_NPHASES] = {
+    "zipOpen", "zipOpenNewFileInZip4_64", "zipWriteInFileInZip",
+    "zipCloseFileInZip", "zipClose"};
+
+typedef struct {
+  write_file_func write;
+  seek64_file_func seek;
+  tell64_file_func tell;
+  ZPOS64_T shift;   /**< offset added to every position zip.c sees */
+  int writes;       /**< write calls so far */
+  int fail_at;      /**< 1-based write call that fails, 0 for none */
+  int seeks;        /**< seek calls so far */
+  int seek_fail_at; /**< 1-based seek call that fails, 0 for none */
+  int phase;        /**< public call running now */
+  int failed_phase; /**< public call running when the write failed, or -1 */
+} zwerr_ctx;
+
+static uLong ZCALLBACK zwerr_write(voidpf opaque, voidpf stream,
+                                   const void *buf, uLong size) {
+  zwerr_ctx *const c = (zwerr_ctx *) opaque;
+
+  if (++c->writes == c->fail_at) {
+    c->failed_phase = c->phase;
+    errno = EIO;
+    return 0;
+  }
+  return c->write(opaque, stream, buf, size);
+}
+
+/* A shifted position puts the member past 4GB, which forces the Zip64 end
+   records without writing 4GB. */
+static ZPOS64_T ZCALLBACK zwerr_tell(voidpf opaque, voidpf stream) {
+  zwerr_ctx *const c = (zwerr_ctx *) opaque;
+
+  return c->tell(opaque, stream) + c->shift;
+}
+
+static long ZCALLBACK zwerr_seek(voidpf opaque, voidpf stream, ZPOS64_T offset,
+                                 int origin) {
+  zwerr_ctx *const c = (zwerr_ctx *) opaque;
+
+  if (++c->seeks == c->seek_fail_at)
+    return -1;
+  if (origin == ZLIB_FILEFUNC_SEEK_SET)
+    offset -= c->shift;
+  return c->seek(opaque, stream, offset, origin);
+}
+
+static zipFile zwerr_open(const char *path, zwerr_ctx *c, int append) {
+  char catbuff[CATBUFF_SIZE];
+  zlib_filefunc64_def ff;
+
+  hts_zip_filefunc64(&ff);
+  c->write = ff.zwrite_file;
+  c->seek = ff.zseek64_file;
+  c->tell = ff.ztell64_file;
+  ff.zwrite_file = zwerr_write;
+  ff.zseek64_file = zwerr_seek;
+  ff.ztell64_file = zwerr_tell;
+  ff.opaque = c;
+  c->writes = c->seeks = 0;
+  c->failed_phase = -1;
+  c->phase = ZW_OPEN;
+  return zipOpen2_64(fconv(catbuff, sizeof(catbuff), path), append, NULL, &ff);
+}
+
+/* Write one stored member; rc[p] is what public call p returned. */
+static void zwerr_run(const char *path, zwerr_ctx *c, int zip64,
+                      const char *data, unsigned size, int rc[ZW_NPHASES]) {
+  zip_fileinfo fi;
+  zipFile zf;
+  int p;
+
+  for (p = 0; p < ZW_NPHASES; p++)
+    rc[p] = ZIP_OK;
+  memset(&fi, 0, sizeof(fi));
+  zf = zwerr_open(path, c, APPEND_STATUS_CREATE);
+  if (zf == NULL) {
+    rc[ZW_OPEN] = ZIP_ERRNO;
+    return;
+  }
+  /* level 0 stores, so the last flush happens inside zipCloseFileInZip() */
+  c->phase = ZW_OPENFILE;
+  rc[ZW_OPENFILE] = zipOpenNewFileInZip4_64(
+      zf, "entry.bin", &fi, NULL, 0, NULL, 0, NULL, Z_DEFLATED, 0, 0,
+      -MAX_WBITS, 8, Z_DEFAULT_STRATEGY, NULL, 0, 0, 0, zip64);
+  if (rc[ZW_OPENFILE] == ZIP_OK) {
+    c->phase = ZW_WRITE;
+    rc[ZW_WRITE] = zipWriteInFileInZip(zf, data, size);
+    c->phase = ZW_CLOSEFILE;
+    rc[ZW_CLOSEFILE] = zipCloseFileInZip(zf);
+  }
+  c->phase = ZW_CLOSE;
+  rc[ZW_CLOSE] = zipClose(zf, NULL);
+}
+
+/* Does the archive hold `data`, with a CRC that unzip accepts? */
+static hts_boolean zwerr_reads_back(const char *path, const char *data,
+                                    unsigned size) {
+  char catbuff[CATBUFF_SIZE];
+  unzFile z = unzOpen(fconv(catbuff, sizeof(catbuff), path));
+  char *out = malloct(size + 1);
+  hts_boolean ok = HTS_FALSE;
+
+  if (z != NULL && unzGoToFirstFile(z) == UNZ_OK &&
+      unzOpenCurrentFile(z) == UNZ_OK) {
+    ok = unzReadCurrentFile(z, out, size + 1) == (int) size &&
+         memcmp(out, data, size) == 0;
+    if (unzCloseCurrentFile(z) != UNZ_OK)
+      ok = HTS_FALSE;
+  }
+  if (z != NULL)
+    unzClose(z);
+  freet(out);
+  return ok;
+}
+
+static int st_zip_write_errors(httrackp *opt, int argc, char **argv) {
+  static const struct {
+    ZPOS64_T shift;
+    int zip64;
+    int min_writes;
+  } cases[] = {
+      /* Zip64 extra field in the local header */
+      {0, 1, 31},
+      /* Zip64 end records, through the shifted position */
+      {(ZPOS64_T) 1 << 32, 0, 41},
+  };
+
+  const unsigned size = 200000;
+  char path[HTS_URLMAXSIZE];
+  char *data = malloct(size);
+  zwerr_ctx c;
+  int rc[ZW_NPHASES];
+  int fail = 0;
+  size_t k;
+
+  gen_body(data, size, 1 /* incompressible */);
+  fconcat(path, sizeof(path), argv[0], "/zip-write-errors.zip");
+  memset(&c, 0, sizeof(c));
+  for (k = 0; k < sizeof(cases) / sizeof(cases[0]); k++) {
+    int w, nwrites, p;
+
+    c.shift = cases[k].shift;
+    c.fail_at = 0;
+    zwerr_run(path, &c, cases[k].zip64, data, size, rc);
+    for (p = 0; p < ZW_NPHASES && rc[p] == ZIP_OK; p++) {
+    }
+    nwrites = c.writes;
+    if (p < ZW_NPHASES || nwrites < cases[k].min_writes) {
+      fprintf(stderr,
+              "zip-write-errors: case %d: clean run failed (%d writes)\n",
+              (int) k, nwrites);
+      fail++;
+      continue;
+    }
+    if (c.shift == 0 && !zwerr_reads_back(path, data, size)) {
+      fprintf(stderr, "zip-write-errors: case %d: archive does not read back\n",
+              (int) k);
+      fail++;
+    }
+    for (w = 1; w <= nwrites; w++) {
+      c.fail_at = w;
+      zwerr_run(path, &c, cases[k].zip64, data, size, rc);
+      if (c.failed_phase < 0 || rc[c.failed_phase] == ZIP_OK) {
+        fprintf(stderr,
+                "zip-write-errors: case %d: write %d of %d failed in %s, "
+                "which returned ZIP_OK\n",
+                (int) k, w, nwrites,
+                c.failed_phase < 0 ? "no call" : zwerr_phase[c.failed_phase]);
+        fail++;
+      }
+    }
+  }
+  /* APPEND_STATUS_CREATEAFTER must not write over the file it cannot seek */
+  c.shift = 0;
+  c.fail_at = 0;
+  c.seek_fail_at = 1;
+  {
+    zipFile zf = zwerr_open(path, &c, APPEND_STATUS_CREATEAFTER);
+
+    if (zf != NULL) {
+      fprintf(stderr, "zip-write-errors: zipOpen ignored a failed seek\n");
+      (void) zipClose(zf, NULL);
+      fail++;
+    }
+  }
+  freet(data);
+  return st_verdict("zip-write-errors", fail);
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: this module's tests, in the order -#test lists them. */
 /* ------------------------------------------------------------ */
@@ -4799,5 +4993,8 @@ const struct selftest_entry selftests_cache[] = {
     {"zip-abandon-notrunc", "<dir>",
      "a rollback that could only rewind reports a failure",
      st_zip_abandon_notrunc},
+    {"zip-write-errors", "<dir>",
+     "a member write that fails once is reported by some zip call",
+     st_zip_write_errors},
     {NULL, NULL, NULL, NULL},
 };

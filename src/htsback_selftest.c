@@ -2362,6 +2362,10 @@ static int st_ftphandoff(httrackp *opt, int argc, char **argv) {
   return st_verdict("ftp-handoff-selftest", err);
 }
 
+static int st_ftpscratch(httrackp *opt, int argc, char **argv) {
+  return st_verdict("ftp-scratch-selftest", ftp_scratch_selftests(opt));
+}
+
 /* #1697: hts_strerror() must own its output. strerror() answers with a buffer
    the next call in that thread reuses and thread exit frees, and POSIX lets it
    be one static shared by every thread. */
@@ -3337,6 +3341,142 @@ static int st_delayedsettled(httrackp *opt, int argc, char **argv) {
   return err ? 1 : 0;
 }
 
+/* -#test=reqstrings: requests keep their User-Agent, Accept and
+   Accept-Language, and the hash its strip-query and host-alias rules, when a
+   front end's copy_htsopt() rewrites them. */
+static int st_reqstrings(httrackp *opt, int argc, char **argv) {
+  enum { SLOTS = 4, LONG = 4096 };
+
+  httrackp *const from = hts_create_opt();
+  char *big = malloct(LONG + 1);
+  struct_back *sback = back_new(opt, SLOTS);
+  cache_back cache;
+  hash_struct hash;
+  htsblk live;
+  T_SOC sv[2] = {INVALID_SOCKET, INVALID_SOCKET};
+  int b, b2 = -1;
+  int err = 0;
+
+#define CHECK(cond) ST_CHECK(err, cond)
+  (void) argc;
+  (void) argv;
+  if (sback == NULL || from == NULL || big == NULL)
+    return 77;
+  opt->maxsoc = SLOTS;
+  opt->timeout = 0;
+  opt->rateout = 0;
+  opt->state.stop = 0;
+  StringCopy(opt->user_agent, "Old/1.0");
+  StringCopy(opt->accept, "old/accept");
+  StringCopy(opt->lang_iso, "xx");
+  StringCopy(opt->strip_query, "utm");
+  StringCopy(opt->host_alias, "b.com=a.com");
+  memset(&cache, 0, sizeof(cache));
+  cache.hashtable = coucal_new(0);
+  hash_init(opt, &hash, opt->urlhack);
+  opt->hash = &hash;
+  CHECK(hash.strip_query != StringBuff(opt->strip_query));
+  CHECK(hash.host_alias != StringBuff(opt->host_alias));
+
+#ifndef _WIN32
+  CHECK(socketpair(AF_UNIX, SOCK_STREAM, 0, sv) == 0);
+#else
+  sv[0] = (T_SOC) socket(AF_INET, SOCK_STREAM, 0);
+#endif
+  CHECK(sv[0] != INVALID_SOCKET);
+  memset(&live, 0, sizeof(live));
+  live.soc = sv[0];
+  live.keep_alive = 1;
+  live.keep_alive_max = 10;
+  live.keep_alive_t = 1000;
+  back_slot_attach(sback, 2, STATUS_ALIVE, &live, "example.com", "/");
+  sback->lnk[2].ka_time_start = time_local();
+  sback->lnk[2].finalized = 1;
+  CHECK(back_add(sback, opt, &cache, "example.com", "/ua.png", "ua.png", NULL,
+                 NULL, 0, HTS_FALSE, NULL) == 0);
+  b = back_index(opt, sback, "example.com", "/ua.png", "ua.png");
+  CHECK(b >= 0);
+  if (b >= 0) {
+    htsblk *const r = &sback->lnk[b].r;
+
+    CHECK(r->req.user_agent != StringBuff(opt->user_agent));
+    CHECK(r->req.accept != StringBuff(opt->accept));
+    CHECK(r->req.lang_iso != StringBuff(opt->lang_iso));
+
+    /* longer values move every buffer the slot could still point into */
+    memset(big, 'z', LONG);
+    big[LONG] = '\0';
+    StringCopy(from->user_agent, big);
+    StringCopy(from->accept, big);
+    from->accept_given = HTS_TRUE;
+    StringCopy(from->lang_iso, big);
+    from->lang_given = HTS_TRUE;
+    StringCopy(from->strip_query, big);
+    StringCopy(from->host_alias, big);
+    copy_htsopt(from, opt);
+    CHECK(strcmp(StringBuff(opt->user_agent), big) == 0);
+
+    (void) http_sendhead(opt, NULL, 0, NULL, "example.com", "/ua.png", NULL,
+                         NULL, NULL, r);
+    CHECK(strcmp(r->req.user_agent, "Old/1.0") == 0);
+    CHECK(strcmp(r->req.accept, "old/accept") == 0);
+    CHECK(strcmp(r->req.lang_iso, "xx") == 0);
+#ifndef _WIN32
+    {
+      char head[8192];
+      const ssize_t n = recv(sv[1], head, sizeof(head) - 1, MSG_DONTWAIT);
+
+      CHECK(n > 0);
+      head[n > 0 ? n : 0] = '\0';
+      CHECK(strstr(head, "User-Agent: Old/1.0\r\n") != NULL);
+    }
+#endif
+
+    /* a request launched after the change takes the new values */
+    memset(&live, 0, sizeof(live));
+    live.soc = (T_SOC) socket(AF_INET, SOCK_STREAM, 0);
+    live.keep_alive = 1;
+    live.keep_alive_max = 10;
+    live.keep_alive_t = 1000;
+    back_slot_attach(sback, 3, STATUS_ALIVE, &live, "example.com", "/");
+    sback->lnk[3].ka_time_start = time_local();
+    sback->lnk[3].finalized = 1;
+    CHECK(back_add(sback, opt, &cache, "example.com", "/ua2.png", "ua2.png",
+                   NULL, NULL, 0, HTS_FALSE, NULL) == 0);
+    b2 = back_index(opt, sback, "example.com", "/ua2.png", "ua2.png");
+    CHECK(b2 >= 0 && b2 != b);
+    if (b2 >= 0) {
+      CHECK(strcmp(sback->lnk[b2].r.req.user_agent, big) == 0);
+      CHECK(strcmp(sback->lnk[b2].r.req.accept, big) == 0);
+      CHECK(strcmp(sback->lnk[b2].r.req.lang_iso, big) == 0);
+    }
+    CHECK(strcmp(r->req.user_agent, "Old/1.0") == 0);
+    CHECK(strcmp(r->req.accept, "old/accept") == 0);
+    CHECK(strcmp(r->req.lang_iso, "xx") == 0);
+    if (b2 >= 0)
+      back_delete(opt, &cache, sback, b2);
+    back_delete(opt, &cache, sback, b);
+  }
+  /* save names read the hash's snapshot, so they agree with its keys */
+  CHECK(strcmp(hash.strip_query, "utm") == 0);
+  CHECK(strcmp(hash.host_alias, "b.com=a.com") == 0);
+  CHECK(hts_strip_query_rules(opt) == hash.strip_query);
+  CHECK(hts_host_alias_rules(opt) == hash.host_alias);
+#undef CHECK
+#ifndef _WIN32
+  if (sv[1] != INVALID_SOCKET)
+    close(sv[1]);
+#endif
+  back_free(&sback);
+  hash_free(&hash);
+  opt->hash = NULL;
+  coucal_delete(&cache.hashtable);
+  hts_free_opt(from);
+  freet(big);
+  printf("reqstrings self-test: %s\n", err ? "FAILED" : "OK");
+  return err ? 1 : 0;
+}
+
 const struct selftest_entry selftests_back[] = {
     {"iofatal", "<logfile>",
      "a disk-full abort logs its line and stops the mirror", st_iofatal},
@@ -3353,6 +3493,8 @@ const struct selftest_entry selftests_back[] = {
     {"ftphandoff", "",
      "an FTP worker's slot handoff is ordered against the crawl thread",
      st_ftphandoff},
+    {"ftpscratch", "", "the FTP worker code takes no rotating buffer of opt",
+     st_ftpscratch},
     {"backnew", "",
      "a backing table too big to allocate is a NULL, not an abort", st_backnew},
     {"recordoom", "",
@@ -3380,6 +3522,9 @@ const struct selftest_entry selftests_back[] = {
     {"delayedsettled", "",
      "a link on a reused keep-alive socket is not re-added as a cache hit",
      st_delayedsettled},
+    {"reqstrings", "",
+     "requests and the hash keep the option strings copy_htsopt() rewrites",
+     st_reqstrings},
     {"busyscans", "<dir>",
      "each slot-table scan reaches every slot in use, up to the last one",
      st_busyscans},

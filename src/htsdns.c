@@ -567,6 +567,70 @@ static int hts_dns_resolve_nocache_list_bounded(
   return count;
 }
 
+/* Cache key and resolver input: identification and any ":port" stripped. */
+static void dns_cache_key(char *host, size_t size, const char *iadr) {
+  char *a;
+
+  strlcpybuff(host, jump_identification_const(iadr), size);
+  if ((a = jump_toport(host)))
+    *a = '\0';
+}
+
+static hts_boolean dns_same_addr(const void *a, size_t size, const SOCaddr *b) {
+  return size != 0 && size == SOCaddr_size(*b) &&
+         memcmp(a, &SOCaddr_sockaddr(*b), size) == 0;
+}
+
+int hts_dns_addr_index(const SOCaddr *list, int count, const SOCaddr *addr) {
+  int i;
+
+  for (i = 0; i < count; i++) {
+    if (dns_same_addr(&SOCaddr_sockaddr(list[i]), SOCaddr_size(list[i]), addr))
+      return i;
+  }
+  return -1;
+}
+
+int hts_dns_preferred(httrackp *opt, const char *iadr) {
+  char BIGSTK host[HTS_URLMAXSIZE * 2];
+  void *ptr;
+  int preferred = 0;
+
+  assertf(opt != NULL);
+  if (!strnotempty(iadr))
+    return 0;
+  dns_cache_key(host, sizeof(host), iadr);
+  hts_mutexlock(&opt->state.lock);
+  if (coucal_read_pvoid(hts_cache(opt), host, &ptr))
+    preferred = ((const t_dnscache *) ptr)->preferred;
+  hts_mutexrelease(&opt->state.lock);
+  return preferred;
+}
+
+void hts_dns_set_preferred(httrackp *opt, const char *iadr,
+                           const SOCaddr *addr) {
+  char BIGSTK host[HTS_URLMAXSIZE * 2];
+  void *ptr;
+
+  assertf(opt != NULL);
+  if (!strnotempty(iadr))
+    return;
+  dns_cache_key(host, sizeof(host), iadr);
+  hts_mutexlock(&opt->state.lock);
+  if (coucal_read_pvoid(hts_cache(opt), host, &ptr)) {
+    t_dnscache *const record = (t_dnscache *) ptr;
+    int i;
+
+    for (i = 0; i < record->host_count; i++) {
+      if (dns_same_addr(record->host_addr[i], record->host_length[i], addr)) {
+        record->preferred = i;
+        break;
+      }
+    }
+  }
+  hts_mutexrelease(&opt->state.lock);
+}
+
 int hts_dns_resolve_all(httrackp *opt, const char *iadr, SOCaddr *out, int max,
                         const char **error) {
   assertf(opt != NULL);
@@ -592,14 +656,7 @@ int hts_dns_resolve_all_bounded(httrackp *opt, const char *iadr, SOCaddr *out,
     return 0;
   }
 
-  /* cache key and resolver input: identification and any ":port" stripped */
-  strcpybuff(host, jump_identification_const(iadr));
-  {
-    char *a;
-
-    if ((a = jump_toport(host)))
-      *a = '\0';
-  }
+  dns_cache_key(host, sizeof(host), iadr);
 
   hts_mutexlock(&opt->state.lock);
   cache = hts_cache(opt);
@@ -609,6 +666,8 @@ int hts_dns_resolve_all_bounded(httrackp *opt, const char *iadr, SOCaddr *out,
   count = hts_ghbn_all(cache, host, out, max);
   hts_mutexrelease(&opt->state.lock);
   if (count >= 0) { // cache hit (0 == negative-cached)
+    if (count == 0 && error != NULL)
+      *error = "host name did not resolve (cached failure)";
     return count;
   }
 

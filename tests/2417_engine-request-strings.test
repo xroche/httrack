@@ -1,0 +1,12 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# A request keeps its User-Agent, Accept and Accept-Language, and the hash its
+# strip-query and host-alias rules, when copy_htsopt() rewrites them.
+
+assert_selftest 'reqstrings self-test: OK' reqstrings

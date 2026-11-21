@@ -349,7 +349,8 @@ static hts_boolean sf_resolve(const sf_ctx *ctx, const char *base_dir,
 
     if (c == ':')
       return HTS_FALSE;
-    if (sf_is_sep(c) || (!isalnum(c) && c != '+' && c != '.' && c != '-'))
+    if (sf_is_sep(c) ||
+        (!isalnum((unsigned char) c) && c != '+' && c != '.' && c != '-'))
       break;
   }
   memcpy(raw, ref, n);

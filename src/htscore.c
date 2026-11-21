@@ -171,6 +171,7 @@ RUN_CALLBACK0(opt, end); \
       template_footer = NULL;                                                  \
     }                                                                          \
     hash_free(&hash);                                                          \
+    opt->hash = NULL;                                                          \
   } while (0)
 #define XH_uninit do { XH_extuninit; if (r.adr) { freet(r.adr); r.adr=NULL; } } while(0)
 
@@ -3860,6 +3861,8 @@ HTSEXT_API hts_boolean hts_addfilter(httrackp *opt, const char *rule) {
 
 // copier nouveaux paramètres si besoin
 HTSEXT_API int copy_htsopt(const httrackp * from, httrackp * to) {
+  /* the engine reads the strings below under this lock */
+  hts_mutexlock(&to->state.lock);
   if (from->maxsite > -1)
     to->maxsite = from->maxsite;
 
@@ -3891,7 +3894,9 @@ HTSEXT_API int copy_htsopt(const httrackp * from, httrackp * to) {
 
   if (from->maxconn > 0)
     to->maxconn = from->maxconn;
-  if (from->max_retry_after >= 0)
+  /* A fresh opt holds the default, so only another value is an edit. */
+  if (from->max_retry_after >= 0 &&
+      from->max_retry_after != HTS_DEFAULT_MAX_RETRY_AFTER)
     to->max_retry_after = from->max_retry_after;
 
   if (from->mptcp > -1)
@@ -3930,14 +3935,6 @@ HTSEXT_API int copy_htsopt(const httrackp * from, httrackp * to) {
 
   if (StringNotEmpty(from->warc_file))
     StringCopyS(to->warc_file, from->warc_file);
-  to->warc_max_size = from->warc_max_size;
-  to->warc_cdx = from->warc_cdx;
-  to->warc_wacz = from->warc_wacz;
-  to->changes = from->changes;
-
-  to->single_file = from->single_file;
-  if (from->single_file_max_size > 0)
-    to->single_file_max_size = from->single_file_max_size;
   if (from->sitemap)
     to->sitemap = from->sitemap;
   if (StringNotEmpty(from->sitemap_url))
@@ -3960,6 +3957,14 @@ HTSEXT_API int copy_htsopt(const httrackp * from, httrackp * to) {
   if (from->parseall > -1)
     to->parseall = from->parseall;
 
+  /* delete_old is left alone, because shipped front ends send it inverted. */
+
+  if (from->external > -1)
+    to->external = from->external;
+
+  if (from->fragment > -1)
+    to->fragment = from->fragment;
+
   // test all: bit 8 de travel
   if (from->travel > -1) {
     if (from->travel & HTS_TRAVEL_TEST_ALL)
@@ -3968,6 +3973,7 @@ HTSEXT_API int copy_htsopt(const httrackp * from, httrackp * to) {
       to->travel &= HTS_TRAVEL_SCOPE_MASK;
   }
 
+  hts_mutexrelease(&to->state.lock);
   return 0;
 }
 

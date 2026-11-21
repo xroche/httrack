@@ -359,11 +359,14 @@ struct_back *back_new(httrackp *opt, int back_max) {
       (back_max + 1), sizeof(hts_connect_fallback));
   sback->fetch =
       (hts_fetch_meta *) calloct((back_max + 1), sizeof(hts_fetch_meta));
+  sback->strings =
+      (hts_slot_strings *) calloct((back_max + 1), sizeof(hts_slot_strings));
   sback->ready = coucal_new(0);
   sback->busy =
       (uint64_t *) calloct(back_busy_words(back_max), sizeof(uint64_t));
   if (sback->lnk == NULL || sback->connect_fallback == NULL ||
-      sback->fetch == NULL || sback->ready == NULL || sback->busy == NULL) {
+      sback->fetch == NULL || sback->strings == NULL || sback->ready == NULL ||
+      sback->busy == NULL) {
     back_free(&sback);
     return NULL;
   }
@@ -391,6 +394,14 @@ struct_back *back_new(httrackp *opt, int back_max) {
   return sback;
 }
 
+/* Copy SRC into the slot's DST, keeping a never-written SRC as NULL. */
+static const char *slot_string(String *dst, const String *src) {
+  if (StringBuff(*src) == NULL)
+    return NULL;
+  StringCopyS(*dst, *src);
+  return StringBuff(*dst);
+}
+
 void back_free(struct_back ** sback) {
   if (sback != NULL && *sback != NULL) {
     if ((*sback)->lnk != NULL) {
@@ -399,6 +410,16 @@ void back_free(struct_back ** sback) {
     }
     freet((*sback)->connect_fallback);
     freet((*sback)->fetch);
+    if ((*sback)->strings != NULL) {
+      int i;
+
+      for (i = 0; i <= (*sback)->count; i++) {
+        StringFree((*sback)->strings[i].user_agent);
+        StringFree((*sback)->strings[i].accept);
+        StringFree((*sback)->strings[i].lang_iso);
+      }
+      freet((*sback)->strings);
+    }
     freet((*sback)->busy);
     if ((*sback)->ready != NULL) {
       coucal_delete(&(*sback)->ready);
@@ -451,7 +472,8 @@ static int back_connect_next(httrackp *opt, struct_back *sback, int i) {
   if (back[i].r.soc != INVALID_SOCKET) {
     deletehttp(&back[i].r);
   }
-  soc = newhttp_addr(opt, back[i].url_adr, &back[i].r, -1, next, NULL);
+  soc = newhttp_addr(opt, back[i].url_adr, &back[i].r, -1,
+                     (cf->addr_first + next) % cf->addr_count, NULL);
   if (soc == INVALID_SOCKET)
     return 0;
 
@@ -762,8 +784,10 @@ int back_available(const struct_back * sback) {
 static LLint back_slot_incache(const lien_back *back) {
   if (back->r.adr == NULL)
     return 0;
-  return max(hts_load_relaxed_llint(&back->r.size),
-             hts_load_relaxed_llint(&back->r.totalsize));
+  const LLint size = hts_load_relaxed_llint(&back->r.size);
+  const LLint total = hts_load_relaxed_llint(&back->r.totalsize);
+
+  return max(size, total);
 }
 
 /* Estimated bytes of the pages and files held in memory. */
@@ -3101,6 +3125,7 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
       // fresh connect: address list not yet probed, start at the first
       sback->connect_fallback[p].addr_index = 0;
       sback->connect_fallback[p].addr_count = -1;
+      sback->connect_fallback[p].addr_first = 0;
       /* A type probe carries no fetch metadata. */
       memset(&sback->fetch[p], 0, sizeof(sback->fetch[p]));
       if (fetch != NULL && !test) {
@@ -3116,11 +3141,17 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
         back[p].r.req.proxy.port = opt->proxy.port;
       }
       // et user-agent
-      back[p].r.req.user_agent = StringBuff(opt->user_agent);
+      /* own copies: a front end's copy_htsopt() may realloc opt's buffers */
+      hts_mutexlock(&opt->state.lock);
+      back[p].r.req.user_agent =
+          slot_string(&sback->strings[p].user_agent, &opt->user_agent);
+      back[p].r.req.lang_iso =
+          slot_string(&sback->strings[p].lang_iso, &opt->lang_iso);
+      back[p].r.req.accept =
+          slot_string(&sback->strings[p].accept, &opt->accept);
+      hts_mutexrelease(&opt->state.lock);
       back[p].r.req.referer = StringBuff(opt->referer);
       back[p].r.req.from = StringBuff(opt->from);
-      back[p].r.req.lang_iso = StringBuff(opt->lang_iso);
-      back[p].r.req.accept = StringBuff(opt->accept);
       back[p].r.req.headers = StringBuff(opt->headers);
       back[p].r.req.user_agent_send = opt->user_agent_send;
       /* a login bundle's site gets the bundle's UA and headers */
@@ -3725,9 +3756,17 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
         if (cf->addr_count < 0 && back[i].r.soc != INVALID_SOCKET &&
             !back[i].r.is_file && !back[i].r.req.proxy.active) {
           SOCaddr scratch[HTS_MAXADDRNUM];
+          int first;
 
           cf->addr_count = hts_dns_resolve_all(opt, back[i].url_adr, scratch,
                                                HTS_MAXADDRNUM, NULL);
+          // the first connect took the preferred address, so count from it
+          first =
+              hts_dns_addr_index(scratch, cf->addr_count, &back[i].r.address);
+          // a replaced record lost it, so use the preferred index
+          if (first < 0)
+            first = hts_dns_preferred(opt, back[i].url_adr);
+          cf->addr_first = first < cf->addr_count ? first : 0;
         }
 
         // vérifier l'existance de timeout-check
@@ -3748,6 +3787,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
             }
             continue; // reconnected (stay connecting) or failed
           }
+          if (cf->addr_index > 0) // a fallback worked: start there next time
+            hts_dns_set_preferred(opt, back[i].url_adr, &back[i].r.address);
           /* A keep-alive slot and the post-TLS re-entry share one socket, so
              count it once. */
           if (!back[i].r.keep_alive

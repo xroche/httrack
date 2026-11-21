@@ -651,7 +651,7 @@ static int st_savename_collide(httrackp *opt, int argc, char **argv) {
       strcatbuff(afs.af.fil, word);
       for (j = 0; j < sizeof(word) - 1; j++) {
         if ((k >> j) & 1)
-          afs.af.fil[1 + j] = (char) toupper(afs.af.fil[1 + j]);
+          afs.af.fil[1 + j] = (char) toupper((unsigned char) afs.af.fil[1 + j]);
       }
       strcatbuff(afs.af.fil, ".html");
       url_savename(&afs, NULL, NULL, NULL, opt, sback, &cache, &hash, 0, 0,
