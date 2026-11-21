@@ -662,9 +662,11 @@ static void cmdl_print_cache_entry(httrackp *opt, cache_back *cache,
 
 /* Feeds the log backstop the passwords of the blank-separated start URLs,
    but not of the +/- filters among them, of the proxy and --why, and the
-   secret -%X values. */
-static void hts_secret_learn_options(httrackp *opt, const char *urls) {
+   secret -%X values. Returns the '?', '#' or '\' before the stray '@' of a
+   start URL, or '\0'. */
+static char hts_secret_learn_options(httrackp *opt, const char *urls) {
   const char *u = urls;
+  char stray = '\0';
 
   while (*u != '\0') {
     const size_t n = strcspn(u, HTS_BLANKS);
@@ -676,12 +678,15 @@ static void hts_secret_learn_options(httrackp *opt, const char *urls) {
       memcpy(word, u, n);
       word[n] = '\0';
       hts_secret_add_login(opt, word);
+      if (stray == '\0' && hts_stray_login(word) != NULL)
+        stray = *hts_authority_end(login_start(word));
     }
     u += n != 0 ? n : 1;
   }
   hts_secret_add_login(opt, StringBuff(opt->proxy.name));
   hts_secret_add_login(opt, StringBuff(opt->why_url));
   hts_secret_add_headers(opt, StringBuff(opt->headers));
+  return stray;
 }
 
 /* The caller frees x_cmd and *url, the start URLs, on every return. */
@@ -2788,6 +2793,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
       char t[256];
       char *masked_url;
       const char *shown_url;
+      char stray;
 
       time_local_rfc822(t);     // faut bien que ca serve quelque part l'heure RFC1945 arf'
 
@@ -2873,7 +2879,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                         "engine: could not create hts-in_progress.lock, so"
                         " this mirror cannot be stopped or paused by a file");
       }
-      hts_secret_learn_options(opt, *url);
+      stray = hts_secret_learn_options(opt, *url);
       masked_url = hts_mask_passwords(*url, HTS_MASK_LIST);
       shown_url = masked_url != NULL ? masked_url : "(out of memory)";
       // hts-log.txt
@@ -2938,6 +2944,12 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
         }
       }
       freet(masked_url);
+      if (stray != '\0')
+        hts_log_print(opt, LOG_WARNING,
+                      "a start URL has an '@' after a '%c', which ends the host"
+                      " name, so no login is sent: if the '%c' is part of the"
+                      " login, write it as %%%02X",
+                      stray, stray, (unsigned char) stray);
     }
 
     io_flush;

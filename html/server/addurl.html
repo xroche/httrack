@@ -42,9 +42,10 @@ function do_add() {
 		}
 		str="http://";
 		if (document.form.urllogin.value.length > 0) {
-			str += document.form.urllogin.value;
+			// escaped, so a '?', '#', '/' or '@' stays in the login
+			str += encodeURIComponent(document.form.urllogin.value);
 			str += ":";
-			str += document.form.urlpass.value;
+			str += encodeURIComponent(document.form.urlpass.value);
 			str += "@";
 		}
 		str += document.form.urladr.value;

@@ -1867,6 +1867,10 @@ static int st_secrets(httrackp *opt, int argc, char **argv) {
   err |= secrets_row(o, fp,
                      "GET /download/file.html ftp://download@h u:download@h",
                      "GET /download/file.html ftp://***@h u:***@h", NULL);
+  // a password a raw '?' cuts off its login: each piece, as a word, any case
+  hts_secret_add_login(o, "http://u:Mir?ror@h/");
+  err |= secrets_row(o, fp, "u:mir/?ror@h mirrored mir ror port: Mir",
+                     "u:***/?***@h mirrored *** *** port: ***", NULL);
   // an address is no login
   err |= secrets_row(o, fp,
                      "mailto:index@h MAILTO:index@h news:index@h "
@@ -4260,8 +4264,7 @@ static int st_contentid_tail(httrackp *opt, int argc, char **argv) {
   return failures != 0;
 }
 
-/* -#test=clienthints <user-agent>: the Sec-CH-UA* values it implies. */
-/* Print where each login skipper puts the host of a URL address. */
+/* Print the host each login parser finds in a URL address. */
 static int st_userinfo(httrackp *opt, int argc, char **argv) {
   int i;
 
@@ -4271,6 +4274,7 @@ static int st_userinfo(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* -#test=clienthints <user-agent>: the Sec-CH-UA* values it implies. */
 static int st_clienthints(httrackp *opt, int argc, char **argv) {
   hts_client_hints ch;
 
@@ -4412,7 +4416,7 @@ const struct selftest_entry selftests_lib[] = {
      st_plugoom},
     {"libhandlesoom", "", "a module that cannot be recorded changes nothing",
      st_libhandlesoom},
-    {"userinfo", "<url>...", "the host each login skipper finds in a URL",
+    {"userinfo", "<url>...", "the host each login parser finds in a URL",
      st_userinfo},
     {"clienthints", "<user-agent>",
      "the client hints a browser sending this User-Agent adds", st_clienthints},

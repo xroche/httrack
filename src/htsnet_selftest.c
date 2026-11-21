@@ -174,9 +174,13 @@ static int st_ftppasv(httrackp *opt, int argc, char **argv) {
 
 static int st_proxyurl(httrackp *opt, int argc, char **argv) {
   char BIGSTK name[HTS_URLMAXSIZE * 2];
+  size_t size = sizeof(name);
   int port = -1;
 
-  hts_parse_proxy(argv[0], name, sizeof(name), &port);
+  // a smaller size shows where a long name is cut
+  if (argc > 1 && atoi(argv[1]) > 0 && (size_t) atoi(argv[1]) < size)
+    size = (size_t) atoi(argv[1]);
+  hts_parse_proxy(argv[0], name, size, &port);
   // host= is the resolved host (scheme/userinfo stripped); kind= the transport
   printf("name=%s port=%d host=%s kind=%s\n", name, port,
          jump_identification_const(name),
@@ -1660,7 +1664,7 @@ const struct selftest_entry selftests_net[] = {
      st_sniname},
     {"ftp-pasv", "pasv|epsv <reply>",
      "the address and port a PASV or EPSV reply parses into", st_ftppasv},
-    {"proxyurl", "<proxy-arg>", "parse a -P proxy URL into host/port",
+    {"proxyurl", "<proxy-arg> [size]", "parse a -P proxy URL into host/port",
      st_proxyurl},
     {"socks5", "", "SOCKS5 handshake framing and credential self-test",
      st_socks5},

@@ -37,7 +37,8 @@ toport 'http://h?u=a@b:80' '(none)'
 toport 'http://h#a@b:80' '(none)'
 toport 'http://h\a@b:80' '(none)'
 toport 'http://u@h:80?a@b/x' ':80?a@b/x'
-toport 'u:p?w@h:8080' ':p?w@h:8080'
+# the authority is u:p, so the port is p and never h's 8080
+selftest_queue 'adr=u:p fil=/?w@h:8080' identurl 'http://u:p?w@h:8080'
 # -P escapes a '?' in a proxy password, which keeps its port
 toport 'u:p%3Fw@h:8080' ':8080'
 # no ']' to end the literal: the first ':' stands, and the port parse rejects it

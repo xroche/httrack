@@ -182,6 +182,9 @@ A project folder (doit.log, hts-cache) and a ./.httrackrc can carry
 (load a plugin). Run
 .B httrack
 only on folders and in directories you trust. Your own \(ti/.httrackrc is yours and fine.
+.PP
+In a URL login, write ? as %3F, # as %23, / as %2F, \e as %5C and @ as %40.
+A raw ?, # or \e ends the host name, so the text after it is not sent as a login.
 .SH LIMITS
 @LIMITS@
 @FOOTER@

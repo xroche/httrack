@@ -2997,6 +2997,12 @@ static int st_cookieflat(httrackp *opt, int argc, char **argv) {
        COOKIE_LOAD_KEEP,
        {FLAT_HOST("localhost", PLAIN, "a", "1"), NULL},
        NULL},
+      // a '\' ends the host, so the '@' after it ends no login
+      {"a=1",
+       "http://127.0.0.1\\u=a@10.0.0.2/x",
+       COOKIE_LOAD_KEEP,
+       {FLAT_HOST("127.0.0.1", PLAIN, "a", "1"), NULL},
+       NULL},
       {"a=1",
        "http://co.uk/",
        COOKIE_LOAD_KEEP,

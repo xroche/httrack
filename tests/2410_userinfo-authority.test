@@ -20,10 +20,11 @@ for t in '?' '#' "\\"; do
 done
 split 'http://h1?u=a@h2/x.html' 'adr=h1 fil=/?u=a@h2/x.html'
 split 'http://h1#u=a@h2/x.html' 'adr=h1 fil=/#u=a@h2/x.html'
-# a browser reads that '\' as '/'
-split 'http://h1\u=a@h2/x.html' 'adr=h1 fil=/u=a@h2/x.html'
+# the parser turns a page link's '\' into '/', so only a start URL keeps one
+split 'http://h1\u=a@h2/x.html' 'adr=h1 fil=/\u=a@h2/x.html'
 split 'http://h1:81?u@h2:82/x' 'adr=h1:81 fil=/?u@h2:82/x'
-split 'http://h\a\b.html' 'adr=h fil=/a\b.html'
+split 'http://h\a\b.html' 'adr=h fil=/\a\b.html'
+selftest_queue 'http://h1' fetchorigin 'http://h1\u=a@h2/x'
 
 # controls: a login before the authority ends is still one
 ui 'http://u:p@h1/x?a@b' 'host=h1/x?a@b end=h1/x?a@b login=1'
@@ -37,6 +38,10 @@ auth 'u:p@h1' 'auth=dTpw'
 proxy 'u:p#w@proxy:3128' 'name=u:p%23w@proxy port=3128 host=proxy kind=http'
 proxy 'connect://u:p?w@proxy:8080' 'name=connect://u:p%3Fw@proxy port=8080 host=proxy kind=connect'
 proxy 'u:a/b\c@proxy' 'name=u:a%2Fb%5Cc@proxy port=8080 host=proxy kind=http'
+proxy 'u:p@q#w@proxy' 'name=u:p@q%23w@proxy port=8080 host=proxy kind=http'
+# an escape that does not fit the name buffer is dropped whole
+selftest_queue 'name=u:ab%3F port=8080 host=u:ab%3F kind=http' proxyurl 'u:ab?@proxy' 8
+selftest_queue 'name=u:abc port=8080 host=u:abc kind=http' proxyurl 'u:abc?@proxy' 8
 auth 'u:p%23w@proxy' 'auth=dTpwI3c='
 
 selftest_run_queued
@@ -70,4 +75,20 @@ srv1=$(<"${tmpdir}/srv1.log")
 srv2=$(<"${tmpdir}/srv2.log")
 grep -q 'GET /index.html' <<<"$srv1" || fail "h1 never served the page: $srv1"
 grep -q "GET /?u=a@${h2}/x.html" <<<"$srv1" || fail "h1 missed the ?-link: $srv1"
+grep -q "GET /@${h2}/x.html" <<<"$srv1" || fail "h1 missed the \\-link: $srv1"
 ! grep -q 'GET ' <<<"$srv2" || fail "h2 was contacted: $srv2"
+
+# A start URL whose password holds a raw '?', '#' or '\': the log warns, and
+# neither piece of the password reaches it.
+for t in '?' '#' "\\"; do
+    out="${tmpdir}/out-stray"
+    rm -rf "$out"
+    httrack -O "$out" --robots=0 --timeout=5 --retries=0 \
+        "http://u:Hd7k${t}Zq9x@${h1}/a/b.html" >"${tmpdir}/stray.out" \
+        2>"${tmpdir}/stray.err" || true
+    log=$(<"${out}/hts-log.txt")
+    shown="$log$(<"${tmpdir}/stray.out")$(<"${tmpdir}/stray.err")"
+    grep -q 'write it as %' <<<"$log" || fail "no warning for '${t}': $log"
+    grep -q 'Invalid port: \*\*\*' <<<"$log" || fail "no masked error: $log"
+    ! grep -q -e Hd7k -e Zq9x <<<"$shown" || fail "password shown: $shown"
+done

@@ -2772,8 +2772,6 @@ int ident_url_absolute(const char *url, lien_adrfil *adrfil) {
 
     if (q[0] != '/') // the default page
       strcatbuff(adrfil->fil, "/");
-    if (q[0] == '\\') // a browser reads it as the '/' just added
-      q++;
     // fil[] holds the path plus a possible leading '/' the top strlen() misses.
     if (strlen(q) >= sizeof(adrfil->fil) - strlen(adrfil->fil))
       return -1;
@@ -3613,6 +3611,13 @@ const char *login_end(const char *adr) {
   const char *const at = strrchr_limit(start, '@', hts_authority_end(start));
 
   return at != NULL ? at : start;
+}
+
+const char *hts_stray_login(const char *adr) {
+  const char *const start = login_start(adr);
+  const char *const at = strrchr_limit(start, '@', start + strcspn(start, "/"));
+
+  return at != NULL && at - 1 > hts_authority_end(start) ? at : NULL;
 }
 
 /* Returns HTS_TRUE when adr has a login, a user alone included. */

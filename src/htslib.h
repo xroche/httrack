@@ -523,7 +523,8 @@ int may_bogus_multiple(httrackp * opt, const char *mime, const char *filename);
 int may_unknown2(httrackp * opt, const char *mime, const char *filename);
 
 const char *strrchr_limit(const char *s, char c, const char *limit);
-/* Returns the end of the authority at s: its first '/', '?', '#' or '\'. */
+/* Returns the end of the authority at s, which must be past the scheme: its
+   first '/', '?', '#' or '\'. */
 const char *hts_authority_end(const char *s);
 char *jump_protocol(char *source);
 const char *jump_protocol_const(const char *source);
@@ -554,14 +555,16 @@ const char *hts_header_shown(httrackp *opt, const char *line, char *dst,
    bytes, and the log writers print each as ***. A URL password is hidden only
    as a login, before an '@', so a password such as "index" leaves index.html
    alone. A header token of HTS_SECRET_TOKEN bytes or more is hidden anywhere.
+   A piece of a password split at a stray '@' is hidden as a whole word.
  */
 #define HTS_SECRET_MAX 64
 #define HTS_SECRET_MAXLEN 1024
 #define HTS_SECRET_TOKEN 8
 
 typedef enum hts_secret_kind {
-  HTS_SECRET_LOGIN, /* a URL password */
-  HTS_SECRET_HEADER /* a header token, kept only from HTS_SECRET_TOKEN bytes */
+  HTS_SECRET_LOGIN,  /* a URL password */
+  HTS_SECRET_HEADER, /* a header token, kept only from HTS_SECRET_TOKEN bytes */
+  HTS_SECRET_PIECE   /* a piece of a password the log prints apart */
 } hts_secret_kind;
 
 /* Allocates and frees the set of opt->secrets. */
@@ -598,6 +601,10 @@ void secret_vfprintf(httrackp *opt, FILE *fp,
 /* Skip adr's blanks and scheme, then its login. */
 const char *login_start(const char *adr);
 const char *login_end(const char *adr);
+/* Returns the host past the last '@' before the first '/' of adr when a '?',
+   '#' or '\' ends the authority before that '@', or NULL. That '@' ends no
+   login, though a user may have meant one. */
+const char *hts_stray_login(const char *adr);
 
 /* Header line helpers shared by the request writer and the redaction code. */
 size_t header_name_len(const char *line);
