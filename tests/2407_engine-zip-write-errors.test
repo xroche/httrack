@@ -1,0 +1,14 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# A member write that fails once must make some zip call return an error.
+
+dir=$(mktemp -d)
+cleanup_push rm -rf "$dir"
+
+assert_selftest 'zip-write-errors: OK' zip-write-errors "$dir"
