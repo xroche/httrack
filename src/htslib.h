@@ -460,12 +460,12 @@ void hts_dns_job_release(hts_dns_job *job);
    cache, with *error set when it is 0; -1 if the worker died unanswered. Must
    hold no lock. */
 int hts_dns_poll(httrackp *opt, hts_dns_job *job, const char **error);
-/* Index of addr in list[0..count-1], port included, or -1. */
+/* Returns the index of addr in list[0..count-1], port included, or -1. */
 int hts_dns_addr_index(const SOCaddr *list, int count, const SOCaddr *addr);
 /* Index in iadr's cached list of the address to try first, 0 by default. */
 int hts_dns_preferred(httrackp *opt, const char *iadr);
 /* Make addr, if it is in iadr's cached list, the one new connects try first.
-   Must hold no lock. */
+   The caller must not hold opt->state.lock. */
 void hts_dns_set_preferred(httrackp *opt, const char *iadr,
                            const SOCaddr *addr);
 HTS_INLINE SOCaddr *hts_dns_resolve2(httrackp *opt, const char *iadr,

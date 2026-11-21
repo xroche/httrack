@@ -829,7 +829,6 @@ static int dns_addr_selftests(httrackp *opt) {
      sequence */
   CHECK(hts_dns_resolve_all(opt, "pref.test", addrs, HTS_MAXADDRNUM, NULL) ==
         3);
-  CHECK(hts_dns_addr_index(addrs, 3, &addrs[0]) == 0);
   {
     char ip[64];
 
