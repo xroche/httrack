@@ -1256,11 +1256,11 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
 
         /* copy_htsopt() may rewrite accept_kinds from another thread */
         hts_mutexlock(&opt->state.lock);
-        accept = hts_accept_lookup(
-            StringBuff(opt->accept_kinds), retour->req.accept,
-            opt->accept_given,
-            fetch != NULL ? fetch->dest : HTS_FETCH_DEST_UNKNOWN, family,
-            accept_buf, sizeof(accept_buf));
+        accept = hts_accept_lookup(StringBuff(opt->accept_kinds),
+                                   retour->req.accept, opt->accept_given,
+                                   fetch != NULL ? fetch->dest
+                                                 : HTS_FETCH_DEST_UNKNOWN,
+                                   family, accept_buf, sizeof(accept_buf));
         if (strnotempty(accept) && !http_headers_have_field(custom, "Accept")) {
           HDR_OPEN(HDR_ACCEPT);
           print_buffer(&hdr, "Accept: %s" H_CRLF, accept);

@@ -3341,6 +3341,7 @@ static int st_delayedsettled(httrackp *opt, int argc, char **argv) {
    a front end's copy_htsopt() rewrites them before the head is sent. */
 static int st_reqstrings(httrackp *opt, int argc, char **argv) {
   enum { SLOTS = 4, LIVE = 2, LONG = 4096 };
+
   httrackp *const from = hts_create_opt();
   char *big = malloct(LONG + 1);
   struct_back *sback = back_new(opt, SLOTS);
