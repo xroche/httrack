@@ -430,7 +430,7 @@ If the site uses a login form, see <a href="login.html">Mirror a site behind a l
 <br>Note: If your username and/or password contains a '<tt>@</tt>' character, you may have to replace all '<tt>@</tt>' 
 occurrences by '<tt>%40</tt>' so that it can work, such as in <tt>user%40domain.com:foobar@www.foo.com/auth/. 
 You may have to do the same for all "special" characters like spaces (%20), quotes (%22), '<tt>?</tt>' (%3F), '<tt>#</tt>' (%23), '<tt>/</tt>' (%2F) and '<tt>\</tt>' (%5C)..</tt>
-In a URL you type, the login runs up to the last '<tt>@</tt>' before the first '<tt>/</tt>'. Inside a page, a raw '<tt>?</tt>', '<tt>#</tt>' or '<tt>\</tt>' ends the host name, as in browsers.
+In a URL you type, the login runs up to the last '<tt>@</tt>' before the first '<tt>/</tt>'. Inside a page, a raw '<tt>?</tt>', '<tt>#</tt>' or '<tt>\</tt>' ends the host name, as in browsers. A filter matches the login as it is stored, so it must write a '<tt>?</tt>', '<tt>#</tt>' or '<tt>\</tt>' in the login as %3F, %23 or %5C.
 </em>
 <br><br>
 

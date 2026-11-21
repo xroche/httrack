@@ -114,13 +114,13 @@ print(urllib.parse.quote(sys.argv[1], safe=""))' "$pass")
     done
 done
 
-# --why takes a typed URL: the login is masked and the host is the right one,
-# and a +/- filter written with the login as typed still matches it.
+# --why takes a typed URL: the login is masked and the host is the right one.
+# A filter matches the stored login, which spells a raw '?' as %3F.
 why_url="http://u:Pq3?Lk5@${h2}/a.html"
 for sign in + -; do
     out="${tmpdir}/why${sign}"
     httrack -O "$out" --robots=0 "http://u:Pq3?Lk5@${h2}/page" \
-        "${sign}*u:Pq3?Lk5@127.0.0.1*a.html" --why "$why_url" \
+        "${sign}*u:Pq3%3FLk5@127.0.0.1*a.html" --why "$why_url" \
         >"${out}.out" 2>"${out}.err" || true
     reply=$(<"${out}.out")
     grep -qF "u:***@${h2}/a.html: " <<<"$reply" || fail "why $sign: $reply"
@@ -128,3 +128,27 @@ for sign in + -; do
     grep -qF "$verdict by rule" <<<"$reply" || fail "why $sign verdict: $reply"
     ! grep -qF "Pq3?Lk5@${h2}/a.html" <<<"$reply" || fail "why $sign: login shown: $reply"
 done
+
+# A login bundle's url line is typed too: it logs in to h2, and the other one
+# goes to nohost.invalid rather than to h1.
+out="${tmpdir}/bundle"
+mkdir -p "${out}.d"
+printf '%s\n' '# HTTrack bundle 1' \
+    "url http://u:Zz9?Yq7@${h2}/reqheaders/echo.txt" \
+    "url http://${h1}?Wk4X@nohost.invalid/q.html" >"${out}.d/b.hts"
+httrack -O "$out" --robots=0 --timeout=5 --retries=0 -r1 \
+    --bundle-dir "${out}.d" "http://${h2}/x.html#httrack-bundle=b" \
+    >"${out}.out" 2>"${out}.err" || true
+echo_txt="${out}/${h2/:/_}/reqheaders/echo.txt"
+[ -f "$echo_txt" ] || fail "bundle: not fetched: $(<"${out}.err")"
+headers=$(<"$echo_txt")
+grep -qF "Authorization: Basic $(printf 'u:Zz9?Yq7' | base64)" <<<"$headers" ||
+    fail "bundle: wrong login: $headers"
+for f in "${out}/hts-log.txt" "${out}.out" "${out}.err"; do
+    if grep -qF -e 'Zz9?Yq7' -e 'Zz9%3FYq7' "$f"; then
+        fail "bundle: password shown in ${f##*/}: $(<"$f")"
+    fi
+done
+srv1=$(<"${tmpdir}/srv1.log")
+! grep -qF 'Wk4X' <<<"$srv1" || fail "bundle: h1 was sent the url line: $srv1"
+grep -qF nohost.invalid "${out}/hts-log.txt" || fail "bundle: nohost.invalid not tried: $(<"${out}/hts-log.txt")"

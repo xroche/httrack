@@ -183,7 +183,7 @@ A project folder (doit.log, hts-cache) and a ./.httrackrc can carry
 .B httrack
 only on folders and in directories you trust. Your own \(ti/.httrackrc is yours and fine.
 .PP
-In a URL you type, the login runs up to the last @ before the first /. Inside a page, a raw ?, # or \e ends the host name, as in browsers.
+In a URL you type, the login runs up to the last @ before the first /. Inside a page, a raw ?, # or \e ends the host name, as in browsers. A filter matches the login as it is stored, so it must write a ?, # or \e in the login as %3F, %23 or %5C.
 .SH LIMITS
 @LIMITS@
 @FOOTER@

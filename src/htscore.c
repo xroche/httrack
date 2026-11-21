@@ -1129,39 +1129,25 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
 
         // skip a sign with nothing after it
         if (strnotempty(tempo)) {
-          char BIGSTK escaped[HTS_FILTER_MAXLEN * 3 + 1];
-          const char *variant[2];
-          int v;
-
-          // a rule naming a login also matches it as the stored host spells it
-          variant[0] = tempo;
-          variant[1] = NULL;
-          if (strchr(tempo, '@') != NULL &&
-              hts_escape_typed_login(tempo, escaped, sizeof(escaped)) &&
-              strcmp(escaped, tempo) != 0 && strlen(escaped) <= room)
-            variant[1] = escaped;
-          for (v = 0; v < 2 && variant[v] != NULL; v++) {
+          if ((plus == 0) && (type == 1)) {
+            if (hts_lastchar(tempo) != '*') {
+              strcatbuff(tempo, "*");
+            }
+          }
+          {
             /* the sign, whatever tempo holds, and the NUL */
             char BIGSTK rule[sizeof(tempo) + 1];
             htsbuff fb = htsbuff_array(rule);
 
-            if ((plus == 0) && (type == 1) && hts_lastchar(variant[v]) != '*') {
-              char BIGSTK star[sizeof(tempo) + 1];
-
-              snprintf(star, sizeof(star), "%s*", variant[v]);
-              htsbuff_cpy(&fb, "+");
-              htsbuff_cat(&fb, star);
-            } else {
-              htsbuff_cpy(&fb, type ? "+" : "-");
-              htsbuff_cat(&fb, variant[v]);
-            }
+            htsbuff_cpy(&fb, type ? "+" : "-");
+            htsbuff_cat(&fb, tempo);
             filters_insert(opt, filptr, rule); /* bumps filptr when stored */
+          }
 
-            if (!filters_grow(opt, 1)) {
-              freet(primary);
-              XH_extuninit;
-              return 0;
-            }
+          if (!filters_grow(opt, 1)) {
+            freet(primary);
+            XH_extuninit;
+            return 0;
           }
         }
 

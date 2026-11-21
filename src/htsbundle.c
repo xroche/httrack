@@ -234,11 +234,15 @@ static hts_boolean bundle_add(httrackp *opt, const char *name,
 
 const char *hts_bundle_take(httrackp *opt, char *url) {
   char name[HTS_BUNDLE_NAME_MAX];
+  char BIGSTK typed[HTS_URLMAXSIZE * 3];
   const char *const why = bundle_cut(url, name, sizeof(name));
 
   if (why != NULL || name[0] == '\0')
     return why;
-  return bundle_add(opt, name, url) ? NULL : "out of memory";
+  // the scope reads the host the crawl will reach
+  if (!hts_escape_typed_login(url, typed, sizeof(typed)))
+    return "invalid url";
+  return bundle_add(opt, name, typed) ? NULL : "out of memory";
 }
 
 hts_boolean hts_bundle_has_control(const char *s, size_t len) {
@@ -472,15 +476,19 @@ static hts_boolean bundle_parse(httrackp *opt, bundle *b, text_src *src,
       BUNDLE_FAIL("%s, line %d: no value", b->file, lineno);
     if (key_is(line, klen, "url")) {
       char host[COOKIE_MAX_DOMAIN];
+      char BIGSTK typed[HTS_URLMAXSIZE * 3];
 
+      // a typed login reads up to the last '@' before the first '/'
       if (strlen(value) >= HTS_URLMAXSIZE ||
-          strstr(value, HTS_BUNDLE_SUFFIX) != NULL ||
-          !cookie_url_host(value, host, sizeof(host)))
+          !hts_escape_typed_login(value, typed, sizeof(typed)) ||
+          strlen(typed) >= HTS_URLMAXSIZE ||
+          strstr(typed, HTS_BUNDLE_SUFFIX) != NULL ||
+          !cookie_url_host(typed, host, sizeof(host)))
         BUNDLE_FAIL("%s, line %d: invalid url", b->file, lineno);
       if (b->nurls >= BUNDLE_LIST_MAX)
         BUNDLE_FAIL("%s, line %d: more than %d url lines", b->file, lineno,
                     BUNDLE_LIST_MAX);
-      if (!strlist_add(&b->urls, &b->nurls, value))
+      if (!strlist_add(&b->urls, &b->nurls, typed))
         BUNDLE_FAIL("%s: out of memory", b->file);
     } else if (key_is(line, klen, "ua")) {
       if (b->ua != NULL)
@@ -1864,8 +1872,9 @@ HTSEXT_API hts_boolean hts_bundle_from_paste_hosts(
   {
     const char *const auth = strstr(base, "://") + 3;
 
-    // the password would land in the URL list and the project file
-    if (memchr(auth, '@', strcspn(auth, "/?\\")) != NULL)
+    // the password would land in the URL list and the project file, and a
+    // typed URL's login runs up to the first '/'
+    if (memchr(auth, '@', strcspn(auth, "/")) != NULL)
       PASTE_FAIL("the address holds a user name or password");
     why = cookie_host_refusal(auth, strcspn(auth, ":/?\\"));
     if (why != NULL)
