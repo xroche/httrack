@@ -6,7 +6,7 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-# A member write that fails once must make some zip call return an error.
+# A zip write that fails once must make the call that ran it return an error.
 
 dir=$(mktemp -d)
 cleanup_push rm -rf "$dir"
