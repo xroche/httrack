@@ -1,0 +1,11 @@
+#!/bin/bash
+#
+# A request keeps its User-Agent when a front end's copy_htsopt() rewrites it.
+
+set -euo pipefail
+
+out=$(httrack -O /dev/null -#test=reqstrings 2>/dev/null)
+test "$out" = "reqstrings self-test: OK" || {
+    echo "expected 'reqstrings self-test: OK', got: $out" >&2
+    exit 1
+}

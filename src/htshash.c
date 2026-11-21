@@ -295,11 +295,18 @@ void hash_init(httrackp *opt, hash_struct *hash, hts_boolean normalized) {
   hash->norm_host = normalized && !opt->no_www_dedup;
   hash->norm_slash = normalized && !opt->no_slash_dedup;
   hash->norm_query = normalized && !opt->no_query_dedup;
-  /* snapshot the query-strip list (not owned; valid for the hash lifetime) */
-  hash->strip_query =
-      StringNotEmpty(opt->strip_query) ? StringBuff(opt->strip_query) : NULL;
+  /* own snapshots: a front end's copy_htsopt() may realloc opt's buffers */
+  hts_mutexlock(&opt->state.lock);
+  hash->strip_query = StringNotEmpty(opt->strip_query)
+                          ? strdupt(StringBuff(opt->strip_query))
+                          : NULL;
   /* host-alias rules apply whatever urlhack says */
-  hash->host_alias = hts_host_alias_rules(opt);
+  {
+    const char *const rules = hts_host_alias_rules(opt);
+
+    hash->host_alias = rules != NULL ? strdupt(rules) : NULL;
+  }
+  hts_mutexrelease(&opt->state.lock);
 
   hts_set_hash_handler(hash->sav, opt);
   hts_set_hash_handler(hash->adrfil, opt);
@@ -362,6 +369,8 @@ void hash_free(hash_struct *hash) {
     coucal_delete(&hash->former_adrfil);
     coucal_delete(&hash->savename_next);
     coucal_delete(&hash->savename_owner);
+    freet(hash->strip_query);
+    freet(hash->host_alias);
   }
 }
 

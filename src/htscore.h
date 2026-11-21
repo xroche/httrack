@@ -162,6 +162,13 @@ typedef struct hts_connect_fallback {
   int addr_count;       /**< resolved addresses; -1 = not yet probed */
 } hts_connect_fallback;
 
+/** A slot's own copies of the request strings copy_htsopt() may rewrite. */
+typedef struct hts_slot_strings {
+  String user_agent;
+  String accept;
+  String lang_iso;
+} hts_slot_strings;
+
 /** The download-slot ring: the set of concurrent transfers in flight.
     Allocated/owned by the engine; consumers (status callbacks, the loop)
     read it but do not resize or free it. */
@@ -180,6 +187,7 @@ struct struct_back {
   int ready_files;        /**< ready entries held in ~hts-tmp files */
   hts_connect_fallback *connect_fallback; /**< per-slot, count+1 entries */
   hts_fetch_meta *fetch; /**< per-slot Sec-Fetch-* values, count+1 entries */
+  hts_slot_strings *strings; /**< per-slot request strings, count+1 entries */
   hts_boolean bot_challenge_noted; /**< the bot-protection note is already in
                                         this mirror's log (#1732) */
   TStamp retry_after_until; /**< Retry-After: no new launch before this local
@@ -242,10 +250,10 @@ struct hash_struct {
   hts_boolean norm_host;
   hts_boolean norm_slash;
   hts_boolean norm_query;
-  /* query-strip keys (not owned); set from opt->strip_query at hash_init */
-  const char *strip_query;
-  /* host-alias rules (not owned); set from opt->host_alias at hash_init */
-  const char *host_alias;
+  /* query-strip keys (owned); copied from opt->strip_query at hash_init */
+  char *strip_query;
+  /* host-alias rules (owned); copied from opt->host_alias at hash_init */
+  char *host_alias;
   /* scratch: the hash key is a host plus a path, the compare one a path */
   char normfil[HTS_URLMAXSIZE * 4];
   char normfil2[HTS_URLMAXSIZE * 2];
