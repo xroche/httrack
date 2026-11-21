@@ -344,10 +344,10 @@ static int st_entities(httrackp *opt, int argc, char **argv) {
   if (s != NULL &&
       hts_unescapeEntitiesWithCharset(s, s, strlen(s) + 1, enc) == 0) {
     printf("%s\n", s);
-    freet(s);
   } else {
     fprintf(stderr, "invalid string '%s'\n", argv[0]);
   }
+  freet(s);
   return 0;
 }
 

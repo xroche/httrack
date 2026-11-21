@@ -99,13 +99,8 @@ hts_boolean hts_random_bytes(void *buf, size_t len) {
   fp = fopen("/dev/urandom", "rb");
   if (fp == NULL)
     return HTS_FALSE;
-  while (got < len) {
-    const size_t n = fread(p + got, 1, len - got, fp);
-
-    if (n == 0) /* a short read is a hard failure, not partial credit */
-      break;
-    got += n;
-  }
+  /* a short read is a hard failure, not partial credit */
+  got += fread(p + got, 1, len - got, fp);
   fclose(fp);
   return got == len ? HTS_TRUE : HTS_FALSE;
 #endif

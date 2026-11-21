@@ -91,7 +91,7 @@ jobs:
         if: failure()
         run: sh tools/ci-test-log.sh
 
-  # About 80 findings on CI, nearly all false positives, so findings do not fail the job.
+  # Any finding fails the job. tools/scan-build-gate.sh holds the checker list.
   scan-build:
     name: clang static analyzer (scan-build)
     runs-on: ubuntu-24.04
@@ -101,38 +101,31 @@ jobs:
         with:
           submodules: recursive
 
+      # Pinned, because each clang release changes what the analyzer reports.
       - name: Install build dependencies
         run: |
           set -euo pipefail
           sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
           sudo apt-get install -y --no-install-recommends \
             build-essential autoconf automake libtool autoconf-archive \
-            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev clang-tools
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev clang-19 clang-tools-19
 
       # --disable-shared stops libtool from analyzing every file twice.
       - name: Configure
         run: |
           set -euo pipefail
           autoreconf -fi
-          scan-build ./configure --disable-shared
-          # Without the wrapper as CC, "No bugs found" would mean nothing was analyzed.
-          grep -q '^CC = .*ccc-analyzer' src/Makefile
+          scan-build-19 ./configure --disable-shared
 
-      # coucal is a submodule with its own upstream.
       - name: Analyze
         run: |
           set -euo pipefail
-          scan-build -o "$RUNNER_TEMP/scan" --exclude "$GITHUB_WORKSPACE/src/coucal" \
-            make -j"$(nproc)" 2>&1 | tee "$RUNNER_TEMP/scan.log"
-          # A build that never reached the analyzer also ends without findings.
-          summary=$(grep -E '^scan-build: ([0-9]+ bugs? found|No bugs found)' "$RUNNER_TEMP/scan.log" || true)
-          test -n "$summary" || { echo "::error::scan-build printed no verdict"; exit 1; }
-          echo "$summary" | tee -a "$GITHUB_STEP_SUMMARY"
+          bash tools/scan-build-gate.sh . "$RUNNER_TEMP/scan-build" | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Upload the analyzer report
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: scan-build-report
-          path: ${{ runner.temp }}/scan/
+          path: ${{ runner.temp }}/scan-build/
           if-no-files-found: ignore

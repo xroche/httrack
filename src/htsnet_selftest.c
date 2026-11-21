@@ -583,6 +583,7 @@ static int st_xfread_lines(httrackp *opt, int argc, char **argv) {
     hts_peek_force_off(HTS_FALSE);
     if (a != b) {
       printf("xfread-lines: case %d (len %d, bufl %d) differs\n", c, len, bufl);
+      freet(stream);
       return 1;
     }
   }

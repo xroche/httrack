@@ -134,7 +134,8 @@ typedef int (*t_hts_htmlcheck_process)(t_hts_callbackarg *carg, httrackp *opt,
 /** Runs on a fetched page before it is parsed, over a NUL-terminated buffer.
     The engine takes over whatever address you store back and frees it, so
     allocate a replacement with hts_malloc() or hts_strdup(), and hts_free() the
-    buffer you were handed unless you grew it with hts_realloc(). */
+    buffer you were handed unless you grew it with hts_realloc(). Storing NULL
+    keeps the page the engine has. */
 typedef t_hts_htmlcheck_process t_hts_htmlcheck_preprocess;
 
 /** Runs on the rewritten page before it is written to disk, over *@p len bytes

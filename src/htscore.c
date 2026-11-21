@@ -1342,8 +1342,10 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
 
   }
 
-  // backing
-  if (opt->maxsoc > 0) {
+  /* backing: at least one socket, or nothing is ever fetched */
+  if (opt->maxsoc <= 0)
+    opt->maxsoc = 1;
+  {
     /* How many HTML files may sit in memory at once. Sized generously: HTML
        takes little room and everything else is written straight to disk. */
     const int back_max = back_max_slots(opt->maxsoc);

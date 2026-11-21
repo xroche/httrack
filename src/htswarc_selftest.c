@@ -1446,6 +1446,7 @@ static int st_warc_wacz(httrackp *opt, int argc, char **argv) {
       e->len = (size_t) info.uncompressed_size;
       e->data = malloct(e->len ? e->len : 1);
       if (e->data == NULL || unzOpenCurrentFile(uf) != UNZ_OK) {
+        freet(e->data);
         err = 1;
         break;
       }

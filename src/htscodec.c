@@ -159,18 +159,19 @@ static int codec_unpack_brotli(FILE *in, FILE *out, LLint maxout,
                                int *io_errno) {
   BrotliDecoderState *const state =
       BrotliDecoderCreateInstance(NULL, NULL, NULL);
-  hts_boolean ok = HTS_TRUE, done = HTS_FALSE;
+  hts_boolean ok = HTS_TRUE, done = HTS_FALSE, last = HTS_FALSE;
   LLint total = 0;
 
   if (state == NULL)
     return -1;
-  while (ok && !done) {
+  while (ok && !done && !last) {
     unsigned char BIGSTK inbuf[8192];
     size_t avail_in = fread(inbuf, 1, sizeof(inbuf), in);
     const uint8_t *next_in = inbuf;
 
     if (avail_in == 0)
       break; /* EOF; a stream still hungry for input is truncated */
+    last = avail_in < sizeof(inbuf);
     for (;;) {
       unsigned char BIGSTK outbuf[8192];
       uint8_t *next_out = outbuf;
@@ -244,10 +245,9 @@ static int codec_unpack_zstd(FILE *in, FILE *out, LLint maxout, int *io_errno) {
     input.src = inbuf;
     input.size = fread(inbuf, 1, sizeof(inbuf), in);
     input.pos = 0;
-    if (input.size == 0) {
-      eof = HTS_TRUE;
+    if (input.size == 0)
       break;
-    }
+    eof = input.size < sizeof(inbuf);
     while (input.pos < input.size) {
       unsigned char BIGSTK outbuf[8192];
       ZSTD_outBuffer output;

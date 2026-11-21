@@ -1121,14 +1121,17 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
   {
     char *cAddr = r->adr;
     int cSize = (int) r->size;
+    int took;
 
     hts_log_print(opt, LOG_DEBUG, "engine: preprocess-html: %s%s",
                   adr_nologin(opt, urladr()), urlfil());
-    if (RUN_CALLBACK4(opt, preprocess, &cAddr, &cSize, urladr(), urlfil()) == 1) {
+    took = RUN_CALLBACK4(opt, preprocess, &cAddr, &cSize, urladr(), urlfil());
+    if (took == 1 && cAddr != NULL) { // a plug-in answering no page keeps ours
       r->adr = cAddr;
       r->size = cSize;
     }
   }
+  assertf(r->adr != NULL); // for the analyzer: the caller always holds a page
   if (RUN_CALLBACK4(opt, check_html, r->adr, (int) r->size, urladr(), urlfil())) {
     FILE *fp = NULL;                  // fichier écrit localement 
     const char *html = r->adr;        // pointeur (on parcours)

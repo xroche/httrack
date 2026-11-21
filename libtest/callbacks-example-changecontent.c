@@ -113,7 +113,9 @@ static void uninit(t_hts_callbackarg *carg) {
     CALLBACKARG_PREV_FUN(carg, uninit)(CALLBACKARG_PREV_CARG(carg));
   }
 
-  /* Process */
+  /* Process. The NULL test is for the analyzer: init always sets userdef. */
+  if (userdef == NULL)
+    return;
   hts_free(userdef->buffer);
   hts_free(userdef->pair);
   hts_free(userdef);
@@ -173,7 +175,7 @@ static int postprocess(t_hts_callbackarg * carg, httrackp * opt, char **html,
   /* Process: the engine's buffer is not a C string, so read exactly *len bytes
      of it and free nothing. */
   page = *html;
-  if (page == NULL || *len <= 0)
+  if (page == NULL || *len <= 0 || userdef == NULL)
     return 1;
   size = (size_t) *len;
 
