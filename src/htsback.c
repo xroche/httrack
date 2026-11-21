@@ -359,11 +359,14 @@ struct_back *back_new(httrackp *opt, int back_max) {
       (back_max + 1), sizeof(hts_connect_fallback));
   sback->fetch =
       (hts_fetch_meta *) calloct((back_max + 1), sizeof(hts_fetch_meta));
+  sback->strings =
+      (hts_slot_strings *) calloct((back_max + 1), sizeof(hts_slot_strings));
   sback->ready = coucal_new(0);
   sback->busy =
       (uint64_t *) calloct(back_busy_words(back_max), sizeof(uint64_t));
   if (sback->lnk == NULL || sback->connect_fallback == NULL ||
-      sback->fetch == NULL || sback->ready == NULL || sback->busy == NULL) {
+      sback->fetch == NULL || sback->strings == NULL || sback->ready == NULL ||
+      sback->busy == NULL) {
     back_free(&sback);
     return NULL;
   }
@@ -391,6 +394,14 @@ struct_back *back_new(httrackp *opt, int back_max) {
   return sback;
 }
 
+/* Copy SRC into the slot's DST, keeping a never-written SRC as NULL. */
+static const char *slot_string(String *dst, const String *src) {
+  if (StringBuff(*src) == NULL)
+    return NULL;
+  StringCopyS(*dst, *src);
+  return StringBuff(*dst);
+}
+
 void back_free(struct_back ** sback) {
   if (sback != NULL && *sback != NULL) {
     if ((*sback)->lnk != NULL) {
@@ -399,6 +410,16 @@ void back_free(struct_back ** sback) {
     }
     freet((*sback)->connect_fallback);
     freet((*sback)->fetch);
+    if ((*sback)->strings != NULL) {
+      int i;
+
+      for (i = 0; i <= (*sback)->count; i++) {
+        StringFree((*sback)->strings[i].user_agent);
+        StringFree((*sback)->strings[i].accept);
+        StringFree((*sback)->strings[i].lang_iso);
+      }
+      freet((*sback)->strings);
+    }
     freet((*sback)->busy);
     if ((*sback)->ready != NULL) {
       coucal_delete(&(*sback)->ready);
@@ -3118,11 +3139,17 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
         back[p].r.req.proxy.port = opt->proxy.port;
       }
       // et user-agent
-      back[p].r.req.user_agent = StringBuff(opt->user_agent);
+      /* own copies: a front end's copy_htsopt() may realloc opt's buffers */
+      hts_mutexlock(&opt->state.lock);
+      back[p].r.req.user_agent =
+          slot_string(&sback->strings[p].user_agent, &opt->user_agent);
+      back[p].r.req.lang_iso =
+          slot_string(&sback->strings[p].lang_iso, &opt->lang_iso);
+      back[p].r.req.accept =
+          slot_string(&sback->strings[p].accept, &opt->accept);
+      hts_mutexrelease(&opt->state.lock);
       back[p].r.req.referer = StringBuff(opt->referer);
       back[p].r.req.from = StringBuff(opt->from);
-      back[p].r.req.lang_iso = StringBuff(opt->lang_iso);
-      back[p].r.req.accept = StringBuff(opt->accept);
       back[p].r.req.headers = StringBuff(opt->headers);
       back[p].r.req.user_agent_send = opt->user_agent_send;
       /* a login bundle's site gets the bundle's UA and headers */
