@@ -158,8 +158,9 @@ struct lien_adrfilsave {
     Tracks which resolved address the slot is currently connecting to so a
     stuck connect can be retried against the next one. */
 typedef struct hts_connect_fallback {
-  int addr_index;       /**< candidate being connected (0-based) */
+  int addr_index;       /**< connects tried before this one */
   int addr_count;       /**< resolved addresses; -1 = not yet probed */
+  int addr_first;       /**< list index of the first attempt */
 } hts_connect_fallback;
 
 /** A slot's own copies of the request strings copy_htsopt() may rewrite. */

@@ -118,6 +118,14 @@ static mock_host mock_hosts[] = {
     {"slow4.test", 0, 1, {{AF_INET, {127, 0, 0, 12}}}, 0, MOCK_GATED},
     /* answers at once, but the backend below never lets the worker say so */
     {"cut.test", 0, 1, {{AF_INET, {127, 0, 0, 13}}}, 0},
+    {"gone.test", EAI_NONAME, 0, {{0}}, 0},
+    {"pref.test",
+     0,
+     3,
+     {{AF_INET, {127, 0, 0, 20}},
+      {AF_INET, {127, 0, 0, 21}},
+      {AF_INET, {127, 0, 0, 22}}},
+     0},
 };
 
 /* Serializes mock_host bookkeeping: a timed-out resolve is abandoned, so its
@@ -778,7 +786,74 @@ static int dns_timeout_selftests(httrackp *opt) {
   return failures;
 }
 
+/* The address a fallback connected to is tried first by the next connect, and
+   a negative-cache hit says why it failed. */
+static int dns_addr_selftests(httrackp *opt) {
+  SOCaddr addrs[HTS_MAXADDRNUM], other;
+  const char *err;
+  htsblk r;
+  T_SOC s;
+  int count;
+
+  failures = 0;
+  hts_dns_set_resolver_backend(&mock_backend);
+  IPV6_resolver = 0;
+
+  err = NULL;
+  CHECK(hts_dns_resolve_all(opt, "gone.test", addrs, HTS_MAXADDRNUM, &err) ==
+        0);
+  CHECK(err != NULL);
+  err = NULL;
+  CHECK(hts_dns_resolve_all(opt, "gone.test", addrs, HTS_MAXADDRNUM, &err) ==
+        0);
+  CHECK(mock_find("gone.test")->calls == 1);
+  CHECK(err != NULL && strstr(err, "cached") != NULL);
+
+  count =
+      hts_dns_resolve_all(opt, "pref.test:8080", addrs, HTS_MAXADDRNUM, NULL);
+  CHECK(count == 3);
+  if (count != 3)
+    return failures;
+  CHECK(hts_dns_preferred(opt, "pref.test") == 0);
+  CHECK(hts_dns_addr_index(addrs, count, &addrs[2]) == 2);
+  /* the port and the login are not part of the key */
+  hts_dns_set_preferred(opt, "user@pref.test:81", &addrs[2]);
+  CHECK(hts_dns_preferred(opt, "pref.test") == 2);
+  /* an address the list does not hold changes nothing */
+  SOCaddr_copy_SOCaddr(other, addrs[1]);
+  SOCaddr_initport(other, 1);
+  CHECK(hts_dns_addr_index(addrs, count, &other) == -1);
+  hts_dns_set_preferred(opt, "pref.test", &other);
+  CHECK(hts_dns_preferred(opt, "pref.test") == 2);
+  /* the order the resolver gave is kept, so a fallback in flight keeps its
+     sequence */
+  CHECK(hts_dns_resolve_all(opt, "pref.test", addrs, HTS_MAXADDRNUM, NULL) ==
+        3);
+  {
+    char ip[64];
+
+    SOCaddr_inetntoa(ip, sizeof(ip), addrs[0]);
+    CHECK(strcmp(ip, "127.0.0.20") == 0);
+  }
+
+  /* a fresh connect takes the preferred address, an explicit index its own */
+  hts_init_htsblk(&r);
+  s = newhttp(opt, "pref.test:9", &r, -1);
+  CHECK(hts_dns_addr_index(addrs, 3, &r.address) == 2);
+  if (s != INVALID_SOCKET)
+    deletesoc(s);
+  hts_init_htsblk(&r);
+  s = newhttp_addr(opt, "pref.test:9", &r, -1, 1, &count);
+  CHECK(count == 3);
+  CHECK(hts_dns_addr_index(addrs, 3, &r.address) == 1);
+  if (s != INVALID_SOCKET)
+    deletesoc(s);
+  return failures;
+}
+
 #else
+
+static int dns_addr_selftests(httrackp *opt) { return 0; }
 
 static int dns_selftests(httrackp *opt) {
   return 0; /* resolver seam only exists in the IPv6 build */
@@ -794,6 +869,10 @@ static int st_dns(httrackp *opt, int argc, char **argv) {
   return st_verdict("dns-selftest", err);
 }
 
+static int st_dnsaddr(httrackp *opt, int argc, char **argv) {
+  return st_verdict("dns-addr-selftest", dns_addr_selftests(opt));
+}
+
 static int st_dnstimeout(httrackp *opt, int argc, char **argv) {
   const int err = dns_timeout_selftests(opt);
 
@@ -806,6 +885,10 @@ static int st_dnstimeout(httrackp *opt, int argc, char **argv) {
 
 const struct selftest_entry selftests_dns[] = {
     {"dns", "", "DNS resolver/cache self-test", st_dns},
+    {"dnsaddr", "",
+     "a fallback's working address is tried first next time, and a cached "
+     "failure says so",
+     st_dnsaddr},
     {"dnstimeout", "", "a slow DNS resolve is bounded and holds no lock",
      st_dnstimeout},
     {NULL, NULL, NULL, NULL},

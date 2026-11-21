@@ -2561,7 +2561,7 @@ int connect_socket_error(T_SOC soc) {
 }
 
 T_SOC newhttp(httrackp *opt, const char *_iadr, htsblk *retour, int port) {
-  return newhttp_addr(opt, _iadr, retour, port, 0, NULL);
+  return newhttp_addr(opt, _iadr, retour, port, -1, NULL);
 }
 
 T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
@@ -2621,6 +2621,11 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
         hts_dns_resolve_all(opt, resolve_host, addrs, HTS_MAXADDRNUM, &error);
     if (addr_count != NULL) {
       *addr_count = naddr;
+    }
+    if (addr_index < 0) {
+      addr_index = hts_dns_preferred(opt, resolve_host);
+      if (addr_index >= naddr)
+        addr_index = 0;
     }
     if (addr_index >= 0 && addr_index < naddr) {
       SOCaddr_copy_SOCaddr(server, addrs[addr_index]);
