@@ -3513,8 +3513,8 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_raw(b"s" * 4096, "application/octet-stream")
 
     # Every page answers after a pause shorter than --timeout=1 (test 2422).
-    LATENCY_SECONDS = 0.4
-    LATENCY_PAGES = 16
+    LATENCY_SECONDS = 0.25
+    LATENCY_PAGES = 24
 
     def route_latency(self):
         if self.path.split("?")[0] == "/latency/index.html":
