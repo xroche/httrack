@@ -3308,19 +3308,7 @@ void back_set_retry_after(struct_back *sback, httrackp *opt, int seconds) {
     sback->retry_after_until = until;
 }
 
-int back_pluggable_sockets_strict(struct_back * sback, httrackp * opt) {
-  int n = opt->maxsoc - back_nsoc(sback);
-  /* A stop outranks the delays below, which would otherwise swallow the user's
-     Ctrl-C for as long as the server or --pause asked us to wait. */
-  const hts_boolean may_wait = !hts_load_acquire_int(&opt->state.stop);
-
-  // Retry-After: withhold launches until the delay the server asked for is up
-  if (n > 0 && may_wait && sback->retry_after_until > 0) {
-    if (mtime_local() < sback->retry_after_until)
-      return 0;
-    sback->retry_after_until = 0;
-  }
-
+int hts_connect_pace(httrackp *opt, int n, hts_boolean may_wait) {
   // connect limiter
   if (n > 0 && opt->maxconn > 0 && HTS_STAT.last_connect > 0) {
     TStamp opTime =
@@ -3353,6 +3341,22 @@ int back_pluggable_sockets_strict(struct_back * sback, httrackp * opt) {
   }
 
   return n;
+}
+
+int back_pluggable_sockets_strict(struct_back *sback, httrackp *opt) {
+  int n = opt->maxsoc - back_nsoc(sback);
+  /* A stop outranks the delays below, which would otherwise swallow the user's
+     Ctrl-C for as long as the server or --pause asked us to wait. */
+  const hts_boolean may_wait = !hts_load_acquire_int(&opt->state.stop);
+
+  // Retry-After: withhold launches until the delay the server asked for is up
+  if (n > 0 && may_wait && sback->retry_after_until > 0) {
+    if (mtime_local() < sback->retry_after_until)
+      return 0;
+    sback->retry_after_until = 0;
+  }
+
+  return hts_connect_pace(opt, n, may_wait);
 }
 
 /* One engine-loop tick: refresh the transfer stats and run the loop callback

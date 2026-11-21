@@ -441,6 +441,25 @@ int hts_dns_resolve_all_bounded(httrackp *opt, const char *iadr, SOCaddr *out,
                                 int max, int timeout,
                                 const volatile hts_boolean *cancel,
                                 const char **error);
+/* A resolve running on a worker thread, so the crawl need not wait for it. */
+typedef struct dns_resolve_job hts_dns_job;
+/* hts_dns_poll() result while the worker has not answered. */
+#define HTS_DNS_PENDING (-2)
+/* Does the DNS cache answer for iadr now, positively or not? */
+hts_boolean hts_dns_cached(httrackp *opt, const char *iadr);
+/* Start resolving iadr's host, returning one reference to the job, or NULL
+   when no worker could start. Must hold no lock. */
+hts_dns_job *hts_dns_start(httrackp *opt, const char *iadr);
+/* Is job resolving iadr's host? */
+hts_boolean hts_dns_job_is(const hts_dns_job *job, const char *iadr);
+/* Take one more reference to job. */
+hts_dns_job *hts_dns_job_ref(hts_dns_job *job);
+/* Drop one reference; the worker holds its own. */
+void hts_dns_job_release(hts_dns_job *job);
+/* HTS_DNS_PENDING while job runs. Then the address count, stored in the DNS
+   cache, with *error set when it is 0; -1 if the worker ended without an
+   answer. Must hold no lock. */
+int hts_dns_poll(httrackp *opt, hts_dns_job *job, const char **error);
 /* Returns the index of addr in list[0..count-1], port included, or -1. */
 int hts_dns_addr_index(const SOCaddr *list, int count, const SOCaddr *addr);
 /* Index in iadr's cached list of the address to try first, 0 by default. */
