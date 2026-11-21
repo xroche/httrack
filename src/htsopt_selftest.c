@@ -231,6 +231,92 @@ static int st_cmdlinesplit(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* A front end's mid-crawl scratch opt: fresh, with what it leaves unset
+   cleared, as WinHTTrack and HTTraQt do before copy_htsopt(). */
+static httrackp *copyopt_gui_scratch(void) {
+  httrackp *const o = hts_create_opt();
+
+  o->maxsite = o->maxfile_nonhtml = o->maxfile_html = -1;
+  o->maxsoc = o->nearlink = o->timeout = o->rateout = o->maxtime = -1;
+  o->maxrate = o->maxconn = o->retry = o->hostcontrol = o->errpage = -1;
+  o->fragment = -1;
+  o->external = o->delete_old = o->parseall = HTS_DEFAULT;
+  o->travel = 0;
+  StringClear(o->user_agent);
+  return o;
+}
+
+/* The crawl a front end edits: every option away from its default. */
+static httrackp *copyopt_gui_running(void) {
+  httrackp *const o = hts_create_opt();
+
+  o->timeout = 33;
+  o->changes = HTS_TRUE;
+  o->single_file = HTS_TRUE;
+  o->single_file_max_size = 4242;
+  o->warc_cdx = HTS_TRUE;
+  o->warc_wacz = HTS_TRUE;
+  o->warc_max_size = 9999;
+  o->max_retry_after = 7;
+  o->delete_old = HTS_FALSE;
+  o->external = HTS_TRUE;
+  o->fragment = 123456;
+  o->check_type = HTS_FALSE;
+  return o;
+}
+
+/* Has every running option other than timeout kept its value? */
+static int copyopt_gui_kept(const httrackp *o) {
+  int err = 0;
+
+  ST_FAIL_IF(err, !o->changes);
+  ST_FAIL_IF(err, !o->single_file);
+  ST_FAIL_IF(err, o->single_file_max_size != 4242);
+  ST_FAIL_IF(err, !o->warc_cdx);
+  ST_FAIL_IF(err, !o->warc_wacz);
+  ST_FAIL_IF(err, o->warc_max_size != 9999);
+  ST_FAIL_IF(err, o->max_retry_after != 7);
+  ST_FAIL_IF(err, o->check_type != HTS_FALSE);
+  return err;
+}
+
+/* A front end's mid-crawl edit changes what it set and nothing else. */
+static int st_copyopt_gui(httrackp *opt, int argc, char **argv) {
+  int err = 0;
+
+  {
+    httrackp *const from = copyopt_gui_scratch();
+    httrackp *const to = copyopt_gui_running();
+
+    from->timeout = 44;
+    copy_htsopt(from, to);
+    ST_FAIL_IF(err, to->timeout != 44);
+    err |= copyopt_gui_kept(to);
+    ST_FAIL_IF(err, to->delete_old != HTS_FALSE);
+    ST_FAIL_IF(err, to->external != HTS_TRUE);
+    ST_FAIL_IF(err, to->fragment != 123456);
+    hts_free_opt(from);
+    hts_free_opt(to);
+  }
+  {
+    httrackp *const from = copyopt_gui_scratch();
+    httrackp *const to = copyopt_gui_running();
+
+    from->delete_old = HTS_TRUE;
+    from->external = HTS_FALSE;
+    from->fragment = 654321;
+    copy_htsopt(from, to);
+    ST_FAIL_IF(err, to->delete_old != HTS_TRUE);
+    ST_FAIL_IF(err, to->external != HTS_FALSE);
+    ST_FAIL_IF(err, to->fragment != 654321);
+    ST_FAIL_IF(err, to->timeout != 33);
+    err |= copyopt_gui_kept(to);
+    hts_free_opt(from);
+    hts_free_opt(to);
+  }
+  return st_verdict("copyopt-gui", err);
+}
+
 static int st_copyopt(httrackp *opt, int argc, char **argv) {
   httrackp *from = hts_create_opt();
   httrackp *to = hts_create_opt();
@@ -1912,6 +1998,9 @@ const struct selftest_entry selftests_opt[] = {
      "webhttrack command-line to argv split (bounds, quoting)",
      st_cmdlinesplit},
     {"copyopt", "", "copy_htsopt option-copy self-test", st_copyopt},
+    {"copyopt-gui", "",
+     "a front end's mid-crawl copy_htsopt changes only what it set",
+     st_copyopt_gui},
     {"upperlinksnote", "",
      "the above-the-start-directory note empties its buffer when silent",
      st_upperlinksnote},

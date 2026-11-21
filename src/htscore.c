@@ -3891,7 +3891,9 @@ HTSEXT_API int copy_htsopt(const httrackp * from, httrackp * to) {
 
   if (from->maxconn > 0)
     to->maxconn = from->maxconn;
-  if (from->max_retry_after >= 0)
+  /* A fresh opt holds the default, so only a value away from it is an edit. */
+  if (from->max_retry_after >= 0 &&
+      from->max_retry_after != HTS_DEFAULT_MAX_RETRY_AFTER)
     to->max_retry_after = from->max_retry_after;
 
   if (from->mptcp > -1)
@@ -3930,13 +3932,21 @@ HTSEXT_API int copy_htsopt(const httrackp * from, httrackp * to) {
 
   if (StringNotEmpty(from->warc_file))
     StringCopyS(to->warc_file, from->warc_file);
-  to->warc_max_size = from->warc_max_size;
-  to->warc_cdx = from->warc_cdx;
-  to->warc_wacz = from->warc_wacz;
-  to->changes = from->changes;
+  /* These have no "unspecified" value, so a fresh opt's default must not turn
+     off what the running crawl asked for. */
+  if (from->warc_max_size > 0)
+    to->warc_max_size = from->warc_max_size;
+  if (from->warc_cdx)
+    to->warc_cdx = HTS_TRUE;
+  if (from->warc_wacz)
+    to->warc_wacz = HTS_TRUE;
+  if (from->changes)
+    to->changes = HTS_TRUE;
 
-  to->single_file = from->single_file;
-  if (from->single_file_max_size > 0)
+  if (from->single_file)
+    to->single_file = HTS_TRUE;
+  if (from->single_file_max_size > 0 &&
+      from->single_file_max_size != SINGLEFILE_DEFAULT_MAX_SIZE)
     to->single_file_max_size = from->single_file_max_size;
   if (from->sitemap)
     to->sitemap = from->sitemap;
@@ -3959,6 +3969,15 @@ HTSEXT_API int copy_htsopt(const httrackp * from, httrackp * to) {
 
   if (from->parseall > -1)
     to->parseall = from->parseall;
+
+  if (from->delete_old > -1)
+    to->delete_old = from->delete_old;
+
+  if (from->external > -1)
+    to->external = from->external;
+
+  if (from->fragment > -1)
+    to->fragment = from->fragment;
 
   // test all: bit 8 de travel
   if (from->travel > -1) {
