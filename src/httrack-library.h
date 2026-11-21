@@ -428,9 +428,9 @@ HTSEXT_API hts_boolean hts_scan_token(char **ptr, char *dest, size_t destsize);
 
 /** Apply the runtime-tunable options from @p from onto @p to, to adjust a live
     mirror. A field @p from leaves at its default is not copied, so @p to keeps
-    its own, apart from warc_max_size, warc_cdx, warc_wacz, changes and
-    single_file, which are copied every time. Strings are deep-copied, so
-    @p from may be released afterward. @return 0. */
+    its own. delete_old and external are copied unless HTS_DEFAULT, so a caller
+    leaving them alone must set that. Strings are deep-copied, so @p from may be
+    released afterward. @return 0. */
 HTSEXT_API int copy_htsopt(const httrackp *from, httrackp *to);
 
 /** Whether @p rule is one well-formed "[scheme://]alias[,...]=[scheme://]host",
