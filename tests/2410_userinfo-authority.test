@@ -113,3 +113,18 @@ print(urllib.parse.quote(sys.argv[1], safe=""))' "$pass")
         done
     done
 done
+
+# --why takes a typed URL: the login is masked and the host is the right one,
+# and a +/- filter written with the login as typed still matches it.
+why_url="http://u:Pq3?Lk5@${h2}/a.html"
+for sign in + -; do
+    out="${tmpdir}/why${sign}"
+    httrack -O "$out" --robots=0 "http://u:Pq3?Lk5@${h2}/page" \
+        "${sign}*u:Pq3?Lk5@127.0.0.1*a.html" --why "$why_url" \
+        >"${out}.out" 2>"${out}.err" || true
+    reply=$(<"${out}.out")
+    grep -qF "u:***@${h2}/a.html: " <<<"$reply" || fail "why $sign: $reply"
+    if [ "$sign" = + ]; then verdict=accepted; else verdict=rejected; fi
+    grep -qF "$verdict by rule" <<<"$reply" || fail "why $sign verdict: $reply"
+    ! grep -qF "Pq3?Lk5@${h2}/a.html" <<<"$reply" || fail "why $sign: login shown: $reply"
+done

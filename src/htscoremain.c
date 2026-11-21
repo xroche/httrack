@@ -708,6 +708,7 @@ static hts_boolean hts_escape_start_logins(char **url, size_t *url_sz) {
       const char c = u[n];
 
       u[n] = '\0';
+      // cap holds three bytes per input byte, so the escape cannot clip
       (void) hts_escape_typed_login(u, out + len, cap - len);
       len += strlen(out + len);
       u[n] = c;

@@ -1129,25 +1129,39 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
 
         // skip a sign with nothing after it
         if (strnotempty(tempo)) {
-          if ((plus == 0) && (type == 1)) {
-            if (hts_lastchar(tempo) != '*') {
-              strcatbuff(tempo, "*");
-            }
-          }
-          {
+          char BIGSTK escaped[HTS_FILTER_MAXLEN * 3 + 1];
+          const char *variant[2];
+          int v;
+
+          // a rule naming a login also matches it as the stored host spells it
+          variant[0] = tempo;
+          variant[1] = NULL;
+          if (strchr(tempo, '@') != NULL &&
+              hts_escape_typed_login(tempo, escaped, sizeof(escaped)) &&
+              strcmp(escaped, tempo) != 0 && strlen(escaped) <= room)
+            variant[1] = escaped;
+          for (v = 0; v < 2 && variant[v] != NULL; v++) {
             /* the sign, whatever tempo holds, and the NUL */
             char BIGSTK rule[sizeof(tempo) + 1];
             htsbuff fb = htsbuff_array(rule);
 
-            htsbuff_cpy(&fb, type ? "+" : "-");
-            htsbuff_cat(&fb, tempo);
-            filters_insert(opt, filptr, rule); /* bumps filptr when stored */
-          }
+            if ((plus == 0) && (type == 1) && hts_lastchar(variant[v]) != '*') {
+              char BIGSTK star[sizeof(tempo) + 1];
 
-          if (!filters_grow(opt, 1)) {
-            freet(primary);
-            XH_extuninit;
-            return 0;
+              snprintf(star, sizeof(star), "%s*", variant[v]);
+              htsbuff_cpy(&fb, "+");
+              htsbuff_cat(&fb, star);
+            } else {
+              htsbuff_cpy(&fb, type ? "+" : "-");
+              htsbuff_cat(&fb, variant[v]);
+            }
+            filters_insert(opt, filptr, rule); /* bumps filptr when stored */
+
+            if (!filters_grow(opt, 1)) {
+              freet(primary);
+              XH_extuninit;
+              return 0;
+            }
           }
         }
 
@@ -1174,10 +1188,15 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
       char BIGSTK url[HTS_URLMAXSIZE * 2];
       lien_adrfil af;
 
+      char BIGSTK typed[HTS_URLMAXSIZE * 2];
+
       if (seed_needs_scheme(StringBuff(opt->why_url)))
-        snprintf(url, sizeof(url), "http://%s", StringBuff(opt->why_url));
+        snprintf(typed, sizeof(typed), "http://%s", StringBuff(opt->why_url));
       else
-        strcpybuff(url, StringBuff(opt->why_url));
+        snprintf(typed, sizeof(typed), "%s", StringBuff(opt->why_url));
+      // a typed login reads up to the last '@' before the first '/'
+      if (!hts_escape_typed_login(typed, url, sizeof(url)))
+        strcpybuff(url, typed);
       if (ident_url_absolute(url, &af) < 0) {
         printf("--why: unable to parse URL %s" LF,
                adr_nologin(opt, StringBuff(opt->why_url)));
@@ -1269,7 +1288,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
           if (line[0]) {
             char BIGSTK typed[HTS_URLLIST_LINE_SIZE * 3];
 
-            // a typed login reads up to the last '@' before the first '/'
+            // sized so the escape cannot clip
             (void) hts_escape_typed_login(line, typed, sizeof(typed));
             n++;
             seed_append(&primarybuff, typed);
