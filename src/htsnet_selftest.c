@@ -1059,8 +1059,9 @@ static int st_ftpctrl(httrackp *opt, int argc, char **argv) {
   assertf(st_socketpair(sv) == 0);
   assertf(send_line(sv[0], "USER bob\001") == 0); // any field, not just a path
   for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
-    ftp_command(cmd, sizeof(cmd), cases[i].verb,
-                unescape_http(catbuff, sizeof(catbuff), cases[i].path));
+    assertf(
+        ftp_command(cmd, sizeof(cmd), cases[i].verb,
+                    unescape_http(catbuff, sizeof(catbuff), cases[i].path)));
     if (cases[i].sent == NULL) {
       assertf(strstr(cmd, "DELE") != NULL); // the payload did reach the builder
       assertf(send_line(sv[0], cmd) == 0);

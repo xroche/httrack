@@ -78,7 +78,8 @@ hts_boolean hts_bundle_has_control(const char *s, size_t len);
 
 /* Copy the host of url, with or without a scheme, into dst as cookie_host
    does. */
-hts_boolean cookie_url_host(const char *url, char *dst, size_t dst_size);
+HTS_CHECK_RESULT hts_boolean cookie_url_host(const char *url, char *dst,
+                                             size_t dst_size);
 
 /* The record of s named cook_name for exactly domain and path, or NULL. */
 char *cookie_find_exact(char *s, const char *cook_name, const char *domain,

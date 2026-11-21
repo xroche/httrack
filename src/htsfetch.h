@@ -122,7 +122,8 @@ const char *hts_fetch_site_name(int site);
 
 /* Write the "scheme://host[:port]" origin of adr into dst. Return HTS_FALSE
    when the host holds a byte a header line cannot carry or dst is too small. */
-hts_boolean hts_fetch_origin(const char *adr, char *dst, size_t size);
+HTS_CHECK_RESULT hts_boolean hts_fetch_origin(const char *adr, char *dst,
+                                              size_t size);
 
 /* httrack sends this Accept when neither -%a nor a browser table names one. */
 #define HTS_ACCEPT_LEGACY                                                      \

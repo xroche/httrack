@@ -43,7 +43,7 @@ extern "C" {
 
 /* Fill buf with len cryptographically strong random bytes. HTS_FALSE when no
    such source is available: the caller must fail, never fall back to rand(). */
-hts_boolean hts_random_bytes(void *buf, size_t len);
+HTS_CHECK_RESULT hts_boolean hts_random_bytes(void *buf, size_t len);
 
 #ifdef __cplusplus
 }

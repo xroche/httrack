@@ -76,9 +76,7 @@ Please visit our Website: http://www.httrack.com
 /* Compiler-attribute markers, each expanding to nothing where the compiler has
    no such attribute. HTS_UNUSED says a symbol may go unused, and HTS_STATIC is
    a static that may. HTS_PRINTF_FUN(fmt, arg) checks the format string at
-   argument index @p fmt against the varargs starting at @p arg.
-   HTS_CHECK_RESULT says a caller must read the return value, and a (void) cast
-   does not silence the warning. */
+   argument index @p fmt against the varargs starting at @p arg. */
 #ifndef HTS_UNUSED
 #ifdef __GNUC__
 #define HTS_UNUSED __attribute__((unused))
@@ -86,12 +84,22 @@ Please visit our Website: http://www.httrack.com
 #define HTS_STATIC static __attribute__((unused))
 
 #define HTS_PRINTF_FUN(fmt, arg) __attribute__((format(printf, fmt, arg)))
-
-#define HTS_CHECK_RESULT __attribute__((warn_unused_result))
 #else
 #define HTS_UNUSED
 #define HTS_STATIC static
 #define HTS_PRINTF_FUN(fmt, arg)
+#endif
+#endif
+
+/* HTS_CHECK_RESULT marks a function whose result a caller must use. GCC
+   still warns through a (void) cast, so the caller must act on the result. */
+#ifndef HTS_CHECK_RESULT
+#ifdef __GNUC__
+#define HTS_CHECK_RESULT __attribute__((warn_unused_result))
+#elif defined(_MSC_VER)
+#include <sal.h>
+#define HTS_CHECK_RESULT _Check_return_
+#else
 #define HTS_CHECK_RESULT
 #endif
 #endif

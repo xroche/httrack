@@ -86,7 +86,8 @@ typedef struct httrackp httrackp;
     without identification, brackets or port. A bracketed literal's zone id
     keeps the bare '%' a jar carries, not the URI's "%25".
     HTS_FALSE means the caller sends no cookie. */
-hts_boolean cookie_host(const char *adr, char *dst, size_t dst_size);
+HTS_CHECK_RESULT hts_boolean cookie_host(const char *adr, char *dst,
+                                         size_t dst_size);
 
 /** A jar record holds this many bytes of name plus value. */
 #define COOKIE_MAX_PAIR 4096
@@ -208,7 +209,8 @@ hts_boolean cookie_domain_match(const char *jar_dom, const char *host);
     attribute DOMAIN? RFC 6265 5.3 says yes when DOMAIN is HOST itself, or a
     parent of it that is not a public suffix. A leading '.' on DOMAIN is
     accepted. When no suffix list is loaded, every parent domain is allowed. */
-hts_boolean cookie_domain_allowed(const char *domain, const char *host);
+HTS_CHECK_RESULT hts_boolean cookie_domain_allowed(const char *domain,
+                                                   const char *host);
 
 /** Read a Set-Cookie Max-Age VALUE received at NOW into *when, the absolute
     expiry, capped 400 days ahead and never below 1 (RFC 6265 5.2.2).

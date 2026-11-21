@@ -143,6 +143,8 @@ void *getFunctionPtr(void *handle, const char *fncname_) {
     /* Strip optional comma */
     char *comma;
 
+    if (fncname == NULL)
+      return NULL;
     if ((comma = strchr(fncname, ',')) != NULL) {       /* empty arg */
       *comma++ = '\0';
     }

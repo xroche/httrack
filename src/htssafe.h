@@ -518,7 +518,7 @@ static HTS_INLINE HTS_UNUSED hts_boolean strclipbuff(char *dest, size_t size,
  * UNTRUSTED half of a path, never on the assembled one: the user's own -O may
  * legitimately start with "..".
  */
-static HTS_INLINE HTS_UNUSED hts_boolean
+static HTS_INLINE HTS_UNUSED HTS_CHECK_RESULT hts_boolean
 hts_path_is_contained(const char *path) {
   const char *s;
 
@@ -541,7 +541,7 @@ hts_path_is_contained(const char *path) {
  * filename must pass before it is joined to a root. Absolute names fail too,
  * because with no -O that root is "".
  */
-static HTS_INLINE HTS_UNUSED hts_boolean
+static HTS_INLINE HTS_UNUSED HTS_CHECK_RESULT hts_boolean
 hts_path_is_relative_contained(const char *path) {
   if (HTS_IS_PATH_SEP(path[0])) {
     return HTS_FALSE;
