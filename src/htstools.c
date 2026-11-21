@@ -398,17 +398,8 @@ hts_boolean link_dir_has_fragment_or_query(const char *lien) {
 
 int link_has_authorization(const char *lien) {
   const char *adr = jump_protocol_const(lien);
-  const char *firstslash = strchr(adr, '/');
-  const char *detect = strchr(adr, '@');
 
-  if (firstslash) {
-    if (detect) {
-      return (detect < firstslash);
-    }
-  } else {
-    return (detect != NULL);
-  }
-  return 0;
+  return memchr(adr, '@', (size_t) (hts_authority_end(adr) - adr)) != NULL;
 }
 
 // conversion chemin de fichier/dossier vers 8-3 ou ISO9660

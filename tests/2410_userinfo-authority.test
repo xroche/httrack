@@ -1,0 +1,73 @@
+#!/bin/bash
+# An '@' after the authority's first '/', '?', '#' or '\' is not a login: the
+# link is fetched from the host before it, with no credentials.
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+ui() { selftest_queue "$2" userinfo "$1"; }
+split() { selftest_queue "$2" identurl "$1"; }
+sni() { selftest_queue "$2" sniname "$1"; }
+auth() { selftest_queue "$2" proxyauth "$1"; }
+proxy() { selftest_queue "$2" proxyurl "$1"; }
+
+for t in '?' '#' "\\"; do
+    ui "http://h1${t}u=a@h2/x" "host=h1${t}u=a@h2/x end=h1${t}u=a@h2/x login=0"
+    sni "http://h1${t}u=a@h2/x" 'sni=h1'
+    auth "http://h1${t}u=a@h2/x" 'auth=none'
+    auth "h1${t}u=a@h2" 'auth=none'
+done
+split 'http://h1?u=a@h2/x.html' 'adr=h1 fil=/?u=a@h2/x.html'
+split 'http://h1#u=a@h2/x.html' 'adr=h1 fil=/#u=a@h2/x.html'
+# a browser reads that '\' as '/'
+split 'http://h1\u=a@h2/x.html' 'adr=h1 fil=/u=a@h2/x.html'
+split 'http://h1:81?u@h2:82/x' 'adr=h1:81 fil=/?u@h2:82/x'
+split 'http://h\a\b.html' 'adr=h fil=/a\b.html'
+
+# controls: a login before the authority ends is still one
+ui 'http://u:p@h1/x?a@b' 'host=h1/x?a@b end=h1/x?a@b login=1'
+ui 'https://u:p@q@h1:8/x' 'host=h1:8/x end=h1:8/x login=1'
+ui 'u:p@h1:3128' 'host=h1:3128 end=h1:3128 login=1'
+split 'http://u:p@h1/x?a@b' 'adr=u:p@h1 fil=/x?a@b'
+sni 'http://u:p@h1/x' 'sni=h1'
+auth 'u:p@h1' 'auth=dTpw'
+
+# -P escapes the terminators in a proxy password, so the login still reaches it
+proxy 'u:p#w@proxy:3128' 'name=u:p%23w@proxy port=3128 host=proxy kind=http'
+proxy 'connect://u:p?w@proxy:8080' 'name=connect://u:p%3Fw@proxy port=8080 host=proxy kind=connect'
+proxy 'u:a/b\c@proxy' 'name=u:a%2Fb%5Cc@proxy port=8080 host=proxy kind=http'
+auth 'u:p%23w@proxy' 'auth=dTpwI3c='
+
+selftest_run_queued
+
+# The crawl: h2 must see no request at all.
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_userinfo.XXXXXX") || exit 1
+cleanup() {
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+doc1="${tmpdir}/doc1"
+doc2="${tmpdir}/doc2"
+mkdir -p "$doc1" "$doc2"
+printf 'h2 page\n' >"${doc2}/x.html"
+local_server_start --root "$doc2" --log "${tmpdir}/srv2.log" \
+    --env LOCAL_SERVER_VERBOSE=1
+port2=$SRV_PORT
+local_server_start --root "$doc1" --log "${tmpdir}/srv1.log" \
+    --env LOCAL_SERVER_VERBOSE=1
+h1="127.0.0.1:${SRV_PORT}"
+h2="127.0.0.1:${port2}"
+printf '<a href="http://%s?u=a@%s/x.html">q</a>\n<a href="http://%s\\@%s/x.html">b</a>\n' \
+    "$h1" "$h2" "$h1" "$h2" >"${doc1}/index.html"
+
+require_httrack
+local_crawl --log "${tmpdir}/crawl.log" -O "${tmpdir}/out" --quiet --robots=0 \
+    --timeout=30 --retries=0 -r2 "http://${h1}/index.html" || true
+
+srv1=$(<"${tmpdir}/srv1.log")
+srv2=$(<"${tmpdir}/srv2.log")
+grep -q 'GET /index.html' <<<"$srv1" || fail "h1 never served the page: $srv1"
+grep -q "GET /?u=a@${h2}/x.html" <<<"$srv1" || fail "h1 missed the ?-link: $srv1"
+! grep -q 'GET ' <<<"$srv2" || fail "h2 was contacted: $srv2"

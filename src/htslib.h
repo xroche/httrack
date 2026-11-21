@@ -523,6 +523,8 @@ int may_bogus_multiple(httrackp * opt, const char *mime, const char *filename);
 int may_unknown2(httrackp * opt, const char *mime, const char *filename);
 
 const char *strrchr_limit(const char *s, char c, const char *limit);
+/* Returns the end of the authority at s: its first '/', '?', '#' or '\'. */
+const char *hts_authority_end(const char *s);
 char *jump_protocol(char *source);
 const char *jump_protocol_const(const char *source);
 

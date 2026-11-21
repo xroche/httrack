@@ -2760,12 +2760,7 @@ int ident_url_absolute(const char *url, lien_adrfil *adrfil) {
     p = url + pos;
 
     // p pointe sur le début de l'adrfil->adresse, ex: www.truc.fr/sommaire/index.html
-    q = strchr(jump_identification_const(p), '/');
-    if (q == 0)
-      q = strchr(jump_identification_const(p), '?');  // http://www.foo.com?bar=1
-    if (q == 0)
-      q = p + strlen(p);        // pointe sur \0
-    // q pointe sur le chemin, ex: index.html?query=recherche
+    q = hts_authority_end(jump_identification_const(p));
 
     // chemin www... trop long!!
     if ((((int) (q - p))) > HTS_URLMAXSIZE) {
@@ -2775,13 +2770,14 @@ int ident_url_absolute(const char *url, lien_adrfil *adrfil) {
     strncatbuff(adrfil->adr, p, ((int) (q - p)));
     // *( adrfil->adr+( ((int) q) - ((int) p) ) )=0;  // faut arrêter la fumette!
 
+    if (q[0] != '/') // the default page
+      strcatbuff(adrfil->fil, "/");
+    if (q[0] == '\\') // a browser reads it as the '/' just added
+      q++;
     // fil[] holds the path plus a possible leading '/' the top strlen() misses.
-    if (strlen(q) >= sizeof(adrfil->fil) - (q[0] != '/' ? 1 : 0))
+    if (strlen(q) >= sizeof(adrfil->fil) - strlen(adrfil->fil))
       return -1;
 
-    // recopier chemin /pub/..
-    if (q[0] != '/')            // page par défaut (/)
-      strcatbuff(adrfil->fil, "/");
     strcatbuff(adrfil->fil, q);
     // SECURITE:
     // simplifier url pour les ../
@@ -3614,7 +3610,7 @@ const char *login_start(const char *adr) {
 /* Returns adr past its login, or login_start(adr) when it has none. */
 const char *login_end(const char *adr) {
   const char *const start = login_start(adr);
-  const char *const at = strrchr_limit(start, '@', strchr(start, '/'));
+  const char *const at = strrchr_limit(start, '@', hts_authority_end(start));
 
   return at != NULL ? at : start;
 }
@@ -3671,7 +3667,7 @@ HTSEXT_API const char *jump_identification_const(const char *source) {
   // rechercher dernier @ (car parfois email transmise dans adresse!)
   // mais sauter ftp:// éventuel
   a = jump_protocol_const(source);
-  trytofind = strrchr_limit(a, '@', strchr(a, '/'));
+  trytofind = strrchr_limit(a, '@', hts_authority_end(a));
   return trytofind != NULL ? trytofind : a;
 }
 
@@ -4256,7 +4252,7 @@ int hts_basic_auth_value(httrackp *opt, const char *url, char *out,
 hts_boolean hts_sni_hostname(const char *url_adr, char *out, size_t size) {
   const char *const host = jump_identification_const(url_adr);
   const char *const colon = strchr(host, ':');
-  size_t len = strcspn(host, "/?#");
+  size_t len = (size_t) (hts_authority_end(host) - host);
 
   if (colon != NULL && (size_t) (colon - host) < len)
     len = (size_t) (colon - host);
@@ -4295,7 +4291,7 @@ hts_boolean hts_ssl_check_cert(SSL *ssl, const char *url_adr) {
     /* an address literal must match an IP name of the certificate */
     const char *const host = jump_identification_const(url_adr);
     const char *const start = host[0] == '[' ? host + 1 : host;
-    const size_t len = strcspn(start, host[0] == '[' ? "]" : ":/?#");
+    const size_t len = strcspn(start, host[0] == '[' ? "]" : ":/?#\\");
 
     if (len == 0 || len >= sizeof(name))
       return HTS_FALSE;
@@ -4309,12 +4305,14 @@ hts_boolean hts_ssl_check_cert(SSL *ssl, const char *url_adr) {
 }
 #endif
 
+const char *hts_authority_end(const char *s) { return s + strcspn(s, "/?#\\"); }
+
 // find the authority's port (:80) or NULL; handles IPv6 literals
 HTSEXT_API const char *jump_toport_const(const char *source) {
   // start at the host jump_identification_const() picks, so callers agree
   const char *const host = jump_identification_const(source);
   // a ':' or ']' in the path, query or fragment is not the authority's
-  const char *const end = host + strcspn(host, "/?#");
+  const char *const end = hts_authority_end(host);
   const char *const bracket = strrchr_limit(host, ']', end);
   const char *const from = bracket != NULL ? bracket : host;
 
@@ -4430,8 +4428,8 @@ static int parse_proxy_port(const char *a, const char *arg) {
 
 void hts_parse_proxy(const char *arg, char *name, size_t name_size, int *port) {
   const char *authority = strstr(arg, "://");
-  const char *a;
-  size_t namelen;
+  const char *a, *at;
+  size_t namelen, len, i;
 
   if (name_size == 0)
     return;
@@ -4449,10 +4447,24 @@ void hts_parse_proxy(const char *arg, char *name, size_t name_size, int *port) {
     *port = proxy_default_port(arg);
     namelen = strlen(arg);
   }
-  if (namelen >= name_size) // arg is user-controlled: truncate, don't overflow
-    namelen = name_size - 1;
-  memcpy(name, arg, namelen);
-  name[namelen] = '\0';
+  at = authority;
+  for (i = (size_t) (authority - arg); i < namelen; i++)
+    if (arg[i] == '@')
+      at = arg + i;
+  // escape what would end the authority early: the login is unescaped later
+  len = 0;
+  for (i = 0; i < namelen && len < name_size - 1; i++) {
+    if (arg + i >= authority && arg + i < at &&
+        strchr("/?#\\", arg[i]) != NULL) {
+      if (name_size - len <= 3) // arg is user-controlled: truncate
+        break;
+      snprintf(name + len, 4, "%%%02X", (unsigned char) arg[i]);
+      len += 3;
+    } else {
+      name[len++] = arg[i];
+    }
+  }
+  name[len] = '\0';
 }
 
 // codage base 64 a vers b

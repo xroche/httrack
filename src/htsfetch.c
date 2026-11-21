@@ -347,7 +347,7 @@ static void origin_of(const char *adr, fetch_origin *o) {
   const char *at, *end;
 
   o->https = strfield(adr, "https:") ? HTS_TRUE : HTS_FALSE;
-  end = p + strcspn(p, "/?#");
+  end = hts_authority_end(p);
   /* The last '@' ends the userinfo. */
   at = strrchr_limit(p, '@', end);
   if (at != NULL)

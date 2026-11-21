@@ -384,7 +384,8 @@ static hts_boolean fprint_request_line(httrackp *opt, FILE *fp,
 }
 
 /* Finds the secret of the userinfo at the authority a, which ends at the last
-   '@' before the first '/', the split jump_identification_const() makes: the
+   '@' before the first '/', wider than jump_identification_const() so that a
+   raw '?' or '#' in a password stays masked: the
    password after the first ':', or a user alone. A token also ends at a
    blank. Returns HTS_FALSE when there is no userinfo. */
 static hts_boolean userinfo_password(const char *a, hts_boolean token,

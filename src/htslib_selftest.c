@@ -4261,6 +4261,16 @@ static int st_contentid_tail(httrackp *opt, int argc, char **argv) {
 }
 
 /* -#test=clienthints <user-agent>: the Sec-CH-UA* values it implies. */
+/* Print where each login skipper puts the host of a URL address. */
+static int st_userinfo(httrackp *opt, int argc, char **argv) {
+  int i;
+
+  for (i = 0; i < argc; i++)
+    printf("host=%s end=%s login=%d\n", jump_identification_const(argv[i]),
+           login_end(argv[i]), link_has_authorization(argv[i]));
+  return 0;
+}
+
 static int st_clienthints(httrackp *opt, int argc, char **argv) {
   hts_client_hints ch;
 
@@ -4402,6 +4412,8 @@ const struct selftest_entry selftests_lib[] = {
      st_plugoom},
     {"libhandlesoom", "", "a module that cannot be recorded changes nothing",
      st_libhandlesoom},
+    {"userinfo", "<url>...", "the host each login skipper finds in a URL",
+     st_userinfo},
     {"clienthints", "<user-agent>",
      "the client hints a browser sending this User-Agent adds", st_clienthints},
     {"headerverdict", "<line> [earlier...]",
