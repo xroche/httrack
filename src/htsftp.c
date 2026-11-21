@@ -65,6 +65,11 @@ Please visit our Website: http://www.httrack.com
 
 #define FTP_DEBUG 0
 
+/* Wait up to timeout seconds for soc to become readable. Optional back ends the
+   wait on a stop, opt clips it to --max-time. */
+static int wait_socket_receive(lien_back *back, T_SOC soc, int timeout,
+                               const httrackp *opt);
+
 /* Live FTP workers, registered at spawn. Do not free their slots or opt while
    the list is non-empty (#1051). */
 static FTPDownloadStruct *ftp_workers = NULL;
@@ -1484,7 +1489,7 @@ char *linejmp(char *line) {
 // 0 : no data
 // 1 : data detected
 // -1: error
-int check_socket(T_SOC soc) {
+static int check_socket(T_SOC soc) {
   fd_set fds, fds_e;            // poll structures
   struct timeval tv;            // structure for select
 
@@ -1534,8 +1539,8 @@ int check_socket_connect(T_SOC soc) {
 }
 
 // attendre des données
-int wait_socket_receive(lien_back *back, T_SOC soc, int timeout,
-                        const httrackp *opt) {
+static int wait_socket_receive(lien_back *back, T_SOC soc, int timeout,
+                               const httrackp *opt) {
   const TStamp ltime = mtime_monotonic();
   int r;
 

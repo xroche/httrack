@@ -125,6 +125,9 @@ Please visit our Website: http://www.httrack.com
 
 /* END specific definitions */
 
+static void deletesoc_r(htsblk *r);
+static void time_rfc822_local(char *s, struct tm *A);
+
 /* variables globales */
 int _DEBUG_HEAD;
 FILE *ioinfo;
@@ -1476,7 +1479,9 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
   return 0;
 }
 
-int hts_status_code(const char *s) {
+/* The three-digit HTTP status code at s, or -1 when s does not start with
+   exactly three digits. */
+static int hts_status_code(const char *s) {
   /* RFC 9110 15: exactly three digits. sscanf("%d") range-checks nothing and
      glibc wraps, so "4294967496" would read as a 200. */
   if (s[0] >= '0' && s[0] <= '9' && s[1] >= '0' && s[1] <= '9' && s[2] >= '0' &&
@@ -2942,7 +2947,7 @@ void deletesoc(T_SOC soc) {
 }
 
 /* Will also clean other things */
-void deletesoc_r(htsblk * r) {
+static void deletesoc_r(htsblk *r) {
 #if HTS_USEOPENSSL
   if (r->ssl_con)
     ssl_shutdown_free(&r->ssl_con);
@@ -3067,7 +3072,7 @@ void time_local_rfc822(char *s) {
 
 /* sets file time. -1 if error */
 /* Note: utf-8 */
-int set_filetime(const char *file, struct tm *tm_time) {
+static int set_filetime(const char *file, struct tm *tm_time) {
   time_t t;
 
   if (hts_tm_filetime(tm_time, &t)) {
@@ -3286,7 +3291,7 @@ void time_rfc822(char *s, struct tm *A) {
 }
 
 // heure locale au format rfc (taille buffer 256o)
-void time_rfc822_local(char *s, struct tm *A) {
+static void time_rfc822_local(char *s, struct tm *A) {
   if (A == NULL) {
     int localtime_returned_null = 0;
 
@@ -3570,17 +3575,6 @@ int ishtml_ext(const char *a) {
 #endif
   }
   return html;
-}
-
-// error (404,500..)
-int ishttperror(int err) {
-  switch (err / 100) {
-  case 4:
-  case 5:
-    return 1;
-    break;
-  }
-  return 0;
 }
 
 /* Declare a non-const version of FUN */

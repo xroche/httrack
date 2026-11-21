@@ -93,6 +93,8 @@ coucal NewLangList = NULL;
   (HTS_LINE_DROP_TAB | HTS_LINE_DROP_FF | HTS_LINE_DROP_NUL)
 
 const char *gethomedir(void);
+static T_SOC smallserver_init(int *port, char *adr, size_t adr_size,
+                              const char *bindAddr);
 int commandRunning = 0;
 int commandEndRequested = 0;
 int commandEnd = 0;
@@ -428,8 +430,8 @@ static void advertised_host(char *dst, size_t size, const char *bound) {
 }
 
 // smallserver_init(&port,&return_host);
-T_SOC smallserver_init(int *port, char *adr, size_t adr_size,
-                       const char *bindAddr) {
+static T_SOC smallserver_init(int *port, char *adr, size_t adr_size,
+                              const char *bindAddr) {
   T_SOC soc = INVALID_SOCKET;
   char h_loc[256 + 2];
   SOCaddr server;

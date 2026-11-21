@@ -245,7 +245,9 @@ static char *secret_mask(httrackp *opt, const char *s, size_t len,
   return out;
 }
 
-void hts_secret_fwrite(httrackp *opt, FILE *fp, const char *s, size_t len) {
+/* Writes the len bytes at s to fp, with each secret of opt as ***. */
+static void hts_secret_fwrite(httrackp *opt, FILE *fp, const char *s,
+                              size_t len) {
   size_t n;
   char *masked = secret_mask(opt, s, len, &n);
 

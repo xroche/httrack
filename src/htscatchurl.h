@@ -68,10 +68,6 @@ catch_url_status catch_url_capture(T_SOC soc, char *url, char *method,
 /* Describes a catch_url_capture() status to the user. */
 const char *catch_url_strerror(catch_url_status status);
 
-// Fonctions
-/* Read one line off a socket; HTS_TRUE if it did not fit "s". */
-hts_boolean socinput(T_SOC soc, char *s, int max);
-
 #define CATCH_RESPONSE \
   "HTTP/1.0 200 OK\r\n"\
   "Content-type: text/html\r\n"\

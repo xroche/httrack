@@ -51,6 +51,8 @@ Please visit our Website: http://www.httrack.com
 #endif
 /* END specific definitions */
 
+static int help_query(const char *list, int def);
+
 /* configure names the host triplet; MSVC has no config.h to carry one. */
 #ifndef HTS_PLATFORM_NAME
 #if defined(_M_ARM64)
@@ -71,7 +73,7 @@ Please visit our Website: http://www.httrack.com
 #define HTS_GUI_HINT "the GUI version is 'webhttrack'."
 #endif
 
-void infomsg(const char *msg) {
+static void infomsg(const char *msg) {
   int done = 0;
 
   if (msg == NULL)
@@ -360,7 +362,8 @@ void help_wizard(httrackp * opt) {
 #undef str
 #undef argv
 }
-int help_query(const char *list, int def) {
+
+static int help_query(const char *list, int def) {
   char s[256];
   const char *a;
   int opt;
