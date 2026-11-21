@@ -1,0 +1,19 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# The punycode host is decoded for the save name even when the scheme or a
+# login puts its xn-- label past the host's own length into the full address.
+idna() { selftest_queue "savename: /dev/null/$2/p.html" savename /p.html text/html "adr=$1"; }
+
+idna 'www.example.xn--p1ai' 'www.example.рф'
+idna 'http://www.example.xn--p1ai' 'www.example.рф'
+idna 'https://www.example.xn--p1ai' 'www.example.рф'
+idna 'https://user:pw@xn--bcher-kva.ch' 'bücher.ch'
+idna 'https://www.example.com' 'www.example.com'
+
+selftest_run_queued
