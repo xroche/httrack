@@ -457,8 +457,8 @@ hts_dns_job *hts_dns_job_ref(hts_dns_job *job);
 /* Drop one reference; the worker holds its own. */
 void hts_dns_job_release(hts_dns_job *job);
 /* HTS_DNS_PENDING while job runs. Then the address count, stored in the DNS
-   cache, with *error set when it is 0; -1 if the worker died unanswered. Must
-   hold no lock. */
+   cache, with *error set when it is 0; -1 if the worker ended without an
+   answer. Must hold no lock. */
 int hts_dns_poll(httrackp *opt, hts_dns_job *job, const char **error);
 /* Returns the index of addr in list[0..count-1], port included, or -1. */
 int hts_dns_addr_index(const SOCaddr *list, int count, const SOCaddr *addr);

@@ -2686,7 +2686,7 @@ static void back_open(httrackp *opt, struct_back *sback, const int p) {
 static hts_boolean back_dns_defer(httrackp *opt, struct_back *sback,
                                   const int p) {
   lien_back *const back = sback->lnk;
-  // under a proxy the origin is the proxy's to resolve
+  // the proxy resolves the origin, so resolve the proxy
   const char *const host =
       back[p].r.req.proxy.active ? back[p].r.req.proxy.name : back[p].url_adr;
   hts_dns_job *job = NULL;
@@ -2706,31 +2706,36 @@ static hts_boolean back_dns_defer(httrackp *opt, struct_back *sback,
   if (job == NULL && (job = hts_dns_start(opt, host)) == NULL)
     return HTS_FALSE;
   sback->connect_fallback[p].dns_job = job;
+  sback->connect_fallback[p].dns_deadline =
+      opt->timeout > 0 ? mtime_monotonic() + (TStamp) opt->timeout * 1000 : 0;
   back[p].status = STATUS_WAIT_DNS;
   return HTS_TRUE;
 }
 
-/* Connect slot p once its resolve is answered, or fail it. */
+/* Connect slot p once its resolve is answered and the connect pacing allows,
+   or fail it. */
 static void back_dns_poll(httrackp *opt, struct_back *sback, const int p) {
   lien_back *const back = &sback->lnk[p];
+  hts_connect_fallback *const cf = &sback->connect_fallback[p];
   const char *error = NULL;
+  // no job left: resolved, and waiting for the pacing
   const int count =
-      hts_dns_poll(opt, sback->connect_fallback[p].dns_job, &error);
+      cf->dns_job != NULL ? hts_dns_poll(opt, cf->dns_job, &error) : 1;
 
-  if (count == HTS_DNS_PENDING) {
-    if (back->timeout > 0 &&
-        (int) (time_local() - back->timeout_refresh) >= back->timeout) {
-      error = "host name resolution timed out";
-    } else {
-      return;
-    }
-  } else if (count > 0) {
+  if (count > 0) {
     back_dns_drop(sback, p);
+    if (hts_connect_pace(opt, 1, !hts_load_acquire_int(&opt->state.stop)) == 0)
+      return;
     if (back->timeout > 0) // the connect gets the full timeout
       back->timeout_refresh = time_local();
     back_open(opt, sback, p);
     return;
   }
+  if (count == HTS_DNS_PENDING &&
+      (cf->dns_deadline == 0 || mtime_monotonic() < cf->dns_deadline))
+    return;
+  if (count == HTS_DNS_PENDING)
+    error = "host name resolution timed out";
   back->r.statuscode = STATUSCODE_NON_FATAL;
   htsblk_failf(&back->r, "Unable to get server's address: %s",
                error != NULL ? error : "host name resolution failed");
@@ -3656,6 +3661,9 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
     max_c = 1;
     BACK_FOR_EACH_BUSY_FROM(sback, start, i) {
+      // before st, so a socket it opens is selected in this pass
+      if (back_status(&back[i]) == STATUS_WAIT_DNS)
+        back_dns_poll(opt, sback, i);
       // One status read serves every branch below.
       const int st = back_status(&back[i]);
 
@@ -3800,8 +3808,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
           }
         }
       }
-      if (back_status(&back[i]) == STATUS_WAIT_DNS)
-        back_dns_poll(opt, sback, i);
       // ---- FLAG WRITE MIS A UN?: POUR LE CONNECT
       // One status read serves every branch below.
       const int st = back_status(&back[i]);
@@ -3832,9 +3838,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
           if (back[i].timeout > 0)
             gestion_timeout = 1;
 
-        // connecté? A socket back_dns_poll() just opened is not checked yet.
+        // connecté?
         dispo = back[i].r.soc != INVALID_SOCKET &&
-                hts_soc_selectable(back[i].r.soc) &&
                 (FD_ISSET(back[i].r.soc, &fds_c) ||
                  FD_ISSET(back[i].r.soc, &fds_e));
         if (dispo) { // socket ready: connect() finished (ok or failed)
@@ -5247,8 +5252,9 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
       act = time_local();       // temps en secondes
       BACK_FOR_EACH_BUSY_FROM(sback, start, i) {
+        // back_dns_poll() times out STATUS_WAIT_DNS
         if (back_is_live(back_status(&back[i])) &&
-            back_status(&back[i]) != STATUS_WAIT_DNS) { // back_dns_poll's
+            back_status(&back[i]) != STATUS_WAIT_DNS) {
           if (back[i].timeout > 0) {
             // The fallback to the next address runs before the timeout below,
             // so it wins the tie.

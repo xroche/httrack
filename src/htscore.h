@@ -162,6 +162,7 @@ typedef struct hts_connect_fallback {
   int addr_count;       /**< resolved addresses; -1 = not yet probed */
   int addr_first;       /**< list index of the first attempt */
   struct dns_resolve_job *dns_job; /**< resolve under STATUS_WAIT_DNS */
+  TStamp dns_deadline; /**< mtime_monotonic() past which it fails; 0 = none */
 } hts_connect_fallback;
 
 /** The download-slot ring: the set of concurrent transfers in flight.
@@ -573,6 +574,9 @@ void fspc_count(httrackp *opt, const char *type);
 int back_pluggable_sockets(struct_back * sback, httrackp * opt);
 
 int back_pluggable_sockets_strict(struct_back * sback, httrackp * opt);
+/* How many of n connects the -%c limiter and --pause allow now. may_wait
+   false skips --pause, as a stop does. */
+int hts_connect_pace(httrackp *opt, int n, hts_boolean may_wait);
 
 /* One engine-loop tick: refresh the transfer stats and run the loop callback
    for slot b (-1 = none). HTS_FALSE = the callback requested an abort. */
