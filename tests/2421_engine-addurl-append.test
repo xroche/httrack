@@ -1,0 +1,15 @@
+#!/bin/bash
+#
+# Two hts_addurl() calls before the engine takes the list keep both, in order,
+# and a NULL list reports whether one is pending.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+out=$(httrack -O /dev/null -#test=addurl) || true
+want="idle=1 first=1 pending=1 second=1 ordered=1 drained=1 reset=1"
+grep -qxF "$want" <<<"$out" || fail "missing '$want' in: $out"
+grep -qxF "addurl self-test OK" <<<"$out" || fail "self-test failed: $out"
+echo "PASS"

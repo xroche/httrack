@@ -513,6 +513,39 @@ static int st_addfilter(httrackp *opt, int argc, char **argv) {
   return failed;
 }
 
+/* hts_addurl() appends to the pending list, and a NULL list asks if one is
+   pending. */
+static int st_addurl(httrackp *opt, int argc, char **argv) {
+  static const char *const one[] = {"a.com/1", NULL};
+  static const char *const two[] = {"b.com/2", "c.com/3", NULL};
+  char **taken;
+  hts_boolean idle, first, pending, second, ordered, drained, reset;
+
+  idle = !hts_addurl(opt, NULL);
+  first = hts_addurl(opt, (char **) one);
+  pending = hts_addurl(opt, NULL);
+  second = hts_addurl(opt, (char **) two);
+  taken = hts_addurl_take(opt);
+  ordered = taken != NULL && taken[0] != NULL &&
+            strcmp(taken[0], "a.com/1") == 0 && taken[1] != NULL &&
+            strcmp(taken[1], "b.com/2") == 0 && taken[2] != NULL &&
+            strcmp(taken[2], "c.com/3") == 0 && taken[3] == NULL;
+  hts_addurl_free(taken);
+  drained = !hts_addurl(opt, NULL);
+  hts_addurl(opt, (char **) one);
+  hts_resetaddurl(opt);
+  reset = !hts_addurl(opt, NULL) && hts_addurl_take(opt) == NULL;
+  printf("idle=%d first=%d pending=%d second=%d ordered=%d drained=%d "
+         "reset=%d\n",
+         idle, first, pending, second, ordered, drained, reset);
+  if (idle && first && pending && second && ordered && drained && reset) {
+    printf("addurl self-test OK\n");
+    return 0;
+  }
+  printf("addurl self-test FAILED\n");
+  return 1;
+}
+
 /* filters_remove() closes the gap it leaves, and removing nothing keeps all. */
 static int st_filterremove(httrackp *opt, int argc, char **argv) {
   const htsfilters saved = opt->filters;
@@ -764,6 +797,7 @@ const struct selftest_entry selftests_filters[] = {
      st_filtercap},
     {"addfilter", "", "hts_addfilter() queues a signed rule within the cap",
      st_addfilter},
+    {"addurl", "", "hts_addurl() appends to the pending list", st_addurl},
     {"filterremove", "", "filters_remove() closes the gap it leaves",
      st_filterremove},
     {"filtergrow", "", "the filter list stops growing at HTS_FILTERS_MAX",

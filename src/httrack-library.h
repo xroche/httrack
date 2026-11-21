@@ -379,8 +379,10 @@ HTSEXT_API int hts_is_exiting(httrackp *opt);
 
 /** Queue extra start URLs to inject into a running mirror. @p url is a
     caller-owned, NULL-terminated array of strings, deep-copied here, so the
-   caller may release it as soon as this returns. Any list still pending is
-   replaced. @return nonzero if a list is now set. */
+   caller may release it as soon as this returns. The URLs are appended to any
+   list still pending. A NULL @p url adds nothing and asks whether a list is
+   pending. @return nonzero if the URLs were queued, or for NULL, if a list is
+   pending. */
 HTSEXT_API hts_boolean hts_addurl(httrackp *opt, char **url);
 
 /** Clear any pending add-URL list set by hts_addurl(). Always returns 0. */
