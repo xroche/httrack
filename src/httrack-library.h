@@ -1019,17 +1019,19 @@ HTSEXT_API void hts_mutexrelease(htsmutex *mutex);
 
 /** Convert 's' from 'charset' to UTF-8. Caller frees; NULL upon error, an
     allocation failure included. */
-HTS_NODISCARD HTSEXT_API char *
+HTS_CHECK_RESULT HTSEXT_API char *
 hts_convertStringToUTF8(const char *s, size_t size, const char *charset);
 
 #ifdef _WIN32
 /** Convert the current system codepage to UTF-8. Caller frees; NULL upon
     error. Windows only. */
-HTSEXT_API char *hts_convertStringSystemToUTF8(const char *s, size_t size);
+HTS_CHECK_RESULT HTSEXT_API char *hts_convertStringSystemToUTF8(const char *s,
+                                                                size_t size);
 
 /** Convert UTF-8 to the current system codepage. Caller frees; NULL upon
     error. Windows only. */
-HTSEXT_API char *hts_convertStringUTF8ToSystem(const char *s, size_t size);
+HTS_CHECK_RESULT HTSEXT_API char *hts_convertStringUTF8ToSystem(const char *s,
+                                                                size_t size);
 
 /** Replace the CRT's ANSI argv by a UTF-8 one decoded from the real UTF-16
     command line. Keeps the CRT's argv on failure, and the new array is

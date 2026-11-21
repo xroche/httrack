@@ -139,9 +139,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     cookie_sink += (rec != NULL) ? (unsigned long) strlen(rec) : 0;
     (void) cookie_domain_match(dom, nlines > 2 ? lines[2] : "www.fuzz.example");
     cookie_sink +=
-        cookie_domain_allowed(dom, nlines > 2 ? lines[2] : "www.fuzz.example")
-            ? 1
-            : 0;
+        cookie_domain_allowed(dom, nlines > 2 ? lines[2] : "www.fuzz.example");
     break;
   }
   case 2: { /* jar file load, save and reload */

@@ -91,23 +91,17 @@ Please visit our Website: http://www.httrack.com
 #endif
 #endif
 
-/* Marks a function whose result a caller must use, because dropping it leaks,
-   misses a truncation or skips a safety verdict. GCC still warns through a
-   (void) cast, so act on the result instead. */
-#ifndef HTS_NODISCARD
+/* HTS_CHECK_RESULT marks a function whose result a caller must use. GCC
+   still warns through a (void) cast, so the caller must act on the result. */
+#ifndef HTS_CHECK_RESULT
 #ifdef __GNUC__
-#define HTS_NODISCARD __attribute__((warn_unused_result))
+#define HTS_CHECK_RESULT __attribute__((warn_unused_result))
 #elif defined(_MSC_VER)
 #include <sal.h>
-#define HTS_NODISCARD _Check_return_
+#define HTS_CHECK_RESULT _Check_return_
 #else
-#define HTS_NODISCARD
+#define HTS_CHECK_RESULT
 #endif
-#endif
-
-/* Older name of HTS_NODISCARD, kept for code built against this header. */
-#ifndef HTS_CHECK_RESULT
-#define HTS_CHECK_RESULT HTS_NODISCARD
 #endif
 
 /* Marks a printf-style format parameter so MSVC /analyze checks callers. */

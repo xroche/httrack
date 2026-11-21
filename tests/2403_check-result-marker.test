@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# HTS_NODISCARD must not expand to nothing on GCC or clang: dropping the result
-# of an annotated exported function has to warn, in C and in C++.
+# On GCC and clang, HTS_CHECK_RESULT must make a dropped result of an exported
+# function warn, in C and in C++.
 
 set -euo pipefail
 
@@ -40,7 +40,7 @@ check() { # check LANG COMPILER-ARGV...
     "$@" -c -o "$tmp/probe.o" -Werror=unused-result "$src" 2>"$tmp/ctl.err" ||
         fail_dump "$lang: the probe that uses the result does not compile" "$tmp/ctl.err"
     if "$@" -c -o "$tmp/probe.o" -Werror=unused-result -DDROP "$src" 2>"$tmp/drop.err"; then
-        fail "$lang: a dropped HTS_NODISCARD result compiles silently with $1"
+        fail "$lang: a dropped HTS_CHECK_RESULT result compiles silently with $1"
     fi
     grep -q 'unused-result' "$tmp/drop.err" ||
         fail_dump "$lang: the dropped-result probe fails for another reason" "$tmp/drop.err"

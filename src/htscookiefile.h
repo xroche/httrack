@@ -46,8 +46,8 @@ hts_boolean cookie_close_synced(FILE *fp);
 int cookie_write(t_cookie *cookie, const char *name);
 
 /* Name in dst a temporary beside path that no other run or thread writes. */
-HTS_NODISCARD hts_boolean cookie_tmpname(char *dst, size_t size,
-                                         const char *path);
+HTS_CHECK_RESULT hts_boolean cookie_tmpname(char *dst, size_t size,
+                                            const char *path);
 
 /* Make bak hold what file holds, leaving file in place. */
 hts_boolean cookie_backup(const char *file, const char *bak);

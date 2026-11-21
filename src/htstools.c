@@ -232,10 +232,9 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
     char *const a = jump_identification(adrfil->adr);
     const size_t room = sizeof(adrfil->adr) - (size_t) (a - adrfil->adr);
 
-    if (!hts_host_to_ascii(a, room < HTS_URLMAXSIZE ? room : HTS_URLMAXSIZE, a,
-                           strlen(a))) {
-      // no ASCII form, or too long once converted: keep the host raw
-    }
+    // a host with no ASCII form, or too long once converted, is kept raw
+    (void) hts_host_to_ascii(a, room < HTS_URLMAXSIZE ? room : HTS_URLMAXSIZE,
+                             a, strlen(a));
   }
 
   return ok;

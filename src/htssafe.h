@@ -495,7 +495,7 @@ static HTS_INLINE HTS_UNUSED const char *htsbuff_str(const htsbuff *b) {
  * so it suits a value read back from a cache, a header or the wire, where
  * refusing the whole record is worse than keeping a clipped one. Returns
  * HTS_TRUE if it all fit; callers that clip on purpose ignore that, so it is
- * not HTS_NODISCARD.
+ * not HTS_CHECK_RESULT.
  */
 static HTS_INLINE HTS_UNUSED hts_boolean strclipbuff(char *dest, size_t size,
                                                      const char *src) {
@@ -518,7 +518,7 @@ static HTS_INLINE HTS_UNUSED hts_boolean strclipbuff(char *dest, size_t size,
  * UNTRUSTED half of a path, never on the assembled one: the user's own -O may
  * legitimately start with "..".
  */
-static HTS_INLINE HTS_UNUSED hts_boolean
+static HTS_INLINE HTS_UNUSED HTS_CHECK_RESULT hts_boolean
 hts_path_is_contained(const char *path) {
   const char *s;
 
@@ -541,7 +541,7 @@ hts_path_is_contained(const char *path) {
  * filename must pass before it is joined to a root. Absolute names fail too,
  * because with no -O that root is "".
  */
-static HTS_INLINE HTS_UNUSED hts_boolean
+static HTS_INLINE HTS_UNUSED HTS_CHECK_RESULT hts_boolean
 hts_path_is_relative_contained(const char *path) {
   if (HTS_IS_PATH_SEP(path[0])) {
     return HTS_FALSE;
@@ -557,7 +557,7 @@ hts_path_is_relative_contained(const char *path) {
 
 /**
  * Callers that deliberately ignore truncation use this instead of
- * slprintfbuff(), so it is not HTS_NODISCARD.
+ * slprintfbuff(), so it is not HTS_CHECK_RESULT.
  */
 static HTS_INLINE HTS_UNUSED HTS_PRINTF_FUN(3, 0) hts_boolean
     vslprintfbuff(char *dest, size_t size, HTS_FORMAT_STRING const char *fmt,
@@ -581,7 +581,7 @@ static HTS_INLINE HTS_UNUSED HTS_PRINTF_FUN(3, 0) hts_boolean
  * strcpybuff() it does not abort on overflow, so it suits text built from
  * remote input.
  */
-static HTS_INLINE HTS_UNUSED HTS_NODISCARD HTS_PRINTF_FUN(3, 4) hts_boolean
+static HTS_INLINE HTS_UNUSED HTS_CHECK_RESULT HTS_PRINTF_FUN(3, 4) hts_boolean
     slprintfbuff(char *dest, size_t size, HTS_FORMAT_STRING const char *fmt,
                  ...) {
   va_list args;
@@ -599,7 +599,7 @@ static HTS_INLINE HTS_UNUSED HTS_NODISCARD HTS_PRINTF_FUN(3, 4) hts_boolean
  * and HTS_FALSE returned, so a record parsed back field by field never carries
  * a half-written one. *used must be below size.
  */
-static HTS_INLINE HTS_UNUSED HTS_NODISCARD HTS_PRINTF_FUN(4, 5) hts_boolean
+static HTS_INLINE HTS_UNUSED HTS_CHECK_RESULT HTS_PRINTF_FUN(4, 5) hts_boolean
     slcatprintfbuff(char *dest, size_t size, size_t *used,
                     HTS_FORMAT_STRING const char *fmt, ...) {
   va_list args;
@@ -619,7 +619,7 @@ static HTS_INLINE HTS_UNUSED HTS_NODISCARD HTS_PRINTF_FUN(4, 5) hts_boolean
 
 /**
  * slprintfbuff() for diagnostics quoting remote or client text, which are
- * meant to be clipped: nothing to act on, hence not HTS_NODISCARD. A (void)
+ * meant to be clipped: nothing to act on, hence not HTS_CHECK_RESULT. A (void)
  * cast on slprintfbuff() is no substitute, GCC warns through it.
  */
 static HTS_INLINE HTS_UNUSED HTS_PRINTF_FUN(3, 4) void slprintfbuff_clip(
@@ -634,7 +634,7 @@ static HTS_INLINE HTS_UNUSED HTS_PRINTF_FUN(3, 4) void slprintfbuff_clip(
 /**
  * slcatprintfbuff() for text meant to be clipped rather than dropped whole:
  * keeps what fitted and advances *used past it. Nothing to act on, hence not
- * HTS_NODISCARD.
+ * HTS_CHECK_RESULT.
  */
 static HTS_INLINE HTS_UNUSED HTS_PRINTF_FUN(4, 5) void slcatprintfbuff_clip(
     char *dest, size_t size, size_t *used, HTS_FORMAT_STRING const char *fmt,
