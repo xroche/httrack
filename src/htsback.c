@@ -439,7 +439,7 @@ void back_free(struct_back ** sback) {
 /* Milliseconds between two looks at a pending resolve. */
 #define HTS_DNS_POLL_MS 10
 
-int back_connect_fallback_due(int addr_index, int addr_count, int elapsed,
+int back_connect_fallback_due(int addr_index, int addr_count, TStamp elapsed_ms,
                               int timeout) {
   int deadline;
 
@@ -450,7 +450,14 @@ int back_connect_fallback_due(int addr_index, int addr_count, int elapsed,
   deadline = (timeout < HTS_CONNECT_FALLBACK_TIMEOUT)
                  ? timeout
                  : HTS_CONNECT_FALLBACK_TIMEOUT;
-  return elapsed >= deadline;
+  return hts_timeout_elapsed(0, elapsed_ms, deadline);
+}
+
+/* Restart slot i's timeout window. timeout_refresh keeps the wall clock for
+   library readers; the timeout itself runs on the monotonic copy. */
+static void back_timeout_refresh(struct_back *sback, int i) {
+  sback->lnk[i].timeout_refresh = time_local();
+  sback->connect_fallback[i].timeout_since = mtime_monotonic();
 }
 
 /* Log the outcome of a stored link. */
@@ -483,7 +490,7 @@ static int back_connect_next(httrackp *opt, struct_back *sback, int i) {
   back[i].r.soc = soc;
   cf->addr_index = next;
   if (back[i].timeout > 0)
-    back[i].timeout_refresh = time_local();
+    back_timeout_refresh(sback, i);
   back[i].status = STATUS_CONNECTING;
   hts_log_print(opt, LOG_DEBUG,
                 "connect failed, trying next address (%d/%d) for %s", next + 1,
@@ -2766,7 +2773,7 @@ static void back_dns_poll(httrackp *opt, struct_back *sback, const int p,
       return;
     (*budget)--;
     if (back->timeout > 0) // the connect gets the full timeout
-      back->timeout_refresh = time_local();
+      back_timeout_refresh(sback, p);
     back_open(opt, sback, p);
     return;
   }
@@ -3323,7 +3330,7 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
 
       if (opt->timeout > 0) {   // gestion du opt->timeout
         back[p].timeout = opt->timeout;
-        back[p].timeout_refresh = time_local();
+        back_timeout_refresh(sback, p);
       } else {
         back[p].timeout = -1;   // pas de gestion (default)
       }
@@ -3985,7 +3992,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                   back[i].status = STATUS_SSL_WAIT_HANDSHAKE;   /* handshake wait */
                   // the handshake gets its own timeout window, as connect does
                   if (back[i].timeout > 0)
-                    back[i].timeout_refresh = time_local();
+                    back_timeout_refresh(sback, i);
                 } else
                   back[i].r.statuscode = STATUSCODE_SSL_HANDSHAKE;
               } else
@@ -4006,8 +4013,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                } */
 
             back[i].ka_time_start = time_local();
-            if (back[i].timeout > 0) {  // refresh timeout si besoin est
-              back[i].timeout_refresh = back[i].ka_time_start;
+            if (back[i].timeout > 0) {
+              back_timeout_refresh(sback, i);
             }
             if (back[i].rateout > 0) {  // le taux de transfert de base sur le début de la connexion
               back[i].rateout_time = back[i].ka_time_start;
@@ -4376,8 +4383,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               }
             }
           } else if (retour_fread > 0) { // pas d'erreur de réception et data
-            if (back[i].timeout > 0) {  // refresh timeout si besoin est
-              back[i].timeout_refresh = time_local();
+            if (back[i].timeout > 0) {
+              back_timeout_refresh(sback, i);
             }
             // Traitement des en têtes chunks ou en têtes
             if (back_status(&back[i]) == STATUS_CHUNK_WAIT ||
@@ -5293,9 +5300,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
     // vérifier timeouts
     if (gestion_timeout) {
-      TStamp act;
-
-      act = time_local();       // temps en secondes
+      const TStamp act = time_local(); // the rate check counts seconds
+      const TStamp act_ms = mtime_monotonic();
       BACK_FOR_EACH_BUSY_FROM(sback, start, i) {
         // back_dns_poll() times out STATUS_WAIT_DNS
         if (back_is_live(back_status(&back[i])) &&
@@ -5307,9 +5313,9 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               const hts_connect_fallback *const cf =
                   &sback->connect_fallback[i];
 
-              if (back_connect_fallback_due(
-                      cf->addr_index, cf->addr_count,
-                      (int) (act - back[i].timeout_refresh), back[i].timeout)) {
+              if (back_connect_fallback_due(cf->addr_index, cf->addr_count,
+                                            act_ms - cf->timeout_since,
+                                            back[i].timeout)) {
                 if (back_connect_next(opt, sback, i)) {
                   continue; // reconnected to the next candidate
                 }
@@ -5320,7 +5326,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                 continue;
               }
             }
-            if (((int) (act - back[i].timeout_refresh)) >= back[i].timeout) {
+            if (hts_timeout_elapsed(sback->connect_fallback[i].timeout_since,
+                                    act_ms, back[i].timeout)) {
               const int slot_status = back_status(&back[i]);
 
               hts_log_print(opt, LOG_DEBUG, "connection timed out for %s%s",

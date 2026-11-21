@@ -3512,6 +3512,22 @@ class Handler(SimpleHTTPRequestHandler):
         time.sleep(self.SLOWHEAD_SECONDS)
         self.send_raw(b"s" * 4096, "application/octet-stream")
 
+    # Every page answers after a pause shorter than --timeout=1 (test 2422).
+    LATENCY_SECONDS = 0.4
+    LATENCY_PAGES = 16
+
+    def route_latency(self):
+        if self.path.split("?")[0] == "/latency/index.html":
+            self.send_html(
+                "".join(
+                    '<a href="p%d.html">p%d</a>\n' % (i, i)
+                    for i in range(self.LATENCY_PAGES)
+                )
+            )
+            return
+        time.sleep(self.LATENCY_SECONDS)
+        self.send_html("late page")
+
     # Repeated Content-Length fields: each file sends DUPCL_BODY under the
     # header values listed. Values that disagree must drop the response.
     DUPCL_BODY = b"0123456789abcdef"
@@ -4919,6 +4935,9 @@ class Handler(SimpleHTTPRequestHandler):
             return True
         if path.startswith("/xmlbase/"):
             self.route_xmlbase()
+            return True
+        if path.startswith("/latency/"):
+            self.route_latency()
             return True
         if path.startswith("/charset/"):
             self.route_charset()
