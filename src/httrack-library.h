@@ -427,10 +427,13 @@ HTSEXT_API hts_boolean hts_filter_rule_ok(const char *rule);
 HTSEXT_API hts_boolean hts_scan_token(char **ptr, char *dest, size_t destsize);
 
 /** Apply the runtime-tunable options from @p from onto @p to, to adjust a live
-    mirror. A field @p from leaves at its default is not copied, so @p to keeps
-    its own. delete_old and external are copied unless HTS_DEFAULT, so a caller
-    leaving them alone must set that. Strings are deep-copied, so @p from may be
-    released afterward. @return 0. */
+    mirror. A numeric option that @p from holds at -1 (HTS_DEFAULT for a
+    tristate), or a string it leaves empty, is not copied, so @p to keeps its
+    own. max_retry_after is copied only when it differs from its default, so
+    that default cannot be re-applied. delete_old, and the options read only
+    at crawl start (--changes, --single-file, --single-file-max-size,
+    --warc-cdx, --wacz, --warc-max-size), are never copied. Strings are
+    deep-copied, so @p from may be released afterward. @return 0. */
 HTSEXT_API int copy_htsopt(const httrackp *from, httrackp *to);
 
 /** Whether @p rule is one well-formed "[scheme://]alias[,...]=[scheme://]host",

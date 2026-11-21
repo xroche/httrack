@@ -3891,7 +3891,7 @@ HTSEXT_API int copy_htsopt(const httrackp * from, httrackp * to) {
 
   if (from->maxconn > 0)
     to->maxconn = from->maxconn;
-  /* A fresh opt holds the default, so only a value away from it is an edit. */
+  /* A fresh opt holds the default, so only another value is an edit. */
   if (from->max_retry_after >= 0 &&
       from->max_retry_after != HTS_DEFAULT_MAX_RETRY_AFTER)
     to->max_retry_after = from->max_retry_after;
@@ -3932,22 +3932,6 @@ HTSEXT_API int copy_htsopt(const httrackp * from, httrackp * to) {
 
   if (StringNotEmpty(from->warc_file))
     StringCopyS(to->warc_file, from->warc_file);
-  /* These have no "unspecified" value, so a fresh opt's default must not turn
-     off what the running crawl asked for. */
-  if (from->warc_max_size > 0)
-    to->warc_max_size = from->warc_max_size;
-  if (from->warc_cdx)
-    to->warc_cdx = HTS_TRUE;
-  if (from->warc_wacz)
-    to->warc_wacz = HTS_TRUE;
-  if (from->changes)
-    to->changes = HTS_TRUE;
-
-  if (from->single_file)
-    to->single_file = HTS_TRUE;
-  if (from->single_file_max_size > 0 &&
-      from->single_file_max_size != SINGLEFILE_DEFAULT_MAX_SIZE)
-    to->single_file_max_size = from->single_file_max_size;
   if (from->sitemap)
     to->sitemap = from->sitemap;
   if (StringNotEmpty(from->sitemap_url))
@@ -3970,8 +3954,7 @@ HTSEXT_API int copy_htsopt(const httrackp * from, httrackp * to) {
   if (from->parseall > -1)
     to->parseall = from->parseall;
 
-  if (from->delete_old > -1)
-    to->delete_old = from->delete_old;
+  /* delete_old is left alone: shipped front ends send it inverted. */
 
   if (from->external > -1)
     to->external = from->external;
