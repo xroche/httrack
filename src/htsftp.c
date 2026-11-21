@@ -701,7 +701,7 @@ static int ftp_wait_left(const httrackp *opt, int timeout) {
    connect() to a black hole sits for the kernel's own two minutes (#1059). */
 static hts_boolean ftp_connect(lien_back *back, T_SOC soc, SOCaddr *server,
                                int timeout, const httrackp *opt) {
-  const TStamp started = time_local();
+  const TStamp started = mtime_monotonic();
 
   timeout = ftp_wait_left(opt, timeout);
   if (!socket_set_nonblocking(soc, HTS_TRUE))
@@ -717,7 +717,7 @@ static hts_boolean ftp_connect(lien_back *back, T_SOC soc, SOCaddr *server,
     while ((ready = check_socket_connect(soc)) == 0) {
       if (hts_load_acquire_int(&back->stop_ftp) ||
           (opt != NULL && hts_load_acquire_int(&opt->state.stop)) ||
-          (int) (time_local() - started) >= timeout)
+          hts_timeout_elapsed(started, mtime_monotonic(), timeout))
         return HTS_FALSE;
       Sleep(100);
     }
@@ -733,7 +733,7 @@ static hts_boolean ftp_connect(lien_back *back, T_SOC soc, SOCaddr *server,
    connection the server may never make (#1074). */
 static T_SOC ftp_accept(lien_back *back, T_SOC soc, int timeout,
                         const httrackp *opt) {
-  const TStamp started = time_local();
+  const TStamp started = mtime_monotonic();
   T_SOC soc_dat;
 
   timeout = ftp_wait_left(opt, timeout);
@@ -743,7 +743,7 @@ static T_SOC ftp_accept(lien_back *back, T_SOC soc, int timeout,
   while (check_socket(soc) == 0) {
     if (hts_load_acquire_int(&back->stop_ftp) ||
         (opt != NULL && hts_load_acquire_int(&opt->state.stop)) ||
-        (int) (time_local() - started) >= timeout)
+        hts_timeout_elapsed(started, mtime_monotonic(), timeout))
       return INVALID_SOCKET;
     Sleep(100);
   }
@@ -1536,7 +1536,7 @@ int check_socket_connect(T_SOC soc) {
 // attendre des données
 int wait_socket_receive(lien_back *back, T_SOC soc, int timeout,
                         const httrackp *opt) {
-  TStamp ltime = time_local();
+  const TStamp ltime = mtime_monotonic();
   int r;
 
   timeout = ftp_wait_left(opt, timeout);
@@ -1549,7 +1549,7 @@ int wait_socket_receive(lien_back *back, T_SOC soc, int timeout,
      after the full timeout, so teardown does not sit on a silent server. */
   while ((!(r = check_socket(soc))) &&
          (back == NULL || !hts_load_acquire_int(&back->stop_ftp)) &&
-         (((int) ((TStamp) (time_local() - ltime))) < timeout)) {
+         !hts_timeout_elapsed(ltime, mtime_monotonic(), timeout)) {
     Sleep(100);
 #if FTP_DEBUG
     printf(".");

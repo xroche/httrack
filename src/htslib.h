@@ -496,6 +496,10 @@ int hts_dns_negative_failures(httrackp *opt, const char *host);
    deadline. Its zero is arbitrary, so it measures an interval and never names
    a date; anything stored or sent still needs mtime_local(). */
 TStamp mtime_monotonic(void);
+/* Has a timeout of timeout_s seconds run out between the readings
+   since_ms and now_ms? Both must come from mtime_monotonic(). A timeout_s <= 0
+   has always run out. */
+hts_boolean hts_timeout_elapsed(TStamp since_ms, TStamp now_ms, int timeout_s);
 
 /* Test-only: move one cached negative record's stamps by ms, so a self-test
    outlasts a wait (positive) or steps behind them (negative), no sleeps. */

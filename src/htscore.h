@@ -163,6 +163,7 @@ typedef struct hts_connect_fallback {
   int addr_first;       /**< list index of the first attempt */
   struct dns_resolve_job *dns_job; /**< resolve under STATUS_WAIT_DNS */
   TStamp dns_deadline; /**< mtime_monotonic() past which it fails; 0 = none */
+  TStamp timeout_since; /**< mtime_monotonic() the slot timeout counts from */
 } hts_connect_fallback;
 
 /** A slot's own copies of the request strings copy_htsopt() may rewrite. */

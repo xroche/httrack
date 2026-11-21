@@ -1,0 +1,29 @@
+#!/bin/bash
+#
+# --timeout counts elapsed time, not second boundaries: pages answering after
+# 0.25s all fit --timeout=1, wherever the wall clock's second ticks over.
+
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+tmpdir=$(mktemp -d)
+cleanup() {
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+local_server_start
+out="$tmpdir/out"
+# Whole-second bookkeeping fails each page with odds 0.25, so all 24 pass by
+# chance once in 1000 runs.
+local_crawl --log "$tmpdir/log" "$BASEURL/latency/index.html" -O "$out" \
+    -c4 --timeout=1 --retries=0 --robots=0 --quiet || true
+if grep -q "Time Out" "$out/hts-log.txt"; then
+    fail_dump "a 0.25s answer timed out under --timeout=1" "$out/hts-log.txt"
+fi
+for n in $(seq 0 15); do
+    test -f "$out/127.0.0.1_${SRV_PORT}/latency/p$n.html" ||
+        fail_dump "p$n.html missing" "$out/hts-log.txt"
+done
