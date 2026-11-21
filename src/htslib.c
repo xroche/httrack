@@ -1252,17 +1252,21 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
       /* dest comes from fetch, so a KIND= entry applies without Sec-Fetch-*. */
       {
         char accept_buf[HTS_ACCEPT_MAXSIZE];
-        const char *const accept = hts_accept_lookup(
-            StringBuff(opt->accept_kinds), retour->req.accept,
-            opt->accept_given,
-            fetch != NULL ? fetch->dest : HTS_FETCH_DEST_UNKNOWN, family,
-            accept_buf, sizeof(accept_buf));
+        const char *accept;
 
+        /* held until printed: accept may point into accept_kinds */
+        hts_mutexlock(&opt->state.lock);
+        accept = hts_accept_lookup(StringBuff(opt->accept_kinds),
+                                   retour->req.accept, opt->accept_given,
+                                   fetch != NULL ? fetch->dest
+                                                 : HTS_FETCH_DEST_UNKNOWN,
+                                   family, accept_buf, sizeof(accept_buf));
         if (strnotempty(accept) && !http_headers_have_field(custom, "Accept")) {
           HDR_OPEN(HDR_ACCEPT);
           print_buffer(&hdr, "Accept: %s" H_CRLF, accept);
           HDR_CLOSE(HDR_ACCEPT);
         }
+        hts_mutexrelease(&opt->state.lock);
       }
 
       if (sent_fetch != NULL) {
@@ -3692,7 +3696,7 @@ HTSEXT_API const char *jump_normalized_const(const char *source) {
     } else {                    // www-4.foo.com -> foo.com
       const char *a = source + 3;
 
-      while(*a && (isdigit(*a) || *a == '-'))
+      while (*a && (isdigit((unsigned char) *a) || *a == '-'))
         a++;
       if (*a == '.') {
         source = a + 1;
@@ -3900,7 +3904,16 @@ const char *hts_query_strip_keys(const char *rules, const char *adr,
 
 /* see htscore.h */
 const char *hts_host_alias_rules(httrackp *opt) {
+  if (opt->hash != NULL)
+    return opt->hash->host_alias;
   return StringNotEmpty(opt->host_alias) ? StringBuff(opt->host_alias) : NULL;
+}
+
+/* see htslib.h */
+const char *hts_strip_query_rules(httrackp *opt) {
+  if (opt->hash != NULL)
+    return opt->hash->strip_query;
+  return StringNotEmpty(opt->strip_query) ? StringBuff(opt->strip_query) : NULL;
 }
 
 /* Split RULE "alias[,alias...]=canonical" at its first '=', both sides

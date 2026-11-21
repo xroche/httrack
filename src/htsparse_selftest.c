@@ -394,7 +394,7 @@ static hts_boolean jsscan_model(httrackp *opt, const char *cursor,
         continue;
       break;
     case JSGUARD_SPACE_BEFORE:
-      if (!isspace(prev))
+      if (!isspace((unsigned char) prev))
         continue;
       break;
     case JSGUARD_NO_IDENT_BYTE:

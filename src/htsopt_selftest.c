@@ -303,22 +303,72 @@ static int st_copyopt(httrackp *opt, int argc, char **argv) {
                       strcmp(StringBuff(to->lang_iso),
                              HTS_ACCEPT_LANGUAGE_LEGACY) != 0);
 
-  from->changes = HTS_TRUE;
-  to->changes = HTS_FALSE;
-  copy_htsopt(from, to);
-  ST_FAIL_IF(err, to->changes != HTS_TRUE);
-
-  /* single_file pair: the cap is guarded by >0, so an unset source must not
-     overwrite the default the target already carries */
-  from->single_file = HTS_TRUE;
+  /* No front end sets these, and a mid-crawl change gives a partial result. */
+  from->changes = from->single_file = HTS_TRUE;
+  from->warc_cdx = from->warc_wacz = HTS_TRUE;
   from->single_file_max_size = 4096;
-  to->single_file = HTS_FALSE;
-  to->single_file_max_size = SINGLEFILE_DEFAULT_MAX_SIZE;
+  from->warc_max_size = 5000;
+  to->changes = to->single_file = HTS_FALSE;
+  to->warc_cdx = to->warc_wacz = HTS_FALSE;
+  to->single_file_max_size = 8192;
+  to->warc_max_size = 0;
   copy_htsopt(from, to);
-  ST_FAIL_IF(err, !to->single_file || to->single_file_max_size != 4096);
-  from->single_file_max_size = 0;
+  ST_FAIL_IF(err, to->changes || to->single_file || to->warc_cdx ||
+                      to->warc_wacz || to->single_file_max_size != 8192 ||
+                      to->warc_max_size != 0);
+  from->changes = from->single_file = HTS_FALSE;
+  from->warc_cdx = from->warc_wacz = HTS_FALSE;
+  from->single_file_max_size = SINGLEFILE_DEFAULT_MAX_SIZE;
+  from->warc_max_size = 0;
+  to->changes = to->single_file = HTS_TRUE;
+  to->warc_cdx = to->warc_wacz = HTS_TRUE;
+  to->warc_max_size = 9999;
   copy_htsopt(from, to);
-  ST_FAIL_IF(err, to->single_file_max_size != 4096);
+  ST_FAIL_IF(err, !to->changes || !to->single_file || !to->warc_cdx ||
+                      !to->warc_wacz || to->single_file_max_size != 8192 ||
+                      to->warc_max_size != 9999);
+  /* Agreeing values stay put, which an inverted copy would break. */
+  from->changes = from->single_file = from->warc_cdx = HTS_TRUE;
+  copy_htsopt(from, to);
+  ST_FAIL_IF(err, !to->changes || !to->single_file || !to->warc_cdx);
+
+  /* delete_old never travels, whatever the source holds. */
+  from->delete_old = HTS_TRUE;
+  to->delete_old = HTS_FALSE;
+  copy_htsopt(from, to);
+  ST_FAIL_IF(err, to->delete_old != HTS_FALSE);
+  from->delete_old = HTS_FALSE;
+  to->delete_old = HTS_TRUE;
+  copy_htsopt(from, to);
+  ST_FAIL_IF(err, to->delete_old != HTS_TRUE);
+  from->delete_old = HTS_TRUE;
+  copy_htsopt(from, to);
+  ST_FAIL_IF(err, to->delete_old != HTS_TRUE);
+
+  /* external travels both ways, and HTS_DEFAULT keeps the target's. */
+  from->external = HTS_TRUE;
+  to->external = HTS_FALSE;
+  copy_htsopt(from, to);
+  ST_FAIL_IF(err, to->external != HTS_TRUE);
+  from->external = HTS_FALSE;
+  copy_htsopt(from, to);
+  ST_FAIL_IF(err, to->external != HTS_FALSE);
+  from->external = HTS_DEFAULT;
+  to->external = HTS_TRUE;
+  copy_htsopt(from, to);
+  ST_FAIL_IF(err, to->external != HTS_TRUE);
+
+  /* fragment: 0 is a real setting, only -1 skips. */
+  from->fragment = 0;
+  to->fragment = 123456;
+  copy_htsopt(from, to);
+  ST_FAIL_IF(err, to->fragment != 0);
+  from->fragment = 654321;
+  copy_htsopt(from, to);
+  ST_FAIL_IF(err, to->fragment != 654321);
+  from->fragment = -1;
+  copy_htsopt(from, to);
+  ST_FAIL_IF(err, to->fragment != 654321);
 
   /* sitemap pair: the flag latches on, the URL takes the String deep copy */
   from->sitemap = HTS_TRUE;
@@ -354,6 +404,13 @@ static int st_copyopt(httrackp *opt, int argc, char **argv) {
   from->max_retry_after = -1;
   copy_htsopt(from, to);
   ST_FAIL_IF(err, to->max_retry_after != 0);
+  from->max_retry_after = 7;
+  copy_htsopt(from, to);
+  ST_FAIL_IF(err, to->max_retry_after != 7);
+  /* A fresh opt's default is not an edit, so it cannot be re-applied. */
+  from->max_retry_after = HTS_DEFAULT_MAX_RETRY_AFTER;
+  copy_htsopt(from, to);
+  ST_FAIL_IF(err, to->max_retry_after != 7);
 
   hts_free_opt(from);
   hts_free_opt(to);

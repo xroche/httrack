@@ -1125,8 +1125,12 @@ const char *hts_host_alias_match(const char *rules, const char *host,
                                  const char *full, hts_boolean collapse_www,
                                  size_t *canonlen);
 
-/* The --host-alias rules of OPT, or NULL when the option was not given. */
+/* The --host-alias rules of OPT, or NULL when the option was not given.
+   While a mirror runs it returns the hash's snapshot, so names match keys. */
 const char *hts_host_alias_rules(httrackp *opt);
+
+/* Return the query-strip keys of OPT or NULL, like hts_host_alias_rules(). */
+const char *hts_strip_query_rules(httrackp *opt);
 
 /* ADR with its host replaced by the canonical one, from the '\n'-separated
    "alias[,alias...]=canonical" RULES (aliases matched with strjoker, last

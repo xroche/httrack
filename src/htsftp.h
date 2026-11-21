@@ -79,6 +79,10 @@ int ftp_worker_selftests(void);
    failed checks. */
 int ftp_handoff_selftests(httrackp *opt);
 
+/* Log through the worker's resume checks and assert they took no rotating
+   buffer of opt. Returns the number of failed checks. */
+int ftp_scratch_selftests(httrackp *opt);
+
 int run_launch_ftp(FTPDownloadStruct * params);
 int send_line(T_SOC soc, const char *data);
 /* Read one control-channel reply into line[line_size]. Returns 0 on error.

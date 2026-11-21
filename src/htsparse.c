@@ -455,7 +455,7 @@ static hts_boolean js_glues_keyword(const char *at, const char *buffer) {
   const size_t before = (size_t) (at - buffer);
 
   if (c < 0x80)
-    return isalnum(c) || c == '_' || c == '$' || c == '.';
+    return isalnum((unsigned char) c) || c == '_' || c == '$' || c == '.';
   /* Above 127 a name may be Unicode, so only a space ends one. This is every
      space the language reads as one: U+00A0 (or a lone 0xA0 where the page is
      not UTF-8, since no continuation byte follows an ASCII one), U+1680,
@@ -593,7 +593,7 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
     nc = strfield(cursor, ":location"); // javascript:location="doc"
   if (!nc) {                            // location="doc"
     if ((nc = strfield(cursor, "location")) &&
-        !isspace(html_prevc(cursor, buffer)))
+        !isspace((unsigned char) html_prevc(cursor, buffer)))
       nc = 0;
   }
   if (!nc)
@@ -1515,12 +1515,14 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
               // We are looking for the first head so that we can declare the HTTP-headers charset early
               // Emit as soon as we see the first <head>, <meta>, or <body> tag.
               // FIXME: we currently emit the tag BEFORE the <head> tag, actually, which is not clean
-              if ((p = strfield(html, "<head>")) != 0
-                  || ((p = strfield(html, "<head")) != 0 && isspace(html[p]))
-                  || (p = strfield(html, "<body>")) != 0
-                  || ((p = strfield(html, "<body")) != 0 && isspace(html[p]))
-                  || ((p = strfield(html, "<meta")) != 0 && isspace(html[p]))
-                ) {
+              if ((p = strfield(html, "<head>")) != 0 ||
+                  ((p = strfield(html, "<head")) != 0 &&
+                   isspace((unsigned char) html[p])) ||
+                  (p = strfield(html, "<body>")) != 0 ||
+                  ((p = strfield(html, "<body")) != 0 &&
+                   isspace((unsigned char) html[p])) ||
+                  ((p = strfield(html, "<meta")) != 0 &&
+                   isspace((unsigned char) html[p]))) {
                 emited_footer++;
               } else {
                 p = 0;
