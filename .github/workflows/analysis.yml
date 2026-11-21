@@ -114,7 +114,6 @@ jobs:
         run: |
           set -euo pipefail
           autoreconf -fi
-          scan-build --version || true
           scan-build ./configure --disable-shared
           # Without the wrapper as CC, "No bugs found" would mean nothing was analyzed.
           grep -q '^CC = .*ccc-analyzer' src/Makefile
