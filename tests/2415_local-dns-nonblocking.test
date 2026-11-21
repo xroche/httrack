@@ -45,12 +45,13 @@ export ASAN_OPTIONS="${ASAN_OPTIONS:+$ASAN_OPTIONS:}verify_asan_link_order=0"
 export GAISTALL_HOST=stall.invalid
 
 # The resolve stalls 60s and --timeout allows 30, so only a crawl that goes on
-# around it can fetch the pages before --max-time.
+# around it can fetch the pages before --max-time. -%N1 lets links start ahead
+# of their turn, so several wait on DNS at once.
 out="$tmpdir/o1"
 rc=0
 TIMEFORMAT='%U %S'
 { time GAISTALL=60 LD_PRELOAD="$GAISTALL_LIB" \
-    local_crawl --log "$tmpdir/log1" "$base/index.html" "+stall.invalid*" -O "$out" -c8 --timeout=30 --max-time=8 --robots=0 --quiet 2>&3 || rc=$?; } 3>&2 2>"$tmpdir/cpu1"
+    local_crawl --log "$tmpdir/log1" "$base/index.html" "+stall.invalid*" -O "$out" -c8 -%N1 --timeout=30 --max-time=8 --robots=0 --quiet 2>&3 || rc=$?; } 3>&2 2>"$tmpdir/cpu1"
 for n in 1 2 3 4 5 6; do
     test -f "$out/127.0.0.1_${SRV_PORT}/p$n.html" ||
         fail_dump "p$n.html waited on the stalled resolve (rc=$rc)" "$out/hts-log.txt"
@@ -77,7 +78,7 @@ echo "<a href=\"http://localhost:${SRV_PORT}/p1.html\">1</a><a href=\"http://loc
 for run in 1 2 3 4 5; do
     out="$tmpdir/o3-$run"
     GAISTALL_HOST=localhost GAISTALL_MS=400 GAISTALL_LOG="$tmpdir/gai3-$run" LD_PRELOAD="$GAISTALL_LIB" \
-        local_crawl --log "$tmpdir/log3-$run" "$base/two.html" "+localhost*" -O "$out" -c8 --timeout=1 --retries=0 --robots=0 --quiet
+        local_crawl --log "$tmpdir/log3-$run" "$base/two.html" "+localhost*" -O "$out" -c8 -%N1 --timeout=1 --retries=0 --robots=0 --quiet
     for n in 1 2; do
         test -f "$out/localhost_${SRV_PORT}/p$n.html" ||
             fail_dump "run $run: localhost p$n.html missing" "$out/hts-log.txt"
@@ -88,7 +89,8 @@ for run in 1 2 3 4 5; do
 done
 
 # A resolved slot waits for --pause like a direct connect, so three links
-# parked on one resolve connect a second apart rather than at once.
+# parked on one resolve do not all connect when it answers: about 3.2s, or
+# 2.2s unpaced.
 links=""
 for n in 1 2 3; do
     links="$links<a href=\"http://localhost:${SRV_PORT}/p$n.html\">$n</a>"
@@ -97,11 +99,11 @@ echo "$links" >"$root/three.html"
 out="$tmpdir/o4"
 start=$(date +%s%N)
 GAISTALL_HOST=localhost GAISTALL=1 LD_PRELOAD="$GAISTALL_LIB" \
-    local_crawl --log "$tmpdir/log4" "$base/three.html" "+localhost*" -O "$out" -c8 --pause 1 --robots=0 --quiet
+    local_crawl --log "$tmpdir/log4" "$base/three.html" "+localhost*" -O "$out" -c8 -%N1 --pause 1 --robots=0 --quiet
 elapsed=$((($(date +%s%N) - start) / 1000000))
 for n in 1 2 3; do
     test -f "$out/localhost_${SRV_PORT}/p$n.html" ||
         fail_dump "paced localhost p$n.html missing" "$out/hts-log.txt"
 done
-test "$elapsed" -ge 3000 ||
-    fail_dump "three paced connects took ${elapsed}ms, under 3s" "$out/hts-log.txt"
+test "$elapsed" -ge 2700 ||
+    fail_dump "three paced connects took ${elapsed}ms, under 2.7s" "$out/hts-log.txt"

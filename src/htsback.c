@@ -3763,8 +3763,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
         FD_ZERO(&fds_c);
         FD_ZERO(&fds_e);
       }
-    } else if (dns_wait) { // nothing to select on, so do not spin
-      Sleep(HTS_DNS_POLL_MS);
     }
     // maximum data which can be received for a socket, if limited
     if (nsockets) {
