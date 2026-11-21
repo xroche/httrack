@@ -516,9 +516,11 @@ static int st_addfilter(httrackp *opt, int argc, char **argv) {
 /* hts_addurl() appends a deep copy to the pending list, and a NULL or empty
    list only asks if one is pending. */
 static int st_addurl(httrackp *opt, int argc, char **argv) {
-  static const char *const one[] = {"a.com/1", NULL};
-  static const char *const two[] = {"b.com/2", "c.com/3", NULL};
-  static const char *const none[] = {NULL};
+  /* hts_addurl() takes char **, so the fixtures are writable buffers */
+  static char a1[] = "a.com/1", b2[] = "b.com/2", c3[] = "c.com/3";
+  char *one[] = {a1, NULL};
+  char *two[] = {b2, c3, NULL};
+  char *none[] = {NULL};
 
   enum { LONG_N = 10000 };
 
@@ -534,13 +536,13 @@ static int st_addurl(httrackp *opt, int argc, char **argv) {
   } while (0)
 
   ADDURL_CHECK("idle", !hts_addurl(opt, NULL));
-  ADDURL_CHECK("empty list when idle", !hts_addurl(opt, (char **) none));
+  ADDURL_CHECK("empty list when idle", !hts_addurl(opt, none));
   ADDURL_CHECK("empty list queues nothing",
                !hts_addurl(opt, NULL) && hts_addurl_take(opt) == NULL);
-  ADDURL_CHECK("first", hts_addurl(opt, (char **) one));
+  ADDURL_CHECK("first", hts_addurl(opt, one));
   ADDURL_CHECK("pending", hts_addurl(opt, NULL));
-  ADDURL_CHECK("empty list when pending", hts_addurl(opt, (char **) none));
-  ADDURL_CHECK("second", hts_addurl(opt, (char **) two));
+  ADDURL_CHECK("empty list when pending", hts_addurl(opt, none));
+  ADDURL_CHECK("second", hts_addurl(opt, two));
   taken = hts_addurl_take(opt);
   ADDURL_CHECK("ordered, empty append kept the list",
                taken != NULL && taken[0] != NULL &&
@@ -576,7 +578,7 @@ static int st_addurl(httrackp *opt, int argc, char **argv) {
     assertf(big[i] != NULL);
   }
   ADDURL_CHECK("long list queued", hts_addurl(opt, big));
-  ADDURL_CHECK("append onto long list", hts_addurl(opt, (char **) one));
+  ADDURL_CHECK("append onto long list", hts_addurl(opt, one));
   hts_addurl_free(big);
   taken = hts_addurl_take(opt);
   for (n = 0; taken != NULL && taken[n] != NULL; n++)
@@ -587,7 +589,7 @@ static int st_addurl(httrackp *opt, int argc, char **argv) {
                    strcmp(taken[LONG_N], "a.com/1") == 0);
   hts_addurl_free(taken);
 
-  hts_addurl(opt, (char **) one);
+  hts_addurl(opt, one);
   hts_resetaddurl(opt);
   ADDURL_CHECK("reset", !hts_addurl(opt, NULL) && hts_addurl_take(opt) == NULL);
 #undef ADDURL_CHECK
