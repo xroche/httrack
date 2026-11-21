@@ -1,0 +1,27 @@
+#!/bin/bash
+#
+# hts_addurl() appends a deep copy, and a NULL or empty list only asks if one
+# is pending.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+assert_selftest 'idle: ok
+empty list when idle: ok
+empty list queues nothing: ok
+first: ok
+pending: ok
+empty list when pending: ok
+second: ok
+ordered, empty append kept the list: ok
+drained: ok
+copy queued: ok
+deep copy: ok
+long list queued: ok
+append onto long list: ok
+long list intact: ok
+reset: ok
+addurl self-test OK' addurl
+echo "PASS"

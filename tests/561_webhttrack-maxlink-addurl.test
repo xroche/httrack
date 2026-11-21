@@ -52,8 +52,7 @@ while test ! -f "${log}"; do
     poll_wait 0.2
 done
 
-# One URL per request, because hts_addurl() replaces the pending list rather
-# than appending to it. Each is drained before the next is installed.
+# One URL per request, each drained before the next is sent.
 added=0
 reported=0
 for i in $(seq 1 "${INJECT}"); do

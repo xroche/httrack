@@ -3740,31 +3740,50 @@ char **hts_addurl_take(httrackp *opt) {
    thread reads the list long after the call returns. */
 HTSEXT_API hts_boolean hts_addurl(httrackp *opt, char **url) {
   char **copy = NULL;
+  size_t n = 0, i;
+  hts_boolean ok;
 
   if (url != NULL) {
-    size_t n, i;
-
     for (n = 0; url[n] != NULL; n++)
       ;
+  }
+  /* An empty list adds nothing, like NULL. */
+  if (n != 0) {
     copy = (char **) calloct(n + 1, sizeof(char *));
     for (i = 0; copy != NULL && i < n; i++) {
       if ((copy[i] = strdupt(url[i])) == NULL) {
         hts_addurl_free(copy);
-        copy = NULL;
+        return HTS_FALSE;
       }
     }
+    if (copy == NULL)
+      return HTS_FALSE;
   }
+  /* One critical section, so two racing callers both land in the list. */
+  hts_mutexlock(&opt->state.lock);
   if (copy != NULL) {
-    char **old;
+    char **const old = opt->state._hts_addurl;
+    size_t n_old = 0;
+    char **list;
 
-    /* One critical section: two racing callers must not both read NULL and
-       then both install, which leaks the loser's list. */
-    hts_mutexlock(&opt->state.lock);
-    old = hts_addurl_swap_(opt, copy);
-    hts_mutexrelease(&opt->state.lock);
-    hts_addurl_free(old);
+    while (old != NULL && old[n_old] != NULL)
+      n_old++;
+    list = n <= SIZE_MAX / sizeof(char *) - 1 - n_old
+               ? (char **) realloct(old, (n_old + n + 1) * sizeof(char *))
+               : NULL;
+    if (list != NULL) {
+      memcpy(list + n_old, copy, (n + 1) * sizeof(char *));
+      opt->state._hts_addurl = list;
+      freet(copy); /* the strings now belong to list */
+    }
+    ok = list != NULL;
+  } else {
+    ok = opt->state._hts_addurl != NULL;
   }
-  return (copy != NULL);
+  hts_mutexrelease(&opt->state.lock);
+  if (!ok)
+    hts_addurl_free(copy);
+  return ok;
 }
 
 HTSEXT_API hts_boolean hts_resetaddurl(httrackp *opt) {
