@@ -2713,8 +2713,10 @@ static hts_boolean back_dns_defer(httrackp *opt, struct_back *sback,
 }
 
 /* Connect slot p once its resolve is answered and the connect pacing allows,
-   or fail it. */
-static void back_dns_poll(httrackp *opt, struct_back *sback, const int p) {
+   or fail it. *budget is the connects this pass may still open, -1 until the
+   pacing is asked, as back_fill() asks it once per call. */
+static void back_dns_poll(httrackp *opt, struct_back *sback, const int p,
+                          int *budget) {
   lien_back *const back = &sback->lnk[p];
   hts_connect_fallback *const cf = &sback->connect_fallback[p];
   const char *error = NULL;
@@ -2724,8 +2726,12 @@ static void back_dns_poll(httrackp *opt, struct_back *sback, const int p) {
 
   if (count > 0) {
     back_dns_drop(sback, p);
-    if (hts_connect_pace(opt, 1, !hts_load_acquire_int(&opt->state.stop)) == 0)
+    if (*budget < 0)
+      *budget = hts_connect_pace(opt, opt->maxsoc,
+                                 !hts_load_acquire_int(&opt->state.stop));
+    if (*budget == 0)
       return;
+    (*budget)--;
     if (back->timeout > 0) // the connect gets the full timeout
       back->timeout_refresh = time_local();
     back_open(opt, sback, p);
@@ -3606,6 +3612,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
   int busy_recv = 0;            // pas de données pour le moment   
   int busy_state = 0;           // pas de connexions
   int dns_wait = 0;             // a slot waits for its resolve
+  int dns_budget;               // see back_dns_poll()
   int max_loop;                 // nombre de boucles max à parcourir..
   int max_loop_chk = 0;
   const unsigned int mod_random =
@@ -3650,6 +3657,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
     busy_state = busy_recv = 0;
     dns_wait = 0;
+    dns_budget = -1;
 
     // inscrire les sockets actuelles, et rechercher l'ID la plus élevée
     FD_ZERO(&fds);
@@ -3663,7 +3671,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
     BACK_FOR_EACH_BUSY_FROM(sback, start, i) {
       // before st, so a socket it opens is selected in this pass
       if (back_status(&back[i]) == STATUS_WAIT_DNS)
-        back_dns_poll(opt, sback, i);
+        back_dns_poll(opt, sback, i, &dns_budget);
       // One status read serves every branch below.
       const int st = back_status(&back[i]);
 

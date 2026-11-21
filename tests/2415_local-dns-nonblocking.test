@@ -73,11 +73,11 @@ grep -q "host name resolution timed out" "$out/hts-log.txt" ||
 test -f "$out/127.0.0.1_${SRV_PORT}/p6.html" || fail_dump "p6.html missing" "$out/hts-log.txt"
 
 # Two links to one host share a single resolve, and the cache keeps its answer.
-# A 400ms resolve fits --timeout=1 however the second boundaries fall.
+# A 700ms resolve fits --timeout=1 however the second boundaries fall.
 echo "<a href=\"http://localhost:${SRV_PORT}/p1.html\">1</a><a href=\"http://localhost:${SRV_PORT}/p2.html\">2</a>" >"$root/two.html"
 for run in 1 2 3 4 5; do
     out="$tmpdir/o3-$run"
-    GAISTALL_HOST=localhost GAISTALL_MS=400 GAISTALL_LOG="$tmpdir/gai3-$run" LD_PRELOAD="$GAISTALL_LIB" \
+    GAISTALL_HOST=localhost GAISTALL_MS=700 GAISTALL_LOG="$tmpdir/gai3-$run" LD_PRELOAD="$GAISTALL_LIB" \
         local_crawl --log "$tmpdir/log3-$run" "$base/two.html" "+localhost*" -O "$out" -c8 -%N1 --timeout=1 --retries=0 --robots=0 --quiet
     for n in 1 2; do
         test -f "$out/localhost_${SRV_PORT}/p$n.html" ||
@@ -89,8 +89,8 @@ for run in 1 2 3 4 5; do
 done
 
 # A resolved slot waits for --pause like a direct connect, so three links
-# parked on one resolve do not all connect when it answers: about 3.2s, or
-# 2.2s unpaced.
+# parked on one resolve do not all connect when it answers: about 4.2s, or
+# 3.2s unpaced.
 links=""
 for n in 1 2 3; do
     links="$links<a href=\"http://localhost:${SRV_PORT}/p$n.html\">$n</a>"
@@ -105,5 +105,5 @@ for n in 1 2 3; do
     test -f "$out/localhost_${SRV_PORT}/p$n.html" ||
         fail_dump "paced localhost p$n.html missing" "$out/hts-log.txt"
 done
-test "$elapsed" -ge 2700 ||
-    fail_dump "three paced connects took ${elapsed}ms, under 2.7s" "$out/hts-log.txt"
+test "$elapsed" -ge 3700 ||
+    fail_dump "three paced connects took ${elapsed}ms, under 3.7s" "$out/hts-log.txt"
