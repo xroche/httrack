@@ -513,37 +513,86 @@ static int st_addfilter(httrackp *opt, int argc, char **argv) {
   return failed;
 }
 
-/* hts_addurl() appends to the pending list, and a NULL list asks if one is
-   pending. */
+/* hts_addurl() appends a deep copy to the pending list, and a NULL or empty
+   list only asks if one is pending. */
 static int st_addurl(httrackp *opt, int argc, char **argv) {
   static const char *const one[] = {"a.com/1", NULL};
   static const char *const two[] = {"b.com/2", "c.com/3", NULL};
-  char **taken;
-  hts_boolean idle, first, pending, second, ordered, drained, reset;
+  static const char *const none[] = {NULL};
 
-  idle = !hts_addurl(opt, NULL);
-  first = hts_addurl(opt, (char **) one);
-  pending = hts_addurl(opt, NULL);
-  second = hts_addurl(opt, (char **) two);
+  enum { LONG_N = 10000 };
+
+  char **taken, **big, *mut;
+  int failed = 0;
+  size_t i, n;
+
+#define ADDURL_CHECK(name, cond)                                               \
+  do {                                                                         \
+    const hts_boolean ok_ = (cond);                                            \
+    printf("%s: %s\n", name, ok_ ? "ok" : "FAILED");                           \
+    failed |= !ok_;                                                            \
+  } while (0)
+
+  ADDURL_CHECK("idle", !hts_addurl(opt, NULL));
+  ADDURL_CHECK("empty list when idle", !hts_addurl(opt, (char **) none));
+  ADDURL_CHECK("empty list queues nothing",
+               !hts_addurl(opt, NULL) && hts_addurl_take(opt) == NULL);
+  ADDURL_CHECK("first", hts_addurl(opt, (char **) one));
+  ADDURL_CHECK("pending", hts_addurl(opt, NULL));
+  ADDURL_CHECK("empty list when pending", hts_addurl(opt, (char **) none));
+  ADDURL_CHECK("second", hts_addurl(opt, (char **) two));
   taken = hts_addurl_take(opt);
-  ordered = taken != NULL && taken[0] != NULL &&
-            strcmp(taken[0], "a.com/1") == 0 && taken[1] != NULL &&
-            strcmp(taken[1], "b.com/2") == 0 && taken[2] != NULL &&
-            strcmp(taken[2], "c.com/3") == 0 && taken[3] == NULL;
+  ADDURL_CHECK("ordered, empty append kept the list",
+               taken != NULL && taken[0] != NULL &&
+                   strcmp(taken[0], "a.com/1") == 0 && taken[1] != NULL &&
+                   strcmp(taken[1], "b.com/2") == 0 && taken[2] != NULL &&
+                   strcmp(taken[2], "c.com/3") == 0 && taken[3] == NULL);
   hts_addurl_free(taken);
-  drained = !hts_addurl(opt, NULL);
+  ADDURL_CHECK("drained", !hts_addurl(opt, NULL));
+
+  /* the caller's strings are free to change once the call returns */
+  big = (char **) calloct(2, sizeof(char *));
+  assertf(big != NULL);
+  big[0] = strdupt("keep.com/x");
+  assertf(big[0] != NULL);
+  mut = big[0];
+  ADDURL_CHECK("copy queued", hts_addurl(opt, big));
+  memset(mut, 'Z', strlen(mut));
+  freet(big[0]);
+  freet(big);
+  taken = hts_addurl_take(opt);
+  ADDURL_CHECK("deep copy", taken != NULL && taken[0] != NULL &&
+                                strcmp(taken[0], "keep.com/x") == 0 &&
+                                taken[1] == NULL);
+  hts_addurl_free(taken);
+
+  big = (char **) calloct(LONG_N + 1, sizeof(char *));
+  assertf(big != NULL);
+  for (i = 0; i < LONG_N; i++) {
+    char buf[32];
+
+    snprintf(buf, sizeof(buf), "h.com/%d", (int) i);
+    big[i] = strdupt(buf);
+    assertf(big[i] != NULL);
+  }
+  ADDURL_CHECK("long list queued", hts_addurl(opt, big));
+  ADDURL_CHECK("append onto long list", hts_addurl(opt, (char **) one));
+  hts_addurl_free(big);
+  taken = hts_addurl_take(opt);
+  for (n = 0; taken != NULL && taken[n] != NULL; n++)
+    ;
+  ADDURL_CHECK("long list intact",
+               n == LONG_N + 1 && strcmp(taken[0], "h.com/0") == 0 &&
+                   strcmp(taken[LONG_N - 1], "h.com/9999") == 0 &&
+                   strcmp(taken[LONG_N], "a.com/1") == 0);
+  hts_addurl_free(taken);
+
   hts_addurl(opt, (char **) one);
   hts_resetaddurl(opt);
-  reset = !hts_addurl(opt, NULL) && hts_addurl_take(opt) == NULL;
-  printf("idle=%d first=%d pending=%d second=%d ordered=%d drained=%d "
-         "reset=%d\n",
-         idle, first, pending, second, ordered, drained, reset);
-  if (idle && first && pending && second && ordered && drained && reset) {
-    printf("addurl self-test OK\n");
-    return 0;
-  }
-  printf("addurl self-test FAILED\n");
-  return 1;
+  ADDURL_CHECK("reset", !hts_addurl(opt, NULL) && hts_addurl_take(opt) == NULL);
+#undef ADDURL_CHECK
+  printf("addurl self-test %s\n", failed ? "FAILED" : "OK");
+  return failed;
 }
 
 /* filters_remove() closes the gap it leaves, and removing nothing keeps all. */

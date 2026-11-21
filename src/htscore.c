@@ -3737,6 +3737,9 @@ HTSEXT_API hts_boolean hts_addurl(httrackp *opt, char **url) {
   if (url != NULL) {
     for (n = 0; url[n] != NULL; n++)
       ;
+  }
+  /* An empty list adds nothing, like NULL. */
+  if (n != 0) {
     copy = (char **) calloct(n + 1, sizeof(char *));
     for (i = 0; copy != NULL && i < n; i++) {
       if ((copy[i] = strdupt(url[i])) == NULL) {
@@ -3756,7 +3759,9 @@ HTSEXT_API hts_boolean hts_addurl(httrackp *opt, char **url) {
 
     while (old != NULL && old[n_old] != NULL)
       n_old++;
-    list = (char **) realloct(old, (n_old + n + 1) * sizeof(char *));
+    list = n <= SIZE_MAX / sizeof(char *) - 1 - n_old
+               ? (char **) realloct(old, (n_old + n + 1) * sizeof(char *))
+               : NULL;
     if (list != NULL) {
       memcpy(list + n_old, copy, (n + 1) * sizeof(char *));
       opt->state._hts_addurl = list;
