@@ -3954,7 +3954,7 @@ HTSEXT_API int copy_htsopt(const httrackp * from, httrackp * to) {
   if (from->parseall > -1)
     to->parseall = from->parseall;
 
-  /* delete_old is left alone: shipped front ends send it inverted. */
+  /* delete_old is left alone, because shipped front ends send it inverted. */
 
   if (from->external > -1)
     to->external = from->external;

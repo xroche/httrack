@@ -303,7 +303,7 @@ static int st_copyopt(httrackp *opt, int argc, char **argv) {
                       strcmp(StringBuff(to->lang_iso),
                              HTS_ACCEPT_LANGUAGE_LEGACY) != 0);
 
-  /* Options read at crawl start never travel, in either direction. */
+  /* No front end sets these, and a mid-crawl change gives a partial result. */
   from->changes = from->single_file = HTS_TRUE;
   from->warc_cdx = from->warc_wacz = HTS_TRUE;
   from->single_file_max_size = 4096;
@@ -327,6 +327,10 @@ static int st_copyopt(httrackp *opt, int argc, char **argv) {
   ST_FAIL_IF(err, !to->changes || !to->single_file || !to->warc_cdx ||
                       !to->warc_wacz || to->single_file_max_size != 8192 ||
                       to->warc_max_size != 9999);
+  /* Agreeing values stay put, which an inverted copy would break. */
+  from->changes = from->single_file = from->warc_cdx = HTS_TRUE;
+  copy_htsopt(from, to);
+  ST_FAIL_IF(err, !to->changes || !to->single_file || !to->warc_cdx);
 
   /* delete_old never travels, whatever the source holds. */
   from->delete_old = HTS_TRUE;
@@ -335,6 +339,9 @@ static int st_copyopt(httrackp *opt, int argc, char **argv) {
   ST_FAIL_IF(err, to->delete_old != HTS_FALSE);
   from->delete_old = HTS_FALSE;
   to->delete_old = HTS_TRUE;
+  copy_htsopt(from, to);
+  ST_FAIL_IF(err, to->delete_old != HTS_TRUE);
+  from->delete_old = HTS_TRUE;
   copy_htsopt(from, to);
   ST_FAIL_IF(err, to->delete_old != HTS_TRUE);
 
@@ -397,9 +404,6 @@ static int st_copyopt(httrackp *opt, int argc, char **argv) {
   from->max_retry_after = -1;
   copy_htsopt(from, to);
   ST_FAIL_IF(err, to->max_retry_after != 0);
-  from->max_retry_after = 30;
-  copy_htsopt(from, to);
-  ST_FAIL_IF(err, to->max_retry_after != 30);
   from->max_retry_after = 7;
   copy_htsopt(from, to);
   ST_FAIL_IF(err, to->max_retry_after != 7);
