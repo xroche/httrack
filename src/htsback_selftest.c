@@ -440,6 +440,7 @@ static int st_backswap(httrackp *opt, int argc, char **argv) {
         (whole_len = ftell(fp)) <= 0 || fseek(fp, 0, SEEK_SET) != 0) {
       fprintf(stderr, "backswap: could not serialize a slot with headers\n");
       err = 1;
+      whole_len = 0;
     } else {
       whole = malloct((size_t) whole_len);
       if (whole == NULL ||

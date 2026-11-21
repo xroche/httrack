@@ -1803,6 +1803,10 @@ static int secrets_full(void) {
 
   if (o == NULL || fp == NULL) {
     fprintf(stderr, "secrets: out of memory\n");
+    if (fp != NULL)
+      fclose(fp);
+    if (o != NULL)
+      hts_free_opt(o);
     return 1;
   }
   o->log = fp;
@@ -1840,6 +1844,10 @@ static int st_secrets(httrackp *opt, int argc, char **argv) {
 
   if (o == NULL || fp == NULL) {
     fprintf(stderr, "secrets: out of memory\n");
+    if (fp != NULL)
+      fclose(fp);
+    if (o != NULL)
+      hts_free_opt(o);
     return 1;
   }
   o->log = fp;
@@ -2696,6 +2704,9 @@ static int st_strsprintf(httrackp *opt, int argc, char **argv) {
 
   if (expected == NULL || head == NULL || tail == NULL) {
     printf("strsprintf self-test: FAIL (out of memory)\n");
+    freet(expected);
+    freet(head);
+    freet(tail);
     return 1;
   }
   for (i = 0; i < maxLen; i++)
@@ -3948,9 +3959,11 @@ static int cid_unescape(const char *cid, char *dest, const size_t size) {
   return 1;
 }
 
-/* A plug-in hook that forwards to prev without checking it. */
+/* A plug-in hook that forwards to prev, which the defaults always fill. */
 static int chain_hits = 0;
-#define CHAIN_PREV(NAME) (chain_hits++, CALLBACKARG_PREV_FUN(carg, NAME))
+#define CHAIN_PREV(NAME)                                                       \
+  (chain_hits++, assertf(CALLBACKARG_PREV_FUN(carg, NAME) != NULL),            \
+   CALLBACKARG_PREV_FUN(carg, NAME))
 #define CHAIN_PCARG CALLBACKARG_PREV_CARG(carg)
 
 static void __cdecl cp_init(t_hts_callbackarg *carg) {

@@ -511,6 +511,7 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
 
     if (sep == NULL) {
       fprintf(stderr, "savename: cached needs ctype|save\n");
+      freet(dup);
       return 1;
     }
     *sep = '\0';

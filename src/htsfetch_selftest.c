@@ -115,8 +115,10 @@ static int st_fetchscale(httrackp *opt, int argc, char **argv) {
   hts_boolean found;
   size_t i;
 
-  if (argc != 0 || page == NULL)
+  if (argc != 0 || page == NULL) {
+    freet(page);
     return 1;
+  }
   for (i = 0; i < count; i++)
     memcpy(page + i * (sizeof(base) - 1), base, sizeof(base) - 1);
   page[count * (sizeof(base) - 1)] = '\0';
