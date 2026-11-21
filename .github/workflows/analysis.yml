@@ -1,6 +1,4 @@
-# Two analyses no PR waits on: a bounds-trapping build of the suite and the
-# clang static analyzer. tier2.yml runs them weekly, and a dispatch aims them
-# at a branch.
+# A bounds-checked test suite and the clang static analyzer, run weekly by tier2.yml.
 name: Analysis
 
 on:
@@ -8,29 +6,22 @@ on:
   workflow_call:
   workflow_dispatch:
 
-# Least privilege: the workflow only needs to read the repo.
 permissions:
   contents: read
 
-concurrency:
-  group: analysis-${{ github.ref }}
-  cancel-in-progress: true
-
-# ci.yml and tier2.yml carry the same number for the legs they run themselves.
 # A reusable workflow inherits no env from its caller.
 env:
   CHECK_JOBS: 16
 
 jobs:
-  # An overflow inside one struct is invisible to ASan and to FORTIFY, and a
-  # bounds check that traps turns it into a crash. No runtime library is linked,
-  # so a trap here is a real out-of-bounds index, never noise.
+  # ASan and FORTIFY cannot see an overflow inside a struct, and any report here is a real bug.
   bounds-strict:
-    name: build (gcc -fsanitize=bounds-strict, trapping)
+    name: build (gcc -fsanitize=bounds-strict)
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     env:
-      BOUNDS_CFLAGS: -O2 -g -fsanitize=bounds-strict -fsanitize-trap=bounds-strict
+      BOUNDS_CFLAGS: -O2 -g -fsanitize=bounds-strict -fno-sanitize-recover=bounds-strict
+      BOUNDS_LDFLAGS: -fsanitize=bounds-strict
     steps:
       - uses: actions/checkout@v7
         with:
@@ -44,9 +35,8 @@ jobs:
             build-essential autoconf automake libtool autoconf-archive \
             zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
 
-      # A compiler that dropped the check would leave the suite green for
-      # nothing, so an index one past the end must trap first.
-      - name: Prove the flags trap an in-struct overflow
+      # The report file, not the exit status, proves the detector fires.
+      - name: Prove an in-struct overflow is reported
         run: |
           set -euo pipefail
           cat >"$RUNNER_TEMP/probe.c" <<'EOF'
@@ -58,39 +48,42 @@ jobs:
             return v.next == 0;
           }
           EOF
-          # shellcheck disable=SC2086 # a flag list, and the splitting is the point
-          gcc $BOUNDS_CFLAGS -o "$RUNNER_TEMP/probe" "$RUNNER_TEMP/probe.c"
-          st=0
-          "$RUNNER_TEMP/probe" || st=$?
-          if test "$st" -le 128 || test "$(kill -l "$st")" != ILL; then
-            echo "::error::the probe exited $st instead of trapping"
-            exit 1
-          fi
+          # shellcheck disable=SC2086 # flag lists, and the splitting is the point
+          gcc $BOUNDS_CFLAGS $BOUNDS_LDFLAGS -o "$RUNNER_TEMP/probe" "$RUNNER_TEMP/probe.c"
+          mkdir -p "$RUNNER_TEMP/probe-logs"
+          UBSAN_OPTIONS="halt_on_error=1:log_path=$RUNNER_TEMP/probe-logs/u" "$RUNNER_TEMP/probe" || true
+          grep -q 'out of bounds' "$RUNNER_TEMP"/probe-logs/u.* ||
+            { echo "::error::the probe overflow went unreported"; exit 1; }
 
       - name: Configure
         run: |
           set -euo pipefail
           autoreconf -fi
-          ./configure CC=gcc CFLAGS="$BOUNDS_CFLAGS"
-          grep -q -- '-fsanitize-trap=bounds-strict' src/Makefile
+          ./configure CC=gcc CFLAGS="$BOUNDS_CFLAGS" LDFLAGS="$BOUNDS_LDFLAGS"
+          grep -q -- '-fno-sanitize-recover=bounds-strict' src/Makefile
 
       - name: Build
         run: make -j"$(nproc)"
 
+      # An absolute log_path, because tests chdir.
       - name: Test
         timeout-minutes: 25
         run: |
           set -euo pipefail
-          make check -j"$CHECK_JOBS"
+          mkdir -p "$RUNNER_TEMP/ubsan"
+          UBSAN_OPTIONS="halt_on_error=1:print_stacktrace=1:log_path=$RUNNER_TEMP/ubsan/u" \
+            make check -j"$CHECK_JOBS"
 
-      # A test that tolerates a failing httrack would still pass through a
-      # trap, but bash names the signal in the test's log.
-      - name: Look for a trap a passing test absorbed
+      # A test that tolerates a failing httrack would hide the report from make check.
+      - name: Fail on any bounds report
         if: always()
         run: |
           set -euo pipefail
-          if grep -l 'Illegal instruction' tests/*.log; then
-            echo "::error::a test binary trapped on an out-of-bounds index"
+          shopt -s nullglob
+          reports=("$RUNNER_TEMP"/ubsan/u.*)
+          if test "${#reports[@]}" -gt 0; then
+            cat "${reports[@]}"
+            echo "::error::${#reports[@]} process(es) indexed out of bounds"
             exit 1
           fi
 
@@ -98,8 +91,7 @@ jobs:
         if: failure()
         run: sh tools/ci-test-log.sh
 
-  # The analyzer still reports a handful of false positives, so findings do not
-  # fail the job. The report is the artifact to read.
+  # About 80 findings on CI, nearly all false positives, so findings do not fail the job.
   scan-build:
     name: clang static analyzer (scan-build)
     runs-on: ubuntu-24.04
@@ -117,14 +109,15 @@ jobs:
             build-essential autoconf automake libtool autoconf-archive \
             zlib1g-dev libssl-dev libbrotli-dev libzstd-dev clang-tools
 
-      # --disable-shared, because libtool otherwise compiles and analyzes
-      # every file twice.
+      # --disable-shared stops libtool from analyzing every file twice.
       - name: Configure
         run: |
           set -euo pipefail
           autoreconf -fi
           scan-build --version || true
           scan-build ./configure --disable-shared
+          # Without the wrapper as CC, "No bugs found" would mean nothing was analyzed.
+          grep -q '^CC = .*ccc-analyzer' src/Makefile
 
       # coucal is a submodule with its own upstream.
       - name: Analyze
