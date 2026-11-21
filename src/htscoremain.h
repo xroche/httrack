@@ -57,7 +57,6 @@ int check_path(String * s, char *defaultname);
 
 /* Absolute path of the running executable, or NULL where the OS will not say
    and argv[0] is the only clue left. Fills dst (dstsize bytes). */
-/* No HTS_ARG_ACCESS_WO: GCC 14 then drops the readlink() truncation test. */
 const char *hts_self_path(char *dst, size_t dstsize);
 
 /* Write the data directory holding the HTML templates into dst (dstsize bytes,

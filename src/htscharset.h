@@ -66,7 +66,6 @@ extern char *hts_convertStringFromUTF8Strict(const char *s, size_t size,
 /**
  * Convert an UTF-8 string to an IDNA (RFC 3492) string.
  **/
-HTS_ARG_ACCESS_RO(1, 2)
 extern char *hts_convertStringUTF8ToIDNA(const char *s, size_t size);
 
 /**
@@ -79,32 +78,29 @@ extern hts_boolean hts_host_to_ascii(char *dst, size_t size, const char *host,
 /**
  * Convert an IDNA (RFC 3492) string to an UTF-8 string.
  **/
-HTS_ARG_ACCESS_RO(1, 2)
 extern char *hts_convertStringIDNAToUTF8(const char *s, size_t size);
 
 /**
  * Has the given string any IDNA segments ?
  **/
-HTS_ARG_ACCESS_RO(1, 2) extern int hts_isStringIDNA(const char *s, size_t size);
+extern int hts_isStringIDNA(const char *s, size_t size);
 
 /**
  * Extract the <meta> charset from the HTML buffer "html" (HTML5 charset= or
  * legacy http-equiv form). Returns a malloc'ed string, or NULL if none.
  **/
-HTS_ARG_ACCESS_RO(1, 2)
 extern char *hts_getCharsetFromMeta(const char *html, size_t size);
 
 /**
  * Is the given string an ASCII string ?
  **/
-HTS_ARG_ACCESS_RO(1, 2)
 extern int hts_isStringAscii(const char *s, size_t size);
 
 /**
  * Is the given string valid UTF-8 ? Strict RFC 3629: overlong forms,
  * surrogates, codepoints above U+10FFFF and 5/6-byte sequences are rejected.
  **/
-HTS_ARG_ACCESS_RO(1, 2) extern int hts_isStringUTF8(const char *s, size_t size);
+extern int hts_isStringUTF8(const char *s, size_t size);
 
 /**
  * Is the given charset the UTF-8 charset ?

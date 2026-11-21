@@ -111,7 +111,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre);
 
 /* Strip a default ":80" (any spelling) from an absolute link's authority, in
    place into a buffer of the given size. */
-HTS_ARG_ACCESS_RW(1, 2) void hts_strip_default_port(char *lien, size_t size);
+void hts_strip_default_port(char *lien, size_t size);
 
 /* Self-test hook: 's' through each parser output writer, joined by '|', for a
    page saved as HTML or not and the given script state. The caller freet()s. */

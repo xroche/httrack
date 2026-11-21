@@ -133,7 +133,6 @@ uint64_t warc_stream_offset(FILE *f, uint64_t current);
 /* Render the CDXJ length/offset pair into out[outsz]; returns its length, or
    -1 if it did not fit. Exposed for the -#test=warc-offset test, which pins
    the emitted text past 4GB. */
-HTS_ARG_ACCESS_WO(1, 2)
 int warc_cdx_extent(char *out, size_t outsz, uint64_t length, uint64_t offset);
 
 /* unchanged_kind for warc_write_transaction. */

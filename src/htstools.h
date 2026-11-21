@@ -62,7 +62,6 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
 const char *hts_memstr(const char *hay, size_t haylen, const char *needle,
                        size_t nlen);
 
-HTS_ARG_ACCESS_WO(1, 2)
 int lienrelatif(char *s, size_t ssize, const char *link, const char *curr);
 int link_has_authority(const char *lien);
 /* Does a base href with no authority name a host rather than the relative
@@ -121,7 +120,6 @@ const char *hts_footer_field_list(char *buffer, size_t size);
 // literal brace, an unknown "{...}" is left verbatim). A NULL slot expands
 // empty. Values must already be escaped for the target context by the caller.
 // Returns <0 on overflow.
-HTS_ARG_ACCESS_WO(1, 2)
 int hts_footer_format(char *buffer, size_t size, const char *footer,
                       const char *const values[HTS_FOOTER_FIELD_COUNT]);
 

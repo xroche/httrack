@@ -515,7 +515,7 @@ int ishttperror(int err);
    value, which "--assume cgi=" leaves empty. */
 hts_boolean get_userhttptype(httrackp *opt, char *s, size_t ssize,
                              const char *fil);
-HTS_ARG_ACCESS_WO(1, 2) int give_mimext(char *s, size_t ssize, const char *st);
+int give_mimext(char *s, size_t ssize, const char *st);
 
 int may_bogus_multiple(httrackp * opt, const char *mime, const char *filename);
 int may_unknown2(httrackp * opt, const char *mime, const char *filename);
@@ -531,7 +531,6 @@ const char *jump_protocol_const(const char *source);
 void hts_parse_proxy(const char *arg, char *name, size_t name_size, int *port);
 void code64(unsigned char *a, int size_a, unsigned char *b, int crlf);
 
-HTS_ARG_ACCESS_WO(1, 2)
 char *convtolower(char *catbuff, size_t catbuffsize, const char *a);
 void hts_lowcase(char *s);
 int multipleStringMatch(const char *s, const char *match);
@@ -619,12 +618,10 @@ char *hts_mask_passwords(const char *s, hts_mask_mode mode);
 
 /* Returns adr with its login masked as user:*** or ***, for log lines: adr
    itself when it has no login, else a copy clipped to size bytes in buf. */
-HTS_ARG_ACCESS_WO(1, 2)
 const char *adr_nologin_r(char *buf, size_t size, const char *adr);
 
 /* Same as adr_nologin_r(), but only a URL with a scheme or "//" has a login.
    Any "scheme://" counts, not only the ones the engine fetches. */
-HTS_ARG_ACCESS_WO(1, 2)
 const char *url_nologin_r(char *buf, size_t size, const char *url);
 
 /* adr_nologin_r() and url_nologin_r() into a rotating buffer of opt, which

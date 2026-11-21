@@ -434,28 +434,6 @@ typedef int hts_tristate;
 #define HTS_FALLTHROUGH
 #endif
 
-/* Says the function only reads (RO), only writes (WO) or both reads and writes
-   (RW) the buffer at argument @p ptr, which holds argument @p size bytes, so
-   GCC checks the callers. It goes before the declaration. A WO buffer is never
-   read before it is written. Under _FORTIFY_SOURCE=3 the size also bounds the
-   callee, so a caller must never over-state it. It can also change the
-   callee's code, so test each new use. */
-#if defined(__has_attribute)
-#if __has_attribute(access)
-#define HTS_ARG_ACCESS_RO(ptr, size)                                           \
-  __attribute__((access(read_only, ptr, size)))
-#define HTS_ARG_ACCESS_WO(ptr, size)                                           \
-  __attribute__((access(write_only, ptr, size)))
-#define HTS_ARG_ACCESS_RW(ptr, size)                                           \
-  __attribute__((access(read_write, ptr, size)))
-#endif
-#endif
-#ifndef HTS_ARG_ACCESS_RO
-#define HTS_ARG_ACCESS_RO(ptr, size)
-#define HTS_ARG_ACCESS_WO(ptr, size)
-#define HTS_ARG_ACCESS_RW(ptr, size)
-#endif
-
 /* Byte counts, file sizes and offsets, exactly 64 bits and signed. -1 means
    "unknown" or "no limit" in the fields and returns that accept it. */
 typedef int64_t LLint;
