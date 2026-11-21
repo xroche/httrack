@@ -3727,7 +3727,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
         if (cf->addr_count < 0 && back[i].r.soc != INVALID_SOCKET &&
             !back[i].r.is_file && !back[i].r.req.proxy.active) {
           SOCaddr scratch[HTS_MAXADDRNUM];
-
           int first;
 
           cf->addr_count = hts_dns_resolve_all(opt, back[i].url_adr, scratch,
@@ -3735,8 +3734,11 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
           // the first connect took the preferred address, so count from it
           first =
               hts_dns_addr_index(scratch, cf->addr_count, &back[i].r.address);
-          if (first >= 0)
-            cf->addr_first = first;
+          // record replaced since the connect: newhttp_addr() took the
+          // preferred
+          if (first < 0)
+            first = hts_dns_preferred(opt, back[i].url_adr);
+          cf->addr_first = first < cf->addr_count ? first : 0;
         }
 
         // vérifier l'existance de timeout-check
