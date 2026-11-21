@@ -112,8 +112,8 @@ hts_boolean ftp_split_userpass(const char *src, const char *end, char *user,
    bare one would give the server a second token; it must already have been
    screened for control bytes. Returns HTS_FALSE and empties line when the
    command does not fit, as a clipped one would name a different file. */
-hts_boolean ftp_command(char *line, size_t line_size, const char *verb,
-                        const char *path);
+HTS_NODISCARD hts_boolean ftp_command(char *line, size_t line_size,
+                                      const char *verb, const char *path);
 /* ftp_command() into a control line of the one capacity every FTP buffer has;
    anything narrower fails the build rather than refusing a path that fits. */
 #define ftp_command_line(line, verb, path)                                     \

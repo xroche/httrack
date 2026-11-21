@@ -138,8 +138,10 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     rec = cookie_find_exact(jar.data, lines[0], dom, path);
     cookie_sink += (rec != NULL) ? (unsigned long) strlen(rec) : 0;
     (void) cookie_domain_match(dom, nlines > 2 ? lines[2] : "www.fuzz.example");
-    (void) cookie_domain_allowed(dom,
-                                 nlines > 2 ? lines[2] : "www.fuzz.example");
+    cookie_sink +=
+        cookie_domain_allowed(dom, nlines > 2 ? lines[2] : "www.fuzz.example")
+            ? 1
+            : 0;
     break;
   }
   case 2: { /* jar file load, save and reload */
@@ -243,8 +245,9 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     char field[8192];
     int i;
 
-    (void) cookie_url_host(nlines > 0 ? lines[0] : "https://[IPv6:::1]:80/",
-                           host, sizeof(host));
+    if (!cookie_url_host(nlines > 0 ? lines[0] : "https://[IPv6:::1]:80/", host,
+                         sizeof(host)))
+      host[0] = '\0'; // a refused URL leaves host unwritten
     cookie_sink += (unsigned long) strlen(host);
     for (i = 0; i < 8; i++) {
       (void) cookie_get(field, jar.data, i);

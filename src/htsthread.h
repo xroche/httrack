@@ -146,8 +146,8 @@ static HTS_INLINE HTS_UNUSED htsmutex hts_load_acquire_mutex(htsmutex *src) {
    fault returns without running the rest of the body, so cleanup the engine
    needs goes here. Not exported, because no caller outside the library spawns a
    worker. */
-HTS_CHECK_RESULT int hts_newthread_tail(void (*fun)(void *arg), void *arg,
-                                        void (*tail)(void *arg));
+HTS_NODISCARD int hts_newthread_tail(void (*fun)(void *arg), void *arg,
+                                     void (*tail)(void *arg));
 
 /* HTS_TRUE where a thread runner recovered from a fault, so a worker stopped
    halfway through its body. Read on the crawl thread, which turns it into a

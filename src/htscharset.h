@@ -51,8 +51,8 @@ typedef unsigned int hts_UCS4;
  * Convert the string "s" from UTF-8 to charset "charset".
  * Return NULL upon error.
  **/
-extern char *hts_convertStringFromUTF8(const char *s, size_t size,
-                                       const char *charset);
+HTS_NODISCARD extern char *hts_convertStringFromUTF8(const char *s, size_t size,
+                                                     const char *charset);
 
 /**
  * Same, but refusing to lose a code point the charset can not represent:
@@ -60,25 +60,28 @@ extern char *hts_convertStringFromUTF8(const char *s, size_t size,
  * substituted string (Windows substitutes, iconv fails).
  * Return NULL upon error.
  **/
-extern char *hts_convertStringFromUTF8Strict(const char *s, size_t size,
-                                             const char *charset);
+HTS_NODISCARD extern char *hts_convertStringFromUTF8Strict(const char *s,
+                                                           size_t size,
+                                                           const char *charset);
 
 /**
  * Convert an UTF-8 string to an IDNA (RFC 3492) string.
  **/
-extern char *hts_convertStringUTF8ToIDNA(const char *s, size_t size);
+HTS_NODISCARD extern char *hts_convertStringUTF8ToIDNA(const char *s,
+                                                       size_t size);
 
 /**
  * Write the ASCII (IDNA) form of the len-byte host into dst, of size bytes;
  * dst may be host. HTS_FALSE, dst untouched, if it has none or does not fit.
  **/
-extern hts_boolean hts_host_to_ascii(char *dst, size_t size, const char *host,
-                                     size_t len);
+HTS_NODISCARD extern hts_boolean
+hts_host_to_ascii(char *dst, size_t size, const char *host, size_t len);
 
 /**
  * Convert an IDNA (RFC 3492) string to an UTF-8 string.
  **/
-extern char *hts_convertStringIDNAToUTF8(const char *s, size_t size);
+HTS_NODISCARD extern char *hts_convertStringIDNAToUTF8(const char *s,
+                                                       size_t size);
 
 /**
  * Has the given string any IDNA segments ?
@@ -89,7 +92,8 @@ extern int hts_isStringIDNA(const char *s, size_t size);
  * Extract the <meta> charset from the HTML buffer "html" (HTML5 charset= or
  * legacy http-equiv form). Returns a malloc'ed string, or NULL if none.
  **/
-extern char *hts_getCharsetFromMeta(const char *html, size_t size);
+HTS_NODISCARD extern char *hts_getCharsetFromMeta(const char *html,
+                                                  size_t size);
 
 /**
  * Is the given string an ASCII string ?
@@ -138,7 +142,8 @@ extern hts_UCS4* hts_convertUTF8StringToUCS4(const char *s, size_t size,
 /**
  * Convert an Unicode string into an UTF-8 string.
  **/
-extern char *hts_convertUCS4StringToUTF8(const hts_UCS4 *s, size_t nChars);
+HTS_NODISCARD extern char *hts_convertUCS4StringToUTF8(const hts_UCS4 *s,
+                                                       size_t nChars);
 
 /**
  * Write the Unicode character 'uc' in 'dest' of maximum size 'size'.

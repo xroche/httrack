@@ -1019,8 +1019,8 @@ HTSEXT_API void hts_mutexrelease(htsmutex *mutex);
 
 /** Convert 's' from 'charset' to UTF-8. Caller frees; NULL upon error, an
     allocation failure included. */
-HTSEXT_API char *hts_convertStringToUTF8(const char *s, size_t size,
-                                         const char *charset);
+HTS_NODISCARD HTSEXT_API char *
+hts_convertStringToUTF8(const char *s, size_t size, const char *charset);
 
 #ifdef _WIN32
 /** Convert the current system codepage to UTF-8. Caller frees; NULL upon

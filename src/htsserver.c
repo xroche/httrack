@@ -3051,8 +3051,8 @@ static void lang_load_catalog(FILE *fp, hts_boolean fallback,
 /* Format "lang/<hashname>.txt" into dst, where hashname is the catalog name
    lang.def gave this language. Refuses an empty name, one carrying a separator
    or "..", and one too long for dst. */
-static HTS_CHECK_RESULT hts_boolean lang_catalog_path(char *dst, size_t size,
-                                                      const char *hashname) {
+static HTS_NODISCARD hts_boolean lang_catalog_path(char *dst, size_t size,
+                                                   const char *hashname) {
   if (!strnotempty(hashname) || strpbrk(hashname, "/\\") != NULL ||
       strstr(hashname, "..") != NULL) {
     return HTS_FALSE;

@@ -97,7 +97,7 @@ typedef struct lien_adrfilsave lien_adrfilsave;
    engine send a local file back to whoever chose the value, so every place
    that fills a location has to refuse it, the cache and a resume ref
    included. */
-hts_boolean hts_location_is_safe(const char *location);
+HTS_NODISCARD hts_boolean hts_location_is_safe(const char *location);
 
 #include "htsopt.h"
 
@@ -366,7 +366,8 @@ int hts_basic_auth_value(httrackp *opt, const char *url, char *out,
    extension: no scheme, userinfo or port. FALSE with out emptied when there is
    no DNS name to send (IP literal, empty, or too long), as RFC 6066 forbids
    literals. */
-hts_boolean hts_sni_hostname(const char *url_adr, char *out, size_t size);
+HTS_NODISCARD hts_boolean hts_sni_hostname(const char *url_adr, char *out,
+                                           size_t size);
 
 #if HTS_USEOPENSSL
 /* Make ssl's handshake fail unless the server's chain verifies against the
@@ -422,7 +423,7 @@ int hts_xfread_bytewise_count(void);
 /* Does an in-memory body of this size fit? r->adr is indexed with an int
    downstream and its allocations add a trailing NUL, so every producer of
    r->size must refuse where http_xfread1() does. */
-hts_boolean hts_inmem_size_fits(LLint size);
+HTS_NODISCARD hts_boolean hts_inmem_size_fits(LLint size);
 /* Cached resolver: fill out[0..count-1] with up to max addresses for iadr (in
    resolver order), returning the count (0 = does not resolve, negative-cached).
    Resolves once per host; later calls read the DNS cache. Must hold no lock

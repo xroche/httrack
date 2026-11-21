@@ -1,0 +1,63 @@
+#!/bin/bash
+#
+# HTS_NODISCARD must not expand to nothing on GCC or clang: dropping the result
+# of an annotated exported function has to warn, in C and in C++.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+top=$(cd "$top_srcdir" && pwd)
+# htsfeatures.h is generated, so a hand run outside make check has none.
+[ -n "${abs_top_builddir:-}" ] || skip "abs_top_builddir unset, no automake environment"
+tmp=$(mktemp -d) || exit 1
+cleanup_push rm -rf "$tmp"
+
+cat >"$tmp/probe.c" <<'PROBE'
+#include "httrack-library.h"
+#ifndef __GNUC__
+#error not a GNU compiler
+#endif
+int main(void) {
+#ifdef DROP
+  hts_convertStringToUTF8("a", 1, "utf-8");
+  return 0;
+#else
+  return hts_convertStringToUTF8("a", 1, "utf-8") == NULL;
+#endif
+}
+PROBE
+cp "$tmp/probe.c" "$tmp/probe.cc"
+
+# GCC reports unused-result only in a full compile, not under -fsyntax-only.
+# The control runs first, so another compile error is not taken for the warning.
+check() { # check LANG COMPILER-ARGV...
+    local lang=$1 src
+    shift
+    src=$tmp/probe.c
+    [ "$lang" = C ] || src=$tmp/probe.cc
+    "$@" -c -o "$tmp/probe.o" -Werror=unused-result "$src" 2>"$tmp/ctl.err" ||
+        fail_dump "$lang: the probe that uses the result does not compile" "$tmp/ctl.err"
+    if "$@" -c -o "$tmp/probe.o" -Werror=unused-result -DDROP "$src" 2>"$tmp/drop.err"; then
+        fail "$lang: a dropped HTS_NODISCARD result compiles silently with $1"
+    fi
+    grep -q 'unused-result' "$tmp/drop.err" ||
+        fail_dump "$lang: the dropped-result probe fails for another reason" "$tmp/drop.err"
+    echo "OK: $lang ($1) warns on a dropped result"
+}
+
+inc=(-I"$abs_top_builddir" -I"$abs_top_builddir/src" -I"$top/src")
+read -r -a cc <<<"${CC:-cc}"
+command -v "${cc[0]}" >/dev/null 2>&1 || skip "no C compiler (${cc[0]})"
+printf '#ifndef __GNUC__\n#error\n#endif\n' >"$tmp/gnu.c"
+"${cc[@]}" -fsyntax-only "$tmp/gnu.c" 2>/dev/null || skip "${cc[0]} is not a GNU compiler"
+check C "${cc[@]}" "${inc[@]}"
+
+read -r -a cxx <<<"${CXX:-c++}"
+if command -v "${cxx[0]}" >/dev/null 2>&1 &&
+    "${cxx[@]}" -x c++ -fsyntax-only "$tmp/gnu.c" 2>/dev/null; then
+    check C++ "${cxx[@]}" "${inc[@]}"
+else
+    echo "note: no GNU C++ compiler, C++ leg not run" >&2
+fi

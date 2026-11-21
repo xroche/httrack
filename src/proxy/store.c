@@ -949,9 +949,9 @@ static const char *save_find_host(const char *save, const char *host) {
 
 /* The root can be empty, so an absolute name is refused, as is a clipped
    join. dst is empty after a refusal. */
-static HTS_CHECK_RESULT hts_boolean index_join_root(char *dst, size_t size,
-                                                    const char *root,
-                                                    const char *name) {
+static HTS_NODISCARD hts_boolean index_join_root(char *dst, size_t size,
+                                                 const char *root,
+                                                 const char *name) {
   dst[0] = '\0';
   if (!hts_path_is_relative_contained(name)) {
     proxytrack_print_log(WARNING,

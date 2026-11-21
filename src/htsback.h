@@ -188,7 +188,8 @@ void back_tmpdir_drop(const char *tmp);
 /* Name the spool file of a frozen backlog slot. Consumes an
    opt->state.tmpnameid. Returns HTS_FALSE (dest emptied) if the name does not
    fit. Note: utf-8. */
-hts_boolean back_spoolname(httrackp *opt, char *dest, size_t size);
+HTS_NODISCARD hts_boolean back_spoolname(httrackp *opt, char *dest,
+                                         size_t size);
 /* Returns this process's id, as back_spoolname() writes it. */
 unsigned long back_self_pid(void);
 /* Write a slot to its spool file. Returns HTS_FALSE, leaving no file, on

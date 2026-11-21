@@ -48,23 +48,23 @@ Please visit our Website: http://www.httrack.com
 #endif
 
 /* Portable fallbacks, also the self-test's reference. */
-static HTS_UNUSED HTS_CHECK_RESULT hts_boolean hts_ckd_add_portable(size_t *r,
-                                                                    size_t a,
-                                                                    size_t b) {
+static HTS_UNUSED HTS_NODISCARD hts_boolean hts_ckd_add_portable(size_t *r,
+                                                                 size_t a,
+                                                                 size_t b) {
   *r = a + b;
   return b > SIZE_MAX - a ? HTS_TRUE : HTS_FALSE;
 }
 
-static HTS_UNUSED HTS_CHECK_RESULT hts_boolean hts_ckd_mul_portable(size_t *r,
-                                                                    size_t a,
-                                                                    size_t b) {
+static HTS_UNUSED HTS_NODISCARD hts_boolean hts_ckd_mul_portable(size_t *r,
+                                                                 size_t a,
+                                                                 size_t b) {
   *r = a * b;
   return a != 0 && b > SIZE_MAX / a ? HTS_TRUE : HTS_FALSE;
 }
 
 /** Sets *r = a + b, wrapped, and returns HTS_TRUE if it overflowed. **/
-static HTS_UNUSED HTS_CHECK_RESULT hts_boolean hts_ckd_add(size_t *r, size_t a,
-                                                           size_t b) {
+static HTS_UNUSED HTS_NODISCARD hts_boolean hts_ckd_add(size_t *r, size_t a,
+                                                        size_t b) {
 #if defined(HTS_CKD_BUILTIN)
   return __builtin_add_overflow(a, b, r) ? HTS_TRUE : HTS_FALSE;
 #else
@@ -73,8 +73,8 @@ static HTS_UNUSED HTS_CHECK_RESULT hts_boolean hts_ckd_add(size_t *r, size_t a,
 }
 
 /** Sets *r = a * b, wrapped, and returns HTS_TRUE if it overflowed. **/
-static HTS_UNUSED HTS_CHECK_RESULT hts_boolean hts_ckd_mul(size_t *r, size_t a,
-                                                           size_t b) {
+static HTS_UNUSED HTS_NODISCARD hts_boolean hts_ckd_mul(size_t *r, size_t a,
+                                                        size_t b) {
 #if defined(HTS_CKD_BUILTIN)
   return __builtin_mul_overflow(a, b, r) ? HTS_TRUE : HTS_FALSE;
 #else
