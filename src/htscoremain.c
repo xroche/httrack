@@ -2597,7 +2597,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
             while (isdigit((unsigned char) com[1])) {
               com++;
             }
-            na++;               // sauter, déja traité
+            na++; // skip, already handled
             break;
           case 'P':            // proxy
             if (!cmdl_take_value(

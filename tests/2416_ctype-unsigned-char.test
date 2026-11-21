@@ -9,22 +9,36 @@ set -euo pipefail
 
 src="${testdir}/../src"
 test -d "$src" || skip "no src/ (dist tarball)"
+test -r "$src/htslib.c" || fail "src/ exists but src/htslib.c is missing"
 
-# Calls whose argument is neither cast to unsigned char nor the unsigned-char variable "c".
-scan() {
-    command grep -nE '(^|[^[:alnum:]_])(isalnum|isalpha|isdigit|isspace|isxdigit|isupper|islower|ispunct|isprint|iscntrl|isgraph|tolower|toupper)[[:space:]]*\(' "$@" |
-        command grep -vE '^[^:]*:[0-9]+:[[:space:]]*(/\*|\*|//)' |
-        command grep -vE '(isalnum|isalpha|isdigit|isspace|isxdigit|isupper|islower|ispunct|isprint|iscntrl|isgraph|tolower|toupper)[[:space:]]*\(([[:space:]]*\((const )?unsigned char\)|[[:space:]]*c[[:space:]]*\))' || true
+names='isalnum|isalpha|isblank|isascii|isdigit|isspace|isxdigit|isupper|islower|ispunct|isprint|iscntrl|isgraph|tolower|toupper'
+
+# Each ctype call whose argument is not cast to unsigned char, one per line.
+bad_calls() {
+    command grep -vE '^[[:space:]]*(/\*|\*|//)' |
+        { command grep -oE "(^|[^[:alnum:]_])($names)[[:space:]]*\\([[:space:]]*(\\((const )?unsigned char\\))?" || true; } |
+        { command grep -vE "unsigned char\\)$" || true; }
 }
 
-bad=$(scan "$src"/*.c "$src"/proxy/*.c)
+n=$(cat "$src"/*.c "$src"/proxy/*.c | { command grep -oE "($names)[[:space:]]*\\(" || true; } | wc -l)
+test "$n" -gt 0 || fail "the scan saw no ctype call at all"
+
+bad=$(cat "$src"/*.c "$src"/proxy/*.c | bad_calls)
 test -z "$bad" || fail "ctype call without an unsigned char cast:
 $bad"
 
-# control: the scan must fire on a planted bad line
-plant=$(mktemp "${TMPDIR:-/tmp}/ctype_plant.XXXXXX")
-cleanup_push rm -f "$plant"
-printf 'int f(const char *s) { return isspace(s[0]); }\n' >"$plant"
-test -n "$(scan "$plant")" || fail "the scan missed a planted isspace(s[0])"
-printf 'int f(const char *s) { return isspace((unsigned char) s[0]); }\n' >"$plant"
-test -z "$(scan "$plant")" || fail "the scan flagged a cast call"
+# control: each planted line must be flagged, and the cast one must not
+check() {
+    got=$(printf '%s\n' "$2" | bad_calls)
+    if [ "$1" = bad ]; then
+        test -n "$got" || fail "the scan missed: $2"
+    else
+        test -z "$got" || fail "the scan flagged: $2"
+    fi
+}
+check bad 'return isspace(s[0]);'
+check bad 'return isspace((unsigned char) c) && isalpha(s[0]);'
+check bad 'return isspace(c) || isspace(s[0]);'
+check bad 'x = tolower(*p);'
+check bad 'return isblank(*p) || isascii(*p);'
+check good 'return isspace((unsigned char) s[0]);'

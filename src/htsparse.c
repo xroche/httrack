@@ -455,7 +455,7 @@ static hts_boolean js_glues_keyword(const char *at, const char *buffer) {
   const size_t before = (size_t) (at - buffer);
 
   if (c < 0x80)
-    return isalnum(c) || c == '_' || c == '$' || c == '.';
+    return isalnum((unsigned char) c) || c == '_' || c == '$' || c == '.';
   /* Above 127 a name may be Unicode, so only a space ends one. This is every
      space the language reads as one: U+00A0 (or a lone 0xA0 where the page is
      not UTF-8, since no continuation byte follows an ASCII one), U+1680,
