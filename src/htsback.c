@@ -451,7 +451,8 @@ static int back_connect_next(httrackp *opt, struct_back *sback, int i) {
   if (back[i].r.soc != INVALID_SOCKET) {
     deletehttp(&back[i].r);
   }
-  soc = newhttp_addr(opt, back[i].url_adr, &back[i].r, -1, next, NULL);
+  soc = newhttp_addr(opt, back[i].url_adr, &back[i].r, -1,
+                     (cf->addr_first + next) % cf->addr_count, NULL);
   if (soc == INVALID_SOCKET)
     return 0;
 
@@ -3101,6 +3102,7 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
       // fresh connect: address list not yet probed, start at the first
       sback->connect_fallback[p].addr_index = 0;
       sback->connect_fallback[p].addr_count = -1;
+      sback->connect_fallback[p].addr_first = 0;
       /* A type probe carries no fetch metadata. */
       memset(&sback->fetch[p], 0, sizeof(sback->fetch[p]));
       if (fetch != NULL && !test) {
@@ -3726,8 +3728,15 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
             !back[i].r.is_file && !back[i].r.req.proxy.active) {
           SOCaddr scratch[HTS_MAXADDRNUM];
 
+          int first;
+
           cf->addr_count = hts_dns_resolve_all(opt, back[i].url_adr, scratch,
                                                HTS_MAXADDRNUM, NULL);
+          // the first connect took the preferred address, so count from it
+          first =
+              hts_dns_addr_index(scratch, cf->addr_count, &back[i].r.address);
+          if (first >= 0)
+            cf->addr_first = first;
         }
 
         // vérifier l'existance de timeout-check
@@ -3748,6 +3757,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
             }
             continue; // reconnected (stay connecting) or failed
           }
+          if (cf->addr_index > 0) // a fallback worked: start there next time
+            hts_dns_set_preferred(opt, back[i].url_adr, &back[i].r.address);
           /* A keep-alive slot and the post-TLS re-entry share one socket, so
              count it once. */
           if (!back[i].r.keep_alive
