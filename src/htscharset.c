@@ -1108,6 +1108,11 @@ char *hts_convertStringIDNAToUTF8(const char *s, size_t size) {
         punycode_uint output_length;
         punycode_uint *output_dest;
 
+        /* no caller passes a 1 GB label, but the 32-bit capa must not wrap */
+        if (segSize > ((punycode_uint) -1) / 4) {
+          FREE_BUFFER();
+          return NULL;
+        }
         /* encode. pre-reserve buffer. */
         for(output_capa = 16 ; output_capa < segSize 
           ; output_capa <<= 1) ;
