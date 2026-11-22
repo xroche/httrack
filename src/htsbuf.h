@@ -38,15 +38,14 @@ Please visit our Website: http://www.httrack.com
 
 #include <stddef.h>
 
-/* P points at SIZE writable bytes, the end NUL included. There is no implicit
-   conversion to or from hts_span. The htsbuff of htssafe.h is an append cursor,
-   which is a different type. */
+/* P holds SIZE writable bytes. It never converts implicitly to hts_span, and
+   unlike htssafe.h's htsbuff it has no cursor. */
 typedef struct {
   char *p;
   size_t size;
 } hts_buf;
 
-/* Use it only to forward a pointer that comes with its size, never an array. */
+/* Returns SIZE bytes at P, for forwarding a pointer that came with its size. */
 static HTS_INLINE HTS_UNUSED hts_buf hts_buf_at(char *p, size_t size) {
   hts_buf b;
 
