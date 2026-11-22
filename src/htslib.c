@@ -2830,15 +2830,8 @@ int ident_url_absolute(const char *url, lien_adrfil *adrfil) {
   if (!strnotempty(adrfil->fil))
     strcpybuff(adrfil->fil, "default-index.html");
 
-  // case insensitive pour adrfil->adresse
-  {
-    char *a = jump_identification(adrfil->adr);
-
-    while(*a) {
-      *a = lochar(*a);
-      a++;
-    }
-  }
+  // host names are case-insensitive
+  hts_lowcase(jump_identification(adrfil->adr));
 
   return 0;
 }

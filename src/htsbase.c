@@ -83,14 +83,6 @@ char *convtolower(char *catbuff, size_t catbuffsize, const char *a) {
   return catbuff;
 }
 
-// lower-case s in place
-void hts_lowcase(char *s) {
-  size_t i;
-
-  for (i = 0; s[i] != '\0'; i++)
-    s[i] = lochar(s[i]);
-}
-
 /* File size, -1 if absent */
 /* Note: NOT utf-8 */
 LLint fsize(const char *s) {

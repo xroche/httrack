@@ -95,4 +95,10 @@ static HTS_INLINE HTS_UNUSED int hts_strcasecmp(const char *a, const char *b) {
   return hts_strncasecmp(a, b, (size_t) -1);
 }
 
+/* Lower-case A-Z in s, in place. */
+static HTS_INLINE HTS_UNUSED void hts_lowcase(char *s) {
+  for (; *s != '\0'; s++)
+    *s = (char) hts_tolower((unsigned char) *s);
+}
+
 #endif

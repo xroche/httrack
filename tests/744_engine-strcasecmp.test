@@ -1,0 +1,9 @@
+#!/bin/bash
+#
+# hts_strcasecmp matches whole strings and sorts bytes unsigned.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+assert_selftest "strcasecmp: OK" strcasecmp

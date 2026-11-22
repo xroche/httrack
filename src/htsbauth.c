@@ -265,7 +265,8 @@ int cookie_add(t_cookie *cookie, const char *cook_name, const char *cook_value,
 hts_boolean cookie_is_host_only(const char *rec) {
   char buffer[8192];
 
-  return strcmpnocase(cookie_get(buffer, sizeof(buffer), rec, 1), "TRUE") != 0;
+  return hts_strcasecmp(cookie_get(buffer, sizeof(buffer), rec, 1), "TRUE") !=
+         0;
 }
 
 /* Is the record at rec Secure? Field 3 is the flag, and only FALSE, in any
@@ -273,7 +274,8 @@ hts_boolean cookie_is_host_only(const char *rec) {
 static hts_boolean cookie_is_secure(const char *rec) {
   char buffer[8192];
 
-  return strcmpnocase(cookie_get(buffer, sizeof(buffer), rec, 3), "FALSE") != 0;
+  return hts_strcasecmp(cookie_get(buffer, sizeof(buffer), rec, 3), "FALSE") !=
+         0;
 }
 
 /* Do two jar domains name the same domain? The leading dot is the Netscape
@@ -283,7 +285,7 @@ static hts_boolean cookie_same_domain(const char *a, const char *b) {
     a++;
   if (b[0] == '.')
     b++;
-  return strcmpnocase(a, b) == 0;
+  return hts_strcasecmp(a, b) == 0;
 }
 
 /* A host may hold this many records, or this many bytes of them (a quarter of
@@ -349,7 +351,7 @@ static size_t cookie_domain_hash(const char *d) {
   if (d[0] == '.')
     d++;
   for (; *d != '\0'; d++)
-    h = h * 33 + (size_t) hichar(*d);
+    h = h * 33 + (size_t) hichar((unsigned char) *d);
   return h;
 }
 
@@ -585,7 +587,7 @@ hts_boolean cookie_domain_match(const char *jar_dom, const char *host) {
   // an empty domain is a suffix of every host, so it would match all of them
   if (dom_len == 0 || dom_len > host_len)
     return HTS_FALSE;
-  if (strcmpnocase(jar_dom, host + host_len - dom_len) != 0)
+  if (hts_strcasecmp(jar_dom, host + host_len - dom_len) != 0)
     return HTS_FALSE;
   if (dom_len == host_len)
     return HTS_TRUE; // the same host

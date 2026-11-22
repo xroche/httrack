@@ -42,14 +42,6 @@ Please visit our Website: http://www.httrack.com
 #include <stdio.h>
 #include <string.h>
 
-/* hts_lowcase() lives in the library proxytrack does not link. */
-static void lowcase(char *s) {
-  size_t i;
-
-  for (i = 0; s[i] != '\0'; i++)
-    s[i] = lochar(s[i]);
-}
-
 struct tm *convert_time_rfc822(struct tm *result, const char *s) {
   return convert_time_rfc822_pivot(result, s, 50);
 }
@@ -72,7 +64,7 @@ struct tm *convert_time_rfc822_pivot(struct tm *result, const char *s,
   if ((int) strlen(s) > 200)
     return NULL;
   strcpybuff(str, s);
-  lowcase(str);
+  hts_lowcase(str);
 
   while ((a = strchr(str, '-')))
     *a = ' ';
