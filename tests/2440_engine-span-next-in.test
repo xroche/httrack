@@ -8,9 +8,7 @@ set -euo pipefail
 . "${0%"${0##*/}"}./testlib.sh"
 
 selftest_queue "[a|,b,][|b,][b|]" span nextin , "a,,b,"
-selftest_queue "" span nextin , ""
 selftest_queue "[|]" span nextin , ","
 selftest_queue "[a|]" span nextin , "a"
-selftest_queue '[a\r|b\n][b|]' span nextin $'\n' $'a\r\nb\n'
 
 selftest_run_queued

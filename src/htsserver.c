@@ -1398,6 +1398,8 @@ static void ini_rebase_lists(const char *ini, int delta, String *out) {
 
   StringClear(*out);
   while (hts_span_next_in(&rest, '\n', &line)) {
+    /* The line with the CRs and newline it keeps in the copy. */
+    const hts_span raw = hts_span_between(line.p, rest.p);
     char name[64];
     char shifted[16];
     int id = -1;
@@ -1408,15 +1410,15 @@ static void ini_rebase_lists(const char *ini, int delta, String *out) {
       if (hts_span_copy(key, name, sizeof(name)) && ini_key_is_list(name))
         id = ini_list_shift(value.p, value.len, delta);
     }
-    /* Each line keeps its own CRs and newline, which [line.p, rest.p) holds. */
     if (id >= 0) {
+      const hts_span tail = hts_span_skip(raw, key.len + 1 + value.len);
+
       snprintf(shifted, sizeof(shifted), "%d", id);
-      StringMemcat(*out, line.p, key.len + 1);
+      StringMemcat(*out, raw.p, key.len + 1);
       StringCat(*out, shifted);
-      StringMemcat(*out, value.p + value.len,
-                   (size_t) (rest.p - (value.p + value.len)));
+      StringMemcat(*out, tail.p, tail.len);
     } else {
-      StringMemcat(*out, line.p, (size_t) (rest.p - line.p));
+      StringMemcat(*out, raw.p, raw.len);
     }
   }
 }

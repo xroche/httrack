@@ -1687,8 +1687,8 @@ void cookie_delete(char *s, size_t s_size, size_t pos) {
 // into buffer. ex: cookie_get("ceci est<tab>un<tab>exemple", 1) returns "un".
 const char *cookie_get(char *buffer, size_t buffer_size,
                        const char *cookie_base, int param) {
-  const char *limit, *cur;
-  hts_span field;
+  const char *limit;
+  hts_span rest, field;
   int i;
 
   assertf(buffer_size != 0);
@@ -1697,8 +1697,8 @@ const char *cookie_get(char *buffer, size_t buffer_size,
   if (limit == NULL)
     limit = cookie_base + strlen(cookie_base);
   /* A negative PARAM reads field 0. */
-  for (cur = cookie_base, i = 0; hts_span_next(&cur, limit, '\t', &field);
-       i++) {
+  rest = hts_span_between(cookie_base, limit);
+  for (i = 0; hts_span_next_in(&rest, '\t', &field); i++) {
     if (i >= param) {
       /* only a caller with a buffer under COOKIE_MAX_LINE can clip here */
       (void) hts_span_copy(field, buffer, buffer_size);

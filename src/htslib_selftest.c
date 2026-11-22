@@ -3702,17 +3702,16 @@ static int st_spandiff(httrackp *opt, int argc, char **argv) {
   {
     static const char nul[] = " a\0b ";
     const hts_span s = {nul, sizeof(nul) - 1};
-    const char *cur = nul;
-    hts_span f, t;
+    hts_span rest = s, f, t;
     char d[8];
 
     t = hts_span_trim(s, " ab", " ab");
     if (t.p != nul + 2 || t.len != 1)
       parsediff_fail(&st, "hts_span_trim NUL", "' a\\0b '", "", "", "");
-    if (!hts_span_next(&cur, nul + s.len, '\0', &f) || f.len != 2 ||
-        !hts_span_next(&cur, nul + s.len, '\0', &f) || f.p != nul + 3 ||
-        f.len != 2 || hts_span_next(&cur, nul + s.len, '\0', &f))
-      parsediff_fail(&st, "hts_span_next NUL", "' a\\0b '", "", "", "");
+    if (!hts_span_next_in(&rest, '\0', &f) || f.len != 2 ||
+        !hts_span_next_in(&rest, '\0', &f) || f.p != nul + 3 || f.len != 2 ||
+        hts_span_next_in(&rest, '\0', &f))
+      parsediff_fail(&st, "hts_span_next_in NUL", "' a\\0b '", "", "", "");
     if (!hts_span_copy(s, d, sizeof(d)) || memcmp(d, nul, sizeof(nul)) != 0)
       parsediff_fail(&st, "hts_span_copy NUL", "' a\\0b '", "", "", "");
   }
@@ -3721,18 +3720,17 @@ static int st_spandiff(httrackp *opt, int argc, char **argv) {
     static const char text[] = " a,b=c/";
     const size_t len = sizeof(text) - 1;
     char *buf = malloct(len);
-    const char *cur;
-    hts_span s, f, h, t;
+    hts_span s, rest, f, h, t;
     char d[sizeof(text)];
     size_t n = 0;
 
     assertf(buf != NULL);
     memcpy(buf, text, len);
     s = hts_span_at(buf, len);
-    for (cur = buf; hts_span_next(&cur, buf + len, ',', &f);)
+    for (rest = s; hts_span_next_in(&rest, ',', &f);)
       n++;
     if (n != 2 || f.p != buf + 3 || f.len != len - 3)
-      parsediff_fail(&st, "hts_span_next unterminated", text, "", "", "");
+      parsediff_fail(&st, "hts_span_next_in unterminated", text, "", "", "");
     if (hts_span_split(f, ';', &h, &t) || !hts_span_split(f, '=', &h, &t) ||
         t.p != buf + 5 || t.len != 2)
       parsediff_fail(&st, "hts_span_split unterminated", text, "", "", "");
@@ -3871,22 +3869,20 @@ static int st_span(httrackp *opt, int argc, char **argv) {
   }
   s = hts_span_of(argv[argc - 1]);
   if (strcmp(argv[0], "next") == 0) {
-    const char *cur = s.p;
+    const char *const end = s.p + s.len;
 
-    while (hts_span_next(&cur, s.p + s.len, argv[1][0], &a)) {
+    while (hts_span_next_in(&s, argv[1][0], &a)) {
       StringAddchar(out, '[');
       StringMemcat(out, a.p, a.len);
       StringAddchar(out, ']');
     }
-    if (cur != s.p + s.len)
+    if (s.p != end)
       StringCat(out, " BADEND");
   } else if (strcmp(argv[0], "nextsep") == 0) {
-    const char *cur = s.p;
-
     /* Each field shows with the separator it ended on. */
-    while (hts_span_next(&cur, s.p + s.len, argv[1][0], &a)) {
+    while (hts_span_next_in(&s, argv[1][0], &a)) {
       StringAddchar(out, '[');
-      span_add_visible(&out, a.p, (size_t) (cur - a.p));
+      span_add_visible(&out, a.p, (size_t) (s.p - a.p));
       StringAddchar(out, ']');
     }
   } else if (strcmp(argv[0], "nextin") == 0) {

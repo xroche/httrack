@@ -508,8 +508,8 @@ static hts_boolean header_is(hts_span line, const char *name) {
              hts_span_of(":"));
 }
 
-/* Read the next line of the header block *REST into *LINE, minus one CR. FALSE
-   at the end of *REST or at the blank line that ends the block. */
+/* Read the next line of the header block *REST into *LINE, minus one CR.
+   Return FALSE at the end of *REST or at the blank line that ends the block. */
 static hts_boolean header_next(hts_span *rest, hts_span *line) {
   if (!hts_span_next_in(rest, '\n', line))
     return HTS_FALSE;
