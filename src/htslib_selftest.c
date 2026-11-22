@@ -2511,8 +2511,7 @@ static int st_chartab(httrackp *opt, int argc, char **argv) {
   return st_verdict("chartab", err);
 }
 
-/* -#test=strcasecmp: folds to lower case, compares unsigned bytes, whole
- * strings. */
+/* -#test=strcasecmp: hts_strcasecmp folds A-Z and compares unsigned bytes. */
 static int st_strcasecmp(httrackp *opt, int argc, char **argv) {
   static const struct {
     const char *a, *b;
