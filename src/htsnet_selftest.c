@@ -135,20 +135,23 @@ static int st_sniname(httrackp *opt, int argc, char **argv) {
 /* Print the Proxy-Authorization value a proxy name yields. */
 static int st_proxyauth(httrackp *opt, int argc, char **argv) {
   char autorisation[1100];
+  int i;
 
-  if (argc != 1) {
+  if (argc < 1) {
     fprintf(stderr, "proxyauth: needs a proxy argument\n");
     return 1;
   }
-  const int got =
-      hts_basic_auth_value(opt, argv[0], autorisation, sizeof(autorisation));
+  for (i = 0; i < argc; i++) {
+    const int got =
+        hts_basic_auth_value(opt, argv[i], autorisation, sizeof(autorisation));
 
-  if (got > 0 && strlen(autorisation) > 64) /* long: print the length only */
-    printf("auth=len%d\n", (int) strlen(autorisation));
-  else if (got > 0)
-    printf("auth=%s\n", autorisation);
-  else
-    printf("auth=%s\n", got < 0 ? "toolong" : "none");
+    if (got > 0 && strlen(autorisation) > 64) /* long: print the length only */
+      printf("auth=len%d\n", (int) strlen(autorisation));
+    else if (got > 0)
+      printf("auth=%s\n", autorisation);
+    else
+      printf("auth=%s\n", got < 0 ? "toolong" : "none");
+  }
   return 0;
 }
 
@@ -1830,7 +1833,7 @@ const struct selftest_entry selftests_net[] = {
 #endif
     {"ftpaddr", "<url-address>...", "host/port the FTP path splits out",
      st_ftpaddr},
-    {"proxyauth", "<proxy>", "Basic credentials a proxy name carries",
+    {"proxyauth", "<proxy>...", "Basic credentials a proxy name carries",
      st_proxyauth},
     {"sniname", "[url-address]...", "TLS SNI name taken from a URL address",
      st_sniname},
