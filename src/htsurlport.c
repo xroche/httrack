@@ -111,6 +111,18 @@ hts_boolean hts_span_next(const char **cur, const char *end, char sep,
   return HTS_TRUE;
 }
 
+hts_boolean hts_span_next_in(hts_span *rest, char sep, hts_span *field) {
+  const char *cur = rest->p;
+  const char *end;
+
+  if (hts_span_empty(*rest))
+    return HTS_FALSE;
+  end = rest->p + rest->len;
+  (void) hts_span_next(&cur, end, sep, field);
+  *rest = hts_span_between(cur, end);
+  return HTS_TRUE;
+}
+
 static hts_boolean span_in_set(const char *set, char c) {
   return c != '\0' && strchr(set, c) != NULL;
 }

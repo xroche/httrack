@@ -3540,8 +3540,7 @@ static void spandiff_one(parsediff_stats *st, const char *rules,
   static const size_t sizes[] = {1, 2, 8, 4096};
   size_t i, j;
   int www;
-  const hts_span all = hts_span_of(rules);
-  const char *cur;
+  hts_span rest = hts_span_of(rules);
   hts_span line;
 
   for (i = 0; keys[i] != NULL; i++) {
@@ -3604,7 +3603,7 @@ static void spandiff_one(parsediff_stats *st, const char *rules,
     }
   }
   /* each line alone, which is what --host-alias hands the validator */
-  for (cur = all.p; hts_span_next(&cur, all.p + all.len, '\n', &line);) {
+  while (hts_span_next_in(&rest, '\n', &line)) {
     char *one = malloct(line.len + 1);
 
     assertf(one != NULL);
@@ -3729,8 +3728,7 @@ static int st_spandiff(httrackp *opt, int argc, char **argv) {
 
     assertf(buf != NULL);
     memcpy(buf, text, len);
-    s.p = buf;
-    s.len = len;
+    s = hts_span_at(buf, len);
     for (cur = buf; hts_span_next(&cur, buf + len, ',', &f);)
       n++;
     if (n != 2 || f.p != buf + 3 || f.len != len - 3)
@@ -3860,8 +3858,8 @@ static int st_buf(httrackp *opt, int argc, char **argv) {
   return bad;
 }
 
-/* Print what a span primitive reads as [bytes], for next|nextsep|split C TEXT,
-   trim L R TEXT or copy SIZE TEXT. */
+/* Print what a span primitive reads as [bytes], for next|nextsep|nextin|split C
+   TEXT, trim L R TEXT or copy SIZE TEXT. */
 static int st_span(httrackp *opt, int argc, char **argv) {
   String out = STRING_EMPTY;
   hts_span s, a, b;
@@ -3889,6 +3887,15 @@ static int st_span(httrackp *opt, int argc, char **argv) {
     while (hts_span_next(&cur, s.p + s.len, argv[1][0], &a)) {
       StringAddchar(out, '[');
       span_add_visible(&out, a.p, (size_t) (cur - a.p));
+      StringAddchar(out, ']');
+    }
+  } else if (strcmp(argv[0], "nextin") == 0) {
+    /* Each field shows with what is left after it. */
+    while (hts_span_next_in(&s, argv[1][0], &a)) {
+      StringAddchar(out, '[');
+      span_add_visible(&out, a.p, a.len);
+      StringAddchar(out, '|');
+      span_add_visible(&out, s.p, s.len);
       StringAddchar(out, ']');
     }
   } else if (strcmp(argv[0], "split") == 0) {
