@@ -3699,10 +3699,13 @@ const char *login_start(const char *adr) {
 
 /* Returns adr past its login, or login_start(adr) when it has none. */
 const char *login_end(const char *adr) {
-  const char *const start = login_start(adr);
-  const char *const at = strrchr_limit(start, '@', hts_authority_end(start));
+  const char *s = adr;
+  hts_url_view v;
 
-  return at != NULL ? at : start;
+  while (hts_isspace((unsigned char) *s))
+    s++;
+  (void) hts_url_view_parse(s, strlen(s), &v);
+  return v.userinfo.p != NULL ? v.host.p : login_start(adr);
 }
 
 hts_boolean hts_escape_typed_login(const char *url, char *dst, size_t size) {
