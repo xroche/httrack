@@ -97,7 +97,7 @@ helper_start() {
         test -s "${tmpdir}/${name}.port" && break
         poll_wait 0.1
     done
-    helper_port=$(<"${tmpdir}/${name}.port")
+    helper_port=$(tr -d '\r' <"${tmpdir}/${name}.port")
     test -n "${helper_port}" || fail "${name}: $(<"${tmpdir}/${name}.err")"
 }
 
