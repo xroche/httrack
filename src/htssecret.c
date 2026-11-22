@@ -328,12 +328,12 @@ void fprint_redacted(FILE *fp, size_t len) {
 }
 
 /* Only the -%H log hides these fields, because they carry logins. */
-static const char *const secret_fields[] = {
-    "Authorization", "Proxy-Authorization", "Cookie", "Set-Cookie"};
+static const char *const secret_fields[] = {HTS_SPAN_WORDS(
+    "Authorization", "Proxy-Authorization", "Cookie", "Set-Cookie")};
 
 /* The -%H log hides the login of the URL these fields carry. */
-static const char *const url_fields[] = {"Location", "Content-Location",
-                                         "Referer"};
+static const char *const url_fields[] = {
+    HTS_SPAN_WORDS("Location", "Content-Location", "Referer")};
 
 /* Writes the line buff, len bytes long, with the login of its URL, from keep
    up to end, masked. Returns HTS_FALSE, writing nothing, when out of memory. */
@@ -462,17 +462,15 @@ char *hts_mask_passwords(const char *s, hts_mask_mode mode) {
 /* Returns the length of the secret field name opening line, a line len bytes
    long, even with no colon behind it, or 0. */
 static size_t secret_name_len(const char *line, size_t len) {
-  size_t word, i;
+  size_t word;
 
-  if (header_name_in(line, secret_fields,
-                     sizeof(secret_fields) / sizeof(secret_fields[0])))
+  if (header_name_in(line, secret_fields))
     return header_name_len(line);
   if (memchr(line, ':', len) != NULL)
     return 0;
   word = strcspn(line, HTS_BLANKS);
-  for (i = 0; i < sizeof(secret_fields) / sizeof(secret_fields[0]); i++)
-    if (header_name_is(line, word, secret_fields[i], strlen(secret_fields[i])))
-      return word;
+  if (hts_span_index_ci(hts_span_at(line, word), secret_fields) >= 0)
+    return word;
   return 0;
 }
 
@@ -487,14 +485,15 @@ void hts_secret_add_headers(httrackp *opt, const char *headers) {
       const char *const colon = memchr(line, ':', len);
       const char *v = colon != NULL ? colon + 1 : line + name;
       const char *end = line + len;
+      const hts_span field = hts_span_at(line, name);
 
       while (v < end && (*v == ' ' || *v == '\t'))
         v++;
       while (end > v && (end[-1] == ' ' || end[-1] == '\t'))
         end--;
       // a cookie value is often a plain word, and -%H hides the whole header
-      if (!header_name_is(line, name, "Cookie", 6) &&
-          !header_name_is(line, name, "Set-Cookie", 10)) {
+      if (!hts_span_eq_ci(field, hts_span_of("Cookie")) &&
+          !hts_span_eq_ci(field, hts_span_of("Set-Cookie"))) {
         // the whole value, then the credentials after the scheme ("Basic
         // TOKEN")
         const char *cred = v + strcspn(v, " \t");
@@ -544,8 +543,7 @@ void fprintfio(FILE *fp, const char *buff, const char *prefix, httrackp *opt) {
       nl = HTS_FALSE;
       if (!(buff == start && fprint_request_line(opt, fp, buff, len)) &&
           (secret || *buff == ' ' || *buff == '\t' ||
-           !header_name_in(buff, url_fields,
-                           sizeof(url_fields) / sizeof(url_fields[0])) ||
+           !header_name_in(buff, url_fields) ||
            !fprint_url_field(opt, fp, buff, len))) {
         hts_secret_fwrite(opt, fp, buff, keep);
         if (keep < len)
@@ -590,8 +588,7 @@ const char *hts_header_shown(httrackp *opt, const char *line, char *dst,
 
     memcpy(value, line + keep, v);
     value[v] = '\0';
-    if (header_name_in(line, url_fields,
-                       sizeof(url_fields) / sizeof(url_fields[0]))) {
+    if (header_name_in(line, url_fields)) {
       char masked[HTS_URLMAXSIZE * 2];
 
       (void) strclipbuff(dst + n, size - n,
