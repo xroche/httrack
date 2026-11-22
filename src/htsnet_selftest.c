@@ -1731,7 +1731,7 @@ static int st_catchurl_sized(httrackp *opt, int argc, char **argv) {
        CATCH_URL_OK},
       {get, "GET", get_want, sizeof(url_want) - 1, 4, sizeof(get_want),
        CATCH_URL_ERR_REQUEST},
-      /* the only row where the host part is clipped here */
+      /* the only row that clips the peer address */
       {get, "GET", get_want, 8, 4, sizeof(get_want), CATCH_URL_ERR_REQUEST},
       {get, "GET", get_want, sizeof(url_want), 3, sizeof(get_want),
        CATCH_URL_ERR_REQUEST},
