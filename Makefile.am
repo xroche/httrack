@@ -17,6 +17,10 @@ EXTRA_DIST = INSTALL.Linux \
 		tools/doc-chrome.py \
 		tools/check-includes.py \
 		tools/check-comments.py \
+		tools/check-api-lint.py \
+		tools/api-lint/ctype.txt \
+		tools/api-lint/macro.txt \
+		tools/api-lint/check-result.txt \
 		tools/ci-sanitizer-report.sh \
 		tools/ci-test-log.sh \
 		tools/tsan-suppressions.txt \
