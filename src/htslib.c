@@ -4372,7 +4372,7 @@ static hts_boolean port_is_valid(hts_span port) {
   size_t i;
 
   for (i = 0; i < port.len; i++) {
-    if (!isdigit((unsigned char) port.p[i]))
+    if (!hts_isdigit((unsigned char) port.p[i]))
       return HTS_FALSE;
     value = value * 10 + (unsigned int) (port.p[i] - '0');
     if (value > 65535)
@@ -4392,8 +4392,8 @@ hts_boolean hts_url_view_parse(const char *s, size_t len, hts_url_view *v) {
   if ((n = engine_scheme_len(s, len)) != 0) {
     v->scheme = span_of(s, s + n - 1);
     p = s + n;
-  } else if (len != 0 && isalpha((unsigned char) s[0])) {
-    for (q = s + 1; q < end && (isalnum((unsigned char) *q) || *q == '+' ||
+  } else if (len != 0 && hts_isalpha((unsigned char) s[0])) {
+    for (q = s + 1; q < end && (hts_isalnum((unsigned char) *q) || *q == '+' ||
                                 *q == '-' || *q == '.');
          q++)
       ;
