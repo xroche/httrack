@@ -338,7 +338,6 @@ T_SOC newhttp_addr(httrackp *opt, const char *iadr, htsblk *retour, int port,
 HTS_INLINE void deletehttp(htsblk * r);
 HTS_INLINE int deleteaddr(htsblk * r);
 HTS_INLINE void deletesoc(T_SOC soc);
-HTS_INLINE void deletesoc_r(htsblk *r);
 /* Return 1 once soc is readable (writable) within timeout seconds, 0 otherwise.
    check_readinput polls r->soc without waiting. */
 int check_readinput(htsblk * r);
@@ -400,10 +399,6 @@ void treatfirstline(htsblk * retour, const char *rcvd);
    in *seen, or -2 for a signed or oversized one. Text that is no number is
    skipped. */
 hts_boolean hts_content_length_agrees(const char *s, LLint *seen);
-
-/* The three-digit HTTP status code at s, or -1 when s does not start with
-   exactly three digits. */
-int hts_status_code(const char *s);
 
 /* The status code of an "HTTP/x.y NNN reason" line, or -1. */
 int hts_status_line_code(const char *line);
@@ -475,12 +470,6 @@ SOCaddr *hts_dns_resolve_nocache2(const char *const hostname,
 SOCaddr *hts_dns_resolve_nocache(const char *const hostname,
                                  SOCaddr *const addr);
 
-#if HTS_DNSCACHE
-/* Return opt's DNS cache hashtable (hostname -> t_dnscache record), creating it
-   on first use. Records are owned by the table and freed on coucal_delete. */
-coucal hts_cache(httrackp *opt);
-#endif
-
 /* How long a name that did not resolve stays negative-cached, and the ceiling
    the wait doubles up to. */
 #define HTS_DNS_NEGATIVE_TTL_MS 60000
@@ -516,13 +505,11 @@ void time_local_rfc822(char *s);
 /* Current UTC time as "YYYY-MM-DDThh:mm:ssZ". */
 void hts_now_iso8601(char out[32]);
 
-int set_filetime(const char *file, struct tm *tm_time);
 int set_filetime_rfc822(const char *file, const char *date);
 /* File mtime as a UTC time_t, or (time_t) -1 if it can not be read. */
 time_t get_filetime(const char *file);
 int get_filetime_rfc822(const char *file, char *date);
 HTS_INLINE void time_rfc822(char *s, struct tm *A);
-HTS_INLINE void time_rfc822_local(char *s, struct tm *A);
 
 HTS_INLINE int sendc(htsblk * r, const char *s);
 /* Returns the advance past the line's terminator. Unlike binput_line(), "max"
@@ -543,7 +530,6 @@ void map_characters(unsigned char *buffer, unsigned int size,
                     unsigned int *map);
 int ishtml(httrackp * opt, const char *urlfil);
 int ishtml_ext(const char *a);
-int ishttperror(int err);
 
 /* Write fil's --assume type into s (capacity ssize, NUL included); too long a
    value is clipped, not fatal. True if a rule matched, s then holding its
@@ -552,7 +538,6 @@ hts_boolean get_userhttptype(httrackp *opt, char *s, size_t ssize,
                              const char *fil);
 int give_mimext(char *s, size_t ssize, const char *st);
 
-int may_bogus_multiple(httrackp * opt, const char *mime, const char *filename);
 int may_unknown2(httrackp * opt, const char *mime, const char *filename);
 
 const char *strrchr_limit(const char *s, char c, const char *limit);
@@ -615,9 +600,6 @@ void hts_secret_add_login(httrackp *opt, const char *url);
 /* Adds the values of the Authorization, Proxy-Authorization and Cookie lines
    of a -%X header block, which may be NULL. */
 void hts_secret_add_headers(httrackp *opt, const char *headers);
-
-/* Writes the len bytes at s to fp, with each secret of opt as ***. */
-void hts_secret_fwrite(httrackp *opt, FILE *fp, const char *s, size_t len);
 
 /* fprintf() to fp, with each secret of opt as ***. */
 void hts_secret_fprintf(httrackp *opt, FILE *fp,

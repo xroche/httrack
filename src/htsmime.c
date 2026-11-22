@@ -711,7 +711,8 @@ hts_boolean may_unknown(httrackp *opt, const char *st) {
 /* returns 1 if the mime/filename seems bogus because of a badly recognized
   multiple extension, such as "application/x-wais-source" for
   "httrack-3.42-1.el5.src.rpm" */
-int may_bogus_multiple(httrackp *opt, const char *mime, const char *filename) {
+static int may_bogus_multiple(httrackp *opt, const char *mime,
+                              const char *filename) {
   int j;
 
   for (j = 0; strnotempty(hts_mime_bogus_multiple[j]); j++) {

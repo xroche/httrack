@@ -78,8 +78,6 @@ void hash_savename_next_set(hash_struct *hash, char kind, const char *name,
 /* Return the link with host ADR (any case) and path FIL, -1 if none, or -2 if
    several with distinct save-names might match. */
 int hash_savename_owner(hash_struct *hash, const char *adr, const char *fil);
-int *hash_calc_chaine(hash_struct * hash, hash_struct_type type, int pos);
-unsigned long int hash_cle(const char *nom1, const char *nom2);
 #endif
 
 #endif

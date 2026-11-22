@@ -38,9 +38,6 @@ Please visit our Website: http://www.httrack.com
 /* Is the record at rec host-only? Defined in htsbauth.c. */
 hts_boolean cookie_is_host_only(const char *rec);
 
-/* Flush fp to the disk and close it. Did every step succeed? */
-hts_boolean cookie_close_synced(FILE *fp);
-
 /* Write the jar to name, or only a header if it is empty. Return 0 on
    success. */
 int cookie_write(t_cookie *cookie, const char *name);

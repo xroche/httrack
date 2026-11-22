@@ -49,6 +49,9 @@ Please visit our Website: http://www.httrack.com
 #endif
 /* END specific definitions */
 
+static int back_checksize(httrackp *opt, lien_back *eback,
+                          int check_only_totalsize);
+
 #include "htsback.h"
 #include "htsfetch.h"
 
@@ -2460,8 +2463,8 @@ void back_slot_fail(httrackp *opt, struct_back *sback, const int p,
 
 /* back_slot_fail() after deletehttp(), which frees ssl_con even on a closed
    socket, so sites that test soc first keep their own close. */
-void back_slot_close_fail(httrackp *opt, struct_back *sback, const int p,
-                          const int statuscode, const char *msg) {
+static void back_slot_close_fail(httrackp *opt, struct_back *sback, const int p,
+                                 const int statuscode, const char *msg) {
   deletehttp(&sback->lnk[p].r);
   back_slot_fail(opt, sback, p, statuscode, msg);
 }
@@ -2500,8 +2503,8 @@ void back_set_unlocked(struct_back *sback, const int p) {
   back_set_lock(sback, p, 0);
 }
 
-int back_flush_output(httrackp * opt, cache_back * cache, struct_back * sback,
-                      const int p) {
+static int back_flush_output(httrackp *opt, cache_back *cache,
+                             struct_back *sback, const int p) {
   lien_back *const back = sback->lnk;
   const int back_max = sback->count;
 
@@ -5367,7 +5370,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
   }
 }
 
-int back_checksize(httrackp * opt, lien_back * eback, int check_only_totalsize) {
+static int back_checksize(httrackp *opt, lien_back *eback,
+                          int check_only_totalsize) {
   LLint size_to_test;
 
   if (check_only_totalsize)

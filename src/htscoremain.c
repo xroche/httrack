@@ -451,6 +451,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
 static hts_boolean cmdl_shortopt_has(const char *s, char c);
 static hts_boolean cmdl_shortopt_named(const char *s, const char *opt);
 static void cmdl_doit_line(String *line, const cmdl_argv *cmd);
+static int check_path(String *s, char *defaultname);
 
 // Main, récupère les paramètres et appelle le robot
 HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
@@ -3151,7 +3152,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
 // main() subroutines
 
 // vérifier chemin path
-int check_path(String * s, char *defaultname) {
+static int check_path(String *s, char *defaultname) {
   int i;
   int return_value = 0;
 

@@ -73,6 +73,11 @@ Please visit our Website: http://www.httrack.com
 #include "htsarena.h"
 #include "htscmdline.h"
 
+/* Schedule more links from the heap into free slots. Returns the number queued,
+   or <=0 if none could be added (no free slot / paused / stopped). */
+static int back_fill(struct_back *sback, httrackp *opt, cache_back *cache,
+                     int ptr, int numero_passe);
+
 /* END specific definitions */
 
 /* external modules */
@@ -201,7 +206,8 @@ static char* hts_record_link_strdup(httrackp *opt, const char *s) {
   return hts_record_link_strdup_(opt, s);
 }
 
-size_t hts_record_link_latest(httrackp *opt) {
+/* Index of the most recently recorded link. */
+static size_t hts_record_link_latest(httrackp *opt) {
   lien_buffers *const liensbuf = opt->liensbuf;
 
   assertf(TypedArraySize(liensbuf->ptr) != 0);
@@ -3258,9 +3264,8 @@ int fspc(httrackp * opt, FILE * fp, const char *type) {
 // sous routines liées au moteur et au backing
 
 // supplemental links ready (done) after ptr or ready in background
-int backlinks_done(const struct_back * sback,
-                   lien_url ** liens, int lien_tot,
-                   int ptr) {
+static int backlinks_done(const struct_back *sback, lien_url **liens,
+                          int lien_tot, int ptr) {
   int n = 0;
 
   // finalized in background
@@ -3406,7 +3411,8 @@ hts_boolean hts_wait_available_socket(struct_back *sback, httrackp *opt,
   return HTS_TRUE;
 }
 
-int back_pluggable_sockets(struct_back * sback, httrackp * opt) {
+/* Like back_pluggable_sockets_strict, but leaves room for naming tests. */
+static int back_pluggable_sockets(struct_back *sback, httrackp *opt) {
   int n;
 
   // ajouter autant de socket qu'on peut ajouter
@@ -3423,8 +3429,8 @@ int back_pluggable_sockets(struct_back * sback, httrackp * opt) {
 }
 
 // remplir backing
-int back_fill(struct_back * sback, httrackp * opt, cache_back * cache,
-              int ptr, int numero_passe) {
+static int back_fill(struct_back *sback, httrackp *opt, cache_back *cache,
+                     int ptr, int numero_passe) {
   int n = back_pluggable_sockets(sback, opt);
 
   if (opt->savename_delayed == HTS_SAVENAME_DELAYED_HARD &&
@@ -3494,7 +3500,7 @@ int check_stdin(void) {
   return (_kbhit());
 }
 #else
-int check_flot(T_SOC s) {
+static int check_flot(T_SOC s) {
   fd_set fds;
   struct timeval tv;
 

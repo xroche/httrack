@@ -51,7 +51,7 @@ static void hts_cache_value_free(coucal_opaque arg, coucal_value value) {
 
 // opt's DNS cache hashtable, created on first use. Records (t_dnscache*) are
 // owned by the table and freed by hts_cache_value_free on coucal_delete.
-coucal hts_cache(httrackp *opt) {
+static coucal hts_cache(httrackp *opt) {
   assertf(opt != NULL);
   if (opt->state.dns_cache == NULL) {
     coucal cache = coucal_new(0);
