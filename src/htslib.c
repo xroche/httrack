@@ -428,9 +428,11 @@ static hts_boolean header_line_valid(const char *line) {
   return len != 0;
 }
 
+/* No list may hold "", which would match a line with no name. */
 hts_boolean header_name_in(const char *line, const char *const *names) {
-  return hts_span_index(hts_span_at(line, header_name_len(line)), names,
-                        HTS_TRUE) >= 0;
+  const hts_span name = hts_span_at(line, header_name_len(line));
+
+  return hts_span_index_ci(name, names) >= 0;
 }
 
 hts_boolean http_headers_have_field(const char *headers,
@@ -460,14 +462,9 @@ hts_boolean http_headers_have_field(const char *headers,
 
 /* These fields frame the message or act per hop. */
 static hts_boolean header_line_refused(const char *line) {
-  static const char *const refused[] = {"Content-Length",
-                                        "Transfer-Encoding",
-                                        "Connection",
-                                        "Keep-Alive",
-                                        "TE",
-                                        "Upgrade",
-                                        "Expect",
-                                        NULL};
+  static const char *const refused[] = {
+      HTS_SPAN_WORDS("Content-Length", "Transfer-Encoding", "Connection",
+                     "Keep-Alive", "TE", "Upgrade", "Expect")};
 
   return header_name_in(line, refused);
 }
@@ -475,7 +472,8 @@ static hts_boolean header_line_refused(const char *line) {
 /* Fields a request carries once, so a later custom line overrides an earlier.
  */
 static hts_boolean header_line_single(const char *line) {
-  static const char *const single[] = {"Host", "Cookie", "Authorization", NULL};
+  static const char *const single[] = {
+      HTS_SPAN_WORDS("Host", "Cookie", "Authorization")};
 
   return header_name_in(line, single);
 }
@@ -483,12 +481,9 @@ static hts_boolean header_line_single(const char *line) {
 /* An update or a resume writes these fields itself, dropping the custom line.
  */
 static hts_boolean header_line_engine_conditional(const char *line) {
-  static const char *const conditional[] = {"Range",
-                                            "If-Match",
-                                            "If-None-Match",
-                                            "If-Modified-Since",
-                                            "If-Unmodified-Since",
-                                            NULL};
+  static const char *const conditional[] = {
+      HTS_SPAN_WORDS("Range", "If-Match", "If-None-Match", "If-Modified-Since",
+                     "If-Unmodified-Since")};
 
   return header_name_in(line, conditional);
 }
@@ -567,7 +562,7 @@ const char *http_custom_header_warning(const char *headers, const char *line) {
 
 /* The -%X warnings, plus Host, Cookie and Proxy-*. */
 const char *http_bundle_header_refusal(const char *headers, const char *line) {
-  static const char *const engine[] = {"Host", "Cookie", NULL};
+  static const char *const engine[] = {HTS_SPAN_WORDS("Host", "Cookie")};
   const char *const why = http_custom_header_warning(headers, line);
 
   if (why != NULL)

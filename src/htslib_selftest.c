@@ -4102,7 +4102,7 @@ static int st_spancmp(httrackp *opt, int argc, char **argv) {
   return failures != 0;
 }
 
-/* Check hts_span_index: the first match wins, and FOLD folds only A-Z. */
+/* Check hts_span_index: the first match wins, and _ci folds only A-Z. */
 static int st_spanindex(httrackp *opt, int argc, char **argv) {
   static const char *const words[] = {"ab", "Ab", "", "abc", NULL};
   static const char *const high[] = {"{", "\xe9", NULL};
@@ -4112,17 +4112,17 @@ static int st_spanindex(httrackp *opt, int argc, char **argv) {
     const char *const *words;
     const char *s;
     size_t len;
-    hts_boolean fold;
+    hts_boolean ci;
     int want;
   } cases[] = {
-      {words, "ab", 2, HTS_FALSE, 0},    {words, "Ab", 2, HTS_FALSE, 1},
-      {words, "AB", 2, HTS_FALSE, -1},   {words, "AB", 2, HTS_TRUE, 0},
-      {words, "Ab", 2, HTS_TRUE, 0},     {words, NULL, 0, HTS_FALSE, 2},
-      {words, "x", 0, HTS_TRUE, 2},      {words, "a", 1, HTS_TRUE, -1},
-      {words, "abcd", 4, HTS_FALSE, -1}, {words, "abcd", 3, HTS_FALSE, 3},
-      {words, "ab\0", 3, HTS_FALSE, -1}, {words, "ABC", 3, HTS_TRUE, 3},
-      {high, "[", 1, HTS_TRUE, -1},      {high, "\xc9", 1, HTS_TRUE, -1},
-      {high, "\xe9", 1, HTS_TRUE, 1},    {none, "", 0, HTS_FALSE, -1},
+      {words, "ab", 2, HTS_FALSE, 0},   {words, "Ab", 2, HTS_FALSE, 1},
+      {words, "AB", 2, HTS_FALSE, -1},  {words, "AB", 2, HTS_TRUE, 0},
+      {words, NULL, 0, HTS_FALSE, 2},   {words, "x", 0, HTS_TRUE, 2},
+      {words, "a", 1, HTS_TRUE, -1},    {words, "abcd", 4, HTS_FALSE, -1},
+      {words, "abcd", 3, HTS_FALSE, 3}, {words, "ab\0", 3, HTS_FALSE, -1},
+      {words, "ABC", 3, HTS_TRUE, 3},   {high, "[", 1, HTS_TRUE, -1},
+      {high, "\xc9", 1, HTS_TRUE, -1},  {high, "\xe9", 1, HTS_TRUE, 1},
+      {none, "", 0, HTS_FALSE, -1},     {none, "a", 1, HTS_TRUE, -1},
   };
 
   size_t i, failures = 0;
@@ -4131,8 +4131,9 @@ static int st_spanindex(httrackp *opt, int argc, char **argv) {
   (void) argc;
   (void) argv;
   for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
-    const int got = hts_span_index(hts_span_at(cases[i].s, cases[i].len),
-                                   cases[i].words, cases[i].fold);
+    const hts_span s = hts_span_at(cases[i].s, cases[i].len);
+    const int got = cases[i].ci ? hts_span_index_ci(s, cases[i].words)
+                                : hts_span_index(s, cases[i].words);
 
     if (got != cases[i].want) {
       printf("spanindex: case %d gave %d\n", (int) i, got);

@@ -421,7 +421,8 @@ static hts_boolean bundle_scope_line(bundle *b, const char *value, int lineno,
 static hts_boolean bundle_parse(httrackp *opt, bundle *b, text_src *src,
                                 int *cookies_line, char *err, size_t err_size) {
   static const char bom[] = "\xEF\xBB\xBF";
-  static const char *const keys[] = {"url", "ua", "header", "scope", NULL};
+  static const char *const keys[] = {
+      HTS_SPAN_WORDS("url", "ua", "header", "scope")};
   char BIGSTK line[BUNDLE_LINE_MAX + 1];
   int lineno = 1;
   int version;
@@ -457,7 +458,7 @@ static hts_boolean bundle_parse(httrackp *opt, bundle *b, text_src *src,
       *cookies_line = lineno;
       return HTS_TRUE;
     }
-    if (hts_span_index(key, keys, HTS_FALSE) < 0) {
+    if (hts_span_index(key, keys) < 0) {
       /* a key in lowercase letters is no secret, so it alone is named */
       const hts_boolean shown =
           key.len <= 32 &&

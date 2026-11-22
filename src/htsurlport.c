@@ -215,7 +215,7 @@ hts_boolean hts_span_ends_with_ci(hts_span s, hts_span suffix) {
          hts_span_starts_with_ci(hts_span_skip(s, s.len - suffix.len), suffix);
 }
 
-int hts_span_index(hts_span s, const char *const *words, hts_boolean fold) {
+static int span_index(hts_span s, const char *const *words, hts_boolean fold) {
   int i;
 
   for (i = 0; words[i] != NULL; i++) {
@@ -225,6 +225,14 @@ int hts_span_index(hts_span s, const char *const *words, hts_boolean fold) {
       return i;
   }
   return -1;
+}
+
+int hts_span_index(hts_span s, const char *const *words) {
+  return span_index(s, words, HTS_FALSE);
+}
+
+int hts_span_index_ci(hts_span s, const char *const *words) {
+  return span_index(s, words, HTS_TRUE);
 }
 
 // Only these two are escapes, so a raw Windows path keeps its backslashes.

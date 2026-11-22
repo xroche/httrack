@@ -430,20 +430,23 @@ hts_fetch_site hts_fetch_site_of(const char *from_adr, const char *to_adr) {
   fetch_origin from, to;
   const char *fk, *tk;
   size_t fl, tl;
+  hts_span f, t;
 
   origin_of(from_adr, &from);
   origin_of(to_adr, &to);
   if (from.https != to.https)
     return HTS_FETCH_SITE_CROSS_SITE;
-  if (hts_span_eq_ci(hts_span_at(from.host, from.host_len),
-                     hts_span_at(to.host, to.host_len)))
+  f = hts_span_at(from.host, from.host_len);
+  t = hts_span_at(to.host, to.host_len);
+  if (hts_span_eq_ci(f, t))
     return from.port == to.port ? HTS_FETCH_SITE_SAME_ORIGIN
                                 : HTS_FETCH_SITE_SAME_SITE;
   fk = site_key(&from, &fl);
   tk = site_key(&to, &tl);
-  return hts_span_eq_ci(hts_span_at(fk, fl), hts_span_at(tk, tl))
-             ? HTS_FETCH_SITE_SAME_SITE
-             : HTS_FETCH_SITE_CROSS_SITE;
+  f = hts_span_at(fk, fl);
+  t = hts_span_at(tk, tl);
+  return hts_span_eq_ci(f, t) ? HTS_FETCH_SITE_SAME_SITE
+                              : HTS_FETCH_SITE_CROSS_SITE;
 }
 
 void hts_fetch_through(httrackp *opt, hts_fetch_meta *fm, const char *adr) {
@@ -462,7 +465,7 @@ void hts_fetch_through(httrackp *opt, hts_fetch_meta *fm, const char *adr) {
 }
 
 hts_boolean hts_fetch_trustworthy(const char *adr) {
-  static const char *const local[] = {"localhost", "[::1]", NULL};
+  static const char *const local[] = {HTS_SPAN_WORDS("localhost", "[::1]")};
   fetch_origin o;
   hts_span host;
 
@@ -470,9 +473,9 @@ hts_boolean hts_fetch_trustworthy(const char *adr) {
     return HTS_FALSE;
   origin_of(adr, &o);
   host = hts_span_at(o.host, o.host_len);
-  if (o.https || hts_span_index(host, local, HTS_TRUE) >= 0)
+  if (o.https || hts_span_index_ci(host, local) >= 0)
     return HTS_TRUE;
-  // a name under .localhost, not ".localhost" itself
+  /* a name under .localhost, not ".localhost" itself */
   if (host.len > 10 && hts_span_ends_with_ci(host, hts_span_of(".localhost")))
     return HTS_TRUE;
   return hts_span_starts_with(host, hts_span_of("127.")) &&
@@ -537,8 +540,8 @@ hts_boolean hts_fetch_origin(const char *adr, char *dst, size_t size) {
 
 /* hts_accept_kinds() publishes the --accept kinds in this display order. */
 static const char *const accept_kinds[] = {
-    "document", "iframe", "frame", "image",  "style", "script",
-    "font",     "audio",  "video", "object", "embed", NULL};
+    HTS_SPAN_WORDS("document", "iframe", "frame", "image", "style", "script",
+                   "font", "audio", "video", "object", "embed")};
 
 enum { ACCEPT_KINDS = sizeof(accept_kinds) / sizeof(accept_kinds[0]) - 1 };
 
@@ -572,7 +575,7 @@ static const char *const accept_presets[][ACCEPT_KINDS] = {
 
 /* Return the accept_kinds index of the n bytes at name, or -1. */
 static int accept_kind_index(const char *name, size_t n) {
-  return hts_span_index(hts_span_at(name, n), accept_kinds, HTS_FALSE);
+  return hts_span_index(hts_span_at(name, n), accept_kinds);
 }
 
 /* Return the accept_kinds index of dest, or -1 for an unknown one. */

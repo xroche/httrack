@@ -857,8 +857,8 @@ int hts_template_format_str(char *buffer, size_t size, const char *format, ...) 
 // Indexed by hts_footer_field_id. Sized by the initializer, then pinned below:
 // a new id without a name here is a compile error, not a NULL slot.
 static const char *const footer_field_names[] = {
-    "addr",    "path",   "url",  "date", "lastmodified", "version", "mime",
-    "charset", "status", "size", NULL};
+    HTS_SPAN_WORDS("addr", "path", "url", "date", "lastmodified", "version",
+                   "mime", "charset", "status", "size")};
 
 enum {
   footer_field_names_complete =
@@ -882,7 +882,7 @@ const char *hts_footer_field_list(char *buffer, size_t size) {
 
 HTSEXT_API hts_boolean hts_footer_field_ok(const char *name) {
   return name != NULL &&
-         hts_span_index(hts_span_of(name), footer_field_names, HTS_FALSE) >= 0;
+         hts_span_index(hts_span_of(name), footer_field_names) >= 0;
 }
 
 // Value of a field, or "" (never NULL, so callers can pass it straight to a
@@ -926,7 +926,7 @@ int hts_footer_format(char *buffer, size_t size, const char *footer,
       if (end != NULL) {
         const size_t namelen = (size_t) (end - (footer + i + 1));
         const int j = hts_span_index(hts_span_at(footer + i + 1, namelen),
-                                     footer_field_names, HTS_FALSE);
+                                     footer_field_names);
         if (j >= 0) {
           if (htsfmt_puts(&buf, footer_field_value(
                                     values, (hts_footer_field_id) j)) < 0)

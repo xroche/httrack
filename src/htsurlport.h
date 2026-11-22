@@ -117,10 +117,14 @@ hts_boolean hts_span_ends_with(hts_span s, hts_span suffix);
 /* Does S end with SUFFIX once A-Z are folded to a-z? */
 hts_boolean hts_span_ends_with_ci(hts_span s, hts_span suffix);
 
-/* Return the index of S in the NULL-terminated WORDS, or -1. FOLD compares A-Z
-   as a-z. */
-HTS_CHECK_RESULT int hts_span_index(hts_span s, const char *const *words,
-                                    hts_boolean fold);
+/* The words of a list for hts_span_index, then the NULL it ends at. */
+#define HTS_SPAN_WORDS(...) __VA_ARGS__, NULL
+
+/* Return the index of S in the NULL-terminated WORDS, or -1. */
+HTS_CHECK_RESULT int hts_span_index(hts_span s, const char *const *words);
+
+/* hts_span_index with A-Z compared as a-z. */
+HTS_CHECK_RESULT int hts_span_index_ci(hts_span s, const char *const *words);
 
 /* Copy S into DST as a terminated string, clipped to SIZE - 1 bytes. Return
    FALSE if it was clipped, or if SIZE is 0, which writes nothing. */

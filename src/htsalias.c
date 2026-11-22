@@ -1179,8 +1179,8 @@ void cmdl_mark_param(cmdl_argv *cmd, int pos) {
    option reads on/off in any case, and unquotes them only for a switch or
    a level. */
 static void optinclude_fold(const char *key, char *value) {
-  static const char *const onoff[] = {"on", "off", NULL};
-  static const char *const none[] = {HTS_NOPARAM, NULL};
+  static const char *const onoff[] = {HTS_SPAN_WORDS("on", "off")};
+  static const char *const none[] = {HTS_SPAN_WORDS(HTS_NOPARAM)};
   const char *const *keywords;
   const char *word = value;
   size_t len = strlen(value);
@@ -1205,7 +1205,7 @@ static void optinclude_fold(const char *key, char *value) {
     word++;
     len -= 2;
   }
-  i = hts_span_index(hts_span_at(word, len), keywords, HTS_TRUE);
+  i = hts_span_index_ci(hts_span_at(word, len), keywords);
   if (i >= 0)
     memcpy(value, keywords[i], len + 1);
 }

@@ -328,12 +328,12 @@ void fprint_redacted(FILE *fp, size_t len) {
 }
 
 /* Only the -%H log hides these fields, because they carry logins. */
-static const char *const secret_fields[] = {
-    "Authorization", "Proxy-Authorization", "Cookie", "Set-Cookie", NULL};
+static const char *const secret_fields[] = {HTS_SPAN_WORDS(
+    "Authorization", "Proxy-Authorization", "Cookie", "Set-Cookie")};
 
 /* The -%H log hides the login of the URL these fields carry. */
-static const char *const url_fields[] = {"Location", "Content-Location",
-                                         "Referer", NULL};
+static const char *const url_fields[] = {
+    HTS_SPAN_WORDS("Location", "Content-Location", "Referer")};
 
 /* Writes the line buff, len bytes long, with the login of its URL, from keep
    up to end, masked. Returns HTS_FALSE, writing nothing, when out of memory. */
@@ -469,9 +469,9 @@ static size_t secret_name_len(const char *line, size_t len) {
   if (memchr(line, ':', len) != NULL)
     return 0;
   word = strcspn(line, HTS_BLANKS);
-  return hts_span_index(hts_span_at(line, word), secret_fields, HTS_TRUE) >= 0
-             ? word
-             : 0;
+  if (hts_span_index_ci(hts_span_at(line, word), secret_fields) >= 0)
+    return word;
+  return 0;
 }
 
 void hts_secret_add_headers(httrackp *opt, const char *headers) {
@@ -485,14 +485,15 @@ void hts_secret_add_headers(httrackp *opt, const char *headers) {
       const char *const colon = memchr(line, ':', len);
       const char *v = colon != NULL ? colon + 1 : line + name;
       const char *end = line + len;
+      const hts_span field = hts_span_at(line, name);
 
       while (v < end && (*v == ' ' || *v == '\t'))
         v++;
       while (end > v && (end[-1] == ' ' || end[-1] == '\t'))
         end--;
       // a cookie value is often a plain word, and -%H hides the whole header
-      if (!hts_span_eq_ci(hts_span_at(line, name), hts_span_of("Cookie")) &&
-          !hts_span_eq_ci(hts_span_at(line, name), hts_span_of("Set-Cookie"))) {
+      if (!hts_span_eq_ci(field, hts_span_of("Cookie")) &&
+          !hts_span_eq_ci(field, hts_span_of("Set-Cookie"))) {
         // the whole value, then the credentials after the scheme ("Basic
         // TOKEN")
         const char *cred = v + strcspn(v, " \t");
