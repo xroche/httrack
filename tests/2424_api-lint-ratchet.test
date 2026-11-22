@@ -1,0 +1,68 @@
+#!/bin/bash
+#
+# check-api-lint.py fails on a violation missing from its baseline, and on a stale entry.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+srcdir="${abs_top_srcdir:?not run under make check}"
+lint="${srcdir}/tools/check-api-lint.py"
+python=$(find_python) || skip "python3 not found"
+test -r "${lint}" || fail "missing ${lint}"
+
+out=$("${python}" "${lint}") || fail "the tree breaks the API lint:
+${out}"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/apilint.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "${work}"
+mkdir -p "${work}/src/proxy"
+cp "${srcdir}"/src/*.[ch] "${work}/src/"
+cp "${srcdir}"/src/proxy/*.[ch] "${work}/src/proxy/"
+cp -R "${srcdir}/tools/api-lint" "${work}/baseline"
+run() {
+    "${python}" "${lint}" --root "${work}" --baseline-dir "${work}/baseline"
+}
+out=$(run) || fail "an unchanged copy fails: ${out}"
+
+c="${work}/src/htslib.c"
+h="${work}/src/htslib.h"
+cl=$(($(wc -l <"${c}") + 1))
+hl=$(($(wc -l <"${h}") + 1))
+cat >>"${c}" <<'C'
+int lint_probe_ctype(const char *s) { return isdigit(s[0]) + isdigit((unsigned char) s[1]); }
+char *lint_probe_ptr(int x) { if (x) return NULL; return "y"; }
+char *lint_probe_marked(int x) { if (x) return NULL; return "y"; }
+C
+cat >>"${h}" <<'H'
+#define lint_twice(x) ((x) + (x))
+#define lint_free(x) ((x) + lint_global)
+#define LINT_STMT(x) foo(x); bar(x)
+#define LINT_TWICE_OK(x) ((x) + (x))
+#define lint_ok(x) do { int n__ = (x); foo(n__, sizeof(x)); } while (0)
+char *lint_probe_ptr(int x);
+HTS_CHECK_RESULT char *lint_probe_marked(int x);
+H
+out=$(run) && fail "planted violations passed"
+for want in "src/htslib.c:${cl}: ctype: new violation: isdigit(s[0])" \
+    "src/htslib.h:${hl}: macro: new violation: macro lint_twice: evaluates x twice" \
+    "src/htslib.h:$((hl + 1)): macro: new violation: macro lint_free: uses free name lint_global" \
+    "src/htslib.h:$((hl + 2)): macro: new violation: macro LINT_STMT: holds statements" \
+    "src/htslib.h:$((hl + 5)): check-result: new violation: lint_probe_ptr returns failure"; do
+    grep -qF "${want}" <<<"${out}" || fail "missed ${want}: ${out}"
+done
+test "$(wc -l <<<"${out}")" -eq 5 || fail "flagged a clean probe: ${out}"
+
+# Removing a known violation, or listing one that never was, leaves a stale entry.
+cp "${srcdir}/src/htslib.c" "${srcdir}/src/htslib.h" "${work}/src/"
+sed 's/^#define heap(N).*/#define heap(N) (N)/' "${srcdir}/src/htscore.h" >"${work}/src/htscore.h"
+sed 's/^int url_savename(/HTS_CHECK_RESULT int url_savename(/' "${srcdir}/src/htsname.h" >"${work}/src/htsname.h"
+echo 'src/htslib.c: isdigit(gone)' >>"${work}/baseline/ctype.txt"
+out=$(run) && fail "stale entries passed"
+for want in "ctype.txt: ctype: stale baseline entry, delete it: src/htslib.c: isdigit(gone)" \
+    "macro.txt: macro: stale baseline entry, delete it: src/htscore.h: heap: uses free name opt" \
+    "check-result.txt: check-result: stale baseline entry, delete it: src/htsname.h: url_savename"; do
+    grep -qF "${want}" <<<"${out}" || fail "missed ${want}: ${out}"
+done
+test "$(wc -l <<<"${out}")" -eq 3 || fail "unexpected output: ${out}"
