@@ -621,6 +621,8 @@ static int st_warc_surt(httrackp *opt, int argc, char **argv) {
       {"https://example.com:443/", "com,example)/"},
       {"http://www2.example.com/x", "com,example)/x"},
       {"http://example.com:8080/p", "com,example:8080)/p"},
+      {"HTTP://h:80/p", "h)/p"},
+      {"http://h:8x/p", "h)/p"},
       {"http://example.com:99999999999999999999/p",
        "com,example:99999999999999999999)/p"},
       {"http://example.com:4294967376/", "com,example:4294967376)/"},

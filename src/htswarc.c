@@ -583,7 +583,7 @@ static int surt_add_utf8(wbuf *out, const char *s, size_t n) {
    [IPv6] literals keep their host form. A non-default port is kept as ":port"
    before the ')'. Returns 0 on success. */
 static int surt_canon(const char *url, wbuf *out) {
-  const char *host;
+  const char *host, *path_end;
   hts_span path;
   size_t url_len, hlen, i;
   int def_port = -1;
@@ -669,9 +669,9 @@ static int surt_canon(const char *url, wbuf *out) {
   if (wbuf_add(out, ")", 1) != 0)
     return -1;
 
-  /* Copy the path and query verbatim, and drop the fragment. */
-  path = hts_span_between(v.path.p, v.fragment.p != NULL ? v.fragment.p - 1
-                                                         : url + url_len);
+  /* Copy the path and query verbatim, and stop before the fragment's '#'. */
+  path_end = v.fragment.p != NULL ? v.fragment.p - 1 : url + url_len;
+  path = hts_span_between(v.path.p, path_end);
   if (surt_add_utf8(out, path.p, path.len) != 0)
     return -1;
   return 0;
