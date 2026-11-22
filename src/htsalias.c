@@ -1017,7 +1017,8 @@ size_t optrate_read(const char *val, double *rate) {
   const char *end;
   const double v = hts_strtod_c(val, &end);
   /* 0x5 is hex, but 5x is the rate 5 then the -x option */
-  const hts_boolean hex = (*end == 'x' || *end == 'X') && end[-1] == '0' &&
+  const hts_boolean hex = end != val && (*end == 'x' || *end == 'X') &&
+                          end[-1] == '0' &&
                           (end - 1 == val || !hts_isdigit(end[-2]));
 
   /* leftover number characters (5,5 or 1.2.3) make the whole value bad */

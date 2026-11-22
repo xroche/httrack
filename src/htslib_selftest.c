@@ -4625,7 +4625,8 @@ static hts_boolean st_locale_engine_ok(const char *name) {
                   "optpause_read junk");
   ST_LOCALE_CHECK(optrate_read("0x5", &rate) == 3 && rate == -1 &&
                       optrate_read("5x", &rate) == 1 && rate == 5 &&
-                      optrate_read("10x", &rate) == 2 && rate == 10,
+                      optrate_read("10x", &rate) == 2 && rate == 10 &&
+                      optrate_read("x", &rate) == 1 && rate == -1,
                   "optrate_read hex");
   ST_LOCALE_CHECK(hts_strcasecmp("INDEX.HTML", "index.html") == 0 &&
                       hts_strncasecmp("Iz", "iy", 1) == 0 &&
