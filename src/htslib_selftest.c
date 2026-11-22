@@ -4321,13 +4321,19 @@ static int st_typedlogin(httrackp *opt, int argc, char **argv) {
   return failures != 0;
 }
 
-/* Append " NAME=text" for a present span to OUT. */
+/* Append " NAME=text" for a present span to OUT, a NUL as "\0". */
 static void urlview_field(char *out, size_t size, const char *name,
                           hts_span sp) {
-  const size_t len = strlen(out);
+  size_t len = strlen(out);
+  size_t i;
 
-  if (sp.p != NULL)
-    snprintf(out + len, size - len, " %s=%.*s", name, (int) sp.len, sp.p);
+  if (sp.p == NULL)
+    return;
+  snprintf(out + len, size - len, " %s=", name);
+  for (i = 0; i < sp.len; i++) {
+    len = strlen(out);
+    snprintf(out + len, size - len, sp.p[i] != '\0' ? "%c" : "\\0", sp.p[i]);
+  }
 }
 
 /* Describe *V as "ok=1 scheme=... host=...", leaving absent parts out. */
@@ -4344,7 +4350,8 @@ static const char *urlview_describe(char *out, size_t size, hts_boolean ok,
   return out;
 }
 
-/* Does every span lie in [s, s + len), in order, the last one at the end? */
+/* Does every span lie in [s, s + len), in order, the last one at the end, with
+   a non-empty path starting at a terminator? */
 static hts_boolean urlview_tiles(const char *s, size_t len,
                                  const hts_url_view *v) {
   const hts_span *const parts[] = {&v->scheme,  &v->userinfo, &v->host,
@@ -4353,7 +4360,8 @@ static hts_boolean urlview_tiles(const char *s, size_t len,
   const char *at = s;
   size_t i;
 
-  if (v->host.p == NULL || v->path.p == NULL)
+  if (v->host.p == NULL || v->path.p == NULL ||
+      (v->path.len != 0 && memchr("/?#\\", v->path.p[0], 4) == NULL))
     return HTS_FALSE;
   for (i = 0; i < sizeof(parts) / sizeof(parts[0]); i++) {
     const hts_span *const sp = parts[i];
@@ -4392,9 +4400,11 @@ static int st_urlview(httrackp *opt, int argc, char **argv) {
       {"http://h?a/b", "ok=1 scheme=http host=h path= query=a/b"},
       {"http://h#a?b/c", "ok=1 scheme=http host=h path= fragment=a?b/c"},
       {"http://h?#", "ok=1 scheme=http host=h path= query= fragment="},
+      {"http://h?", "ok=1 scheme=http host=h path= query="},
       /* IPv6 literals, ports and zone ids */
       {"http://[::1]:8080/x", "ok=1 scheme=http host=[::1] port=8080 path=/x"},
       {"http://[::1]/", "ok=1 scheme=http host=[::1] path=/"},
+      {"http://[::1]:/", "ok=1 scheme=http host=[::1] port= path=/"},
       {"http://[fe80::1%25eth0]:80/",
        "ok=1 scheme=http host=[fe80::1%25eth0] port=80 path=/"},
       {"http://u:p@[::1]:1/", "ok=1 scheme=http userinfo=u:p host=[::1] port=1 "
@@ -4417,6 +4427,12 @@ static int st_urlview(httrackp *opt, int argc, char **argv) {
       {"gopher://u@h/x", "ok=1 scheme=gopher userinfo=u host=h path=/x"},
       {"connect:proxy:443", "ok=1 scheme=connect host=proxy port=443 path="},
       {"http:h/x", "ok=1 scheme=http host=h path=/x"},
+      {"HTTP:h/x", "ok=1 scheme=HTTP host=h path=/x"},
+      {"File://u@h/x", "ok=1 scheme=File userinfo=u host=h path=/x"},
+      {"a+b://u@h/x", "ok=1 scheme=a+b userinfo=u host=h path=/x"},
+      {"a.b://h/", "ok=1 scheme=a.b host=h path=/"},
+      {"a-b://h/", "ok=1 scheme=a-b host=h path=/"},
+      {"1x://u@h/", "ok=1 host=1x port= path=//u@h/"},
       /* ports */
       {"http://h:65535/", "ok=1 scheme=http host=h port=65535 path=/"},
       {"http://h:0/", "ok=1 scheme=http host=h port=0 path=/"},
@@ -4429,9 +4445,26 @@ static int st_urlview(httrackp *opt, int argc, char **argv) {
       {"http://h:1:2/", "ok=0 scheme=http host=h port=1:2 path=/"},
   };
 
-  static const char *const tokens[] = {"http:", "gopher:", "//", "/", "u",
-                                       ":",     "@",       "?",  "#", "\\",
-                                       "[",     "]",       "80", "h"};
+  /* A string with LEN bytes, which may hold a NUL. */
+  static const struct {
+    const char *s;
+    size_t len;
+    const char *want;
+  } bounded[] = {
+      {"http://h/xyz?q", 9, "ok=1 scheme=http host=h path=/"},
+      {"http:", 4, "ok=1 host=http path="},
+      {"http://h\0x@evil:80/p", 20,
+       "ok=1 scheme=http userinfo=h\\0x host=evil port=80 path=/p"},
+  };
+
+  static const struct {
+    const char *s;
+    size_t len;
+  } tokens[] = {{"http:", 5}, {"http", 4}, {"gopher:", 7}, {"//", 2},
+                {"/", 1},     {"u", 1},    {":", 1},       {"@", 1},
+                {"?", 1},     {"#", 1},    {"\\", 1},      {"[", 1},
+                {"]", 1},     {"80", 2},   {"h", 1},       {"\0", 1}};
+
   const size_t ntok = sizeof(tokens) / sizeof(tokens[0]);
   char out[512];
   hts_url_view v;
@@ -4459,12 +4492,15 @@ static int st_urlview(httrackp *opt, int argc, char **argv) {
       failures++;
     }
   }
-  /* LEN bounds the read, so a prefix parses as if it were the string */
-  if (strcmp(urlview_describe(out, sizeof(out),
-                              hts_url_view_parse("http://h/xyz?q", 9, &v), &v),
-             "ok=1 scheme=http host=h path=/") != 0) {
-    printf("FAIL prefix: %s\n", out);
-    failures++;
+  /* LEN bounds the read, and a NUL is an ordinary byte */
+  for (i = 0; i < sizeof(bounded) / sizeof(bounded[0]); i++) {
+    const hts_boolean ok = hts_url_view_parse(bounded[i].s, bounded[i].len, &v);
+
+    if (strcmp(urlview_describe(out, sizeof(out), ok, &v), bounded[i].want) !=
+        0) {
+      printf("FAIL bounded %s: %s\n", bounded[i].s, out);
+      failures++;
+    }
   }
   /* every string of up to three tokens, in a buffer with no NUL after it */
   for (i = 0; i < ntok * ntok * ntok + ntok * ntok + ntok + 1; i++) {
@@ -4473,16 +4509,16 @@ static int st_urlview(httrackp *opt, int argc, char **argv) {
     size_t len = 0;
 
     for (j = i, k = 0; j != 0 && k < 3; j = (j - 1) / ntok, k++) {
-      const char *const t = tokens[(j - 1) % ntok];
+      const size_t t = (j - 1) % ntok;
 
-      memcpy(s + len, t, strlen(t));
-      len += strlen(t);
+      memcpy(s + len, tokens[t].s, tokens[t].len);
+      len += tokens[t].len;
     }
     buf = malloct(len != 0 ? len : 1);
     memcpy(buf, s, len);
     (void) hts_url_view_parse(buf, len, &v);
     if (!urlview_tiles(buf, len, &v)) {
-      printf("FAIL tiles %.*s\n", (int) len, s);
+      printf("FAIL tiles (%d bytes) %.*s\n", (int) len, (int) len, s);
       failures++;
     }
     freet(buf);

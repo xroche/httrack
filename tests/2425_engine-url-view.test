@@ -14,6 +14,11 @@ selftest_queue 'ok=1 scheme=https userinfo=u host=[::1] port=8 path=/x query=a@b
     urlview 'https://u@[::1]:8/x?a@b'
 selftest_queue 'host=[::1]:8/x?a@b end=[::1]:8/x?a@b login=1' \
     userinfo 'https://u@[::1]:8/x?a@b'
+# engine schemes match in any case, with or without "//"
+selftest_queue 'host=h/x end=h/x login=1' userinfo 'HTTP://u@h/x'
+selftest_queue 'host=h/x end=h/x login=0' userinfo 'HTTP:h/x'
+selftest_queue 'host=h/x end=h/x login=1' userinfo 'File://u@h/x'
+selftest_queue 'host=/x end=/x login=0' userinfo 'file:/x'
 # an unknown scheme and a bare file:// stay whole, as before the view
 selftest_queue 'host=gopher://u@h/x end=h/x login=0' userinfo 'gopher://u@h/x'
 selftest_queue 'host=file:// end= login=0' userinfo 'file://'
