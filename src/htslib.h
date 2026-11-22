@@ -706,10 +706,12 @@ void hts_dns_test_move_clock(httrackp *opt, const char *host, TStamp ms);
 // outils divers
 HTS_INLINE TStamp time_local(void);
 
-void sec2str(char *s, TStamp t);
+/* Duration t in seconds as long text, clipped to size bytes. */
+void sec2str(char *s, size_t size, TStamp t);
 
-void time_gmt_rfc822(char *s);
-void time_local_rfc822(char *s);
+/* The current time as an RFC 822 date, GMT or local, clipped to size bytes. */
+void time_gmt_rfc822(char *s, size_t size);
+void time_local_rfc822(char *s, size_t size);
 
 /* Current UTC time as "YYYY-MM-DDThh:mm:ssZ". */
 void hts_now_iso8601(char out[32]);
@@ -717,8 +719,10 @@ void hts_now_iso8601(char out[32]);
 int set_filetime_rfc822(const char *file, const char *date);
 /* File mtime as a UTC time_t, or (time_t) -1 if it can not be read. */
 time_t get_filetime(const char *file);
-int get_filetime_rfc822(const char *file, char *date);
-HTS_INLINE void time_rfc822(char *s, struct tm *A);
+/* File mtime as an RFC 822 GMT date clipped to size bytes; 0 if unreadable. */
+int get_filetime_rfc822(const char *file, char *date, size_t size);
+/* A as an RFC 822 GMT date, clipped to size bytes. */
+HTS_INLINE void time_rfc822(char *s, size_t size, struct tm *A);
 
 HTS_INLINE int sendc(htsblk * r, const char *s);
 /* Returns the advance past the line's terminator. Unlike binput_line(), "max"
