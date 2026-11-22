@@ -2,6 +2,7 @@
 """Fail on new ctype calls without an (unsigned char) cast, unsafe function-like
 macros, and header functions that can fail without HTS_CHECK_RESULT.
 Known cases live in tools/api-lint/, and --update rewrites those baselines.
+Known limits: tail-call failures and free names inside _Generic go unreported.
 """
 
 import argparse
@@ -26,8 +27,10 @@ CTYPE = (
 CTYPE_CALL = re.compile(r"(?<![\w.>])(" + "|".join(CTYPE) + r")\s*\(")
 UCHAR_CAST = re.compile(r"^\(\s*(const\s+)?unsigned\s+char\s*\)")
 # Exempt: a plain name declared int in the same function, since it may hold EOF.
-INT_DECL = (
-    r"(?<!unsigned )\bint\s+(?:\w+\s*(?:=[^,;()]*(?:\([^()]*\))?)?,\s*)*%s\s*[=;,)]"
+QUALIFIERS = r"(?:(?:const|volatile|static|register|signed|unsigned|short|long)\s+)*"
+DECL = (
+    r"(?<![\w.>])(" + QUALIFIERS + r"(?:(?:struct|union|enum)\s+)?([A-Za-z_]\w*))"
+    r"\s*((?:[\w*\s]+(?:=[^,;()]*(?:\([^()]*\))?)?,\s*)*)(\**)\s*%s\s*[=;,)\[]"
 )
 
 KEYWORDS = set(
@@ -153,17 +156,68 @@ def squash(s):
     return " ".join(s.split())
 
 
-def int_variable(code, functions, at, arg):
-    """Is arg a name declared int in the function holding position at?"""
+def in_scope(text, decl, at):
+    """Is a declaration at decl still in scope at position at?"""
+    opener = enclosing_paren(text, decl)
+    if opener is not None:
+        before = text[:opener].rstrip()
+        if before.endswith(")"):
+            return False
+        if re.search(r"\bfor$", before):
+            close = matching(text, opener)
+            rest = re.match(r"\s*\{", text[close:])
+            end = (
+                matching(text, close + rest.end() - 1, "{}")
+                if rest
+                else text.find(";", close)
+            )
+            return end < 0 or at <= end
+    depth = 0
+    for c in text[decl:at]:
+        depth += c == "{"
+        depth -= c == "}"
+        if depth < 0:
+            return False
+    return True
+
+
+def enclosing_paren(text, pos):
+    """Index of the innermost ( still open at pos, or None."""
+    depth = 0
+    for k in range(pos - 1, -1, -1):
+        if text[k] == ")":
+            depth += 1
+        elif text[k] == "(":
+            if depth == 0:
+                return k
+            depth -= 1
+        elif text[k] in "{};":
+            return None
+    return None
+
+
+def int_variable(code, functions, at, arg, types):
+    """Is the nearest declaration of arg in scope at position at a plain int?"""
     if not re.fullmatch(r"[A-Za-z_]\w*", arg):
         return False
     for start, end in functions:
         if start <= at < end:
-            return re.search(INT_DECL % re.escape(arg), code[start:at]) is not None
+            text = code[start:at]
+            decls = [
+                m
+                for m in re.finditer(DECL % re.escape(arg), text)
+                if is_type(m.group(2), types)
+            ]
+            for m in sorted(decls, key=lambda m: m.end(), reverse=True):
+                if in_scope(text, m.start(), len(text)):
+                    words = m.group(1).split()
+                    plain = set(words[:-1]) <= {"const", "volatile", "register"}
+                    return words[-1] == "int" and plain and not m.group(4)
+            return False
     return False
 
 
-def check_ctype(path, code):
+def check_ctype(path, code, types):
     """Yield (line, key, message) for each ctype call lacking the cast."""
     functions = []
     for start, head, body in top_level(code):
@@ -174,7 +228,7 @@ def check_ctype(path, code):
         arg = code[open_at + 1 : matching(code, open_at) - 1].strip()
         if UCHAR_CAST.match(arg) or arg.startswith("'") or re.fullmatch(r"-?\d+", arg):
             continue
-        if int_variable(code, functions, m.start(), arg):
+        if int_variable(code, functions, m.start(), arg, types):
             continue
         call = squash(m.group(1) + "(" + arg + ")")
         yield line_of(code, m.start()), call, call + " needs an (unsigned char) cast"
@@ -236,7 +290,8 @@ def generic_uses(text, named, types, declared):
     """Parameter uses of a _Generic( ... ) body: only one association runs."""
     uses = collections.Counter()
     for assoc in split_top(text, ",")[1:]:
-        uses |= idents(split_top(assoc, ":")[-1], named, types, declared)[0]
+        expr = ":".join(split_top(assoc, ":")[1:]) or assoc
+        uses |= idents(expr, named, types, declared)[0]
     return uses
 
 
@@ -329,23 +384,54 @@ def collect_types(codes):
     return types
 
 
+def first_branches(text):
+    """strip_preprocessor, also blanking the later branches of an #if group whose
+    branches leave braces or parentheses open, so brackets match on one branch."""
+    raw = text.split("\n")
+    lines = strip_preprocessor(text).split("\n")
+
+    def delta(a, b):
+        seg = "\n".join(lines[a:b])
+        return seg.count("{") - seg.count("}"), seg.count("(") - seg.count(")")
+
+    stack = []
+    for k, line in enumerate(raw):
+        m = re.match(r"[ \t]*#[ \t]*(if|ifdef|ifndef|elif|else|endif)\b", line)
+        if not m:
+            continue
+        if m.group(1).startswith("if"):
+            stack.append([k])
+        elif stack and m.group(1) != "endif":
+            stack[-1].append(k)
+        elif stack:
+            marks = stack.pop() + [k]
+            branches = list(zip(marks, marks[1:]))
+            if any(delta(a, b) != (0, 0) for a, b in branches):
+                for a, b in branches[1:]:
+                    lines[a:b] = [" " * len(x) for x in lines[a:b]]
+    return "\n".join(lines)
+
+
 def top_level(code):
-    """Yield (start, head, body) per top-level declaration: body is None for a ;."""
-    flat = strip_preprocessor(code)
-    flat = re.sub(r'\bextern\s*"[^"\n]*"\s*\{', lambda m: " " * len(m.group(0)), flat)
+    """Yield (start, head, body) per top-level declaration: body is None for a ;.
+    Brackets match on the first branch of an unbalanced #if, but head and body
+    hold every branch."""
+    extern = r'\bextern\s*"[^"\n]*"\s*\{'
+    flat = re.sub(extern, lambda m: " " * len(m.group(0)), strip_preprocessor(code))
+    first = re.sub(extern, lambda m: " " * len(m.group(0)), first_branches(code))
     start = 0
     k = 0
-    while k < len(flat):
-        c = flat[k]
+    while k < len(first):
+        c = first[k]
         if c == "(":
-            k = matching(flat, k)
+            k = matching(first, k)
             continue
         if c == ";":
             yield start, flat[start:k], None
             start = k = k + 1
             continue
         if c == "{":
-            end = matching(flat, k, "{}")
+            end = matching(first, k, "{}")
             head = flat[start:k]
             if re.search(r"\)\s*$", head):
                 yield start, head, flat[k:end]
@@ -438,10 +524,10 @@ def scan(root):
         with open(p, encoding="utf-8", errors="surrogateescape") as f:
             files[rel] = strip_comments(f.read())
     found = {rule: [] for rule in RULES}
-    for path, code in files.items():
-        for line, key, msg in check_ctype(path, code):
-            found["ctype"].append((path, line, key, msg))
     types = collect_types(files.values())
+    for path, code in files.items():
+        for line, key, msg in check_ctype(path, code, types):
+            found["ctype"].append((path, line, key, msg))
     for path, code in files.items():
         for line, name, params, body in macros(code):
             for problem in macro_problems(name, params, body, types):

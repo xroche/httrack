@@ -47,6 +47,24 @@ char *lint_probe_twin(int x) { return "a"; }
 #else
 char *lint_probe_twin(int x) { if (x) return NULL; return "b"; }
 #endif
+int lint_probe_param(int c) { return isdigit(c); }
+int lint_probe_shadow(int c) { { char c = 'x'; return isdigit(c); } }
+int lint_probe_block(const char *s) { { int c = 0; (void) c; } char c = s[0]; return isspace(c); }
+int lint_probe_for(const char *s) { char c = s[0]; for (int c = 0; c < 1; c++) {} return isalpha(c); }
+int lint_probe_scope(const char *s) { char c = s[0]; { int c = fgetc(stdin); (void) c; } return isupper(c); }
+int lint_probe_fp(char c, int (*cb)(int c)) { return cb(0) + islower(c); }
+int lint_probe_short(short int c) { return isxdigit(c); }
+int lint_probe_branch(int a) {
+#ifdef LINT_X
+  if (a) {
+#else
+  if (!a) {
+#endif
+    return 1;
+  }
+  return 0;
+}
+int lint_probe_late(int x) { if (x) return -1; return 0; }
 C
 cat >>"${h}" <<'H'
 #define lint_twice(x) ((x) + (x))
@@ -57,6 +75,7 @@ cat >>"${h}" <<'H'
 #define lint_generic(x) _Generic((x), int: lint_i, default: lint_d)(x)
 #define lint_generic2(x) (_Generic((x), int: lint_f(x), default: lint_g(x)) + (x))
 #define lint_const(x) (__builtin_constant_p(x) ? lint_c(x) : lint_c(0))
+#define lint_gabs(x) _Generic((x), int: (x) < 0 ? -(x) : (x), default: lint_h(x))
 #define lint_va(ap) lint_vf((va_list *) &(ap))
 #define lint_dup(x) ((x) + (x))
 #define lint_dup(x) ((x) + (x))
@@ -65,6 +84,7 @@ HTS_CHECK_RESULT char *lint_probe_marked(int x);
 int lint_probe_int(int x);
 hts_boolean lint_probe_bool(int x);
 char *lint_probe_twin(int x);
+int lint_probe_late(int x);
 #define lint_cmt(x) ((x) + /* a note \
    that wraps */ (x))
 static inline int lint_probe_after(int x) { if (x) return -1; return 0; }
@@ -88,6 +108,14 @@ at() {
 }
 for want in "src/htslib.c:$(at "${c}" "lint_probe_ctype("): ctype: new violation: isdigit(s[0])" \
     "src/htslib.c:$(at "${c}" "lint_probe_char("): ctype: new violation: isdigit(c)" \
+    "src/htslib.c:$(at "${c}" "lint_probe_shadow("): ctype: new violation: isdigit(c)" \
+    "src/htslib.c:$(at "${c}" "lint_probe_block("): ctype: new violation: isspace(c)" \
+    "src/htslib.c:$(at "${c}" "lint_probe_for("): ctype: new violation: isalpha(c)" \
+    "src/htslib.c:$(at "${c}" "lint_probe_scope("): ctype: new violation: isupper(c)" \
+    "src/htslib.c:$(at "${c}" "lint_probe_fp("): ctype: new violation: islower(c)" \
+    "src/htslib.c:$(at "${c}" "lint_probe_short("): ctype: new violation: isxdigit(c)" \
+    "src/htslib.h:$(at "${h}" "lint_gabs("): macro: new violation: macro lint_gabs: evaluates x twice" \
+    "src/htslib.h:$(at "${h}" "lint_probe_late("): check-result: new violation: lint_probe_late returns failure (int)" \
     "src/lintprobe/probe.c:1: ctype: new violation: isalpha(s[0])" \
     "src/htslib.h:$(at "${h}" "lint_twice("): macro: new violation: macro lint_twice: evaluates x twice" \
     "src/htslib.h:$(at "${h}" "lint_free("): macro: new violation: macro lint_free: uses free name lint_global" \
@@ -104,7 +132,7 @@ for want in "src/htslib.c:$(at "${c}" "lint_probe_ctype("): ctype: new violation
     "src/htslib.h:$(at "${h}" "lint_probe_extern("): check-result: new violation: lint_probe_extern returns failure"; do
     grep -qF "${want}" <<<"${out}" || fail "missed ${want}: ${out}"
 done
-test "$(wc -l <<<"${out}")" -eq 16 || fail "flagged a clean probe: ${out}"
+test "$(wc -l <<<"${out}")" -eq 24 || fail "flagged a clean probe: ${out}"
 
 # Removing a known violation, or listing one that never was, leaves a stale entry.
 rm -r "${work}/src/lintprobe"
