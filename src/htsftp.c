@@ -772,17 +772,18 @@ static SOCaddr *ftp_dns_resolve(httrackp *opt, lien_back *back,
                                 const char *host, SOCaddr *addr, int timeout,
                                 const char **error) {
   const int left = ftp_wait_left(opt, timeout);
+  hts_dns_result dns;
 
   SOCaddr_clear(*addr);
   if (left <= 0) {
-    if (error != NULL)
-      *error = "mirror deadline reached";
+    *error = "mirror deadline reached";
     return NULL;
   }
-  if (hts_dns_resolve_all_bounded(opt, host, addr, 1, left, &back->stop_ftp,
-                                  error) > 0)
-    return SOCaddr_is_valid(*addr) ? addr : NULL;
-  return NULL;
+  if (hts_dns_resolve(opt, host, left, &back->stop_ftp, &dns) == HTS_DNS_OK)
+    SOCaddr_copy_SOCaddr(*addr, dns.addr[0]);
+  else
+    *error = hts_dns_strerror(&dns);
+  return SOCaddr_is_valid(*addr) ? addr : NULL;
 }
 
 // la véritable fonction une fois lancées les routines thread/fork

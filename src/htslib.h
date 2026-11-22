@@ -315,6 +315,7 @@ struct t_dnscache {
   TStamp stored;
   int failures; // consecutive failed resolves, which lengthen the next wait
   int preferred; // index of the address a fallback last connected to
+  int gai_code;  // getaddrinfo()'s code behind a negative record
 };
 
 /* Break t down as UTC into the caller's buffer, HTS_FALSE if that failed.
@@ -603,20 +604,45 @@ int hts_xfread_bytewise_count(void);
    downstream and its allocations add a trailing NUL, so every producer of
    r->size must refuse where http_xfread1() does. */
 HTS_CHECK_RESULT hts_boolean hts_inmem_size_fits(LLint size);
-/* Cached resolver: fill out[0..count-1] with up to max addresses for iadr (in
-   resolver order), returning the count (0 = does not resolve, negative-cached).
+/* Why a resolve gave the addresses it did. */
+typedef enum hts_dns_status {
+  HTS_DNS_OK = 0,
+  HTS_DNS_NONAME,   /* the resolver says the name does not exist */
+  HTS_DNS_TEMPFAIL, /* the resolver could not answer, so ask again later */
+  HTS_DNS_TIMEOUT,
+  HTS_DNS_CANCELLED
+} hts_dns_status;
+
+/* A resolve's answer, owned by the caller. */
+typedef struct hts_dns_result {
+  int count; /* addr[0..count-1], in resolver order; 0 unless status is OK */
+  SOCaddr addr[HTS_MAXADDRNUM];
+  hts_dns_status status;
+  int gai_code;       /* getaddrinfo()'s code behind a failure, else 0 */
+  hts_boolean cached; /* answered by the DNS cache, negatively or not */
+} hts_dns_result;
+
+/* Static English text for res's failure, safe to keep and share. */
+const char *hts_dns_strerror(const hts_dns_result *res);
+
+/* Cached resolver: fill res with iadr's addresses and return res->status.
    Resolves once per host; later calls read the DNS cache. Must hold no lock
    (brackets opt->state.lock itself, never across the resolve). A miss resolves
-   on a worker thread bounded by opt->timeout and cut short by a mirror stop;
-   either reports 0, uncached. */
+   on a worker thread bounded by timeout seconds (<= 0: unbounded) and cut short
+   as soon as *cancel, if given, is raised; neither outcome is cached. */
+hts_dns_status hts_dns_resolve(httrackp *opt, const char *iadr, int timeout,
+                               const volatile hts_boolean *cancel,
+                               hts_dns_result *res);
+/* hts_dns_resolve() bounded by opt->timeout and cut by a mirror stop, copying
+   up to max addresses into out. Returns their count, and the status into
+   *status if given. */
 int hts_dns_resolve_all(httrackp *opt, const char *iadr, SOCaddr *out, int max,
-                        const char **error);
-/* Like hts_dns_resolve_all(), with the wait bounded by timeout seconds (<= 0:
-   unbounded) and cut short as soon as *cancel, if given, is raised. */
+                        hts_dns_status *status);
+/* Like hts_dns_resolve_all(), with hts_dns_resolve()'s timeout and cancel. */
 int hts_dns_resolve_all_bounded(httrackp *opt, const char *iadr, SOCaddr *out,
                                 int max, int timeout,
                                 const volatile hts_boolean *cancel,
-                                const char **error);
+                                hts_dns_status *status);
 /* A resolve running on a worker thread, so the crawl need not wait for it. */
 typedef struct dns_resolve_job hts_dns_job;
 /* hts_dns_poll() result while the worker has not answered. */
@@ -633,9 +659,9 @@ hts_dns_job *hts_dns_job_ref(hts_dns_job *job);
 /* Drop one reference; the worker holds its own. */
 void hts_dns_job_release(hts_dns_job *job);
 /* HTS_DNS_PENDING while job runs. Then the address count, stored in the DNS
-   cache, with *error set when it is 0; -1 if the worker ended without an
+   cache, and the answer in *res if given; -1 if the worker ended without an
    answer. Must hold no lock. */
-int hts_dns_poll(httrackp *opt, hts_dns_job *job, const char **error);
+int hts_dns_poll(httrackp *opt, hts_dns_job *job, hts_dns_result *res);
 /* Returns the index of addr in list[0..count-1], port included, or -1. */
 int hts_dns_addr_index(const SOCaddr *list, int count, const SOCaddr *addr);
 /* Index in iadr's cached list of the address to try first, 0 by default. */
@@ -644,10 +670,12 @@ int hts_dns_preferred(httrackp *opt, const char *iadr);
    The caller must not hold opt->state.lock. */
 void hts_dns_set_preferred(httrackp *opt, const char *iadr,
                            const SOCaddr *addr);
-HTS_INLINE SOCaddr *hts_dns_resolve2(httrackp *opt, const char *iadr,
-                                     SOCaddr *const addr, const char **error);
+/* First address of hts_dns_resolve_all() into *addr, or NULL. */
+SOCaddr *hts_dns_resolve2(httrackp *opt, const char *iadr, SOCaddr *const addr,
+                          hts_dns_status *status);
+/* Uncached and unbounded: first address of hostname into *addr, or NULL. */
 SOCaddr *hts_dns_resolve_nocache2(const char *const hostname,
-                                  SOCaddr *const addr, const char **error);
+                                  SOCaddr *const addr, hts_dns_status *status);
 SOCaddr *hts_dns_resolve_nocache(const char *const hostname,
                                  SOCaddr *const addr);
 

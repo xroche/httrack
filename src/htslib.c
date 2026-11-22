@@ -2579,9 +2579,7 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
 
   if (strcmp(_iadr, "file://") != 0) {  /* non fichier */
     SOCaddr server;
-    SOCaddr addrs[HTS_MAXADDRNUM];
-    int naddr;
-    const char *error = "unknown error";
+    hts_dns_result dns;
 
     // tester un éventuel id:pass et virer id:pass@ si détecté
     const char *const iadr = jump_identification_const(_iadr);
@@ -2622,18 +2620,18 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
 
     // resolve the full address list and pick the requested candidate; the
     // scheduler retries the next index when a connect fails (dead IPv6 etc.)
-    naddr =
-        hts_dns_resolve_all(opt, resolve_host, addrs, HTS_MAXADDRNUM, &error);
+    (void) hts_dns_resolve(opt, resolve_host, opt->timeout, &opt->state.stop,
+                           &dns);
     if (addr_count != NULL) {
-      *addr_count = naddr;
+      *addr_count = dns.count;
     }
     if (addr_index < 0) {
       addr_index = hts_dns_preferred(opt, resolve_host);
-      if (addr_index >= naddr)
+      if (addr_index >= dns.count)
         addr_index = 0;
     }
-    if (addr_index >= 0 && addr_index < naddr) {
-      SOCaddr_copy_SOCaddr(server, addrs[addr_index]);
+    if (addr_index >= 0 && addr_index < dns.count) {
+      SOCaddr_copy_SOCaddr(server, dns.addr[addr_index]);
     }
 
     if (!SOCaddr_is_valid(server)) {
@@ -2641,7 +2639,8 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
       printf("erreur gethostbyname\n");
 #endif
       if (retour != NULL) {
-        htsblk_failf(retour, "Unable to get server's address: %s", error);
+        htsblk_failf(retour, "Unable to get server's address: %s",
+                     hts_dns_strerror(&dns));
       }
       return INVALID_SOCKET;
     }
@@ -2672,15 +2671,19 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
     }
     // bind this address
     if (retour != NULL && strnotempty(retour->req.proxy.bindhost)) {
-      const char *error = "unknown error";
-      SOCaddr bind_addr;
+      hts_dns_result bind_dns;
+      const char *error = NULL;
+      char errbuf[HTS_STRERROR_SIZE];
 
-      if (hts_dns_resolve2(opt, retour->req.proxy.bindhost,
-                             &bind_addr, &error) == NULL
-          || bind(soc, &SOCaddr_sockaddr(bind_addr), 
-                  SOCaddr_size(bind_addr)) != 0) {
-        htsblk_failf(
-            retour, "Unable to bind the specificied server address: %s", error);
+      if (hts_dns_resolve(opt, retour->req.proxy.bindhost, opt->timeout,
+                          &opt->state.stop, &bind_dns) != HTS_DNS_OK)
+        error = hts_dns_strerror(&bind_dns);
+      else if (bind(soc, &SOCaddr_sockaddr(bind_dns.addr[0]),
+                    SOCaddr_size(bind_dns.addr[0])) != 0)
+        error = hts_strerror(hts_socket_errno(), errbuf, sizeof(errbuf));
+      if (error != NULL) {
+        htsblk_failf(retour, "Unable to bind the specified server address: %s",
+                     error);
         deletesoc(soc);
         return INVALID_SOCKET;
       }

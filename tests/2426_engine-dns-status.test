@@ -1,0 +1,13 @@
+#!/bin/bash
+#
+# Each DNS outcome, fresh, negative-cached, cancelled or timed out, reports its
+# own status and message.
+
+set -euo pipefail
+
+out=$(httrack -#test=dnsstatus run)
+
+test "$out" = "dns-status-selftest: OK" || {
+    echo "expected 'dns-status-selftest: OK', got: $out" >&2
+    exit 1
+}

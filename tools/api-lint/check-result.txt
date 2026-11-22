@@ -111,8 +111,6 @@ src/htslib.h: hts_body_missing_unexpectedly
 src/htslib.h: hts_client_hints_of
 src/htslib.h: hts_content_length_agrees
 src/htslib.h: hts_dns_addr_index
-src/htslib.h: hts_dns_resolve2
-src/htslib.h: hts_dns_resolve_nocache2
 src/htslib.h: hts_escape_span
 src/htslib.h: hts_file_backdate
 src/htslib.h: hts_file_mtime

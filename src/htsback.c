@@ -2752,10 +2752,10 @@ static void back_dns_poll(httrackp *opt, struct_back *sback, const int p,
                           int *budget) {
   lien_back *const back = &sback->lnk[p];
   hts_connect_fallback *const cf = &sback->connect_fallback[p];
-  const char *error = NULL;
+  hts_dns_result dns;
   // no job left: resolved, and waiting for the pacing
   const int count =
-      cf->dns_job != NULL ? hts_dns_poll(opt, cf->dns_job, &error) : 1;
+      cf->dns_job != NULL ? hts_dns_poll(opt, cf->dns_job, &dns) : 1;
 
   if (count > 0) {
     back_dns_drop(sback, p);
@@ -2783,11 +2783,13 @@ static void back_dns_poll(httrackp *opt, struct_back *sback, const int p,
   if (count == HTS_DNS_PENDING &&
       (cf->dns_deadline == 0 || mtime_monotonic() < cf->dns_deadline))
     return;
-  if (count == HTS_DNS_PENDING)
-    error = "host name resolution timed out";
+  if (count == HTS_DNS_PENDING) {
+    memset(&dns, 0, sizeof(dns));
+    dns.status = HTS_DNS_TIMEOUT;
+  }
   back->r.statuscode = STATUSCODE_NON_FATAL;
   htsblk_failf(&back->r, "Unable to get server's address: %s",
-               error != NULL ? error : "host name resolution failed");
+               hts_dns_strerror(&dns));
   back_set_finished(opt, sback, p);
 }
 
