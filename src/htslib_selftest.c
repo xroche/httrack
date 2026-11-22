@@ -3823,7 +3823,7 @@ static void span_add_visible(String *out, const char *p, size_t len) {
   }
 }
 
-/* buf [tail-overrun]: the sizes HTS_BUF, HTS_BUF_N and hts_buf_tail give.
+/* buf [tail-overrun]: the sizes HTS_BUF, HTS_BUF_N and hts_buf_skip give.
    tail-overrun takes a tail with no byte left, which must abort. */
 static int st_buf(httrackp *opt, int argc, char **argv) {
   struct {
@@ -3838,19 +3838,19 @@ static int st_buf(httrackp *opt, int argc, char **argv) {
 
   (void) opt;
   if (argc >= 1 && strcmp(argv[0], "tail-overrun") == 0)
-    (void) hts_buf_tail(b, b.size);
+    (void) hts_buf_skip(b, b.size);
   if (b.p != a || b.size != sizeof(a) || HTS_BUF(st.f).p != st.f ||
       HTS_BUF(st.f).size != 7 || HTS_BUF_N(st.g, 64).size != 64 ||
       HTS_BUF_N(a, 1).p != a || HTS_BUF_N(a, 1).size != 1) {
     printf("buf: wrong array size\n");
     bad = 1;
   }
-  t = hts_buf_tail(b, 0);
+  t = hts_buf_skip(b, 0);
   if (t.p != a || t.size != 32) {
     printf("buf: tail 0 moved\n");
     bad = 1;
   }
-  t = hts_buf_tail(b, 31);
+  t = hts_buf_skip(b, 31);
   if (t.p != a + 31 || t.size != 1) {
     printf("buf: tail 31 is %d bytes\n", (int) t.size);
     bad = 1;
@@ -4994,7 +4994,7 @@ const struct selftest_entry selftests_lib[] = {
      "the span iterator matches the rule-list parsers it replaced",
      st_spandiff},
     {"buf", "[tail-overrun]",
-     "the sizes HTS_BUF, HTS_BUF_N and hts_buf_tail give", st_buf},
+     "the sizes HTS_BUF, HTS_BUF_N and hts_buf_skip give", st_buf},
     {"span", "<next|nextsep|split|trim|copy> <args> <text>",
      "the fields and copies the span primitive makes", st_span},
     {"gmtime", "",

@@ -193,7 +193,7 @@ hts_boolean hts_readline_cpp(FILE *fp, hts_buf b, int flags) {
       if (rlen > 0)
         s[--rlen] = '\0';
     }
-    if (readline_trim(fp, hts_buf_tail(b, rlen), flags, &n, &end))
+    if (readline_trim(fp, hts_buf_skip(b, rlen), flags, &n, &end))
       cut = HTS_TRUE;
     rlen += n;
     run = end.other ? end.run : run + end.run;

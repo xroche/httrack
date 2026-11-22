@@ -54,8 +54,8 @@ static HTS_INLINE HTS_UNUSED hts_buf hts_buf_at(char *p, size_t size) {
   return b;
 }
 
-/* Return B without its first OFF bytes. It aborts unless a byte is left. */
-static HTS_INLINE HTS_UNUSED hts_buf hts_buf_tail(hts_buf b, size_t off) {
+/* Return B without its first OFF bytes, aborting unless a byte is left. */
+static HTS_INLINE HTS_UNUSED hts_buf hts_buf_skip(hts_buf b, size_t off) {
   assertf(off < b.size);
   return hts_buf_at(b.p + off, b.size - off);
 }
