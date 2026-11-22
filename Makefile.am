@@ -21,6 +21,7 @@ EXTRA_DIST = INSTALL.Linux \
 		tools/api-lint/ctype.txt \
 		tools/api-lint/macro.txt \
 		tools/api-lint/check-result.txt \
+		tools/api-lint/span.txt \
 		tools/ci-sanitizer-report.sh \
 		tools/ci-test-log.sh \
 		tools/tsan-suppressions.txt \

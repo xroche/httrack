@@ -1,0 +1,122 @@
+#!/bin/bash
+#
+# A connect that fails at once, such as one to a broadcast address, must move
+# on to the next resolved address, like one that fails after select().
+
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+skip_on_windows "nobody has measured which addresses Winsock fails at once"
+if test "${V6_SUPPORT:-}" == "no"; then
+    echo "no IPv6 support (resolver override is IPv6-only), skipping"
+    exit 77
+fi
+
+tmpdir=$(mktemp -d)
+
+cleanup() {
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+local_server_start --log "$tmpdir/srv.out" --bind 127.0.0.1
+
+# Print each address whose non-blocking connect fails at once, with its reason.
+cat >"$tmpdir/probe.py" <<'PYEOF'
+import errno, os, socket, sys
+
+pending = (0, errno.EINPROGRESS, errno.EWOULDBLOCK, errno.EALREADY,
+           getattr(errno, "WSAEWOULDBLOCK", errno.EWOULDBLOCK))
+for addr in sys.argv[2:]:
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.setblocking(False)
+    err = s.connect_ex((addr, int(sys.argv[1])))
+    if err not in pending:
+        print(addr + "\t" + os.strerror(err))
+    s.close()
+PYEOF
+bad=()
+why=()
+while IFS=$'\t' read -r addr reason; do
+    bad+=("$addr")
+    why+=("$reason")
+done < <("${SRV_PYTHON}" "$tmpdir/probe.py" "$SRV_PORT" 255.255.255.255 224.0.0.1)
+
+# crawl NAME ADDRESSES: fetch basic.html from NAME pinned to ADDRESSES
+crawl() {
+    HTTRACK_DEBUG_RESOLVE="$1:$2" \
+        local_crawl --log "$tmpdir/$1.out" "http://$1:${SRV_PORT}/simple/basic.html" -O "$tmpdir/$1" -c1 -%k0 --robots=0 --timeout=5 --retries=0 --quiet -Z
+}
+
+# fetched NAME: the page came, with no error logged
+fetched() {
+    local log="$tmpdir/$1/hts-log.txt"
+    test -f "$tmpdir/$1/$1_${SRV_PORT}/simple/basic.html" ||
+        fail_dump "$1: basic.html not downloaded" "$log"
+    test "$(count_log_errors "$log")" == "0" ||
+        fail_dump "$1: errors reported" "$log"
+}
+
+# control: a live address alone needs no skip
+crawl good.test 127.0.0.1
+fetched good.test
+if grep -q "skipping address" "$tmpdir/good.test/hts-log.txt"; then
+    fail_dump "good.test: a live address was skipped" "$tmpdir/good.test/hts-log.txt"
+fi
+
+test "${#bad[@]}" -ge 1 || skip "no address fails a connect at once here"
+
+# The page links to link.html, and -%k0 gives that fetch its own connect, which
+# must start at the address that worked.
+crawl sync.test "${bad[0]},127.0.0.1"
+fetched sync.test
+log="$tmpdir/sync.test/hts-log.txt"
+links=$(find "$tmpdir/sync.test/sync.test_${SRV_PORT}/simple" -name 'link*.html' | wc -l)
+test "$links" -ge 2 || fail_dump "sync.test: link.html not downloaded" "$log"
+test "$(grep -c "skipping address 1/2 of sync.test: Connect error: ${why[0]}" "$log")" = 1 ||
+    fail_dump "sync.test: the failed address was not skipped exactly once" "$log"
+
+# Linux refuses 127.0.0.2 at once, so this chain also covers the select() fallback.
+case "$HTS_OS" in
+Linux)
+    crawl chain.test "127.0.0.2,${bad[0]},127.0.0.1"
+    fetched chain.test
+    log="$tmpdir/chain.test/hts-log.txt"
+    grep -q "skipping address 2/3 of chain.test: Connect error: ${why[0]}" "$log" ||
+        fail_dump "chain.test: the fallback did not skip the failed address" "$log"
+    ;;
+esac
+
+if test "${#bad[@]}" -ge 2; then
+    # every address fails at once: the slot reports why, and nothing is saved
+    crawl dead.test "${bad[0]},${bad[1]}"
+    log="$tmpdir/dead.test/hts-log.txt"
+    grep -q "skipping address 1/2 of dead.test: Connect error: ${why[0]}" "$log" ||
+        fail_dump "dead.test: the first address was not skipped with its reason" "$log"
+    grep -q "skipping address 2/2 of dead.test: Connect error: ${why[1]}" "$log" ||
+        fail_dump "dead.test: the second address was not tried" "$log"
+    grep -q "Error:.*\"Connect error: ${why[1]}\"" "$log" ||
+        fail_dump "dead.test: the slot did not report the connect error" "$log"
+    test ! -f "$tmpdir/dead.test/dead.test_${SRV_PORT}/simple/basic.html" ||
+        fail "dead.test: file downloaded although every address failed"
+
+    # 60 fetches open 120 sockets under a 64 descriptor limit, so a skipped
+    # socket left open soon fails a fetch with "Unable to create a socket".
+    urls=()
+    for n in $(seq 1 60); do
+        urls+=("http://fd.test:${SRV_PORT}/p$n.html")
+    done
+    (
+        ulimit -n 64
+        HTTRACK_DEBUG_RESOLVE="fd.test:${bad[0]},${bad[1]}" \
+            local_crawl --log "$tmpdir/fd.test.out" "${urls[@]}" -O "$tmpdir/fd.test" -c1 -%k0 --robots=0 --timeout=5 --retries=0 --quiet -Z
+    )
+    subshell_ok $?
+    log="$tmpdir/fd.test/hts-log.txt"
+    test "$(grep -c "Error:.*\"Connect error: ${why[1]}\"" "$log")" = 60 ||
+        fail_dump "fd.test: a skipped address leaked its socket" "$log"
+fi
+
+echo "OK: a connect that fails at once falls back to the next address"

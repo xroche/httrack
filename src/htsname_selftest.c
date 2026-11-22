@@ -36,7 +36,8 @@ Please visit our Website: http://www.httrack.com
 static int st_refname(httrackp *opt, int argc, char **argv) {
   char name[64];
 
-  url_savename_refname(argv[0], argv[1], name);
+  if (!url_savename_refname(argv[0], argv[1], name, sizeof(name)))
+    return 1;
   printf("refname=%s\n", name);
   return 0;
 }
@@ -2118,7 +2119,73 @@ static int st_reserved(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* url_md5() clips its digest, url_savename_refname() refuses a short buffer. */
+static int st_name_sized(httrackp *opt, int argc, char **argv) {
+  /* MD5 of "a=1" */
+  static const char md5[] = "3872c9ae3f427af0be0ead09d07ae2cf";
+  /* The caps are 8 bytes, one byte short, and an exact fit. */
+  const size_t mcaps[] = {8, sizeof(md5) - 1, sizeof(md5)};
+  char want[64];
+  size_t k;
+  int fail = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  if (!url_savename_refname("www.example.com", "/", want, sizeof(want)) ||
+      strlen(want) != strlen(CACHE_REFNAME "/") + 32 + strlen(".ref")) {
+    printf("name-sized: refname is '%s'\n", want);
+    return 1;
+  }
+  for (k = 0; k < 3; k++) {
+    const size_t mcap = mcaps[k];
+    char *buf = st_sized_alloc(mcap);
+
+    if (url_md5(buf, mcap, "/p?a=1") != buf ||
+        !st_sized_clip_ok(buf, mcap, md5)) {
+      printf("name-sized: url_md5 into %u bytes is '%.*s'\n", (unsigned) mcap,
+             (int) mcap, buf);
+      fail = 1;
+    }
+    buf[0] = 'Q';
+    if (url_md5(buf, mcap, "/p") != buf || !st_sized_clip_ok(buf, mcap, "")) {
+      printf("name-sized: url_md5 without a query into %u bytes\n",
+             (unsigned) mcap);
+      fail = 1;
+    }
+    freet(buf);
+  }
+  {
+    const size_t len = strlen(want);
+    const size_t rcaps[] = {8, len, len + 1};
+
+    for (k = 0; k < 3; k++) {
+      const size_t rcap = rcaps[k];
+      char *buf = st_sized_alloc(rcap);
+      hts_boolean fit, ok;
+
+      buf[0] = 'Q'; /* so a refusal must clear it */
+      fit = url_savename_refname("www.example.com", "/", buf, rcap);
+      if (rcap == len + 1)
+        ok = fit && strcmp(buf, want) == 0;
+      else
+        ok = !fit && buf[0] == '\0';
+      if (!ok || !st_sized_guard_ok(buf, rcap)) {
+        printf("name-sized: refname into %u bytes is '%.*s'\n", (unsigned) rcap,
+               (int) rcap, buf);
+        fail = 1;
+      }
+      freet(buf);
+    }
+  }
+  return st_verdict("name-sized", fail);
+}
+
 const struct selftest_entry selftests_name[] = {
+    {"name-sized", "",
+     "url_md5() and url_savename_refname() stay inside the buffer they are "
+     "given",
+     st_name_sized},
     {"urlbounds", "",
      "an over-long path is refused by the wizard and auth consumers",
      st_urlbounds},

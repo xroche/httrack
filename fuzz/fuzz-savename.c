@@ -78,8 +78,8 @@ static void fuzz_line(const char *line, httrackp *opt, cache_back *cache,
   {
     char refname[HTS_URLMAXSIZE * 2];
 
-    url_savename_refname(afs.af.adr, afs.af.fil, refname);
-    savename_sink += (unsigned long) strlen(refname);
+    if (url_savename_refname(afs.af.adr, afs.af.fil, refname, sizeof(refname)))
+      savename_sink += (unsigned long) strlen(refname);
   }
 
   /* The append helpers that build names piece by piece. */
@@ -122,7 +122,8 @@ static void fuzz_line(const char *line, httrackp *opt, cache_back *cache,
   {
     char digest[32 + 1];
 
-    savename_sink += (unsigned long) strlen(url_md5(digest, afs.af.fil));
+    savename_sink +=
+        (unsigned long) strlen(url_md5(digest, sizeof(digest), afs.af.fil));
   }
 }
 

@@ -1,0 +1,1 @@
+# Known span violations. Regenerate: tools/check-api-lint.py --update

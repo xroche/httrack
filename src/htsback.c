@@ -3207,7 +3207,7 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
           if (sz > 0) {         // Fichier non vide? (question bête, sinon on transfert tout!)
             char lastmodified[256];
 
-            get_filetime_rfc822(save, lastmodified);
+            get_filetime_rfc822(save, lastmodified, sizeof(lastmodified));
             if (strnotempty(lastmodified)) { /* pas de If-.. possible */
               hts_log_print(opt, LOG_DEBUG,
                             "File partially present (" LLintP " bytes): %s%s",
@@ -3935,7 +3935,10 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
             }
             continue; // reconnected (stay connecting) or failed
           }
-          if (cf->addr_index > 0) // a fallback worked: start there next time
+          // Start next time at a fallback or skipped address that worked.
+          if (cf->addr_index > 0 ||
+              (cf->addr_count > 1 &&
+               cf->addr_first != hts_dns_preferred(opt, back[i].url_adr)))
             hts_dns_set_preferred(opt, back[i].url_adr, &back[i].r.address);
           /* A keep-alive slot and the post-TLS re-entry share one socket, so
              count it once. */

@@ -500,13 +500,12 @@ static void warc_make_id(warc_writer *w, char out[64]) {
 
 /* Case-insensitive "is this the header named name?" test, tolerating optional
    whitespace before the ':' (non-compliant "Name : value" is still matched). */
-static int header_is(const char *line, size_t line_len, const char *name) {
-  size_t nl = strlen(name), i;
-  if (line_len < nl || hts_strncasecmp(line, name, nl) != 0)
-    return 0;
-  for (i = nl; i < line_len && (line[i] == ' ' || line[i] == '\t'); i++)
-    ;
-  return i < line_len && line[i] == ':';
+static hts_boolean header_is(hts_span line, const char *name) {
+  const hts_span n = hts_span_of(name);
+  return hts_span_starts_with_ci(line, n) &&
+         hts_span_starts_with(
+             hts_span_trim(hts_span_skip(line, n.len), " \t", ""),
+             hts_span_of(":"));
 }
 
 /* Build the normalized HTTP header block from raw resp_hdr into out (no
@@ -524,15 +523,15 @@ static int normalize_http_headers(const char *resp_hdr, long long set_cl,
     return -1;
   all = hts_span_of(resp_hdr);
   for (cur = all.p; hts_span_next(&cur, all.p + all.len, '\n', &line);) {
-    if (line.len > 0 && line.p[line.len - 1] == '\r')
+    if (hts_span_ends_with(line, hts_span_of("\r")))
       line.len--; /* Strip the CR, which is re-added below. */
-    if (line.len == 0)
+    if (hts_span_empty(line))
       break; /* blank line: end of headers */
     if (first) {
       first = 0; /* status line: keep verbatim */
-    } else if (header_is(line.p, line.len, "Transfer-Encoding")) {
+    } else if (header_is(line, "Transfer-Encoding")) {
       continue;
-    } else if (set_cl >= 0 && header_is(line.p, line.len, "Content-Length")) {
+    } else if (set_cl >= 0 && header_is(line, "Content-Length")) {
       continue;
     }
     if (wbuf_add(out, line.p, line.len) != 0 || wbuf_add(out, "\r\n", 2) != 0)
@@ -708,8 +707,7 @@ static int cdx_json_str(wbuf *b, const char *s) {
 /* see htswarc.h */
 void warc_http_header_value(const char *hdr, const char *name, char *out,
                             size_t outsz) {
-  size_t nl = strlen(name);
-  hts_span all, line;
+  hts_span all, line, n;
   const char *cur;
   if (outsz == 0)
     return;
@@ -717,28 +715,22 @@ void warc_http_header_value(const char *hdr, const char *name, char *out,
   if (hdr == NULL)
     return;
   all = hts_span_of(hdr);
+  n = hts_span_of(name);
   for (cur = all.p; hts_span_next(&cur, all.p + all.len, '\n', &line);) {
-    const char *const p = line.p;
-    size_t len = line.len;
-    if (len > 0 && p[len - 1] == '\r')
-      len--;
-    if (len == 0)
+    if (hts_span_ends_with(line, hts_span_of("\r")))
+      line.len--;
+    if (hts_span_empty(line))
       break; /* end of headers */
-    if (len > nl && hts_strncasecmp(p, name, nl) == 0 && p[nl] == ':') {
-      const char *v = p + nl + 1;
-      size_t vlen, k;
-      while (v < p + len && (*v == ' ' || *v == '\t'))
-        v++;
-      vlen = (size_t) (p + len - v);
-      for (k = 0; k < vlen; k++)
-        if (v[k] == ';' || v[k] == ' ' || v[k] == '\t') {
-          vlen = k;
+    if (hts_span_starts_with_ci(line, n) &&
+        hts_span_starts_with(hts_span_skip(line, n.len), hts_span_of(":"))) {
+      hts_span v = hts_span_trim(hts_span_skip(line, n.len + 1), " \t", "");
+      size_t k;
+      for (k = 0; k < v.len; k++)
+        if (v.p[k] == ';' || v.p[k] == ' ' || v.p[k] == '\t') {
+          v.len = k;
           break;
         }
-      if (vlen >= outsz)
-        vlen = outsz - 1;
-      memcpy(out, v, vlen);
-      out[vlen] = '\0';
+      (void) hts_span_copy(v, out, outsz);
       return;
     }
   }

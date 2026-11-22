@@ -1,0 +1,20 @@
+#!/bin/bash
+#
+# The sizes hts_buf gives (-#test=buf), and the abort of a tail with no byte
+# left. Test 2401 checks that a pointer does not compile.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+assert_selftest "buf: OK" buf
+
+ulimit -c 0 # a deliberate abort must not litter the box with cores
+rc=0
+out=$(httrack -O /dev/null "-#test=buf" tail-overrun 2>&1) || rc=$?
+test "$rc" -ne 0 || fail "a tail with no byte left did not abort"
+case "$out" in
+*"off < b.size failed at"*htsbuf.h*) ;;
+*) fail "a tail with no byte left failed another way (exit $rc): $out" ;;
+esac

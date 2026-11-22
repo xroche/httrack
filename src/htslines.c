@@ -81,15 +81,11 @@ FILE *hts_fopen_private_new(const char *name, const char *mode) {
   return fopen_private(name, mode, HTS_TRUE);
 }
 
-/* hts_readline_raw() keeps every byte. */
-#define LINE_RAW 0x100
-
 /* Is c one of the bytes flags drop? */
 static hts_boolean line_drops(int c, int flags) {
-  return (flags & LINE_RAW) == 0 &&
-         (c == '\r' || ((flags & HTS_LINE_DROP_TAB) != 0 && c == '\t') ||
-          ((flags & HTS_LINE_DROP_FF) != 0 && c == '\f') ||
-          ((flags & HTS_LINE_DROP_NUL) != 0 && c == '\0'));
+  return c == '\r' || ((flags & HTS_LINE_DROP_TAB) != 0 && c == '\t') ||
+         ((flags & HTS_LINE_DROP_FF) != 0 && c == '\f') ||
+         ((flags & HTS_LINE_DROP_NUL) != 0 && c == '\0');
 }
 
 /* How a line ends once trimmed, which decides whether it continues. */
@@ -133,7 +129,7 @@ static hts_boolean readline_end(FILE *fp, char *s, size_t max, int flags,
     }
     if (j + 1 < max)
       s[j++] = (char) c;
-    else if ((flags & LINE_RAW) != 0 || !is_realspace(c))
+    else if (!is_realspace(c))
       cut = HTS_TRUE;
   }
   s[j] = '\0';
@@ -141,11 +137,11 @@ static hts_boolean readline_end(FILE *fp, char *s, size_t max, int flags,
   return cut;
 }
 
-hts_boolean hts_readline(FILE *fp, char *s, size_t max, int flags) {
+hts_boolean hts_readline(FILE *fp, hts_buf s, int flags) {
   size_t len;
   line_end end;
 
-  return readline_end(fp, s, max, flags, &len, &end);
+  return readline_end(fp, s.p, s.size, flags, &len, &end);
 }
 
 int linput(FILE *fp, char *s, int max) {
@@ -159,16 +155,11 @@ int linput(FILE *fp, char *s, int max) {
   return (int) len;
 }
 
-hts_boolean hts_readline_raw(FILE *fp, char *s, size_t max, size_t *len) {
-  line_end end;
-
-  return readline_end(fp, s, max, LINE_RAW, len, &end);
-}
-
 /* readline_end(), then the trim hts_readline_cpp() does on each line. */
-static hts_boolean readline_trim(FILE *fp, char *s, size_t max, int flags,
-                                 size_t *len, line_end *end) {
-  const hts_boolean cut = readline_end(fp, s, max, flags, len, end);
+static hts_boolean readline_trim(FILE *fp, hts_buf b, int flags, size_t *len,
+                                 line_end *end) {
+  char *const s = b.p;
+  const hts_boolean cut = readline_end(fp, s, b.size, flags, len, end);
   size_t n = *len;
   size_t i = 0;
 
@@ -185,7 +176,8 @@ static hts_boolean readline_trim(FILE *fp, char *s, size_t max, int flags,
   return cut;
 }
 
-hts_boolean hts_readline_cpp(FILE *fp, char *s, size_t max, int flags) {
+hts_boolean hts_readline_cpp(FILE *fp, hts_buf b, int flags) {
+  char *const s = b.p;
   hts_boolean cut = HTS_FALSE;
   size_t rlen = 0;
   /* trailing backslashes of the whole joined line, stored or not */
@@ -201,7 +193,7 @@ hts_boolean hts_readline_cpp(FILE *fp, char *s, size_t max, int flags) {
       if (rlen > 0)
         s[--rlen] = '\0';
     }
-    if (readline_trim(fp, s + rlen, max - rlen, flags, &n, &end))
+    if (readline_trim(fp, hts_buf_skip(b, rlen), flags, &n, &end))
       cut = HTS_TRUE;
     rlen += n;
     run = end.other ? end.run : run + end.run;

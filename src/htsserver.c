@@ -2986,9 +2986,10 @@ int smallserver_setkeyarr(const char *key, int id, const char *key2, const char 
    pair, and the next pair still lines up. */
 static hts_boolean lang_read_pair(FILE *fp, char *key, char *value,
                                   size_t size) {
-  const hts_boolean key_cut = hts_readline_cpp(fp, key, size, HTS_LINES_SERVER);
+  const hts_boolean key_cut =
+      hts_readline_cpp(fp, hts_buf_at(key, size), HTS_LINES_SERVER);
   const hts_boolean value_cut =
-      hts_readline_cpp(fp, value, size, HTS_LINES_SERVER);
+      hts_readline_cpp(fp, hts_buf_at(value, size), HTS_LINES_SERVER);
 
   if (key_cut || value_cut) {
     fprintf(stderr, "lang: line too long, ignored\n");

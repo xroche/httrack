@@ -319,6 +319,8 @@ ci_suite_heartbeat() {
 # private-run-files checks POSIX file modes, which Windows does not have.
 # fd-setsize tests the POSIX fd_set ceiling, and a Winsock fd_set has none.
 # syscall-trim traces the engine with strace, which only a Linux engine has.
+# connect-sync-fallback needs addresses that fail a connect at once, and nobody
+# has measured which ones Winsock fails that way.
 expected_skips_msys="01_engine-usercommand.test
 01_engine-footer-overflow.test
 253_local-ftp-close-once.test
@@ -331,6 +333,7 @@ expected_skips_msys="01_engine-usercommand.test
 158_local-link-control-bytes.test
 114_local-update-304-leak.test
 283_engine-cmdline-leak.test
+2428_local-connect-sync-fallback.test
 120_local-proxytrack-webdav-default.test
 143_engine-backtrace-empty.test
 152_engine-string-oom.test
@@ -391,6 +394,8 @@ expected_skips_msys="01_engine-usercommand.test
 # private-run-files checks POSIX file modes, which Windows does not have.
 # fd-setsize tests the POSIX fd_set ceiling, and a Winsock fd_set has none.
 # syscall-trim traces the engine with strace, which only a Linux engine has.
+# connect-sync-fallback needs addresses that fail a connect at once, and nobody
+# has measured which ones Winsock fails that way.
 expected_skips_wsl2="01_engine-usercommand.test
 01_engine-footer-overflow.test
 253_local-ftp-close-once.test
@@ -403,6 +408,7 @@ expected_skips_wsl2="01_engine-usercommand.test
 158_local-link-control-bytes.test
 114_local-update-304-leak.test
 283_engine-cmdline-leak.test
+2428_local-connect-sync-fallback.test
 120_local-proxytrack-webdav-default.test
 143_engine-backtrace-empty.test
 152_engine-string-oom.test

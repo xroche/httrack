@@ -125,7 +125,7 @@ Please visit our Website: http://www.httrack.com
 /* END specific definitions */
 
 static void deletesoc_r(htsblk *r);
-static void time_rfc822_local(char *s, struct tm *A);
+static void time_rfc822_local(char *s, size_t size, struct tm *A);
 
 /* variables globales */
 int _DEBUG_HEAD;
@@ -1032,7 +1032,7 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
           char BIGSTK protocol[256], url[HTS_URLMAXSIZE * 2], method[256];
 
           /* a TAB may separate the request line's words */
-          hts_readline(fp, line, 1000, HTS_LINE_DROP_FF);
+          hts_readline(fp, HTS_BUF_N(line, 1000), HTS_LINE_DROP_FF);
           /* widths bound method[256], url[HTS_URLMAXSIZE*2], protocol[256] */
           if (sscanf(line, "%255s %2047s %255s", method, url, protocol) == 3) {
             // http proxy: absolute-URI; socks/CONNECT tunnel: origin-form
@@ -2530,6 +2530,17 @@ int hts_socket_connect(T_SOC soc, const struct sockaddr *addr, SOClen len,
   return connect(soc, addr, len);
 }
 
+hts_boolean hts_socket_connect_started(T_SOC soc, const SOCaddr *server,
+                                       const httrackp *opt,
+                                       hts_boolean *pending) {
+  const hts_boolean wait = hts_socket_connect(soc, &SOCaddr_sockaddr(*server),
+                                              SOCaddr_size(*server), opt) != 0;
+
+  if (pending != NULL)
+    *pending = wait;
+  return !wait || hts_socket_connect_pending();
+}
+
 hts_boolean hts_socket_is_mptcp(T_SOC soc) {
 #if HTS_INET_MPTCP_INFO
   struct mptcp_info info;
@@ -2583,18 +2594,19 @@ static hts_dns_status newhttp_bind_resolve(httrackp *opt, const char *host,
   return hts_dns_resolve(opt, host, opt->timeout, &opt->state.stop, res);
 }
 
-/* Open a non-blocking connect to *server, from the first bind_dns address of
-   its family that binds. On failure, set retour's message and *bind_failed. */
+/* Open a non-blocking connect to *server from the first bind_dns address of
+   its family that binds. On failure, set retour's message, and set *try_next
+   when the next address may work. */
 static T_SOC newhttp_open(httrackp *opt, htsblk *retour, SOCaddr *server,
                           int port, const hts_dns_result *bind_dns,
-                          hts_boolean *bind_failed) {
+                          hts_boolean *try_next) {
   const int family = SOCaddr_sinfamily(*server);
   const SOCaddr *local = NULL;
   T_SOC soc = INVALID_SOCKET;
   int i;
 
   assertf(retour != NULL);
-  *bind_failed = HTS_FALSE;
+  *try_next = HTS_FALSE;
   // make a copy for external clients
   SOCaddr_copy_SOCaddr(retour->address, *server);
   retour->address_size = SOCaddr_size(retour->address);
@@ -2627,7 +2639,7 @@ static T_SOC newhttp_open(httrackp *opt, htsblk *retour, SOCaddr *server,
       htsblk_failf(retour, HTS_DNS_BIND_PREFIX "%s",
                    "no address of the server's family");
     if (soc == INVALID_SOCKET && local == NULL) {
-      *bind_failed = HTS_TRUE;
+      *try_next = HTS_TRUE;
       return INVALID_SOCKET;
     }
   } else {
@@ -2655,9 +2667,18 @@ static T_SOC newhttp_open(httrackp *opt, htsblk *retour, SOCaddr *server,
   }
   HTS_STAT.last_connect = mtime_local();
 
-  // non-blocking: back_wait sees how the connect ended
-  (void) hts_socket_connect(soc, &SOCaddr_sockaddr(*server),
-                            SOCaddr_size(*server), local != NULL ? NULL : opt);
+  // non-blocking: back_wait sees how a pending connect ended
+  if (!hts_socket_connect_started(soc, server, local != NULL ? NULL : opt,
+                                  NULL)) {
+    const int last_errno = hts_socket_errno();
+    char errbuf[HTS_STRERROR_SIZE];
+
+    htsblk_failf(retour, "Connect error: %s",
+                 hts_strerror(last_errno, errbuf, sizeof(errbuf)));
+    deletesoc(soc);
+    *try_next = HTS_TRUE;
+    return INVALID_SOCKET;
+  }
   return soc;
 }
 
@@ -2682,7 +2703,7 @@ T_SOC newhttp_addrs(httrackp *opt, const char *_iadr, htsblk *retour, int port,
     SOCaddr server;
     hts_dns_result dns, bind_res;
     const hts_dns_result *bind_dns = NULL;
-    hts_boolean bind_failed = HTS_FALSE;
+    hts_boolean try_next = HTS_FALSE;
     char msg[sizeof(retour->msg)];
     int t;
 
@@ -2757,16 +2778,17 @@ T_SOC newhttp_addrs(httrackp *opt, const char *_iadr, htsblk *retour, int port,
       bind_dns = &bind_res;
     }
 
-    /* A first connect skips addresses it cannot bind for, and
-       back_connect_next() does the same for a fallback. */
+    /* A first connect skips addresses it cannot bind for or connect to at
+       once, and back_connect_next() does the same for a fallback. */
     strcpybuff(msg, retour->msg);
     for (t = 0; t < tries && t < dns.count; t++) {
       SOCaddr_copy_SOCaddr(server, dns.addr[(addr_index + t) % dns.count]);
-      soc = newhttp_open(opt, retour, &server, port, bind_dns, &bind_failed);
-      if (soc != INVALID_SOCKET || !bind_failed)
+      soc = newhttp_open(opt, retour, &server, port, bind_dns, &try_next);
+      if (soc != INVALID_SOCKET || !try_next)
         break;
-      hts_log_print(opt, LOG_DEBUG, "cannot bind for address %d/%d of %s",
-                    (addr_index + t) % dns.count + 1, dns.count, resolve_host);
+      hts_log_print(opt, LOG_DEBUG, "skipping address %d/%d of %s: %s",
+                    (addr_index + t) % dns.count + 1, dns.count, resolve_host,
+                    retour->msg);
     }
     if (soc != INVALID_SOCKET) {
       // a skipped address must not leave its reason on a working connect
@@ -3063,8 +3085,8 @@ hts_boolean hts_timeout_elapsed(TStamp since_ms, TStamp now_ms, int timeout_s) {
 }
 
 /* Writes t seconds as days, hours, minutes and seconds, dropping the empty
-   leading units. The caller's buffer holds 256 bytes. */
-static void duration_str(char *st, TStamp t, hts_boolean quick) {
+   leading units, clipped to size bytes. */
+static void duration_str(char *st, size_t size, TStamp t, hts_boolean quick) {
   const int j = (int) (t / (3600 * 24));
   int h, m, s;
 
@@ -3076,36 +3098,41 @@ static void duration_str(char *st, TStamp t, hts_boolean quick) {
   s = (int) t;
 
   if (j > 0)
-    snprintf(st, 256,
+    snprintf(st, size,
              quick == HTS_TRUE ? "%dd,%02dh,%02dmin%02ds"
                                : "%d days, %d hours %d minutes %d seconds",
              j, h, m, s);
   else if (h > 0)
-    snprintf(st, 256,
+    snprintf(st, size,
              quick == HTS_TRUE ? "%dh,%02dmin%02ds"
                                : "%d hours %d minutes %d seconds",
              h, m, s);
   else if (m > 0)
-    snprintf(st, 256,
+    snprintf(st, size,
              quick == HTS_TRUE ? "%dmin%02ds" : "%d minutes %d seconds", m, s);
   else
-    snprintf(st, 256, quick == HTS_TRUE ? "%ds" : "%d seconds", s);
+    snprintf(st, size, quick == HTS_TRUE ? "%ds" : "%d seconds", s);
 }
 
-void sec2str(char *st, TStamp t) { duration_str(st, t, HTS_FALSE); }
+void sec2str(char *st, size_t size, TStamp t) {
+  duration_str(st, size, t, HTS_FALSE);
+}
 
-HTSEXT_API void qsec2str(char *st, TStamp t) { duration_str(st, t, HTS_TRUE); }
+// the 32 bytes httrack-library.h documents, which the longest form fits
+HTSEXT_API void qsec2str(char *st, TStamp t) {
+  duration_str(st, 32, t, HTS_TRUE);
+}
 
-// heure actuelle, GMT, format rfc (taille buffer 256o)
-void time_gmt_rfc822(char *s) {
+void time_gmt_rfc822(char *s, size_t size) {
   time_t tt;
   struct tm tmv;
 
+  assertf(size != 0);
   tt = time(NULL);
   /* no local-time fallback: it would format local time and still label it GMT
    * (#806) */
   if (hts_gmtime(tt, &tmv))
-    time_rfc822(s, &tmv);
+    time_rfc822(s, size, &tmv);
   else
     s[0] = '\0';
 }
@@ -3119,14 +3146,14 @@ void hts_now_iso8601(char out[32]) {
   strftime(out, 32, "%Y-%m-%dT%H:%M:%SZ", &tmv);
 }
 
-// heure actuelle, format rfc (taille buffer 256o)
-void time_local_rfc822(char *s) {
+void time_local_rfc822(char *s, size_t size) {
   time_t tt;
   struct tm tmv;
 
+  assertf(size != 0);
   tt = time(NULL);
   if (hts_localtime(tt, &tmv))
-    time_rfc822_local(s, &tmv);
+    time_rfc822_local(s, size, &tmv);
   else
     s[0] = '\0';
 }
@@ -3323,9 +3350,10 @@ hts_boolean hts_file_backdate(const char *file, int seconds) {
 }
 
 /* Note: utf-8 */
-int get_filetime_rfc822(const char *file, char *date) {
+int get_filetime_rfc822(const char *file, char *date, size_t size) {
   STRUCT_STAT buf;
 
+  assertf(size != 0);
   date[0] = '\0';
   if (STAT(file, &buf) == 0) {
     struct tm tmv;
@@ -3334,31 +3362,30 @@ int get_filetime_rfc822(const char *file, char *date) {
     /* no local-time fallback: it would format local time and still label it GMT
      * (#806) */
     if (hts_gmtime(tt, &tmv)) {
-      time_rfc822(date, &tmv);
+      time_rfc822(date, size, &tmv);
       return 1;
     }
   }
   return 0;
 }
 
-// RFC 822 date in GMT (256-byte buffer)
-void time_rfc822(char *s, struct tm *A) {
+void time_rfc822(char *s, size_t size, struct tm *A) {
   if (A == NULL) {
     int localtime_returned_null = 0;
 
     assertf(localtime_returned_null);
   }
-  hts_format_rfc822(s, 256, A, " GMT");
+  hts_format_rfc822(s, size, A, " GMT");
 }
 
-// RFC 822 date in local time (256-byte buffer)
-static void time_rfc822_local(char *s, struct tm *A) {
+// Writes A as an RFC 822 date in local time.
+static void time_rfc822_local(char *s, size_t size, struct tm *A) {
   if (A == NULL) {
     int localtime_returned_null = 0;
 
     assertf(localtime_returned_null);
   }
-  hts_format_rfc822(s, 256, A, "");
+  hts_format_rfc822(s, size, A, "");
 }
 
 // conversion en b,Kb,Mb
@@ -3677,10 +3704,13 @@ const char *login_start(const char *adr) {
 
 /* Returns adr past its login, or login_start(adr) when it has none. */
 const char *login_end(const char *adr) {
-  const char *const start = login_start(adr);
-  const char *const at = strrchr_limit(start, '@', hts_authority_end(start));
+  const char *s = adr;
+  hts_url_view v;
 
-  return at != NULL ? at : start;
+  while (hts_isspace((unsigned char) *s))
+    s++;
+  (void) hts_url_view_parse(s, strlen(s), &v);
+  return v.userinfo.p != NULL ? v.host.p : login_start(adr);
 }
 
 hts_boolean hts_escape_typed_login(const char *url, char *dst, size_t size) {
@@ -3862,9 +3892,8 @@ hts_boolean hts_query_key_stripped(const char *arg, size_t keylen,
 
   while (hts_span_next(&cur, end, ',', &tok)) {
     tok = hts_span_trim(tok, " ", " ");
-    if (tok.len == 1 && tok.p[0] == '*')
-      return HTS_TRUE;
-    if (tok.len == keylen && strncmp(tok.p, arg, keylen) == 0)
+    if (hts_span_eq(tok, hts_span_of("*")) ||
+        hts_span_eq(tok, hts_span_at(arg, keylen)))
       return HTS_TRUE;
   }
   return HTS_FALSE;
@@ -3942,7 +3971,7 @@ static const char *hts_query_strip_keys_match(const char *rules,
     hts_span pattern, keys;
     char BIGSTK pat[HTS_URLMAXSIZE * 2];
 
-    if (line.len == 0)
+    if (hts_span_empty(line))
       continue;
     if (hts_span_split(line, '=', &pattern, &keys)) {
       /* Clip a too-long pattern, never skip it. */
@@ -3986,8 +4015,8 @@ const char *hts_strip_query_rules(httrackp *opt) {
    rule is. HTS_FALSE when either side is empty. */
 static hts_boolean hts_host_alias_split(hts_span rule, hts_span *aliases,
                                         hts_span *canon) {
-  return hts_span_split(rule, '=', aliases, canon) && aliases->len != 0 &&
-         canon->len != 0;
+  return hts_span_split(rule, '=', aliases, canon) &&
+         !hts_span_empty(*aliases) && !hts_span_empty(*canon);
 }
 
 /* see htscore.h */
@@ -4012,7 +4041,7 @@ const char *hts_host_alias_match(const char *rules, const char *host,
 
       /* A trailing slash is not part of a path. */
       alias = hts_span_trim(alias, " \t", " \t/");
-      if (alias.len != 0 && hts_span_copy(alias, glob, sizeof(glob))) {
+      if (!hts_span_empty(alias) && hts_span_copy(alias, glob, sizeof(glob))) {
         char *ghost;
 
         /* the collapse applies to the pattern too, so a rule may spell either
@@ -4227,7 +4256,7 @@ static hts_boolean hts_host_alias_token_ok(hts_span token, hts_boolean glob) {
   size_t len;
 
   token = hts_span_trim(token, " \t", " \t");
-  if (token.len == 0 || !hts_span_copy(token, buff, sizeof(buff)))
+  if (hts_span_empty(token) || !hts_span_copy(token, buff, sizeof(buff)))
     return HTS_FALSE;
   len = token.len;
   while (len > 0 && buff[len - 1] == '/')
@@ -4281,8 +4310,8 @@ const char *hts_host_alias_looping(const char *rules, hts_boolean collapse_www,
     char BIGSTK canon[HTS_URLMAXSIZE * 2], tmp[HTS_URLMAXSIZE * 2];
     hts_boolean settled;
 
-    if (!hts_span_split(line, '=', &aliases, &target) || target.len == 0 ||
-        !hts_span_copy(target, canon, sizeof(canon)))
+    if (!hts_span_split(line, '=', &aliases, &target) ||
+        hts_span_empty(target) || !hts_span_copy(target, canon, sizeof(canon)))
       continue;
     (void) hts_host_alias_resolve(rules, canon, collapse_www, tmp, sizeof(tmp),
                                   &settled);
@@ -4314,20 +4343,23 @@ HTSEXT_API char *adr_normalized(const char *source, char *dest) {
 
 int hts_basic_auth_value(httrackp *opt, const char *url, char *out,
                          size_t out_size) {
-  const char *const a = jump_identification_const(url);
-  const char *const astart = jump_protocol_const(url);
-  const size_t idlen = a > astart ? (size_t) (a - astart) - 1 : 0;
+  hts_url_view v;
+  size_t idlen;
   char user_pass[768];
 
   assertf(out_size >= 1100); /* base-64 of 765 bytes is 1020 */
   out[0] = user_pass[0] = '\0';
+  (void) hts_url_view_parse(url, strlen(url), &v);
+  // no login where jump_identification_const() keeps the URL whole
+  idlen = jump_identification_const(url) == v.host.p ? v.userinfo.len : 0;
   if (idlen == 0)
     return 0;
   /* a clipped credential authenticates as somebody else, and an encoded one
      wider than bauth_chain.auth could not be stored for the child pages */
   if (idlen > (sizeof(((bauth_chain *) 0)->auth) - 1) / 4 * 3)
     return -1;
-  strncatbuff(user_pass, astart, (int) idlen);
+  memcpy(user_pass, v.userinfo.p, idlen);
+  user_pass[idlen] = '\0';
   strcpybuff(user_pass, unescape_http(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                                       user_pass));
   code64((unsigned char *) user_pass, (int) strlen(user_pass),
@@ -4337,16 +4369,14 @@ int hts_basic_auth_value(httrackp *opt, const char *url, char *out,
 }
 
 hts_boolean hts_sni_hostname(const char *url_adr, char *out, size_t size) {
-  const char *const host = jump_identification_const(url_adr);
-  const char *const colon = strchr(host, ':');
-  size_t len = (size_t) (hts_authority_end(host) - host);
+  hts_url_view v;
 
-  if (colon != NULL && (size_t) (colon - host) < len)
-    len = (size_t) (colon - host);
+  (void) hts_url_view_parse(url_adr, strlen(url_adr), &v);
   out[0] = '\0';
-  if (len == 0 || len >= size || host[0] == '[' || hts_host_is_ipv4(host, len))
+  if (v.host.len == 0 || v.host.len >= size || v.host.p[0] == '[' ||
+      hts_host_is_ipv4(v.host.p, v.host.len))
     return HTS_FALSE;
-  strlncatbuff(out, host, size, len);
+  strlncatbuff(out, v.host.p, size, v.host.len);
   return HTS_TRUE;
 }
 
@@ -4418,14 +4448,6 @@ static size_t engine_scheme_len(const char *s, size_t len) {
   return 0;
 }
 
-static hts_span span_of(const char *from, const char *to) {
-  hts_span r;
-
-  r.p = from;
-  r.len = (size_t) (to - from);
-  return r;
-}
-
 /* Is the span a decimal port in 0..65535? Empty and 0 pass, because
    hts_parse_url_port() checks the 1..65535 range. */
 static hts_boolean port_is_valid(hts_span port) {
@@ -4446,24 +4468,25 @@ hts_boolean hts_url_view_parse(const char *s, size_t len, hts_url_view *v) {
   const char *const end = s + len;
   const char *p = s;
   const char *auth_end, *at, *q;
+  hts_span auth;
   hts_boolean ok = HTS_TRUE;
   size_t n;
 
   memset(v, 0, sizeof(*v));
   if ((n = engine_scheme_len(s, len)) != 0) {
-    v->scheme = span_of(s, s + n - 1);
+    v->scheme = hts_span_at(s, n - 1);
     p = s + n;
   } else if (len != 0 && hts_isalpha((unsigned char) s[0])) {
     for (q = s + 1; q < end && (hts_isalnum((unsigned char) *q) || *q == '+' ||
                                 *q == '-' || *q == '.');
          q++)
       ;
-    if (end - q >= 3 && memcmp(q, "://", 3) == 0) {
-      v->scheme = span_of(s, q);
+    if (hts_span_starts_with(hts_span_between(q, end), hts_span_of("://"))) {
+      v->scheme = hts_span_between(s, q);
       p = q + 1;
     }
   }
-  if (end - p >= 2 && p[0] == '/' && p[1] == '/')
+  if (hts_span_starts_with(hts_span_between(p, end), hts_span_of("//")))
     p += 2;
 
   // the same set as hts_authority_end(), but a NUL is data here
@@ -4475,56 +4498,55 @@ hts_boolean hts_url_view_parse(const char *s, size_t len, hts_url_view *v) {
     if (*q == '@')
       at = q;
   if (at != NULL) {
-    v->userinfo = span_of(p, at);
+    v->userinfo = hts_span_between(p, at);
     p = at + 1;
   }
 
-  if (p < auth_end && *p == '[') {
-    const char *const close = memchr(p, ']', (size_t) (auth_end - p));
+  auth = hts_span_between(p, auth_end);
+  if (hts_span_starts_with(auth, hts_span_of("["))) {
+    hts_span inside, rest;
 
-    if (close != NULL && (close + 1 == auth_end || close[1] == ':')) {
-      v->host = span_of(p, close + 1);
-      if (close + 1 != auth_end)
-        v->port = span_of(close + 2, auth_end);
+    if (hts_span_split(auth, ']', &inside, &rest) &&
+        (hts_span_empty(rest) ||
+         hts_span_starts_with(rest, hts_span_of(":")))) {
+      v->host = hts_span_at(auth.p, inside.len + 1);
+      if (!hts_span_empty(rest))
+        v->port = hts_span_skip(rest, 1);
     } else {
-      v->host = span_of(p, auth_end);
+      v->host = auth;
       ok = HTS_FALSE;
     }
-  } else {
-    const char *const colon = memchr(p, ':', (size_t) (auth_end - p));
-
-    v->host = span_of(p, colon != NULL ? colon : auth_end);
-    if (colon != NULL)
-      v->port = span_of(colon + 1, auth_end);
+  } else if (!hts_span_split(auth, ':', &v->host, &v->port)) {
+    v->host = auth;
   }
   if (v->port.p != NULL && !port_is_valid(v->port))
     ok = HTS_FALSE;
 
   for (q = auth_end; q < end && *q != '?' && *q != '#'; q++)
     ;
-  v->path = span_of(auth_end, q);
+  v->path = hts_span_between(auth_end, q);
   if (q < end && *q == '?') {
     const char *const query = q + 1;
 
     for (q = query; q < end && *q != '#'; q++)
       ;
-    v->query = span_of(query, q);
+    v->query = hts_span_between(query, q);
   }
   if (q < end)
-    v->fragment = span_of(q + 1, end);
+    v->fragment = hts_span_between(q + 1, end);
   return ok;
 }
 
 // find the authority's port (:80) or NULL; handles IPv6 literals
 const char *jump_toport_const(const char *source) {
-  // start at the host jump_identification_const() picks, so callers agree
-  const char *const host = jump_identification_const(source);
-  // a ':' or ']' in the path, query or fragment is not the authority's
-  const char *const end = hts_authority_end(host);
-  const char *const bracket = strrchr_limit(host, ']', end);
-  const char *const from = bracket != NULL ? bracket : host;
+  hts_url_view v;
 
-  return memchr(from, ':', (size_t) (end - from));
+  (void) hts_url_view_parse(source, strlen(source), &v);
+  // jump_identification_const() keeps these whole, so their ':' is the port
+  if (v.scheme.p != NULL &&
+      (strcmp(source, "file://") == 0 || jump_protocol_const(source) == source))
+    return source + v.scheme.len;
+  return v.port.p != NULL ? v.port.p - 1 : NULL;
 }
 
 DECLARE_NON_CONST_VERSION(jump_toport)
