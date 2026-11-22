@@ -198,7 +198,7 @@ if test "$HTS_OS" = Linux && test "$(suite_backend)" = posix &&
         if awk -v a="${accept%%$'\n'*}" -v s="${start}" \
             'BEGIN { exit !(s > 0 && a - s >= 11) }'; then
             crawled bindlate "${log}"
-            test "$(grep -c "cannot bind for address 2/2" <<<"${log}")" = 1 ||
+            test "$(grep -c "skipping address 2/2 of late.test: Unable to bind" <<<"${log}")" = 1 ||
                 fail "the second fetch did not start at 127.0.0.1: ${log}"
         else
             echo "the late connect was accepted too early, skipping its case"

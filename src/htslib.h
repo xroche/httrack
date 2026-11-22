@@ -513,8 +513,9 @@ T_SOC newhttp(httrackp *opt, const char *iadr, htsblk *retour, int port);
 T_SOC newhttp_addr(httrackp *opt, const char *iadr, htsblk *retour, int port,
                    int addr_index, int *addr_count);
 /* Like newhttp_addr(), but try up to tries addresses from addr_index on (all
-   of them for -1), skipping one -%b cannot bind for. On success, *skipped (if
-   non-NULL) gets how many were skipped before the one opened. */
+   of them for -1), skipping one -%b cannot bind for or whose connect fails at
+   once. On success, *skipped (if non-NULL) gets how many were skipped before
+   the one opened. */
 T_SOC newhttp_addrs(httrackp *opt, const char *iadr, htsblk *retour, int port,
                     int addr_index, int tries, int *addr_count, int *skipped);
 /* Clips the formatted failure reason into r->msg, which also round-trips

@@ -1,0 +1,95 @@
+#!/bin/bash
+#
+# A connect that fails at once, such as one to a broadcast address, must move
+# on to the next resolved address, like one that fails after select().
+
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+if test "${V6_SUPPORT:-}" == "no"; then
+    echo "no IPv6 support (resolver override is IPv6-only), skipping"
+    exit 77
+fi
+
+tmpdir=$(mktemp -d)
+
+cleanup() {
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+local_server_start --log "$tmpdir/srv.out" --bind 127.0.0.1
+
+# Print the addresses whose non-blocking connect fails before returning.
+cat >"$tmpdir/probe.py" <<'PYEOF'
+import errno, socket, sys
+
+pending = (0, errno.EINPROGRESS, errno.EWOULDBLOCK, errno.EALREADY,
+           getattr(errno, "WSAEWOULDBLOCK", errno.EWOULDBLOCK))
+for addr in sys.argv[2:]:
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.setblocking(False)
+    if s.connect_ex((addr, int(sys.argv[1]))) not in pending:
+        print(addr)
+    s.close()
+PYEOF
+mapfile -t bad < <("${SRV_PYTHON}" "$tmpdir/probe.py" "$SRV_PORT" \
+    255.255.255.255 224.0.0.1)
+
+# crawl NAME ADDRESSES: fetch basic.html from NAME pinned to ADDRESSES
+crawl() {
+    HTTRACK_DEBUG_RESOLVE="$1:$2" \
+        local_crawl --log "$tmpdir/$1.out" "http://$1:${SRV_PORT}/simple/basic.html" -O "$tmpdir/$1" -c1 --robots=0 --timeout=5 --retries=0 --quiet -Z
+}
+
+# fetched NAME: the page came, with no error logged
+fetched() {
+    local log="$tmpdir/$1/hts-log.txt"
+    test -f "$tmpdir/$1/$1_${SRV_PORT}/simple/basic.html" ||
+        fail_dump "$1: basic.html not downloaded" "$log"
+    test "$(count_log_errors "$log")" == "0" ||
+        fail_dump "$1: errors reported" "$log"
+}
+
+# control: a live address alone needs no skip
+crawl good.test 127.0.0.1
+fetched good.test
+if grep -q "skipping address" "$tmpdir/good.test/hts-log.txt"; then
+    fail_dump "good.test: a live address was skipped" "$tmpdir/good.test/hts-log.txt"
+fi
+
+if test "${#bad[@]}" -lt 2; then
+    echo "fewer than two addresses fail a connect at once here (${bad[*]:-none}), skipping the rest"
+    exit 0
+fi
+
+crawl sync.test "${bad[0]},127.0.0.1"
+fetched sync.test
+grep -q "skipping address 1/2 of sync.test: Connect error: " \
+    "$tmpdir/sync.test/hts-log.txt" ||
+    fail_dump "sync.test: the failed address was not skipped" "$tmpdir/sync.test/hts-log.txt"
+
+# every address fails at once: the slot reports why, and nothing is saved
+crawl dead.test "${bad[0]},${bad[1]}"
+log="$tmpdir/dead.test/hts-log.txt"
+grep -q "skipping address 2/2 of dead.test" "$log" ||
+    fail_dump "dead.test: the second address was not tried" "$log"
+grep -qE "Error:.*\"Connect error: " "$log" ||
+    fail_dump "dead.test: no connect error reported" "$log"
+test ! -f "$tmpdir/dead.test/dead.test_${SRV_PORT}/simple/basic.html" ||
+    fail "dead.test: file downloaded although every address failed"
+
+# A refused 127.0.0.2 goes through the select() fallback, which must also skip
+# an address that fails at once. Only Linux refuses 127.0.0.2 right away.
+case "$HTS_OS" in
+Linux)
+    crawl chain.test "127.0.0.2,${bad[0]},127.0.0.1"
+    fetched chain.test
+    grep -q "skipping address 2/3 of chain.test" "$tmpdir/chain.test/hts-log.txt" ||
+        fail_dump "chain.test: the fallback did not skip the failed address" "$tmpdir/chain.test/hts-log.txt"
+    ;;
+esac
+
+echo "OK: a connect that fails at once falls back to the next address"
