@@ -141,11 +141,11 @@ static hts_boolean readline_end(FILE *fp, char *s, size_t max, int flags,
   return cut;
 }
 
-hts_boolean hts_readline(FILE *fp, char *s, size_t max, int flags) {
+hts_boolean hts_readline(FILE *fp, hts_buf s, int flags) {
   size_t len;
   line_end end;
 
-  return readline_end(fp, s, max, flags, &len, &end);
+  return readline_end(fp, s.p, s.size, flags, &len, &end);
 }
 
 int linput(FILE *fp, char *s, int max) {
@@ -159,16 +159,17 @@ int linput(FILE *fp, char *s, int max) {
   return (int) len;
 }
 
-hts_boolean hts_readline_raw(FILE *fp, char *s, size_t max, size_t *len) {
+hts_boolean hts_readline_raw(FILE *fp, hts_buf s, size_t *len) {
   line_end end;
 
-  return readline_end(fp, s, max, LINE_RAW, len, &end);
+  return readline_end(fp, s.p, s.size, LINE_RAW, len, &end);
 }
 
 /* readline_end(), then the trim hts_readline_cpp() does on each line. */
-static hts_boolean readline_trim(FILE *fp, char *s, size_t max, int flags,
-                                 size_t *len, line_end *end) {
-  const hts_boolean cut = readline_end(fp, s, max, flags, len, end);
+static hts_boolean readline_trim(FILE *fp, hts_buf b, int flags, size_t *len,
+                                 line_end *end) {
+  char *const s = b.p;
+  const hts_boolean cut = readline_end(fp, s, b.size, flags, len, end);
   size_t n = *len;
   size_t i = 0;
 
@@ -185,7 +186,8 @@ static hts_boolean readline_trim(FILE *fp, char *s, size_t max, int flags,
   return cut;
 }
 
-hts_boolean hts_readline_cpp(FILE *fp, char *s, size_t max, int flags) {
+hts_boolean hts_readline_cpp(FILE *fp, hts_buf b, int flags) {
+  char *const s = b.p;
   hts_boolean cut = HTS_FALSE;
   size_t rlen = 0;
   /* trailing backslashes of the whole joined line, stored or not */
@@ -201,7 +203,7 @@ hts_boolean hts_readline_cpp(FILE *fp, char *s, size_t max, int flags) {
       if (rlen > 0)
         s[--rlen] = '\0';
     }
-    if (readline_trim(fp, s + rlen, max - rlen, flags, &n, &end))
+    if (readline_trim(fp, hts_buf_tail(b, rlen), flags, &n, &end))
       cut = HTS_TRUE;
     rlen += n;
     run = end.other ? end.run : run + end.run;
