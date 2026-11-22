@@ -66,6 +66,31 @@ int lint_probe_branch(int a) {
   return 0;
 }
 int lint_probe_late(int x) { if (x) return -1; return 0; }
+size_t lint_probe_span(hts_span tok, const hts_span *out, const char *z) {
+  hts_span a, b = hts_span_of(z);
+  hts_url_view v;
+  printf("%s %.*s %d%s\n", a.p, (int) b.len, b.p, 1, tok.p);
+  return strlen(tok.p) + strlen((const char *) a.p + 1) + atoi(out->p) +
+         strlen(v.host.p) + (size_t) memchr(a.p, 'a', a.len) + strlen(z) +
+         (size_t) a.p[0] + strlen(b.p ? z : z);
+}
+size_t lint_probe_field(struct { hts_url_view u; } *s) { return strlen(s->u.query.p); }
+size_t lint_probe_readers(hts_span tok, hts_span a, hts_span b) {
+  int x;
+  char buf[2];
+  printf("%%%s", tok.p);
+  printf("%*s", 3, a.p);
+  sscanf(b.p, "%d", &x);
+  fputs(tok.p, stdout);
+  puts(a.p);
+  fopen(b.p, "r");
+  getaddrinfo(tok.p, NULL, NULL, NULL);
+  hts_span_of(a.p);
+  hts_parse_url_port(b.p, &x);
+  hts_header_param(tok.p, ";", "n", buf, 1);
+  return hts_strcasecmp(a.p, "x") + strnlen(tok.p, tok.len) +
+         strnlen(b.p, a.len) + stream_read(a.p);
+}
 C
 cat >>"${h}" <<'H'
 #define lint_twice(x) ((x) + (x))
@@ -130,10 +155,29 @@ for want in "src/htslib.c:$(at "${c}" "lint_probe_ctype("): ctype: new violation
     "src/htslib.h:$(at "${h}" "lint_probe_int("): check-result: new violation: lint_probe_int returns failure (int)" \
     "src/htslib.h:$(at "${h}" "lint_probe_bool("): check-result: new violation: lint_probe_bool returns failure (hts_boolean)" \
     "src/htslib.h:$(at "${h}" "lint_probe_twin("): check-result: new violation: lint_probe_twin returns failure" \
-    "src/htslib.h:$(at "${h}" "lint_probe_extern("): check-result: new violation: lint_probe_extern returns failure"; do
+    "src/htslib.h:$(at "${h}" "lint_probe_extern("): check-result: new violation: lint_probe_extern returns failure" \
+    "src/htslib.c:$(at "${c}" "printf(\"%s %.*s"): span: new violation: printf(a.p) prints a span with %s" \
+    "src/htslib.c:$(at "${c}" "printf(\"%s %.*s"): span: new violation: printf(tok.p) prints a span with %s" \
+    "src/htslib.c:$(at "${c}" "return strlen(tok.p)"): span: new violation: strlen(tok.p) reads a span up to a NUL" \
+    "span: new violation: strlen((const char *) a.p + 1) reads a span up to a NUL" \
+    "span: new violation: atoi(out->p) reads a span up to a NUL" \
+    "span: new violation: strlen(v.host.p) reads a span up to a NUL" \
+    "src/htslib.c:$(at "${c}" "lint_probe_field("): span: new violation: strlen(s->u.query.p) reads a span up to a NUL" \
+    "src/htslib.c:$(at "${c}" 'printf("%%%s"'): span: new violation: printf(tok.p) prints a span with %s" \
+    "src/htslib.c:$(at "${c}" 'printf("%*s"'): span: new violation: printf(a.p) prints a span with %s" \
+    "span: new violation: sscanf(b.p) reads a span up to a NUL" \
+    "span: new violation: fputs(tok.p) reads a span up to a NUL" \
+    "span: new violation: puts(a.p) reads a span up to a NUL" \
+    "span: new violation: fopen(b.p) reads a span up to a NUL" \
+    "span: new violation: getaddrinfo(tok.p) reads a span up to a NUL" \
+    "span: new violation: hts_span_of(a.p) reads a span up to a NUL" \
+    "span: new violation: hts_parse_url_port(b.p) reads a span up to a NUL" \
+    "span: new violation: hts_header_param(tok.p) reads a span up to a NUL" \
+    "span: new violation: hts_strcasecmp(a.p) reads a span up to a NUL" \
+    "span: new violation: strnlen(b.p) reads a span up to a NUL"; do
     grep -qF "${want}" <<<"${out}" || fail "missed ${want}: ${out}"
 done
-test "$(wc -l <<<"${out}")" -eq 24 || fail "flagged a clean probe: ${out}"
+test "$(wc -l <<<"${out}")" -eq 43 || fail "flagged a clean probe: ${out}"
 
 # Removing a known violation, or listing one that never was, leaves a stale entry.
 rm -r "${work}/src/lintprobe"

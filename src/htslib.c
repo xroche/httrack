@@ -3892,9 +3892,8 @@ hts_boolean hts_query_key_stripped(const char *arg, size_t keylen,
 
   while (hts_span_next(&cur, end, ',', &tok)) {
     tok = hts_span_trim(tok, " ", " ");
-    if (tok.len == 1 && tok.p[0] == '*')
-      return HTS_TRUE;
-    if (tok.len == keylen && strncmp(tok.p, arg, keylen) == 0)
+    if (hts_span_eq(tok, hts_span_of("*")) ||
+        hts_span_eq(tok, hts_span_at(arg, keylen)))
       return HTS_TRUE;
   }
   return HTS_FALSE;
@@ -3972,7 +3971,7 @@ static const char *hts_query_strip_keys_match(const char *rules,
     hts_span pattern, keys;
     char BIGSTK pat[HTS_URLMAXSIZE * 2];
 
-    if (line.len == 0)
+    if (hts_span_empty(line))
       continue;
     if (hts_span_split(line, '=', &pattern, &keys)) {
       /* Clip a too-long pattern, never skip it. */
@@ -4016,8 +4015,8 @@ const char *hts_strip_query_rules(httrackp *opt) {
    rule is. HTS_FALSE when either side is empty. */
 static hts_boolean hts_host_alias_split(hts_span rule, hts_span *aliases,
                                         hts_span *canon) {
-  return hts_span_split(rule, '=', aliases, canon) && aliases->len != 0 &&
-         canon->len != 0;
+  return hts_span_split(rule, '=', aliases, canon) &&
+         !hts_span_empty(*aliases) && !hts_span_empty(*canon);
 }
 
 /* see htscore.h */
@@ -4042,7 +4041,7 @@ const char *hts_host_alias_match(const char *rules, const char *host,
 
       /* A trailing slash is not part of a path. */
       alias = hts_span_trim(alias, " \t", " \t/");
-      if (alias.len != 0 && hts_span_copy(alias, glob, sizeof(glob))) {
+      if (!hts_span_empty(alias) && hts_span_copy(alias, glob, sizeof(glob))) {
         char *ghost;
 
         /* the collapse applies to the pattern too, so a rule may spell either
@@ -4257,7 +4256,7 @@ static hts_boolean hts_host_alias_token_ok(hts_span token, hts_boolean glob) {
   size_t len;
 
   token = hts_span_trim(token, " \t", " \t");
-  if (token.len == 0 || !hts_span_copy(token, buff, sizeof(buff)))
+  if (hts_span_empty(token) || !hts_span_copy(token, buff, sizeof(buff)))
     return HTS_FALSE;
   len = token.len;
   while (len > 0 && buff[len - 1] == '/')
@@ -4311,8 +4310,8 @@ const char *hts_host_alias_looping(const char *rules, hts_boolean collapse_www,
     char BIGSTK canon[HTS_URLMAXSIZE * 2], tmp[HTS_URLMAXSIZE * 2];
     hts_boolean settled;
 
-    if (!hts_span_split(line, '=', &aliases, &target) || target.len == 0 ||
-        !hts_span_copy(target, canon, sizeof(canon)))
+    if (!hts_span_split(line, '=', &aliases, &target) ||
+        hts_span_empty(target) || !hts_span_copy(target, canon, sizeof(canon)))
       continue;
     (void) hts_host_alias_resolve(rules, canon, collapse_www, tmp, sizeof(tmp),
                                   &settled);
@@ -4449,14 +4448,6 @@ static size_t engine_scheme_len(const char *s, size_t len) {
   return 0;
 }
 
-static hts_span span_of(const char *from, const char *to) {
-  hts_span r;
-
-  r.p = from;
-  r.len = (size_t) (to - from);
-  return r;
-}
-
 /* Is the span a decimal port in 0..65535? Empty and 0 pass, because
    hts_parse_url_port() checks the 1..65535 range. */
 static hts_boolean port_is_valid(hts_span port) {
@@ -4477,24 +4468,25 @@ hts_boolean hts_url_view_parse(const char *s, size_t len, hts_url_view *v) {
   const char *const end = s + len;
   const char *p = s;
   const char *auth_end, *at, *q;
+  hts_span auth;
   hts_boolean ok = HTS_TRUE;
   size_t n;
 
   memset(v, 0, sizeof(*v));
   if ((n = engine_scheme_len(s, len)) != 0) {
-    v->scheme = span_of(s, s + n - 1);
+    v->scheme = hts_span_at(s, n - 1);
     p = s + n;
   } else if (len != 0 && hts_isalpha((unsigned char) s[0])) {
     for (q = s + 1; q < end && (hts_isalnum((unsigned char) *q) || *q == '+' ||
                                 *q == '-' || *q == '.');
          q++)
       ;
-    if (end - q >= 3 && memcmp(q, "://", 3) == 0) {
-      v->scheme = span_of(s, q);
+    if (hts_span_starts_with(hts_span_between(q, end), hts_span_of("://"))) {
+      v->scheme = hts_span_between(s, q);
       p = q + 1;
     }
   }
-  if (end - p >= 2 && p[0] == '/' && p[1] == '/')
+  if (hts_span_starts_with(hts_span_between(p, end), hts_span_of("//")))
     p += 2;
 
   // the same set as hts_authority_end(), but a NUL is data here
@@ -4506,43 +4498,42 @@ hts_boolean hts_url_view_parse(const char *s, size_t len, hts_url_view *v) {
     if (*q == '@')
       at = q;
   if (at != NULL) {
-    v->userinfo = span_of(p, at);
+    v->userinfo = hts_span_between(p, at);
     p = at + 1;
   }
 
-  if (p < auth_end && *p == '[') {
-    const char *const close = memchr(p, ']', (size_t) (auth_end - p));
+  auth = hts_span_between(p, auth_end);
+  if (hts_span_starts_with(auth, hts_span_of("["))) {
+    hts_span inside, rest;
 
-    if (close != NULL && (close + 1 == auth_end || close[1] == ':')) {
-      v->host = span_of(p, close + 1);
-      if (close + 1 != auth_end)
-        v->port = span_of(close + 2, auth_end);
+    if (hts_span_split(auth, ']', &inside, &rest) &&
+        (hts_span_empty(rest) ||
+         hts_span_starts_with(rest, hts_span_of(":")))) {
+      v->host = hts_span_at(auth.p, inside.len + 1);
+      if (!hts_span_empty(rest))
+        v->port = hts_span_skip(rest, 1);
     } else {
-      v->host = span_of(p, auth_end);
+      v->host = auth;
       ok = HTS_FALSE;
     }
-  } else {
-    const char *const colon = memchr(p, ':', (size_t) (auth_end - p));
-
-    v->host = span_of(p, colon != NULL ? colon : auth_end);
-    if (colon != NULL)
-      v->port = span_of(colon + 1, auth_end);
+  } else if (!hts_span_split(auth, ':', &v->host, &v->port)) {
+    v->host = auth;
   }
   if (v->port.p != NULL && !port_is_valid(v->port))
     ok = HTS_FALSE;
 
   for (q = auth_end; q < end && *q != '?' && *q != '#'; q++)
     ;
-  v->path = span_of(auth_end, q);
+  v->path = hts_span_between(auth_end, q);
   if (q < end && *q == '?') {
     const char *const query = q + 1;
 
     for (q = query; q < end && *q != '#'; q++)
       ;
-    v->query = span_of(query, q);
+    v->query = hts_span_between(query, q);
   }
   if (q < end)
-    v->fragment = span_of(q + 1, end);
+    v->fragment = hts_span_between(q + 1, end);
   return ok;
 }
 
