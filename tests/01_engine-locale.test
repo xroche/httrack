@@ -6,6 +6,9 @@ set -euo pipefail
 # The engine must read and write text the same way whatever locale its host
 # sets: ctype, case folding, decimal points and HTTP dates (see htsctype.h).
 
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
 top="${top_srcdir:-..}"
 locdir=
 cleanup() {
@@ -13,11 +16,6 @@ cleanup() {
 }
 trap 'set +e; cleanup' EXIT
 trap 'set +e; cleanup; exit 1' HUP INT TERM
-
-fail() {
-    echo "FAIL: $*"
-    exit 1
-}
 
 # Raw libc calls whose answer follows the locale, or is undefined for a negative
 # char, and float formats, which print the locale's decimal point. htslib_selftest.c calls them on purpose, as the reference and control.
@@ -59,7 +57,8 @@ fi
 set -- tr_TR.ISO8859-9 de_DE.ISO8859-1 fr_FR.ISO8859-1
 built=
 made=
-if command -v localedef >/dev/null 2>&1; then
+# a Windows httrack.exe under wsl2 cannot load what the Linux side builds
+if ! target_is_windows && command -v localedef >/dev/null 2>&1; then
     locdir=$(mktemp -d ./locale-def.XXXXXX)
     for spec in tr_TR:ISO-8859-9 de_DE:ISO-8859-1 fr_FR:ISO-8859-1; do
         name=${spec%%:*}.${spec#*:}
