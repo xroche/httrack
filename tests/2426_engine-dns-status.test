@@ -33,15 +33,25 @@ log=$(crawl ftp ftp://gone.invalid/f.txt)
 grep -q "Unable to get server's address: host name does not exist" <<<"${log}" ||
     fail "the FTP resolve lost its reason: ${log}"
 
-# -%b applies through a proxy; 127.0.0.1:1 is never reached
-log=$(crawl bindname http://example.invalid/ -P 127.0.0.1:1 -%b gone.invalid)
+# -%b binds a direct connection; 127.0.0.1:1 refuses whatever reaches it
+log=$(crawl bindname http://127.0.0.1:1/ -%b gone.invalid)
 grep -q "Unable to bind the specified server address: host name does not exist" \
     <<<"${log}" || fail "an unresolvable -%b lost its reason: ${log}"
 
-# TEST-NET-1 is no local address, so bind() itself fails
-log=$(crawl bindaddr http://example.invalid/ -P 127.0.0.1:1 -%b 192.0.2.1)
-grep -q "Unable to bind the specified server address: [[:alnum:]]" <<<"${log}" ||
-    fail "a failed bind() logged no reason: ${log}"
-if grep -Eq "address: (no error|unknown error|host name)" <<<"${log}"; then
-    fail "a failed bind() logged a resolver reason: ${log}"
+# TEST-NET-1 is no local address, so bind() itself fails, direct or proxied
+for via in "" "-P 127.0.0.1:1"; do
+    # shellcheck disable=SC2086 # $via is zero or two words
+    log=$(crawl "bindaddr${via:+-proxy}" http://127.0.0.1:1/ ${via} -%b 192.0.2.1)
+    grep -q "Unable to bind the specified server address: [[:alnum:]]" \
+        <<<"${log}" || fail "a failed bind() (${via:-direct}) logged no reason: ${log}"
+    if grep -Eq "address: (no error|unknown error|host name)" <<<"${log}"; then
+        fail "a failed bind() (${via:-direct}) logged a resolver reason: ${log}"
+    fi
+done
+
+# the control: a local address binds, so the crawl reaches the connect
+log=$(crawl bindok http://127.0.0.1:1/ -%b 127.0.0.1)
+grep -q "Connect Error" <<<"${log}" || fail "-%b 127.0.0.1 did not connect: ${log}"
+if grep -q "Unable to bind" <<<"${log}"; then
+    fail "-%b 127.0.0.1 failed to bind: ${log}"
 fi

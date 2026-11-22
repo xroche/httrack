@@ -3252,9 +3252,10 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
         hts_fetch_through(opt, &sback->fetch[p], adr);
       }
       // recopier proxy
+      // -%b binds every connection, direct or through the proxy
+      if (StringBuff(opt->proxy.bindhost) != NULL)
+        back[p].r.req.proxy.bindhost = StringBuff(opt->proxy.bindhost);
       if ((back[p].r.req.proxy.active = opt->proxy.active)) {
-        if (StringBuff(opt->proxy.bindhost) != NULL)
-          back[p].r.req.proxy.bindhost = StringBuff(opt->proxy.bindhost);
         if (StringBuff(opt->proxy.name) != NULL)
           back[p].r.req.proxy.name = StringBuff(opt->proxy.name);
         back[p].r.req.proxy.port = opt->proxy.port;
