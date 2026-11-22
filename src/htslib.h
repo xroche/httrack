@@ -605,7 +605,7 @@ int hts_xfread_bytewise_count(void);
    r->size must refuse where http_xfread1() does. */
 HTS_CHECK_RESULT hts_boolean hts_inmem_size_fits(LLint size);
 
-/* Outcome of a resolve. */
+/* How did a resolve end? */
 typedef enum hts_dns_status {
   HTS_DNS_OK = 0,
   HTS_DNS_NONAME,   /* the resolver says the name does not exist */
@@ -626,6 +626,10 @@ typedef struct hts_dns_result {
 /* Static English text for res's outcome ("no error" when it resolved), safe
    to keep and share. */
 const char *hts_dns_strerror(const hts_dns_result *res);
+/* Log prefixes for hts_dns_strerror(): with the longest text, both fit in
+   htsblk.msg. */
+#define HTS_DNS_FAIL_PREFIX "Unable to get server's address: "
+#define HTS_DNS_BIND_PREFIX "Unable to bind the local address: "
 
 /* Cached resolver: fill res with iadr's addresses and return res->status.
    Resolves once per host; later calls read the DNS cache. Must hold no lock

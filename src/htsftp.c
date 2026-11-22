@@ -890,7 +890,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
     // récupérer adresse résolue
     strcpybuff(back->info, "host name");
     if (ftp_dns_resolve(opt, back, _adr, &server, timeout, &error) == NULL) {
-      htsblk_failf(&back->r, "Unable to get server's address: %s", error);
+      htsblk_failf(&back->r, HTS_DNS_FAIL_PREFIX "%s", error);
       back->r.statuscode = STATUSCODE_NON_FATAL;
       goto done;
     }

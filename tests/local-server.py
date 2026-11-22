@@ -5020,6 +5020,8 @@ def main():
 
     # An MPTCP listener is what lets a client negotiate multipath instead of
     # being silently fallen back to TCP, so a test can tell the two apart.
+    if ":" in args.bind:  # an IPv6 literal
+        BacklogHTTPServer.address_family = socket.AF_INET6
     httpd = BacklogHTTPServer((args.bind, 0), factory, bind_and_activate=not args.mptcp)
     if args.mptcp:
         httpd.socket.close()

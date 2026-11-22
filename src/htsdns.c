@@ -109,9 +109,8 @@ int hts_dns_negative_wait_ms(int failures) {
                                             : HTS_DNS_NEGATIVE_TTL_MAX_MS;
 }
 
-/* Fixed texts for getaddrinfo() codes, so no thread shares gai_strerror()'s
-   buffer. Each code is guarded, and a table tolerates two names for one code.
- */
+/* Fixed texts, since gai_strerror() may share one buffer between threads. A
+   table, because some systems give two codes one value. */
 typedef struct dns_gai_text {
   int code;
   const char *text;
@@ -120,51 +119,26 @@ typedef struct dns_gai_text {
 
 static const dns_gai_text dns_gai_texts[] = {
 #ifdef EAI_AGAIN
-    {EAI_AGAIN, "temporary failure in name resolution",
-     "temporary failure in name resolution (cached failure)"},
+    {EAI_AGAIN, "temporary DNS failure", "temporary DNS failure (cached)"},
 #endif
 #ifdef EAI_FAIL
-    {EAI_FAIL, "non-recoverable failure in name resolution",
-     "non-recoverable failure in name resolution (cached failure)"},
+    {EAI_FAIL, "permanent DNS failure", "permanent DNS failure (cached)"},
 #endif
 #ifdef EAI_NODATA
-    {EAI_NODATA, "no address associated with host name",
-     "no address associated with host name (cached failure)"},
+    {EAI_NODATA, "no address for host name",
+     "no address for host name (cached)"},
 #endif
 #ifdef EAI_ADDRFAMILY
-    {EAI_ADDRFAMILY, "no address in the requested family",
-     "no address in the requested family (cached failure)"},
-#endif
-#ifdef EAI_FAMILY
-    {EAI_FAMILY, "address family not supported",
-     "address family not supported (cached failure)"},
-#endif
-#ifdef EAI_SOCKTYPE
-    {EAI_SOCKTYPE, "socket type not supported",
-     "socket type not supported (cached failure)"},
-#endif
-#ifdef EAI_SERVICE
-    {EAI_SERVICE, "service not supported for this socket type",
-     "service not supported for this socket type (cached failure)"},
-#endif
-#ifdef EAI_BADFLAGS
-    {EAI_BADFLAGS, "invalid resolver flags",
-     "invalid resolver flags (cached failure)"},
+    {EAI_ADDRFAMILY, "no address in this family",
+     "no address in this family (cached)"},
 #endif
 #ifdef EAI_MEMORY
-    {EAI_MEMORY, "out of memory in name resolution",
-     "out of memory in name resolution (cached failure)"},
-#endif
-#ifdef EAI_OVERFLOW
-    {EAI_OVERFLOW, "name resolution buffer overflow",
-     "name resolution buffer overflow (cached failure)"},
+    {EAI_MEMORY, "resolver out of memory", "resolver out of memory (cached)"},
 #endif
 #ifdef EAI_SYSTEM
-    {EAI_SYSTEM, "system error in name resolution",
-     "system error in name resolution (cached failure)"},
+    {EAI_SYSTEM, "resolver system error", "resolver system error (cached)"},
 #endif
-    {0, "host name resolution failed",
-     "host name resolution failed (cached failure)"},
+    {0, "host name resolution failed", "host name resolution failed (cached)"},
 };
 
 const char *hts_dns_strerror(const hts_dns_result *res) {
@@ -174,7 +148,7 @@ const char *hts_dns_strerror(const hts_dns_result *res) {
   case HTS_DNS_OK:
     return "no error";
   case HTS_DNS_NONAME:
-    return res->cached ? "host name does not exist (cached failure)"
+    return res->cached ? "host name does not exist (cached)"
                        : "host name does not exist";
   case HTS_DNS_TEMPFAIL:
     /* the last row, code 0, also answers for a code with no text */

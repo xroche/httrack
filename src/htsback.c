@@ -476,8 +476,8 @@ static void back_log_link(httrackp *opt, const lien_back *b, const char *what) {
 static int back_connect_next(httrackp *opt, struct_back *sback, int i) {
   hts_connect_fallback *const cf = &sback->connect_fallback[i];
   lien_back *const back = sback->lnk;
-  const int next = cf->addr_index + 1;
-  T_SOC soc;
+  T_SOC soc = INVALID_SOCKET;
+  int next = cf->addr_index + 1;
 
   if (next >= cf->addr_count)
     return 0;
@@ -485,8 +485,13 @@ static int back_connect_next(httrackp *opt, struct_back *sback, int i) {
   if (back[i].r.soc != INVALID_SOCKET) {
     deletehttp(&back[i].r);
   }
-  soc = newhttp_addr(opt, back[i].url_adr, &back[i].r, -1,
-                     (cf->addr_first + next) % cf->addr_count, NULL);
+  // an address that cannot be opened, or bound for -%b, fails alone
+  for (; next < cf->addr_count; next++) {
+    soc = newhttp_addr(opt, back[i].url_adr, &back[i].r, -1,
+                       (cf->addr_first + next) % cf->addr_count, NULL);
+    if (soc != INVALID_SOCKET)
+      break;
+  }
   if (soc == INVALID_SOCKET)
     return 0;
 
@@ -2788,8 +2793,7 @@ static void back_dns_poll(httrackp *opt, struct_back *sback, const int p,
     dns.status = HTS_DNS_TIMEOUT;
   }
   back->r.statuscode = STATUSCODE_NON_FATAL;
-  htsblk_failf(&back->r, "Unable to get server's address: %s",
-               hts_dns_strerror(&dns));
+  htsblk_failf(&back->r, HTS_DNS_FAIL_PREFIX "%s", hts_dns_strerror(&dns));
   back_set_finished(opt, sback, p);
 }
 
@@ -3251,8 +3255,7 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
         sback->fetch[p] = *fetch;
         hts_fetch_through(opt, &sback->fetch[p], adr);
       }
-      // recopier proxy
-      // -%b binds every connection, direct or through the proxy
+      // -%b binds every connection, direct or proxied
       if (StringBuff(opt->proxy.bindhost) != NULL)
         back[p].r.req.proxy.bindhost = StringBuff(opt->proxy.bindhost);
       if ((back[p].r.req.proxy.active = opt->proxy.active)) {
