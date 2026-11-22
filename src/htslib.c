@@ -4337,16 +4337,14 @@ int hts_basic_auth_value(httrackp *opt, const char *url, char *out,
 }
 
 hts_boolean hts_sni_hostname(const char *url_adr, char *out, size_t size) {
-  const char *const host = jump_identification_const(url_adr);
-  const char *const colon = strchr(host, ':');
-  size_t len = (size_t) (hts_authority_end(host) - host);
+  hts_url_view v;
 
-  if (colon != NULL && (size_t) (colon - host) < len)
-    len = (size_t) (colon - host);
+  (void) hts_url_view_parse(url_adr, strlen(url_adr), &v);
   out[0] = '\0';
-  if (len == 0 || len >= size || host[0] == '[' || hts_host_is_ipv4(host, len))
+  if (v.host.len == 0 || v.host.len >= size || v.host.p[0] == '[' ||
+      hts_host_is_ipv4(v.host.p, v.host.len))
     return HTS_FALSE;
-  strlncatbuff(out, host, size, len);
+  strlncatbuff(out, v.host.p, size, v.host.len);
   return HTS_TRUE;
 }
 
