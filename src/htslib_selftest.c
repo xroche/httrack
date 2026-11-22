@@ -3866,8 +3866,8 @@ static void st_abort_line(int line) {
   fflush(stdout);
 }
 
-/* bufwrite [cpy|cat|catn|unterminated]: the hts_buf write helpers. An
-   argument overflows that helper, which must abort at the line it prints. */
+/* bufwrite [cpy|cat|catn|unterminated[-cpy|-catn]]: the hts_buf write helpers.
+   An argument overflows that helper, which must abort at the line it prints. */
 static int st_bufwrite(httrackp *opt, int argc, char **argv) {
   struct {
     char name[8];
@@ -3900,6 +3900,14 @@ static int st_bufwrite(httrackp *opt, int argc, char **argv) {
   if (strcmp(mode, "unterminated") == 0) {
     st_abort_line(__LINE__ + 1);
     hts_buf_cat(HTS_BUF(out), r.name);
+  }
+  if (strcmp(mode, "unterminated-cpy") == 0) {
+    st_abort_line(__LINE__ + 1);
+    hts_buf_cpy(HTS_BUF(out), r.name);
+  }
+  if (strcmp(mode, "unterminated-catn") == 0) {
+    st_abort_line(__LINE__ + 1);
+    hts_buf_catn(HTS_BUF(out), r.name, 4);
   }
   memset(big, 'X', sizeof(big));
   hts_buf_cpy(b, "ab");
@@ -5328,7 +5336,7 @@ const struct selftest_entry selftests_lib[] = {
      st_spandiff},
     {"buf", "[tail-overrun]",
      "the sizes HTS_BUF, HTS_BUF_N and hts_buf_skip give", st_buf},
-    {"bufwrite", "[cpy|cat|catn|unterminated]",
+    {"bufwrite", "[cpy|cat|catn|unterminated[-cpy|-catn]]",
      "the hts_buf write helpers copy, append, clip and print in bounds",
      st_bufwrite},
     {"span", "<next|nextsep|split|trim|copy> <args> <text>",

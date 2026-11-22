@@ -14,7 +14,9 @@ ulimit -c 0 # a deliberate abort must not litter the box with cores
 for row in "cpy:overflow while copying into a buffer" \
     "cat:overflow while appending to a buffer" \
     "catn:overflow while appending to a buffer" \
-    "unterminated:size < sizeof_source"; do
+    "unterminated:size < sizeof_source" \
+    "unterminated-cpy:size < sizeof_source" \
+    "unterminated-catn:size < sizeof_source"; do
     mode=${row%%:*}
     kind=${row#*:}
     rc=0
