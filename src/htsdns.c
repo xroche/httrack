@@ -109,7 +109,67 @@ int hts_dns_negative_wait_ms(int failures) {
                                             : HTS_DNS_NEGATIVE_TTL_MAX_MS;
 }
 
+/* Fixed texts for getaddrinfo() codes, so no thread shares gai_strerror()'s
+   buffer. Each code is guarded, and a table tolerates two names for one code.
+ */
+typedef struct dns_gai_text {
+  int code;
+  const char *text;
+  const char *cached;
+} dns_gai_text;
+
+static const dns_gai_text dns_gai_texts[] = {
+#ifdef EAI_AGAIN
+    {EAI_AGAIN, "temporary failure in name resolution",
+     "temporary failure in name resolution (cached failure)"},
+#endif
+#ifdef EAI_FAIL
+    {EAI_FAIL, "non-recoverable failure in name resolution",
+     "non-recoverable failure in name resolution (cached failure)"},
+#endif
+#ifdef EAI_NODATA
+    {EAI_NODATA, "no address associated with host name",
+     "no address associated with host name (cached failure)"},
+#endif
+#ifdef EAI_ADDRFAMILY
+    {EAI_ADDRFAMILY, "no address in the requested family",
+     "no address in the requested family (cached failure)"},
+#endif
+#ifdef EAI_FAMILY
+    {EAI_FAMILY, "address family not supported",
+     "address family not supported (cached failure)"},
+#endif
+#ifdef EAI_SOCKTYPE
+    {EAI_SOCKTYPE, "socket type not supported",
+     "socket type not supported (cached failure)"},
+#endif
+#ifdef EAI_SERVICE
+    {EAI_SERVICE, "service not supported for this socket type",
+     "service not supported for this socket type (cached failure)"},
+#endif
+#ifdef EAI_BADFLAGS
+    {EAI_BADFLAGS, "invalid resolver flags",
+     "invalid resolver flags (cached failure)"},
+#endif
+#ifdef EAI_MEMORY
+    {EAI_MEMORY, "out of memory in name resolution",
+     "out of memory in name resolution (cached failure)"},
+#endif
+#ifdef EAI_OVERFLOW
+    {EAI_OVERFLOW, "name resolution buffer overflow",
+     "name resolution buffer overflow (cached failure)"},
+#endif
+#ifdef EAI_SYSTEM
+    {EAI_SYSTEM, "system error in name resolution",
+     "system error in name resolution (cached failure)"},
+#endif
+    {0, "host name resolution failed",
+     "host name resolution failed (cached failure)"},
+};
+
 const char *hts_dns_strerror(const hts_dns_result *res) {
+  size_t i;
+
   switch (res->status) {
   case HTS_DNS_OK:
     return "no error";
@@ -117,8 +177,11 @@ const char *hts_dns_strerror(const hts_dns_result *res) {
     return res->cached ? "host name does not exist (cached failure)"
                        : "host name does not exist";
   case HTS_DNS_TEMPFAIL:
-    return res->cached ? "host name resolution failed (cached failure)"
-                       : "host name resolution failed";
+    /* the last row, code 0, also answers for a code with no text */
+    for (i = 0; i + 1 < sizeof(dns_gai_texts) / sizeof(dns_gai_texts[0]); i++)
+      if (dns_gai_texts[i].code == res->gai_code)
+        break;
+    return res->cached ? dns_gai_texts[i].cached : dns_gai_texts[i].text;
   case HTS_DNS_TIMEOUT:
     return "host name resolution timed out";
   case HTS_DNS_CANCELLED:
@@ -127,7 +190,7 @@ const char *hts_dns_strerror(const hts_dns_result *res) {
   return "unknown error";
 }
 
-/* An empty answer of status st, and its getaddrinfo() code. */
+/* Empty res, giving it status st and getaddrinfo() code gai. */
 static void dns_result_fail(hts_dns_result *res, hts_dns_status st, int gai) {
   res->count = 0;
   res->status = st;
@@ -461,27 +524,15 @@ static hts_dns_status hts_dns_resolve_nocache_list(const char *const hostname,
   }
 }
 
-/* First address of res into *addr, or NULL. */
-static SOCaddr *dns_first_addr(const hts_dns_result *res, SOCaddr *addr) {
-  SOCaddr_clear(*addr);
-  if (res->count > 0)
-    SOCaddr_copy_SOCaddr(*addr, res->addr[0]);
-  return SOCaddr_is_valid(*addr) ? addr : NULL;
-}
-
-SOCaddr *hts_dns_resolve_nocache2(const char *const hostname,
-                                  SOCaddr *const addr, hts_dns_status *status) {
-  hts_dns_result res;
-  const hts_dns_status st = hts_dns_resolve_nocache_list(hostname, &res);
-
-  if (status != NULL)
-    *status = st;
-  return dns_first_addr(&res, addr);
-}
-
 SOCaddr *hts_dns_resolve_nocache(const char *const hostname,
                                  SOCaddr *const addr) {
-  return hts_dns_resolve_nocache2(hostname, addr, NULL);
+  hts_dns_result res;
+
+  (void) hts_dns_resolve_nocache_list(hostname, &res);
+  SOCaddr_clear(*addr);
+  if (res.count > 0)
+    SOCaddr_copy_SOCaddr(*addr, res.addr[0]);
+  return SOCaddr_is_valid(*addr) ? addr : NULL;
 }
 
 /* A timed-out resolve keeps running, so this job is refcounted and the last of
@@ -746,29 +797,21 @@ hts_dns_status hts_dns_resolve(httrackp *opt, const char *iadr, int timeout,
   return res->status;
 }
 
-int hts_dns_resolve_all_bounded(httrackp *opt, const char *iadr, SOCaddr *out,
-                                int max, int timeout,
-                                const volatile hts_boolean *cancel,
-                                hts_dns_status *status) {
+int hts_dns_resolve_all(httrackp *opt, const char *iadr, SOCaddr *out,
+                        int max) {
   hts_dns_result res;
   int i;
 
-  assertf(out != NULL);
-  (void) hts_dns_resolve(opt, iadr, timeout, cancel, &res);
-  if (status != NULL)
-    *status = res.status;
-  for (i = 0; i < res.count && i < max; i++)
-    SOCaddr_copy_SOCaddr(out[i], res.addr[i]);
-  return max > 0 ? res.count : 0;
-}
-
-int hts_dns_resolve_all(httrackp *opt, const char *iadr, SOCaddr *out, int max,
-                        hts_dns_status *status) {
   assertf(opt != NULL);
+  assertf(out != NULL);
+  if (!strnotempty(iadr) || max <= 0)
+    return 0;
   /* the mirror's stop flag cancels: a resolve behind a black hole otherwise
      holds a stopped crawl for the whole --timeout (#1073) */
-  return hts_dns_resolve_all_bounded(opt, iadr, out, max, opt->timeout,
-                                     &opt->state.stop, status);
+  (void) hts_dns_resolve(opt, iadr, opt->timeout, &opt->state.stop, &res);
+  for (i = 0; i < res.count && i < max; i++)
+    SOCaddr_copy_SOCaddr(out[i], res.addr[i]);
+  return res.count;
 }
 
 hts_boolean hts_dns_cached(httrackp *opt, const char *iadr) {
@@ -833,19 +876,8 @@ int hts_dns_poll(httrackp *opt, hts_dns_job *job, hts_dns_result *res) {
     dns_cache_store(opt, job->hostname, &answer);
   if (res != NULL) {
     *res = answer;
-    if (res->count < 0)
+    if (res->count < 0) /* the worker was cut short */
       res->count = 0;
   }
   return answer.count;
-}
-
-SOCaddr *hts_dns_resolve2(httrackp *opt, const char *iadr, SOCaddr *const addr,
-                          hts_dns_status *status) {
-  hts_dns_result res;
-
-  assertf(opt != NULL);
-  (void) hts_dns_resolve(opt, iadr, opt->timeout, &opt->state.stop, &res);
-  if (status != NULL)
-    *status = res.status;
-  return dns_first_addr(&res, addr);
 }

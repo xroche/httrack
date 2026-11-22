@@ -1,13 +1,47 @@
 #!/bin/bash
 #
 # Each DNS outcome, fresh, negative-cached, cancelled or timed out, reports its
-# own status and message.
+# own status and message, and the FTP and -%b paths log that message.
 
 set -euo pipefail
 
-out=$(httrack -#test=dnsstatus run)
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
 
-test "$out" = "dns-status-selftest: OK" || {
-    echo "expected 'dns-status-selftest: OK', got: $out" >&2
-    exit 1
+out=$(httrack -#test=dnsstatus run)
+test "$out" = "dns-status-selftest: OK" ||
+    fail "expected 'dns-status-selftest: OK', got: $out"
+
+if test "${V6_SUPPORT:-}" == "no"; then
+    echo "no IPv6 support (resolver override compiled out), skipping the crawls"
+    exit 0
+fi
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_dnsstatus.XXXXXX") || exit 1
+cleanup_push rm -rf "${tmpdir}"
+
+# crawl DIR ARGS...: run httrack with gone.invalid pinned to no address
+crawl() {
+    local dir="${tmpdir}/$1"
+    shift
+    HTTRACK_DEBUG_RESOLVE="gone.invalid:" httrack "$@" -O "${dir}" -q \
+        >/dev/null 2>&1 || true
+    cat "${dir}/hts-log.txt"
 }
+
+log=$(crawl ftp ftp://gone.invalid/f.txt)
+grep -q "Unable to get server's address: host name does not exist" <<<"${log}" ||
+    fail "the FTP resolve lost its reason: ${log}"
+
+# -%b applies through a proxy; 127.0.0.1:1 is never reached
+log=$(crawl bindname http://example.invalid/ -P 127.0.0.1:1 -%b gone.invalid)
+grep -q "Unable to bind the specified server address: host name does not exist" \
+    <<<"${log}" || fail "an unresolvable -%b lost its reason: ${log}"
+
+# TEST-NET-1 is no local address, so bind() itself fails
+log=$(crawl bindaddr http://example.invalid/ -P 127.0.0.1:1 -%b 192.0.2.1)
+grep -q "Unable to bind the specified server address: [[:alnum:]]" <<<"${log}" ||
+    fail "a failed bind() logged no reason: ${log}"
+if grep -Eq "address: (no error|unknown error|host name)" <<<"${log}"; then
+    fail "a failed bind() logged a resolver reason: ${log}"
+fi

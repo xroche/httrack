@@ -3880,7 +3880,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
           int first;
 
           cf->addr_count = hts_dns_resolve_all(opt, back[i].url_adr, scratch,
-                                               HTS_MAXADDRNUM, NULL);
+                                               HTS_MAXADDRNUM);
           // the first connect took the preferred address, so count from it
           first =
               hts_dns_addr_index(scratch, cf->addr_count, &back[i].r.address);

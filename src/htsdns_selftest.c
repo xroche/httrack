@@ -123,6 +123,8 @@ static mock_host mock_hosts[] = {
     {"st-ok.test", 0, 1, {{AF_INET, {127, 0, 0, 30}}}, 0},
     {"st-noname.test", EAI_NONAME, 0, {{0}}, 0},
     {"st-again.test", EAI_AGAIN, 0, {{0}}, 0},
+    {"st-fail.test", EAI_FAIL, 0, {{0}}, 0},
+    {"st-cut.test", 0, 1, {{AF_INET, {127, 0, 0, 32}}}, 0},
     {"st-job.test", EAI_NONAME, 0, {{0}}, 0},
     {"st-slow.test", 0, 1, {{AF_INET, {127, 0, 0, 31}}}, 0, MOCK_GATED},
     {"pref.test",
@@ -344,11 +346,31 @@ static int failures = 0;
    AF_UNSPEC if the host did not resolve. */
 static int resolve_family_nocache(const char *host) {
   SOCaddr addr;
-  hts_dns_status err;
 
-  if (hts_dns_resolve_nocache2(host, &addr, &err) == NULL)
+  if (hts_dns_resolve_nocache(host, &addr) == NULL)
     return AF_UNSPEC;
   return SOCaddr_sinfamily(addr);
+}
+
+/* Cached resolve of host bounded like a crawl's: its first address into *a,
+   or NULL. */
+static SOCaddr *resolve_first(httrackp *opt, const char *host, SOCaddr *a) {
+  hts_dns_result res;
+
+  SOCaddr_clear(*a);
+  if (hts_dns_resolve(opt, host, opt->timeout, &opt->state.stop, &res) ==
+      HTS_DNS_OK)
+    SOCaddr_copy_SOCaddr(*a, res.addr[0]);
+  return SOCaddr_is_valid(*a) ? a : NULL;
+}
+
+/* Cached resolve of host with this timeout and cancel; returns the count. */
+static int resolve_count(httrackp *opt, const char *host, int timeout,
+                         const volatile hts_boolean *cancel) {
+  hts_dns_result res;
+
+  (void) hts_dns_resolve(opt, host, timeout, cancel, &res);
+  return res.count;
 }
 
 /* Drive the DNS resolver and cache through a scripted (mock) getaddrinfo,
@@ -385,10 +407,9 @@ static int dns_selftests(httrackp *opt) {
   {
     SOCaddr a1, a2;
     char ip1[64], ip2[64];
-    hts_dns_status err;
 
-    CHECK(hts_dns_resolve2(opt, "v4only.test", &a1, &err) != NULL);
-    CHECK(hts_dns_resolve2(opt, "v4only.test", &a2, &err) != NULL);
+    CHECK(resolve_first(opt, "v4only.test", &a1) != NULL);
+    CHECK(resolve_first(opt, "v4only.test", &a2) != NULL);
     CHECK(mock_find("v4only.test")->calls == 1);
     /* the cache returns the right address, not merely a hit for the key */
     SOCaddr_inetntoa(ip1, sizeof(ip1), a1);
@@ -400,10 +421,9 @@ static int dns_selftests(httrackp *opt) {
   /* A negative result is cached too: a second lookup does not re-resolve. */
   {
     SOCaddr a1, a2;
-    hts_dns_status err;
 
-    CHECK(hts_dns_resolve2(opt, "nodns.test", &a1, &err) == NULL);
-    CHECK(hts_dns_resolve2(opt, "nodns.test", &a2, &err) == NULL);
+    CHECK(resolve_first(opt, "nodns.test", &a1) == NULL);
+    CHECK(resolve_first(opt, "nodns.test", &a2) == NULL);
     CHECK(mock_find("nodns.test")->calls == 1); /* resolved once, then cached */
   }
 
@@ -412,28 +432,27 @@ static int dns_selftests(httrackp *opt) {
   hts_dns_set_negative_ttl_ms(100000);
   {
     SOCaddr a;
-    hts_dns_status err;
 
-    CHECK(hts_dns_resolve2(opt, "flaky.test", &a, &err) == NULL);
+    CHECK(resolve_first(opt, "flaky.test", &a) == NULL);
     CHECK(hts_dns_negative_failures(opt, "flaky.test") == 1);
-    CHECK(hts_dns_resolve2(opt, "flaky.test", &a, &err) == NULL);
+    CHECK(resolve_first(opt, "flaky.test", &a) == NULL);
     CHECK(mock_read_calls("flaky.test") == 1); /* still inside the wait */
     hts_dns_test_move_clock(opt, "flaky.test", 150000);
     /* asking again after the wait counts, and lengthens the next one */
-    CHECK(hts_dns_resolve2(opt, "flaky.test", &a, &err) == NULL);
+    CHECK(resolve_first(opt, "flaky.test", &a) == NULL);
     CHECK(mock_read_calls("flaky.test") == 2);
     CHECK(hts_dns_negative_failures(opt, "flaky.test") == 2);
     /* that next one is twice as long, so the same move no longer reaches it */
     hts_dns_test_move_clock(opt, "flaky.test", 150000);
-    CHECK(hts_dns_resolve2(opt, "flaky.test", &a, &err) == NULL);
+    CHECK(resolve_first(opt, "flaky.test", &a) == NULL);
     CHECK(mock_read_calls("flaky.test") == 2);
     mock_find("flaky.test")->gai_err = 0; /* the network is back */
     hts_dns_test_move_clock(opt, "flaky.test", 100000); /* now past it */
-    CHECK(hts_dns_resolve2(opt, "flaky.test", &a, &err) != NULL);
+    CHECK(resolve_first(opt, "flaky.test", &a) != NULL);
     CHECK(mock_read_calls("flaky.test") == 3);
     CHECK(hts_dns_negative_failures(opt, "flaky.test") == 0);
     hts_dns_test_move_clock(opt, "flaky.test", 1000000);
-    CHECK(hts_dns_resolve2(opt, "flaky.test", &a, &err) != NULL);
+    CHECK(resolve_first(opt, "flaky.test", &a) != NULL);
     CHECK(mock_read_calls("flaky.test") == 3); /* the answer does not expire */
   }
 
@@ -441,14 +460,13 @@ static int dns_selftests(httrackp *opt) {
   mock_reset_calls();
   {
     SOCaddr a;
-    hts_dns_status err;
 
-    CHECK(hts_dns_resolve2(opt, "stepped.test", &a, &err) == NULL);
-    CHECK(hts_dns_resolve2(opt, "stepped.test", &a, &err) == NULL);
+    CHECK(resolve_first(opt, "stepped.test", &a) == NULL);
+    CHECK(resolve_first(opt, "stepped.test", &a) == NULL);
     CHECK(mock_read_calls("stepped.test") == 1); /* still inside the wait */
     mock_find("stepped.test")->gai_err = 0;      /* the network is back */
     hts_dns_test_move_clock(opt, "stepped.test", -600000); /* NTP steps back */
-    CHECK(hts_dns_resolve2(opt, "stepped.test", &a, &err) != NULL);
+    CHECK(resolve_first(opt, "stepped.test", &a) != NULL);
     CHECK(mock_read_calls("stepped.test") == 2);
     mock_find("stepped.test")->gai_err = EAI_AGAIN; /* leave the row as found */
   }
@@ -468,12 +486,11 @@ static int dns_selftests(httrackp *opt) {
   /* "no such host" is an answer about the name, so it stands for the crawl. */
   {
     SOCaddr a;
-    hts_dns_status err;
 
     hts_dns_set_negative_ttl_ms(200);
-    CHECK(hts_dns_resolve2(opt, "dead.test", &a, &err) == NULL);
+    CHECK(resolve_first(opt, "dead.test", &a) == NULL);
     Sleep(300);
-    CHECK(hts_dns_resolve2(opt, "dead.test", &a, &err) == NULL);
+    CHECK(resolve_first(opt, "dead.test", &a) == NULL);
     CHECK(mock_read_calls("dead.test") == 1);
   }
   hts_dns_set_negative_ttl_ms(HTS_DNS_NEGATIVE_TTL_MS);
@@ -486,11 +503,9 @@ static int dns_selftests(httrackp *opt) {
   {
     SOCaddr addrs[HTS_MAXADDRNUM];
     char ip[64];
-    hts_dns_status err;
 
     /* dual-stack, in resolver order: [0]=v6, [1]=v4 */
-    CHECK(hts_dns_resolve_all(opt, "dual.test", addrs, HTS_MAXADDRNUM, &err) ==
-          2);
+    CHECK(hts_dns_resolve_all(opt, "dual.test", addrs, HTS_MAXADDRNUM) == 2);
     CHECK(SOCaddr_sinfamily(addrs[0]) == AF_INET6);
     CHECK(SOCaddr_sinfamily(addrs[1]) == AF_INET);
     SOCaddr_inetntoa(ip, sizeof(ip), addrs[1]);
@@ -499,18 +514,16 @@ static int dns_selftests(httrackp *opt) {
           1); /* one backend hit for the list */
 
     /* single-address host: count 1 */
-    CHECK(hts_dns_resolve_all(opt, "v4only.test", addrs, HTS_MAXADDRNUM,
-                              &err) == 1);
+    CHECK(hts_dns_resolve_all(opt, "v4only.test", addrs, HTS_MAXADDRNUM) == 1);
     SOCaddr_inetntoa(ip, sizeof(ip), addrs[0]);
     CHECK(strcmp(ip, "1.2.3.4") == 0);
 
     /* does-not-resolve: count 0 (negative), no addresses */
-    CHECK(hts_dns_resolve_all(opt, "nodns.test", addrs, HTS_MAXADDRNUM, &err) ==
-          0);
+    CHECK(hts_dns_resolve_all(opt, "nodns.test", addrs, HTS_MAXADDRNUM) == 0);
 
     /* more than the cap: the kept list is clamped to HTS_MAXADDRNUM, keeping
        the FIRST addresses in resolver order (not some other window) */
-    CHECK(hts_dns_resolve_all(opt, "many.test", addrs, HTS_MAXADDRNUM, &err) ==
+    CHECK(hts_dns_resolve_all(opt, "many.test", addrs, HTS_MAXADDRNUM) ==
           HTS_MAXADDRNUM);
     SOCaddr_inetntoa(ip, sizeof(ip), addrs[0]);
     CHECK(strcmp(ip, "10.0.0.1") == 0);
@@ -519,8 +532,7 @@ static int dns_selftests(httrackp *opt) {
 
     /* family filter still applies through the list path */
     IPV6_resolver = 1;
-    CHECK(hts_dns_resolve_all(opt, "dual4.test", addrs, HTS_MAXADDRNUM, &err) ==
-          1);
+    CHECK(hts_dns_resolve_all(opt, "dual4.test", addrs, HTS_MAXADDRNUM) == 1);
     CHECK(SOCaddr_sinfamily(addrs[0]) == AF_INET);
     IPV6_resolver = 0;
   }
@@ -531,16 +543,15 @@ static int dns_selftests(httrackp *opt) {
   {
     SOCaddr a;
     char ip[64];
-    hts_dns_status err;
 
     /* cache miss: the backend is hit with the stripped host, not "host:port" */
-    CHECK(hts_dns_resolve2(opt, "v6only.test:8080", &a, &err) != NULL);
+    CHECK(resolve_first(opt, "v6only.test:8080", &a) != NULL);
     CHECK(mock_find("v6only.test")->calls == 1);
     /* the bare host shares that one cache entry (stripped key) */
-    CHECK(hts_dns_resolve2(opt, "v6only.test", &a, &err) != NULL);
+    CHECK(resolve_first(opt, "v6only.test", &a) != NULL);
     CHECK(mock_find("v6only.test")->calls == 1);
     /* a port variant of an already-cached host also hits, right address */
-    CHECK(hts_dns_resolve2(opt, "v4only.test:1234", &a, &err) != NULL);
+    CHECK(resolve_first(opt, "v4only.test:1234", &a) != NULL);
     SOCaddr_inetntoa(ip, sizeof(ip), a);
     CHECK(strcmp(ip, "1.2.3.4") == 0);
   }
@@ -667,7 +678,6 @@ static void lock_probe_thread(void *arg) {
    Returns the number of failed checks (0 == success). */
 static int dns_timeout_selftests(httrackp *opt) {
   SOCaddr addrs[HTS_MAXADDRNUM];
-  hts_dns_status err;
   static lock_probe probe; /* outlives this call if the probe is late */
   TStamp start, elapsed;
   int count, finished;
@@ -679,7 +689,7 @@ static int dns_timeout_selftests(httrackp *opt) {
   opt->timeout = 1; /* the bound under test */
 
   start = mtime_monotonic();
-  count = hts_dns_resolve_all(opt, "slow.test", addrs, HTS_MAXADDRNUM, &err);
+  count = hts_dns_resolve_all(opt, "slow.test", addrs, HTS_MAXADDRNUM);
   elapsed = mtime_monotonic() - start;
   finished = mock_read_finished();
 
@@ -691,7 +701,7 @@ static int dns_timeout_selftests(httrackp *opt) {
   /* a timeout is not an answer, so it must not be negative-cached: the host is
      resolved again rather than written off for the rest of the crawl */
   CHECK(mock_read_calls("slow.test") == 1);
-  count = hts_dns_resolve_all(opt, "slow.test", addrs, HTS_MAXADDRNUM, &err);
+  count = hts_dns_resolve_all(opt, "slow.test", addrs, HTS_MAXADDRNUM);
   CHECK(count == 0);
   CHECK(mock_read_calls("slow.test") == 2); /* re-resolved, not cached */
 
@@ -701,8 +711,7 @@ static int dns_timeout_selftests(httrackp *opt) {
   memset(&probe, 0, sizeof(probe));
   probe.opt = opt;
   CHECK(hts_newthread(lock_probe_thread, &probe) == 0);
-  count = hts_dns_resolve_all_bounded(opt, "slow.test", addrs, HTS_MAXADDRNUM,
-                                      0, &probe.got_lock, &err);
+  count = resolve_count(opt, "slow.test", 0, &probe.got_lock);
   CHECK(count == 0);
   {
     const TStamp give_up = mtime_monotonic() + MOCK_GATE_MAX_MS;
@@ -720,8 +729,7 @@ static int dns_timeout_selftests(httrackp *opt) {
   {
     hts_boolean cancel = HTS_TRUE;
 
-    count = hts_dns_resolve_all_bounded(opt, "slow.test", addrs, HTS_MAXADDRNUM,
-                                        0, &cancel, &err);
+    count = resolve_count(opt, "slow.test", 0, &cancel);
     CHECK(count == 0);
   }
 
@@ -731,8 +739,7 @@ static int dns_timeout_selftests(httrackp *opt) {
     hts_boolean cancel = HTS_FALSE;
 
     start = mtime_monotonic();
-    count = hts_dns_resolve_all_bounded(opt, "slow2.test", addrs,
-                                        HTS_MAXADDRNUM, 0, &cancel, &err);
+    count = resolve_count(opt, "slow2.test", 0, &cancel);
     elapsed = mtime_monotonic() - start;
     CHECK(count == 1);
     CHECK(elapsed >= MOCK_SLOW_MS / 2);
@@ -745,13 +752,13 @@ static int dns_timeout_selftests(httrackp *opt) {
   {
     /* control first: with the mirror running, the same call still waits */
     start = mtime_monotonic();
-    count = hts_dns_resolve_all(opt, "slow3.test", addrs, HTS_MAXADDRNUM, &err);
+    count = hts_dns_resolve_all(opt, "slow3.test", addrs, HTS_MAXADDRNUM);
     elapsed = mtime_monotonic() - start;
     CHECK(count == 1);
     CHECK(elapsed >= MOCK_SLOW_MS / 2);
 
     opt->state.stop = 1; /* the flag, not hts_request_stop's log line */
-    count = hts_dns_resolve_all(opt, "slow4.test", addrs, HTS_MAXADDRNUM, &err);
+    count = hts_dns_resolve_all(opt, "slow4.test", addrs, HTS_MAXADDRNUM);
     opt->state.stop = 0;
     CHECK(count == 0);
   }
@@ -773,8 +780,7 @@ static int dns_timeout_selftests(httrackp *opt) {
     hts_dns_set_resolver_backend(&cut_backend);
     CHECK(hts_set_thread_runner(dns_cut_runner) == NULL);
     start = mtime_monotonic();
-    count = hts_dns_resolve_all_bounded(opt, "cut.test", addrs, HTS_MAXADDRNUM,
-                                        MOCK_GATE_MAX_MS / 1000, &cancel, &err);
+    count = resolve_count(opt, "cut.test", MOCK_GATE_MAX_MS / 1000, &cancel);
     elapsed = mtime_monotonic() - start;
     /* the cut worker longjmps out of the backend after freeing its answer, so
        it too has to be out before the swaps below */
@@ -788,8 +794,7 @@ static int dns_timeout_selftests(httrackp *opt) {
     CHECK(elapsed < MOCK_GATE_MAX_MS / 2);
     CHECK(mock_read_calls("cut.test") == 1);
     /* no answer was had, so nothing may be cached in its place */
-    count = hts_dns_resolve_all_bounded(opt, "cut.test", addrs, HTS_MAXADDRNUM,
-                                        0, &cancel, &err);
+    count = resolve_count(opt, "cut.test", 0, &cancel);
     CHECK(count == 1);
     CHECK(mock_read_calls("cut.test") == 2);
     /* and the mirror gives up on it, see back_checkmirror() */
@@ -818,8 +823,7 @@ static int dns_addr_selftests(httrackp *opt) {
   CHECK(mock_find("gone.test")->calls == 1);
   CHECK(strstr(hts_dns_strerror(&res), "cached") != NULL);
 
-  count =
-      hts_dns_resolve_all(opt, "pref.test:8080", addrs, HTS_MAXADDRNUM, NULL);
+  count = hts_dns_resolve_all(opt, "pref.test:8080", addrs, HTS_MAXADDRNUM);
   CHECK(count == 3);
   if (count != 3)
     return failures;
@@ -836,8 +840,7 @@ static int dns_addr_selftests(httrackp *opt) {
   CHECK(hts_dns_preferred(opt, "pref.test") == 2);
   /* the order the resolver gave is kept, so a fallback in flight keeps its
      sequence */
-  CHECK(hts_dns_resolve_all(opt, "pref.test", addrs, HTS_MAXADDRNUM, NULL) ==
-        3);
+  CHECK(hts_dns_resolve_all(opt, "pref.test", addrs, HTS_MAXADDRNUM) == 3);
   {
     char ip[64];
 
@@ -860,7 +863,8 @@ static int dns_addr_selftests(httrackp *opt) {
   return failures;
 }
 
-/* Is res a failure of status st, cached or not, whose message is msg? */
+/* Is res an empty answer with, in this order, status st, cached flag, gai
+   code and message msg? */
 static hts_boolean st_is(const hts_dns_result *res, hts_dns_status st,
                          hts_boolean cached, int gai, const char *msg) {
   return res->status == st && res->count == 0 && res->cached == cached &&
@@ -869,13 +873,24 @@ static hts_boolean st_is(const hts_dns_result *res, hts_dns_status st,
              : HTS_FALSE;
 }
 
+/* Poll job until it answers, then drop it; returns the poll's count. */
+static int st_poll(httrackp *opt, hts_dns_job *job, hts_dns_result *res) {
+  const TStamp give_up = mtime_monotonic() + MOCK_GATE_MAX_MS;
+  int count;
+
+  while ((count = hts_dns_poll(opt, job, res)) == HTS_DNS_PENDING &&
+         mtime_monotonic() < give_up)
+    Sleep(10);
+  hts_dns_job_release(job);
+  return count;
+}
+
 /* Each resolve outcome carries its own status and message, fresh and from the
    negative cache, through the cached entry point and an async job. */
 static int dns_status_selftests(httrackp *opt) {
   hts_dns_result res;
   hts_dns_job *job;
-  TStamp give_up;
-  int count;
+  int calls;
 
   failures = 0;
   hts_dns_set_resolver_backend(&mock_backend);
@@ -888,63 +903,83 @@ static int dns_status_selftests(httrackp *opt) {
   CHECK(hts_dns_resolve(opt, "st-ok.test", 0, NULL, &res) == HTS_DNS_OK);
   CHECK(res.count == 1 && res.cached);
 
-  CHECK(hts_dns_resolve(opt, "st-noname.test", 0, NULL, &res) ==
-        HTS_DNS_NONAME);
+  (void) hts_dns_resolve(opt, "", 0, NULL, &res);
+  CHECK(st_is(&res, HTS_DNS_NONAME, HTS_FALSE, 0, "host name does not exist"));
+
+  (void) hts_dns_resolve(opt, "st-noname.test", 0, NULL, &res);
   CHECK(st_is(&res, HTS_DNS_NONAME, HTS_FALSE, EAI_NONAME,
               "host name does not exist"));
-  CHECK(hts_dns_resolve(opt, "st-noname.test", 0, NULL, &res) ==
-        HTS_DNS_NONAME);
+  (void) hts_dns_resolve(opt, "st-noname.test", 0, NULL, &res);
   CHECK(st_is(&res, HTS_DNS_NONAME, HTS_TRUE, EAI_NONAME,
               "host name does not exist (cached failure)"));
   CHECK(mock_read_calls("st-noname.test") == 1);
 
-  CHECK(hts_dns_resolve(opt, "st-again.test", 0, NULL, &res) ==
-        HTS_DNS_TEMPFAIL);
+  /* a resolver failure keeps its own reason, fresh and cached */
+  (void) hts_dns_resolve(opt, "st-again.test", 0, NULL, &res);
   CHECK(st_is(&res, HTS_DNS_TEMPFAIL, HTS_FALSE, EAI_AGAIN,
-              "host name resolution failed"));
-  CHECK(hts_dns_resolve(opt, "st-again.test", 0, NULL, &res) ==
-        HTS_DNS_TEMPFAIL);
+              "temporary failure in name resolution"));
+  (void) hts_dns_resolve(opt, "st-again.test", 0, NULL, &res);
   CHECK(st_is(&res, HTS_DNS_TEMPFAIL, HTS_TRUE, EAI_AGAIN,
-              "host name resolution failed (cached failure)"));
+              "temporary failure in name resolution (cached failure)"));
   CHECK(mock_read_calls("st-again.test") == 1);
+  (void) hts_dns_resolve(opt, "st-fail.test", 0, NULL, &res);
+  CHECK(st_is(&res, HTS_DNS_TEMPFAIL, HTS_FALSE, EAI_FAIL,
+              "non-recoverable failure in name resolution"));
+  /* a code with no text of its own */
+  res.gai_code = -12345;
+  CHECK(strcmp(hts_dns_strerror(&res), "host name resolution failed") == 0);
 
   /* the async job reports the worker's status, and caches it */
   job = hts_dns_start(opt, "st-job.test");
   CHECK(job != NULL);
   if (job == NULL)
     return failures;
-  give_up = mtime_monotonic() + MOCK_GATE_MAX_MS;
-  while ((count = hts_dns_poll(opt, job, &res)) == HTS_DNS_PENDING &&
-         mtime_monotonic() < give_up)
-    Sleep(10);
-  hts_dns_job_release(job);
-  CHECK(count == 0);
+  CHECK(st_poll(opt, job, &res) == 0);
   CHECK(st_is(&res, HTS_DNS_NONAME, HTS_FALSE, EAI_NONAME,
               "host name does not exist"));
-  CHECK(hts_dns_resolve(opt, "st-job.test", 0, NULL, &res) == HTS_DNS_NONAME);
-  CHECK(res.cached);
+  (void) hts_dns_resolve(opt, "st-job.test", 0, NULL, &res);
+  CHECK(res.status == HTS_DNS_NONAME && res.cached);
 
   /* a cancel and a deadline are not answers: neither is cached */
   {
     const hts_boolean cancel = HTS_TRUE;
 
-    CHECK(hts_dns_resolve(opt, "st-slow.test", 0, &cancel, &res) ==
-          HTS_DNS_CANCELLED);
+    (void) hts_dns_resolve(opt, "st-slow.test", 0, &cancel, &res);
     CHECK(st_is(&res, HTS_DNS_CANCELLED, HTS_FALSE, 0,
                 "host name resolution cancelled"));
   }
-  CHECK(hts_dns_resolve(opt, "st-slow.test", 1, NULL, &res) == HTS_DNS_TIMEOUT);
+  (void) hts_dns_resolve(opt, "st-slow.test", 1, NULL, &res);
   CHECK(st_is(&res, HTS_DNS_TIMEOUT, HTS_FALSE, 0,
               "host name resolution timed out"));
   CHECK(!hts_dns_cached(opt, "st-slow.test"));
 
-  /* both abandoned workers must leave the backend before the process does */
+  /* every backend call, the two abandoned ones included, must be out of the
+     backend before it is swapped */
   mock_open_gate();
-  CHECK(mock_wait_released(
-      mock_read_calls("st-ok.test") + mock_read_calls("st-noname.test") +
-      mock_read_calls("st-again.test") + mock_read_calls("st-job.test") +
-      mock_read_calls("st-slow.test")));
+  calls = mock_read_calls("st-ok.test") + mock_read_calls("st-noname.test") +
+          mock_read_calls("st-again.test") + mock_read_calls("st-fail.test") +
+          mock_read_calls("st-job.test") + mock_read_calls("st-slow.test");
+  CHECK(mock_wait_released(calls));
   CHECK(mock_read_calls("st-slow.test") == 2);
+  if (failures != 0)
+    return failures;
+
+  /* a job whose worker was cut short polls -1, with an empty uncached answer */
+  hts_dns_set_resolver_backend(&cut_backend);
+  CHECK(hts_set_thread_runner(dns_cut_runner) == NULL);
+  job = hts_dns_start(opt, "st-cut.test");
+  CHECK(job != NULL);
+  if (job != NULL) {
+    CHECK(st_poll(opt, job, &res) == -1);
+    CHECK(st_is(&res, HTS_DNS_TEMPFAIL, HTS_FALSE, 0,
+                "host name resolution failed"));
+  }
+  CHECK(mock_wait_released(calls + 1));
+  hts_set_thread_runner(NULL);
+  hts_dns_set_resolver_backend(&mock_backend);
+  CHECK(!hts_dns_cached(opt, "st-cut.test"));
+  CHECK(hts_worker_faulted());
+  hts_worker_fault_clear();
   return failures;
 }
 
