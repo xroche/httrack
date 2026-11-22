@@ -73,14 +73,18 @@ static void basic_selftests(void) {
   {
     char cbuf[8192];
 
-    assertf(strcmp(cookie_get(cbuf, "a\tb\tc", 0), "a") == 0);
-    assertf(strcmp(cookie_get(cbuf, "a\tb\tc", 1), "b") == 0);
-    assertf(strcmp(cookie_get(cbuf, "a\tb\tc", 2), "c") == 0);
+    assertf(strcmp(cookie_get(cbuf, sizeof(cbuf), "a\tb\tc", 0), "a") == 0);
+    assertf(strcmp(cookie_get(cbuf, sizeof(cbuf), "a\tb\tc", 1), "b") == 0);
+    assertf(strcmp(cookie_get(cbuf, sizeof(cbuf), "a\tb\tc", 2), "c") == 0);
     // multi-char fields catch length/boundary bugs that 1-char fields hide
-    assertf(strcmp(cookie_get(cbuf, "host\tx\t/path/to", 0), "host") == 0);
-    assertf(strcmp(cookie_get(cbuf, "host\tx\t/path/to", 2), "/path/to") == 0);
-    assertf(strcmp(cookie_get(cbuf, "a\t\tc", 1), "") == 0);  // empty field
-    assertf(strcmp(cookie_get(cbuf, "a\tb\tc", 9), "") == 0); // beyond last
+    assertf(strcmp(cookie_get(cbuf, sizeof(cbuf), "host\tx\t/path/to", 0),
+                   "host") == 0);
+    assertf(strcmp(cookie_get(cbuf, sizeof(cbuf), "host\tx\t/path/to", 2),
+                   "/path/to") == 0);
+    assertf(strcmp(cookie_get(cbuf, sizeof(cbuf), "a\t\tc", 1), "") ==
+            0); // empty field
+    assertf(strcmp(cookie_get(cbuf, sizeof(cbuf), "a\tb\tc", 9), "") ==
+            0); // beyond last
   }
   // back_infostr()'s size trailer must not clobber the URL written before it.
   {

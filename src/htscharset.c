@@ -752,9 +752,14 @@ size_t hts_copyStringUTF8(char *dest, const char *src, size_t size) {
   return i;
 }
 
-size_t hts_appendStringUTF8(char *dest, const char *src,  size_t nBytes) {
-  const size_t size = strlen(dest);
-  return hts_copyStringUTF8(dest + size, src, nBytes);
+size_t hts_appendStringUTF8(char *dest, size_t dest_size, const char *src,
+                            size_t nBytes) {
+  const size_t used = strlen(dest);
+  size_t room;
+
+  assertf(used < dest_size);
+  room = dest_size - 1 - used;
+  return hts_copyStringUTF8(dest + used, src, nBytes < room ? nBytes : room);
 }
 
 int hts_isCharsetUTF8(const char *charset) {

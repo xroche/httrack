@@ -882,7 +882,47 @@ static int st_unescape_plus(httrackp *opt, int argc, char **argv) {
 /* Registry: this module's tests, in the order -#test lists them. */
 /* ------------------------------------------------------------ */
 
+/* hts_appendStringUTF8() clips to dest's room, on a sequence boundary. */
+static int st_append_utf8_sized(httrackp *opt, int argc, char **argv) {
+  /* "ab" then five two-byte u-umlauts */
+  static const char src[] = "ab\xc3\xbc\xc3\xbc\xc3\xbc\xc3\xbc\xc3\xbc";
+
+  static const struct {
+    size_t cap;
+    const char *want;
+  } cases[] = {
+      {8, "dirab\xc3\xbc"}, /* 4 bytes of room, one u-umlaut fits */
+      {9, "dirab\xc3\xbc"}, /* 5 bytes, the second one would not */
+      {4, "dir"},           /* no room at all */
+      {sizeof(src) + 3, "dirab\xc3\xbc\xc3\xbc\xc3\xbc\xc3\xbc\xc3\xbc"},
+  };
+
+  const size_t no_budget = (size_t) -1 / 2; /* a byte budget that never binds */
+  size_t i;
+  int fail = 0;
+
+  for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+    const size_t cap = cases[i].cap;
+    char *buf = st_sized_alloc(cap);
+    size_t n;
+
+    strlcpybuff(buf, "dir", cap);
+    n = hts_appendStringUTF8(buf, cap, src, no_budget);
+    if (n != strlen(cases[i].want) - 3 ||
+        !st_sized_clip_ok(buf, cap, cases[i].want)) {
+      printf("append-utf8-sized: into %u bytes gave '%.*s'\n", (unsigned) cap,
+             (int) cap, buf);
+      fail = 1;
+    }
+    freet(buf);
+  }
+  return st_verdict("append-utf8-sized", fail);
+}
+
 const struct selftest_entry selftests_charset[] = {
+    {"append-utf8-sized", "",
+     "hts_appendStringUTF8() clips to the room its buffer has left",
+     st_append_utf8_sized},
     {"charset", "<charset> <hex:..|string>",
      "convert a string to UTF-8 from a charset", st_charset},
     {"syscharset", "", "UTF-8 <-> system codepage conversion (WIN32 only)",

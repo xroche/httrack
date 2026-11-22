@@ -1,0 +1,18 @@
+#!/bin/bash
+#
+# The internal readers of wire and cache data take their output size: each one
+# clips or refuses into a small buffer and never writes past it.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+dir=$(mktemp -d)
+cleanup_push rm -rf "$dir"
+
+assert_selftest 'cache-sized: OK' cache-sized "$dir" 2>/dev/null
+assert_selftest 'cookie-sized: OK' cookie-sized
+assert_selftest 'append-utf8-sized: OK' append-utf8-sized
+assert_selftest 'catchurl-sized: OK' catchurl-sized
+echo "PASS"

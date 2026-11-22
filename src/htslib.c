@@ -351,8 +351,8 @@ static int append_cookie_header(buff_struct *bstr, t_cookie *cookie,
           print_buffer(bstr, "Cookie: ");
         else
           print_buffer(bstr, "; ");
-        print_buffer(bstr, "%s", cookie_get(buffer, b, 5));
-        print_buffer(bstr, "=%s", cookie_get(buffer, b, 6));
+        print_buffer(bstr, "%s", cookie_get(buffer, sizeof(buffer), b, 5));
+        print_buffer(bstr, "=%s", cookie_get(buffer, sizeof(buffer), b, 6));
         kept = !bstr->overflow && bstr->pos <= max_pos;
       }
       if (kept) {

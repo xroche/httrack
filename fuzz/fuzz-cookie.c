@@ -131,7 +131,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     for (; rec != NULL && *rec != '\0'; rec = cookie_nextfield(rec)) {
       (void) cookie_sendable(rec, https ? HTS_TRUE : HTS_FALSE, now);
       for (i = 0; i < 6; i++) {
-        (void) cookie_get(field, rec, i);
+        (void) cookie_get(field, sizeof(field), rec, i);
         cookie_sink += (unsigned long) strlen(field);
       }
     }
@@ -248,7 +248,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
       host[0] = '\0'; // a refused URL leaves host unwritten
     cookie_sink += (unsigned long) strlen(host);
     for (i = 0; i < 8; i++) {
-      (void) cookie_get(field, jar.data, i);
+      (void) cookie_get(field, sizeof(field), jar.data, i);
       cookie_sink += (unsigned long) strlen(field);
     }
     break;
