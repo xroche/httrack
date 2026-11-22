@@ -4321,6 +4321,176 @@ static int st_typedlogin(httrackp *opt, int argc, char **argv) {
   return failures != 0;
 }
 
+/* Append " NAME=text" for a present span to OUT. */
+static void urlview_field(char *out, size_t size, const char *name,
+                          hts_span sp) {
+  const size_t len = strlen(out);
+
+  if (sp.p != NULL)
+    snprintf(out + len, size - len, " %s=%.*s", name, (int) sp.len, sp.p);
+}
+
+/* Describe *V as "ok=1 scheme=... host=...", leaving absent parts out. */
+static const char *urlview_describe(char *out, size_t size, hts_boolean ok,
+                                    const hts_url_view *v) {
+  snprintf(out, size, "ok=%d", ok ? 1 : 0);
+  urlview_field(out, size, "scheme", v->scheme);
+  urlview_field(out, size, "userinfo", v->userinfo);
+  urlview_field(out, size, "host", v->host);
+  urlview_field(out, size, "port", v->port);
+  urlview_field(out, size, "path", v->path);
+  urlview_field(out, size, "query", v->query);
+  urlview_field(out, size, "fragment", v->fragment);
+  return out;
+}
+
+/* Does every span lie in [s, s + len), in order, the last one at the end? */
+static hts_boolean urlview_tiles(const char *s, size_t len,
+                                 const hts_url_view *v) {
+  const hts_span *const parts[] = {&v->scheme,  &v->userinfo, &v->host,
+                                   &v->port,    &v->path,     &v->query,
+                                   &v->fragment};
+  const char *at = s;
+  size_t i;
+
+  if (v->host.p == NULL || v->path.p == NULL)
+    return HTS_FALSE;
+  for (i = 0; i < sizeof(parts) / sizeof(parts[0]); i++) {
+    const hts_span *const sp = parts[i];
+
+    if (sp->p == NULL)
+      continue;
+    if (sp->p < at || sp->len > (size_t) (s + len - sp->p))
+      return HTS_FALSE;
+    at = sp->p + sp->len;
+  }
+  return at == s + len ? HTS_TRUE : HTS_FALSE;
+}
+
+/* -#test=urlview [url...]: print each URL's view, or check the table. */
+static int st_urlview(httrackp *opt, int argc, char **argv) {
+  static const struct {
+    const char *url;
+    const char *want;
+  } rows[] = {
+      {"http://u:p@h:8080/x?q#f",
+       "ok=1 scheme=http userinfo=u:p host=h port=8080 path=/x query=q "
+       "fragment=f"},
+      /* an '@' after the authority is not a login */
+      {"http://h1?u=a@h2/x", "ok=1 scheme=http host=h1 path= query=u=a@h2/x"},
+      {"http://h1#u=a@h2/x",
+       "ok=1 scheme=http host=h1 path= fragment=u=a@h2/x"},
+      {"http://h1\\u=a@h2/x", "ok=1 scheme=http host=h1 path=\\u=a@h2/x"},
+      {"http://h/p@q/x", "ok=1 scheme=http host=h path=/p@q/x"},
+      {"http://u@h/x?a@b",
+       "ok=1 scheme=http userinfo=u host=h path=/x query=a@b"},
+      {"http://h\\@evil/", "ok=1 scheme=http host=h path=\\@evil/"},
+      /* the browser rule: the last '@' of the authority ends the login */
+      {"http://u:p@q@h/", "ok=1 scheme=http userinfo=u:p@q host=h path=/"},
+      {"http://@h/", "ok=1 scheme=http userinfo= host=h path=/"},
+      /* '?' and '#' before any '/' */
+      {"http://h?a/b", "ok=1 scheme=http host=h path= query=a/b"},
+      {"http://h#a?b/c", "ok=1 scheme=http host=h path= fragment=a?b/c"},
+      {"http://h?#", "ok=1 scheme=http host=h path= query= fragment="},
+      /* IPv6 literals, ports and zone ids */
+      {"http://[::1]:8080/x", "ok=1 scheme=http host=[::1] port=8080 path=/x"},
+      {"http://[::1]/", "ok=1 scheme=http host=[::1] path=/"},
+      {"http://[fe80::1%25eth0]:80/",
+       "ok=1 scheme=http host=[fe80::1%25eth0] port=80 path=/"},
+      {"http://u:p@[::1]:1/", "ok=1 scheme=http userinfo=u:p host=[::1] port=1 "
+                              "path=/"},
+      {"http://[::1/x", "ok=0 scheme=http host=[::1 path=/x"},
+      {"http://[::1]x:80/", "ok=0 scheme=http host=[::1]x:80 path=/"},
+      /* empty host */
+      {"http:///x", "ok=1 scheme=http host= path=/x"},
+      {"http://:80/", "ok=1 scheme=http host= port=80 path=/"},
+      {"file:///etc/x", "ok=1 scheme=file host= path=/etc/x"},
+      {"", "ok=1 host= path="},
+      /* scheme-less: an adr starts at its authority */
+      {"h:80/x", "ok=1 host=h port=80 path=/x"},
+      {"example.com", "ok=1 host=example.com path="},
+      {"localhost:8080", "ok=1 host=localhost port=8080 path="},
+      {"//u@h/x", "ok=1 userinfo=u host=h path=/x"},
+      {"u:p@h", "ok=1 userinfo=u:p host=h path="},
+      /* schemes */
+      {"HTTPS://U@H/", "ok=1 scheme=HTTPS userinfo=U host=H path=/"},
+      {"gopher://u@h/x", "ok=1 scheme=gopher userinfo=u host=h path=/x"},
+      {"connect:proxy:443", "ok=1 scheme=connect host=proxy port=443 path="},
+      {"http:h/x", "ok=1 scheme=http host=h path=/x"},
+      /* ports */
+      {"http://h:65535/", "ok=1 scheme=http host=h port=65535 path=/"},
+      {"http://h:0/", "ok=1 scheme=http host=h port=0 path=/"},
+      {"http://h:/", "ok=1 scheme=http host=h port= path=/"},
+      {"http://h:65536/", "ok=0 scheme=http host=h port=65536 path=/"},
+      {"http://h:99999999999999999999/",
+       "ok=0 scheme=http host=h port=99999999999999999999 path=/"},
+      {"http://h:8a/", "ok=0 scheme=http host=h port=8a path=/"},
+      {"http://h:-1/", "ok=0 scheme=http host=h port=-1 path=/"},
+      {"http://h:1:2/", "ok=0 scheme=http host=h port=1:2 path=/"},
+  };
+
+  static const char *const tokens[] = {"http:", "gopher:", "//", "/", "u",
+                                       ":",     "@",       "?",  "#", "\\",
+                                       "[",     "]",       "80", "h"};
+  const size_t ntok = sizeof(tokens) / sizeof(tokens[0]);
+  char out[512];
+  hts_url_view v;
+  size_t i, j, k;
+  int failures = 0;
+
+  (void) opt;
+  if (argc > 0) {
+    int a;
+
+    for (a = 0; a < argc; a++) {
+      const hts_boolean ok = hts_url_view_parse(argv[a], strlen(argv[a]), &v);
+
+      printf("%s\n", urlview_describe(out, sizeof(out), ok, &v));
+    }
+    return 0;
+  }
+  for (i = 0; i < sizeof(rows) / sizeof(rows[0]); i++) {
+    const hts_boolean ok =
+        hts_url_view_parse(rows[i].url, strlen(rows[i].url), &v);
+
+    urlview_describe(out, sizeof(out), ok, &v);
+    if (strcmp(out, rows[i].want) != 0) {
+      printf("FAIL %s: %s\n", rows[i].url, out);
+      failures++;
+    }
+  }
+  /* LEN bounds the read, so a prefix parses as if it were the string */
+  if (strcmp(urlview_describe(out, sizeof(out),
+                              hts_url_view_parse("http://h/xyz?q", 9, &v), &v),
+             "ok=1 scheme=http host=h path=/") != 0) {
+    printf("FAIL prefix: %s\n", out);
+    failures++;
+  }
+  /* every string of up to three tokens, in a buffer with no NUL after it */
+  for (i = 0; i < ntok * ntok * ntok + ntok * ntok + ntok + 1; i++) {
+    char s[32];
+    char *buf;
+    size_t len = 0;
+
+    for (j = i, k = 0; j != 0 && k < 3; j = (j - 1) / ntok, k++) {
+      const char *const t = tokens[(j - 1) % ntok];
+
+      memcpy(s + len, t, strlen(t));
+      len += strlen(t);
+    }
+    buf = malloct(len != 0 ? len : 1);
+    memcpy(buf, s, len);
+    (void) hts_url_view_parse(buf, len, &v);
+    if (!urlview_tiles(buf, len, &v)) {
+      printf("FAIL tiles %.*s\n", (int) len, s);
+      failures++;
+    }
+    freet(buf);
+  }
+  printf("urlview: %d failure(s)\n", failures);
+  return failures != 0;
+}
+
 /* -#test=clienthints <user-agent>: the Sec-CH-UA* values it implies. */
 static int st_clienthints(httrackp *opt, int argc, char **argv) {
   hts_client_hints ch;
@@ -4467,6 +4637,8 @@ const struct selftest_entry selftests_lib[] = {
      st_userinfo},
     {"typedlogin", "", "escape the ?, # and \\ of a typed URL's login",
      st_typedlogin},
+    {"urlview", "[url...]", "the spans hts_url_view_parse() finds in a URL",
+     st_urlview},
     {"clienthints", "<user-agent>",
      "the client hints a browser sending this User-Agent adds", st_clienthints},
     {"headerverdict", "<line> [earlier...]",

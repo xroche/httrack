@@ -725,6 +725,28 @@ const char *strrchr_limit(const char *s, char c, const char *limit);
 /* Returns the end of the authority at s, which must be past the scheme: its
    first '/', '?', '#' or '\'. */
 const char *hts_authority_end(const char *s);
+
+/* Spans into one adr or URL string. An absent part has a NULL p, a present
+   but empty one ("h:" has an empty port) a non-NULL p and a zero len. */
+typedef struct hts_url_view {
+  hts_span scheme;   /* without ':'; absent for plain http */
+  hts_span userinfo; /* before the authority's last '@' */
+  hts_span host;     /* always present, brackets kept for IPv6 */
+  hts_span port;     /* without ':' */
+  hts_span path;     /* always present, from the authority's end */
+  hts_span query;    /* without '?' */
+  hts_span fragment; /* without '#' */
+} hts_url_view;
+
+/* Split the LEN bytes at S into *V, owning nothing and reading no further.
+   Input with no scheme starts at its authority, as an adr does, and the
+   authority ends at '/', '?', '#' or '\'. A scheme is one jump_protocol_const()
+   knows, "//" optional, or any other followed by "://". Return FALSE, with *V
+   still filled, on an unclosed '[', bytes after ']' that are not ":port", or a
+   port with a non-digit or above 65535; the first two leave the port absent.
+   Syntax only, so an empty host is not an error. */
+hts_boolean hts_url_view_parse(const char *s, size_t len, hts_url_view *v);
+
 char *jump_protocol(char *source);
 const char *jump_protocol_const(const char *source);
 

@@ -1,0 +1,20 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# hts_url_view_parse() splits a URL the way RFC 3986 and browsers do, and
+# jump_identification_const() finds its host through it.
+
+selftest_queue 'urlview: 0 failure(s)' urlview
+selftest_queue 'ok=1 scheme=https userinfo=u host=[::1] port=8 path=/x query=a@b' \
+    urlview 'https://u@[::1]:8/x?a@b'
+selftest_queue 'host=[::1]:8/x?a@b end=[::1]:8/x?a@b login=1' \
+    userinfo 'https://u@[::1]:8/x?a@b'
+# an unknown scheme and a bare file:// stay whole, as before the view
+selftest_queue 'host=gopher://u@h/x end=h/x login=0' userinfo 'gopher://u@h/x'
+selftest_queue 'host=file:// end= login=0' userinfo 'file://'
+selftest_run_queued
