@@ -4373,11 +4373,11 @@ hts_boolean hts_sni_hostname(const char *url_adr, char *out, size_t size) {
 
   (void) hts_url_view_parse(url_adr, strlen(url_adr), &v);
   out[0] = '\0';
-  if (v.host.len == 0 || v.host.len >= size || v.host.p[0] == '[' ||
+  if (hts_span_empty(v.host) || v.host.len >= size ||
+      hts_span_starts_with(v.host, hts_span_of("[")) ||
       hts_host_is_ipv4(v.host.p, v.host.len))
     return HTS_FALSE;
-  strlncatbuff(out, v.host.p, size, v.host.len);
-  return HTS_TRUE;
+  return hts_span_copy(v.host, out, size);
 }
 
 #if HTS_USEOPENSSL
