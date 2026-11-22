@@ -1235,7 +1235,7 @@ cmdl_file_result optinclude_file(const char *name, cmdl_argv *cmd) {
       int result;
 
       /* a clipped option can mean something else, so it is skipped */
-      if (hts_readline(fp, hts_buf_at(line, 250), HTS_LINE_DROP_FF)) {
+      if (hts_readline(fp, HTS_BUF_N(line, 250), HTS_LINE_DROP_FF)) {
         fprintf(stderr, "* %s: line too long, ignored\n", name);
         continue;
       }

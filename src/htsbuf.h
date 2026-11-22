@@ -38,14 +38,15 @@ Please visit our Website: http://www.httrack.com
 
 #include <stddef.h>
 
-/* P points at SIZE writable bytes, the end NUL included. It does not convert
-   to or from hts_span, the read-only view. */
+/* P points at SIZE writable bytes, the end NUL included. There is no implicit
+   conversion to or from hts_span. The htsbuff of htssafe.h is an append cursor,
+   which is a different type. */
 typedef struct {
   char *p;
   size_t size;
 } hts_buf;
 
-/* Return the buffer of SIZE bytes at P. */
+/* Use it only to forward a pointer that comes with its size, never an array. */
 static HTS_INLINE HTS_UNUSED hts_buf hts_buf_at(char *p, size_t size) {
   hts_buf b;
 
@@ -54,24 +55,22 @@ static HTS_INLINE HTS_UNUSED hts_buf hts_buf_at(char *p, size_t size) {
   return b;
 }
 
-/* Return B without its first OFF bytes. Aborts unless a byte is left. */
+/* Return B without its first OFF bytes. It aborts unless a byte is left. */
 static HTS_INLINE HTS_UNUSED hts_buf hts_buf_tail(hts_buf b, size_t off) {
   assertf(off < b.size);
   return hts_buf_at(b.p + off, b.size - off);
 }
 
-/* The buffer over the in-scope array ARR. A pointer does not compile, as with
-   htsbuff_array(). */
+/* HTS_BUF(ARR) is the buffer over array ARR, and a pointer does not compile.
+   HTS_BUF_N(ARR, N) is its first N bytes, and N past ARR does not compile. */
 #ifdef htsbuff_must_be_array_
-#define HTS_BUF(ARR)                                                           \
-  hts_buf_at((ARR), sizeof(ARR) + htsbuff_must_be_array_(ARR))
+#define HTS_BUF_GUARD_(ARR) htsbuff_must_be_array_(ARR)
 #else
-#define HTS_BUF(ARR) hts_buf_at((ARR), sizeof(ARR))
+#define HTS_BUF_GUARD_(ARR) 0
 #endif
-
-/* HTS_BUF(ARR) that does not compile when ARR holds fewer than N bytes. */
-#define HTS_BUF_MIN(ARR, N)                                                    \
-  hts_buf_at((ARR), HTS_BUF(ARR).size +                                        \
-                        (sizeof(char[sizeof(ARR) >= (N) ? 1 : -1]) - 1))
+#define HTS_BUF(ARR) hts_buf_at((ARR), sizeof(ARR) + HTS_BUF_GUARD_(ARR))
+#define HTS_BUF_N(ARR, N)                                                      \
+  (HTS_COMPILE_ASSERT((N) <= sizeof(ARR)),                                     \
+   hts_buf_at((ARR), (N) + HTS_BUF_GUARD_(ARR)))
 
 #endif

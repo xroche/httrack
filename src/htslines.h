@@ -58,13 +58,9 @@ FILE *hts_fopen_private_new(const char *name, const char *mode);
    non-space byte was dropped. At EOF it reads an empty line. */
 hts_boolean hts_readline(FILE *fp, hts_buf s, int flags);
 
-/* hts_readline() into max bytes with HTS_LINE_DROP_TAB | HTS_LINE_DROP_FF,
-   returning the number of bytes stored. */
+/* linput() reads like hts_readline() into max bytes, with HTS_LINE_DROP_TAB |
+   HTS_LINE_DROP_FF, and returns the number of bytes stored. */
 int linput(FILE *fp, char *s, int max);
-
-/* hts_readline(fp, s, 0) keeping CR and NUL, and storing the byte count in
-   len. HTS_TRUE when the line was cut. */
-hts_boolean hts_readline_raw(FILE *fp, hts_buf s, size_t *len);
 
 /* hts_readline() trimmed and joined after a trailing backslash. Leading spaces
    and backslashes count against s.size, so "abc\\\n\n" at 4 is cut. */

@@ -3823,9 +3823,7 @@ static void span_add_visible(String *out, const char *p, size_t len) {
   }
 }
 
-/* Print what a span primitive reads as [bytes], for next|nextsep|split C TEXT,
-   trim L R TEXT or copy SIZE TEXT. */
-/* buf [tail-overrun]: the sizes HTS_BUF, HTS_BUF_MIN and hts_buf_tail give.
+/* buf [tail-overrun]: the sizes HTS_BUF, HTS_BUF_N and hts_buf_tail give.
    tail-overrun takes a tail with no byte left, which must abort. */
 static int st_buf(httrackp *opt, int argc, char **argv) {
   struct {
@@ -3834,18 +3832,16 @@ static int st_buf(httrackp *opt, int argc, char **argv) {
   } st;
 
   char a[32];
-  char *heap = malloct(5);
   const hts_buf b = HTS_BUF(a);
   hts_buf t;
   int bad = 0;
 
   (void) opt;
-  assertf(heap != NULL);
   if (argc >= 1 && strcmp(argv[0], "tail-overrun") == 0)
     (void) hts_buf_tail(b, b.size);
   if (b.p != a || b.size != sizeof(a) || HTS_BUF(st.f).p != st.f ||
-      HTS_BUF(st.f).size != 7 || HTS_BUF_MIN(st.g, 64).size != 64 ||
-      HTS_BUF_MIN(a, 1).size != 32 || hts_buf_at(heap, 5).size != 5) {
+      HTS_BUF(st.f).size != 7 || HTS_BUF_N(st.g, 64).size != 64 ||
+      HTS_BUF_N(a, 1).p != a || HTS_BUF_N(a, 1).size != 1) {
     printf("buf: wrong array size\n");
     bad = 1;
   }
@@ -3859,12 +3855,13 @@ static int st_buf(httrackp *opt, int argc, char **argv) {
     printf("buf: tail 31 is %d bytes\n", (int) t.size);
     bad = 1;
   }
-  freet(heap);
   if (!bad)
     printf("buf: OK\n");
   return bad;
 }
 
+/* Print what a span primitive reads as [bytes], for next|nextsep|split C TEXT,
+   trim L R TEXT or copy SIZE TEXT. */
 static int st_span(httrackp *opt, int argc, char **argv) {
   String out = STRING_EMPTY;
   hts_span s, a, b;
@@ -4997,7 +4994,7 @@ const struct selftest_entry selftests_lib[] = {
      "the span iterator matches the rule-list parsers it replaced",
      st_spandiff},
     {"buf", "[tail-overrun]",
-     "the sizes HTS_BUF, HTS_BUF_MIN and hts_buf_tail give", st_buf},
+     "the sizes HTS_BUF, HTS_BUF_N and hts_buf_tail give", st_buf},
     {"span", "<next|nextsep|split|trim|copy> <args> <text>",
      "the fields and copies the span primitive makes", st_span},
     {"gmtime", "",
