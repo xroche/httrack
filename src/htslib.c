@@ -4314,20 +4314,22 @@ HTSEXT_API char *adr_normalized(const char *source, char *dest) {
 
 int hts_basic_auth_value(httrackp *opt, const char *url, char *out,
                          size_t out_size) {
-  const char *const a = jump_identification_const(url);
-  const char *const astart = jump_protocol_const(url);
-  const size_t idlen = a > astart ? (size_t) (a - astart) - 1 : 0;
+  hts_url_view v;
+  size_t idlen;
   char user_pass[768];
 
   assertf(out_size >= 1100); /* base-64 of 765 bytes is 1020 */
   out[0] = user_pass[0] = '\0';
+  (void) hts_url_view_parse(url, strlen(url), &v);
+  // no login where jump_identification_const() keeps the URL whole
+  idlen = jump_identification_const(url) == v.host.p ? v.userinfo.len : 0;
   if (idlen == 0)
     return 0;
   /* a clipped credential authenticates as somebody else, and an encoded one
      wider than bauth_chain.auth could not be stored for the child pages */
   if (idlen > (sizeof(((bauth_chain *) 0)->auth) - 1) / 4 * 3)
     return -1;
-  strncatbuff(user_pass, astart, (int) idlen);
+  strncatbuff(user_pass, v.userinfo.p, (int) idlen);
   strcpybuff(user_pass, unescape_http(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                                       user_pass));
   code64((unsigned char *) user_pass, (int) strlen(user_pass),

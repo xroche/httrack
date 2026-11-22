@@ -1,0 +1,24 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# hts_basic_auth_value() takes the login from hts_url_view_parse().
+
+auth() { selftest_queue "$2" proxyauth "$1"; }
+
+auth 'http://u:p@h/x' 'auth=dTpw'
+auth 'HTTPS:u:p@q@h' 'auth=dTpwQHE='
+auth '//u:p@h' 'auth=dTpw'
+auth 'file://u:p@h' 'auth=dTpw'
+auth 'http://@h' 'auth=none'
+auth 'http://h?u:p@x' 'auth=none'
+# no login where jump_identification_const() keeps the URL whole
+auth 'gopher://u:p@h/' 'auth=none'
+auth ' http://u:p@h' 'auth=none'
+# two proxies in one call, one line each
+selftest_queue_lines $'auth=dTpw\nauth=none' proxyauth 'u:p@h' 'h'
+selftest_run_queued
