@@ -87,7 +87,6 @@ typedef struct filecreate_params filecreate_params;
 // options
 #include "htsopt.h"
 
-// writable buffer with its size
 #include "htsbuf.h"
 
 // HTTrack engine sub-headers

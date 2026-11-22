@@ -96,12 +96,8 @@ static hts_boolean usercommand_push(shell_frame_t *stack, size_t *depth,
   return HTS_TRUE;
 }
 
-/*
- * Append "len" bytes of "src" at "*pos" in "dest", kept NUL-terminated.
- * Returns HTS_FALSE and parks *pos at dest.size when the result would not fit,
- * so the caller drops the command instead of aborting: both the template and
- * the save name expanded into it can be arbitrarily long.
- */
+/* Appends len bytes of src at *pos in dest and keeps it NUL-terminated.
+   Returns HTS_FALSE and parks *pos at dest.size when it does not fit. */
 static hts_boolean usercommand_append(hts_buf dest, size_t *pos,
                                       const char *src, size_t len) {
   if (*pos >= dest.size || len >= dest.size - *pos) {

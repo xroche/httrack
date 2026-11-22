@@ -257,6 +257,12 @@ assert_eq TOOLONG "$VERDICT" 'over-long command'
 usercmd 'rm $0' 'x.html' 10
 assert_eq OK "$VERDICT" 'the byte below the bound'
 assert_eq 'rm "${1}"' "$CMD" 'the command that just fits'
+# Each single-quoted $0 grows to the 8 bytes '"${1}"': 510 of them make 4082.
+long="'$(printf '$0%.0s' $(seq 510))'"
+usercmd "$long" 'x.html' 4083
+assert_eq OK "$VERDICT" 'long expansion: exact fit'
+usercmd "$long" 'x.html' 4082
+assert_eq TOOLONG "$VERDICT" 'long expansion: one byte short'
 
 # ---------------------------------------------------------------------------
 # The documented templates, which the allowlist has to keep whole.
