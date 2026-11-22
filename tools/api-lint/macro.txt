@@ -3,7 +3,8 @@ src/htsarrays.h: TypedArray: holds statements outside do { } while (0)
 src/htsarrays.h: TypedArray: uses free name data
 src/htsarrays.h: TypedArray: uses free name elts
 src/htsarrays.h: TypedArrayAdd: evaluates A twice
-src/htsarrays.h: TypedArrayAppend: holds statements outside do { } while (0)
+src/htsarrays.h: TypedArrayAppend: evaluates A twice
+src/htsarrays.h: TypedArrayAppend: evaluates PTR twice
 src/htsarrays.h: TypedArrayEnsureRoom: evaluates A twice
 src/htsarrays.h: TypedArrayFree: evaluates A twice
 src/htsarrays.h: TypedArrayRoom: evaluates A twice
@@ -105,7 +106,6 @@ src/htsfilters_selftest.c: REFUSED: uses free name warned
 src/htsfilters_selftest.c: TRY: uses free name filptr
 src/htsfilters_selftest.c: TRY: uses free name filters
 src/htsfilters_selftest.c: TRY: uses free name line
-src/htsfilters_selftest.c: TRY: uses free name log
 src/htsfilters_selftest.c: TRY: uses free name opt
 src/htsfilters_selftest.c: TRY: uses free name subject
 src/htsfilters_selftest.c: TRY: uses free name taken
@@ -232,7 +232,6 @@ src/htsparse.h: ENGINE_DEFINE_CONTEXT: holds statements outside do { } while (0)
 src/htsparse.h: ENGINE_DEFINE_CONTEXT: uses free name base
 src/htsparse.h: ENGINE_DEFINE_CONTEXT: uses free name codebase
 src/htsparse.h: ENGINE_DEFINE_CONTEXT: uses free name hash
-src/htsparse.h: ENGINE_DEFINE_CONTEXT: uses free name makestat_fp
 src/htsparse.h: ENGINE_DEFINE_CONTEXT: uses free name r
 src/htsparse.h: ENGINE_DEFINE_CONTEXT: uses free name stre
 src/htsparse.h: ENGINE_DEFINE_CONTEXT: uses free name template_body
@@ -300,7 +299,6 @@ src/htsstrings.h: StringRight: evaluates BLK twice
 src/htsstrings.h: StringRightRW: evaluates BLK twice
 src/htsstrings.h: StringRoom: evaluates BLK twice
 src/htsstrings.h: StringRoomTotal: evaluates BLK twice
-src/htsstrings.h: StringRoomTotal: holds statements outside do { } while (0)
 src/htsstrings.h: StringSetBuffer: evaluates BLK twice
 src/htsstrings.h: StringSetBuffer: evaluates STR twice
 src/htsstrings.h: StringSetLength: evaluates BLK twice

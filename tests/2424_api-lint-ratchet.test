@@ -17,23 +17,36 @@ ${out}"
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/apilint.XXXXXX") || fail "no tmpdir"
 cleanup_push rm -rf "${work}"
-mkdir -p "${work}/src/proxy"
-cp "${srcdir}"/src/*.[ch] "${work}/src/"
-cp "${srcdir}"/src/proxy/*.[ch] "${work}/src/proxy/"
+mkdir "${work}/empty" "${work}/fresh"
+out=$("${python}" "${lint}" --root "${work}/empty" 2>&1) && fail "an empty tree passed"
+grep -qF "only 0 sources" <<<"${out}" || fail "no source-count error: ${out}"
+
+cp -R "${srcdir}/src" "${work}/src"
 cp -R "${srcdir}/tools/api-lint" "${work}/baseline"
 run() {
     "${python}" "${lint}" --root "${work}" --baseline-dir "${work}/baseline"
 }
 out=$(run) || fail "an unchanged copy fails: ${out}"
+"${python}" "${lint}" --root "${work}" --baseline-dir "${work}/fresh" --update
+out=$(diff -r "${work}/fresh" "${srcdir}/tools/api-lint") ||
+    fail "the committed baselines are not what --update writes: ${out}"
 
 c="${work}/src/htslib.c"
 h="${work}/src/htslib.h"
-cl=$(($(wc -l <"${c}") + 1))
-hl=$(($(wc -l <"${h}") + 1))
 cat >>"${c}" <<'C'
 int lint_probe_ctype(const char *s) { return isdigit(s[0]) + isdigit((unsigned char) s[1]); }
+int lint_probe_eof(FILE *f) { int c = fgetc(f); return isdigit(c); }
+int lint_probe_char(const char *s) { char c = s[0]; return isdigit(c); }
 char *lint_probe_ptr(int x) { if (x) return NULL; return "y"; }
 char *lint_probe_marked(int x) { if (x) return NULL; return "y"; }
+int lint_probe_int(int x) { if (x) return -1; return 0; }
+hts_boolean lint_probe_bool(int x) { if (x) return HTS_FALSE; return HTS_TRUE; }
+char *lint_probe_extern(int x) { if (x) return NULL; return "y"; }
+#ifdef LINT_TWIN
+char *lint_probe_twin(int x) { return "a"; }
+#else
+char *lint_probe_twin(int x) { if (x) return NULL; return "b"; }
+#endif
 C
 cat >>"${h}" <<'H'
 #define lint_twice(x) ((x) + (x))
@@ -41,28 +54,73 @@ cat >>"${h}" <<'H'
 #define LINT_STMT(x) foo(x); bar(x)
 #define LINT_TWICE_OK(x) ((x) + (x))
 #define lint_ok(x) do { int n__ = (x); foo(n__, sizeof(x)); } while (0)
+#define lint_generic(x) _Generic((x), int: lint_i, default: lint_d)(x)
+#define lint_generic2(x) (_Generic((x), int: lint_f(x), default: lint_g(x)) + (x))
+#define lint_const(x) (__builtin_constant_p(x) ? lint_c(x) : lint_c(0))
+#define lint_va(ap) lint_vf((va_list *) &(ap))
+#define lint_dup(x) ((x) + (x))
+#define lint_dup(x) ((x) + (x))
 char *lint_probe_ptr(int x);
 HTS_CHECK_RESULT char *lint_probe_marked(int x);
+int lint_probe_int(int x);
+hts_boolean lint_probe_bool(int x);
+char *lint_probe_twin(int x);
+#define lint_cmt(x) ((x) + /* a note \
+   that wraps */ (x))
+static inline int lint_probe_after(int x) { if (x) return -1; return 0; }
+#ifdef __cplusplus
+extern "C" {
+#endif
+char *lint_probe_extern(int x);
+#ifdef __cplusplus
+}
+#endif
+#warning don't use this
+#define lint_after(x) ((x) + (x))
 H
+echo 'src/htslib.h: lint_dup: evaluates x twice' >>"${work}/baseline/macro.txt"
+mkdir "${work}/src/lintprobe"
+echo 'int lint_probe_sub(const char *s) { return isalpha(s[0]); }' >"${work}/src/lintprobe/probe.c"
+
 out=$(run) && fail "planted violations passed"
-for want in "src/htslib.c:${cl}: ctype: new violation: isdigit(s[0])" \
-    "src/htslib.h:${hl}: macro: new violation: macro lint_twice: evaluates x twice" \
-    "src/htslib.h:$((hl + 1)): macro: new violation: macro lint_free: uses free name lint_global" \
-    "src/htslib.h:$((hl + 2)): macro: new violation: macro LINT_STMT: holds statements" \
-    "src/htslib.h:$((hl + 5)): check-result: new violation: lint_probe_ptr returns failure"; do
+at() {
+    grep -nF "$2" "$1" | tail -n 1 | cut -d: -f1
+}
+for want in "src/htslib.c:$(at "${c}" "lint_probe_ctype("): ctype: new violation: isdigit(s[0])" \
+    "src/htslib.c:$(at "${c}" "lint_probe_char("): ctype: new violation: isdigit(c)" \
+    "src/lintprobe/probe.c:1: ctype: new violation: isalpha(s[0])" \
+    "src/htslib.h:$(at "${h}" "lint_twice("): macro: new violation: macro lint_twice: evaluates x twice" \
+    "src/htslib.h:$(at "${h}" "lint_free("): macro: new violation: macro lint_free: uses free name lint_global" \
+    "src/htslib.h:$(at "${h}" "LINT_STMT("): macro: new violation: macro LINT_STMT: holds statements" \
+    "src/htslib.h:$(at "${h}" "lint_generic2("): macro: new violation: macro lint_generic2: evaluates x twice" \
+    "macro: new violation: macro lint_dup: evaluates x twice" \
+    "src/htslib.h:$(at "${h}" "lint_after("): macro: new violation: macro lint_after: evaluates x twice" \
+    "src/htslib.h:$(at "${h}" "lint_cmt("): macro: new violation: macro lint_cmt: evaluates x twice" \
+    "src/htslib.h:$(at "${h}" "lint_probe_after("): check-result: new violation: lint_probe_after returns failure (int)" \
+    "src/htslib.h:$(at "${h}" "lint_probe_ptr("): check-result: new violation: lint_probe_ptr returns failure (pointer)" \
+    "src/htslib.h:$(at "${h}" "lint_probe_int("): check-result: new violation: lint_probe_int returns failure (int)" \
+    "src/htslib.h:$(at "${h}" "lint_probe_bool("): check-result: new violation: lint_probe_bool returns failure (hts_boolean)" \
+    "src/htslib.h:$(at "${h}" "lint_probe_twin("): check-result: new violation: lint_probe_twin returns failure" \
+    "src/htslib.h:$(at "${h}" "lint_probe_extern("): check-result: new violation: lint_probe_extern returns failure"; do
     grep -qF "${want}" <<<"${out}" || fail "missed ${want}: ${out}"
 done
-test "$(wc -l <<<"${out}")" -eq 5 || fail "flagged a clean probe: ${out}"
+test "$(wc -l <<<"${out}")" -eq 16 || fail "flagged a clean probe: ${out}"
 
 # Removing a known violation, or listing one that never was, leaves a stale entry.
+rm -r "${work}/src/lintprobe"
 cp "${srcdir}/src/htslib.c" "${srcdir}/src/htslib.h" "${work}/src/"
+cp "${srcdir}/tools/api-lint/macro.txt" "${work}/baseline/"
 sed 's/^#define heap(N).*/#define heap(N) (N)/' "${srcdir}/src/htscore.h" >"${work}/src/htscore.h"
 sed 's/^int url_savename(/HTS_CHECK_RESULT int url_savename(/' "${srcdir}/src/htsname.h" >"${work}/src/htsname.h"
 echo 'src/htslib.c: isdigit(gone)' >>"${work}/baseline/ctype.txt"
+dup='src/htssafe.h: strcatbuff: evaluates A twice'
+test "$(grep -cxF "${dup}" "${work}/baseline/macro.txt")" -eq 2 || fail "no duplicate entry to test: ${dup}"
+echo "${dup}" >>"${work}/baseline/macro.txt"
 out=$(run) && fail "stale entries passed"
 for want in "ctype.txt: ctype: stale baseline entry, delete it: src/htslib.c: isdigit(gone)" \
     "macro.txt: macro: stale baseline entry, delete it: src/htscore.h: heap: uses free name opt" \
+    "macro.txt: macro: stale baseline entry, delete it: ${dup}" \
     "check-result.txt: check-result: stale baseline entry, delete it: src/htsname.h: url_savename"; do
     grep -qF "${want}" <<<"${out}" || fail "missed ${want}: ${out}"
 done
-test "$(wc -l <<<"${out}")" -eq 3 || fail "unexpected output: ${out}"
+test "$(wc -l <<<"${out}")" -eq 4 || fail "unexpected output: ${out}"

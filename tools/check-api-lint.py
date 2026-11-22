@@ -1,20 +1,11 @@
 #!/usr/bin/env python3
-"""Ratchet three API rules over src/ against the baselines in tools/api-lint/.
-
-ctype: a ctype call takes an (unsigned char) argument.
-macro: a function-like macro evaluates each argument once, uses only its
-       arguments, and wraps statements in do { } while (0).
-check-result: a header function that can return failure carries HTS_CHECK_RESULT.
-              It reads return statements, so it misses a failure that only a
-              tail call returns.
-
-A violation missing from its baseline fails, and so does a baseline entry that no
-longer occurs, so each list only shrinks. --update rewrites the baselines.
+"""Fail on new ctype calls without an (unsigned char) cast, unsafe function-like
+macros, and header functions that can fail without HTS_CHECK_RESULT.
+Known cases live in tools/api-lint/, and --update rewrites those baselines.
 """
 
 import argparse
 import collections
-import glob
 import os
 import re
 import sys
@@ -23,7 +14,7 @@ RULES = ("ctype", "macro", "check-result")
 HEADER = "# Known %s violations. Regenerate: tools/check-api-lint.py --update\n"
 
 # Vendored trees follow their upstream's conventions.
-SOURCES = ["src/*.c", "src/*.h", "src/proxy/*.c", "src/proxy/*.h"]
+VENDORED = ("src/coucal", "src/minizip")
 
 # Well under the tree's count, so an empty listing fails instead of passing.
 MIN_SOURCES = 100
@@ -34,6 +25,10 @@ CTYPE = (
 ).split()
 CTYPE_CALL = re.compile(r"(?<![\w.>])(" + "|".join(CTYPE) + r")\s*\(")
 UCHAR_CAST = re.compile(r"^\(\s*(const\s+)?unsigned\s+char\s*\)")
+# Exempt: a plain name declared int in the same function, since it may hold EOF.
+INT_DECL = (
+    r"(?<!unsigned )\bint\s+(?:\w+\s*(?:=[^,;()]*(?:\([^()]*\))?)?,\s*)*%s\s*[=;,)]"
+)
 
 KEYWORDS = set(
     """auto break case char const continue default do double else enum extern
@@ -53,7 +48,10 @@ UNEVALUATED = (
     "typeof",
     "_Alignof",
     "__builtin_types_compatible_p",
+    "__builtin_constant_p",
 )
+# Library types a cast may name without a typedef in the tree.
+LIBC_TYPES = {"va_list", "FILE", "DIR", "jmp_buf", "fd_set"}
 # Process-wide names every C file may use.
 LIBC_GLOBALS = {"errno", "stderr", "stdout", "stdin"}
 STATEMENT_START = re.compile(
@@ -81,12 +79,18 @@ def strip_comments(text):
     out = []
     i = 0
     n = len(text)
+    directive = re.match(r"[ \t]*#", text) is not None
     while i < n:
         c = text[i]
         if text.startswith("/*", i):
             j = text.find("*/", i + 2)
             j = n if j < 0 else j + 2
-            out.append(blank(text, i, j))
+            gap = blank(text, i, j)
+            if directive:
+                # The comment does not end the directive, so keep it continued.
+                rows = gap.split("\n")
+                gap = "\\\n".join([r[:-1] for r in rows[:-1]] + rows[-1:])
+            out.append(gap)
             i = j
         elif text.startswith("//", i):
             j = i
@@ -95,13 +99,23 @@ def strip_comments(text):
             out.append(blank(text, i, j))
             i = j
         elif c in "\"'":
+            # A literal never crosses a newline, so a stray quote eats one line.
             j = i + 1
-            while j < n and text[j] != c and text[j] != "\n":
-                j += 2 if text[j] == "\\" else 1
-            j = min(j, n - 1)
-            out.append(c + blank(text, i + 1, j) + c)
-            i = j + 1
+            while j < n and text[j] not in (c, "\n"):
+                j += 2 if text[j] == "\\" and text[j + 1 : j + 2] != "\n" else 1
+            j = min(j, n)
+            closed = j < n and text[j] == c
+            inner = blank(text, i + 1, j)
+            if not closed and j > i + 1 and text[j - 1] == "\\":
+                inner = inner[:-1] + "\\"
+            out.append(c + inner + (c if closed else ""))
+            i = j + 1 if closed else j
         else:
+            if c == "\n":
+                continued = text[i - 1 : i] == "\\"
+                directive = (directive and continued) or bool(
+                    re.match(r"[ \t]*#", text[i + 1 : i + 80])
+                )
             out.append(c)
             i += 1
     return "".join(out)
@@ -139,12 +153,28 @@ def squash(s):
     return " ".join(s.split())
 
 
+def int_variable(code, functions, at, arg):
+    """Is arg a name declared int in the function holding position at?"""
+    if not re.fullmatch(r"[A-Za-z_]\w*", arg):
+        return False
+    for start, end in functions:
+        if start <= at < end:
+            return re.search(INT_DECL % re.escape(arg), code[start:at]) is not None
+    return False
+
+
 def check_ctype(path, code):
     """Yield (line, key, message) for each ctype call lacking the cast."""
+    functions = []
+    for start, head, body in top_level(code):
+        if body is not None:
+            functions.append((start, start + len(head) + len(body)))
     for m in CTYPE_CALL.finditer(code):
         open_at = m.end() - 1
         arg = code[open_at + 1 : matching(code, open_at) - 1].strip()
         if UCHAR_CAST.match(arg) or arg.startswith("'") or re.fullmatch(r"-?\d+", arg):
+            continue
+        if int_variable(code, functions, m.start(), arg):
             continue
         call = squash(m.group(1) + "(" + arg + ")")
         yield line_of(code, m.start()), call, call + " needs an (unsigned char) cast"
@@ -174,7 +204,9 @@ def spans(body, words):
 
 
 def is_type(word, types):
-    return word in TYPE_WORDS or word in types or word.endswith("_t")
+    return (
+        word in TYPE_WORDS or word in types or word in LIBC_TYPES or word.endswith("_t")
+    )
 
 
 def locals_of(body, types):
@@ -188,17 +220,42 @@ def locals_of(body, types):
     return found
 
 
-def macro_problems(name, params, body, types):
-    """List the rule-6 problems of one macro, each a stable phrase."""
-    problems = []
-    named = [p for p in params if p != "..."]
+def split_top(text, sep):
+    """Split text at each sep outside any bracket."""
+    parts, depth, last = [], 0, 0
+    for k, c in enumerate(text):
+        depth += c in "([{"
+        depth -= c in ")]}"
+        if c == sep and depth == 0:
+            parts.append(text[last:k])
+            last = k + 1
+    return parts + [text[last:]]
+
+
+def generic_uses(text, named, types, declared):
+    """Parameter uses of a _Generic( ... ) body: only one association runs."""
+    uses = collections.Counter()
+    for assoc in split_top(text, ",")[1:]:
+        uses |= idents(split_top(assoc, ":")[-1], named, types, declared)[0]
+    return uses
+
+
+def idents(body, named, types, declared):
+    """(evaluated parameter uses, free names) of a macro body."""
     unevaluated = list(spans(body, UNEVALUATED))
     attributes = list(spans(body, ("__attribute__", "__declspec")))
-    declared = locals_of(body, types)
+    generics = []
+    for a, b in spans(body, ("_Generic",)):
+        if not any(x <= a < y for x, y in generics):
+            generics.append((a, b))
     uses = collections.Counter()
     free = set()
+    for a, b in generics:
+        uses.update(generic_uses(body[a + 1 : b - 1], named, types, declared))
     for m in IDENT.finditer(body):
         ident, at = m.group(0), m.start()
+        if any(a <= at < b for a, b in generics):
+            continue
         before = body[:at].rstrip()
         after = body[m.end() :].lstrip()
         if before.endswith("#") or after.startswith("##"):
@@ -222,6 +279,14 @@ def macro_problems(name, params, body, types):
         ):
             continue
         free.add(ident)
+    return uses, free
+
+
+def macro_problems(name, params, body, types):
+    """List the rule-6 problems of one macro, each a stable phrase."""
+    problems = []
+    named = [p for p in params if p != "..."]
+    uses, free = idents(body, named, types, locals_of(body, types))
     upper = re.fullmatch(r"[A-Z0-9_]+", name) is not None
     if not upper and "__builtin_choose_expr" not in body:
         for p in sorted(p for p in uses if uses[p] > 1):
@@ -267,7 +332,7 @@ def collect_types(codes):
 def top_level(code):
     """Yield (start, head, body) per top-level declaration: body is None for a ;."""
     flat = strip_preprocessor(code)
-    flat = re.sub(r'\bextern\s*"\s*C\s*"\s*\{', lambda m: " " * len(m.group(0)), flat)
+    flat = re.sub(r'\bextern\s*"[^"\n]*"\s*\{', lambda m: " " * len(m.group(0)), flat)
     start = 0
     k = 0
     while k < len(flat):
@@ -331,7 +396,7 @@ def yes_no(body):
 
 def check_result(files):
     """Yield (path, line, key, message) for header functions that can fail unmarked."""
-    bodies = {}
+    bodies = collections.defaultdict(list)
     marked = set()
     decls = []
     for path, code in files.items():
@@ -343,15 +408,15 @@ def check_result(files):
             if "HTS_CHECK_RESULT" in head:
                 marked.add(name)
             if body is not None and "static" not in ret.split():
-                bodies.setdefault(name, body)
+                bodies[name].append(body)
             if path.endswith(".h"):
                 decls.append((path, start, head, name, ret, body))
     for path, start, head, name, ret, body in decls:
         cls = return_class(ret)
-        body = body if body is not None else bodies.get(name)
-        if cls is None or body is None or name in marked:
+        found = [body] if body is not None else bodies.get(name, [])
+        if cls is None or name in marked:
             continue
-        if FAILURE[cls].search(body) or (cls == "int" and yes_no(body)):
+        if any(FAILURE[cls].search(b) or (cls == "int" and yes_no(b)) for b in found):
             line = line_of(files[path], start + len(head) - len(head.lstrip()))
             msg = "%s returns failure (%s) without HTS_CHECK_RESULT" % (name, cls)
             yield path, line, name, msg
@@ -359,7 +424,12 @@ def check_result(files):
 
 def scan(root):
     """Map each rule to a list of (path, line, key, message)."""
-    paths = sorted({p for pat in SOURCES for p in glob.glob(os.path.join(root, pat))})
+    paths = []
+    for top, dirs, names in os.walk(os.path.join(root, "src")):
+        rel = os.path.relpath(top, root).replace(os.sep, "/")
+        dirs[:] = sorted(d for d in dirs if rel + "/" + d not in VENDORED)
+        paths += [os.path.join(top, f) for f in names if f.endswith((".c", ".h"))]
+    paths.sort()
     if len(paths) < MIN_SOURCES:
         sys.exit("check-api-lint: only %d sources under %s" % (len(paths), root))
     files = {}
@@ -417,6 +487,7 @@ def main():
         for path, line, key, msg in found[rule]:
             entry = "%s: %s" % (path, key)
             if new[entry] > 0:
+                new[entry] -= 1
                 print("%s:%d: %s: new violation: %s" % (path, line, rule, msg))
                 status = 1
         for entry in sorted((known - current).elements()):
