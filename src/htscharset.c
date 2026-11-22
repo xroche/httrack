@@ -710,11 +710,6 @@ char *hts_convertStringFromUTF8Strict(const char *s, size_t size,
 
 #endif
 
-#ifdef _WIN32
-#define strcasecmp(a,b) stricmp(a,b)
-#define strncasecmp(a,b,n) strnicmp(a,b,n)
-#endif
-
 /* WHATWG prescan whitespace excludes VT. */
 static int is_html_space(char c) {
   return c == ' ' || c == '\t' || c == '\r' || c == '\n' || c == '\f';
@@ -757,15 +752,19 @@ size_t hts_copyStringUTF8(char *dest, const char *src, size_t size) {
   return i;
 }
 
-size_t hts_appendStringUTF8(char *dest, const char *src,  size_t nBytes) {
-  const size_t size = strlen(dest);
-  return hts_copyStringUTF8(dest + size, src, nBytes);
+size_t hts_appendStringUTF8(char *dest, size_t dest_size, const char *src,
+                            size_t nBytes) {
+  const size_t used = strlen(dest);
+  size_t room;
+
+  assertf(used < dest_size);
+  room = dest_size - 1 - used;
+  return hts_copyStringUTF8(dest + used, src, nBytes < room ? nBytes : room);
 }
 
 int hts_isCharsetUTF8(const char *charset) {
-  return charset != NULL 
-    && ( strcasecmp(charset, "utf-8") == 0 
-         || strcasecmp(charset, "utf8") == 0 );
+  return charset != NULL && (hts_strcasecmp(charset, "utf-8") == 0 ||
+                             hts_strcasecmp(charset, "utf8") == 0);
 }
 
 /* Extract X from a "text/html; charset=X" content= attribute value. */
@@ -774,7 +773,7 @@ static char *charset_from_content(const char *s, size_t len) {
 
   for (i = 0; i + 7 < len; i++) {
     if ((i == 0 || is_html_space(s[i - 1]) || s[i - 1] == ';') &&
-        strncasecmp(&s[i], "charset", 7) == 0 &&
+        hts_strncasecmp(&s[i], "charset", 7) == 0 &&
         is_html_space_or_equal(s[i + 7])) {
       size_t j, val;
 
@@ -803,7 +802,7 @@ char *hts_getCharsetFromMeta(const char *html, size_t size) {
     const char *equiv = NULL, *content = NULL;
     size_t equiv_len = 0, content_len = 0;
 
-    if (html[i] != '<' || strncasecmp(&html[i + 1], "meta", 4) != 0 ||
+    if (html[i] != '<' || hts_strncasecmp(&html[i + 1], "meta", 4) != 0 ||
         !is_html_space(html[i + 5])) {
       continue;
     }
@@ -848,20 +847,20 @@ char *hts_getCharsetFromMeta(const char *html, size_t size) {
       }
       /* first occurrence of each attribute wins, as in browsers */
       if (val_len != 0) {
-        if (name_len == 7 && strncasecmp(&html[name], "charset", 7) == 0) {
+        if (name_len == 7 && hts_strncasecmp(&html[name], "charset", 7) == 0) {
           return hts_stringMemCopy(&html[val], val_len);
         } else if (equiv == NULL && name_len == 10 &&
-                   strncasecmp(&html[name], "http-equiv", 10) == 0) {
+                   hts_strncasecmp(&html[name], "http-equiv", 10) == 0) {
           equiv = &html[val];
           equiv_len = val_len;
         } else if (content == NULL && name_len == 7 &&
-                   strncasecmp(&html[name], "content", 7) == 0) {
+                   hts_strncasecmp(&html[name], "content", 7) == 0) {
           content = &html[val];
           content_len = val_len;
         }
       }
     }
-    if (equiv_len == 12 && strncasecmp(equiv, "content-type", 12) == 0 &&
+    if (equiv_len == 12 && hts_strncasecmp(equiv, "content-type", 12) == 0 &&
         content != NULL) {
       char *const s = charset_from_content(content, content_len);
 
@@ -1081,8 +1080,7 @@ int hts_isStringIDNA(const char *s, size_t size) {
     if (c == 0 || c == '.' || c == ':' || c == '/' || c == '?') {
       const size_t segSize = i - startSeg;
       /* IDNA segment ? */
-      if (segSize > 4
-          && strncasecmp(&s[startSeg], "xn--", 4) == 0) {
+      if (segSize > 4 && hts_strncasecmp(&s[startSeg], "xn--", 4) == 0) {
         return 1;
       }
       /* next segment start */
@@ -1101,8 +1099,7 @@ char *hts_convertStringIDNAToUTF8(const char *s, size_t size) {
     if (c == 0 || c == '.' || c == ':' || c == '/' || c == '?') {
       const size_t segSize = i - startSeg;
       /* IDNA segment ? */
-      if (segSize > 4
-          && strncasecmp(&s[startSeg], "xn--", 4) == 0) {
+      if (segSize > 4 && hts_strncasecmp(&s[startSeg], "xn--", 4) == 0) {
         punycode_status status;
         punycode_uint output_capa;
         punycode_uint output_length;

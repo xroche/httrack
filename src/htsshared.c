@@ -35,9 +35,9 @@ Please visit our Website: http://www.httrack.com
 #define HTS_INTERNAL_BYTECODE
 #endif
 #include "htsshared.h"
+#include "htsctype.h"
 #include "htsnet.h"
 
-#include <ctype.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -95,8 +95,8 @@ hts_boolean hts_shared_fexist(const char *s) {
 hts_boolean hts_shared_link_has_authority(const char *lien) {
   const char *a = lien;
 
-  if (isalpha((const unsigned char) *a)) {
-    while (isalpha((const unsigned char) *a))
+  if (hts_isalpha((const unsigned char) *a)) {
+    while (hts_isalpha((const unsigned char) *a))
       a++;
     if (*a == ':')
       a++;

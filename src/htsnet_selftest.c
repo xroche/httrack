@@ -1195,7 +1195,8 @@ static int st_catchurl(httrackp *opt, int argc, char **argv) {
   arg.tail = fits;
   url[0] = method[0] = data[0] = '\0';
   assertf(hts_newthread(st_catchurl_client, &arg) == 0);
-  assertf(catch_url_capture(srv, url, method, data) == CATCH_URL_OK);
+  assertf(catch_url_capture(srv, url, sizeof(url), method, sizeof(method), data,
+                            CATCH_URL_DATA_SIZE) == CATCH_URL_OK);
   htsthread_wait();
   assertf(strcmp(method, "GET") == 0);
   assertf(strcmp(url, "http://example.com/") == 0);
@@ -1206,7 +1207,8 @@ static int st_catchurl(httrackp *opt, int argc, char **argv) {
   arg.tail = fits + 1;
   url[0] = method[0] = data[0] = '\0';
   assertf(hts_newthread(st_catchurl_client, &arg) == 0);
-  assertf(catch_url_capture(srv, url, method, data) == CATCH_URL_ERR_BLOCK);
+  assertf(catch_url_capture(srv, url, sizeof(url), method, sizeof(method), data,
+                            CATCH_URL_DATA_SIZE) == CATCH_URL_ERR_BLOCK);
   htsthread_wait();
   deletesoc(srv);
   assertf(data[0] == '\0');
@@ -1276,14 +1278,16 @@ static int st_catchurl_overlong(httrackp *opt, int argc, char **argv) {
   /* one over-long line, far under any block bound: refused, nothing kept */
   url[0] = method[0] = data[0] = '\0';
   assertf(hts_newthread(st_catchurl_over_client, &arg) == 0);
-  assertf(catch_url_capture(srv, url, method, data) == CATCH_URL_ERR_HEADER);
+  assertf(catch_url_capture(srv, url, sizeof(url), method, sizeof(method), data,
+                            CATCH_URL_DATA_SIZE) == CATCH_URL_ERR_HEADER);
   htsthread_wait();
   assertf(data[0] == '\0');
 
   /* nothing but over-long lines: the capture ends on the first one */
   url[0] = method[0] = data[0] = '\0';
   assertf(hts_newthread(st_catchurl_flood_client, &arg) == 0);
-  assertf(catch_url_capture(srv, url, method, data) == CATCH_URL_ERR_HEADER);
+  assertf(catch_url_capture(srv, url, sizeof(url), method, sizeof(method), data,
+                            CATCH_URL_DATA_SIZE) == CATCH_URL_ERR_HEADER);
   htsthread_wait();
   deletesoc(srv);
   assertf(data[0] == '\0');
@@ -1321,7 +1325,8 @@ static void st_catchurl_check_bind(T_SOC srv, int port, const char *adr) {
   arg.tail = 7;
   url[0] = method[0] = data[0] = '\0';
   assertf(hts_newthread(st_catchurl_client, &arg) == 0);
-  assertf(catch_url_capture(srv, url, method, data) == CATCH_URL_OK);
+  assertf(catch_url_capture(srv, url, sizeof(url), method, sizeof(method), data,
+                            CATCH_URL_DATA_SIZE) == CATCH_URL_OK);
   htsthread_wait();
   deletesoc(srv);
   assertf(strcmp(method, "GET") == 0);
@@ -1633,6 +1638,159 @@ static int st_selectable(httrackp *opt, int argc, char **argv) {
 /* Registry: this module's tests, in the order -#test lists them. */
 /* ------------------------------------------------------------ */
 
+#define ST_CATCHURL_GET_BLOCK ST_CATCHURL_LINE "X-Pad: \r\n\r\n"
+#define ST_CATCHURL_POST_BLOCK "POST / HTTP/1.0\r\nContent-Length: 10\r\n\r\n"
+#define ST_CATCHURL_POST_BODY "0123456789"
+
+typedef struct st_catchurl_sized_arg {
+  int port;
+  const char *req;
+} st_catchurl_sized_arg;
+
+/* Sends the whole request at once, so an early refusal cannot fail a send. */
+static void st_catchurl_sized_client(void *varg) {
+  const st_catchurl_sized_arg *const arg = (const st_catchurl_sized_arg *) varg;
+  T_SOC cli = st_catchurl_connect(arg->port);
+  const int len = (int) strlen(arg->req);
+  char buf[256];
+
+  assertf(send(cli, arg->req, len, 0) == len);
+  (void) recv(cli, buf, (int) sizeof(buf), 0);
+  deletesoc(cli);
+}
+
+/* One capture of req into buffers of the given capacities. */
+static catch_url_status st_catchurl_sized_run(const char *req, char *url,
+                                              size_t url_size, char *method,
+                                              size_t method_size, char *data,
+                                              size_t data_size) {
+  st_catchurl_sized_arg arg;
+  T_SOC srv = st_catchurl_listen(&arg.port);
+  catch_url_status status;
+
+  arg.req = req;
+  assertf(hts_newthread(st_catchurl_sized_client, &arg) == 0);
+  status = catch_url_capture(srv, url, url_size, method, method_size, data,
+                             data_size);
+  htsthread_wait();
+  deletesoc(srv);
+  return status;
+}
+
+/* Did a method and URL of these lengths capture with the given status? */
+static hts_boolean st_catchurl_width_ok(size_t method_len, size_t url_len,
+                                        catch_url_status want) {
+  static const char base[] = "http://example.com/";
+  static const char tail[] = " HTTP/1.0\r\nX-Pad: \r\n\r\n";
+  const size_t cap = 4096; /* above every width, so only the scan can refuse */
+  char *req = malloct(method_len + 1 + url_len + sizeof(tail));
+  char *const want_url = req + method_len + 1;
+  char *url = st_sized_alloc(cap);
+  char *method = st_sized_alloc(cap);
+  char *data = st_sized_alloc(CATCH_URL_DATA_SIZE);
+  catch_url_status got;
+  hts_boolean ok;
+
+  assertf(req != NULL && url_len >= sizeof(base) - 1);
+  memset(req, 'A', method_len);
+  req[method_len] = ' ';
+  memcpy(want_url, base, sizeof(base) - 1);
+  memset(want_url + sizeof(base) - 1, 'a', url_len - (sizeof(base) - 1));
+  memcpy(want_url + url_len, tail, sizeof(tail));
+  got = st_catchurl_sized_run(req, url, cap, method, cap, data,
+                              CATCH_URL_DATA_SIZE);
+  want_url[url_len] = '\0';
+  ok = got == want && (got != CATCH_URL_OK || (strcmp(url, want_url) == 0 &&
+                                               strlen(method) == method_len));
+  if (!ok) {
+    printf("catchurl-sized: method %u url %u: status %d, want %d\n",
+           (unsigned) method_len, (unsigned) url_len, (int) got, (int) want);
+  }
+  freet(req);
+  freet(url);
+  freet(method);
+  freet(data);
+  return ok;
+}
+
+/* Each catch_url_capture() output fits its capacity, or the capture fails. */
+static int st_catchurl_sized(httrackp *opt, int argc, char **argv) {
+  static const char get[] = ST_CATCHURL_REQ "X-Pad: \r\n\r\n";
+  static const char post[] = "POST http://example.com/ HTTP/1.0\r\n"
+                             "Content-Length: 10\r\n\r\n" ST_CATCHURL_POST_BODY;
+  static const char url_want[] = "http://example.com/";
+  static const char get_want[] = ST_CATCHURL_GET_BLOCK;
+  static const char post_want[] = ST_CATCHURL_POST_BLOCK ST_CATCHURL_POST_BODY;
+
+  static const struct {
+    const char *req, *method_want, *data_want;
+    size_t url, method, data;
+    catch_url_status want;
+  } cases[] = {
+      {get, "GET", get_want, sizeof(url_want), 4, sizeof(get_want),
+       CATCH_URL_OK},
+      {get, "GET", get_want, sizeof(url_want) - 1, 4, sizeof(get_want),
+       CATCH_URL_ERR_REQUEST},
+      /* the only row that clips the peer address */
+      {get, "GET", get_want, 8, 4, sizeof(get_want), CATCH_URL_ERR_REQUEST},
+      {get, "GET", get_want, sizeof(url_want), 3, sizeof(get_want),
+       CATCH_URL_ERR_REQUEST},
+      {get, "GET", get_want, sizeof(url_want), 4, sizeof(get_want) - 1,
+       CATCH_URL_ERR_BLOCK},
+      {get, "GET", get_want, sizeof(url_want), 4, 8, CATCH_URL_ERR_BLOCK},
+      {post, "POST", post_want, sizeof(url_want), 5, sizeof(post_want),
+       CATCH_URL_OK},
+      /* spare room past the body, so its NUL is checked */
+      {post, "POST", post_want, sizeof(url_want), 5, sizeof(post_want) + 4,
+       CATCH_URL_OK},
+      /* the body is clipped to the room the headers left */
+      {post, "POST", post_want, sizeof(url_want), 5,
+       sizeof(ST_CATCHURL_POST_BLOCK) + 5, CATCH_URL_OK},
+  };
+
+  size_t i;
+  int fail = 0;
+
+  for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+    char *url = st_sized_alloc(cases[i].url);
+    char *method = st_sized_alloc(cases[i].method);
+    char *data = st_sized_alloc(cases[i].data);
+    catch_url_status got;
+    hts_boolean bad;
+
+    data[0] = 'Q'; /* a refused request line must leave it alone */
+    got = st_catchurl_sized_run(cases[i].req, url, cases[i].url, method,
+                                cases[i].method, data, cases[i].data);
+    bad = got != cases[i].want || !st_sized_guard_ok(url, cases[i].url) ||
+          !st_sized_guard_ok(method, cases[i].method) ||
+          !st_sized_guard_ok(data, cases[i].data) ||
+          memchr(url, '\0', cases[i].url) == NULL;
+    if (got == CATCH_URL_OK) {
+      bad = bad || strcmp(url, url_want) != 0 ||
+            strcmp(method, cases[i].method_want) != 0 ||
+            !st_sized_clip_ok(data, cases[i].data, cases[i].data_want);
+    } else {
+      bad = bad || data[0] != (got == CATCH_URL_ERR_REQUEST ? 'Q' : '\0');
+    }
+    if (bad) {
+      printf("catchurl-sized: case %u: status %d, want %d\n", (unsigned) i,
+             (int) got, (int) cases[i].want);
+      fail = 1;
+    }
+    freet(url);
+    freet(method);
+    freet(data);
+  }
+  /* a token longer than the scan width is refused, not split */
+  if (!st_catchurl_width_ok(CATCH_URL_METHOD_MAX, 19, CATCH_URL_OK) ||
+      !st_catchurl_width_ok(CATCH_URL_METHOD_MAX + 1, 19,
+                            CATCH_URL_ERR_REQUEST) ||
+      !st_catchurl_width_ok(3, HTS_URLMAXSIZE * 2 - 1, CATCH_URL_OK) ||
+      !st_catchurl_width_ok(3, HTS_URLMAXSIZE * 2, CATCH_URL_ERR_REQUEST))
+    fail = 1;
+  return st_verdict("catchurl-sized", fail);
+}
+
 const struct selftest_entry selftests_net[] = {
     {"mptcp", "",
      "which protocol an outgoing socket asks for, and whether a "
@@ -1650,6 +1808,9 @@ const struct selftest_entry selftests_net[] = {
     {"catchurl", "",
      "an over-long request header block fails the capture, not the process",
      st_catchurl},
+    {"catchurl-sized", "",
+     "catch_url_capture() keeps each output inside its own capacity",
+     st_catchurl_sized},
     {"catchurl-overlong", "",
      "a request header line the line buffer cannot hold fails the capture",
      st_catchurl_overlong},

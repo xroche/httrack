@@ -100,7 +100,7 @@ run "$tmp/pause-ok" --pause 0.2:0.4
 accepted "$tmp/pause-ok" "#185: valid --pause range rejected"
 run "$tmp/pause-fix" --pause 0.2
 accepted "$tmp/pause-fix" "#185: valid fixed --pause rejected"
-for bad in nan nan:5 5:nan inf 10:5 99999; do
+for bad in nan nan:5 5:nan 5:x 0:x inf 10:5 99999; do
     run "$tmp/pause-bad" --pause "$bad"
     refused "#185: invalid --pause '$bad' not refused cleanly"
 done

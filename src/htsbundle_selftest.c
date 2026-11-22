@@ -138,8 +138,9 @@ static int st_bundle(httrackp *opt, int argc, char **argv) {
   for (rec = jar->data; *rec != '\0'; rec = cookie_nextfield(rec)) {
     char dom[8192], cname[8192], value[8192];
 
-    printf("cookie %s %s=%s\n", cookie_get(dom, rec, 0),
-           cookie_get(cname, rec, 5), cookie_get(value, rec, 6));
+    printf("cookie %s %s=%s\n", cookie_get(dom, sizeof(dom), rec, 0),
+           cookie_get(cname, sizeof(cname), rec, 5),
+           cookie_get(value, sizeof(value), rec, 6));
   }
   for (i = 1; i < argc; i++) {
     if (strncmp(argv[i], "host:", 5) == 0) {

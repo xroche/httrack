@@ -1451,9 +1451,8 @@ int get_ftp_line(lien_back *back, T_SOC soc, char *ptrline, size_t line_size,
       break;
     }
     if (((b == 13) || (b == 10)) && (i > 0)) {  // CR/LF
-      if ((data[3] == '-')
-          || ((multiline) && (!isdigit((unsigned char) data[0])))
-        ) {
+      if ((data[3] == '-') ||
+          ((multiline) && (!hts_isdigit((unsigned char) data[0])))) {
         data[3] = '\0';
         i = 0;
         multiline = 1;

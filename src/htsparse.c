@@ -33,7 +33,6 @@ Please visit our Website: http://www.httrack.com
 /* ------------------------------------------------------------ */
 
 #include <fcntl.h>
-#include <ctype.h>
 
 /* File defs */
 #include "htscore.h"
@@ -179,7 +178,7 @@ static hts_boolean hts_attr_is_js_binding(const char *name, const char *nend) {
   for (i = 0; prefixes[i] != NULL; i++) {
     const size_t l = strlen(prefixes[i]);
 
-    if (len > l && strncasecmp(name, prefixes[i], l) == 0)
+    if (len > l && hts_strncasecmp(name, prefixes[i], l) == 0)
       return HTS_TRUE;
   }
   return HTS_FALSE;
@@ -412,7 +411,7 @@ hts_boolean hts_dirty_link_is_url(httrackp *opt, const char *str, size_t len,
       || strchr(tempo, '\'') /* potential parsing bug */
   )
     return HTS_FALSE;
-  if (tempo[0] == '.' && isalnum((unsigned char) tempo[1])) // ".gif"
+  if (tempo[0] == '.' && hts_isalnum((unsigned char) tempo[1])) // ".gif"
     return HTS_FALSE;
 
   // a trailing '+' concatenates, so only an extension speaks for the string
@@ -455,7 +454,7 @@ static hts_boolean js_glues_keyword(const char *at, const char *buffer) {
   const size_t before = (size_t) (at - buffer);
 
   if (c < 0x80)
-    return isalnum((unsigned char) c) || c == '_' || c == '$' || c == '.';
+    return hts_isalnum((unsigned char) c) || c == '_' || c == '$' || c == '.';
   /* Above 127 a name may be Unicode, so only a space ends one. This is every
      space the language reads as one: U+00A0 (or a lone 0xA0 where the page is
      not UTF-8, since no continuation byte follows an ASCII one), U+1680,
@@ -593,7 +592,7 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
     nc = strfield(cursor, ":location"); // javascript:location="doc"
   if (!nc) {                            // location="doc"
     if ((nc = strfield(cursor, "location")) &&
-        !isspace((unsigned char) html_prevc(cursor, buffer)))
+        !hts_isspace((unsigned char) html_prevc(cursor, buffer)))
       nc = 0;
   }
   if (!nc)
@@ -838,7 +837,7 @@ static hts_boolean data_attr_is_not_url(const char *s, size_t len) {
       return HTS_TRUE;
   }
   for (i = 0; words[i] != NULL; i++) {
-    if (strlen(words[i]) == len && strncasecmp(s, words[i], len) == 0)
+    if (strlen(words[i]) == len && hts_strncasecmp(s, words[i], len) == 0)
       return HTS_TRUE;
   }
   return HTS_FALSE;
@@ -1080,7 +1079,7 @@ void hts_strip_default_port(char *lien, size_t size) {
     int port;
     hts_boolean is_default;
 
-    while (isdigit((unsigned char) *b))
+    while (hts_isdigit((unsigned char) *b))
       b++;
     saved = *b;
     *b = '\0';
@@ -1517,12 +1516,12 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
               // FIXME: we currently emit the tag BEFORE the <head> tag, actually, which is not clean
               if ((p = strfield(html, "<head>")) != 0 ||
                   ((p = strfield(html, "<head")) != 0 &&
-                   isspace((unsigned char) html[p])) ||
+                   hts_isspace((unsigned char) html[p])) ||
                   (p = strfield(html, "<body>")) != 0 ||
                   ((p = strfield(html, "<body")) != 0 &&
-                   isspace((unsigned char) html[p])) ||
+                   hts_isspace((unsigned char) html[p])) ||
                   ((p = strfield(html, "<meta")) != 0 &&
-                   isspace((unsigned char) html[p]))) {
+                   hts_isspace((unsigned char) html[p]))) {
                 emited_footer++;
               } else {
                 p = 0;
@@ -1722,7 +1721,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
           // ------------------------------------------------------------
           // parsing évolé
           // ------------------------------------------------------------
-          if (((isalpha((unsigned char) *html)) || (*html == '/') || (inscript) || (in_media) || (inscriptgen))) {        // sinon pas la peine de tester..
+          if (((hts_isalpha((unsigned char) *html)) || (*html == '/') ||
+               (inscript) || (in_media) ||
+               (inscriptgen))) { // sinon pas la peine de tester..
 
             /* caractère de terminaison pour "miniparsing" javascript=.. ? 
                (ex: <a href="javascript:()" action="foo"> ) */
@@ -1950,7 +1951,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         if ((*html == 'o') && (*(html + 1) == 'n')
                             && isUpperLetter(*(html + 2))) {
                           p = 0;
-                          while ((p < 64) && isalpha((unsigned char) html[p]))
+                          while ((p < 64) &&
+                                 hts_isalpha((unsigned char) html[p]))
                             p++;
                           if (p < 64) {
                             while(is_space(html[p]))
@@ -2150,7 +2152,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
               ending_p = '\r';
             }
 
-          } else if (isspace((unsigned char) *html)) {
+          } else if (hts_isspace((unsigned char) *html)) {
             intag_startattr = html + 1;  // attribute in tag (for dirty parsing)
           }
 
@@ -3928,10 +3930,10 @@ hts_boolean hts_redirect_same_savefile(httrackp *opt, const char *cur_adr,
   const int norm_query = opt->urlhack && !opt->no_query_dedup;
   char BIGSTK n_fil[HTS_URLMAXSIZE * 2], pn_fil[HTS_URLMAXSIZE * 2];
 
-  if (strcasecmp(jump_identification_const(moved_adr),
-                 jump_identification_const(cur_adr)) != 0)
+  if (hts_strcasecmp(jump_identification_const(moved_adr),
+                     jump_identification_const(cur_adr)) != 0)
     return HTS_FALSE;
   fil_normalized_filtered_ex(moved_fil, n_fil, NULL, norm_slash, norm_query);
   fil_normalized_filtered_ex(cur_fil, pn_fil, NULL, norm_slash, norm_query);
-  return strcasecmp(n_fil, pn_fil) == 0;
+  return hts_strcasecmp(n_fil, pn_fil) == 0;
 }

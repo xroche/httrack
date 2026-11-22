@@ -572,7 +572,7 @@ static int st_warc_verbatim(httrackp *opt, int argc, char **argv) {
         nce++;
         scan = warc_memstr(scan + 17, "Content-Encoding:", rem - 17, 17);
       }
-      ST_FAIL_IF(err, ce == NULL || strncasecmp(ce + 17, " gzip", 5) != 0 ||
+      ST_FAIL_IF(err, ce == NULL || hts_strncasecmp(ce + 17, " gzip", 5) != 0 ||
                           nce != 1);
       ST_FAIL_IF(err, warc_memstr(block, "Transfer-Encoding:",
                                   (size_t) block_len, 18) != NULL);
@@ -1673,7 +1673,7 @@ static const char *sf_payload(const char *hay, const char *prefix,
   if (p == NULL)
     return NULL;
   p += strlen(prefix);
-  while (p[n] != '\0' && (isalnum((unsigned char) p[n]) || p[n] == '+' ||
+  while (p[n] != '\0' && (hts_isalnum((unsigned char) p[n]) || p[n] == '+' ||
                           p[n] == '/' || p[n] == '='))
     n++;
   *len = n;
@@ -2297,7 +2297,7 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
 static int legacy_header_is(const char *line, size_t line_len,
                             const char *name) {
   size_t nl = strlen(name), i;
-  if (line_len < nl || strncasecmp(line, name, nl) != 0)
+  if (line_len < nl || hts_strncasecmp(line, name, nl) != 0)
     return 0;
   for (i = nl; i < line_len && (line[i] == ' ' || line[i] == '\t'); i++)
     ;
@@ -2353,7 +2353,7 @@ static void legacy_http_header_value(const char *hdr, const char *name,
       len--;
     if (len == 0)
       break;
-    if (len > nl && strncasecmp(p, name, nl) == 0 && p[nl] == ':') {
+    if (len > nl && hts_strncasecmp(p, name, nl) == 0 && p[nl] == ':') {
       const char *v = p + nl + 1;
       size_t vlen, k;
       while (v < p + len && (*v == ' ' || *v == '\t'))

@@ -125,12 +125,12 @@ extern size_t hts_copyStringUTF8(char *dest, const char *src,
                                  size_t nBytes);
 
 /**
- * Append at most 'nBytes' bytes from src to dest, not truncating UTF-8
- * sequences.
+ * Append at most 'nBytes' bytes from src to dest, a buffer of dest_size bytes,
+ * clipping to what fits and not truncating UTF-8 sequences.
  * Returns the number of bytes appended, not including the terminating \0.
  **/
-extern size_t hts_appendStringUTF8(char *dest, const char *src, 
-                                   size_t nBytes);
+extern size_t hts_appendStringUTF8(char *dest, size_t dest_size,
+                                   const char *src, size_t nBytes);
 
 /**
  * Convert an UTF-8 string into an Unicode string (0-terminated).

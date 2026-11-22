@@ -35,7 +35,6 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsselftest_int.h"
 
-#include <ctype.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -64,7 +63,7 @@ static hts_boolean dirtylink_model(httrackp *opt, const char *str, char lastc,
     return HTS_FALSE;
   if (strpbrk(cut, "*<>,\"'") != NULL)
     return HTS_FALSE;
-  if (cut[0] == '.' && isalnum((unsigned char) cut[1])) /* ".gif" */
+  if (cut[0] == '.' && hts_isalnum((unsigned char) cut[1])) /* ".gif" */
     return HTS_FALSE;
 
   by_ext = (get_httptype_sized(opt, type, sizeof(type), cut, 0) ||
@@ -394,12 +393,12 @@ static hts_boolean jsscan_model(httrackp *opt, const char *cursor,
         continue;
       break;
     case JSGUARD_SPACE_BEFORE:
-      if (!isspace((unsigned char) prev))
+      if (!hts_isspace((unsigned char) prev))
         continue;
       break;
     case JSGUARD_NO_IDENT_BYTE:
       /* The engine matches byte triples, and cases[] pins that they agree. */
-      if (isalnum((unsigned char) prev) || prev == '_' || prev == '$' ||
+      if (hts_isalnum((unsigned char) prev) || prev == '_' || prev == '$' ||
           prev == '.' ||
           ((unsigned char) prev >= 0x80 &&
            !js_space_codepoint(model_prev_codepoint(cursor, buffer))))
@@ -415,7 +414,7 @@ static hts_boolean jsscan_model(httrackp *opt, const char *cursor,
       if (prev == '"' || prev == '\'' || prev == '`')
         continue;
       /* Quotes aside, the identifier test below applies here too. */
-      if (isalnum((unsigned char) prev) || prev == '_' || prev == '$' ||
+      if (hts_isalnum((unsigned char) prev) || prev == '_' || prev == '$' ||
           prev == '.' ||
           ((unsigned char) prev >= 0x80 &&
            !js_space_codepoint(model_prev_codepoint(cursor, buffer))))
@@ -1250,7 +1249,7 @@ static int st_attrkind(httrackp *opt, int argc, char **argv) {
     err |= attr_case(text, HTS_TRUE, at, len + 1);
     err |= attr_case(text, HTS_FALSE, script ? NULL : at, script ? 0 : len + 1);
     for (k = 0; at->name[k] != '\0' && k + 1 < sizeof(upper); k++)
-      upper[k] = (char) toupper((unsigned char) at->name[k]);
+      upper[k] = (char) hts_toupper((unsigned char) at->name[k]);
     upper[k] = '\0';
     snprintf(text, sizeof(text), " %s = x", upper);
     err |= attr_case(text, HTS_TRUE, at, len + 2);

@@ -577,7 +577,7 @@ static hts_boolean bundle_admit(cookie_filter *filter, t_cookie *cookie,
              (ctx->mine != NULL
                   ? cookie_find_exact(ctx->mine->data, name, host, path) == NULL
                   : !repeat) &&
-             strcmp(cookie_get(buffer, other, 6), value) != 0) {
+             strcmp(cookie_get(buffer, sizeof(buffer), other, 6), value) != 0) {
     // outside this bundle's home, a later check decides
     if (ctx->clashes != NULL &&
         !scope_list_covers(ctx->b->home, ctx->b->nhome, bare)) {
@@ -1596,7 +1596,8 @@ static void paste_scope_text(const bundle *b, size_t own, const t_cookie *jar,
     return;
   while (*a != '\0') {
     a += binput(a, line, (int) sizeof(line) - 1);
-    if (!cookie_host(cookie_get(buffer, line, 0), host, sizeof(host)))
+    if (!cookie_host(cookie_get(buffer, sizeof(buffer), line, 0), host,
+                     sizeof(host)))
       continue;
     for (i = 0; i < b->nscope; i++) {
       if (scope_covers(b->scope[i], host[0] == '.' ? host + 1 : host)) {
@@ -1634,7 +1635,7 @@ static void paste_jar_summary(const t_cookie *jar, int *count,
     const char *dom;
 
     a += binput(a, line, (int) sizeof(line) - 1);
-    dom = cookie_get(buffer, line, 0);
+    dom = cookie_get(buffer, sizeof(buffer), line, 0);
     if (dom[0] == '.')
       dom++;
     if (*count < INT_MAX)

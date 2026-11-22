@@ -43,7 +43,6 @@ Please visit our Website: http://www.httrack.com
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
-#include <ctype.h>
 #ifndef _WIN32
 #include <signal.h>
 #endif

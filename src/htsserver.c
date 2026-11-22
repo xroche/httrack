@@ -549,7 +549,7 @@ static hts_boolean host_is_address(const char *name) {
     return HTS_TRUE;
   }
   for (i = 0; name[i] != '\0'; i++) {
-    if (!isdigit((unsigned char) name[i]) && name[i] != '.') {
+    if (!hts_isdigit((unsigned char) name[i]) && name[i] != '.') {
       return HTS_FALSE;
     }
   }
@@ -596,7 +596,8 @@ static hts_boolean query_alnum_value(char *dst, size_t size, const char *query,
   if (!hts_query_find(query, name, &f)) {
     return HTS_FALSE;
   }
-  while (n < f.vallen && n + 1 < size && isalnum((unsigned char) f.val[n])) {
+  while (n < f.vallen && n + 1 < size &&
+         hts_isalnum((unsigned char) f.val[n])) {
     dst[n] = f.val[n];
     n++;
   }
@@ -953,8 +954,8 @@ static void cat_theme_entry(String *list, const char *name) {
   StringCat(*list, "\t");
   for (p = name; *p != '\0'; p++) {
     const char c = *p == '-' || *p == '_' ? ' '
-                   : p == name            ? (char) toupper((unsigned char) *p)
-                                          : *p;
+                   : p == name ? (char) hts_toupper((unsigned char) *p)
+                               : *p;
 
     StringMemcat(*list, &c, 1);
   }
@@ -1201,8 +1202,8 @@ static void cat_cmdline_arg(String *output, const char *value) {
    except beside a ',' or '=', where the parser trims it. */
 static void cat_cmdline_arglist(String *output, const char *value,
                                 const char *flag) {
-  /* isspace()'s C-locale set, so a rules box splits the same here and in the
-     Android app, whose Java \s covers \v and \f too. */
+  /* hts_isspace()'s C-locale set, so a rules box splits the same here and in
+     the Android app, whose Java \s covers \v and \f too. */
   static const char *const ws = " \t\r\n\v\f";
   const char *p = value + strspn(value, ws);
   hts_boolean first = HTS_TRUE;
@@ -2648,8 +2649,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                             /* the ini writer has no inverse for it, so a lone
                                backslash in a settings value must stay one */
                             if (literal && a[0] == '\\' &&
-                                isxdigit((unsigned char) a[1]) &&
-                                isxdigit((unsigned char) a[2])) {
+                                hts_isxdigit((unsigned char) a[1]) &&
+                                hts_isxdigit((unsigned char) a[2])) {
                               int n;
                               char c;
 
