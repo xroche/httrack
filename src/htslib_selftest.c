@@ -124,7 +124,7 @@ static void basic_selftests(void) {
     }
     for (idx = 0; idx < n; idx++) {
       line[0] = '\0';
-      back_infostr(&sb, idx, 3, line, sizeof(line));
+      back_infostr(&sb, idx, 3, HTS_BUF(line));
       // Match exactly, because a presence check lets a partial clobber through.
       snprintf(expect, sizeof(expect),
                "%s\"http://h%d.example/p/%d.html\" " LLintP " " LLintP " ",
@@ -159,7 +159,7 @@ static void basic_selftests(void) {
         snprintf(slot->url_adr, sizeof(slot->url_adr), "http://h.example");
         snprintf(slot->url_fil, sizeof(slot->url_fil), "/p");
         line[0] = '\0';
-        back_infostr(&sb, 0, by_status[k].j, line, sizeof(line));
+        back_infostr(&sb, 0, by_status[k].j, HTS_BUF(line));
         assertf(strcmp(line, by_status[k].expect) == 0);
       }
     }
@@ -3860,6 +3860,41 @@ static int st_buf(httrackp *opt, int argc, char **argv) {
   return bad;
 }
 
+/* bufwrite [cpy|cat|catn]: the hts_buf write helpers. An argument overflows
+   that helper, which must abort at this file's line. */
+static int st_bufwrite(httrackp *opt, int argc, char **argv) {
+  char a[8], big[16];
+  const hts_buf b = HTS_BUF_N(big, 6);
+  int bad = 0;
+
+  (void) opt;
+  memset(big, 'X', sizeof(big));
+  if (argc >= 1 && strcmp(argv[0], "cpy") == 0)
+    hts_buf_cpy(b, "abcdef");
+  if (argc >= 1 && strcmp(argv[0], "cat") == 0) {
+    hts_buf_cpy(b, "abc");
+    hts_buf_cat(b, "def");
+  }
+  if (argc >= 1 && strcmp(argv[0], "catn") == 0) {
+    hts_buf_cpy(b, "abcd");
+    hts_buf_catn(b, "efgh", 2);
+  }
+  hts_buf_cpy(b, "ab");
+  hts_buf_cat(b, "c");
+  hts_buf_catn(b, "dxyz", 2);
+  bad |= strcmp(big, "abcdx") != 0 || big[6] != 'X';
+  hts_buf_cpy(HTS_BUF(a), "1234567");
+  bad |= strcmp(a, "1234567") != 0;
+  bad |= !hts_buf_clip(b, "12345") || strcmp(big, "12345") != 0;
+  bad |= hts_buf_clip(b, "123456") || strcmp(big, "12345") != 0;
+  bad |= !hts_buf_printf(b, "%d-%s", 12, "ab") || strcmp(big, "12-ab") != 0;
+  bad |= hts_buf_printf(b, "%d-%s", 12, "abc") || strcmp(big, "12-ab") != 0;
+  hts_buf_printf_clip(b, "%s", "uvwxyz");
+  bad |= strcmp(big, "uvwxy") != 0 || big[6] != 'X';
+  printf(bad ? "bufwrite: FAILED\n" : "bufwrite: OK\n");
+  return bad;
+}
+
 /* Print what a span primitive reads as [bytes], for next|nextsep|split C TEXT,
    trim L R TEXT or copy SIZE TEXT. */
 static int st_span(httrackp *opt, int argc, char **argv) {
@@ -5265,6 +5300,9 @@ const struct selftest_entry selftests_lib[] = {
      st_spandiff},
     {"buf", "[tail-overrun]",
      "the sizes HTS_BUF, HTS_BUF_N and hts_buf_skip give", st_buf},
+    {"bufwrite", "[cpy|cat|catn]",
+     "the hts_buf write helpers copy, append, clip and print in bounds",
+     st_bufwrite},
     {"span", "<next|nextsep|split|trim|copy> <args> <text>",
      "the fields and copies the span primitive makes", st_span},
     {"spancmp", "", "span compares read a NUL as a byte and fold only A-Z",

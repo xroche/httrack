@@ -1,0 +1,22 @@
+#!/bin/bash
+#
+# The hts_buf write helpers (-#test=bufwrite), and that an overflow aborts at
+# the caller's line rather than inside htsbuf.h.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+assert_selftest "bufwrite: OK" bufwrite
+
+ulimit -c 0 # a deliberate abort must not litter the box with cores
+for helper in cpy cat catn; do
+    rc=0
+    out=$(httrack -O /dev/null "-#test=bufwrite" "$helper" 2>&1) || rc=$?
+    test "$rc" -ne 0 || fail "an overflowing hts_buf_$helper did not abort"
+    case "$out" in
+    *"overflow while"*htslib_selftest.c*) ;;
+    *) fail "an overflowing hts_buf_$helper failed another way (exit $rc): $out" ;;
+    esac
+done
