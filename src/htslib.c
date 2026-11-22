@@ -101,7 +101,6 @@ Please visit our Website: http://www.httrack.com
 #endif /* _WIN32 */
 #include <stdarg.h>
 
-#include <ctype.h>
 #include <stdint.h>
 #include <string.h>
 #include <time.h>
@@ -700,12 +699,13 @@ static hts_boolean ua_product_is(const char *s, size_t n, const char *name,
   *major = -1;
   if (s[len + 1] == '0')
     return HTS_TRUE;
-  for (i = len + 1; i < n && isdigit((unsigned char) s[i]) && v < 100000; i++)
+  for (i = len + 1; i < n && hts_isdigit((unsigned char) s[i]) && v < 100000;
+       i++)
     v = v * 10 + (s[i] - '0');
   if (i == len + 1 || v >= 100000)
     return HTS_TRUE;
   for (; i < n; i++) {
-    if (s[i] != '.' && !isdigit((unsigned char) s[i]))
+    if (s[i] != '.' && !hts_isdigit((unsigned char) s[i]))
       return HTS_TRUE;
   }
   *major = (int) v;
@@ -1716,7 +1716,7 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
     const char *a;
 
     for(a = rcvd + p; is_space(*a); a++) ;
-    if (strncasecmp(a, "bytes ", 6) == 0) {
+    if (hts_strncasecmp(a, "bytes ", 6) == 0) {
       LLint start = 0, end = 0, total = 0;
       hts_scan_result got;
       hts_boolean refused;
@@ -2737,7 +2737,7 @@ int ident_url_absolute(const char *url, lien_adrfil *adrfil) {
   {
     const char *a = url;
 
-    while(isalpha((unsigned char) *a))
+    while (hts_isalpha((unsigned char) *a))
       a++;
     if (*a == ':')
       scheme = 1;
@@ -3280,24 +3280,68 @@ int get_filetime_rfc822(const char *file, char *date) {
   return 0;
 }
 
-// heure au format rfc (taille buffer 256o)
+double hts_strtod_c(const char *s, const char **end) {
+  const char *p = s;
+  double v = 0;
+  int digits = 0, scale = 0, neg = 0;
+
+  while (hts_isspace(*p))
+    p++;
+  if (*p == '+' || *p == '-')
+    neg = *p++ == '-';
+  for (; hts_isdigit(*p); p++, digits++)
+    v = v * 10 + (*p - '0');
+  if (*p == '.') {
+    for (p++; hts_isdigit(*p); p++, digits++, scale--)
+      v = v * 10 + (*p - '0');
+  }
+  if (digits == 0) {
+    if (end != NULL)
+      *end = s;
+    return 0;
+  }
+  if (*p == 'e' || *p == 'E') {
+    const char *q = p + 1;
+    int eneg = 0, e = 0;
+
+    if (*q == '+' || *q == '-')
+      eneg = *q++ == '-';
+    if (hts_isdigit(*q)) {
+      /* past 1000 the result is already 0 or infinite */
+      for (; hts_isdigit(*q); q++)
+        if (e < 1000)
+          e = e * 10 + (*q - '0');
+      scale += eneg ? -e : e;
+      p = q;
+    }
+  }
+  for (; scale > 0; scale--)
+    v *= 10;
+  for (; scale < 0; scale++)
+    v /= 10;
+  if (end != NULL)
+    *end = p;
+  return neg ? -v : v;
+}
+
+// RFC 822 date in GMT (256-byte buffer)
 void time_rfc822(char *s, struct tm *A) {
   if (A == NULL) {
     int localtime_returned_null = 0;
 
     assertf(localtime_returned_null);
   }
-  strftime(s, 256, "%a, %d %b %Y %H:%M:%S GMT", A);
+  hts_format_rfc822(s, 256, A, " GMT");
 }
 
-// heure locale au format rfc (taille buffer 256o)
+// RFC 822 date in local time (256-byte buffer)
 static void time_rfc822_local(char *s, struct tm *A) {
   if (A == NULL) {
     int localtime_returned_null = 0;
 
     assertf(localtime_returned_null);
   }
-  strftime(s, 256, "%a, %d %b %Y %H:%M:%S", A);
+  hts_format_rfc822(s, 256, A, "");
 }
 
 // conversion en b,Kb,Mb
@@ -3602,14 +3646,14 @@ const char *login_start(const char *adr) {
   const char *s = adr;
   const char *known;
 
-  while (isspace((unsigned char) *s))
+  while (hts_isspace((unsigned char) *s))
     s++;
   known = jump_protocol_const(s);
   if (known != s)
     return known;
-  if (!isalpha((unsigned char) *s))
+  if (!hts_isalpha((unsigned char) *s))
     return adr;
-  while (isalnum((unsigned char) *s) || *s == '+' || *s == '-' || *s == '.')
+  while (hts_isalnum((unsigned char) *s) || *s == '+' || *s == '-' || *s == '.')
     s++;
   return strncmp(s, "://", 3) == 0 ? s + 3 : adr;
 }
@@ -3700,7 +3744,7 @@ const char *jump_normalized_const(const char *source) {
     } else {                    // www-4.foo.com -> foo.com
       const char *a = source + 3;
 
-      while (*a && (isdigit((unsigned char) *a) || *a == '-'))
+      while (*a && (hts_isdigit((unsigned char) *a) || *a == '-'))
         a++;
       if (*a == '.') {
         source = a + 1;
@@ -4082,7 +4126,7 @@ static const char *hts_host_alias_resolve_rules(const char *rules,
     next = hts_host_alias_match(rules, dhost, fullsubj, collapse_www, &nextlen);
     if (next == NULL)
       break; /* settled: no rule maps this host further */
-    if (nextlen == canonlen && strncasecmp(next, canon, canonlen) == 0)
+    if (nextlen == canonlen && hts_strncasecmp(next, canon, canonlen) == 0)
       break; /* a rule matching its own target */
     if (hop + 1 >= HTS_HOST_ALIAS_MAXHOPS) {
       if (settled != NULL)
@@ -4093,7 +4137,7 @@ static const char *hts_host_alias_resolve_rules(const char *rules,
     canonlen = nextlen;
   }
   /* a host that maps to itself: keep the callers' fast path */
-  return strcasecmp(dest, adr) != 0 ? dest : NULL;
+  return hts_strcasecmp(dest, adr) != 0 ? dest : NULL;
 }
 
 /* see htscore.h */
@@ -4151,8 +4195,8 @@ hts_boolean hts_host_same_alias(const char *rules, const char *adra,
   b = hts_host_alias(rules, adrb, collapse_www, cb, sizeof(cb));
   if (a == NULL && b == NULL)
     return HTS_FALSE; /* neither is aliased: the caller's own test */
-  return strcasecmp(jump_identification_const(a != NULL ? a : adra),
-                    jump_identification_const(b != NULL ? b : adrb)) == 0
+  return hts_strcasecmp(jump_identification_const(a != NULL ? a : adra),
+                        jump_identification_const(b != NULL ? b : adrb)) == 0
              ? HTS_TRUE
              : HTS_FALSE;
 }

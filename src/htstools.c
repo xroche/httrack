@@ -32,7 +32,6 @@ Please visit our Website: http://www.httrack.com
 /* ------------------------------------------------------------ */
 
 /* String */
-#include <ctype.h>
 #include <limits.h>
 #include "htscore.h"
 #include "htstools.h"
@@ -96,7 +95,7 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
   {
     const char *a = lien;
 
-    while(isalpha((unsigned char) *a))
+    while (hts_isalpha((unsigned char) *a))
       a++;
     if (*a == ':')
       scheme = 1;
@@ -347,9 +346,9 @@ int lienrelatif(char *s, size_t ssize, const char *link, const char *curr_fil) {
 int link_has_authority(const char *lien) {
   const char *a = lien;
 
-  if (isalpha((unsigned char) *a)) {
+  if (hts_isalpha((unsigned char) *a)) {
     // Skip scheme?
-    while(isalpha((unsigned char) *a))
+    while (hts_isalpha((unsigned char) *a))
       a++;
     if (*a == ':')
       a++;
@@ -617,9 +616,8 @@ HTS_INLINE int rech_tageq_all(const char *adr, const char *s) {
         break;
       } else {                  /* note: bogus for bogus foo = bar */
         if (token == NULL) {
-          if (strncasecmp(&adr[p], s, s_len) == 0
-              && (is_realspace(adr[p + s_len]) || adr[p + s_len] == '=')
-            ) {
+          if (hts_strncasecmp(&adr[p], s, s_len) == 0 &&
+              (is_realspace(adr[p + s_len]) || adr[p + s_len] == '=')) {
             p += s_len;
             p += (int) strspn(&adr[p], HTS_REALSPACES "=");
             return p;
@@ -658,7 +656,7 @@ HTS_INLINE int __rech_tageqbegdigits(const char *adr, const char *s) {
 
   p = strfield(adr, s);
   if (p) {
-    while(isdigit((unsigned char) adr[p]))
+    while (hts_isdigit((unsigned char) adr[p]))
       p++;                      // jump digits
     p += (int) strspn(&adr[p], HTS_SPACES);
     if (adr[p] == '=') {
@@ -675,7 +673,7 @@ HTS_INLINE int rech_sampletag(const char *adr, const char *s) {
   if ((*(adr - 1) == '<') || (is_space(*(adr - 1)))) {  // <tag < tag etc
     p = strfield(adr, s);
     if (p) {
-      if (!isalnum((unsigned char) adr[p])) {   // <srcbis n'est pas <src
+      if (!hts_isalnum((unsigned char) adr[p])) { // <srcbis n'est pas <src
         return 1;
       }
       return 0;
@@ -691,7 +689,8 @@ HTS_INLINE int check_tag(const char *from, const char *tag) {
   char s[256];
 
   a += strspn(a, HTS_SPACES);
-  for( ; (isalnum((unsigned char) *a) || (*a == '/')) && i + 1 < sizeof(s) ; i++, a++) {
+  for (; (hts_isalnum((unsigned char) *a) || (*a == '/')) && i + 1 < sizeof(s);
+       i++, a++) {
     s[i] = *a;
   }
   s[i] = '\0';

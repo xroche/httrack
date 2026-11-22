@@ -44,7 +44,6 @@ Please visit our Website: http://www.httrack.com
 #include "htssafe.h"
 #include "htstools.h"
 
-#include <ctype.h>
 #include <string.h>
 
 /* One queued sitemap document awaiting ingestion. */
@@ -105,7 +104,7 @@ static hts_boolean sitemap_root_is(const char *doc, size_t size,
   if (size >= 3 && memcmp(doc, "\xef\xbb\xbf", 3) == 0)
     i = 3; /* UTF-8 BOM */
   while (i < size) {
-    if (isspace((unsigned char) doc[i])) {
+    if (hts_isspace((unsigned char) doc[i])) {
       i++;
     } else if (doc[i] != '<') {
       return HTS_FALSE; /* character data before any element: not XML */
@@ -124,7 +123,7 @@ static hts_boolean sitemap_root_is(const char *doc, size_t size,
 
       /* an optional namespace prefix: <sm:sitemapindex> is the same element */
       while (j < size && doc[j] != ':' && doc[j] != '>' &&
-             !isspace((unsigned char) doc[j]))
+             !hts_isspace((unsigned char) doc[j]))
         j++;
       if (j >= size || doc[j] != ':')
         j = i + 1;
@@ -132,7 +131,7 @@ static hts_boolean sitemap_root_is(const char *doc, size_t size,
         j++;
       return j + nlen <= size && memcmp(doc + j, name, nlen) == 0 &&
                      (j + nlen == size ||
-                      isspace((unsigned char) doc[j + nlen]) ||
+                      hts_isspace((unsigned char) doc[j + nlen]) ||
                       doc[j + nlen] == '>' || doc[j + nlen] == '/')
                  ? HTS_TRUE
                  : HTS_FALSE;
@@ -206,7 +205,8 @@ int hts_sitemap_scan(const char *body, size_t size, int maxurls,
     if (loc == NULL)
       break;
     /* "<loc>" or "<loc xmlns:..>", never "<location>" */
-    if (loc + 4 >= end || (loc[4] != '>' && !isspace((unsigned char) loc[4]))) {
+    if (loc + 4 >= end ||
+        (loc[4] != '>' && !hts_isspace((unsigned char) loc[4]))) {
       p = loc + 4;
       continue;
     }
@@ -219,9 +219,9 @@ int hts_sitemap_scan(const char *body, size_t size, int maxurls,
     if (stop == end)
       break;
     p = stop;
-    while (val < stop && isspace((unsigned char) *val))
+    while (val < stop && hts_isspace((unsigned char) *val))
       val++;
-    while (stop > val && isspace((unsigned char) *(stop - 1)))
+    while (stop > val && hts_isspace((unsigned char) *(stop - 1)))
       stop--;
     len = (size_t) (stop - val);
     /* Overflow-safe: the untrusted length alone against the room left. */

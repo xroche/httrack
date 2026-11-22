@@ -651,7 +651,8 @@ static int st_savename_collide(httrackp *opt, int argc, char **argv) {
       strcatbuff(afs.af.fil, word);
       for (j = 0; j < sizeof(word) - 1; j++) {
         if ((k >> j) & 1)
-          afs.af.fil[1 + j] = (char) toupper((unsigned char) afs.af.fil[1 + j]);
+          afs.af.fil[1 + j] =
+              (char) hts_toupper((unsigned char) afs.af.fil[1 + j]);
       }
       strcatbuff(afs.af.fil, ".html");
       url_savename(&afs, NULL, NULL, NULL, opt, sback, &cache, &hash, 0, 0,
@@ -1546,7 +1547,7 @@ static int legacy_key_adrfil_equals(hash_struct *hash, const char *a_adr,
                        : jump_identification_const(a_canon);
   jb = hash->norm_host ? jump_normalized_const(b_canon)
                        : jump_identification_const(b_canon);
-  if (strcasecmp(ja, jb) != 0) {
+  if (hts_strcasecmp(ja, jb) != 0) {
     return 0;
   }
   {

@@ -1,0 +1,91 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# The engine must read and write text the same way whatever locale its host
+# sets: ctype, case folding, decimal points and HTTP dates (see htsctype.h).
+
+top="${top_srcdir:-..}"
+locdir=
+cleanup() {
+    test -z "$locdir" || rm -rf "$locdir"
+}
+trap 'set +e; cleanup' EXIT
+trap 'set +e; cleanup; exit 1' HUP INT TERM
+
+fail() {
+    echo "FAIL: $*"
+    exit 1
+}
+
+# Raw libc calls whose answer follows the locale, or is undefined for a negative
+# char. htslib_selftest.c calls them on purpose, as the reference and control.
+raw='(?<![\w.>])(is(ascii|alpha|alnum|digit|xdigit|space|upper|lower|punct|print|graph|cntrl|blank)|to(upper|lower)|strn?casecmp|str(icmp|nicmp)|_str(icmp|nicmp)|strto(d|f|ld)|atof|setlocale)\s*\(|strftime\s*\([^;]*"[^"]*%[aAbBcxXp]|scanf\s*\([^;]*%l?[fgeaFGEA]'
+scan() {
+    perl -ne "print \"\$ARGV:\$.:\$_\" if /$raw/; close ARGV if eof" "$@"
+}
+# control: the pattern must fire on each form it bans
+probe=$(mktemp -d ./locale-probe.XXXXXX)
+locdir=$probe
+printf '%s\n' 'x = isalpha(c);' 'y=tolower (c);' 'strcasecmp(a, b);' \
+    'strtod(s, &e);' 'strftime(s, 9, "%a", t);' 'sscanf(s, "%lf", &d);' \
+    'setlocale(LC_ALL, "");' 'if (isascii(*p))' >"$probe/dirty.c"
+printf '%s\n' 'x = hts_isalpha(c);' 'a->isalpha(c);' 'hts_strtod_c(s, &e);' \
+    'strftime(s, 9, "%H:%M", t);' 'sscanf(s, "%d", &i);' >"$probe/clean.c"
+hits=$(scan "$probe/dirty.c" | wc -l)
+test "$hits" -eq 8 || fail "the lint matched $hits of 8 banned forms"
+test -z "$(scan "$probe/clean.c")" || fail "the lint matched a clean form"
+rm -rf "$probe"
+locdir=
+
+if test -d "$top/src"; then
+    files=()
+    for f in "$top"/src/*.[ch] "$top"/src/proxy/*.[ch]; do
+        case "$f" in
+        */htsctype.h | */htslib_selftest.c) ;;
+        *) files+=("$f") ;;
+        esac
+    done
+    test "${#files[@]}" -gt 100 || fail "the lint saw only ${#files[@]} files"
+    found=$(scan "${files[@]}" || true)
+    test -z "$found" || fail "use the htsctype.h helpers instead:
+$found"
+fi
+
+# Locales whose libc answers differ from "C". Built ones need LOCPATH, and the
+# BSD and macOS spellings are tried as the system has them.
+set -- tr_TR.ISO8859-9 de_DE.ISO8859-1 fr_FR.ISO8859-1
+built=
+if command -v localedef >/dev/null 2>&1; then
+    locdir=$(mktemp -d ./locale-def.XXXXXX)
+    for spec in tr_TR:ISO-8859-9 de_DE:ISO-8859-1 fr_FR:ISO-8859-1; do
+        name=${spec%%:*}.${spec#*:}
+        # localedef exits 1 on mere warnings, so judge by what it wrote
+        localedef -i "${spec%%:*}" -f "${spec#*:}" "$locdir/$name" \
+            >/dev/null 2>&1 || true
+        if test -d "$locdir/$name"; then
+            set -- "$@" "$name"
+            built="$built $name"
+        fi
+    done
+    export LOCPATH="$locdir"
+fi
+
+out=$(httrack -O /dev/null -#test=locale "$@") || fail "self-test: $out"
+echo "$out"
+grep -qxF 'ctype C: ok' <<<"$out" || fail "ctype differs from the C locale"
+grep -q 'FAIL' <<<"$out" && fail "an engine check failed under a locale"
+for name in $built; do
+    grep -qxF "locale $name: ok" <<<"$out" || fail "$name did not run"
+done
+# a locale that changes no libc answer would prove nothing
+ran=$(grep -c ': ok$' <<<"$out" || true)
+diverged=$(grep -cE '^libc-diverges [^:]+: [a-z]' <<<"$out" || true)
+test "$diverged" -eq "$((ran - 1))" ||
+    fail "only $diverged of $((ran - 1)) locales changed a libc answer"
+case "$built" in
+*tr_TR*) grep -qE '^libc-diverges tr_TR[^:]*:.* case' <<<"$out" ||
+    fail "tr_TR left case folding alone" ;;
+esac
+test "$ran" -gt 1 || echo "no non-C locale here: only the C checks ran"

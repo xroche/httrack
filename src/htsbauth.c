@@ -1028,7 +1028,8 @@ hts_boolean cookie_url_host(const char *url, char *dst, size_t dst_size) {
   if (len >= sizeof(adr))
     return HTS_FALSE;
   // file://C:/x names a Windows drive, not a host
-  if (strfield(url, "file:") && len == 2 && isalpha((unsigned char) rest[0]) &&
+  if (strfield(url, "file:") && len == 2 &&
+      hts_isalpha((unsigned char) rest[0]) &&
       (rest[1] == ':' || rest[1] == '|'))
     return HTS_FALSE;
   adr[0] = '\0';

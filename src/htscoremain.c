@@ -58,7 +58,6 @@ Please visit our Website: http://www.httrack.com
 #include "htsfetch.h"
 #include "htsbundle.h"
 
-#include <ctype.h>
 /* hts_self_path() */
 #ifdef __APPLE__
 #include <mach-o/dyld.h>
@@ -1410,7 +1409,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
             opt->seeker = HTS_SEEKER_DOWN;
             break;
           case 'r':            // n'est plus le recurse get bestial mais wizard itou!
-            if (isdigit((unsigned char) *(com + 1))) {
+            if (hts_isdigit((unsigned char) *(com + 1))) {
               // One short of INT_MAX, as the seed is queued at depth + 1.
               readGluedInt(opt->depth, INT_MAX - 1);
             } else
@@ -1478,12 +1477,12 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
             httrack_logmode = 2;
             if (*(com + 1) == '2')
               httrack_logmode = 3;
-            while(isdigit((unsigned char) *(com + 1)))
+            while (hts_isdigit((unsigned char) *(com + 1)))
               com++;
             break;
           case 'K':
             opt->urlmode = HTS_URLMODE_ABSOLUTE;
-            if (isdigit((unsigned char) *(com + 1))) {
+            if (hts_isdigit((unsigned char) *(com + 1))) {
               readGluedEnum(opt->urlmode, HTS_URLMODE_TRANSPARENT_PROXY);
               if (opt->urlmode == HTS_URLMODE_ABSOLUTE) { // in fact K0 ==> K2
                 // and K ==> K0
@@ -1492,7 +1491,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
             }
             break;
           case 'c':
-            if (isdigit((unsigned char) *(com + 1))) {
+            if (hts_isdigit((unsigned char) *(com + 1))) {
               readGluedInt(opt->maxsoc, INT_MAX);
               opt->maxsoc = max(opt->maxsoc, 1); // At least one socket.
             } else
@@ -1515,7 +1514,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
             if (*(com + 1) != ',') {
               readGluedLLint(opt->maxfile_nonhtml, INT64_MAX);
             }
-            if (*(com + 1) == ',' && isdigit((unsigned char) *(com + 2))) {
+            if (*(com + 1) == ',' && hts_isdigit((unsigned char) *(com + 2))) {
               com++;
               readGluedLLint(opt->maxfile_html, INT64_MAX);
             } else
@@ -1586,7 +1585,8 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
               const char *digits = com + 1;
               int ndigits;
 
-              for (ndigits = 0; isdigit((unsigned char) *(com + 1)); ndigits++)
+              for (ndigits = 0; hts_isdigit((unsigned char) *(com + 1));
+                   ndigits++)
                 com++;
               if (ndigits > 0)
                 opt->savename_type =
@@ -1599,7 +1599,8 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
             const char *const digits = com + 1;
             int ndigits, level = 1;
 
-            for (ndigits = 0; isdigit((unsigned char) *(com + 1)); ndigits++)
+            for (ndigits = 0; hts_isdigit((unsigned char) *(com + 1));
+                 ndigits++)
               com++;
             if (ndigits > 0 && optalias_digits_fit(digits, ndigits))
               level = atoi(digits);
@@ -1616,7 +1617,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
             }
           } break;
           case 's':
-            if (isdigit((unsigned char) *(com + 1))) {
+            if (hts_isdigit((unsigned char) *(com + 1))) {
               readGluedEnum(opt->robots, HTS_ROBOTS_ALWAYS_STRICT);
             } else
               opt->robots = HTS_ROBOTS_SOMETIMES;
@@ -1629,7 +1630,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
             break;
             //
           case 'C':
-            if (isdigit((unsigned char) *(com + 1))) {
+            if (hts_isdigit((unsigned char) *(com + 1))) {
               readGluedEnum(opt->cache, HTS_CACHE_TEST_UPDATE);
             } else
               opt->cache = HTS_CACHE_PRIORITY;
@@ -1683,7 +1684,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                 break;
               case 'I':
                 opt->kindex = 1;
-                if (isdigit((unsigned char) *(com + 1))) {
+                if (hts_isdigit((unsigned char) *(com + 1))) {
                   readGluedInt(opt->kindex, 2);
                 }
                 break;          // Keyword Index
@@ -1747,7 +1748,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                 break;
               case 'v':
                 opt->verbosedisplay = HTS_VERBOSE_FULL;
-                if (isdigit((unsigned char) *(com + 1))) {
+                if (hts_isdigit((unsigned char) *(com + 1))) {
                   readGluedEnum(opt->verbosedisplay, HTS_VERBOSE_FULL);
                 }
                 break;
@@ -1756,7 +1757,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                 break;
               case 'N':
                 opt->savename_delayed = HTS_SAVENAME_DELAYED_HARD;
-                if (isdigit((unsigned char) *(com + 1))) {
+                if (hts_isdigit((unsigned char) *(com + 1))) {
                   readGluedEnum(opt->savename_delayed,
                                 HTS_SAVENAME_DELAYED_HARD);
                 }
@@ -2182,13 +2183,13 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                     LLint v;
                     const char *num = argv[na];
 
-                    while (isspace((unsigned char) *num))
+                    while (hts_isspace((unsigned char) *num))
                       num++;
                     errno = 0;
                     v = strtoll(num, &end, 10);
-                    while (isspace((unsigned char) *end))
+                    while (hts_isspace((unsigned char) *end))
                       end++;
-                    if (isdigit((unsigned char) *num) && *end == '\0' &&
+                    if (hts_isdigit((unsigned char) *num) && *end == '\0' &&
                         errno != ERANGE) {
                       opt->warc_max_size = v;
                     } else {
@@ -2225,8 +2226,8 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
 
                     errno = 0;
                     v = strtoll(argv[na], &end, 10);
-                    if (!isdigit((unsigned char) argv[na][0]) || *end != '\0' ||
-                        errno == ERANGE || v <= 0) {
+                    if (!hts_isdigit((unsigned char) argv[na][0]) ||
+                        *end != '\0' || errno == ERANGE || v <= 0) {
                       cmdl_panic_value(
                           opt,
                           "Option single-file-max-size needs a positive size",
@@ -2307,7 +2308,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                 } else {
                   opt->max_retry_after = (int) secs;
                 }
-                while (isdigit((unsigned char) *(com + 1)))
+                while (hts_isdigit((unsigned char) *(com + 1)))
                   com++;
               } break;
               case 'G': // pause: randomized inter-file delay MIN[:MAX] seconds
@@ -2320,7 +2321,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                   double pmin = 0, pmax = 0;
                   int nf;
 
-                  nf = sscanf(argv[na], "%lf:%lf", &pmin, &pmax);
+                  nf = optpause_read(argv[na], &pmin, &pmax);
                   if (nf < 2)
                     pmax = pmin; /* a single value means a fixed delay */
                   /* positive-form bounds: NaN fails every comparison, so this
@@ -2356,7 +2357,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
               case 'i':
 #if HTS_INET6==0
                 /* Or -@i2's 2 is read as an option and refused (#615). */
-                while (isdigit((unsigned char) *(com + 1)))
+                while (hts_isdigit((unsigned char) *(com + 1)))
                   com++;
                 printf
                   ("Warning, option @i has no effect (v6 routines not compiled)\n");
@@ -2633,7 +2634,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
             }
             break;
           case 'O':            // output path
-            while (isdigit((unsigned char) com[1])) {
+            while (hts_isdigit((unsigned char) com[1])) {
               com++;
             }
             na++; // skip, already handled
@@ -3003,8 +3004,9 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
       if (opt->maxconn <= 0 || opt->maxconn > 5.0) {
         opt->maxconn = 5.0;
         hts_log_print(opt, LOG_WARNING,
-                      "* security warning: maximum number of connections per second limited to %f to avoid server overload",
-                      (float) opt->maxconn);
+                      "* security warning: maximum number of connections per "
+                      "second limited to %d to avoid server overload",
+                      (int) opt->maxconn);
       }
     } else {
       hts_log_print(opt, LOG_WARNING,

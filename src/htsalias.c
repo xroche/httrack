@@ -318,7 +318,7 @@ static hts_boolean optreal_glued(const char *token) {
     pieces++;
     at += strspn(token + at, "0123456789");
     while ((token[at] == '.' || token[at] == ',') &&
-           isdigit((unsigned char) token[at + 1]))
+           hts_isdigit((unsigned char) token[at + 1]))
       at += 1 + strspn(token + at + 1, "0123456789");
   }
   return pieces > 0 && (pieces <= 2 || token[1] == '#');
@@ -408,7 +408,7 @@ static hts_boolean optalias_clusters(hts_optclass type, const char *command) {
   if (command[0] != '-' || command[1] == '\0' || strcmp(command, "-h") == 0)
     return HTS_FALSE;
   for (i = 1; command[i] != '\0'; i++) {
-    if (command[i] == 'c' || !isalnum((unsigned char) command[i]))
+    if (command[i] == 'c' || !hts_isalnum((unsigned char) command[i]))
       return HTS_FALSE;
   }
   return HTS_TRUE;
@@ -430,10 +430,10 @@ static const char *optalias_suffix(hts_optclass type, const char *value) {
 
   if (!level && type != HTS_OPT_ONOFF)
     return NULL;
-  if (level && isdigit((unsigned char) value[0])) {
+  if (level && hts_isdigit((unsigned char) value[0])) {
     size_t i;
 
-    for (i = 0; isdigit((unsigned char) value[i]); i++) {
+    for (i = 0; hts_isdigit((unsigned char) value[i]); i++) {
     }
     /* a level reaches sscanf("%d") too, so bound it by what that holds */
     return value[i] == '\0' && optalias_run_fits(value, INT_MAX) ? value : NULL;
@@ -458,7 +458,7 @@ static hts_boolean optalias_is_digits(const char *value) {
   size_t i;
 
   for (i = 0; value[i] != '\0'; i++) {
-    if (!isdigit((unsigned char) value[i]))
+    if (!hts_isdigit((unsigned char) value[i]))
       return HTS_FALSE;
   }
   return i != 0 && optalias_digits_fit(value, i) ? HTS_TRUE : HTS_FALSE;
@@ -477,7 +477,7 @@ static hts_boolean optalias_paramn_glues(const char *value) {
 static hts_boolean optalias_paramn_cluster_tail(const char *value) {
   size_t i;
 
-  for (i = 0; isdigit((unsigned char) value[i]); i++) {
+  for (i = 0; hts_isdigit((unsigned char) value[i]); i++) {
   }
   if (i == 0 || value[i] == '\0' || !optalias_digits_fit(value, i))
     return HTS_FALSE;
@@ -517,7 +517,7 @@ static hts_boolean optalias_param_takes(const char *command,
   if (strcmp(value, "on") == 0 || strcmp(value, "off") == 0)
     return HTS_TRUE;
   for (i = 0;; i++) {
-    if (isdigit((unsigned char) value[i])) {
+    if (hts_isdigit((unsigned char) value[i])) {
       digit = HTS_TRUE;
       continue;
     }
@@ -526,7 +526,7 @@ static hts_boolean optalias_param_takes(const char *command,
       return HTS_FALSE;
     if (value[i] == '\0')
       break;
-    if (value[i] != sep || split || !isdigit((unsigned char) value[i + 1]))
+    if (value[i] != sep || split || !hts_isdigit((unsigned char) value[i + 1]))
       return HTS_FALSE;
     split = HTS_TRUE;
     start = i + 1;
@@ -903,7 +903,7 @@ hts_boolean optcluster_next(const char *token, size_t *at, char *name,
   if (name[1] == '&' && len == 2)
     name[1] = '%';
   /* a sub-letter naming an option of its own: -%rf, -%Zs */
-  if (len == 2 && isalpha((unsigned char) token[i + 2])) {
+  if (len == 2 && hts_isalpha((unsigned char) token[i + 2])) {
     name[3] = token[i + 2];
     name[4] = '\0';
     if (optreal_find(name) >= 0)
@@ -921,9 +921,22 @@ hts_boolean optcluster_next(const char *token, size_t *at, char *name,
   return HTS_TRUE;
 }
 
+int optpause_read(const char *val, double *pmin, double *pmax) {
+  const char *end;
+
+  *pmin = hts_strtod_c(val, &end);
+  if (end == val)
+    return 0;
+  if (*end != ':')
+    return 1;
+  val = end + 1;
+  *pmax = hts_strtod_c(val, &end);
+  return end == val ? 0 : 2;
+}
+
 size_t optrate_read(const char *val, double *rate) {
-  char *end;
-  const double v = strtod(val, &end);
+  const char *end;
+  const double v = hts_strtod_c(val, &end);
 
   /* leftover number characters (5,5 or 1.2.3) make the whole value bad */
   if (end == val || !(v >= 0 && v <= FLT_MAX) ||
@@ -1106,7 +1119,7 @@ static void optinclude_fold(const char *key, char *value) {
   }
   for (i = 0; keywords[i] != NULL; i++) {
     if (strlen(keywords[i]) == len &&
-        strncasecmp(word, keywords[i], len) == 0) {
+        hts_strncasecmp(word, keywords[i], len) == 0) {
       memcpy(value, keywords[i], len + 1);
       return;
     }
@@ -1146,7 +1159,7 @@ cmdl_file_result optinclude_file(const char *name, cmdl_argv *cmd) {
         /* no comment line: # // ; even indented */
         if (strchr("#/;", *a) == NULL) {
           /* jump "set " and spaces */
-          if (strncasecmp(a, "set", 3) == 0 && is_realspace(a[3]))
+          if (hts_strncasecmp(a, "set", 3) == 0 && is_realspace(a[3]))
             a += 4;
           a += strspn(a, HTS_REALSPACES);
 

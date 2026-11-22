@@ -41,6 +41,7 @@ extern "C" {
 #include "htsglobal.h"
 #include "htsstrings.h"
 #include "htssafe.h"
+#include "htsctype.h"
 
 #include <string.h>
 #include <time.h>

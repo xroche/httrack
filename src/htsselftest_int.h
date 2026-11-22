@@ -88,7 +88,6 @@ Please visit our Website: http://www.httrack.com
 #include <utime.h>
 #endif
 
-#include <ctype.h>
 #include <errno.h>
 #include <limits.h>
 #include <setjmp.h>

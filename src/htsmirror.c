@@ -33,7 +33,6 @@ Please visit our Website: http://www.httrack.com
 /* ------------------------------------------------------------ */
 
 #include <fcntl.h>
-#include <ctype.h>
 
 /* File defs */
 #include "htscore.h"

@@ -64,6 +64,9 @@ hts_boolean optcluster_next(const char *token, size_t *at, char *name,
 /* Reads the -%c rate at VAL. Returns the bytes it spans: the number, or the
    rest of the word when no usable rate is there, in which case *RATE is -1. */
 size_t optrate_read(const char *val, double *rate);
+/* Reads the --pause MIN[:MAX] at VAL, with "." as the decimal point in any
+   locale. Returns how many numbers it read, or 0 when one is missing. */
+int optpause_read(const char *val, double *pmin, double *pmax);
 const char *optreal_value(int p);
 const char *optalias_value(int p);
 

@@ -39,7 +39,6 @@ Please visit our Website: http://www.httrack.com
 #include "htswarc.h"
 #include "htschanges.h"
 #include "htsthread.h"
-#include <ctype.h>
 #include <limits.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -155,14 +154,14 @@ static unsigned long back_spool_owner(const char *name) {
   if (strncmp(p, prefix, sizeof(prefix) - 1) != 0)
     return 0;
   p += sizeof(prefix) - 1;
-  for (; isdigit((unsigned char) *p); p++) {
+  for (; hts_isdigit((unsigned char) *p); p++) {
     if (pid > (ULONG_MAX - 9) / 10)
       return 0;
     pid = pid * 10 + (unsigned long) (*p - '0');
   }
-  if (*p++ != '-' || !isdigit((unsigned char) *p))
+  if (*p++ != '-' || !hts_isdigit((unsigned char) *p))
     return 0;
-  while (isdigit((unsigned char) *p))
+  while (hts_isdigit((unsigned char) *p))
     p++;
   return strcmp(p, ".tmp") == 0 ? pid : 0;
 }
@@ -382,7 +381,7 @@ struct_back *back_new(httrackp *opt, int back_max) {
        spool's memory budget, and 0 forces the disk spool. */
     const char *const max = getenv("HTTRACK_DEBUG_SPOOL_MEM");
 
-    if (max != NULL && isdigit((unsigned char) max[0]))
+    if (max != NULL && hts_isdigit((unsigned char) max[0]))
       sback->ready_mem_max = (LLint) strtoul(max, NULL, 10);
   }
   coucal_value_is_malloc(sback->ready, 1);
@@ -4410,7 +4409,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
                   back[i].chunk_adr[back[i].chunk_size - 1] = '\0';     // octet nul 
                   // skip leading spaces or cr
-                  while (isspace((unsigned char) *chstrip))
+                  while (hts_isspace((unsigned char) *chstrip))
                     chstrip++;
                   chunk_data[0] = '\0';
                   strncatbuff(chunk_data, chstrip, sizeof(chunk_data) - 2);

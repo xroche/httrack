@@ -115,6 +115,7 @@ Remark: If no cache newer than the added one is found, all entries can be added 
 #include "htsthread.h"
 #include "htsglobal.h"
 #include "htsurlport.h"
+#include "htsdate.h"
 #include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -313,7 +314,7 @@ static void proxytrack_add_DAV_Item(String * item, String * buff,
     char tms[256 + 1];
     const char *name;
 
-    strftime(tms, 256, "%a, %d %b %Y %H:%M:%S GMT", timetm);    /* Sun, 18 Sep 2005 11:45:45 GMT */
+    hts_format_rfc822(tms, sizeof(tms), timetm, " GMT");
 
     if (mime == NULL || *mime == 0)
       mime = "application/octet-stream";
@@ -694,9 +695,9 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
             keepAlive = 0;
             length = 0;
           }
-        } else if (strcasecmp(line, "Connection: close") == 0) {
+        } else if (hts_strcasecmp(line, "Connection: close") == 0) {
           keepAlive = 0;
-        } else if (strcasecmp(line, "Connection: keep-alive") == 0) {
+        } else if (hts_strcasecmp(line, "Connection: keep-alive") == 0) {
           keepAlive = 1;
         } else if ((p = strfield(line, "Host:"))) {
           char *chost = line + p;
@@ -734,14 +735,14 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
       }
 
       /* Switch protocol ID */
-      if (strcasecmp(command, "post") == 0) {
+      if (hts_strcasecmp(command, "post") == 0) {
         msgCode = 404;
         msgError = "Proxy Error (POST Request Forbidden)";
-      } else if (strcasecmp(command, "get") == 0) {
+      } else if (hts_strcasecmp(command, "get") == 0) {
         headRequest = 0;
-      } else if (strcasecmp(command, "head") == 0) {
+      } else if (hts_strcasecmp(command, "head") == 0) {
         headRequest = 1;
-      } else if (strcasecmp(command, "options") == 0) {
+      } else if (hts_strcasecmp(command, "options") == 0) {
         const char *options = "GET, HEAD, OPTIONS, POST, PROPFIND, TRACE" ", MKCOL, DELETE, PUT";       /* Not supported */
 
         msgCode = HTTP_OK;
@@ -752,21 +753,21 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
                       "Cache-Control: private\r\n"
                       "Allow: %s\r\n",
                       msgCode, GetHttpMessage(msgCode), options);
-      } else if (strcasecmp(command, "propfind") == 0) {
+      } else if (hts_strcasecmp(command, "propfind") == 0) {
         if (davDepth > 1) {
           msgCode = 403;
           msgError = "DAV Depth Limit Forbidden";
         } else {
           listRequest = 2;      /* propfind */
         }
-      } else if (strcasecmp(command, "mkcol") == 0 ||
-                 strcasecmp(command, "delete") == 0 ||
-                 strcasecmp(command, "put") == 0 ||
-                 strcasecmp(command, "proppatch") == 0 ||
-                 strcasecmp(command, "lock") == 0 ||
-                 strcasecmp(command, "unlock") == 0 ||
-                 strcasecmp(command, "copy") == 0 ||
-                 strcasecmp(command, "trace") == 0) {
+      } else if (hts_strcasecmp(command, "mkcol") == 0 ||
+                 hts_strcasecmp(command, "delete") == 0 ||
+                 hts_strcasecmp(command, "put") == 0 ||
+                 hts_strcasecmp(command, "proppatch") == 0 ||
+                 hts_strcasecmp(command, "lock") == 0 ||
+                 hts_strcasecmp(command, "unlock") == 0 ||
+                 hts_strcasecmp(command, "copy") == 0 ||
+                 hts_strcasecmp(command, "trace") == 0) {
         msgCode = 403;
         msgError = "Method Forbidden";
       } else {
@@ -774,9 +775,9 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
         msgError = "Proxy Error (Unsupported or Unknown HTTP Command Request)";
         keepAlive = 0;
       }
-      if (strcasecmp(proto, "http/1.1") == 0) {
+      if (hts_strcasecmp(proto, "http/1.1") == 0) {
         keepAlive = 1;
-      } else if (strcasecmp(proto, "http/1.0") == 0) {
+      } else if (hts_strcasecmp(proto, "http/1.0") == 0) {
         keepAlive = 0;
       } else {
         msgCode = 505;
@@ -786,8 +787,8 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
 
       /* Post-process request */
       if (hts_shared_link_has_authority(surl)) {
-        if (strncasecmp(surl, "http://proxytrack/",
-                        sizeof("http://proxytrack/") - 1) == 0) {
+        if (hts_strncasecmp(surl, "http://proxytrack/",
+                            sizeof("http://proxytrack/") - 1) == 0) {
         }
         StringCopy(url, surl);
       } else {
@@ -795,8 +796,8 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
         if (StringLength(host) > 0) {
           /* Direct hit */
           if (listRequest != 2 &&
-              strncasecmp(StringBuff(host), StringBuff(localhost),
-                          StringLength(localhost)) == 0 &&
+              hts_strncasecmp(StringBuff(host), StringBuff(localhost),
+                              StringLength(localhost)) == 0 &&
               (StringBuff(host)[StringLength(localhost)] == '\0' ||
                StringBuff(host)[StringLength(localhost)] == ':') &&
               surl[0] == '/') {
@@ -810,8 +811,8 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
             if (!hts_shared_link_has_authority(toHit))
               StringCat(url, "http://");
             StringCat(url, toHit);
-          } else if (strncasecmp(surl, "/proxytrack/",
-                                 sizeof("/proxytrack/") - 1) == 0) {
+          } else if (hts_strncasecmp(surl, "/proxytrack/",
+                                     sizeof("/proxytrack/") - 1) == 0) {
             const char *toHit = surl + sizeof("/proxytrack/") - 1;
 
             /* Direct hit */
