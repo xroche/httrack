@@ -864,8 +864,7 @@ static int dns_addr_selftests(httrackp *opt) {
 static hts_boolean st_is(const hts_dns_result *res, hts_dns_status st,
                          hts_boolean cached, int gai, const char *msg) {
   return res->status == st && res->count == 0 && res->cached == cached &&
-                 res->gai_code == gai &&
-                 strcmp(hts_dns_strerror(res), msg) == 0
+                 res->gai_code == gai && strcmp(hts_dns_strerror(res), msg) == 0
              ? HTS_TRUE
              : HTS_FALSE;
 }
@@ -934,19 +933,17 @@ static int dns_status_selftests(httrackp *opt) {
     CHECK(st_is(&res, HTS_DNS_CANCELLED, HTS_FALSE, 0,
                 "host name resolution cancelled"));
   }
-  CHECK(hts_dns_resolve(opt, "st-slow.test", 1, NULL, &res) ==
-        HTS_DNS_TIMEOUT);
+  CHECK(hts_dns_resolve(opt, "st-slow.test", 1, NULL, &res) == HTS_DNS_TIMEOUT);
   CHECK(st_is(&res, HTS_DNS_TIMEOUT, HTS_FALSE, 0,
               "host name resolution timed out"));
   CHECK(!hts_dns_cached(opt, "st-slow.test"));
 
   /* both abandoned workers must leave the backend before the process does */
   mock_open_gate();
-  CHECK(mock_wait_released(mock_read_calls("st-ok.test") +
-                           mock_read_calls("st-noname.test") +
-                           mock_read_calls("st-again.test") +
-                           mock_read_calls("st-job.test") +
-                           mock_read_calls("st-slow.test")));
+  CHECK(mock_wait_released(
+      mock_read_calls("st-ok.test") + mock_read_calls("st-noname.test") +
+      mock_read_calls("st-again.test") + mock_read_calls("st-job.test") +
+      mock_read_calls("st-slow.test")));
   CHECK(mock_read_calls("st-slow.test") == 2);
   return failures;
 }

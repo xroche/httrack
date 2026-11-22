@@ -604,6 +604,7 @@ int hts_xfread_bytewise_count(void);
    downstream and its allocations add a trailing NUL, so every producer of
    r->size must refuse where http_xfread1() does. */
 HTS_CHECK_RESULT hts_boolean hts_inmem_size_fits(LLint size);
+
 /* Why a resolve gave the addresses it did. */
 typedef enum hts_dns_status {
   HTS_DNS_OK = 0,

@@ -380,8 +380,8 @@ static hts_dns_status hts_dns_resolve_nocache_list_(const char *const hostname,
   if (hp != NULL) {
     char *const *h;
 
-    for (h = hp->h_addr_list;
-         count < HTS_MAXADDRNUM && h != NULL && *h != NULL; h++) {
+    for (h = hp->h_addr_list; count < HTS_MAXADDRNUM && h != NULL && *h != NULL;
+         h++) {
       SOCaddr_clear(res->addr[count]);
       SOCaddr_copyaddr2(res->addr[count], *h, hp->h_length);
       if (SOCaddr_is_valid(res->addr[count]))
@@ -491,7 +491,7 @@ typedef struct dns_resolve_job {
   int refcount;
   hts_boolean done;
   char *hostname;
-  hts_dns_result res;  /* res.count is -1 when the worker gave no answer */
+  hts_dns_result res; /* res.count is -1 when the worker gave no answer */
   hts_boolean stored; /* hts_dns_poll() put the answer in the cache */
 } dns_resolve_job;
 
