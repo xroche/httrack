@@ -4360,6 +4360,7 @@ static hts_boolean urlview_tiles(const char *s, size_t len,
   const char *at = s;
   size_t i;
 
+  /* memchr() over 4 bytes, because strchr() would match a NUL */
   if (v->host.p == NULL || v->path.p == NULL ||
       (v->path.len != 0 && memchr("/?#\\", v->path.p[0], 4) == NULL))
     return HTS_FALSE;

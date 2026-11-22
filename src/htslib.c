@@ -4333,13 +4333,13 @@ hts_boolean hts_ssl_check_cert(SSL *ssl, const char *url_adr) {
 
 const char *hts_authority_end(const char *s) { return s + strcspn(s, "/?#\\"); }
 
-/* Schemes the engine knows, used by jump_protocol_const() and the view. */
+/* jump_protocol_const() and the view both read these schemes. */
 static const char *const hts_engine_schemes[] = {
     "http", "ftp", "https", "file", "socks5h", "socks5", "connect"};
 
 /* Return the length of the engine scheme and ':' that start the LEN bytes at
-   S, or 0. LEN may exceed the string, since jump_protocol_const() passes
-   (size_t) -1; a NUL ends the match. */
+   S, or 0. LEN may exceed the string, because jump_protocol_const() passes
+   (size_t) -1, and a NUL then ends the match. */
 static size_t engine_scheme_len(const char *s, size_t len) {
   size_t i;
 
@@ -4365,7 +4365,7 @@ static hts_span span_of(const char *from, const char *to) {
   return r;
 }
 
-/* Is the span a decimal port in 0..65535? Syntax only, so empty and 0 pass;
+/* Is the span a decimal port in 0..65535? Empty and 0 pass, because
    hts_parse_url_port() checks the 1..65535 range. */
 static hts_boolean port_is_valid(hts_span port) {
   unsigned int value = 0;
@@ -4405,7 +4405,7 @@ hts_boolean hts_url_view_parse(const char *s, size_t len, hts_url_view *v) {
   if (end - p >= 2 && p[0] == '/' && p[1] == '/')
     p += 2;
 
-  // the same set as hts_authority_end(), keep them in sync
+  // the same set as hts_authority_end(), but a NUL is data here
   for (auth_end = p; auth_end < end && *auth_end != '/' && *auth_end != '?' &&
                      *auth_end != '#' && *auth_end != '\\';
        auth_end++)
