@@ -469,34 +469,44 @@ static void back_log_link(httrackp *opt, const lien_back *b, const char *what) {
                 what, adr_nologin(opt, b->url_adr), b->url_fil, b->url_sav);
 }
 
-/* Retry a stuck/failed connecting slot against its next resolved address,
-   closing the current socket once a new connect started. Returns 1 if one did,
-   or if keep_pending and -%b could bind for no other address, in which case the
-   current connect keeps its full timeout; 0 if the caller fails the slot. */
+/* Retry a stuck/failed connecting slot against its next resolved address.
+   Returns 0 if the caller must fail the slot. Returns 1 if a new connect
+   started, or if keep_pending is set and -%b binds no other address, so the
+   current connect keeps its timeout. */
 static int back_connect_next(httrackp *opt, struct_back *sback, int i,
                              hts_boolean keep_pending) {
   hts_connect_fallback *const cf = &sback->connect_fallback[i];
   lien_back *const back = sback->lnk;
   const int next = cf->addr_index + 1;
+  // only -%b can fail every candidate while the current connect is still fine
+  const hts_boolean keep =
+      keep_pending && strnotempty(back[i].r.req.proxy.bindhost);
   SOCaddr address;
   const int address_size = back[i].r.address_size;
   char msg[sizeof(back[i].r.msg)];
-  hts_boolean bind_failed;
-  int skipped;
+  int skipped = 0;
   T_SOC soc;
 
   if (next >= cf->addr_count)
     return 0;
 
+  // close first, so a slot at the descriptor limit can still fall back
+  if (!keep && back[i].r.soc != INVALID_SOCKET) {
+    deletehttp(&back[i].r);
+  }
+  // the kept connect may still succeed and set the preferred address
   SOCaddr_copy_SOCaddr(address, back[i].r.address);
   strcpybuff(msg, back[i].r.msg);
   soc = newhttp_addrs(opt, back[i].url_adr, &back[i].r, -1,
                       (cf->addr_first + next) % cf->addr_count,
-                      cf->addr_count - next, NULL, &skipped, &bind_failed);
+                      cf->addr_count - next, NULL, &skipped);
   if (soc == INVALID_SOCKET) {
-    cf->addr_index = cf->addr_count - 1; // no fallback left
-    if (!keep_pending || !bind_failed)
+    // ends the fallback wait, so the slot's own timeout can fire
+    cf->addr_index = cf->addr_count - 1;
+    if (!keep)
       return 0;
+    /* Any failure keeps the pending connect: a bind, a -%b resolve or a
+       socket() failure says nothing about it. */
     SOCaddr_copy_SOCaddr(back[i].r.address, address);
     back[i].r.address_size = address_size;
     strcpybuff(back[i].r.msg, msg);

@@ -2584,8 +2584,7 @@ static hts_dns_status newhttp_bind_resolve(httrackp *opt, const char *host,
 }
 
 /* Open a non-blocking connect to *server, from the first bind_dns address of
-   its family that binds. *bind_failed tells whether binding caused a failure.
- */
+   its family that binds. On failure, set retour's message and *bind_failed. */
 static T_SOC newhttp_open(httrackp *opt, htsblk *retour, SOCaddr *server,
                           int port, const hts_dns_result *bind_dns,
                           hts_boolean *bind_failed) {
@@ -2601,11 +2600,12 @@ static T_SOC newhttp_open(httrackp *opt, htsblk *retour, SOCaddr *server,
   retour->address_size = SOCaddr_size(retour->address);
 
   if (bind_dns != NULL) {
-    htsblk_failf(retour, HTS_DNS_BIND_PREFIX "%s",
-                 "no address of the server's family");
+    hts_boolean family_seen = HTS_FALSE;
+
     for (i = 0; i < bind_dns->count && soc == INVALID_SOCKET; i++) {
       if (SOCaddr_sinfamily(bind_dns->addr[i]) != family)
         continue;
+      family_seen = HTS_TRUE;
       local = &bind_dns->addr[i];
       // a socket that binds cannot be a multipath one
       soc = hts_socket_client(family, opt, HTS_TRUE);
@@ -2623,6 +2623,9 @@ static T_SOC newhttp_open(httrackp *opt, htsblk *retour, SOCaddr *server,
         local = NULL;
       }
     }
+    if (!family_seen)
+      htsblk_failf(retour, HTS_DNS_BIND_PREFIX "%s",
+                   "no address of the server's family");
     if (soc == INVALID_SOCKET && local == NULL) {
       *bind_failed = HTS_TRUE;
       return INVALID_SOCKET;
@@ -2661,12 +2664,11 @@ static T_SOC newhttp_open(httrackp *opt, htsblk *retour, SOCaddr *server,
 T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
                    int addr_index, int *addr_count) {
   return newhttp_addrs(opt, _iadr, retour, port, addr_index, 1, addr_count,
-                       NULL, NULL);
+                       NULL);
 }
 
 T_SOC newhttp_addrs(httrackp *opt, const char *_iadr, htsblk *retour, int port,
-                    int addr_index, int tries, int *addr_count, int *skipped,
-                    hts_boolean *bind_failed_out) {
+                    int addr_index, int tries, int *addr_count, int *skipped) {
   T_SOC soc = INVALID_SOCKET; // descipteur de la socket
 
   if (addr_count != NULL) {
@@ -2675,15 +2677,13 @@ T_SOC newhttp_addrs(httrackp *opt, const char *_iadr, htsblk *retour, int port,
   if (skipped != NULL) {
     *skipped = 0;
   }
-  if (bind_failed_out != NULL) {
-    *bind_failed_out = HTS_FALSE;
-  }
 
   if (strcmp(_iadr, "file://") != 0) {  /* non fichier */
     SOCaddr server;
     hts_dns_result dns, bind_res;
     const hts_dns_result *bind_dns = NULL;
     hts_boolean bind_failed = HTS_FALSE;
+    char msg[sizeof(retour->msg)];
     int t;
 
     // tester un éventuel id:pass et virer id:pass@ si détecté
@@ -2759,17 +2759,21 @@ T_SOC newhttp_addrs(httrackp *opt, const char *_iadr, htsblk *retour, int port,
 
     /* A first connect skips addresses it cannot bind for, and
        back_connect_next() does the same for a fallback. */
+    strcpybuff(msg, retour->msg);
     for (t = 0; t < tries && t < dns.count; t++) {
       SOCaddr_copy_SOCaddr(server, dns.addr[(addr_index + t) % dns.count]);
       soc = newhttp_open(opt, retour, &server, port, bind_dns, &bind_failed);
       if (soc != INVALID_SOCKET || !bind_failed)
         break;
+      hts_log_print(opt, LOG_DEBUG, "cannot bind for address %d/%d of %s",
+                    (addr_index + t) % dns.count + 1, dns.count, resolve_host);
     }
-    if (skipped != NULL) {
-      *skipped = t;
-    }
-    if (bind_failed_out != NULL) {
-      *bind_failed_out = bind_failed;
+    if (soc != INVALID_SOCKET) {
+      // a skipped address must not leave its reason on a working connect
+      strcpybuff(retour->msg, msg);
+      if (skipped != NULL) {
+        *skipped = t;
+      }
     }
 
   } else {                      // on doit ouvrir un fichier local!

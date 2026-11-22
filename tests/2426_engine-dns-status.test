@@ -44,24 +44,62 @@ socket.socket(socket.AF_INET6 if ":" in a else socket.AF_INET).bind((a, 0))' \
         "$1" 2>/dev/null
 }
 
-# silent ADDR: does a connect to ADDR stay unanswered, settled and re-probed?
-silent() {
-    "${SRV_PYTHON}" -c 'import socket, sys, time
-for _ in range(2):
-    s = socket.socket()
-    s.settimeout(0.5)
-    try:
-        s.connect((sys.argv[1], 80))
-        sys.exit(1)
-    except socket.timeout:
-        pass
-    except OSError:
-        sys.exit(1)
-    s.close()
-    time.sleep(0.5)' "$1" 2>/dev/null
-}
-
 bind_prefix="Unable to bind the local address: "
+
+# A listen(0) queue holding one connection drops SYNs, so a connect stays
+# pending until the helper accepts. "probe" checks this stack does so.
+helper=${tmpdir}/queue.py
+cat >"${helper}" <<'PY'
+import socket, sys, time
+
+mode = sys.argv[1]
+srv = socket.socket()
+srv.bind(("127.0.0.1", 0))
+srv.listen(0)
+if mode == "close":
+    print(srv.getsockname()[1], flush=True)
+    while True:
+        c = srv.accept()[0]
+        c.recv(65536)
+        c.close()
+fill = socket.create_connection(srv.getsockname())
+if mode == "probe":
+    c = socket.socket()
+    c.settimeout(1)
+    try:
+        c.connect(srv.getsockname())
+    except socket.timeout:
+        sys.exit(0)
+    except OSError:
+        pass
+    sys.exit(1)
+print(srv.getsockname()[1], flush=True)
+time.sleep(int(sys.argv[2]))
+srv.accept()[0].close()
+for _ in range(int(sys.argv[3])):
+    c = srv.accept()[0]
+    print("accept %f" % time.time(), file=sys.stderr, flush=True)
+    c.settimeout(30)
+    c.recv(65536)
+    c.sendall(b"HTTP/1.0 200 OK\r\nContent-Type: text/html\r\n\r\n<p>ok</p>")
+    c.close()
+time.sleep(60)
+PY
+
+# helper_start NAME ARGS...: start the helper and set helper_port
+helper_start() {
+    local name=$1
+    shift
+    "${SRV_PYTHON}" "${helper}" "$@" >"${tmpdir}/${name}.port" \
+        2>"${tmpdir}/${name}.err" &
+    cleanup_push stop_server "$!"
+    for _ in $(seq 50); do
+        test -s "${tmpdir}/${name}.port" && break
+        poll_wait 0.1
+    done
+    helper_port=$(<"${tmpdir}/${name}.port")
+    test -n "${helper_port}" || fail "${name}: $(<"${tmpdir}/${name}.err")"
+}
 
 # the retry reads the negative cache
 log=$(crawl ftp "gone.invalid:" ftp://gone.invalid/f.txt --retries=1)
@@ -92,6 +130,15 @@ log=$(crawl bindskip "two.test:::1,127.0.0.1" "http://two.test:${p4}${page}" \
     -%b 127.0.0.1)
 crawled bindskip "${log}"
 
+# a connection closed after the request must not report a bind failure
+helper_start close close
+for host in 127.0.0.1 two.test; do
+    log=$(crawl "bindclose-${host}" "two.test:::1,127.0.0.1" \
+        "http://${host}:${helper_port}/" -%b 127.0.0.1)
+    grep -q "No data (connection closed)" <<<"${log}" ||
+        fail "-%b ${host} against a closing server: ${log}"
+done
+
 if bindable ::1; then
     local_server_start --log "${tmpdir}/srv6.log" --bind ::1
     p6=${SRV_PORT}
@@ -108,16 +155,6 @@ if bindable ::1; then
         log=$(crawl bindpair "pair.test:192.0.2.1,::1" \
             "http://pair.test:${p6}${page}" -%b pair.test)
         crawled bindpair "${log}"
-    fi
-
-    # -%b has no IPv6 address for ::1, so the unanswered connect keeps its timeout
-    if test "${testnet_local}" = no && silent 192.0.2.1; then
-        log=$(crawl bindkeep "slow.test:192.0.2.1,::1" \
-            "http://slow.test:${p6}${page}" -%b 0.0.0.0 --timeout=2)
-        grep -q "Connect Time Out" <<<"${log}" ||
-            fail "the pending connect was not left to time out: ${log}"
-    else
-        echo "192.0.2.1 answers here, skipping the kept-connect case"
     fi
 else
     echo "no IPv6 loopback, skipping the IPv6 -%b cases"
@@ -142,32 +179,33 @@ if test "$HTS_OS" = Linux && test "$(suite_backend)" = posix &&
             fail "-%b skipped to the wrong address: $(<"${tmpdir}/srv4.log")"
     fi
 
-    # A full accept queue drops SYNs until 11s, past the 10s fallback, and -%b
-    # has no IPv6 address for ::1, so the first connect must be kept open.
-    "${SRV_PYTHON}" -c 'import socket, time
-srv = socket.socket()
-srv.bind(("127.0.0.1", 0))
-srv.listen(0)
-fill = socket.create_connection(srv.getsockname())
-print(srv.getsockname()[1], flush=True)
-time.sleep(11)
-srv.accept()[0].close()
-c = srv.accept()[0]
-c.settimeout(30)
-c.recv(65536)
-c.sendall(b"HTTP/1.0 200 OK\r\nContent-Type: text/html\r\n\r\n<p>late</p>")
-c.close()' >"${tmpdir}/late.port" 2>"${tmpdir}/late.err" &
-    late_pid=$!
-    cleanup_push stop_server "${late_pid}"
-    for _ in $(seq 50); do
-        test -s "${tmpdir}/late.port" && break
-        poll_wait 0.1
-    done
-    late_port=$(<"${tmpdir}/late.port")
-    test -n "${late_port}" || fail "the late server: $(<"${tmpdir}/late.err")"
-    log=$(crawl bindlate "late.test:127.0.0.1,::1" \
-        "http://late.test:${late_port}/" -%b 127.0.0.1 --timeout=25)
-    crawled bindlate "${log}"
+    if "${SRV_PYTHON}" "${helper}" probe; then
+        # -%b has no IPv6 address for ::1, so the fallback keeps the connect
+        helper_start held held 60 0
+        log=$(crawl bindheld "held.test:127.0.0.1,::1" \
+            "http://held.test:${helper_port}/" -%b 127.0.0.1 --timeout=2)
+        grep -q "Connect Time Out" <<<"${log}" ||
+            fail "the kept connect did not time out: ${log}"
+
+        # the kept connect succeeds past the 10s fallback, then sets the
+        # preferred address, so the second fetch binds at once
+        helper_start late late 11 2
+        start=${EPOCHREALTIME:-0}
+        log=$(crawl bindlate "late.test:127.0.0.1,::1" \
+            "http://late.test:${helper_port}/" \
+            "http://late.test:${helper_port}/2" -%b 127.0.0.1 --timeout=25)
+        accept=$(sed -n 's/^accept //p' "${tmpdir}/late.err")
+        if awk -v a="${accept%%$'\n'*}" -v s="${start}" \
+            'BEGIN { exit !(s > 0 && a - s >= 11) }'; then
+            crawled bindlate "${log}"
+            test "$(grep -c "cannot bind for address 2/2" <<<"${log}")" = 1 ||
+                fail "the second fetch did not start at 127.0.0.1: ${log}"
+        else
+            echo "the late connect was accepted too early, skipping its case"
+        fi
+    else
+        echo "a full listen queue does not leave a connect pending, skipping"
+    fi
 
     # 127.0.0.1 refuses, ::1 cannot be bound for, 127.0.0.2 serves
     local_server_start --log "${tmpdir}/srv2.log" --bind 127.0.0.2 \
