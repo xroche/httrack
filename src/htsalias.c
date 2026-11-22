@@ -974,7 +974,7 @@ double hts_strtod_c(const char *s, const char **end) {
     }
   }
   /* 0.0700000 is 7e-2, so trailing zeros cannot leave the exact path below */
-  while (m != 0 && m % 10 == 0) {
+  while (m != 0 && m % 10 == 0 && scale < 0) {
     m /= 10;
     scale++;
   }
@@ -1016,10 +1016,15 @@ int optpause_read(const char *val, double *pmin, double *pmax) {
 size_t optrate_read(const char *val, double *rate) {
   const char *end;
   const double v = hts_strtod_c(val, &end);
-  /* 0x5 is hex, but 5x is the rate 5 then the -x option */
-  const hts_boolean hex = end != val && (*end == 'x' || *end == 'X') &&
-                          end[-1] == '0' &&
-                          (end - 1 == val || !hts_isdigit(end[-2]));
+  const char *first = val;
+  hts_boolean hex;
+
+  while (hts_isspace(*first))
+    first++;
+  if (*first == '+' || *first == '-')
+    first++;
+  /* 0x5 is hex, but 5x and 1.0x are a rate then the -x option */
+  hex = end == first + 1 && *first == '0' && (*end == 'x' || *end == 'X');
 
   /* leftover number characters (5,5 or 1.2.3) make the whole value bad */
   if (end == val || !(v >= 0 && v <= FLT_MAX) || hex ||
