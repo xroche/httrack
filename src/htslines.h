@@ -36,6 +36,7 @@ Please visit our Website: http://www.httrack.com
 #define HTSLINES_DEFH
 
 #include "htsglobal.h"
+#include "htsbuf.h"
 #include "htsstrings.h"
 
 #include <stddef.h>
@@ -53,21 +54,17 @@ FILE *hts_fopen_private_new(const char *name, const char *mode);
 #define HTS_LINE_DROP_NUL 2 /* NUL */
 #define HTS_LINE_DROP_FF 4  /* form feed */
 
-/* Read a line into s, max bytes with the NUL, and consume its rest. HTS_TRUE
-   when a non-space byte was dropped. At EOF it reads an empty line. */
-hts_boolean hts_readline(FILE *fp, char *s, size_t max, int flags);
+/* Read a line into s, NUL included, and consume its rest. HTS_TRUE when a
+   non-space byte was dropped. At EOF it reads an empty line. */
+hts_boolean hts_readline(FILE *fp, hts_buf s, int flags);
 
-/* hts_readline(fp, s, max, HTS_LINE_DROP_TAB | HTS_LINE_DROP_FF), returning
-   the number of bytes stored. */
+/* linput() reads like hts_readline() into max bytes, with HTS_LINE_DROP_TAB |
+   HTS_LINE_DROP_FF, and returns the number of bytes stored. */
 int linput(FILE *fp, char *s, int max);
 
-/* hts_readline(fp, s, max, 0) keeping CR and NUL, and storing the byte count
-   in len. HTS_TRUE when the line was cut. */
-hts_boolean hts_readline_raw(FILE *fp, char *s, size_t max, size_t *len);
-
 /* hts_readline() trimmed and joined after a trailing backslash. Leading spaces
-   and backslashes count against max, so "abc\\\n\n" at 4 is cut. */
-hts_boolean hts_readline_cpp(FILE *fp, char *s, size_t max, int flags);
+   and backslashes count against s.size, so "abc\\\n\n" at 4 is cut. */
+hts_boolean hts_readline_cpp(FILE *fp, hts_buf s, int flags);
 
 /* The limit for files httrack writes itself. */
 #define HTS_READLINE_ALLOC_MAX ((size_t) 1 << 20)

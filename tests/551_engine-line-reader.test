@@ -26,6 +26,9 @@ selftest_queue "!!" readline 1 t 'ab\nc'
 selftest_queue "[abc][d]" readline 4 - 'abc  \t \nd'
 # Trimmed, and a line ending with a backslash joins the next one.
 selftest_queue "[ab][]" readline 8 tn 'a\\\nb\n' cpp
+# A line that exactly fills the buffer, alone and joined.
+selftest_queue "[abc][]" readline 4 tn 'abc\n' cpp
+selftest_queue "[abc][]" readline 4 tn 'ab\\\nc\n' cpp
 selftest_queue "[a b][]" readline 16 tn '  a b  \n' cpp
 selftest_queue "[a][b]" readline 8 n 'a\f\v\nb' cpp
 selftest_queue "[\\x0ba]" readline 8 tn '\va' cpp

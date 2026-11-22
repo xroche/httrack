@@ -60,7 +60,7 @@ lib_LTLIBRARIES = libhttrack.la
 htsserver_SOURCES = htsserver.c htsserver.h htsweb.c htsweb.h htsstats.h \
 	htsrandom.c htsrandom.h \
 	htscmdline.c htscmdline.h \
-	htslines.c htslines.h \
+	htslines.c htslines.h htsbuf.h \
 	htsurlport.c htsurlport.h htsescape.c htsescape.h \
 	htsshared.c htsshared.h
 proxytrack_SOURCES = proxy/main.c \
@@ -98,7 +98,7 @@ libhttrack_la_SOURCES =  htscore.c htsusercmd.c htsmhtml.c htsparse.c htsmirror.
 	htsselftest.h htsselftest_int.h htsselftest_util.h htscatchurl.h  \
 	htscmdline.h htsconfig.h htscore.h htsparse.h htsmirror.h htscoremain.h htsdefines.h  \
 	htsfilters.h htsftp.h htsglobal.h htshash.h coucal/coucal.h \
-	htshelp.h htsindex.h htsio.h htslib.h htslines.h htsurlport.h htsmd5.h \
+	htshelp.h htsindex.h htsio.h htslib.h htslines.h htsbuf.h htsurlport.h htsmd5.h \
 	htsmodules.h htsname.h htsnet.h htsshared.h htssniff.h \
 	htsopt.h htsrobots.h htsthread.h htswin32.h  \
 	htscrashtest.h htstools.h htsrandom.h htswizard.h htswrap.h htscodec.h htswarc.h htschanges.h htssinglefile.h htsfetch.h htspsl.h htssitemap.h htsproxy.h htszlib.h  \

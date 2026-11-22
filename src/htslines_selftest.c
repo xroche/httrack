@@ -134,7 +134,7 @@ static int st_readline(httrackp *opt, int argc, char **argv) {
     }
     memset(line, '#', sizeof(line));
     if (cpp) {
-      cut = hts_readline_cpp(fp, line, (size_t) cap, flags);
+      cut = hts_readline_cpp(fp, hts_buf_at(line, (size_t) cap), flags);
       n = strlen(line);
     } else if (lin) {
       const int len = linput(fp, line, cap);
@@ -143,7 +143,7 @@ static int st_readline(httrackp *opt, int argc, char **argv) {
       cut = HTS_FALSE;
       n = (size_t) len;
     } else {
-      cut = hts_readline(fp, line, (size_t) cap, flags);
+      cut = hts_readline(fp, hts_buf_at(line, (size_t) cap), flags);
       /* the terminator is the last NUL, as a kept NUL is data */
       while (n > 0 && line[n - 1] != '\0')
         n--;
@@ -272,9 +272,9 @@ static long st_read(FILE *fp, int r, size_t cap, hts_boolean legacy, char *s,
   else if (legacy)
     (void) legacy_linput(fp, s, (int) cap, st_reader_flags[r]);
   else if (r == ST_CPP)
-    *cut = hts_readline_cpp(fp, s, cap, st_reader_flags[r]);
+    *cut = hts_readline_cpp(fp, hts_buf_at(s, cap), st_reader_flags[r]);
   else
-    *cut = hts_readline(fp, s, cap, st_reader_flags[r]);
+    *cut = hts_readline(fp, hts_buf_at(s, cap), st_reader_flags[r]);
   return ftell(fp);
 }
 

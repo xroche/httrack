@@ -2,7 +2,8 @@
 #
 # On a C11 compiler without GNU extensions (MSVC /std:c17), the buff() family
 # must refuse a pointer destination at compile time and bound an array by its
-# size. Clang with -U__GNUC__ stands in for MSVC.
+# size. Clang with -U__GNUC__ stands in for MSVC. HTS_BUF and HTS_BUF_N are
+# checked on that path and on the GNU one.
 
 set -euo pipefail
 
@@ -28,6 +29,9 @@ for c in "${CC:-cc}" clang; do
     fi
 done
 [ ${#cc[@]} -gt 0 ] || skip "no compiler builds the system headers without __GNUC__"
+read -r -a gnucc <<<"${CC:-cc}"
+gnucc+=(-std=gnu11 -I"$abs_top_builddir" -I"$top/src")
+"${gnucc[@]}" -o "$tmp/ctl" "$tmp/ctl.c" || fail "${gnucc[0]} does not build the system headers"
 
 cat >"$tmp/probe.c" <<'PROBE'
 #include "htssafe.h"
@@ -120,4 +124,42 @@ for type in 'char *' 'unsigned char *' 'void *' 'char *restrict' \
     'const volatile char *' 'char *const volatile'; do
     check_neg "-DPTRTYPE=$type"
 done
+cat >"$tmp/buf.c" <<'PROBE'
+#include "htsbuf.h"
+struct s {
+  char f[48];
+};
+int main(void) {
+  char a[64];
+  struct s st;
+  char *ptr = a;
+  char *const cptr = a;
+  hts_buf b = HTS_BUF(a);
+  (void) ptr;
+  (void) cptr;
+#ifdef NEG
+  b = NEG;
+#endif
+  return b.size == 64 && HTS_BUF_N(a, 64).size == 64 &&
+                 HTS_BUF_N(a, 10).size == 10 && HTS_BUF(st.f).size == 48 &&
+                 HTS_BUF_N(st.f, 1).p == st.f
+             ? 0
+             : 1;
+}
+PROBE
+# The control: each compiler builds and runs the arrays before refusing.
+check_buf() {
+    local -a c=("$@")
+    "${c[@]}" -o "$tmp/buf" "$tmp/buf.c" 2>"$tmp/pos.err" || fail_dump "HTS_BUF of an array does not compile: ${c[*]}" "$tmp/pos.err"
+    "$tmp/buf" || fail "HTS_BUF gave the wrong size: ${c[*]}"
+    for neg in 'HTS_BUF(ptr)' 'HTS_BUF(cptr)' 'HTS_BUF_N(ptr, 1)' 'HTS_BUF_N(a, 65)' \
+        'HTS_BUF_N(st.f, 49)'; do
+        if "${c[@]}" -fsyntax-only "-DNEG=$neg" "$tmp/buf.c" 2>"$tmp/neg.err"; then
+            fail "$neg compiles: ${c[*]}"
+        fi
+        grep -q 'negative' "$tmp/neg.err" || fail_dump "$neg fails for another reason" "$tmp/neg.err"
+    done
+}
+check_buf "${cc[@]}"
+check_buf "${gnucc[@]}"
 echo "OK: ${cc[0]} bounds every array and refuses every pointer destination"
