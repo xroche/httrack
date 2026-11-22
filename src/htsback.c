@@ -3935,7 +3935,10 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
             }
             continue; // reconnected (stay connecting) or failed
           }
-          if (cf->addr_index > 0) // a fallback worked: start there next time
+          // a fallback or a skipped address worked: start there next time
+          if (cf->addr_index > 0 ||
+              (cf->addr_count > 1 &&
+               cf->addr_first != hts_dns_preferred(opt, back[i].url_adr)))
             hts_dns_set_preferred(opt, back[i].url_adr, &back[i].r.address);
           /* A keep-alive slot and the post-TLS re-entry share one socket, so
              count it once. */

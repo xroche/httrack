@@ -514,8 +514,7 @@ T_SOC newhttp_addr(httrackp *opt, const char *iadr, htsblk *retour, int port,
                    int addr_index, int *addr_count);
 /* Like newhttp_addr(), but try up to tries addresses from addr_index on (all
    of them for -1), skipping one -%b cannot bind for or whose connect fails at
-   once. On success, *skipped (if non-NULL) gets how many were skipped before
-   the one opened. */
+   once. On success, *skipped (if non-NULL) gets how many were skipped. */
 T_SOC newhttp_addrs(httrackp *opt, const char *iadr, htsblk *retour, int port,
                     int addr_index, int tries, int *addr_count, int *skipped);
 /* Clips the formatted failure reason into r->msg, which also round-trips
@@ -934,6 +933,12 @@ hts_boolean hts_mptcp_reports(void);
    Returns 0, or -1 with errno set, exactly as connect() does. */
 int hts_socket_connect(T_SOC soc, const struct sockaddr *addr, SOClen len,
                        const httrackp *opt);
+
+/* Start a non-blocking connect to *server. Returns HTS_TRUE when it succeeded
+   or is in progress, and sets *pending (if non-NULL) when it is in progress. */
+hts_boolean hts_socket_connect_started(T_SOC soc, const SOCaddr *server,
+                                       const httrackp *opt,
+                                       hts_boolean *pending);
 
 /* Did Multipath TCP survive this established connection's handshake? */
 hts_boolean hts_socket_is_mptcp(T_SOC soc);
