@@ -1,0 +1,352 @@
+# Known macro violations. Regenerate: tools/check-api-lint.py --update
+src/htsarrays.h: TypedArray: holds statements outside do { } while (0)
+src/htsarrays.h: TypedArray: uses free name data
+src/htsarrays.h: TypedArray: uses free name elts
+src/htsarrays.h: TypedArrayAdd: evaluates A twice
+src/htsarrays.h: TypedArrayAppend: evaluates A twice
+src/htsarrays.h: TypedArrayAppend: evaluates PTR twice
+src/htsarrays.h: TypedArrayEnsureRoom: evaluates A twice
+src/htsarrays.h: TypedArrayFree: evaluates A twice
+src/htsarrays.h: TypedArrayRoom: evaluates A twice
+src/htsarrays.h: TypedArrayTail: evaluates A twice
+src/htsback.c: BACK_FOR_EACH_BUSY: holds statements outside do { } while (0)
+src/htsback.c: BACK_FOR_EACH_BUSY_FROM: holds statements outside do { } while (0)
+src/htsback.c: BACK_SPOOL_STR: holds statements outside do { } while (0)
+src/htsback.c: ESC_URL: uses free name opt
+src/htsback_selftest.c: CHECK: uses free name back
+src/htsback_selftest.c: CHECK: uses free name err
+src/htsback_selftest.c: CHECK: uses free name err
+src/htsback_selftest.c: CHECK: uses free name err
+src/htsback_selftest.c: CHECK: uses free name err
+src/htsback_selftest.c: CHECK: uses free name err
+src/htsback_selftest.c: CHECK: uses free name err
+src/htsback_selftest.c: CHECK: uses free name err
+src/htsback_selftest.c: CHECK: uses free name err
+src/htsback_selftest.c: CHECK: uses free name err
+src/htsback_selftest.c: CHECK: uses free name err
+src/htsback_selftest.c: CHECK: uses free name err
+src/htsback_selftest.c: CHECK: uses free name err
+src/htsback_selftest.c: CHECK: uses free name err
+src/htsback_selftest.c: CHECK: uses free name err
+src/htsback_selftest.c: IN_MEMORY: uses free name in_memory
+src/htsback_selftest.c: ST_FIELD: holds statements outside do { } while (0)
+src/htsback_selftest.c: ST_FIELD: uses free name back
+src/htsbase.h: Sleep: evaluates a twice
+src/htsbase.h: Sleep: holds statements outside do { } while (0)
+src/htsbase.h: hichar: evaluates a twice
+src/htsbase.h: isUpperLetter: evaluates a twice
+src/htsbase.h: lochar: evaluates a twice
+src/htsbase.h: max: evaluates a twice
+src/htsbase.h: max: evaluates b twice
+src/htsbase.h: min: evaluates a twice
+src/htsbase.h: min: evaluates b twice
+src/htsbundle.c: BUNDLE_FAIL: uses free name err
+src/htsbundle.c: BUNDLE_FAIL: uses free name err_size
+src/htsbundle.c: PASTE_FAIL: uses free name done
+src/htsbundle.c: PASTE_FAIL: uses free name ok
+src/htsbundle.c: PASTE_FAIL: uses free name result
+src/htscache_selftest.c: CHECK_STR: uses free name adr
+src/htscache_selftest.c: CHECK_STR: uses free name fail
+src/htscache_selftest.c: CHECK_STR: uses free name fil
+src/htscache_selftest.c: CHECK_STR: uses free name selftest_tag
+src/htscache_selftest.c: JSON_IS: uses free name err
+src/htscache_selftest.c: JSON_IS: uses free name out
+src/htscachecodec.h: ZIP_FIELD_INT: uses free name LLintP
+src/htscachecodec.h: ZIP_FIELD_INT_FORCE: uses free name LLintP
+src/htscharset.c: ADD_BYTE: uses free name capa
+src/htscharset.c: ADD_BYTE: uses free name dest
+src/htscharset.c: ADD_BYTE: uses free name destSize
+src/htscharset.c: FREE_BUFFER: uses free name dest
+src/htscharset.c: INCREASE_CAPA: uses free name capa
+src/htscharset.c: INCREASE_CAPA: uses free name dest
+src/htscookie_selftest.c: HC_FAIL: uses free name err
+src/htscookie_selftest.c: ROWS: holds statements outside do { } while (0)
+src/htscore.c: LOAD_IN_MEMORY_IF_NECESSARY: uses free name is_loaded_from_file
+src/htscore.c: LOAD_IN_MEMORY_IF_NECESSARY: uses free name opt
+src/htscore.c: LOAD_IN_MEMORY_IF_NECESSARY: uses free name ptr
+src/htscore.c: LOAD_IN_MEMORY_IF_NECESSARY: uses free name r
+src/htscore.c: LOAD_IN_MEMORY_IF_NECESSARY: uses free name store_errpage
+src/htscore.h: heap: uses free name opt
+src/htscore.h: heap_top_index: uses free name opt
+src/htscore.h: parentsavename: uses free name ptr
+src/htscore.h: parenturladr: uses free name ptr
+src/htscore.h: parenturlfil: uses free name ptr
+src/htscore.h: relative_to_parent: uses free name module_base
+src/htscore.h: relative_to_parent: uses free name parent_relative
+src/htscore.h: savename: uses free name ptr
+src/htscore.h: urladr: uses free name ptr
+src/htscore.h: urlfil: uses free name ptr
+src/htscoremain.c: ensureUrlCapacity: evaluates size twice
+src/htscoremain.c: ensureUrlCapacity: evaluates url twice
+src/htscoremain.c: ensureUrlCapacity: evaluates urlsize twice
+src/htscoremain.c: readGluedEnum: evaluates field twice
+src/htscoremain.c: readGluedInt: uses free name cmdl_glued_int
+src/htscoremain.c: readGluedLLint: uses free name cmdl_glued_llint
+src/htscoremain.c: readGluedOnOff: evaluates field twice
+src/htscoremain.c: readGluedOnOff: uses free name com
+src/htscoremain.c: readGluedOnOffInv: evaluates field twice
+src/htscoremain.c: readGluedOnOffInv: uses free name com
+src/htscoremain.c: readGluedOpt_: uses free name argv
+src/htscoremain.c: readGluedOpt_: uses free name com
+src/htscoremain.c: readGluedOpt_: uses free name na
+src/htsdefines.h: DEFCALLBACK: holds statements outside do { } while (0)
+src/htsdefines.h: DEFCALLBACK: uses free name fun
+src/htsdefines.h: HTS_PANIC_PRINTF: holds statements outside do { } while (0)
+src/htsdefines.h: HTS_PANIC_PRINTF: uses free name opt
+src/htsdefines.h: HT_PRINT: holds statements outside do { } while (0)
+src/htsdefines.h: HT_PRINT: uses free name opt
+src/htsdns_selftest.c: CHECK: uses free name failures
+src/htsfilters_selftest.c: ADDURL_CHECK: uses free name failed
+src/htsfilters_selftest.c: REFUSED: uses free name atcap
+src/htsfilters_selftest.c: REFUSED: uses free name filptr
+src/htsfilters_selftest.c: REFUSED: uses free name filters
+src/htsfilters_selftest.c: REFUSED: uses free name taken
+src/htsfilters_selftest.c: REFUSED: uses free name verdict
+src/htsfilters_selftest.c: REFUSED: uses free name warned
+src/htsfilters_selftest.c: TRY: uses free name filptr
+src/htsfilters_selftest.c: TRY: uses free name filters
+src/htsfilters_selftest.c: TRY: uses free name line
+src/htsfilters_selftest.c: TRY: uses free name opt
+src/htsfilters_selftest.c: TRY: uses free name subject
+src/htsfilters_selftest.c: TRY: uses free name taken
+src/htsfilters_selftest.c: TRY: uses free name verdict
+src/htsfilters_selftest.c: TRY: uses free name warned
+src/htsftp.c: _T_SOC_close: evaluates soc twice
+src/htsftp.c: ftp_fail: evaluates R twice
+src/htsglobal.h: maximum: evaluates A twice
+src/htsglobal.h: maximum: evaluates B twice
+src/htsglobal.h: minimum: evaluates A twice
+src/htsglobal.h: minimum: evaluates B twice
+src/htsglobal.h: strnotempty: evaluates A twice
+src/htsheader_selftest.c: GATE_CHECK: uses free name err
+src/htslib.c: ADD_CHAR: uses free name dest
+src/htslib.c: ADD_CHAR: uses free name j
+src/htslib.c: ADD_CHAR: uses free name size
+src/htslib.c: CALLBACK_OPERATION: uses free name error
+src/htslib.c: CALLBACK_OPERATION: uses free name function
+src/htslib.c: DECLARE_APPEND_ESCAPE_VERSION: holds statements outside do { } while (0)
+src/htslib.c: DECLARE_INPLACE_ESCAPE_VERSION: holds statements outside do { } while (0)
+src/htslib.c: DECLARE_NON_CONST_VERSION: holds statements outside do { } while (0)
+src/htslib.c: DISPATCH_CALLBACK: uses free name check_html
+src/htslib.c: DISPATCH_CALLBACK: uses free name check_link
+src/htslib.c: DISPATCH_CALLBACK: uses free name check_mime
+src/htslib.c: DISPATCH_CALLBACK: uses free name chopt
+src/htslib.c: DISPATCH_CALLBACK: uses free name end
+src/htslib.c: DISPATCH_CALLBACK: uses free name filesave
+src/htslib.c: DISPATCH_CALLBACK: uses free name filesave2
+src/htslib.c: DISPATCH_CALLBACK: uses free name init
+src/htslib.c: DISPATCH_CALLBACK: uses free name linkdetected
+src/htslib.c: DISPATCH_CALLBACK: uses free name linkdetected2
+src/htslib.c: DISPATCH_CALLBACK: uses free name loop
+src/htslib.c: DISPATCH_CALLBACK: uses free name pause
+src/htslib.c: DISPATCH_CALLBACK: uses free name postprocess
+src/htslib.c: DISPATCH_CALLBACK: uses free name preprocess
+src/htslib.c: DISPATCH_CALLBACK: uses free name query
+src/htslib.c: DISPATCH_CALLBACK: uses free name query2
+src/htslib.c: DISPATCH_CALLBACK: uses free name query3
+src/htslib.c: DISPATCH_CALLBACK: uses free name receivehead
+src/htslib.c: DISPATCH_CALLBACK: uses free name savename
+src/htslib.c: DISPATCH_CALLBACK: uses free name sendhead
+src/htslib.c: DISPATCH_CALLBACK: uses free name start
+src/htslib.c: DISPATCH_CALLBACK: uses free name uninit
+src/htslib.c: DISPATCH_CALLBACK: uses free name xfrstatus
+src/htslib.c: HDR_CLOSE: uses free name hdr
+src/htslib.c: HDR_CLOSE: uses free name slots
+src/htslib.c: HDR_OPEN: uses free name hdr
+src/htslib.c: HDR_OPEN: uses free name slots
+src/htslib.c: endwith: holds statements outside do { } while (0)
+src/htslib.c: endwith: uses free name dest
+src/htslib.c: endwith: uses free name len
+src/htslib.h: GET_CALLBACK: uses free name default_callbacks
+src/htslib.h: HAS_CALLBACK: uses free name default_callbacks
+src/htslib.h: OPT_GET_BUFF_SIZE: uses free name opt
+src/htslib.h: fslash: evaluates B twice
+src/htslib.h: hts_effective_mime: evaluates m twice
+src/htslib.h: is_html_mime_type: evaluates a twice
+src/htslib.h: is_hypertext_mime__: evaluates a twice
+src/htslib.h: is_javascript_mime_type: evaluates a twice
+src/htslib.h: is_playlist_mime_type: evaluates a twice
+src/htslib.h: is_realspace: evaluates c twice
+src/htslib.h: is_retorsep: evaluates c twice
+src/htslib.h: is_space: evaluates c twice
+src/htslib.h: is_taborspace: evaluates c twice
+src/htslib.h: may_be_hypertext_mime__: evaluates a twice
+src/htslib.h: strfield2: evaluates f twice
+src/htslib.h: strfield2: evaluates s twice
+src/htslib_selftest.c: CHAIN_PREV: uses free name carg
+src/htslib_selftest.c: CHAIN_PREV: uses free name chain_hits
+src/htslib_selftest.c: CHECK: uses free name err
+src/htslib_selftest.c: CHECK: uses free name err
+src/htslib_selftest.c: FMT: holds statements outside do { } while (0)
+src/htslib_selftest.c: FMT: uses free name i
+src/htslib_selftest.c: FMT: uses free name strings
+src/htslib_selftest.c: NEIGHBOURS_INTACT: uses free name r
+src/htslib_selftest.c: POISON_DST: uses free name s
+src/htslib_selftest.c: POISON_DST: uses free name s
+src/htslib_selftest.c: REPOISON: uses free name arena
+src/htslib_selftest.c: REPOISON: uses free name arena
+src/htslib_selftest.c: REPOISON: uses free name off
+src/htslib_selftest.c: REPOISON: uses free name off
+src/htslib_selftest.c: REPOISON: uses free name s
+src/htslib_selftest.c: REPOISON: uses free name s
+src/htslib_selftest.c: RESET_DST: uses free name s
+src/htslib_selftest.c: RESET_DST: uses free name used
+src/htsmd5.c: MDCHECK: uses free name digest
+src/htsname.c: ADD_STANDARD_NAME: holds statements outside do { } while (0)
+src/htsname.c: ADD_STANDARD_NAME: uses free name afs
+src/htsname.c: ADD_STANDARD_NAME: uses free name buff
+src/htsname.c: ADD_STANDARD_NAME: uses free name dot_pos
+src/htsname.c: ADD_STANDARD_NAME: uses free name fil_complete
+src/htsname.c: ADD_STANDARD_NAME: uses free name need
+src/htsname.c: ADD_STANDARD_NAME: uses free name nom_pos
+src/htsname.c: ADD_STANDARD_NAME: uses free name tail
+src/htsname.c: DECLARE_ADR: holds statements outside do { } while (0)
+src/htsname.c: DECLARE_ADR: uses free name print_adr
+src/htsname.c: DECLARE_ADR: uses free name protocol
+src/htsname.c: RELEASE_ADR: uses free name idna_adr
+src/htsname.c: TMPL_CATN: uses free name afs
+src/htsname.c: TMPL_CATN: uses free name tmpl_clipped
+src/htsname.c: TMPL_FLUSH: uses free name afs
+src/htsname.c: TMPL_FLUSH: uses free name tmpltail
+src/htsname.c: TMPL_TAILC: uses free name tmpltail
+src/htsname.c: TMPL_TAILN: uses free name tmpltail
+src/htsname_selftest.c: EQ: uses free name opt
+src/htsname_selftest.c: EQ: uses free name opt
+src/htsname_selftest.c: SAME: uses free name opt
+src/htsnet.h: SOCaddr_copy_SOCaddr: evaluates src twice
+src/htsopt_selftest.c: EXPANDS: uses free name got
+src/htsopt_selftest.c: EXPANDS: uses free name used
+src/htsopt_selftest.c: EXPANDS: uses free name warn
+src/htsopt_selftest.c: REFUSES: uses free name got
+src/htsopt_selftest.c: REFUSES: uses free name used
+src/htsopt_selftest.c: REFUSES: uses free name warn
+src/htsopt_selftest.c: WARNS: uses free name got
+src/htsopt_selftest.c: WARNS: uses free name used
+src/htsopt_selftest.c: WARNS: uses free name warn
+src/htsparse.c: HT_ADD: uses free name sink
+src/htsparse.c: HT_ADD_HTMLESCAPED: uses free name sink
+src/htsparse.c: HT_ADD_HTMLESCAPED_FULL: uses free name sink
+src/htsparse.c: HT_ADD_N: uses free name sink
+src/htsparse.c: HT_ADD_URL_HTMLESCAPED: uses free name sink
+src/htsparse.c: HT_SET_SIZE: uses free name sink
+src/htsparse.h: ENGINE_DEFINE_CONTEXT: holds statements outside do { } while (0)
+src/htsparse.h: ENGINE_DEFINE_CONTEXT: uses free name base
+src/htsparse.h: ENGINE_DEFINE_CONTEXT: uses free name codebase
+src/htsparse.h: ENGINE_DEFINE_CONTEXT: uses free name hash
+src/htsparse.h: ENGINE_DEFINE_CONTEXT: uses free name r
+src/htsparse.h: ENGINE_DEFINE_CONTEXT: uses free name stre
+src/htsparse.h: ENGINE_DEFINE_CONTEXT: uses free name template_body
+src/htsparse.h: ENGINE_DEFINE_CONTEXT: uses free name template_footer
+src/htsparse.h: ENGINE_DEFINE_CONTEXT: uses free name template_header
+src/htsparse.h: ENGINE_DEFINE_CONTEXT_BASE: holds statements outside do { } while (0)
+src/htsparse.h: ENGINE_DEFINE_CONTEXT_BASE: uses free name back
+src/htsparse.h: ENGINE_DEFINE_CONTEXT_BASE: uses free name back_max
+src/htsparse.h: ENGINE_DEFINE_CONTEXT_BASE: uses free name cache
+src/htsparse.h: ENGINE_DEFINE_CONTEXT_BASE: uses free name hashptr
+src/htsparse.h: ENGINE_DEFINE_CONTEXT_BASE: uses free name numero_passe
+src/htsparse.h: ENGINE_DEFINE_CONTEXT_BASE: uses free name opt
+src/htsparse.h: ENGINE_DEFINE_CONTEXT_BASE: uses free name sback
+src/htsparse.h: ENGINE_DEFINE_CONTEXT_BASE: uses free name str
+src/htsparse.h: ENGINE_FIELD_DECLARE: holds statements outside do { } while (0)
+src/htsparse.h: ENGINE_FIELD_LOAD: holds statements outside do { } while (0)
+src/htsparse.h: ENGINE_FIELD_STORE: holds statements outside do { } while (0)
+src/htsparse.h: ENGINE_MUTABLE_FIELDS: uses free name error
+src/htsparse.h: ENGINE_MUTABLE_FIELDS: uses free name makeindex_done
+src/htsparse.h: ENGINE_MUTABLE_FIELDS: uses free name makeindex_fp
+src/htsparse.h: ENGINE_MUTABLE_FIELDS: uses free name makeindex_links
+src/htsparse.h: ENGINE_MUTABLE_FIELDS: uses free name stat_fragment
+src/htsparse.h: ENGINE_MUTABLE_FIELDS: uses free name store_errpage
+src/htsparse.h: ENGINE_MUTABLE_FIELDS: uses free name stre
+src/htsparse.h: ENGINE_SAVE_CONTEXT: holds statements outside do { } while (0)
+src/htsparse.h: ENGINE_SAVE_CONTEXT_BASE: uses free name ptr
+src/htsparse.h: ENGINE_SAVE_CONTEXT_BASE: uses free name str
+src/htsparse.h: ENGINE_SET_CONTEXT: holds statements outside do { } while (0)
+src/htsparse.h: ENGINE_SET_CONTEXT_BASE: uses free name ptr
+src/htsparse.h: ENGINE_SET_CONTEXT_BASE: uses free name str
+src/htssafe.h: freet: evaluates A twice
+src/htssafe.h: hts_lastcharptr: evaluates S twice
+src/htssafe.h: htsbuff_array: evaluates ARR twice
+src/htssafe.h: realloct: uses free name hts_realloct_fault_selftest
+src/htssafe.h: sprintfbuff: evaluates ARR twice
+src/htssafe.h: strcatbuff: evaluates A twice
+src/htssafe.h: strcatbuff: evaluates A twice
+src/htssafe.h: strcatbuff: evaluates B twice
+src/htssafe.h: strcatbuff: evaluates B twice
+src/htssafe.h: strcpybuff: evaluates A twice
+src/htssafe.h: strcpybuff: evaluates A twice
+src/htssafe.h: strcpybuff: evaluates B twice
+src/htssafe.h: strcpybuff: evaluates B twice
+src/htssafe.h: strlcatbuff: evaluates B twice
+src/htssafe.h: strlcpybuff: evaluates B twice
+src/htssafe.h: strlncatbuff: evaluates B twice
+src/htssafe.h: strncatbuff: evaluates A twice
+src/htssafe.h: strncatbuff: evaluates A twice
+src/htssafe.h: strncatbuff: evaluates B twice
+src/htssafe.h: strncatbuff: evaluates B twice
+src/htssafe.h: strncatbuff: evaluates N twice
+src/htsserver.c: SET_ERROR: uses free name NewLangList
+src/htsserver.c: SET_ERROR: uses free name error_redirect
+src/htssniff.c: SNIFF_RULE: uses free name op
+src/htsstrings.h: StringClear: evaluates BLK twice
+src/htsstrings.h: StringCopy: evaluates BLK twice
+src/htsstrings.h: StringCopyN: evaluates BLK twice
+src/htsstrings.h: StringCopyS: evaluates blk2 twice
+src/htsstrings.h: StringFree: evaluates BLK twice
+src/htsstrings.h: StringInit: evaluates BLK twice
+src/htsstrings.h: StringMemcat: evaluates BLK twice
+src/htsstrings.h: StringMemcpy: evaluates BLK twice
+src/htsstrings.h: StringPopRight: evaluates BLK twice
+src/htsstrings.h: StringRight: evaluates BLK twice
+src/htsstrings.h: StringRightRW: evaluates BLK twice
+src/htsstrings.h: StringRoom: evaluates BLK twice
+src/htsstrings.h: StringRoomTotal: evaluates BLK twice
+src/htsstrings.h: StringSetBuffer: evaluates BLK twice
+src/htsstrings.h: StringSetBuffer: evaluates STR twice
+src/htsstrings.h: StringSetLength: evaluates BLK twice
+src/htstools.c: FPUTC: uses free name buf
+src/htstools.c: FPUTS: uses free name buf
+src/htstools.h: rech_tageq: evaluates adr twice
+src/htstools.h: rech_tageq_at: evaluates adr twice
+src/htstools.h: rech_tageq_at: evaluates prevc twice
+src/htstools.h: rech_tageq_at: evaluates s twice
+src/htstools.h: rech_tageqbegdigits: evaluates adr twice
+src/htstools.h: rech_tageqbegdigits: evaluates s twice
+src/htswizard.c: ACCEPT_LINK: uses free name forbidden_url
+src/htswizard.c: ACCEPT_LINK: uses free name upper_refused
+src/htswizard.c: ACCEPT_UNLESS_MOVED: uses free name adr
+src/htswizard.c: ACCEPT_UNLESS_MOVED: uses free name fil
+src/htswizard.c: ACCEPT_UNLESS_MOVED: uses free name opt
+src/htswizard.c: ACCEPT_UNLESS_MOVED: uses free name ptr
+src/htswizard.c: REFUSE_LINK: uses free name forbidden_url
+src/htswizard.c: REFUSE_LINK: uses free name upper_refused
+src/htswizard_selftest.c: APPLIES: uses free name depth
+src/htswizard_selftest.c: APPLIES: uses free name opt
+src/htswizard_selftest.c: APPLIES: uses free name url
+src/htswizard_selftest.c: ASKS: uses free name prompt
+src/htswizard_selftest.c: EMITS_SLOT: uses free name f
+src/htswizard_selftest.c: EMITS_SLOT: uses free name pattern
+src/htswizard_selftest.c: HOLDS: uses free name filptr
+src/htswizard_selftest.c: HOLDS: uses free name filters
+src/htswizard_selftest.c: INSERT: uses free name opt
+src/htswizard_selftest.c: NOSCOPE: uses free name scope
+src/htswizard_selftest.c: NOSCOPE_SIZED: uses free name scope
+src/htswizard_selftest.c: RESET: uses free name filptr
+src/htswizard_selftest.c: RESET: uses free name filters
+src/htswizard_selftest.c: RESET: uses free name opt
+src/htswizard_selftest.c: SCOPE: uses free name scope
+src/htswizard_selftest.c: SEED: uses free name filptr
+src/htswizard_selftest.c: SEED: uses free name filters
+src/htswizard_selftest.c: SEED: uses free name opt
+src/htswizard_selftest.c: VERDICT: uses free name filptr
+src/htswizard_selftest.c: VERDICT: uses free name filters
+src/htswizard_selftest.c: WARNS: uses free name depth
+src/htswizard_selftest.c: WARNS: uses free name line
+src/htswizard_selftest.c: WARNS: uses free name log
+src/htswizard_selftest.c: WARNS: uses free name opt
+src/htswizard_selftest.c: WARNS: uses free name url
+src/httrack-library.h: concat: evaluates B twice
+src/httrack-library.h: fconcat: evaluates B twice
+src/httrack-library.h: fconv: evaluates B twice
+src/md5.c: byteSwap: evaluates a twice
+src/md5.c: byteSwap: evaluates b twice
+src/punycode.c: delim: uses free name delimiter
