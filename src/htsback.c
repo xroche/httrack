@@ -3935,7 +3935,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
             }
             continue; // reconnected (stay connecting) or failed
           }
-          // a fallback or a skipped address worked: start there next time
+          // Start next time at a fallback or skipped address that worked.
           if (cf->addr_index > 0 ||
               (cf->addr_count > 1 &&
                cf->addr_first != hts_dns_preferred(opt, back[i].url_adr)))
