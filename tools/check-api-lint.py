@@ -523,7 +523,8 @@ NUL_READERS = frozenset(
     hts_stringLengthUTF8 strdupt strcpybuff strcatbuff strlcpybuff strlcatbuff
     strclipbuff strncatbuff strlncatbuff strfield strfield2 streql strstrcase
     strnotempty strjoker str_begins strrchr_limit hts_authority_end hts_span_of
-    hts_parse_url_port hts_header_param
+    hts_parse_url_port hts_header_param strjokerfind strtoimax strtoumax
+    strendwith_ structcheck strlist_add
     """.split()
 )
 VIEW_FIELDS = r"(?:scheme|userinfo|host|port|path|query|fragment)"

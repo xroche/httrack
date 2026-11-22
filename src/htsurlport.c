@@ -200,13 +200,13 @@ hts_boolean hts_span_starts_with_ci(hts_span s, hts_span prefix) {
 }
 
 hts_boolean hts_span_ends_with(hts_span s, hts_span suffix) {
-  // skip() clamps too, but unclamped, s.len - suffix.len would read before S
+  // Check the length so the subtraction cannot wrap.
   return s.len >= suffix.len &&
          hts_span_starts_with(hts_span_skip(s, s.len - suffix.len), suffix);
 }
 
 hts_boolean hts_span_ends_with_ci(hts_span s, hts_span suffix) {
-  // skip() clamps too, but unclamped, s.len - suffix.len would read before S
+  // Check the length so the subtraction cannot wrap.
   return s.len >= suffix.len &&
          hts_span_starts_with_ci(hts_span_skip(s, s.len - suffix.len), suffix);
 }
