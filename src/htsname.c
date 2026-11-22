@@ -813,9 +813,9 @@ static void add_host_dir(lien_adrfilsave *const afs, const httrackp *opt,
     /* no crawled host is longer, and the type's directories still fit */
     strlncatbuff(afs->save, host, sizeof(afs->save), HTS_URLMAXSIZE);
   } else if (strlen(host) > 4 && strfield(host, "www.")) {
-    hts_appendStringUTF8(afs->save, host + 4, max_char);
+    hts_appendStringUTF8(afs->save, sizeof(afs->save), host + 4, max_char);
   } else {
-    hts_appendStringUTF8(afs->save, host, max_char);
+    hts_appendStringUTF8(afs->save, sizeof(afs->save), host, max_char);
   }
 }
 
@@ -1071,7 +1071,8 @@ int url_savename(lien_adrfilsave *const afs,
 
           previous_save[0] = '\0';
           r = cache_read_including_broken(opt, cache, adr, fil, previous_save,
-                                          NULL); // test uniquement
+                                          sizeof(previous_save), NULL,
+                                          0); // test only
 
           if (r.statuscode != -1) { // cache entry read OK
             hts_log_print(opt, LOG_DEBUG, "Testing link type (from cache) %s%s",

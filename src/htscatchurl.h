@@ -61,9 +61,11 @@ typedef enum {
   CATCH_URL_ERR_BLOCK    /* the headers did not fit CATCH_URL_DATA_SIZE */
 } catch_url_status;
 
-/* Like catch_url(), but returns why the capture failed. */
-catch_url_status catch_url_capture(T_SOC soc, char *url, char *method,
-                                   char *data);
+/* Like catch_url(), but returns why the capture failed, into buffers of the
+   given sizes. A method or URL too long for its buffer is refused. */
+catch_url_status catch_url_capture(T_SOC soc, char *url, size_t url_size,
+                                   char *method, size_t method_size, char *data,
+                                   size_t data_size);
 
 /* Describes a catch_url_capture() status to the user. */
 const char *catch_url_strerror(catch_url_status status);

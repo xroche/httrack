@@ -2950,8 +2950,9 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
                 previous_save[0] = '\0';
                 r = cache_readex(opt, cache, adr, fil, /*head */ NULL,
                                  /*bound to back[p] (temporary) */
-                                 back[p].location_buffer, previous_save, /*ro */
-                                 1);
+                                 back[p].location_buffer,
+                                 sizeof(back[p].location_buffer), previous_save,
+                                 sizeof(previous_save), /*ro */ 1);
                 /* Is supposed to be on disk only */
                 if (r.is_write && previous_save[0] != '\0') {
                   /* rename a file saved under an older name */
@@ -3020,9 +3021,12 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
           // lire dans le cache
           if (!test)
             back[p].r =
-              cache_read(opt, cache, adr, fil, save, back[p].location_buffer);
+                cache_read(opt, cache, adr, fil, save, back[p].location_buffer,
+                           sizeof(back[p].location_buffer));
           else
-            back[p].r = cache_read(opt, cache, adr, fil, NULL, back[p].location_buffer);        // charger en tête uniquement du cache
+            back[p].r =
+                cache_read(opt, cache, adr, fil, NULL, back[p].location_buffer,
+                           sizeof(back[p].location_buffer)); // headers only
 
           /* ensure correct location buffer set */
           back[p].r.location = back[p].location_buffer;
@@ -4850,7 +4854,9 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                           !is_hypertext_mime(opt, back[i].r.contenttype,
                                              back[i].url_fil) &&
                           strnotempty(back[i].url_sav)) {
-                        htsblk r = cache_read(opt, cache, back[i].url_adr, back[i].url_fil, NULL, NULL);        // lire entrée cache
+                        htsblk r = cache_read(opt, cache, back[i].url_adr,
+                                              back[i].url_fil, NULL, NULL,
+                                              0); // read the cache entry
 
                         if (r.statuscode == HTTP_OK) {  // OK pas d'erreur cache
                           LLint len1, len2;
@@ -5005,9 +5011,10 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                       /* the cache entry overwrites the whole struct, so drop
                          what the 304 response still owns first (#782) */
                       back_free_response(&back[i].r);
-                      back[i].r =
-                        cache_read(opt, cache, back[i].url_adr, back[i].url_fil,
-                                   back[i].url_sav, back[i].location_buffer);
+                      back[i].r = cache_read(opt, cache, back[i].url_adr,
+                                             back[i].url_fil, back[i].url_sav,
+                                             back[i].location_buffer,
+                                             sizeof(back[i].location_buffer));
                       back[i].r.location = back[i].location_buffer;
                       back_connxfr(&tmp, &back[i].r);
                       warc_move_request(&tmp, &back[i].r);

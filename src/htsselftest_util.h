@@ -108,6 +108,15 @@ hts_boolean st_mkdir_at(const char *path, size_t n, const char *who);
    as the self-test exit code. */
 int st_verdict(const char *label, int err);
 
+/* A sized-output buffer: cap bytes the callee may write, then
+   ST_SIZED_GUARD bytes of a non-zero canary. Starts as "". Free with freet().
+ */
+#define ST_SIZED_GUARD 16
+char *st_sized_alloc(size_t cap);
+
+/* Is the canary past buf[cap] untouched? */
+HTS_CHECK_RESULT hts_boolean st_sized_guard_ok(const char *buf, size_t cap);
+
 /* UTF-16 units s[0..n) costs, which is what Windows measures MAX_PATH in. */
 size_t st_utf16_units(const char *s, size_t n);
 

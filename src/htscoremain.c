@@ -589,7 +589,7 @@ static void cmdl_print_cache_entry(httrackp *opt, cache_back *cache,
     fprintf(stdout, "X-URL: %s\r\nX-Cache-Entry-Unreadable: yes\r\n\r\n", url);
     return;
   }
-  r = cache_read_ro(opt, cache, afs.af.adr, afs.af.fil, "", NULL);
+  r = cache_read_ro(opt, cache, afs.af.adr, afs.af.fil, "", NULL, 0);
   if (r.statuscode == STATUSCODE_INVALID) {
     fprintf(stdout, "X-URL: %s\r\nX-Cache-Entry-Unreadable: yes\r\n\r\n", url);
     freet(r.adr);

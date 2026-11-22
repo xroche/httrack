@@ -194,9 +194,10 @@ void cookie_insert(char *s, size_t s_size, const char *ins);
 void cookie_delete(char *s, size_t s_size, size_t pos);
 
 /** Return tab-separated field param (0-based) of the jar record at
-    cookie_base, copied into buffer, or "" when the record has no such field.
-    buffer must hold 8192 bytes. */
-const char *cookie_get(char *buffer, const char *cookie_base, int param);
+    cookie_base, clipped into buffer (buffer_size bytes), or "" when the record
+    has no such field. */
+const char *cookie_get(char *buffer, size_t buffer_size,
+                       const char *cookie_base, int param);
 
 /** Does the jar domain JAR_DOM cover the host HOST? RFC 6265 5.1.3 says it
     does when the two name the same host, or when JAR_DOM ends a whole label of
@@ -256,9 +257,8 @@ void bauth_free(t_cookie *cookie);
 /** Build the auth lookup key (scheme if https, host + path, query string
    stripped, truncated at the last '/') from adr and fil into prefix; returns
    prefix, or NULL when adr+fil does not fit, since a clipped key would match
-   URLs nobody authenticated. Caller must supply a buffer of HTS_URLMAXSIZE * 2
-   bytes. */
-char *bauth_prefix(char *buffer, const char *adr, const char *fil);
+   URLs nobody authenticated. prefix holds size bytes. */
+char *bauth_prefix(char *prefix, size_t size, const char *adr, const char *fil);
 
 #endif
 

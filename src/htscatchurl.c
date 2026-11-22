@@ -96,12 +96,12 @@ T_SOC catch_url_init(int *port, /* 128 bytes */ char *adr) {
   return soc;
 }
 
-/* Accumulate the request headers into "data" (CATCH_URL_DATA_SIZE bytes) and
-   feed them to treathead(). A line or block that does not fit fails. */
+/* Accumulate the request headers into "data" (data_size bytes) and feed them
+   to treathead(). A line or block that does not fit fails. */
 static catch_url_status catch_url_headers(T_SOC soc, char *data,
-                                          htsblk *blkretour) {
+                                          size_t data_size, htsblk *blkretour) {
   char BIGSTK line[CATCH_URL_LINE_SIZE];
-  size_t used = strlen(data); /* invariant: used < CATCH_URL_DATA_SIZE */
+  size_t used = strlen(data); /* invariant: used < data_size */
 
   do {
     size_t need;
@@ -111,10 +111,10 @@ static catch_url_status catch_url_headers(T_SOC soc, char *data,
       return CATCH_URL_ERR_HEADER;
     treathead(NULL, NULL, NULL, blkretour, line); // traiter
     need = strlen(line) + 2;                      // the CRLF this line carries
-    if (need >= CATCH_URL_DATA_SIZE - used)
+    if (need >= data_size - used)
       return CATCH_URL_ERR_BLOCK;
-    strlcatbuff(data, line, CATCH_URL_DATA_SIZE);
-    strlcatbuff(data, "\r\n", CATCH_URL_DATA_SIZE);
+    strlcatbuff(data, line, data_size);
+    strlcatbuff(data, "\r\n", data_size);
     used += need;
     /* the empty line ending the block is already appended */
   } while (strnotempty(line));
@@ -148,12 +148,14 @@ const char *catch_url_strerror(catch_url_status status) {
 // data: 32Kb
 HTSEXT_API hts_boolean catch_url(T_SOC soc, char *url, char *method,
                                  char *data) {
-  return catch_url_capture(soc, url, method, data) == CATCH_URL_OK;
+  return catch_url_capture(soc, url, HTS_URLMAXSIZE * 2, method, 32, data,
+                           CATCH_URL_DATA_SIZE) == CATCH_URL_OK;
 }
 
 /* Contract in htscatchurl.h. */
-catch_url_status catch_url_capture(T_SOC soc, char *url, char *method,
-                                   char *data) {
+catch_url_status catch_url_capture(T_SOC soc, char *url, size_t url_size,
+                                   char *method, size_t method_size, char *data,
+                                   size_t data_size) {
   catch_url_status status = CATCH_URL_ERR_REQUEST;
 
   // connexion (accept)
@@ -172,7 +174,8 @@ catch_url_status catch_url_capture(T_SOC soc, char *url, char *method,
         char dot[256 + 2];
 
         SOCaddr_inetntoa(dot, sizeof(dot), server2);
-        sprintf(url, "%s:%d", dot, ntohs(SOCaddr_sinport(server2)));
+        slprintfbuff_clip(url, url_size, "%s:%d", dot,
+                          ntohs(SOCaddr_sinport(server2)));
       }
     }
     /* INFOS */
@@ -180,14 +183,18 @@ catch_url_status catch_url_capture(T_SOC soc, char *url, char *method,
     // réception
     if (soc != INVALID_SOCKET) {
       char BIGSTK line[CATCH_URL_LINE_SIZE];
+      char BIGSTK wire_url[HTS_URLMAXSIZE * 2];
+      char wire_method[32];
       char protocol[256];
 
       line[0] = protocol[0] = '\0';
       // a clipped request-line names a URL the browser did not ask for
       if (!socinput(soc, line, (int) sizeof(line)) && strnotempty(line)) {
-        /* widths bound the caller buffers: method[32], url[HTS_URLMAXSIZE*2],
-           protocol[256] */
-        if (sscanf(line, "%31s %2047s %255s", method, url, protocol) == 3) {
+        /* widths bound the locals; a clipped method or URL would name a request
+           the browser never made, so one too long for the caller is refused */
+        if (sscanf(line, "%31s %2047s %255s", wire_method, wire_url,
+                   protocol) == 3 &&
+            strlen(wire_method) < method_size && strlen(wire_url) < url_size) {
           lien_adrfil af;
 
           // méthode en majuscule
@@ -195,8 +202,9 @@ catch_url_status catch_url_capture(T_SOC soc, char *url, char *method,
           int r = 0;
 
           af.adr[0] = af.fil[0] = '\0';
-          //
-          for(i = 0; method[i] != '\0'; i++) {
+          strlcpybuff(method, wire_method, method_size);
+          strlcpybuff(url, wire_url, url_size);
+          for (i = 0; method[i] != '\0'; i++) {
             if ((method[i] >= 'a') && (method[i] <= 'z'))
               method[i] -= ('a' - 'A');
           }
@@ -209,15 +217,18 @@ catch_url_status catch_url_capture(T_SOC soc, char *url, char *method,
             hts_init_htsblk(&blkretour);
             blkretour.location = loc;   // si non nul, contiendra l'adresse véritable en cas de moved xx
             // Lire en têtes restants
-            sprintf(data, "%s %s %s\r\n", method, af.fil, protocol);
-            status = catch_url_headers(soc, data, &blkretour);
+            if (!slprintfbuff(data, data_size, "%s %s %s\r\n", method, af.fil,
+                              protocol))
+              status = CATCH_URL_ERR_BLOCK;
+            else
+              status = catch_url_headers(soc, data, data_size, &blkretour);
             if (status == CATCH_URL_OK) {
               if (blkretour.totalsize > 0) {
                 int pos = (int) strlen(data);
                 /* the headers already took part of data[], so bound the body by
                    the room they left rather than by a constant */
                 int len = (int) min(blkretour.totalsize,
-                                    (LLint) (CATCH_URL_DATA_SIZE - 1 - pos));
+                                    (LLint) (data_size - 1 - (size_t) pos));
 
                 // Copier le reste (post éventuel)
                 while ((len > 0) &&

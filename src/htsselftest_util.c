@@ -171,6 +171,27 @@ int st_verdict(const char *label, int err) {
   return err;
 }
 
+#define ST_SIZED_POISON 'Z'
+
+char *st_sized_alloc(size_t cap) {
+  char *const buf = malloct(cap + ST_SIZED_GUARD);
+
+  assertf(buf != NULL && cap != 0);
+  memset(buf, ST_SIZED_POISON, cap + ST_SIZED_GUARD);
+  buf[0] = '\0';
+  return buf;
+}
+
+hts_boolean st_sized_guard_ok(const char *buf, size_t cap) {
+  size_t i;
+
+  for (i = cap; i < cap + ST_SIZED_GUARD; i++) {
+    if (buf[i] != ST_SIZED_POISON)
+      return HTS_FALSE;
+  }
+  return HTS_TRUE;
+}
+
 // mkdir path, tolerating one that already exists; a failure keeps its errno.
 hts_boolean st_mkdir_at(const char *path, size_t n, const char *who) {
   if (MKDIR(path) != 0 && errno != EEXIST) {

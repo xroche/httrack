@@ -1908,7 +1908,7 @@ static int st_urlbounds(httrackp *opt, int argc, char **argv) {
   /* This goes first, because bauth_check() skips the key on an empty jar and
      the refused lookups below must read it. */
   strcpybuff(fil, "/secure/page.html?a=b");
-  assertf(bauth_prefix(prefix, adr, fil) == prefix);
+  assertf(bauth_prefix(prefix, sizeof(prefix), adr, fil) == prefix);
   assertf(strcmp(prefix, "http://www.example.com/secure/") == 0);
   assertf(bauth_add(cookie, adr, fil, "dXNlcjpwYXNz") == 1);
   assertf(bauth_check(cookie, adr, fil) != NULL);
@@ -1938,12 +1938,12 @@ static int st_urlbounds(httrackp *opt, int argc, char **argv) {
   /* bauth_prefix(): the key it keeps fills its buffer to the last byte, and
      #1561's guard then refuses to store a key wider than bauth_chain */
   st_urlbounds_path(fil, bafits);
-  assertf(bauth_prefix(prefix, adr, fil) == prefix);
+  assertf(bauth_prefix(prefix, sizeof(prefix), adr, fil) == prefix);
   assertf(strlen(prefix) == HTS_URLMAXSIZE * 2 - 1);
   assertf(bauth_add(cookie, adr, fil, "dXNlcjpwYXNz") == 0);
   /* one byte more: no key at all, and both callers survive the NULL */
   st_urlbounds_path(fil, bafits + 1);
-  assertf(bauth_prefix(prefix, adr, fil) == NULL);
+  assertf(bauth_prefix(prefix, sizeof(prefix), adr, fil) == NULL);
   assertf(bauth_check(cookie, adr, fil) == NULL);
   assertf(bauth_add(cookie, adr, fil, "dXNlcjpwYXNz") == 0);
 

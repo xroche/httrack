@@ -69,24 +69,31 @@ void cache_mayadd(httrackp * opt, cache_back * cache, htsblk * r,
 void cache_add(httrackp * opt, cache_back * cache, const htsblk * r,
                const char *url_adr, const char *url_fil, const char *url_save,
                int all_in_cache, const char *path_prefix);
-htsblk cache_read(httrackp * opt, cache_back * cache, const char *adr,
-                  const char *fil, const char *save, char *location);
+/* location, when not NULL, gets the cached Location clipped to location_size
+   bytes. */
+htsblk cache_read(httrackp *opt, cache_back *cache, const char *adr,
+                  const char *fil, const char *save, char *location,
+                  size_t location_size);
 /* Re-store the previous entry of a link this run failed to fetch, so the next
    run keeps its save name (#1421). `url_save` is the copy on disk. */
 void cache_keep_previous(httrackp *opt, cache_back *cache, const char *url_adr,
                          const char *url_fil, const char *url_save);
-htsblk cache_read_ro(httrackp * opt, cache_back * cache, const char *adr,
-                     const char *fil, const char *save, char *location);
+htsblk cache_read_ro(httrackp *opt, cache_back *cache, const char *adr,
+                     const char *fil, const char *save, char *location,
+                     size_t location_size);
 /* Like cache_read, but also yields broken and kept entries (#1421). Optional
-   return_save (HTS_URLMAXSIZE*2) and return_location (HTS_LOCATION_SIZE) get
-   the save name and Location. Read return_location, not r.location. adr and
-   headers are NULL: nothing to free. */
+   return_save and return_location get the save name and Location. Read
+   return_location, not r.location. adr and headers are NULL: nothing to free.
+   A save name too long for return_save fails the read and leaves it empty. */
 htsblk cache_read_including_broken(httrackp *opt, cache_back *cache,
                                    const char *adr, const char *fil,
-                                   char *return_save, char *return_location);
-htsblk cache_readex(httrackp * opt, cache_back * cache, const char *adr,
+                                   char *return_save, size_t return_save_size,
+                                   char *return_location,
+                                   size_t return_location_size);
+htsblk cache_readex(httrackp *opt, cache_back *cache, const char *adr,
                     const char *fil, const char *save, char *location,
-                    char *return_save, int readonly);
+                    size_t location_size, char *return_save,
+                    size_t return_save_size, int readonly);
 htsblk *cache_header(httrackp * opt, cache_back * cache, const char *adr,
                      const char *fil, htsblk * r);
 void cache_init(cache_back * cache, httrackp * opt);
