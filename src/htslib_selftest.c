@@ -3870,7 +3870,7 @@ static void st_abort_line(int line) {
    An argument overflows that helper, which must abort at the line it prints. */
 static int st_bufwrite(httrackp *opt, int argc, char **argv) {
   struct {
-    char name[8];
+    char name[12]; /* not pointer-sized, so MSVC sees an array */
     char secret[16];
   } r;
 
