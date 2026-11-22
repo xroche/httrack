@@ -2569,19 +2569,122 @@ T_SOC newhttp(httrackp *opt, const char *_iadr, htsblk *retour, int port) {
   return newhttp_addr(opt, _iadr, retour, port, -1, NULL);
 }
 
+/* Resolve the -%b host into res. A bare IPv6 literal gets brackets, or the
+   cache key would read its last group as a port. */
+static hts_dns_status newhttp_bind_resolve(httrackp *opt, const char *host,
+                                           hts_dns_result *res) {
+  char buf[HTS_BINDHOST_MAXSIZE + 3];
+
+  if (host[0] != '[' && strchr(host, ':') != strrchr(host, ':') &&
+      strlen(host) <= HTS_BINDHOST_MAXSIZE) {
+    snprintf(buf, sizeof(buf), "[%s]", host);
+    host = buf;
+  }
+  return hts_dns_resolve(opt, host, opt->timeout, &opt->state.stop, res);
+}
+
+/* Open a non-blocking connect to *server, from the first bind_dns address of
+   its family that binds. On failure, set retour's message and *bind_failed. */
+static T_SOC newhttp_open(httrackp *opt, htsblk *retour, SOCaddr *server,
+                          int port, const hts_dns_result *bind_dns,
+                          hts_boolean *bind_failed) {
+  const int family = SOCaddr_sinfamily(*server);
+  const SOCaddr *local = NULL;
+  T_SOC soc = INVALID_SOCKET;
+  int i;
+
+  assertf(retour != NULL);
+  *bind_failed = HTS_FALSE;
+  // make a copy for external clients
+  SOCaddr_copy_SOCaddr(retour->address, *server);
+  retour->address_size = SOCaddr_size(retour->address);
+
+  if (bind_dns != NULL) {
+    hts_boolean family_seen = HTS_FALSE;
+
+    for (i = 0; i < bind_dns->count && soc == INVALID_SOCKET; i++) {
+      if (SOCaddr_sinfamily(bind_dns->addr[i]) != family)
+        continue;
+      family_seen = HTS_TRUE;
+      local = &bind_dns->addr[i];
+      // a socket that binds cannot be a multipath one
+      soc = hts_socket_client(family, opt, HTS_TRUE);
+      retour->debugid = HTS_STAT.stat_sockid++;
+      if (soc == INVALID_SOCKET)
+        break;
+      if (bind(soc, &SOCaddr_sockaddr(*local), SOCaddr_size(*local)) != 0) {
+        const int last_errno = hts_socket_errno();
+        char errbuf[HTS_STRERROR_SIZE];
+
+        htsblk_failf(retour, HTS_DNS_BIND_PREFIX "%s",
+                     hts_strerror(last_errno, errbuf, sizeof(errbuf)));
+        deletesoc(soc);
+        soc = INVALID_SOCKET;
+        local = NULL;
+      }
+    }
+    if (!family_seen)
+      htsblk_failf(retour, HTS_DNS_BIND_PREFIX "%s",
+                   "no address of the server's family");
+    if (soc == INVALID_SOCKET && local == NULL) {
+      *bind_failed = HTS_TRUE;
+      return INVALID_SOCKET;
+    }
+  } else {
+    soc = hts_socket_client(family, opt, HTS_FALSE);
+    retour->debugid = HTS_STAT.stat_sockid++;
+  }
+  if (soc == INVALID_SOCKET) {
+    const int last_errno = hts_socket_errno();
+    char errbuf[HTS_STRERROR_SIZE];
+
+    htsblk_failf(retour, "Unable to create a socket: %s",
+                 hts_strerror(last_errno, errbuf, sizeof(errbuf)));
+    return INVALID_SOCKET;
+  }
+  SOCaddr_initport(*server, port);
+
+  if (!socket_set_nonblocking(soc, HTS_TRUE)) {
+    const int last_errno = hts_socket_errno();
+    char errbuf[HTS_STRERROR_SIZE];
+
+    htsblk_failf(retour, "Non-blocking socket failed: %s",
+                 hts_strerror(last_errno, errbuf, sizeof(errbuf)));
+    deletesoc(soc);
+    return INVALID_SOCKET;
+  }
+  HTS_STAT.last_connect = mtime_local();
+
+  // non-blocking: back_wait sees how the connect ended
+  (void) hts_socket_connect(soc, &SOCaddr_sockaddr(*server),
+                            SOCaddr_size(*server), local != NULL ? NULL : opt);
+  return soc;
+}
+
 T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
                    int addr_index, int *addr_count) {
-  T_SOC soc;                    // descipteur de la socket
+  return newhttp_addrs(opt, _iadr, retour, port, addr_index, 1, addr_count,
+                       NULL);
+}
+
+T_SOC newhttp_addrs(httrackp *opt, const char *_iadr, htsblk *retour, int port,
+                    int addr_index, int tries, int *addr_count, int *skipped) {
+  T_SOC soc = INVALID_SOCKET; // descipteur de la socket
 
   if (addr_count != NULL) {
     *addr_count = 0;
   }
+  if (skipped != NULL) {
+    *skipped = 0;
+  }
 
   if (strcmp(_iadr, "file://") != 0) {  /* non fichier */
     SOCaddr server;
-    SOCaddr addrs[HTS_MAXADDRNUM];
-    int naddr;
-    const char *error = "unknown error";
+    hts_dns_result dns, bind_res;
+    const hts_dns_result *bind_dns = NULL;
+    hts_boolean bind_failed = HTS_FALSE;
+    char msg[sizeof(retour->msg)];
+    int t;
 
     // tester un éventuel id:pass et virer id:pass@ si détecté
     const char *const iadr = jump_identification_const(_iadr);
@@ -2622,91 +2725,56 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
 
     // resolve the full address list and pick the requested candidate; the
     // scheduler retries the next index when a connect fails (dead IPv6 etc.)
-    naddr =
-        hts_dns_resolve_all(opt, resolve_host, addrs, HTS_MAXADDRNUM, &error);
+    (void) hts_dns_resolve(opt, resolve_host, opt->timeout, &opt->state.stop,
+                           &dns);
     if (addr_count != NULL) {
-      *addr_count = naddr;
+      *addr_count = dns.count;
     }
     if (addr_index < 0) {
+      tries = dns.count;
       addr_index = hts_dns_preferred(opt, resolve_host);
-      if (addr_index >= naddr)
+      if (addr_index >= dns.count)
         addr_index = 0;
     }
-    if (addr_index >= 0 && addr_index < naddr) {
-      SOCaddr_copy_SOCaddr(server, addrs[addr_index]);
+    if (addr_index >= 0 && addr_index < dns.count) {
+      SOCaddr_copy_SOCaddr(server, dns.addr[addr_index]);
     }
 
     if (!SOCaddr_is_valid(server)) {
-#if DEBUG
-      printf("erreur gethostbyname\n");
-#endif
       if (retour != NULL) {
-        htsblk_failf(retour, "Unable to get server's address: %s", error);
+        htsblk_failf(retour, HTS_DNS_FAIL_PREFIX "%s", hts_dns_strerror(&dns));
       }
       return INVALID_SOCKET;
     }
 
-    // make a copy for external clients
-    SOCaddr_copy_SOCaddr(retour->address, server);
-    retour->address_size = SOCaddr_size(retour->address);
-
-    // créer ("attachement") une socket (point d'accès) internet,en flot
-    /* -%b pins the source address, and a socket that binds cannot be a
-       multipath one. */
-    const hts_boolean will_bind =
-        retour != NULL && strnotempty(retour->req.proxy.bindhost) ? HTS_TRUE
-                                                                  : HTS_FALSE;
-    soc = hts_socket_client(SOCaddr_sinfamily(server), opt, will_bind);
-    if (retour != NULL) {
-      retour->debugid = HTS_STAT.stat_sockid++;
-    }
-    if (soc == INVALID_SOCKET) {
-      if (retour != NULL) {
-        const int last_errno = hts_socket_errno();
-        char errbuf[HTS_STRERROR_SIZE];
-
-        htsblk_failf(retour, "Unable to create a socket: %s",
-                     hts_strerror(last_errno, errbuf, sizeof(errbuf)));
-      }
-      return INVALID_SOCKET;    // erreur création socket impossible
-    }
-    // bind this address
     if (retour != NULL && strnotempty(retour->req.proxy.bindhost)) {
-      const char *error = "unknown error";
-      SOCaddr bind_addr;
-
-      if (hts_dns_resolve2(opt, retour->req.proxy.bindhost,
-                             &bind_addr, &error) == NULL
-          || bind(soc, &SOCaddr_sockaddr(bind_addr), 
-                  SOCaddr_size(bind_addr)) != 0) {
-        htsblk_failf(
-            retour, "Unable to bind the specificied server address: %s", error);
-        deletesoc(soc);
+      if (newhttp_bind_resolve(opt, retour->req.proxy.bindhost, &bind_res) !=
+          HTS_DNS_OK) {
+        htsblk_failf(retour, HTS_DNS_BIND_PREFIX "%s",
+                     hts_dns_strerror(&bind_res));
         return INVALID_SOCKET;
       }
+      bind_dns = &bind_res;
     }
-    // structure: connexion au domaine internet, port 80 (ou autre)
-    SOCaddr_initport(server, port);
 
-    if (!socket_set_nonblocking(soc, HTS_TRUE)) {
-      const int last_errno = hts_socket_errno();
-      char errbuf[HTS_STRERROR_SIZE];
-
-      htsblk_failf(retour, "Non-blocking socket failed: %s",
-                   hts_strerror(last_errno, errbuf, sizeof(errbuf)));
-      deletesoc(soc);
-      return INVALID_SOCKET;
+    /* A first connect skips addresses it cannot bind for, and
+       back_connect_next() does the same for a fallback. */
+    strcpybuff(msg, retour->msg);
+    for (t = 0; t < tries && t < dns.count; t++) {
+      SOCaddr_copy_SOCaddr(server, dns.addr[(addr_index + t) % dns.count]);
+      soc = newhttp_open(opt, retour, &server, port, bind_dns, &bind_failed);
+      if (soc != INVALID_SOCKET || !bind_failed)
+        break;
+      hts_log_print(opt, LOG_DEBUG, "cannot bind for address %d/%d of %s",
+                    (addr_index + t) % dns.count + 1, dns.count, resolve_host);
     }
-    // Connexion au serveur lui même
-    HTS_STAT.last_connect = mtime_local();
-
-    // non-blocking: back_wait sees how the connect ended
-    (void) hts_socket_connect(soc, &SOCaddr_sockaddr(server),
-                              SOCaddr_size(server), will_bind ? NULL : opt);
-
-    // A partir de maintenant, on peut envoyer et recevoir des données
-    // via le flot identifié par soc (socket): write(soc,adr,taille) et
-    // read(soc,adr,taille)
+    if (soc != INVALID_SOCKET) {
+      // a skipped address must not leave its reason on a working connect
+      strcpybuff(retour->msg, msg);
+      if (skipped != NULL) {
+        *skipped = t;
+      }
+    }
 
   } else {                      // on doit ouvrir un fichier local!
     // il sera géré de la même manière qu'une socket (c'est idem!)

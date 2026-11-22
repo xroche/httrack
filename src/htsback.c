@@ -469,34 +469,59 @@ static void back_log_link(httrackp *opt, const lien_back *b, const char *what) {
 }
 
 /* Retry a stuck/failed connecting slot against its next resolved address.
-   Closes the current socket and starts a non-blocking connect to the next
-   candidate, leaving the slot in STATUS_CONNECTING. Returns 1 if a new connect
-   was started, 0 if no fallback address remains (caller fails the slot). */
-static int back_connect_next(httrackp *opt, struct_back *sback, int i) {
+   Returns 0 if the caller must fail the slot. Returns 1 if a new connect
+   started, or if keep_pending is set under -%b and no later address opens,
+   so the current connect keeps its timeout. */
+static int back_connect_next(httrackp *opt, struct_back *sback, int i,
+                             hts_boolean keep_pending) {
   hts_connect_fallback *const cf = &sback->connect_fallback[i];
   lien_back *const back = sback->lnk;
   const int next = cf->addr_index + 1;
+  // keep the pending connect only under -%b
+  const hts_boolean keep =
+      keep_pending && strnotempty(back[i].r.req.proxy.bindhost);
+  SOCaddr address;
+  const int address_size = back[i].r.address_size;
+  char msg[sizeof(back[i].r.msg)];
+  int skipped = 0;
   T_SOC soc;
 
   if (next >= cf->addr_count)
     return 0;
 
+  // close first, so a slot at the descriptor limit can still fall back
+  if (!keep && back[i].r.soc != INVALID_SOCKET) {
+    deletehttp(&back[i].r);
+  }
+  // save these, since a kept connect can still succeed
+  SOCaddr_copy_SOCaddr(address, back[i].r.address);
+  strcpybuff(msg, back[i].r.msg);
+  soc = newhttp_addrs(opt, back[i].url_adr, &back[i].r, -1,
+                      (cf->addr_first + next) % cf->addr_count,
+                      cf->addr_count - next, NULL, &skipped);
+  if (soc == INVALID_SOCKET) {
+    // ends the fallback wait, so the slot's own timeout can fire
+    cf->addr_index = cf->addr_count - 1;
+    if (!keep)
+      return 0;
+    // failing to open another address says nothing about the pending connect
+    SOCaddr_copy_SOCaddr(back[i].r.address, address);
+    back[i].r.address_size = address_size;
+    strcpybuff(back[i].r.msg, msg);
+    return 1;
+  }
+
   if (back[i].r.soc != INVALID_SOCKET) {
     deletehttp(&back[i].r);
   }
-  soc = newhttp_addr(opt, back[i].url_adr, &back[i].r, -1,
-                     (cf->addr_first + next) % cf->addr_count, NULL);
-  if (soc == INVALID_SOCKET)
-    return 0;
-
   back[i].r.soc = soc;
-  cf->addr_index = next;
+  cf->addr_index = next + skipped;
   if (back[i].timeout > 0)
     back_timeout_refresh(sback, i);
   back[i].status = STATUS_CONNECTING;
-  hts_log_print(opt, LOG_DEBUG,
-                "connect failed, trying next address (%d/%d) for %s", next + 1,
-                cf->addr_count, adr_nologin(opt, back[i].url_adr));
+  hts_log_print(
+      opt, LOG_DEBUG, "connect failed, trying next address (%d/%d) for %s",
+      cf->addr_index + 1, cf->addr_count, adr_nologin(opt, back[i].url_adr));
   return 1;
 }
 
@@ -2751,10 +2776,10 @@ static void back_dns_poll(httrackp *opt, struct_back *sback, const int p,
                           int *budget) {
   lien_back *const back = &sback->lnk[p];
   hts_connect_fallback *const cf = &sback->connect_fallback[p];
-  const char *error = NULL;
+  hts_dns_result dns;
   // no job left: resolved, and waiting for the pacing
   const int count =
-      cf->dns_job != NULL ? hts_dns_poll(opt, cf->dns_job, &error) : 1;
+      cf->dns_job != NULL ? hts_dns_poll(opt, cf->dns_job, &dns) : 1;
 
   if (count > 0) {
     back_dns_drop(sback, p);
@@ -2782,11 +2807,12 @@ static void back_dns_poll(httrackp *opt, struct_back *sback, const int p,
   if (count == HTS_DNS_PENDING &&
       (cf->dns_deadline == 0 || mtime_monotonic() < cf->dns_deadline))
     return;
-  if (count == HTS_DNS_PENDING)
-    error = "host name resolution timed out";
+  if (count == HTS_DNS_PENDING) {
+    memset(&dns, 0, sizeof(dns));
+    dns.status = HTS_DNS_TIMEOUT;
+  }
   back->r.statuscode = STATUSCODE_NON_FATAL;
-  htsblk_failf(&back->r, "Unable to get server's address: %s",
-               error != NULL ? error : "host name resolution failed");
+  htsblk_failf(&back->r, HTS_DNS_FAIL_PREFIX "%s", hts_dns_strerror(&dns));
   back_set_finished(opt, sback, p);
 }
 
@@ -3252,10 +3278,10 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
         sback->fetch[p] = *fetch;
         hts_fetch_through(opt, &sback->fetch[p], adr);
       }
-      // recopier proxy
+      // -%b binds every connection, direct or proxied
+      if (StringBuff(opt->proxy.bindhost) != NULL)
+        back[p].r.req.proxy.bindhost = StringBuff(opt->proxy.bindhost);
       if ((back[p].r.req.proxy.active = opt->proxy.active)) {
-        if (StringBuff(opt->proxy.bindhost) != NULL)
-          back[p].r.req.proxy.bindhost = StringBuff(opt->proxy.bindhost);
         if (StringBuff(opt->proxy.name) != NULL)
           back[p].r.req.proxy.name = StringBuff(opt->proxy.name);
         back[p].r.req.proxy.port = opt->proxy.port;
@@ -3881,7 +3907,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
           int first;
 
           cf->addr_count = hts_dns_resolve_all(opt, back[i].url_adr, scratch,
-                                               HTS_MAXADDRNUM, NULL);
+                                               HTS_MAXADDRNUM);
           // the first connect took the preferred address, so count from it
           first =
               hts_dns_addr_index(scratch, cf->addr_count, &back[i].r.address);
@@ -3903,7 +3929,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
         if (dispo) { // socket ready: connect() finished (ok or failed)
           // probe SO_ERROR and, on failure, fall back to the next address
           if (connect_socket_error(back[i].r.soc) != 0) {
-            if (!back_connect_next(opt, sback, i)) {
+            if (!back_connect_next(opt, sback, i, HTS_FALSE)) {
               back_slot_close_fail(opt, sback, i, STATUSCODE_CONNERROR,
                                    "Connect Error");
             }
@@ -5325,13 +5351,10 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               if (back_connect_fallback_due(cf->addr_index, cf->addr_count,
                                             act_ms - cf->timeout_since,
                                             back[i].timeout)) {
-                if (back_connect_next(opt, sback, i)) {
-                  continue; // reconnected to the next candidate
+                if (!back_connect_next(opt, sback, i, HTS_TRUE)) {
+                  back_slot_close_fail(opt, sback, i, STATUSCODE_CONNERROR,
+                                       "Connect Error");
                 }
-                // no socket could be opened, so stop rather than spin
-                back[i].r.soc = INVALID_SOCKET;
-                back_slot_fail(opt, sback, i, STATUSCODE_CONNERROR,
-                               "Connect Error");
                 continue;
               }
             }
