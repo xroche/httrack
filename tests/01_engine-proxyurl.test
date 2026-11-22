@@ -98,5 +98,14 @@ pa '@proxy:3128' 'auth=none'
 pa "u:$(printf 'a%.0s' $(seq 1 300))@proxy:3128" 'auth=len404'
 pa "u:$(printf 'a%.0s' $(seq 1 763))@proxy:3128" 'auth=len1020'
 pa "u:$(printf 'a%.0s' $(seq 1 764))@proxy:3128" 'auth=toolong'
+# only the scheme-less or http(s) form carries a login
+pa 'HTTPS:u:p@q@h' 'auth=dTpwQHE='
+pa '//u:p@h' 'auth=dTpw'
+pa 'file://u:p@h' 'auth=dTpw'
+pa ' http://u:p@h' 'auth=none'
+# an unknown scheme keeps the URL whole, so it has no login
+pa 'gopher://u:p@h/' 'auth=none'
+# two proxies in one call, one line each
+selftest_queue_lines $'auth=dTpw\nauth=none' proxyauth 'u:p@h' 'h'
 
 selftest_run_queued

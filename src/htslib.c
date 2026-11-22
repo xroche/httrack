@@ -4329,7 +4329,8 @@ int hts_basic_auth_value(httrackp *opt, const char *url, char *out,
      wider than bauth_chain.auth could not be stored for the child pages */
   if (idlen > (sizeof(((bauth_chain *) 0)->auth) - 1) / 4 * 3)
     return -1;
-  strncatbuff(user_pass, v.userinfo.p, (int) idlen);
+  memcpy(user_pass, v.userinfo.p, idlen);
+  user_pass[idlen] = '\0';
   strcpybuff(user_pass, unescape_http(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                                       user_pass));
   code64((unsigned char *) user_pass, (int) strlen(user_pass),
