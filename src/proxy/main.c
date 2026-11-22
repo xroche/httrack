@@ -31,7 +31,6 @@ Please visit our Website: http://www.httrack.com
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <ctype.h>
 #ifdef _WIN32
 #include <io.h>    /* _setmode, _fileno */
 #include <fcntl.h> /* _O_BINARY */

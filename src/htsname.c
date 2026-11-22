@@ -43,7 +43,6 @@ Please visit our Website: http://www.httrack.com
 #include "htscodec.h"
 #include "htszlib.h"
 #include "htsmirror.h"
-#include <ctype.h>
 #include <limits.h>
 
 #define MAX_EXT_LEN 12 /* longest tail kept across a cut, sans the dot */
@@ -792,7 +791,7 @@ static hts_boolean savename_walk_skipped(const httrackp *opt, int max_char,
   strcpybuff(node, first);
   return savename_collision_next(node, sizeof(node), opt, max_char, k,
                                  &regular) == k &&
-         strcasecmp(node, name) == 0;
+         hts_strcasecmp(node, name) == 0;
 }
 
 /* Sets ext from the user's --assume type for fil. Did it find one? */
@@ -1113,7 +1112,9 @@ int url_savename(lien_adrfilsave *const afs,
                 mime_from_file[0] = 0;
                 get_httptype_sized(opt, mime_from_file, sizeof(mime_from_file),
                                    fil, 1);
-                if (!strnotempty(mime_from_file) || strcasecmp(mime_type, mime_from_file) != 0) {       /* different mime for this type */
+                if (!strnotempty(mime_from_file) ||
+                    hts_strcasecmp(mime_type, mime_from_file) !=
+                        0) { /* different mime for this type */
                   /* type change not forbidden (or no extension at all) */
                   if (!may_unknown2(opt, mime_type, fil)) {
                     ext_chg = 1;

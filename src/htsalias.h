@@ -64,6 +64,13 @@ hts_boolean optcluster_next(const char *token, size_t *at, char *name,
 /* Reads the -%c rate at VAL. Returns the bytes it spans: the number, or the
    rest of the word when no usable rate is there, in which case *RATE is -1. */
 size_t optrate_read(const char *val, double *rate);
+/* Reads the whole --pause MIN[:MAX] at VAL. Returns how many numbers it read,
+   or 0 when a number is missing or junk follows. */
+HTS_CHECK_RESULT int optpause_read(const char *val, double *pmin, double *pmax);
+/* strtod() with a "." decimal point in any locale, rounding as it does up to 15
+   digits and 10^22. It reads no hex, inf or nan. end is set as strtod() sets
+   it. */
+double hts_strtod_c(const char *s, const char **end);
 const char *optreal_value(int p);
 const char *optalias_value(int p);
 

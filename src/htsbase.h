@@ -41,6 +41,7 @@ extern "C" {
 #include "htsglobal.h"
 #include "htsstrings.h"
 #include "htssafe.h"
+#include "htsctype.h"
 
 #include <string.h>
 #include <time.h>
@@ -76,17 +77,14 @@ extern "C" {
 #define Sleep(a) { if (((a)*1000)%1000000) usleep(((a)*1000)%1000000); if (((a)*1000)/1000000) sleep(((a)*1000)/1000000); }
 #endif
 
-/* hichar: ASCII uppercasing of one char. streql: case-insensitive equality of
-   two chars. ASCII only; not locale-aware. */
-#define hichar(a) ((((a)>='a') && ((a)<='z')) ? ((a)-('a'-'A')) : (a))
-
-/* lochar: ASCII lowercasing of one char. ASCII only; not locale-aware. */
-#define lochar(a) ((((a) >= 'A') && ((a) <= 'Z')) ? ((a) + ('a' - 'A')) : (a))
+/* Older names for the htsctype.h helpers. streql: case-insensitive equality of
+   two chars. */
+#define hichar(a) hts_toupper(a)
+#define lochar(a) hts_tolower(a)
 
 #define streql(a,b) (hichar(a)==hichar(b))
 
-/* True if c is an ASCII uppercase letter. */
-#define isUpperLetter(a) ( ((a) >= 'A') && ((a) <= 'Z') )
+#define isUpperLetter(a) hts_isupper(a)
 
 /* Created in the output directory to ask a running engine to stop and keep
    its work; Windows, which has no cross-process SIGTERM, has no other way. */

@@ -45,7 +45,6 @@ Please visit our Website: http://www.httrack.com
 /* specific definitions */
 #include "htsbase.h"
 #include "htslib.h"
-#include <ctype.h>
 #include <stdint.h>
 /* END specific definitions */
 
@@ -366,7 +365,7 @@ static const char *strjoker_impl(strjoker_memo *memo, const char *chaine,
               // hand-rolled, not sscanf("%d"): a rule off -%S may carry more
               // digits than an int holds, which is undefined there
               i++;
-              while (isdigit((unsigned char) joker[i])) {
+              while (hts_isdigit((unsigned char) joker[i])) {
                 if (lsize < 1000000000)
                   lsize = lsize * 10 + (joker[i] - '0');
                 i++;

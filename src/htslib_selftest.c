@@ -35,8 +35,11 @@ Please visit our Website: http://www.httrack.com
 #include "htsname.h"
 #include "htsfetch.h"
 #include "htspsl.h"
+#include "htsalias.h"
 
+#include <ctype.h>
 #include <limits.h>
+#include <locale.h>
 #include <stdint.h>
 #ifndef _WIN32
 #include <sys/wait.h> /* the forking sigterm self-test reaps its children */
@@ -3961,7 +3964,7 @@ static int cid_unescape(const char *cid, char *dest, const size_t size) {
         return 0;
       dest[j++] = (char) c;
       cid += 2;
-    } else if (isalnum((unsigned char) *cid)) {
+    } else if (hts_isalnum((unsigned char) *cid)) {
       dest[j++] = *cid;
     } else {
       return 0;
@@ -4458,7 +4461,227 @@ static int st_plugoom(httrackp *opt, int argc, char **argv) {
   return all ? 0 : 1;
 }
 
+/* The libc functions the htsctype.h helpers stand in for. */
+static const struct {
+  const char *name;
+  int (*libc)(int);
+  int (*hts)(int);
+  hts_boolean returns_char; /* rather than a yes/no */
+} st_ctype_pairs[] = {
+    {"isdigit", isdigit, hts_isdigit, HTS_FALSE},
+    {"isupper", isupper, hts_isupper, HTS_FALSE},
+    {"islower", islower, hts_islower, HTS_FALSE},
+    {"isalpha", isalpha, hts_isalpha, HTS_FALSE},
+    {"isalnum", isalnum, hts_isalnum, HTS_FALSE},
+    {"isxdigit", isxdigit, hts_isxdigit, HTS_FALSE},
+    {"isspace", isspace, hts_isspace, HTS_FALSE},
+    {"tolower", tolower, hts_tolower, HTS_TRUE},
+    {"toupper", toupper, hts_toupper, HTS_TRUE},
+};
+
+/* Does each helper give the "C" locale's answer for EOF and every byte? */
+static hts_boolean st_ctype_matches_c(void) {
+  hts_boolean ok = HTS_TRUE;
+  size_t i;
+  int c;
+
+  setlocale(LC_ALL, "C");
+  for (i = 0; i < sizeof(st_ctype_pairs) / sizeof(st_ctype_pairs[0]); i++) {
+    for (c = EOF; c <= 255; c++) {
+      const int want = st_ctype_pairs[i].libc(c),
+                got = st_ctype_pairs[i].hts(c);
+
+      if (st_ctype_pairs[i].returns_char ? want != got : !want != !got) {
+        printf("ctype C: %s(%d) is %d, libc says %d\n", st_ctype_pairs[i].name,
+               c, got, want);
+        ok = HTS_FALSE;
+      }
+    }
+    /* a negative char is undefined for libc: no class, case unchanged */
+    for (c = -128; c < EOF; c++) {
+      if (st_ctype_pairs[i].hts(c) !=
+          (st_ctype_pairs[i].returns_char ? c : 0)) {
+        printf("ctype C: %s(%d) is %d\n", st_ctype_pairs[i].name, c,
+               st_ctype_pairs[i].hts(c));
+        ok = HTS_FALSE;
+      }
+    }
+  }
+  return ok;
+}
+
+/* Does hts_strtod_c() round every value as the "C" locale's strtod() does? */
+static hts_boolean st_strtod_matches_c(void) {
+  static const char *const odd[] = {"1.005",
+                                    "0.123456789",
+                                    "1e22",
+                                    "0.07",
+                                    "123456789012345",
+                                    "9007199254740993",
+                                    "1e-5",
+                                    "86400.001",
+                                    "2.5E-3",
+                                    "-0.07",
+                                    "5e",
+                                    "-x",
+                                    "7e+2",
+                                    "0.07000000000000000000000",
+                                    "1000e22",
+                                    "123000e20"};
+  hts_boolean ok = HTS_TRUE;
+  char buf[32];
+  int n;
+
+  setlocale(LC_ALL, "C");
+  for (n = 0; n < 200000 + (int) (sizeof(odd) / sizeof(odd[0])); n++) {
+    const char *s = buf;
+
+    if (n < 100000)
+      snprintf(buf, sizeof(buf), "%d.%03d", n / 1000, n % 1000);
+    else if (n < 200000)
+      snprintf(buf, sizeof(buf), "0.%05d", n - 100000);
+    else
+      s = odd[n - 200000];
+    /* stored, so x87 compares doubles rather than 80-bit values */
+    volatile double got = hts_strtod_c(s, NULL), want = strtod(s, NULL);
+
+    if (got != want) {
+      printf("strtod C: %s reads %.17g, libc says %.17g\n", s, got, want);
+      ok = HTS_FALSE;
+    }
+  }
+  return ok;
+}
+
+/* Sun, 06 Nov 1994 08:49:37, the RFC 9110 example date. */
+static void st_locale_date(struct tm *tm) {
+  memset(tm, 0, sizeof(*tm));
+  tm->tm_year = 94;
+  tm->tm_mon = 10;
+  tm->tm_mday = 6;
+  tm->tm_wday = 0;
+  tm->tm_hour = 8;
+  tm->tm_min = 49;
+  tm->tm_sec = 37;
+}
+
+/* Prints which libc answers this locale changes, so the caller knows the
+   locale really took effect. */
+static void st_locale_libc_diverges(const char *name) {
+  struct tm tm;
+  char buf[256];
+  int c, high = 0;
+
+  printf("libc-diverges %s:", name);
+#ifdef _WIN32
+  if (_stricmp("I", "i") != 0 || toupper('i') != 'I')
+#else
+  if (strcasecmp("I", "i") != 0 || toupper('i') != 'I')
+#endif
+    printf(" case");
+  for (c = 0x80; c <= 0xff; c++)
+    high |= isalpha(c);
+  if (high)
+    printf(" isalpha");
+  if (strtod("0.5", NULL) != 0.5)
+    printf(" strtod");
+  st_locale_date(&tm);
+  if (strftime(buf, sizeof(buf), "%a %b", &tm) == 0 ||
+      strcmp(buf, "Sun Nov") != 0)
+    printf(" strftime");
+  printf("\n");
+}
+
+/* Prints a failed check of the engine under locale name, and clears *ok. */
+static void st_locale_check(hts_boolean *ok, const char *name, int cond,
+                            const char *what) {
+  if (!cond) {
+    printf("locale %s: FAIL %s\n", name, what);
+    *ok = HTS_FALSE;
+  }
+}
+
+/* Do the engine's own parsers and formatters ignore this locale? */
+static hts_boolean st_locale_engine_ok(const char *name) {
+  hts_boolean ok = HTS_TRUE;
+  struct tm tm;
+  char buf[256];
+  const char *end;
+  double rate, pmin, pmax;
+  int c;
+
+  st_locale_date(&tm);
+  time_rfc822(buf, &tm);
+  st_locale_check(&ok, name, strcmp(buf, "Sun, 06 Nov 1994 08:49:37 GMT") == 0,
+                  "time_rfc822");
+  st_locale_check(&ok, name, optrate_read("0.5", &rate) == 3 && rate == 0.5,
+                  "optrate_read");
+  st_locale_check(&ok, name,
+                  optpause_read("1.5:2.5", &pmin, &pmax) == 2 && pmin == 1.5 &&
+                      pmax == 2.5,
+                  "optpause_read");
+  st_locale_check(&ok, name,
+                  hts_strtod_c(" -2.5e1x", &end) == -25 && *end == 'x',
+                  "hts_strtod_c");
+  st_locale_check(&ok, name,
+                  optpause_read(" 5:10 ", &pmin, &pmax) == 2 &&
+                      optpause_read("5", &pmin, &pmax) == 1 &&
+                      optpause_read("5:", &pmin, &pmax) == 0 &&
+                      optpause_read("5x", &pmin, &pmax) == 0 &&
+                      optpause_read("0x10", &pmin, &pmax) == 0,
+                  "optpause_read junk");
+  st_locale_check(&ok, name,
+                  optrate_read("0x5", &rate) == 3 && rate == -1 &&
+                      optrate_read("5x", &rate) == 1 && rate == 5 &&
+                      optrate_read("10x", &rate) == 2 && rate == 10 &&
+                      optrate_read("x", &rate) == 1 && rate == -1 &&
+                      optrate_read("1.0x", &rate) == 3 && rate == 1,
+                  "optrate_read hex");
+  st_locale_check(&ok, name,
+                  hts_strcasecmp("INDEX.HTML", "index.html") == 0 &&
+                      hts_strncasecmp("Iz", "iy", 1) == 0 &&
+                      hts_strcasecmp("\xc9", "\xe9") != 0,
+                  "hts_strcasecmp");
+  for (c = 0x80; c <= 0xff; c++)
+    st_locale_check(&ok, name, !hts_isalpha(c) && hts_toupper(c) == c,
+                    "high byte");
+  st_locale_check(&ok, name, hts_toupper('i') == 'I' && hts_tolower('I') == 'i',
+                  "dotless i");
+  return ok;
+}
+
+/* Runs the engine's text handling under each named locale, as a host that
+   calls setlocale() would. */
+static int st_locale(httrackp *opt, int argc, char **argv) {
+  hts_boolean ok = st_ctype_matches_c();
+  int i;
+
+  (void) opt;
+  if (ok)
+    printf("ctype C: ok\n");
+  if (st_strtod_matches_c())
+    printf("strtod C: ok\n");
+  else
+    ok = HTS_FALSE;
+  ok = st_locale_engine_ok("C") && ok;
+  for (i = 0; i < argc; i++) {
+    if (setlocale(LC_ALL, argv[i]) == NULL) {
+      printf("locale %s: unavailable\n", argv[i]);
+      continue;
+    }
+    st_locale_libc_diverges(argv[i]);
+    if (st_locale_engine_ok(argv[i]))
+      printf("locale %s: ok\n", argv[i]);
+    else
+      ok = HTS_FALSE;
+  }
+  setlocale(LC_ALL, "C");
+  return ok ? 0 : 1;
+}
+
 const struct selftest_entry selftests_lib[] = {
+    {"locale", "<locale>...", "text handling ignores the locale a host may set",
+     st_locale},
     {"plugoom", "<module>", "a module that cannot be recorded is unplugged",
      st_plugoom},
     {"libhandlesoom", "", "a module that cannot be recorded changes nothing",

@@ -555,11 +555,12 @@ static int PT_GetType(const char *filename) {
   char *dot = strrchr(filename, '.');
 
   if (dot != NULL) {
-    if (strcasecmp(dot, ".zip") == 0) {
+    if (hts_strcasecmp(dot, ".zip") == 0) {
       return PT_CACHE__NEW;
-    } else if (strcasecmp(dot, ".ndx") == 0 || strcasecmp(dot, ".dat") == 0) {
+    } else if (hts_strcasecmp(dot, ".ndx") == 0 ||
+               hts_strcasecmp(dot, ".dat") == 0) {
       return PT_CACHE__OLD;
-    } else if (strcasecmp(dot, ".arc") == 0) {
+    } else if (hts_strcasecmp(dot, ".arc") == 0) {
       return PT_CACHE__ARC;
     }
   }
@@ -1001,7 +1002,7 @@ static void PT_resolve_previous_save(char *dst, size_t size, const char *root,
   }
   // relative ? (hack)
   else if (*safeCache || (save[0] != '/' // /home/foo/bar.gif
-                          && (!isalpha((unsigned char) save[0]) ||
+                          && (!hts_isalpha((unsigned char) save[0]) ||
                               save[1] != ':')) // c:/home/foo/bar.gif
   ) {
     if (!index_join_root(dst, size, root, save)) {
@@ -2140,11 +2141,11 @@ static hts_boolean arcHasRecordShape(const char *line) {
   int last;
   int i;
 
-  if (!isalpha((unsigned char) line[0]))
+  if (!hts_isalpha((unsigned char) line[0]))
     return HTS_FALSE;
   for (i = 0; line[i] != ':'; i++) {
-    if (!isalnum((unsigned char) line[i]) && line[i] != '+' && line[i] != '-' &&
-        line[i] != '.')
+    if (!hts_isalnum((unsigned char) line[i]) && line[i] != '+' &&
+        line[i] != '-' && line[i] != '.')
       return HTS_FALSE;
   }
   if (line[i + 1] == '\0' || line[i + 1] == ARC_SP)
@@ -2179,15 +2180,15 @@ static hts_boolean arcMayOpenRecord(const char *raw, size_t len) {
 
   for (i = 0; i < len && arcDroppedByte(raw[i]); i++)
     ;
-  if (i == len || !isalpha((unsigned char) raw[i]))
+  if (i == len || !hts_isalpha((unsigned char) raw[i]))
     return HTS_FALSE;
   for (; i < len; i++) {
     if (raw[i] == ':')
       return HTS_TRUE;
     if (arcDroppedByte(raw[i]))
       continue;
-    if (!isalnum((unsigned char) raw[i]) && raw[i] != '+' && raw[i] != '-' &&
-        raw[i] != '.')
+    if (!hts_isalnum((unsigned char) raw[i]) && raw[i] != '+' &&
+        raw[i] != '-' && raw[i] != '.')
       return HTS_FALSE;
   }
   return HTS_FALSE;

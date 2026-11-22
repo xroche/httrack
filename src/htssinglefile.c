@@ -41,7 +41,6 @@ Please visit our Website: http://www.httrack.com
 #include "htstools.h"
 #include "htswizard.h"
 
-#include <ctype.h>
 #include <stdint.h>
 #include <stdlib.h>
 
@@ -190,7 +189,7 @@ static int sf_rel_is_stylesheet(const char *tag_name) {
       while (j < len && !is_space(value[j]))
         j++;
       if (j - start == want &&
-          strncasecmp(value + start, "stylesheet", want) == 0)
+          hts_strncasecmp(value + start, "stylesheet", want) == 0)
         return 1;
     }
     return 0;
@@ -350,7 +349,7 @@ static hts_boolean sf_resolve(const sf_ctx *ctx, const char *base_dir,
     if (c == ':')
       return HTS_FALSE;
     if (sf_is_sep(c) ||
-        (!isalnum((unsigned char) c) && c != '+' && c != '.' && c != '-'))
+        (!hts_isalnum((unsigned char) c) && c != '+' && c != '.' && c != '-'))
       break;
   }
   memcpy(raw, ref, n);
@@ -677,7 +676,7 @@ static size_t sf_parse_mark(const char *intro, size_t introlen, const char *p,
         0)
       return 0;
     for (k = sizeof(SINGLEFILE_MARK_INTRO) - 1; k < introlen; k++) {
-      if (!isxdigit((unsigned char) p[k]))
+      if (!hts_isxdigit((unsigned char) p[k]))
         return 0;
     }
   }

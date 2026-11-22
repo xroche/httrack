@@ -39,7 +39,6 @@ HTS_STATIC_ASSERT(sizeof(HTS_WIZARD_FILTER_SUFFIX) <= HTS_FILTER_SUFFIX_MAX,
 
 /* specific definitions */
 #include "htsbase.h"
-#include <ctype.h>
 #include <limits.h>
 /* END specific definitions */
 
@@ -132,8 +131,9 @@ int hts_acceptlink(httrackp *opt, int ptr, const char *adr, const char *fil,
 hts_boolean hts_cmp_tag_token(const char *tag, const char *cmp) {
   int p;
 
-  return (tag != NULL && strncasecmp(tag, cmp, (p = (int) strlen(cmp))) == 0 &&
-          !isalnum((unsigned char) tag[p]))
+  return (tag != NULL &&
+          hts_strncasecmp(tag, cmp, (p = (int) strlen(cmp))) == 0 &&
+          !hts_isalnum((unsigned char) tag[p]))
              ? HTS_TRUE
              : HTS_FALSE;
 }
@@ -177,7 +177,7 @@ int hts_wizard_parse_reply(const char *s) {
 
   if (!strnotempty(s))
     return 0;
-  if (isdigit((unsigned char) *s))
+  if (hts_isdigit((unsigned char) *s))
     return hts_scan_llint(&s, 0, INT_MAX, &v) == HTS_SCAN_OK ? (int) v : -999;
   return *s == '*' ? -1 : -999;
 }

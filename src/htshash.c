@@ -74,7 +74,7 @@ static int key_sav_equals(void *arg,
                           coucal_key_const b_) {
   const char *const a = (const char*) a_;
   const char *const b = (const char*) b_;
-  return strcasecmp(a, b) == 0;
+  return hts_strcasecmp(a, b) == 0;
 }
 
 static const char* key_sav_debug_print(void *arg,
@@ -177,7 +177,7 @@ static int key_adrfil_equals_(hash_struct *hash, const char *a_canon,
 
   assertf(ja != NULL);
   assertf(jb != NULL);
-  if (strcasecmp(ja, jb) != 0) {
+  if (hts_strcasecmp(ja, jb) != 0) {
     return 0;
   }
 
@@ -507,7 +507,8 @@ void hash_write(hash_struct * hash, size_t lpos) {
     savename_owner_key(key, sizeof(key), link->adr, link->fil);
     if (!coucal_read(hash->savename_owner, key, &prev))
       coucal_write(hash->savename_owner, key, (intptr_t) lpos);
-    else if (prev >= 0 && strcasecmp((*hash->liens)[prev]->sav, link->sav) != 0)
+    else if (prev >= 0 &&
+             hts_strcasecmp((*hash->liens)[prev]->sav, link->sav) != 0)
       coucal_write(hash->savename_owner, key, (intptr_t) -2);
   }
 

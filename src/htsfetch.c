@@ -38,7 +38,8 @@ Please visit our Website: http://www.httrack.com
 
 static hts_boolean span_eq(const char *a, size_t alen, const char *b,
                            size_t blen) {
-  return alen == blen && strncasecmp(a, b, alen) == 0 ? HTS_TRUE : HTS_FALSE;
+  return alen == blen && hts_strncasecmp(a, b, alen) == 0 ? HTS_TRUE
+                                                          : HTS_FALSE;
 }
 
 /* Find attribute name in the start tag at tag_name. On a match, *value and
@@ -90,7 +91,7 @@ static hts_boolean tag_attr_find_end(const char *tag_name, const char *name,
         *len = (size_t) (p - *value);
       }
     }
-    if (nlen == want && strncasecmp(n, name, want) == 0)
+    if (nlen == want && hts_strncasecmp(n, name, want) == 0)
       return HTS_TRUE;
   }
 }
@@ -112,7 +113,7 @@ static hts_boolean has_token(const char *s, size_t len, const char *token) {
       i++;
     for (start = i; i < len && !is_realspace(s[i]); i++)
       ;
-    if (i - start == want && strncasecmp(s + start, token, want) == 0)
+    if (i - start == want && hts_strncasecmp(s + start, token, want) == 0)
       return HTS_TRUE;
   }
   return HTS_FALSE;
@@ -125,7 +126,7 @@ static hts_boolean tag_attr_is(const char *tag_name, const char *name,
   size_t len;
 
   return tag_attr_find(tag_name, name, &value, &len) && len == strlen(word) &&
-                 strncasecmp(value, word, len) == 0
+                 hts_strncasecmp(value, word, len) == 0
              ? HTS_TRUE
              : HTS_FALSE;
 }
@@ -155,7 +156,7 @@ static hts_boolean fil_ext_in(const char *fil, const char *const *exts) {
   for (i = 0; exts[i] != NULL; i++) {
     const size_t n = strlen(exts[i]);
 
-    if ((size_t) (end - dot) == n && strncasecmp(dot, exts[i], n) == 0)
+    if ((size_t) (end - dot) == n && hts_strncasecmp(dot, exts[i], n) == 0)
       return HTS_TRUE;
   }
   return HTS_FALSE;
@@ -315,8 +316,8 @@ void hts_fetch_classify(hts_fetch_meta *fm, hts_fetch_tag *tag,
     for (i = 0; i < sizeof(rules) / sizeof(rules[0]); i++) {
       if ((rules[i].tag == NULL ||
            hts_cmp_tag_token(tag->name, rules[i].tag)) &&
-          strncasecmp(attr, rules[i].attr, strlen(rules[i].attr)) == 0 &&
-          !isalnum((unsigned char) attr[strlen(rules[i].attr)]) &&
+          hts_strncasecmp(attr, rules[i].attr, strlen(rules[i].attr)) == 0 &&
+          !hts_isalnum((unsigned char) attr[strlen(rules[i].attr)]) &&
           attr[strlen(rules[i].attr)] != '-') {
         fm->dest = (unsigned char) rules[i].dest;
         break;
@@ -413,7 +414,7 @@ static const char *site_key(const fetch_origin *o, size_t *len) {
   /* A browser reads "0x7f.0.0.1" as IPv4, and no TLD starts with a digit. */
   for (i = n; i > 0 && o->host[i - 1] != '.'; i--)
     ;
-  if (i < n && isdigit((unsigned char) o->host[i]))
+  if (i < n && hts_isdigit((unsigned char) o->host[i]))
     return o->host;
   {
     const char *const key = psl_site_key(o, n, len);
