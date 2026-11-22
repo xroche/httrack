@@ -2,7 +2,8 @@
 """Fail on new ctype calls without an (unsigned char) cast, unsafe function-like
 macros, and header functions that can fail without HTS_CHECK_RESULT.
 Known cases live in tools/api-lint/, and --update rewrites those baselines.
-Known limits: tail-call failures and free names inside _Generic go unreported.
+Known limits: tail-call failures, free names inside _Generic, and a function
+defined only in a later branch of an unbalanced #if group go unreported.
 """
 
 import argparse
