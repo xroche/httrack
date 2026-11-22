@@ -508,6 +508,16 @@ static hts_boolean header_is(hts_span line, const char *name) {
              hts_span_of(":"));
 }
 
+/* Read the next line of the header block *REST into *LINE, minus one CR.
+   Return FALSE at the end of *REST or at the blank line that ends the block. */
+static hts_boolean header_next(hts_span *rest, hts_span *line) {
+  if (!hts_span_next_in(rest, '\n', line))
+    return HTS_FALSE;
+  if (hts_span_ends_with(*line, hts_span_of("\r")))
+    line->len--;
+  return !hts_span_empty(*line);
+}
+
 /* Build the normalized HTTP header block from raw resp_hdr into out (no
    trailing CRLF terminator). Always drops the hop-by-hop Transfer-Encoding.
    When set_cl>=0 (a body is stored), drops the original Content-Length and
@@ -516,17 +526,12 @@ static hts_boolean header_is(hts_span line, const char *name) {
    sent. Returns 0. */
 static int normalize_http_headers(const char *resp_hdr, long long set_cl,
                                   wbuf *out) {
-  hts_span all, line;
-  const char *cur;
+  hts_span rest, line;
   int first = 1;
   if (resp_hdr == NULL)
     return -1;
-  all = hts_span_of(resp_hdr);
-  for (cur = all.p; hts_span_next(&cur, all.p + all.len, '\n', &line);) {
-    if (hts_span_ends_with(line, hts_span_of("\r")))
-      line.len--; /* Strip the CR, which is re-added below. */
-    if (hts_span_empty(line))
-      break; /* blank line: end of headers */
+  rest = hts_span_of(resp_hdr);
+  while (header_next(&rest, &line)) {
     if (first) {
       first = 0; /* status line: keep verbatim */
     } else if (header_is(line, "Transfer-Encoding")) {
@@ -704,20 +709,15 @@ static int cdx_json_str(wbuf *b, const char *s) {
 /* see htswarc.h */
 void warc_http_header_value(const char *hdr, const char *name, char *out,
                             size_t outsz) {
-  hts_span all, line, n;
-  const char *cur;
+  hts_span rest, line, n;
   if (outsz == 0)
     return;
   out[0] = '\0';
   if (hdr == NULL)
     return;
-  all = hts_span_of(hdr);
+  rest = hts_span_of(hdr);
   n = hts_span_of(name);
-  for (cur = all.p; hts_span_next(&cur, all.p + all.len, '\n', &line);) {
-    if (hts_span_ends_with(line, hts_span_of("\r")))
-      line.len--;
-    if (hts_span_empty(line))
-      break; /* end of headers */
+  while (header_next(&rest, &line)) {
     if (hts_span_starts_with_ci(line, n) &&
         hts_span_starts_with(hts_span_skip(line, n.len), hts_span_of(":"))) {
       hts_span v = hts_span_trim(hts_span_skip(line, n.len + 1), " \t", "");

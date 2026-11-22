@@ -98,16 +98,14 @@ hts_span hts_span_of(const char *s) {
   return hts_span_at(s, strlen(s));
 }
 
-hts_boolean hts_span_next(const char **cur, const char *end, char sep,
-                          hts_span *out) {
-  const char *const start = *cur;
+hts_boolean hts_span_next_in(hts_span *rest, char sep, hts_span *field) {
   const char *stop;
 
-  if (start >= end)
+  if (hts_span_empty(*rest))
     return HTS_FALSE;
-  stop = memchr(start, sep, (size_t) (end - start));
-  *out = hts_span_between(start, stop != NULL ? stop : end);
-  *cur = stop != NULL ? stop + 1 : end;
+  stop = memchr(rest->p, sep, rest->len);
+  *field = stop != NULL ? hts_span_between(rest->p, stop) : *rest;
+  *rest = hts_span_skip(*rest, field->len + (stop != NULL ? 1 : 0));
   return HTS_TRUE;
 }
 

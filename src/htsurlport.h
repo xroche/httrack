@@ -90,11 +90,11 @@ hts_span hts_span_trim(hts_span s, const char *left, const char *right);
    and leave both unchanged when S holds no C. */
 hts_boolean hts_span_split(hts_span s, char c, hts_span *head, hts_span *tail);
 
-/* Read the next field of [*cur, end) up to SEP into *out, and move *cur past
-   SEP. Return FALSE once *cur reaches END, so "a," yields only "a". After a
-   TRUE return, [out->p, *cur) is the field plus the SEP it ended on, if any. */
-hts_boolean hts_span_next(const char **cur, const char *end, char sep,
-                          hts_span *out);
+/* Read the field of *REST up to SEP into *FIELD and shrink *REST past that SEP.
+   Return FALSE once *REST is empty, so "" yields nothing and "a," yields only
+   "a". After a TRUE return, [field->p, rest->p) is the field plus its SEP. */
+HTS_CHECK_RESULT hts_boolean hts_span_next_in(hts_span *rest, char sep,
+                                              hts_span *field);
 
 /* Does S hold no bytes? Its pointer does not matter. */
 hts_boolean hts_span_empty(hts_span s);

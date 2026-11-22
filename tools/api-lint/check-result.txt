@@ -198,7 +198,6 @@ src/htsurlport.h: hts_header_param
 src/htsurlport.h: hts_parse_llint
 src/htsurlport.h: hts_parse_url_port
 src/htsurlport.h: hts_span_copy
-src/htsurlport.h: hts_span_next
 src/htsurlport.h: hts_span_split
 src/htsurlport.h: hts_status_reason
 src/htswarc.h: warc_normalized_headers

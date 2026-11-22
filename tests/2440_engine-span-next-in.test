@@ -1,0 +1,14 @@
+#!/bin/bash
+#
+# hts_span_next_in yields each field and shrinks the rest to what follows it.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+selftest_queue "[a|,b,][|b,][b|]" span nextin , "a,,b,"
+selftest_queue "[|]" span nextin , ","
+selftest_queue "[a|]" span nextin , "a"
+
+selftest_run_queued
