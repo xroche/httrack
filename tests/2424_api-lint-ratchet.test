@@ -23,6 +23,7 @@ grep -qF "only 0 sources" <<<"${out}" || fail "no source-count error: ${out}"
 
 cp -R "${srcdir}/src" "${work}/src"
 cp -R "${srcdir}/tools/api-lint" "${work}/baseline"
+chmod -R u+w "${work}"
 run() {
     "${python}" "${lint}" --root "${work}" --baseline-dir "${work}/baseline"
 }
