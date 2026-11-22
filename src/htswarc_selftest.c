@@ -634,22 +634,21 @@ static int st_warc_surt(httrackp *opt, int argc, char **argv) {
       {"http://example.com/d\xed\xa0\x80z", "com,example)/d%ED%A0%80z"},
       {"http://example.com/tr\xe2\x82", "com,example)/tr%E2%82"},
       {"http://ex\xe9.com/", "com,ex%E9)/"},
+      {"http://user:pass@www.Example.com:80/a?q=1#f", "com,example)/a?q=1"},
+      {"https://[2001:db8::1]:443/x", "[2001:db8::1])/x"},
+      {"ftp://1.2.3.4:21/p", "1.2.3.4:21)/p"},
+      {"http://[::FFFF:1.2.3.4]:8080/v", "[::ffff:1.2.3.4]:8080)/v"},
+      {"https://www3.a.b:8443/c", "b,a:8443)/c"},
+      /* These split as the URL view does, which changed their SURT. */
+      {"http://h\\x@y/z", "h)\\x@y/z"},
+      {"http://a\\b/c", "a)\\b/c"},
+      {"http://[::1]x/p", "[::1]x)/p"},
+      {"h/x?u=http://a/b", "h)/x?u=http://a/b"},
+      {"http:h/x", "h)/x"},
   };
 
   int err = 0;
   size_t i;
-  // with arguments, print the SURT of each
-  if (argc > 0) {
-    int k;
-    for (k = 0; k < argc; k++) {
-      char out[4096];
-      if (warc_surt(argv[k], out, sizeof(out)) == 0)
-        printf("surt=%s\n", out);
-      else
-        printf("surt-error\n");
-    }
-    return 0;
-  }
   for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
     char out[512];
     if (warc_surt(cases[i].url, out, sizeof(out)) != 0 ||
@@ -2526,7 +2525,7 @@ const struct selftest_entry selftests_warc[] = {
      st_warc_rotate},
     {"warc-verbatim", "<dir>", "verbatim compressed response body (default)",
      st_warc_verbatim},
-    {"warc-surt", "[url...]", "SURT canonicalization of the CDXJ sort key",
+    {"warc-surt", "", "SURT canonicalization of the CDXJ sort key",
      st_warc_surt},
     {"warc-offset", "<dir>", "the CDXJ record offset stays 64-bit past 2GB",
      st_warc_offset},
