@@ -707,14 +707,14 @@ static int ftp_wait_left(const httrackp *opt, int timeout) {
 static hts_boolean ftp_connect(lien_back *back, T_SOC soc, SOCaddr *server,
                                int timeout, const httrackp *opt) {
   const TStamp started = mtime_monotonic();
+  hts_boolean pending;
 
   timeout = ftp_wait_left(opt, timeout);
   if (!socket_set_nonblocking(soc, HTS_TRUE))
     return HTS_FALSE;
-  if (hts_socket_connect(soc, &SOCaddr_sockaddr(*server), SOCaddr_size(*server),
-                         opt) != 0) {
-    if (!hts_socket_connect_pending())
-      return HTS_FALSE;
+  if (!hts_socket_connect_started(soc, server, opt, &pending))
+    return HTS_FALSE;
+  if (pending) {
     int ready;
 
     /* state.stop counts here, unlike in the waits below: a mirror the user

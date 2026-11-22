@@ -2530,6 +2530,17 @@ int hts_socket_connect(T_SOC soc, const struct sockaddr *addr, SOClen len,
   return connect(soc, addr, len);
 }
 
+hts_boolean hts_socket_connect_started(T_SOC soc, const SOCaddr *server,
+                                       const httrackp *opt,
+                                       hts_boolean *pending) {
+  const hts_boolean wait = hts_socket_connect(soc, &SOCaddr_sockaddr(*server),
+                                              SOCaddr_size(*server), opt) != 0;
+
+  if (pending != NULL)
+    *pending = wait;
+  return !wait || hts_socket_connect_pending();
+}
+
 hts_boolean hts_socket_is_mptcp(T_SOC soc) {
 #if HTS_INET_MPTCP_INFO
   struct mptcp_info info;
@@ -2583,18 +2594,19 @@ static hts_dns_status newhttp_bind_resolve(httrackp *opt, const char *host,
   return hts_dns_resolve(opt, host, opt->timeout, &opt->state.stop, res);
 }
 
-/* Open a non-blocking connect to *server, from the first bind_dns address of
-   its family that binds. On failure, set retour's message and *bind_failed. */
+/* Open a non-blocking connect to *server from the first bind_dns address of
+   its family that binds. On failure, set retour's message, and set *try_next
+   when the next address may work. */
 static T_SOC newhttp_open(httrackp *opt, htsblk *retour, SOCaddr *server,
                           int port, const hts_dns_result *bind_dns,
-                          hts_boolean *bind_failed) {
+                          hts_boolean *try_next) {
   const int family = SOCaddr_sinfamily(*server);
   const SOCaddr *local = NULL;
   T_SOC soc = INVALID_SOCKET;
   int i;
 
   assertf(retour != NULL);
-  *bind_failed = HTS_FALSE;
+  *try_next = HTS_FALSE;
   // make a copy for external clients
   SOCaddr_copy_SOCaddr(retour->address, *server);
   retour->address_size = SOCaddr_size(retour->address);
@@ -2627,7 +2639,7 @@ static T_SOC newhttp_open(httrackp *opt, htsblk *retour, SOCaddr *server,
       htsblk_failf(retour, HTS_DNS_BIND_PREFIX "%s",
                    "no address of the server's family");
     if (soc == INVALID_SOCKET && local == NULL) {
-      *bind_failed = HTS_TRUE;
+      *try_next = HTS_TRUE;
       return INVALID_SOCKET;
     }
   } else {
@@ -2655,9 +2667,18 @@ static T_SOC newhttp_open(httrackp *opt, htsblk *retour, SOCaddr *server,
   }
   HTS_STAT.last_connect = mtime_local();
 
-  // non-blocking: back_wait sees how the connect ended
-  (void) hts_socket_connect(soc, &SOCaddr_sockaddr(*server),
-                            SOCaddr_size(*server), local != NULL ? NULL : opt);
+  // non-blocking: back_wait sees how a pending connect ended
+  if (!hts_socket_connect_started(soc, server, local != NULL ? NULL : opt,
+                                  NULL)) {
+    const int last_errno = hts_socket_errno();
+    char errbuf[HTS_STRERROR_SIZE];
+
+    htsblk_failf(retour, "Connect error: %s",
+                 hts_strerror(last_errno, errbuf, sizeof(errbuf)));
+    deletesoc(soc);
+    *try_next = HTS_TRUE;
+    return INVALID_SOCKET;
+  }
   return soc;
 }
 
@@ -2682,7 +2703,7 @@ T_SOC newhttp_addrs(httrackp *opt, const char *_iadr, htsblk *retour, int port,
     SOCaddr server;
     hts_dns_result dns, bind_res;
     const hts_dns_result *bind_dns = NULL;
-    hts_boolean bind_failed = HTS_FALSE;
+    hts_boolean try_next = HTS_FALSE;
     char msg[sizeof(retour->msg)];
     int t;
 
@@ -2757,16 +2778,17 @@ T_SOC newhttp_addrs(httrackp *opt, const char *_iadr, htsblk *retour, int port,
       bind_dns = &bind_res;
     }
 
-    /* A first connect skips addresses it cannot bind for, and
-       back_connect_next() does the same for a fallback. */
+    /* A first connect skips addresses it cannot bind for or connect to at
+       once, and back_connect_next() does the same for a fallback. */
     strcpybuff(msg, retour->msg);
     for (t = 0; t < tries && t < dns.count; t++) {
       SOCaddr_copy_SOCaddr(server, dns.addr[(addr_index + t) % dns.count]);
-      soc = newhttp_open(opt, retour, &server, port, bind_dns, &bind_failed);
-      if (soc != INVALID_SOCKET || !bind_failed)
+      soc = newhttp_open(opt, retour, &server, port, bind_dns, &try_next);
+      if (soc != INVALID_SOCKET || !try_next)
         break;
-      hts_log_print(opt, LOG_DEBUG, "cannot bind for address %d/%d of %s",
-                    (addr_index + t) % dns.count + 1, dns.count, resolve_host);
+      hts_log_print(opt, LOG_DEBUG, "skipping address %d/%d of %s: %s",
+                    (addr_index + t) % dns.count + 1, dns.count, resolve_host,
+                    retour->msg);
     }
     if (soc != INVALID_SOCKET) {
       // a skipped address must not leave its reason on a working connect
