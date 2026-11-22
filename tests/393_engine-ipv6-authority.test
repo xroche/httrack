@@ -43,6 +43,13 @@ selftest_queue 'adr=u:p fil=/?w@h:8080' identurl 'http://u:p?w@h:8080'
 toport 'u:p%3Fw@h:8080' ':8080'
 # no ']' to end the literal: no port, and the host lookup rejects it
 toport 'https://[::1:8080' '(none)'
+# a stray ']' or text after the literal gives no port to a bracketed host
+toport '[::1]x:8' '(none)'
+toport '[::1]:8]:9' ':8]:9'
+toport 'a:b]' ':b]'
+# an unknown scheme and a bare file:// keep their old port
+toport 'gopher://h:8/' '://h:8/'
+toport 'file://' '://'
 
 ftpaddr() { selftest_queue "$2" ftpaddr "$1"; }
 
