@@ -471,14 +471,14 @@ static void back_log_link(httrackp *opt, const lien_back *b, const char *what) {
 
 /* Retry a stuck/failed connecting slot against its next resolved address.
    Returns 0 if the caller must fail the slot. Returns 1 if a new connect
-   started, or if keep_pending is set and -%b binds no other address, so the
-   current connect keeps its timeout. */
+   started, or if keep_pending is set under -%b and no later address opens,
+   so the current connect keeps its timeout. */
 static int back_connect_next(httrackp *opt, struct_back *sback, int i,
                              hts_boolean keep_pending) {
   hts_connect_fallback *const cf = &sback->connect_fallback[i];
   lien_back *const back = sback->lnk;
   const int next = cf->addr_index + 1;
-  // only -%b can fail every candidate while the current connect is still fine
+  // keep the pending connect only under -%b
   const hts_boolean keep =
       keep_pending && strnotempty(back[i].r.req.proxy.bindhost);
   SOCaddr address;
@@ -494,7 +494,7 @@ static int back_connect_next(httrackp *opt, struct_back *sback, int i,
   if (!keep && back[i].r.soc != INVALID_SOCKET) {
     deletehttp(&back[i].r);
   }
-  // the kept connect may still succeed and set the preferred address
+  // save these, since a kept connect can still succeed
   SOCaddr_copy_SOCaddr(address, back[i].r.address);
   strcpybuff(msg, back[i].r.msg);
   soc = newhttp_addrs(opt, back[i].url_adr, &back[i].r, -1,
@@ -505,8 +505,7 @@ static int back_connect_next(httrackp *opt, struct_back *sback, int i,
     cf->addr_index = cf->addr_count - 1;
     if (!keep)
       return 0;
-    /* Any failure keeps the pending connect: a bind, a -%b resolve or a
-       socket() failure says nothing about it. */
+    // failing to open another address says nothing about the pending connect
     SOCaddr_copy_SOCaddr(back[i].r.address, address);
     back[i].r.address_size = address_size;
     strcpybuff(back[i].r.msg, msg);
