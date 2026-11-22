@@ -216,15 +216,8 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
 
   } // test news: etc.
 
-  // case insensitive pour adresse
-  {
-    char *a = jump_identification(adrfil->adr);
-
-    while(*a) {
-      *a = lochar(*a);
-      a++;
-    }
-  }
+  // host names are case-insensitive
+  hts_lowcase(jump_identification(adrfil->adr));
 
   // IDNA / RFC 3492 (Punycode) handling for HTTP(s)
   if (!link_has_authority(adrfil->adr) || strfield(adrfil->adr, "https:")) {
@@ -725,8 +718,8 @@ static int sortTopIndexFnc(const void *a_, const void *b_) {
 
   /* Category first, then name */
   if ((cmp = (*a)->level - (*b)->level) == 0) {
-    if ((cmp = strcmpnocase((*a)->category, (*b)->category)) == 0) {
-      cmp = strcmpnocase((*a)->name, (*b)->name);
+    if ((cmp = hts_strcasecmp((*a)->category, (*b)->category)) == 0) {
+      cmp = hts_strcasecmp((*a)->name, (*b)->name);
     }
   }
   return cmp;

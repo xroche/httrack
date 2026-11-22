@@ -262,7 +262,7 @@ static hts_boolean is_wizard_pane(const char *file) {
   if (strfield(file, "server/") == 0)
     return HTS_FALSE;
   page = skip_separators(file + 7);
-  return strcmpnocase(page, "about.html") != 0;
+  return hts_strcasecmp(page, "about.html") != 0;
 }
 
 static void sig_brpipe(int code) {

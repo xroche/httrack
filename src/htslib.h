@@ -736,7 +736,6 @@ void hts_parse_proxy(const char *arg, char *name, size_t name_size, int *port);
 void code64(unsigned char *a, int size_a, unsigned char *b, int crlf);
 
 char *convtolower(char *catbuff, size_t catbuffsize, const char *a);
-void hts_lowcase(char *s);
 int multipleStringMatch(const char *s, const char *match);
 
 /* Writes a header block to fp, each line after prefix, with the value of a
@@ -1072,17 +1071,6 @@ HTS_STATIC int strfield(const char *f, const char *s) {
 }
 
 /* clang-format on */
-
-/* Compare a and b ignoring ASCII case, like strcmp: 0 only when both match
-   to the end. */
-HTS_STATIC int strcmpnocase(const char *a, const char *b) {
-  for (;; a++, b++) {
-    const int cmp = hichar(*a) - hichar(*b);
-
-    if (cmp != 0 || *a == '\0')
-      return cmp;
-  }
-}
 
 /* MSVC ships these POSIX functions under other names. Kept out of the installed
    headers: they would rewrite the same identifiers in a consumer's own code. */

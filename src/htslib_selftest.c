@@ -2511,33 +2511,41 @@ static int st_chartab(httrackp *opt, int argc, char **argv) {
   return st_verdict("chartab", err);
 }
 
-/* -#test=strcmpnocase: equal only when both strings end together, and the
-   order flips with the arguments. */
-static int st_strcmpnocase(httrackp *opt, int argc, char **argv) {
+/* -#test=strcasecmp: equal only when both strings end together, the order
+   flips with the arguments, and bytes compare unsigned after folding to lower
+   case, as the top index sorts. */
+static int st_strcasecmp(httrackp *opt, int argc, char **argv) {
   static const struct {
     const char *a, *b;
     int sign;
   } cases[] = {
-      {"ab", "abc", -1}, {"", "about.html", -1}, {"a.com", "a.com.evil", -1},
-      {"", "TRUE", -1},  {"abd", "abc", 1},      {"ABC", "abc", 0},
-      {"", "", 0},       {"TRUE", "true", 0},
+      {"ab", "abc", -1},
+      {"", "about.html", -1},
+      {"a.com", "a.com.evil", -1},
+      {"", "TRUE", -1},
+      {"abd", "abc", 1},
+      {"ABC", "abc", 0},
+      {"", "", 0},
+      {"TRUE", "true", 0},
+      {"A_b", "ab", -1},
+      {"\xc3\xa9t\xc3\xa9", "zoo", 1},
   };
 
   size_t i;
   int err = 0;
 
   for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
-    const int ab = strcmpnocase(cases[i].a, cases[i].b);
-    const int ba = strcmpnocase(cases[i].b, cases[i].a);
+    const int ab = hts_strcasecmp(cases[i].a, cases[i].b);
+    const int ba = hts_strcasecmp(cases[i].b, cases[i].a);
     const int sign = (ab > 0) - (ab < 0);
 
     if (sign != cases[i].sign || (ba > 0) - (ba < 0) != -sign) {
-      printf("strcmpnocase: (\"%s\", \"%s\") gives %d, reversed %d\n",
-             cases[i].a, cases[i].b, ab, ba);
+      printf("strcasecmp: (\"%s\", \"%s\") gives %d, reversed %d\n", cases[i].a,
+             cases[i].b, ab, ba);
       err = 1;
     }
   }
-  return st_verdict("strcmpnocase", err);
+  return st_verdict("strcasecmp", err);
 }
 
 static void uninit_worker_noop(void *arg) { (void) arg; }
@@ -4728,9 +4736,9 @@ const struct selftest_entry selftests_lib[] = {
     {"uninit", "", "hts_uninit releases what hts_init sets up, twice safely",
      st_uninit},
     {"chartab", "", "HTS_BLANKS and lochar() over every byte", st_chartab},
-    {"strcmpnocase", "",
-     "strcmpnocase compares the whole of both strings, ignoring case",
-     st_strcmpnocase},
+    {"strcasecmp", "",
+     "hts_strcasecmp compares the whole of both strings, ignoring case",
+     st_strcasecmp},
     {"queryparam", "<url> <name> [size]", "the value %[param] reads for a key",
      st_queryparam},
     {"querysweep", "", "%[param] stays inside every buffer size it is given",
