@@ -2029,7 +2029,7 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
 }
 
 // HTTP status code -> reason phrase (per RFC), or NULL if unknown.
-HTSEXT_API const char *infostatuscode_const(int statuscode) {
+const char *infostatuscode_const(int statuscode) {
   return hts_status_reason(statuscode);
 }
 
@@ -3318,7 +3318,8 @@ HTSEXT_API char *int2bytessec(strc_int2bytes2 * strc, long int n) {
   strcatbuff(buff, a[1]);
   return concat(strc->catbuff, sizeof(strc->catbuff), buff, "/s");
 }
-HTSEXT_API char *int2char(strc_int2bytes2 * strc, int n) {
+
+char *int2char(strc_int2bytes2 *strc, int n) {
   sprintf(strc->buff2, "%d", n);
   return strc->buff2;
 }
@@ -3334,7 +3335,8 @@ HTSEXT_API char *int2char(strc_int2bytes2 * strc, int n) {
 #define ToLLintTiB (ToLLintKiB * ToLLintKiB * ToLLintKiB * ToLLintKiB)
 #define ToLLintPiB                                                             \
   (ToLLintKiB * ToLLintKiB * ToLLintKiB * ToLLintKiB * ToLLintKiB)
-HTSEXT_API char **int2bytes2(strc_int2bytes2 * strc, LLint n) {
+
+char **int2bytes2(strc_int2bytes2 *strc, LLint n) {
   if (n < ToLLintKiB) {
     sprintf(strc->buff1, "%d", (int) (LLint) n);
     strcpybuff(strc->buff2, "B");
@@ -3684,9 +3686,11 @@ HTSEXT_API const char *jump_identification_const(const char *source) {
   return trytofind != NULL ? trytofind : a;
 }
 
+/* clang-format reads the macro line as an unfinished statement. */
+/* clang-format off */
 HTSEXT_API DECLARE_NON_CONST_VERSION(jump_identification)
 
-HTSEXT_API const char *jump_normalized_const(const char *source) {
+const char *jump_normalized_const(const char *source) {
   if (strcmp(source, "file://") == 0)
     return source;
   source = jump_identification_const(source);
@@ -3706,7 +3710,7 @@ HTSEXT_API const char *jump_normalized_const(const char *source) {
   return source;
 }
 
-HTSEXT_API DECLARE_NON_CONST_VERSION(jump_normalized)
+/* clang-format on */
 
 static int sortNormFnc(const void *a_, const void *b_) {
   const hts_query_field *const a = (const hts_query_field *) a_;
@@ -3783,7 +3787,7 @@ static char *fil_normalized_ex(const char *source, char *dest, int do_slash,
   return dest;
 }
 
-HTSEXT_API char *fil_normalized(const char *source, char *dest) {
+char *fil_normalized(const char *source, char *dest) {
   return fil_normalized_ex(source, dest, 1, 1);
 }
 
@@ -4330,7 +4334,7 @@ hts_boolean hts_ssl_check_cert(SSL *ssl, const char *url_adr) {
 const char *hts_authority_end(const char *s) { return s + strcspn(s, "/?#\\"); }
 
 // find the authority's port (:80) or NULL; handles IPv6 literals
-HTSEXT_API const char *jump_toport_const(const char *source) {
+const char *jump_toport_const(const char *source) {
   // start at the host jump_identification_const() picks, so callers agree
   const char *const host = jump_identification_const(source);
   // a ':' or ']' in the path, query or fragment is not the authority's
@@ -4341,7 +4345,7 @@ HTSEXT_API const char *jump_toport_const(const char *source) {
   return memchr(from, ':', (size_t) (end - from));
 }
 
-HTSEXT_API DECLARE_NON_CONST_VERSION(jump_toport)
+DECLARE_NON_CONST_VERSION(jump_toport)
 
 // strrchr, but not too far
 const char *strrchr_limit(const char *s, char c, const char *limit) {
@@ -4622,8 +4626,8 @@ HTSEXT_API char *unescape_http_unharm(char *const catbuff, const size_t size,
 
 // remplacer " par %xx etc..
 // buffer MAX 1Ko
-HTSEXT_API size_t escape_spc_url(const char *const src, 
-                                 char *const dest, const size_t size) {
+size_t escape_spc_url(const char *const src, char *const dest,
+                      const size_t size) {
   return x_escape_http(src, dest, size, 2);
 }
 
@@ -4634,13 +4638,12 @@ HTSEXT_API size_t escape_in_url(const char *const src,
 }
 
 // smith / john -> smith%20/%20john
-HTSEXT_API size_t escape_uri(const char *const src, 
-                             char *const dest, const size_t size) {
+size_t escape_uri(const char *const src, char *const dest, const size_t size) {
   return x_escape_http(src, dest, size, 3);
 }
 
-HTSEXT_API size_t escape_uri_utf(const char *const src, 
-                                 char *const dest, const size_t size) {
+size_t escape_uri_utf(const char *const src, char *const dest,
+                      const size_t size) {
   return x_escape_http(src, dest, size, 30);
 }
 
@@ -4649,14 +4652,14 @@ HTSEXT_API size_t escape_check_url(const char *const src, char *const dest,
   return x_escape_http(src, dest, size, 0);
 }
 
-HTSEXT_API size_t escape_control_url(const char *const src, char *const dest,
-                                     const size_t size) {
+size_t escape_control_url(const char *const src, char *const dest,
+                          const size_t size) {
   return x_escape_http(src, dest, size, 4);
 }
 
 // same as escape_check_url, but returns char*
-HTSEXT_API char *escape_check_url_addr(const char *const src, 
-                                       char *const dest, const size_t size) {
+char *escape_check_url_addr(const char *const src, char *const dest,
+                            const size_t size) {
   escape_check_url(src, dest, size);
   return dest;
 }
@@ -4666,7 +4669,7 @@ HTSEXT_API char *escape_check_url_addr(const char *const src,
 /* clang-format off: an edit realigns all backslashes, churning the macro. */
 /* clang-format off */
 #define DECLARE_APPEND_ESCAPE_VERSION(NAME) \
-HTSEXT_API size_t append_ ##NAME(const char *const src, char *const dest, const size_t size) { \
+size_t append_ ##NAME(const char *const src, char *const dest, const size_t size) { \
   const size_t len = strnlen(dest, size); \
   assertf(len < size); \
   RUNTIME_TIME_CHECK_SIZE(size); \
@@ -4681,9 +4684,7 @@ HTSEXT_API size_t append_ ##NAME(const char *const src, char *const dest, const 
 
 DECLARE_APPEND_ESCAPE_VERSION(escape_in_url)
 DECLARE_APPEND_ESCAPE_VERSION(escape_spc_url)
-DECLARE_APPEND_ESCAPE_VERSION(escape_uri_utf)
 DECLARE_APPEND_ESCAPE_VERSION(escape_check_url)
-DECLARE_APPEND_ESCAPE_VERSION(escape_uri)
 
 #undef DECLARE_APPEND_ESCAPE_VERSION
 
@@ -4707,10 +4708,10 @@ static size_t inplace_escape(char *const dest, const size_t size,
   return ret;
 }
 
-// Thin exported wrappers binding inplace_escape() to each escaper (ABI).
+// Thin wrappers binding inplace_escape() to each escaper.
 #undef DECLARE_INPLACE_ESCAPE_VERSION
 #define DECLARE_INPLACE_ESCAPE_VERSION(NAME)                                   \
-  HTSEXT_API size_t inplace_##NAME(char *const dest, const size_t size) {      \
+  size_t inplace_##NAME(char *const dest, const size_t size) {                 \
     return inplace_escape(dest, size, NAME);                                   \
   }
 
@@ -4722,9 +4723,8 @@ DECLARE_INPLACE_ESCAPE_VERSION(escape_uri)
 
 #undef DECLARE_INPLACE_ESCAPE_VERSION
 
-
-HTSEXT_API size_t make_content_id(const char *const adr, const char *const fil, 
-                                  char *const dest, const size_t size) {
+size_t make_content_id(const char *const adr, const char *const fil,
+                       char *const dest, const size_t size) {
   char *a;
   size_t esc_size = escape_in_url(adr, dest, size);
   /* the append form takes a remainder the size check would misread */
@@ -4741,7 +4741,7 @@ HTSEXT_API size_t make_content_id(const char *const adr, const char *const fil,
 }
 
 // strip all control characters
-HTSEXT_API void escape_remove_control(char *const s) {
+void escape_remove_control(char *const s) {
   size_t i, j;
   for(i = 0, j = 0 ; s[i] != '\0' ; i++) {
     const unsigned char c = (unsigned  char) s[i];
@@ -4768,8 +4768,8 @@ HTSEXT_API void escape_remove_control(char *const s) {
   } while(0)
 
 /* Returns the number of characters written (not taking in account the terminating \0), or 'size' upon overflow. */
-HTSEXT_API size_t x_escape_http(const char *const s, char *const dest, 
-                                const size_t size, const int mode) {
+size_t x_escape_http(const char *const s, char *const dest, const size_t size,
+                     const int mode) {
   static const char hex[] = "0123456789abcdef";
   size_t i, j;
 
@@ -4822,7 +4822,8 @@ HTSEXT_API size_t x_escape_http(const char *const s, char *const dest,
   return j;
 }
 
-HTSEXT_API size_t escape_for_html_print(const char *const s, char *const dest, const size_t size) {
+size_t escape_for_html_print(const char *const s, char *const dest,
+                             const size_t size) {
   size_t i, j;
 
   RUNTIME_TIME_CHECK_SIZE(size);
@@ -4844,7 +4845,8 @@ HTSEXT_API size_t escape_for_html_print(const char *const s, char *const dest, c
   return j;
 }
 
-HTSEXT_API size_t escape_for_html_print_full(const char *const s, char *const dest, const size_t size) {
+size_t escape_for_html_print_full(const char *const s, char *const dest,
+                                  const size_t size) {
   static const char hex[] = "0123456789abcdef";
   size_t i, j;
 
@@ -5134,7 +5136,8 @@ static void hts_debug_log_print(HTS_FORMAT_STRING const char *format, ...)
 
 static int hts_dgb_init = 0;
 static FILE *hts_dgb_init_fp = NULL;
-HTSEXT_API void hts_debug(int level) {
+
+void hts_debug(int level) {
   hts_dgb_init = level;
   if (hts_dgb_init > 0) {
     hts_debug_log_print("hts_debug() called");
@@ -5387,9 +5390,8 @@ HTSEXT_API void hts_set_log_vprint_callback(void (*callback)(httrackp * opt,
 
 char hts_log_quiet_tag;
 
-HTSEXT_API void hts_log_vprint(httrackp *opt, int type,
-                               HTS_FORMAT_STRING const char *format,
-                               va_list args) {
+void hts_log_vprint(httrackp *opt, int type,
+                    HTS_FORMAT_STRING const char *format, va_list args) {
   assertf(format != NULL);
   if (opt == HTS_LOG_QUIET)
     return;
@@ -5462,9 +5464,6 @@ HTSEXT_API void hts_log_print(httrackp *opt, int type,
   va_end(args);
 }
 
-HTSEXT_API void set_wrappers(httrackp * opt) {  // LEGACY
-}
-
 hts_boolean hts_libhandles_add(httrackp *opt, void *handle,
                                const char *moduleName) {
   char *name = strdupt(moduleName);
@@ -5486,8 +5485,7 @@ hts_boolean hts_libhandles_add(httrackp *opt, void *handle,
   return HTS_TRUE;
 }
 
-HTSEXT_API int plug_wrapper(httrackp * opt, const char *moduleName,
-                            const char *argv) {
+int plug_wrapper(httrackp *opt, const char *moduleName, const char *argv) {
   void *handle = openFunctionLib(moduleName);
 
   if (handle != NULL) {

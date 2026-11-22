@@ -389,13 +389,16 @@ HTSNET_API void SOCaddr_inetntoa_(char *namebuf, size_t namebuflen,
     because the address comes from a peer. Returns HTS_FALSE when @p namebuflen
     left no room for the port, which a caller sizing on
     SOCADDR_INETNTOA_PORT_SIZE never sees. Asserts when @p namebuflen is 0, or
-    when @p ss carries no family. */
-HTSNET_API hts_boolean SOCaddr_inetntoa_port_(char *namebuf, size_t namebuflen,
-                                              SOCaddr *const ss,
-                                              const char *file, const int line);
+    when @p ss carries no family. Not exported: only the engine and proxytrack,
+    which compiles htsnet.c in, call it. */
+#if defined(HTS_INTERNAL_BYTECODE) || defined(HTS_NO_LIBHTTRACK)
+hts_boolean SOCaddr_inetntoa_port_(char *namebuf, size_t namebuflen,
+                                   SOCaddr *const ss, const char *file,
+                                   const int line);
 
 #define SOCaddr_inetntoa_port(namebuf, namebuflen, ss)                         \
   SOCaddr_inetntoa_port_(namebuf, namebuflen, &(ss), __FILE__, __LINE__)
+#endif
 
 #ifdef _WIN32
 /** Start WinSock 1.1, or print why not on stderr and return HTS_FALSE. */

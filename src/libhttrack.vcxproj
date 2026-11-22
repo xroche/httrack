@@ -128,7 +128,7 @@
   </ItemDefinitionGroup>
 
   <ItemGroup>
-    <ClCompile Include="coucal\coucal.c" />
+    <ClCompile Include="htscoucal.c" />
     <ClCompile Include="htsalias.c" />
     <ClCompile Include="htsback.c" />
     <ClCompile Include="htsback_selftest.c" />

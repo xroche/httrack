@@ -84,7 +84,7 @@ webhttrack: webhttrack.in htsglobal.h Makefile
 CLEANFILES = webhttrack
 
 libhttrack_la_SOURCES =  htscore.c htsusercmd.c htsmhtml.c htsparse.c htsmirror.c htsback.c htscache.c \
-	htscatchurl.c htsfetch.c htspsl.c htspsl_data.c htsfilters.c htsftp.c htshash.c coucal/coucal.c \
+	htscatchurl.c htsfetch.c htspsl.c htspsl_data.c htsfilters.c htsftp.c htshash.c htscoucal.c \
 	htscmdline.c htshelp.c htsbase.c htsdns.c htslib.c htsmime.c htssecret.c htslines.c htsurlport.c htsdate.c htscoremain.c htsshared.c \
 	htsname.c htsrobots.c htstools.c htsrandom.c htswizard.c \
 	htsalias.c htsthread.c htsindex.c htsbauth.c htscookiefile.c htsbundle.c \

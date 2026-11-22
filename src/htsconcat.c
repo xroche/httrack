@@ -35,7 +35,7 @@ Please visit our Website: http://www.httrack.com
 #include <string.h>
 
 #include "htssafe.h"
-#include "httrack-library.h"
+#include "htslib.h"
 
 /* Concatenate a and b into catbuff; an overflow stops before the part that
    does not fit. */
@@ -105,7 +105,7 @@ char *fslash(char *catbuff, size_t size, const char *a) {
 }
 
 // extension : html,gif..
-HTSEXT_API const char *get_ext(char *catbuff, size_t size, const char *fil) {
+const char *get_ext(char *catbuff, size_t size, const char *fil) {
   size_t i, last;
 
   RUNTIME_TIME_CHECK_SIZE(size);

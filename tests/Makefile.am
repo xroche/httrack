@@ -31,6 +31,7 @@ EXTRA_DIST = $(TESTS) renamefail.c unlinkfail.c threadattrfail.c gaistall.c noba
 	server-root/abslogin/index.html \
 	fixtures/cache-golden/hts-cache/new.zip \
 	install-manifest.txt \
+	2423_export-list.txt \
 	62_lang-untranslated.counts \
 	62_lang-linebreaks.counts \
 	834_engine-entities-sweep.pairs \

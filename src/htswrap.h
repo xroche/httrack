@@ -32,8 +32,7 @@ Please visit our Website: http://www.httrack.com
 /* ------------------------------------------------------------ */
 
 /** @file htswrap.h
-    The wrapper functions (htswrap_init() and friends) are declared in
-    httrack-library.h. */
+    htswrap_add() is declared in httrack-library.h. */
 
 #ifndef HTSWRAP_DEFH
 #define HTSWRAP_DEFH
