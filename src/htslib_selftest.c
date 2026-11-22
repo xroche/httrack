@@ -4904,7 +4904,7 @@ static hts_boolean st_sized_len_ok(const char *buf, size_t cap, size_t full) {
 
 /* The duration and date writers clip to the size they are given. */
 static int st_lib_sized(httrackp *opt, int argc, char **argv) {
-  /* one input per branch of the duration formatter */
+  /* Each row exercises one branch of the duration formatter. */
   static const struct {
     TStamp t;
     const char *want;
@@ -4917,7 +4917,7 @@ static int st_lib_sized(httrackp *opt, int argc, char **argv) {
   static const char qdur[] = "2147483647d,23h,59min59s";
   static const char date[] = "Sun, 06 Nov 1994 08:49:37 GMT";
   static const char mdate[] = "Tue, 29 Feb 2000 00:00:00 GMT";
-  /* 8 bytes, one byte short, then an exact fit */
+  /* The caps are 8 bytes, one byte short, and an exact fit. */
   const size_t rcaps[] = {8, sizeof(date) - 1, sizeof(date)};
   char path[HTS_URLMAXSIZE];
   char gmt[256], local[256];

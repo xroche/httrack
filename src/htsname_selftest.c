@@ -2123,7 +2123,7 @@ static int st_reserved(httrackp *opt, int argc, char **argv) {
 static int st_name_sized(httrackp *opt, int argc, char **argv) {
   /* MD5 of "a=1" */
   static const char md5[] = "3872c9ae3f427af0be0ead09d07ae2cf";
-  /* 8 bytes, one byte short, then an exact fit */
+  /* The caps are 8 bytes, one byte short, and an exact fit. */
   const size_t mcaps[] = {8, sizeof(md5) - 1, sizeof(md5)};
   char want[64];
   size_t k;

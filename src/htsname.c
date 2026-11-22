@@ -2217,8 +2217,9 @@ char *url_savename_refname_fullpath(httrackp * opt, const char *adr,
                         sizeof(digest_filename),
                     refname_fits);
 
+  // The assert above guarantees the name fits.
   (void) !url_savename_refname(adr, fil, digest_filename,
-                               sizeof(digest_filename)); // always fits
+                               sizeof(digest_filename));
   return hts_logpath(opt, digest_filename);
 }
 
