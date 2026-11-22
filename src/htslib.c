@@ -3668,15 +3668,15 @@ const char *url_nologin(httrackp *opt, const char *url) {
 
 // Returns source past its login (user:pass@), if any.
 HTSEXT_API const char *jump_identification_const(const char *source) {
-  const char *a, *trytofind;
+  hts_url_view v;
 
   if (strcmp(source, "file://") == 0)
     return source;
-  // rechercher dernier @ (car parfois email transmise dans adresse!)
-  // mais sauter ftp:// éventuel
-  a = jump_protocol_const(source);
-  trytofind = strrchr_limit(a, '@', hts_authority_end(a));
-  return trytofind != NULL ? trytofind : a;
+  (void) hts_url_view_parse(source, strlen(source), &v);
+  // a scheme the engine does not know is kept whole
+  if (v.scheme.p != NULL && jump_protocol_const(source) == source)
+    return source;
+  return v.host.p;
 }
 
 /* clang-format reads the macro line as an unfinished statement. */
@@ -4326,6 +4326,127 @@ hts_boolean hts_ssl_check_cert(SSL *ssl, const char *url_adr) {
 
 const char *hts_authority_end(const char *s) { return s + strcspn(s, "/?#\\"); }
 
+/* jump_protocol_const() and the view both read these schemes. */
+static const char *const hts_engine_schemes[] = {
+    "http", "ftp", "https", "file", "socks5h", "socks5", "connect"};
+
+/* Return the length of the engine scheme and ':' that start the LEN bytes at
+   S, or 0. LEN may exceed the string, because jump_protocol_const() passes
+   (size_t) -1, and a NUL then ends the match. */
+static size_t engine_scheme_len(const char *s, size_t len) {
+  size_t i;
+
+  for (i = 0; i < sizeof(hts_engine_schemes) / sizeof(hts_engine_schemes[0]);
+       i++) {
+    const char *const name = hts_engine_schemes[i];
+    const size_t n = strlen(name);
+    size_t j;
+
+    for (j = 0; j < n && j < len && streql(s[j], name[j]); j++)
+      ;
+    if (j == n && n < len && s[n] == ':')
+      return n + 1;
+  }
+  return 0;
+}
+
+static hts_span span_of(const char *from, const char *to) {
+  hts_span r;
+
+  r.p = from;
+  r.len = (size_t) (to - from);
+  return r;
+}
+
+/* Is the span a decimal port in 0..65535? Empty and 0 pass, because
+   hts_parse_url_port() checks the 1..65535 range. */
+static hts_boolean port_is_valid(hts_span port) {
+  unsigned int value = 0;
+  size_t i;
+
+  for (i = 0; i < port.len; i++) {
+    if (!hts_isdigit((unsigned char) port.p[i]))
+      return HTS_FALSE;
+    value = value * 10 + (unsigned int) (port.p[i] - '0');
+    if (value > 65535)
+      return HTS_FALSE;
+  }
+  return HTS_TRUE;
+}
+
+hts_boolean hts_url_view_parse(const char *s, size_t len, hts_url_view *v) {
+  const char *const end = s + len;
+  const char *p = s;
+  const char *auth_end, *at, *q;
+  hts_boolean ok = HTS_TRUE;
+  size_t n;
+
+  memset(v, 0, sizeof(*v));
+  if ((n = engine_scheme_len(s, len)) != 0) {
+    v->scheme = span_of(s, s + n - 1);
+    p = s + n;
+  } else if (len != 0 && hts_isalpha((unsigned char) s[0])) {
+    for (q = s + 1; q < end && (hts_isalnum((unsigned char) *q) || *q == '+' ||
+                                *q == '-' || *q == '.');
+         q++)
+      ;
+    if (end - q >= 3 && memcmp(q, "://", 3) == 0) {
+      v->scheme = span_of(s, q);
+      p = q + 1;
+    }
+  }
+  if (end - p >= 2 && p[0] == '/' && p[1] == '/')
+    p += 2;
+
+  // the same set as hts_authority_end(), but a NUL is data here
+  for (auth_end = p; auth_end < end && *auth_end != '/' && *auth_end != '?' &&
+                     *auth_end != '#' && *auth_end != '\\';
+       auth_end++)
+    ;
+  for (at = NULL, q = p; q < auth_end; q++)
+    if (*q == '@')
+      at = q;
+  if (at != NULL) {
+    v->userinfo = span_of(p, at);
+    p = at + 1;
+  }
+
+  if (p < auth_end && *p == '[') {
+    const char *const close = memchr(p, ']', (size_t) (auth_end - p));
+
+    if (close != NULL && (close + 1 == auth_end || close[1] == ':')) {
+      v->host = span_of(p, close + 1);
+      if (close + 1 != auth_end)
+        v->port = span_of(close + 2, auth_end);
+    } else {
+      v->host = span_of(p, auth_end);
+      ok = HTS_FALSE;
+    }
+  } else {
+    const char *const colon = memchr(p, ':', (size_t) (auth_end - p));
+
+    v->host = span_of(p, colon != NULL ? colon : auth_end);
+    if (colon != NULL)
+      v->port = span_of(colon + 1, auth_end);
+  }
+  if (v->port.p != NULL && !port_is_valid(v->port))
+    ok = HTS_FALSE;
+
+  for (q = auth_end; q < end && *q != '?' && *q != '#'; q++)
+    ;
+  v->path = span_of(auth_end, q);
+  if (q < end && *q == '?') {
+    const char *const query = q + 1;
+
+    for (q = query; q < end && *q != '#'; q++)
+      ;
+    v->query = span_of(query, q);
+  }
+  if (q < end)
+    v->fragment = span_of(q + 1, end);
+  return ok;
+}
+
 // find the authority's port (:80) or NULL; handles IPv6 literals
 const char *jump_toport_const(const char *source) {
   // start at the host jump_identification_const() picks, so callers agree
@@ -4358,26 +4479,10 @@ const char *strrchr_limit(const char *s, char c, const char *limit) {
   }
 }
 
-// retourner adr sans ftp://
+// Returns source past its engine scheme and "//", if any.
 const char *jump_protocol_const(const char *source) {
-  int p;
-
-  // scheme
   // "Comparisons of scheme names MUST be case-insensitive" (RFC2616)
-  if ((p = strfield(source, "http:")))
-    source += p;
-  else if ((p = strfield(source, "ftp:")))
-    source += p;
-  else if ((p = strfield(source, "https:")))
-    source += p;
-  else if ((p = strfield(source, "file:")))
-    source += p;
-  else if ((p = strfield(source, "socks5h:")))
-    source += p;
-  else if ((p = strfield(source, "socks5:")))
-    source += p;
-  else if ((p = strfield(source, "connect:")))
-    source += p;
+  source += engine_scheme_len(source, (size_t) -1);
   // net_path
   if (strncmp(source, "//", 2) == 0)
     source += 2;

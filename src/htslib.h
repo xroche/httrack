@@ -725,6 +725,27 @@ const char *strrchr_limit(const char *s, char c, const char *limit);
 /* Returns the end of the authority at s, which must be past the scheme: its
    first '/', '?', '#' or '\'. */
 const char *hts_authority_end(const char *s);
+
+/* Spans into one adr or URL string. An absent part has a NULL p, a present
+   but empty one ("h:" has an empty port) a non-NULL p and a zero len. */
+typedef struct hts_url_view {
+  hts_span scheme;   /* without ':'; absent when the input has no scheme */
+  hts_span userinfo; /* before the authority's last '@' */
+  hts_span host;     /* always present, brackets kept for IPv6 */
+  hts_span port;     /* without ':' */
+  hts_span path;     /* always present, from the authority's end */
+  hts_span query;    /* without '?' */
+  hts_span fragment; /* without '#' */
+} hts_url_view;
+
+/* Split the LEN bytes at S, NULs included, into *V without copying. Input with
+   no scheme starts at its authority, as an adr does. The scheme is an engine
+   one ("//" optional) or any other before "://". The authority ends at '/',
+   '?', '#' or '\'. Syntax only: return FALSE, *V still filled, on
+   - an unclosed '[', or bytes after ']' that are not ":port" (no port then);
+   - a port with a non-digit or above 65535. */
+hts_boolean hts_url_view_parse(const char *s, size_t len, hts_url_view *v);
+
 char *jump_protocol(char *source);
 const char *jump_protocol_const(const char *source);
 
