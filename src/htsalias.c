@@ -973,6 +973,11 @@ double hts_strtod_c(const char *s, const char **end) {
       p = q;
     }
   }
+  /* 0.0700000 is 7e-2, so trailing zeros cannot leave the exact path below */
+  while (m != 0 && m % 10 == 0) {
+    m /= 10;
+    scale++;
+  }
   v = (double) m;
   /* one operation on exact operands rounds correctly, as strtod() does */
   if (m < ((uint64_t) 1 << 53) && scale >= -22 && scale <= 22) {
@@ -1011,10 +1016,13 @@ int optpause_read(const char *val, double *pmin, double *pmax) {
 size_t optrate_read(const char *val, double *rate) {
   const char *end;
   const double v = hts_strtod_c(val, &end);
+  /* 0x5 is hex, but 5x is the rate 5 then the -x option */
+  const hts_boolean hex = (*end == 'x' || *end == 'X') && end[-1] == '0' &&
+                          (end - 1 == val || !hts_isdigit(end[-2]));
 
-  /* leftover number characters (5,5, 1.2.3 or 0x5) make the whole value bad */
-  if (end == val || !(v >= 0 && v <= FLT_MAX) ||
-      (*end != '\0' && strchr("0123456789.,xX", *end) != NULL)) {
+  /* leftover number characters (5,5 or 1.2.3) make the whole value bad */
+  if (end == val || !(v >= 0 && v <= FLT_MAX) || hex ||
+      (*end != '\0' && strchr("0123456789.,", *end) != NULL)) {
     *rate = -1;
     return strlen(val);
   }

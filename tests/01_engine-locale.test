@@ -21,7 +21,7 @@ fail() {
 
 # Raw libc calls whose answer follows the locale, or is undefined for a negative
 # char, and float formats, which print the locale's decimal point. htslib_selftest.c calls them on purpose, as the reference and control.
-raw='(?<![\w.>])(is(ascii|alpha|alnum|digit|xdigit|space|upper|lower|punct|print|graph|cntrl|blank)|to(upper|lower)|strn?casecmp|str(icmp|nicmp)|_str(icmp|nicmp)|strto(d|f|ld)|atof|setlocale)\s*\((?!\s*\))|strftime\s*\([^;]*"[^"]*%[aAbBcxXp]|scanf\s*\([^;]*%[0-9]*[lL]?[fgeaFGEA]|(printf|_print)\s*\([^;]*"[^"]*%[-+ #0-9.*]*[lL]?[fFeEgGaA]'
+raw='(?<![\w.>])(is(ascii|alpha|alnum|digit|xdigit|space|upper|lower|punct|print|graph|cntrl|blank)|to(upper|lower)|strn?casecmp|str(icmp|nicmp)|_str(icmp|nicmp)|strto(d|f|ld)|atof|setlocale)\s*\((?!\s*\))|strftime\s*\([^;]*"[^"]*%[aAbBcxXp]|scanf\s*\([^;]*%[0-9]*[lL]?[fgeaFGEA]|(printf|_print)\s*\([^;]*"[^"]*%[-+ #0-9.*\x27]*[lL]?[fFeEgGaA]'
 scan() {
     perl -ne "print \"\$ARGV:\$.:\$_\" if /$raw/; close ARGV if eof" "$@"
 }

@@ -4524,7 +4524,8 @@ static hts_boolean st_strtod_matches_c(void) {
                                     "-0.07",
                                     "5e",
                                     "-x",
-                                    "7e+2"};
+                                    "7e+2",
+                                    "0.07000000000000000000000"};
   hts_boolean ok = HTS_TRUE;
   char buf[32];
   int n;
@@ -4539,9 +4540,11 @@ static hts_boolean st_strtod_matches_c(void) {
       snprintf(buf, sizeof(buf), "0.%05d", n - 100000);
     else
       s = odd[n - 200000];
-    if (hts_strtod_c(s, NULL) != strtod(s, NULL)) {
-      printf("strtod C: %s reads %.17g, libc says %.17g\n", s,
-             hts_strtod_c(s, NULL), strtod(s, NULL));
+    /* stored, so x87 compares doubles rather than 80-bit values */
+    volatile double got = hts_strtod_c(s, NULL), want = strtod(s, NULL);
+
+    if (got != want) {
+      printf("strtod C: %s reads %.17g, libc says %.17g\n", s, got, want);
       ok = HTS_FALSE;
     }
   }
@@ -4620,7 +4623,9 @@ static hts_boolean st_locale_engine_ok(const char *name) {
                       optpause_read("5x", &pmin, &pmax) == 0 &&
                       optpause_read("0x10", &pmin, &pmax) == 0,
                   "optpause_read junk");
-  ST_LOCALE_CHECK(optrate_read("0x5", &rate) == 3 && rate == -1,
+  ST_LOCALE_CHECK(optrate_read("0x5", &rate) == 3 && rate == -1 &&
+                      optrate_read("5x", &rate) == 1 && rate == 5 &&
+                      optrate_read("10x", &rate) == 2 && rate == 10,
                   "optrate_read hex");
   ST_LOCALE_CHECK(hts_strcasecmp("INDEX.HTML", "index.html") == 0 &&
                       hts_strncasecmp("Iz", "iy", 1) == 0 &&
