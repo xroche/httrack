@@ -584,57 +584,28 @@ static int surt_add_utf8(wbuf *out, const char *s, size_t n) {
    [IPv6] literals keep their host form. A non-default port is kept as ":port"
    before the ')'. Returns 0 on success. */
 static int surt_canon(const char *url, wbuf *out) {
-  const char *p, *scheme_end, *authend, *host, *hostsep, *port = NULL;
+  const char *authend, *host, *port = NULL;
   size_t portlen = 0, hlen, i;
   int def_port = -1;
   int is_ipv6 = 0, is_ip = 0;
   char hostbuf[1024];
+  hts_url_view v;
 
   if (url == NULL)
     return -1;
 
-  p = url;
-  scheme_end = strstr(url, "://");
-  if (scheme_end != NULL) {
-    size_t sl = (size_t) (scheme_end - url);
-    if (sl == 4 && hts_strncasecmp(url, "http", 4) == 0)
-      def_port = 80;
-    else if (sl == 5 && hts_strncasecmp(url, "https", 5) == 0)
-      def_port = 443;
-    p = scheme_end + 3;
-  }
-
-  authend = p;
-  while (*authend != '\0' && *authend != '/' && *authend != '?' &&
-         *authend != '#')
-    authend++;
-
-  { /* drop userinfo up to the last '@' inside the authority */
-    const char *q, *at = NULL;
-    for (q = p; q < authend; q++)
-      if (*q == '@')
-        at = q;
-    if (at != NULL)
-      p = at + 1;
-  }
-  host = p;
-
-  if (host < authend && host[0] == '[') { /* [IPv6] literal */
-    const char *rb = host;
-    is_ipv6 = 1;
-    while (rb < authend && *rb != ']')
-      rb++;
-    hostsep = (rb < authend) ? rb + 1 : authend;
-  } else {
-    const char *c = host;
-    while (c < authend && *c != ':')
-      c++;
-    hostsep = c;
-  }
-  hlen = (size_t) (hostsep - host);
-  if (hostsep < authend && *hostsep == ':') {
-    port = hostsep + 1;
-    portlen = (size_t) (authend - port);
+  (void) hts_url_view_parse(url, strlen(url), &v);
+  if (v.scheme.len == 4 && hts_strncasecmp(v.scheme.p, "http", 4) == 0)
+    def_port = 80;
+  else if (v.scheme.len == 5 && hts_strncasecmp(v.scheme.p, "https", 5) == 0)
+    def_port = 443;
+  host = v.host.p;
+  hlen = v.host.len;
+  authend = v.path.p;
+  is_ipv6 = hlen != 0 && host[0] == '[';
+  if (v.port.p != NULL) {
+    port = v.port.p;
+    portlen = v.port.len;
   }
 
   if (hlen >= sizeof(hostbuf))

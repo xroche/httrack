@@ -638,6 +638,18 @@ static int st_warc_surt(httrackp *opt, int argc, char **argv) {
 
   int err = 0;
   size_t i;
+  // with arguments, print the SURT of each
+  if (argc > 0) {
+    int k;
+    for (k = 0; k < argc; k++) {
+      char out[4096];
+      if (warc_surt(argv[k], out, sizeof(out)) == 0)
+        printf("surt=%s\n", out);
+      else
+        printf("surt-error\n");
+    }
+    return 0;
+  }
   for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
     char out[512];
     if (warc_surt(cases[i].url, out, sizeof(out)) != 0 ||
@@ -2514,7 +2526,7 @@ const struct selftest_entry selftests_warc[] = {
      st_warc_rotate},
     {"warc-verbatim", "<dir>", "verbatim compressed response body (default)",
      st_warc_verbatim},
-    {"warc-surt", "", "SURT canonicalization of the CDXJ sort key",
+    {"warc-surt", "[url...]", "SURT canonicalization of the CDXJ sort key",
      st_warc_surt},
     {"warc-offset", "<dir>", "the CDXJ record offset stays 64-bit past 2GB",
      st_warc_offset},

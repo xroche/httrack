@@ -1,0 +1,26 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# surt_canon() splits the URL with hts_url_view_parse(): the URLs the engine
+# writes keep their SURT, and malformed ones split as the view does.
+
+surt() { selftest_queue "surt=$2" warc-surt "$1"; }
+
+surt 'http://user:pass@www.Example.com:80/a?q=1#f' 'com,example)/a?q=1'
+surt 'https://[2001:db8::1]:443/x' '[2001:db8::1])/x'
+surt 'ftp://1.2.3.4:21/p' '1.2.3.4:21)/p'
+surt 'http://[::FFFF:1.2.3.4]:8080/v' '[::ffff:1.2.3.4]:8080)/v'
+surt 'https://www3.a.b:8443/c' 'b,a:8443)/c'
+# changed: the host ends at '\', keeps bytes after ']', and "://" in a query
+# or a scheme with no "//" is no longer the authority
+surt 'http://h\x@y/z' 'h)\x@y/z'
+surt 'http://[::1]x/p' '[::1]x)/p'
+surt 'h/x?u=http://a/b' 'h)/x?u=http://a/b'
+surt 'http:h/x' 'h)/x'
+selftest_queue 'warc-surt: OK' warc-surt
+selftest_run_queued
