@@ -26,13 +26,12 @@ Please visit our Website: http://www.httrack.com
 */
 
 /* ------------------------------------------------------------ */
-/* File: Locale-independent character and number helpers        */
+/* File: Locale-independent character helpers                  */
 /* ------------------------------------------------------------ */
 
-/* <ctype.h>, strcasecmp() and strtod() follow the locale a host may set (Qt
-   does), and <ctype.h> is undefined for a negative char. These helpers act as
-   the "C" locale on any char. tests/01_engine-locale.test bans the libc forms.
- */
+/* <ctype.h> and strcasecmp() follow the locale a host may set (Qt does), and
+   <ctype.h> is undefined for a negative char. These helpers act as the "C"
+   locale on any char. tests/01_engine-locale.test bans the libc forms. */
 
 #ifndef HTS_CTYPE_DEFH
 #define HTS_CTYPE_DEFH
@@ -70,26 +69,6 @@ static HTS_INLINE HTS_UNUSED int hts_isspace(int c) {
   return c == ' ' || (c >= '\t' && c <= '\r');
 }
 
-static HTS_INLINE HTS_UNUSED int hts_isblank(int c) {
-  return c == ' ' || c == '\t';
-}
-
-static HTS_INLINE HTS_UNUSED int hts_iscntrl(int c) {
-  return (c >= 0 && c < 0x20) || c == 0x7f;
-}
-
-static HTS_INLINE HTS_UNUSED int hts_isprint(int c) {
-  return c >= 0x20 && c < 0x7f;
-}
-
-static HTS_INLINE HTS_UNUSED int hts_isgraph(int c) {
-  return c > 0x20 && c < 0x7f;
-}
-
-static HTS_INLINE HTS_UNUSED int hts_ispunct(int c) {
-  return hts_isgraph(c) && !hts_isalnum(c);
-}
-
 /* Any other value, a negative char included, comes back unchanged. */
 static HTS_INLINE HTS_UNUSED int hts_tolower(int c) {
   return hts_isupper(c) ? c + ('a' - 'A') : c;
@@ -99,8 +78,7 @@ static HTS_INLINE HTS_UNUSED int hts_toupper(int c) {
   return hts_islower(c) ? c - ('a' - 'A') : c;
 }
 
-/* strncasecmp() over ASCII letters only: bytes compare as unsigned char, and
-   only A-Z fold. At most n bytes are read from each string. */
+/* strncasecmp() that folds only A-Z and compares bytes as unsigned char. */
 static HTS_INLINE HTS_UNUSED int hts_strncasecmp(const char *a, const char *b,
                                                  size_t n) {
   for (; n != 0; a++, b++, n--) {
@@ -116,9 +94,5 @@ static HTS_INLINE HTS_UNUSED int hts_strncasecmp(const char *a, const char *b,
 static HTS_INLINE HTS_UNUSED int hts_strcasecmp(const char *a, const char *b) {
   return hts_strncasecmp(a, b, (size_t) -1);
 }
-
-/* strtod() with "." as the decimal point in any locale, minus its hex, inf and
-   nan forms. end, when not NULL, is set as strtod() sets it. */
-double hts_strtod_c(const char *s, const char **end);
 
 #endif

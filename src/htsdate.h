@@ -46,10 +46,10 @@ Please visit our Website: http://www.httrack.com
    it. */
 struct tm *convert_time_rfc822(struct tm *result, const char *s);
 
-/* Write tm as "Sun, 06 Nov 1994 08:49:37" then zone (" GMT" or "") into s,
-   in English whatever LC_TIME says, as HTTP requires. */
+/* Writes tm as "Sun, 06 Nov 1994 08:49:37" then suffix (" GMT" or "") into s,
+   in English under any LC_TIME, as HTTP requires. */
 void hts_format_rfc822(char *s, size_t size, const struct tm *tm,
-                       const char *zone);
+                       const char *suffix);
 
 /* As convert_time_rfc822, but a two-digit year up to PIVOT means 20xx and one
    above it 19xx. HTTP dates use 50, and cookies use 69 (RFC 6265 5.1.1). */

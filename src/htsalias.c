@@ -921,26 +921,100 @@ hts_boolean optcluster_next(const char *token, size_t *at, char *name,
   return HTS_TRUE;
 }
 
+/* 10^0 to 10^22, every one exact in a double */
+static const double optnum_pow10[] = {
+    1e0,  1e1,  1e2,  1e3,  1e4,  1e5,  1e6,  1e7,  1e8,  1e9,  1e10, 1e11,
+    1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19, 1e20, 1e21, 1e22};
+
+double hts_strtod_c(const char *s, const char **end) {
+  const char *p = s;
+  uint64_t m = 0;
+  int digits = 0, sig = 0, scale = 0, neg = 0;
+  double v;
+
+  while (hts_isspace(*p))
+    p++;
+  if (*p == '+' || *p == '-')
+    neg = *p++ == '-';
+  for (; hts_isdigit(*p); p++, digits++) {
+    if (sig < 19) {
+      m = m * 10 + (uint64_t) (*p - '0');
+      sig += m != 0;
+    } else {
+      scale++;
+    }
+  }
+  if (*p == '.') {
+    for (p++; hts_isdigit(*p); p++, digits++) {
+      if (sig < 19) {
+        m = m * 10 + (uint64_t) (*p - '0');
+        sig += m != 0;
+        scale--;
+      }
+    }
+  }
+  if (digits == 0) {
+    if (end != NULL)
+      *end = s;
+    return 0;
+  }
+  if (*p == 'e' || *p == 'E') {
+    const char *q = p + 1;
+    int eneg = 0, e = 0;
+
+    if (*q == '+' || *q == '-')
+      eneg = *q++ == '-';
+    if (hts_isdigit(*q)) {
+      /* past 1000 the result is already 0 or infinite */
+      for (; hts_isdigit(*q); q++)
+        if (e < 1000)
+          e = e * 10 + (*q - '0');
+      scale += eneg ? -e : e;
+      p = q;
+    }
+  }
+  v = (double) m;
+  /* one operation on exact operands rounds correctly, as strtod() does */
+  if (m < ((uint64_t) 1 << 53) && scale >= -22 && scale <= 22) {
+    v = scale < 0 ? v / optnum_pow10[-scale] : v * optnum_pow10[scale];
+  } else {
+    for (; scale > 0; scale--)
+      v *= 10;
+    for (; scale < 0; scale++)
+      v /= 10;
+  }
+  if (end != NULL)
+    *end = p;
+  return neg ? -v : v;
+}
+
 int optpause_read(const char *val, double *pmin, double *pmax) {
   const char *end;
+
+  int n = 1;
 
   *pmin = hts_strtod_c(val, &end);
   if (end == val)
     return 0;
-  if (*end != ':')
-    return 1;
-  val = end + 1;
-  *pmax = hts_strtod_c(val, &end);
-  return end == val ? 0 : 2;
+  if (*end == ':') {
+    val = end + 1;
+    *pmax = hts_strtod_c(val, &end);
+    if (end == val)
+      return 0;
+    n = 2;
+  }
+  while (hts_isspace(*end))
+    end++;
+  return *end == '\0' ? n : 0;
 }
 
 size_t optrate_read(const char *val, double *rate) {
   const char *end;
   const double v = hts_strtod_c(val, &end);
 
-  /* leftover number characters (5,5 or 1.2.3) make the whole value bad */
+  /* leftover number characters (5,5, 1.2.3 or 0x5) make the whole value bad */
   if (end == val || !(v >= 0 && v <= FLT_MAX) ||
-      (*end != '\0' && strchr("0123456789.,", *end) != NULL)) {
+      (*end != '\0' && strchr("0123456789.,xX", *end) != NULL)) {
     *rate = -1;
     return strlen(val);
   }

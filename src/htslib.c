@@ -3280,50 +3280,6 @@ int get_filetime_rfc822(const char *file, char *date) {
   return 0;
 }
 
-double hts_strtod_c(const char *s, const char **end) {
-  const char *p = s;
-  double v = 0;
-  int digits = 0, scale = 0, neg = 0;
-
-  while (hts_isspace(*p))
-    p++;
-  if (*p == '+' || *p == '-')
-    neg = *p++ == '-';
-  for (; hts_isdigit(*p); p++, digits++)
-    v = v * 10 + (*p - '0');
-  if (*p == '.') {
-    for (p++; hts_isdigit(*p); p++, digits++, scale--)
-      v = v * 10 + (*p - '0');
-  }
-  if (digits == 0) {
-    if (end != NULL)
-      *end = s;
-    return 0;
-  }
-  if (*p == 'e' || *p == 'E') {
-    const char *q = p + 1;
-    int eneg = 0, e = 0;
-
-    if (*q == '+' || *q == '-')
-      eneg = *q++ == '-';
-    if (hts_isdigit(*q)) {
-      /* past 1000 the result is already 0 or infinite */
-      for (; hts_isdigit(*q); q++)
-        if (e < 1000)
-          e = e * 10 + (*q - '0');
-      scale += eneg ? -e : e;
-      p = q;
-    }
-  }
-  for (; scale > 0; scale--)
-    v *= 10;
-  for (; scale < 0; scale++)
-    v /= 10;
-  if (end != NULL)
-    *end = p;
-  return neg ? -v : v;
-}
-
 // RFC 822 date in GMT (256-byte buffer)
 void time_rfc822(char *s, struct tm *A) {
   if (A == NULL) {

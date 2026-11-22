@@ -1819,7 +1819,7 @@ static void st_glued_read(hts_boolean wide, LLint min, LLint max,
            (int) (com - buf));
 }
 
-/* Parses the text with the frozen legacy sscanf() and hts_isdigit() loop. */
+/* Parses the text with the legacy sscanf() and digit loop. */
 static void st_glued_legacy(hts_boolean wide, const char *text, LLint *value,
                             int *adv) {
   if (wide) {

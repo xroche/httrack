@@ -4466,7 +4466,7 @@ static const struct {
   const char *name;
   int (*libc)(int);
   int (*hts)(int);
-  hts_boolean maps; /* returns a char rather than a yes/no */
+  hts_boolean returns_char; /* rather than a yes/no */
 } st_ctype_pairs[] = {
     {"isdigit", isdigit, hts_isdigit, HTS_FALSE},
     {"isupper", isupper, hts_isupper, HTS_FALSE},
@@ -4475,11 +4475,6 @@ static const struct {
     {"isalnum", isalnum, hts_isalnum, HTS_FALSE},
     {"isxdigit", isxdigit, hts_isxdigit, HTS_FALSE},
     {"isspace", isspace, hts_isspace, HTS_FALSE},
-    {"isblank", isblank, hts_isblank, HTS_FALSE},
-    {"iscntrl", iscntrl, hts_iscntrl, HTS_FALSE},
-    {"isprint", isprint, hts_isprint, HTS_FALSE},
-    {"isgraph", isgraph, hts_isgraph, HTS_FALSE},
-    {"ispunct", ispunct, hts_ispunct, HTS_FALSE},
     {"tolower", tolower, hts_tolower, HTS_TRUE},
     {"toupper", toupper, hts_toupper, HTS_TRUE},
 };
@@ -4496,7 +4491,7 @@ static hts_boolean st_ctype_matches_c(void) {
       const int want = st_ctype_pairs[i].libc(c),
                 got = st_ctype_pairs[i].hts(c);
 
-      if (st_ctype_pairs[i].maps ? want != got : !want != !got) {
+      if (st_ctype_pairs[i].returns_char ? want != got : !want != !got) {
         printf("ctype C: %s(%d) is %d, libc says %d\n", st_ctype_pairs[i].name,
                c, got, want);
         ok = HTS_FALSE;
@@ -4504,11 +4499,50 @@ static hts_boolean st_ctype_matches_c(void) {
     }
     /* a negative char is undefined for libc: no class, case unchanged */
     for (c = -128; c < EOF; c++) {
-      if (st_ctype_pairs[i].hts(c) != (st_ctype_pairs[i].maps ? c : 0)) {
+      if (st_ctype_pairs[i].hts(c) !=
+          (st_ctype_pairs[i].returns_char ? c : 0)) {
         printf("ctype C: %s(%d) is %d\n", st_ctype_pairs[i].name, c,
                st_ctype_pairs[i].hts(c));
         ok = HTS_FALSE;
       }
+    }
+  }
+  return ok;
+}
+
+/* Does hts_strtod_c() round every value as the "C" locale's strtod() does? */
+static hts_boolean st_strtod_matches_c(void) {
+  static const char *const odd[] = {"1.005",
+                                    "0.123456789",
+                                    "1e22",
+                                    "0.07",
+                                    "123456789012345",
+                                    "9007199254740993",
+                                    "1e-5",
+                                    "86400.001",
+                                    "2.5E-3",
+                                    "-0.07",
+                                    "5e",
+                                    "-x",
+                                    "7e+2"};
+  hts_boolean ok = HTS_TRUE;
+  char buf[32];
+  int n;
+
+  setlocale(LC_ALL, "C");
+  for (n = 0; n < 200000 + (int) (sizeof(odd) / sizeof(odd[0])); n++) {
+    const char *s = buf;
+
+    if (n < 100000)
+      snprintf(buf, sizeof(buf), "%d.%03d", n / 1000, n % 1000);
+    else if (n < 200000)
+      snprintf(buf, sizeof(buf), "0.%05d", n - 100000);
+    else
+      s = odd[n - 200000];
+    if (hts_strtod_c(s, NULL) != strtod(s, NULL)) {
+      printf("strtod C: %s reads %.17g, libc says %.17g\n", s,
+             hts_strtod_c(s, NULL), strtod(s, NULL));
+      ok = HTS_FALSE;
     }
   }
   return ok;
@@ -4580,6 +4614,14 @@ static hts_boolean st_locale_engine_ok(const char *name) {
                   "optpause_read");
   ST_LOCALE_CHECK(hts_strtod_c(" -2.5e1x", &end) == -25 && *end == 'x',
                   "hts_strtod_c");
+  ST_LOCALE_CHECK(optpause_read(" 5:10 ", &pmin, &pmax) == 2 &&
+                      optpause_read("5", &pmin, &pmax) == 1 &&
+                      optpause_read("5:", &pmin, &pmax) == 0 &&
+                      optpause_read("5x", &pmin, &pmax) == 0 &&
+                      optpause_read("0x10", &pmin, &pmax) == 0,
+                  "optpause_read junk");
+  ST_LOCALE_CHECK(optrate_read("0x5", &rate) == 3 && rate == -1,
+                  "optrate_read hex");
   ST_LOCALE_CHECK(hts_strcasecmp("INDEX.HTML", "index.html") == 0 &&
                       hts_strncasecmp("Iz", "iy", 1) == 0 &&
                       hts_strcasecmp("\xc9", "\xe9") != 0,
@@ -4601,6 +4643,10 @@ static int st_locale(httrackp *opt, int argc, char **argv) {
   (void) opt;
   if (ok)
     printf("ctype C: ok\n");
+  if (st_strtod_matches_c())
+    printf("strtod C: ok\n");
+  else
+    ok = HTS_FALSE;
   ok = st_locale_engine_ok("C") && ok;
   for (i = 0; i < argc; i++) {
     if (setlocale(LC_ALL, argv[i]) == NULL) {
