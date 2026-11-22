@@ -3941,7 +3941,7 @@ static const char *hts_query_strip_keys_match(const char *rules,
     hts_span pattern, keys;
     char BIGSTK pat[HTS_URLMAXSIZE * 2];
 
-    if (line.len == 0)
+    if (hts_span_empty(line))
       continue;
     if (hts_span_split(line, '=', &pattern, &keys)) {
       /* Clip a too-long pattern, never skip it. */
@@ -3985,8 +3985,8 @@ const char *hts_strip_query_rules(httrackp *opt) {
    rule is. HTS_FALSE when either side is empty. */
 static hts_boolean hts_host_alias_split(hts_span rule, hts_span *aliases,
                                         hts_span *canon) {
-  return hts_span_split(rule, '=', aliases, canon) && aliases->len != 0 &&
-         canon->len != 0;
+  return hts_span_split(rule, '=', aliases, canon) &&
+         !hts_span_empty(*aliases) && !hts_span_empty(*canon);
 }
 
 /* see htscore.h */
@@ -4011,7 +4011,7 @@ const char *hts_host_alias_match(const char *rules, const char *host,
 
       /* A trailing slash is not part of a path. */
       alias = hts_span_trim(alias, " \t", " \t/");
-      if (alias.len != 0 && hts_span_copy(alias, glob, sizeof(glob))) {
+      if (!hts_span_empty(alias) && hts_span_copy(alias, glob, sizeof(glob))) {
         char *ghost;
 
         /* the collapse applies to the pattern too, so a rule may spell either
@@ -4226,7 +4226,7 @@ static hts_boolean hts_host_alias_token_ok(hts_span token, hts_boolean glob) {
   size_t len;
 
   token = hts_span_trim(token, " \t", " \t");
-  if (token.len == 0 || !hts_span_copy(token, buff, sizeof(buff)))
+  if (hts_span_empty(token) || !hts_span_copy(token, buff, sizeof(buff)))
     return HTS_FALSE;
   len = token.len;
   while (len > 0 && buff[len - 1] == '/')
@@ -4280,8 +4280,8 @@ const char *hts_host_alias_looping(const char *rules, hts_boolean collapse_www,
     char BIGSTK canon[HTS_URLMAXSIZE * 2], tmp[HTS_URLMAXSIZE * 2];
     hts_boolean settled;
 
-    if (!hts_span_split(line, '=', &aliases, &target) || target.len == 0 ||
-        !hts_span_copy(target, canon, sizeof(canon)))
+    if (!hts_span_split(line, '=', &aliases, &target) ||
+        hts_span_empty(target) || !hts_span_copy(target, canon, sizeof(canon)))
       continue;
     (void) hts_host_alias_resolve(rules, canon, collapse_www, tmp, sizeof(tmp),
                                   &settled);
@@ -4476,9 +4476,10 @@ hts_boolean hts_url_view_parse(const char *s, size_t len, hts_url_view *v) {
     hts_span inside, rest;
 
     if (hts_span_split(auth, ']', &inside, &rest) &&
-        (rest.len == 0 || hts_span_starts_with(rest, hts_span_of(":")))) {
+        (hts_span_empty(rest) ||
+         hts_span_starts_with(rest, hts_span_of(":")))) {
       v->host = hts_span_at(auth.p, inside.len + 1);
-      if (rest.len != 0)
+      if (!hts_span_empty(rest))
         v->port = hts_span_skip(rest, 1);
     } else {
       v->host = auth;

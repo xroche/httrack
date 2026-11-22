@@ -525,7 +525,7 @@ static int normalize_http_headers(const char *resp_hdr, long long set_cl,
   for (cur = all.p; hts_span_next(&cur, all.p + all.len, '\n', &line);) {
     if (hts_span_ends_with(line, hts_span_of("\r")))
       line.len--; /* Strip the CR, which is re-added below. */
-    if (line.len == 0)
+    if (hts_span_empty(line))
       break; /* blank line: end of headers */
     if (first) {
       first = 0; /* status line: keep verbatim */
@@ -748,7 +748,7 @@ void warc_http_header_value(const char *hdr, const char *name, char *out,
   for (cur = all.p; hts_span_next(&cur, all.p + all.len, '\n', &line);) {
     if (hts_span_ends_with(line, hts_span_of("\r")))
       line.len--;
-    if (line.len == 0)
+    if (hts_span_empty(line))
       break; /* end of headers */
     if (hts_span_starts_with_ci(line, n) &&
         hts_span_starts_with(hts_span_skip(line, n.len), hts_span_of(":"))) {

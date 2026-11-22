@@ -115,16 +115,20 @@ static hts_boolean span_in_set(const char *set, char c) {
   return c != '\0' && strchr(set, c) != NULL;
 }
 
+hts_boolean hts_span_empty(hts_span s) {
+  return s.len == 0 ? HTS_TRUE : HTS_FALSE;
+}
+
 hts_span hts_span_trim(hts_span s, const char *left, const char *right) {
-  while (s.len > 0 && span_in_set(left, s.p[0]))
+  while (!hts_span_empty(s) && span_in_set(left, s.p[0]))
     s = hts_span_skip(s, 1);
-  while (s.len > 0 && span_in_set(right, s.p[s.len - 1]))
+  while (!hts_span_empty(s) && span_in_set(right, s.p[s.len - 1]))
     s.len--;
   return s;
 }
 
 hts_boolean hts_span_split(hts_span s, char c, hts_span *head, hts_span *tail) {
-  const char *const at = s.len != 0 ? memchr(s.p, c, s.len) : NULL;
+  const char *const at = !hts_span_empty(s) ? memchr(s.p, c, s.len) : NULL;
 
   if (at == NULL)
     return HTS_FALSE;

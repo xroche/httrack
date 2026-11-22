@@ -96,6 +96,9 @@ hts_boolean hts_span_split(hts_span s, char c, hts_span *head, hts_span *tail);
 hts_boolean hts_span_next(const char **cur, const char *end, char sep,
                           hts_span *out);
 
+/* Does S hold no bytes? Its pointer does not matter. */
+hts_boolean hts_span_empty(hts_span s);
+
 /* Do A and B hold the same bytes? */
 hts_boolean hts_span_eq(hts_span a, hts_span b);
 

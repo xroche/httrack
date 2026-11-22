@@ -4041,6 +4041,20 @@ static int st_spancmp(httrackp *opt, int argc, char **argv) {
       failures++;
     }
   }
+  {
+    static const char one[] = "x";
+    const hts_span spans[] = {hts_span_at(NULL, 0), hts_span_at(one, 0),
+                              hts_span_at(one, 1)};
+    const hts_boolean want[] = {HTS_TRUE, HTS_TRUE, HTS_FALSE};
+
+    for (i = 0; i < sizeof(spans) / sizeof(spans[0]); i++) {
+      if (hts_span_empty(spans[i]) != want[i]) {
+        printf("spancmp: empty %d gave %d\n", (int) i,
+               (int) hts_span_empty(spans[i]));
+        failures++;
+      }
+    }
+  }
   printf("spancmp: %d cases, %d failures\n",
          (int) (sizeof(cases) / sizeof(cases[0]) +
                 sizeof(skips) / sizeof(skips[0])),
@@ -4520,7 +4534,7 @@ static hts_boolean urlview_tiles(const char *s, size_t len,
 
   /* memchr() over 4 bytes, because strchr() would match a NUL */
   if (v->host.p == NULL || v->path.p == NULL ||
-      (v->path.len != 0 && memchr("/?#\\", v->path.p[0], 4) == NULL))
+      (!hts_span_empty(v->path) && memchr("/?#\\", v->path.p[0], 4) == NULL))
     return HTS_FALSE;
   for (i = 0; i < sizeof(parts) / sizeof(parts[0]); i++) {
     const hts_span *const sp = parts[i];
