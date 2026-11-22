@@ -3282,8 +3282,8 @@ static int sized_clip_bad(const char *what, const char *got, const char *buf,
   return 0;
 }
 
-/* cookie_get() clips a field, bauth_prefix() refuses a key that does not fit.
- */
+/* cookie_get() clips a field, but bauth_prefix() refuses a key that does not
+ * fit. */
 static int st_cookie_sized(httrackp *opt, int argc, char **argv) {
   static const char value[] = "0123456789abcdefghijklmnopqrstuvwxyz0123456789";
   static const char rec[] = "example.com\tTRUE\t/\tFALSE\t0\tname\t"

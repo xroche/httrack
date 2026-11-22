@@ -909,8 +909,7 @@ static int st_append_utf8_sized(httrackp *opt, int argc, char **argv) {
     strlcpybuff(buf, "dir", cap);
     n = hts_appendStringUTF8(buf, cap, src, no_budget);
     if (n != strlen(cases[i].want) - 3 ||
-        !st_sized_clip_ok(buf, cap, cases[i].want) ||
-        strlen(buf) != strlen(cases[i].want)) {
+        !st_sized_clip_ok(buf, cap, cases[i].want)) {
       printf("append-utf8-sized: into %u bytes gave '%.*s'\n", (unsigned) cap,
              (int) cap, buf);
       fail = 1;

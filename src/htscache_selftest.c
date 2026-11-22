@@ -4959,8 +4959,7 @@ static int sized_save_bad(const char *what, const htsblk *r, const char *buf,
   return 0;
 }
 
-/* Sized cache readers clip Location, refuse a long save name, stay in bounds.
- */
+/* The sized cache readers clip Location and refuse a long save name. */
 static int st_cache_sized(httrackp *opt, int argc, char **argv) {
   const char *const adr = "example.com";
   const char *const fil = "/moved.html";
@@ -5016,15 +5015,19 @@ static int st_cache_sized(httrackp *opt, int argc, char **argv) {
     r = cache_read_ro(opt, &cache, adr, fil, NULL, loc, cap);
     fail |= r.statuscode != 301 || sized_location_bad("read_ro", loc, cap);
     freet(r.adr);
+    loc[0] = 'Q';
     r = cache_read(opt, &cache, adr, fil, NULL, loc, cap);
     fail |= sized_location_bad("read", loc, cap);
     freet(r.adr);
+    sav[0] = 'Q';
     r = cache_readex(opt, &cache, adr, fil, NULL, NULL, 0, sav, cap, 1);
     fail |= sized_save_bad("readex", &r, sav, cap, save, 301);
     freet(r.adr);
+    sav[0] = 'Q';
     r = cache_read_including_broken(opt, &cache, adr, fil, sav, cap, loc, cap);
     fail |= sized_save_bad("including_broken", &r, sav, cap, save, 301) ||
             sized_location_bad("including_broken", loc, cap);
+    sav[0] = 'Q';
     r = cache_read_including_broken(opt, &cache, adr, broken_fil, sav, cap, loc,
                                     cap);
     fail |= sized_save_bad("broken ref", &r, sav, cap, save, 200) ||
@@ -5036,9 +5039,11 @@ static int st_cache_sized(httrackp *opt, int argc, char **argv) {
   for (i = savelen; i <= savelen + 1; i++) {
     char *sav = st_sized_alloc(i);
 
+    sav[0] = 'Q';
     r = cache_readex(opt, &cache, adr, fil, NULL, NULL, 0, sav, i, 1);
     fail |= sized_save_bad("readex edge", &r, sav, i, save, 301);
     freet(r.adr);
+    sav[0] = 'Q';
     r = cache_read_including_broken(opt, &cache, adr, broken_fil, sav, i, NULL,
                                     0);
     fail |= sized_save_bad("broken ref edge", &r, sav, i, save, 200);

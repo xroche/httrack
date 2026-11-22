@@ -66,7 +66,8 @@ typedef enum {
 } catch_url_status;
 
 /* Like catch_url(), but returns why the capture failed. A method or URL too
-   long for its buffer is refused. */
+   long for its buffer is refused. data is left untouched on
+   CATCH_URL_ERR_REQUEST, and emptied on CATCH_URL_ERR_BLOCK. */
 catch_url_status catch_url_capture(T_SOC soc, char *url, size_t url_size,
                                    char *method, size_t method_size, char *data,
                                    size_t data_size);

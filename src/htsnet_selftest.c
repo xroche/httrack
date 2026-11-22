@@ -1677,6 +1677,42 @@ static catch_url_status st_catchurl_sized_run(const char *req, char *url,
   return status;
 }
 
+/* Did a method and URL of these lengths capture with the given status? */
+static hts_boolean st_catchurl_width_ok(size_t method_len, size_t url_len,
+                                        catch_url_status want) {
+  static const char base[] = "http://example.com/";
+  static const char tail[] = " HTTP/1.0\r\nX-Pad: \r\n\r\n";
+  const size_t cap = 4096; /* above every width, so only the scan can refuse */
+  char *req = malloct(method_len + 1 + url_len + sizeof(tail));
+  char *const want_url = req + method_len + 1;
+  char *url = st_sized_alloc(cap);
+  char *method = st_sized_alloc(cap);
+  char *data = st_sized_alloc(CATCH_URL_DATA_SIZE);
+  catch_url_status got;
+  hts_boolean ok;
+
+  assertf(req != NULL && url_len >= sizeof(base) - 1);
+  memset(req, 'A', method_len);
+  req[method_len] = ' ';
+  memcpy(want_url, base, sizeof(base) - 1);
+  memset(want_url + sizeof(base) - 1, 'a', url_len - (sizeof(base) - 1));
+  memcpy(want_url + url_len, tail, sizeof(tail));
+  got = st_catchurl_sized_run(req, url, cap, method, cap, data,
+                              CATCH_URL_DATA_SIZE);
+  want_url[url_len] = '\0';
+  ok = got == want && (got != CATCH_URL_OK || (strcmp(url, want_url) == 0 &&
+                                               strlen(method) == method_len));
+  if (!ok) {
+    printf("catchurl-sized: method %u url %u: status %d, want %d\n",
+           (unsigned) method_len, (unsigned) url_len, (int) got, (int) want);
+  }
+  freet(req);
+  freet(url);
+  freet(method);
+  freet(data);
+  return ok;
+}
+
 /* Each catch_url_capture() output fits its capacity, or the capture fails. */
 static int st_catchurl_sized(httrackp *opt, int argc, char **argv) {
   static const char get[] = ST_CATCHURL_REQ "X-Pad: \r\n\r\n";
@@ -1695,7 +1731,7 @@ static int st_catchurl_sized(httrackp *opt, int argc, char **argv) {
        CATCH_URL_OK},
       {get, "GET", get_want, sizeof(url_want) - 1, 4, sizeof(get_want),
        CATCH_URL_ERR_REQUEST},
-      /* the only row where the peer address itself is clipped */
+      /* the only row where the host part is clipped here */
       {get, "GET", get_want, 8, 4, sizeof(get_want), CATCH_URL_ERR_REQUEST},
       {get, "GET", get_want, sizeof(url_want), 3, sizeof(get_want),
        CATCH_URL_ERR_REQUEST},
@@ -1703,6 +1739,9 @@ static int st_catchurl_sized(httrackp *opt, int argc, char **argv) {
        CATCH_URL_ERR_BLOCK},
       {get, "GET", get_want, sizeof(url_want), 4, 8, CATCH_URL_ERR_BLOCK},
       {post, "POST", post_want, sizeof(url_want), 5, sizeof(post_want),
+       CATCH_URL_OK},
+      /* spare room past the body, so its NUL is checked */
+      {post, "POST", post_want, sizeof(url_want), 5, sizeof(post_want) + 4,
        CATCH_URL_OK},
       /* the body is clipped to the room the headers left */
       {post, "POST", post_want, sizeof(url_want), 5,
@@ -1742,6 +1781,13 @@ static int st_catchurl_sized(httrackp *opt, int argc, char **argv) {
     freet(method);
     freet(data);
   }
+  /* a token longer than the scan width is refused, not split */
+  if (!st_catchurl_width_ok(CATCH_URL_METHOD_MAX, 19, CATCH_URL_OK) ||
+      !st_catchurl_width_ok(CATCH_URL_METHOD_MAX + 1, 19,
+                            CATCH_URL_ERR_REQUEST) ||
+      !st_catchurl_width_ok(3, HTS_URLMAXSIZE * 2 - 1, CATCH_URL_OK) ||
+      !st_catchurl_width_ok(3, HTS_URLMAXSIZE * 2, CATCH_URL_ERR_REQUEST))
+    fail = 1;
   return st_verdict("catchurl-sized", fail);
 }
 

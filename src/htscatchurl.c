@@ -191,10 +191,14 @@ catch_url_status catch_url_capture(T_SOC soc, char *url, size_t url_size,
       line[0] = protocol[0] = '\0';
       // a clipped request-line names a URL the browser did not ask for
       if (!socinput(soc, line, (int) sizeof(line)) && strnotempty(line)) {
+        int method_end = 0, url_end = 0;
+
         // a clipped method or URL names another request: refuse what won't fit
         if (sscanf(line,
-                   "%" CATCH_URL_STR(CATCH_URL_METHOD_MAX) "s %2047s %255s",
-                   wire_method, wire_url, protocol) == 3 &&
+                   "%" CATCH_URL_STR(CATCH_URL_METHOD_MAX) "s%n %2047s%n %255s",
+                   wire_method, &method_end, wire_url, &url_end,
+                   protocol) == 3 &&
+            is_realspace(line[method_end]) && is_realspace(line[url_end]) &&
             strlen(wire_method) < method_size && strlen(wire_url) < url_size) {
           lien_adrfil af;
 

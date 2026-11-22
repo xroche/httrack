@@ -728,11 +728,11 @@ char *cookie_find(char *s, const char *cook_name, const char *domain, const char
     int t;
 
     if (strnotempty(cook_name) == 0)
-      t = 1;                    // accepter par défaut
+      t = 1; // accept by default
     else
       t = (strcmp(cookie_get(buffer, sizeof(buffer), a, 5), cook_name) ==
-           0);                  // same name?
-    if (t) {                    // même nom ou nom qualconque
+           0); // same name?
+    if (t) {   // same name, or any name
       //
       const char *chk_dom =
           cookie_get(buffer, sizeof(buffer), a, 0); // cookie's own domain
