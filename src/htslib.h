@@ -860,10 +860,8 @@ hts_boolean hts_escape_span(const char *src, size_t n, const char *from,
 
 /* Header line helpers shared by the request writer and the redaction code. */
 size_t header_name_len(const char *line);
-hts_boolean header_name_is(const char *line, size_t len, const char *name,
-                           size_t name_len);
-hts_boolean header_name_in(const char *line, const char *const *names,
-                           size_t count);
+/* Is the name opening LINE one of the NULL-terminated NAMES, in any case? */
+hts_boolean header_name_in(const char *line, const char *const *names);
 
 /* What hts_mask_passwords() reads: */
 typedef enum {

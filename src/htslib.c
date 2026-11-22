@@ -413,18 +413,6 @@ size_t header_name_len(const char *line) {
   return len;
 }
 
-/* Does the name on this line equal name, ignoring case? */
-hts_boolean header_name_is(const char *line, size_t len, const char *name,
-                           size_t name_len) {
-  size_t i = 0;
-
-  if (len != name_len)
-    return HTS_FALSE;
-  while (i < len && streql(line[i], name[i]))
-    i++;
-  return i == len;
-}
-
 /* Does the line open with an RFC 7230 token name and a colon? */
 static hts_boolean header_line_valid(const char *line) {
   const size_t len = header_name_len(line);
@@ -440,16 +428,9 @@ static hts_boolean header_line_valid(const char *line) {
   return len != 0;
 }
 
-hts_boolean header_name_in(const char *line, const char *const *names,
-                           size_t count) {
-  const size_t len = header_name_len(line);
-  size_t i;
-
-  for (i = 0; len != 0 && i < count; i++) {
-    if (header_name_is(line, len, names[i], strlen(names[i])))
-      return HTS_TRUE;
-  }
-  return HTS_FALSE;
+hts_boolean header_name_in(const char *line, const char *const *names) {
+  return hts_span_index(hts_span_at(line, header_name_len(line)), names,
+                        HTS_TRUE) >= 0;
 }
 
 hts_boolean http_headers_have_field(const char *headers,
@@ -466,7 +447,8 @@ hts_boolean http_headers_have_field(const char *headers,
     return HTS_FALSE;
   /* anchored, so a folded line or a name inside a value cannot match */
   for (line = headers; *line != '\0';) {
-    if (header_name_is(line, header_name_len(line), field_name, len))
+    if (hts_span_eq_ci(hts_span_at(line, header_name_len(line)),
+                       hts_span_at(field_name, len)))
       return HTS_TRUE;
     while (*line != '\0' && *line != '\n' && *line != '\r')
       line++;
@@ -484,28 +466,31 @@ static hts_boolean header_line_refused(const char *line) {
                                         "Keep-Alive",
                                         "TE",
                                         "Upgrade",
-                                        "Expect"};
+                                        "Expect",
+                                        NULL};
 
-  return header_name_in(line, refused, sizeof(refused) / sizeof(refused[0]));
+  return header_name_in(line, refused);
 }
 
 /* Fields a request carries once, so a later custom line overrides an earlier.
  */
 static hts_boolean header_line_single(const char *line) {
-  static const char *const single[] = {"Host", "Cookie", "Authorization"};
+  static const char *const single[] = {"Host", "Cookie", "Authorization", NULL};
 
-  return header_name_in(line, single, sizeof(single) / sizeof(single[0]));
+  return header_name_in(line, single);
 }
 
 /* An update or a resume writes these fields itself, dropping the custom line.
  */
 static hts_boolean header_line_engine_conditional(const char *line) {
-  static const char *const conditional[] = {
-      "Range", "If-Match", "If-None-Match", "If-Modified-Since",
-      "If-Unmodified-Since"};
+  static const char *const conditional[] = {"Range",
+                                            "If-Match",
+                                            "If-None-Match",
+                                            "If-Modified-Since",
+                                            "If-Unmodified-Since",
+                                            NULL};
 
-  return header_name_in(line, conditional,
-                        sizeof(conditional) / sizeof(conditional[0]));
+  return header_name_in(line, conditional);
 }
 
 /* Return the last unfolded line of headers, or NULL. */
@@ -582,12 +567,12 @@ const char *http_custom_header_warning(const char *headers, const char *line) {
 
 /* The -%X warnings, plus Host, Cookie and Proxy-*. */
 const char *http_bundle_header_refusal(const char *headers, const char *line) {
-  static const char *const engine[] = {"Host", "Cookie"};
+  static const char *const engine[] = {"Host", "Cookie", NULL};
   const char *const why = http_custom_header_warning(headers, line);
 
   if (why != NULL)
     return why;
-  if (header_name_in(line, engine, sizeof(engine) / sizeof(engine[0])))
+  if (header_name_in(line, engine))
     return "Host and Cookie are the engine's";
   if (strfield(line, "Proxy-"))
     return "a proxy header is not for the site";

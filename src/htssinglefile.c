@@ -247,21 +247,7 @@ char singlefile_ref_class(const char *tag_name, const char *attr,
 /* Paths                                                         */
 /* ------------------------------------------------------------ */
 
-static int sf_is_space(int c) {
-  return c == ' ' || c == '\t' || c == '\r' || c == '\n' || c == '\f';
-}
-
 static int sf_is_sep(int c) { return c == '/' || c == '\\'; }
-
-/* Drop the whitespace surrounding a reference. */
-static void sf_trim(const char **ref, size_t *reflen) {
-  while (*reflen > 0 && sf_is_space((unsigned char) **ref)) {
-    (*ref)++;
-    (*reflen)--;
-  }
-  while (*reflen > 0 && sf_is_space((unsigned char) (*ref)[*reflen - 1]))
-    (*reflen)--;
-}
 
 /* Copy path into out with '/' separators and no trailing one. */
 static void sf_normalize_path(const char *path, String *out) {
@@ -331,20 +317,21 @@ static hts_boolean sf_resolve(const sf_ctx *ctx, const char *base_dir,
   hts_boolean ok = HTS_TRUE;
   size_t i, n;
   int sp = 0, part;
+  const hts_span r =
+      hts_span_trim(hts_span_at(ref, reflen), " \t\r\n\f", " \t\r\n\f");
 
-  sf_trim(&ref, &reflen);
   /* A mirrored name carries no query or fragment. */
-  for (n = 0; n < reflen; n++) {
-    if (ref[n] == '#' || ref[n] == '?')
+  for (n = 0; n < r.len; n++) {
+    if (r.p[n] == '#' || r.p[n] == '?')
       break;
   }
   if (n == 0 || n >= sizeof(raw))
     return HTS_FALSE;
   /* Site-root-relative: no base to resolve it against. */
-  if (sf_is_sep((unsigned char) ref[0]))
+  if (sf_is_sep((unsigned char) r.p[0]))
     return HTS_FALSE;
   for (i = 0; i < n; i++) { /* a colon before any separator marks a scheme */
-    const unsigned char c = (unsigned char) ref[i];
+    const unsigned char c = (unsigned char) r.p[i];
 
     if (c == ':')
       return HTS_FALSE;
@@ -352,7 +339,7 @@ static hts_boolean sf_resolve(const sf_ctx *ctx, const char *base_dir,
         (!hts_isalnum((unsigned char) c) && c != '+' && c != '.' && c != '-'))
       break;
   }
-  memcpy(raw, ref, n);
+  memcpy(raw, r.p, n);
   raw[n] = '\0';
   unescape_amp(raw); /* HTML entities first, then the percent escapes */
   unescape_http(decoded, sizeof(decoded), raw);

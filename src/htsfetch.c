@@ -36,12 +36,6 @@ Please visit our Website: http://www.httrack.com
 #include "htspsl.h"
 #include "htswizard.h"
 
-static hts_boolean span_eq(const char *a, size_t alen, const char *b,
-                           size_t blen) {
-  return alen == blen && hts_strncasecmp(a, b, alen) == 0 ? HTS_TRUE
-                                                          : HTS_FALSE;
-}
-
 /* Find attribute name in the start tag at tag_name. On a match, *value and
  *len hold its value, empty when it has none. Otherwise *end, if not NULL,
  gets the tag's end, which is its '>', an unquoted '<' or the NUL. */
@@ -224,14 +218,14 @@ hts_boolean hts_fetch_has_base_target(const char *html) {
 /* Return the destination a click on a link with this target loads. A named
    target is a frame we cannot tell. */
 static int link_target_dest(const hts_fetch_tag *tag, int page_frame) {
-  const char *const target = tag->target;
-  const size_t len = tag->target_len;
+  const hts_span target = hts_span_at(tag->target, tag->target_len);
 
-  if (target == NULL || span_eq(target, len, "_self", 5))
+  if (tag->target == NULL || hts_span_eq_ci(target, hts_span_of("_self")))
     return page_frame;
-  if (span_eq(target, len, "_top", 4) || span_eq(target, len, "_blank", 6))
+  if (hts_span_eq_ci(target, hts_span_of("_top")) ||
+      hts_span_eq_ci(target, hts_span_of("_blank")))
     return HTS_FETCH_DEST_DOCUMENT;
-  if (span_eq(target, len, "_parent", 7) &&
+  if (hts_span_eq_ci(target, hts_span_of("_parent")) &&
       page_frame == HTS_FETCH_DEST_DOCUMENT)
     return HTS_FETCH_DEST_DOCUMENT;
   return HTS_FETCH_DEST_UNKNOWN;
@@ -441,13 +435,15 @@ hts_fetch_site hts_fetch_site_of(const char *from_adr, const char *to_adr) {
   origin_of(to_adr, &to);
   if (from.https != to.https)
     return HTS_FETCH_SITE_CROSS_SITE;
-  if (span_eq(from.host, from.host_len, to.host, to.host_len))
+  if (hts_span_eq_ci(hts_span_at(from.host, from.host_len),
+                     hts_span_at(to.host, to.host_len)))
     return from.port == to.port ? HTS_FETCH_SITE_SAME_ORIGIN
                                 : HTS_FETCH_SITE_SAME_SITE;
   fk = site_key(&from, &fl);
   tk = site_key(&to, &tl);
-  return span_eq(fk, fl, tk, tl) ? HTS_FETCH_SITE_SAME_SITE
-                                 : HTS_FETCH_SITE_CROSS_SITE;
+  return hts_span_eq_ci(hts_span_at(fk, fl), hts_span_at(tk, tl))
+             ? HTS_FETCH_SITE_SAME_SITE
+             : HTS_FETCH_SITE_CROSS_SITE;
 }
 
 void hts_fetch_through(httrackp *opt, hts_fetch_meta *fm, const char *adr) {
@@ -466,25 +462,21 @@ void hts_fetch_through(httrackp *opt, hts_fetch_meta *fm, const char *adr) {
 }
 
 hts_boolean hts_fetch_trustworthy(const char *adr) {
+  static const char *const local[] = {"localhost", "[::1]", NULL};
   fetch_origin o;
-  const char *dot;
+  hts_span host;
 
   if (strfield(adr, "ftp:"))
     return HTS_FALSE;
   origin_of(adr, &o);
-  if (o.https)
+  host = hts_span_at(o.host, o.host_len);
+  if (o.https || hts_span_index(host, local, HTS_TRUE) >= 0)
     return HTS_TRUE;
-  if (span_eq(o.host, o.host_len, "localhost", 9) ||
-      span_eq(o.host, o.host_len, "[::1]", 5))
+  // a name under .localhost, not ".localhost" itself
+  if (host.len > 10 && hts_span_ends_with_ci(host, hts_span_of(".localhost")))
     return HTS_TRUE;
-  if (o.host_len > 10 &&
-      span_eq(o.host + o.host_len - 10, 10, ".localhost", 10))
-    return HTS_TRUE;
-  dot = memchr(o.host, '.', o.host_len);
-  return dot != NULL && span_eq(o.host, (size_t) (dot - o.host), "127", 3) &&
-                 hts_host_is_ipv4(o.host, o.host_len)
-             ? HTS_TRUE
-             : HTS_FALSE;
+  return hts_span_starts_with(host, hts_span_of("127.")) &&
+         hts_host_is_ipv4(o.host, o.host_len);
 }
 
 hts_boolean hts_fetch_is_navigation(int dest) {
@@ -580,13 +572,7 @@ static const char *const accept_presets[][ACCEPT_KINDS] = {
 
 /* Return the accept_kinds index of the n bytes at name, or -1. */
 static int accept_kind_index(const char *name, size_t n) {
-  int i;
-
-  for (i = 0; i < ACCEPT_KINDS; i++) {
-    if (strlen(accept_kinds[i]) == n && strncmp(accept_kinds[i], name, n) == 0)
-      return i;
-  }
-  return -1;
+  return hts_span_index(hts_span_at(name, n), accept_kinds, HTS_FALSE);
 }
 
 /* Return the accept_kinds index of dest, or -1 for an unknown one. */

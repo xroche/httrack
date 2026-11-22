@@ -104,8 +104,6 @@ src/htslib.h: fsize_utf8
 src/htslib.h: getFunctionPtr
 src/htslib.h: get_filetime_rfc822
 src/htslib.h: get_userhttptype
-src/htslib.h: header_name_in
-src/htslib.h: header_name_is
 src/htslib.h: hts_basic_auth_value
 src/htslib.h: hts_body_missing_unexpectedly
 src/htslib.h: hts_client_hints_of
@@ -226,7 +224,6 @@ src/httrack-library.h: hts_findisdir
 src/httrack-library.h: hts_findisfile
 src/httrack-library.h: hts_findissystem
 src/httrack-library.h: hts_findnext
-src/httrack-library.h: hts_footer_field_ok
 src/httrack-library.h: hts_get_stats
 src/httrack-library.h: hts_host_alias_rule_ok
 src/httrack-library.h: hts_is_parsing

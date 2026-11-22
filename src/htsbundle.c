@@ -416,16 +416,12 @@ static hts_boolean bundle_scope_line(bundle *b, const char *value, int lineno,
   return HTS_TRUE;
 }
 
-/* Is the klen bytes at line the key key? */
-static hts_boolean key_is(const char *line, size_t klen, const char *key) {
-  return klen == strlen(key) && strncmp(line, key, klen) == 0;
-}
-
 /* Read b's lines up to "cookies", leaving fp at its jar. *cookies_line gets
    the number of that line, or 0 when b has no cookies. */
 static hts_boolean bundle_parse(httrackp *opt, bundle *b, text_src *src,
                                 int *cookies_line, char *err, size_t err_size) {
   static const char bom[] = "\xEF\xBB\xBF";
+  static const char *const keys[] = {"url", "ua", "header", "scope", NULL};
   char BIGSTK line[BUNDLE_LINE_MAX + 1];
   int lineno = 1;
   int version;
@@ -444,7 +440,7 @@ static hts_boolean bundle_parse(httrackp *opt, bundle *b, text_src *src,
   *cookies_line = 0;
   while (!src->eof) {
     const char *value;
-    size_t klen;
+    hts_span key;
 
     lineno++;
     why = bundle_readline(src, line);
@@ -452,29 +448,29 @@ static hts_boolean bundle_parse(httrackp *opt, bundle *b, text_src *src,
       BUNDLE_FAIL("%s, line %d: %s", b->file, lineno, why);
     if (line[0] == '\0' || line[0] == '#')
       continue;
-    klen = strcspn(line, " \t");
-    value = line + klen;
+    key = hts_span_at(line, strcspn(line, " \t"));
+    value = line + key.len;
     value += strspn(value, " \t");
-    if (key_is(line, klen, "cookies")) {
+    if (hts_span_eq(key, hts_span_of("cookies"))) {
       if (*value != '\0')
         BUNDLE_FAIL("%s, line %d: \"cookies\" takes no value", b->file, lineno);
       *cookies_line = lineno;
       return HTS_TRUE;
     }
-    if (!key_is(line, klen, "url") && !key_is(line, klen, "ua") &&
-        !key_is(line, klen, "header") && !key_is(line, klen, "scope")) {
+    if (hts_span_index(key, keys, HTS_FALSE) < 0) {
       /* a key in lowercase letters is no secret, so it alone is named */
       const hts_boolean shown =
-          klen <= 32 && strspn(line, "abcdefghijklmnopqrstuvwxyz") == klen;
+          key.len <= 32 &&
+          strspn(line, "abcdefghijklmnopqrstuvwxyz") == key.len;
 
       hts_log_print(opt, LOG_WARNING, "Bundle %s, line %d: unknown key%s%.*s",
-                    b->file, lineno, shown ? " " : "", shown ? (int) klen : 0,
-                    line);
+                    b->file, lineno, shown ? " " : "",
+                    shown ? (int) key.len : 0, line);
       continue;
     }
     if (*value == '\0')
       BUNDLE_FAIL("%s, line %d: no value", b->file, lineno);
-    if (key_is(line, klen, "url")) {
+    if (hts_span_eq(key, hts_span_of("url"))) {
       char host[COOKIE_MAX_DOMAIN];
       char BIGSTK typed[HTS_URLMAXSIZE * 3];
 
@@ -490,13 +486,13 @@ static hts_boolean bundle_parse(httrackp *opt, bundle *b, text_src *src,
                     BUNDLE_LIST_MAX);
       if (!strlist_add(&b->urls, &b->nurls, typed))
         BUNDLE_FAIL("%s: out of memory", b->file);
-    } else if (key_is(line, klen, "ua")) {
+    } else if (hts_span_eq(key, hts_span_of("ua"))) {
       if (b->ua != NULL)
         BUNDLE_FAIL("%s, line %d: ua given twice", b->file, lineno);
       b->ua = strdupt(value);
       if (b->ua == NULL)
         BUNDLE_FAIL("%s: out of memory", b->file);
-    } else if (key_is(line, klen, "header")) {
+    } else if (hts_span_eq(key, hts_span_of("header"))) {
       why = http_bundle_header_refusal(StringBuff(b->headers), value);
       if (why != NULL)
         BUNDLE_FAIL("%s, line %d: refused header: %s", b->file, lineno, why);

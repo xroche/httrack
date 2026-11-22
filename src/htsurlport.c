@@ -215,6 +215,18 @@ hts_boolean hts_span_ends_with_ci(hts_span s, hts_span suffix) {
          hts_span_starts_with_ci(hts_span_skip(s, s.len - suffix.len), suffix);
 }
 
+int hts_span_index(hts_span s, const char *const *words, hts_boolean fold) {
+  int i;
+
+  for (i = 0; words[i] != NULL; i++) {
+    const hts_span w = hts_span_of(words[i]);
+
+    if (s.len == w.len && span_bytes_eq(s.p, w.p, s.len, fold))
+      return i;
+  }
+  return -1;
+}
+
 // Only these two are escapes, so a raw Windows path keeps its backslashes.
 static hts_boolean param_escape(const char *p) {
   return p[0] == '\\' && (p[1] == '"' || p[1] == '\\');

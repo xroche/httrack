@@ -1205,13 +1205,9 @@ static void optinclude_fold(const char *key, char *value) {
     word++;
     len -= 2;
   }
-  for (i = 0; keywords[i] != NULL; i++) {
-    if (strlen(keywords[i]) == len &&
-        hts_strncasecmp(word, keywords[i], len) == 0) {
-      memcpy(value, keywords[i], len + 1);
-      return;
-    }
-  }
+  i = hts_span_index(hts_span_at(word, len), keywords, HTS_TRUE);
+  if (i >= 0)
+    memcpy(value, keywords[i], len + 1);
 }
 
 /* Include a file to the current command line */
