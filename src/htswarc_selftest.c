@@ -621,6 +621,8 @@ static int st_warc_surt(httrackp *opt, int argc, char **argv) {
       {"https://example.com:443/", "com,example)/"},
       {"http://www2.example.com/x", "com,example)/x"},
       {"http://example.com:8080/p", "com,example:8080)/p"},
+      {"HTTP://h:80/p", "h)/p"},
+      {"http://h:8x/p", "h)/p"},
       {"http://example.com:99999999999999999999/p",
        "com,example:99999999999999999999)/p"},
       {"http://example.com:4294967376/", "com,example:4294967376)/"},
@@ -634,6 +636,17 @@ static int st_warc_surt(httrackp *opt, int argc, char **argv) {
       {"http://example.com/d\xed\xa0\x80z", "com,example)/d%ED%A0%80z"},
       {"http://example.com/tr\xe2\x82", "com,example)/tr%E2%82"},
       {"http://ex\xe9.com/", "com,ex%E9)/"},
+      {"http://user:pass@www.Example.com:80/a?q=1#f", "com,example)/a?q=1"},
+      {"https://[2001:db8::1]:443/x", "[2001:db8::1])/x"},
+      {"ftp://1.2.3.4:21/p", "1.2.3.4:21)/p"},
+      {"http://[::FFFF:1.2.3.4]:8080/v", "[::ffff:1.2.3.4]:8080)/v"},
+      {"https://www3.a.b:8443/c", "b,a:8443)/c"},
+      /* These split as the URL view does, which changed their SURT. */
+      {"http://h\\x@y/z", "h)\\x@y/z"},
+      {"http://a\\b/c", "a)\\b/c"},
+      {"http://[::1]x/p", "[::1]x)/p"},
+      {"h/x?u=http://a/b", "h)/x?u=http://a/b"},
+      {"http:h/x", "h)/x"},
   };
 
   int err = 0;

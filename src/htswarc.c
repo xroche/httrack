@@ -583,58 +583,26 @@ static int surt_add_utf8(wbuf *out, const char *s, size_t n) {
    [IPv6] literals keep their host form. A non-default port is kept as ":port"
    before the ')'. Returns 0 on success. */
 static int surt_canon(const char *url, wbuf *out) {
-  const char *p, *scheme_end, *authend, *host, *hostsep, *port = NULL;
-  size_t portlen = 0, hlen, i;
+  const char *host, *path_end;
+  hts_span path;
+  size_t url_len, hlen, i;
   int def_port = -1;
   int is_ipv6 = 0, is_ip = 0;
   char hostbuf[1024];
+  hts_url_view v;
 
   if (url == NULL)
     return -1;
 
-  p = url;
-  scheme_end = strstr(url, "://");
-  if (scheme_end != NULL) {
-    size_t sl = (size_t) (scheme_end - url);
-    if (sl == 4 && hts_strncasecmp(url, "http", 4) == 0)
-      def_port = 80;
-    else if (sl == 5 && hts_strncasecmp(url, "https", 5) == 0)
-      def_port = 443;
-    p = scheme_end + 3;
-  }
-
-  authend = p;
-  while (*authend != '\0' && *authend != '/' && *authend != '?' &&
-         *authend != '#')
-    authend++;
-
-  { /* drop userinfo up to the last '@' inside the authority */
-    const char *q, *at = NULL;
-    for (q = p; q < authend; q++)
-      if (*q == '@')
-        at = q;
-    if (at != NULL)
-      p = at + 1;
-  }
-  host = p;
-
-  if (host < authend && host[0] == '[') { /* [IPv6] literal */
-    const char *rb = host;
-    is_ipv6 = 1;
-    while (rb < authend && *rb != ']')
-      rb++;
-    hostsep = (rb < authend) ? rb + 1 : authend;
-  } else {
-    const char *c = host;
-    while (c < authend && *c != ':')
-      c++;
-    hostsep = c;
-  }
-  hlen = (size_t) (hostsep - host);
-  if (hostsep < authend && *hostsep == ':') {
-    port = hostsep + 1;
-    portlen = (size_t) (authend - port);
-  }
+  url_len = strlen(url);
+  (void) hts_url_view_parse(url, url_len, &v);
+  if (hts_span_eq_ci(v.scheme, hts_span_of("http")))
+    def_port = 80;
+  else if (hts_span_eq_ci(v.scheme, hts_span_of("https")))
+    def_port = 443;
+  host = v.host.p;
+  hlen = v.host.len;
+  is_ipv6 = hts_span_starts_with(v.host, hts_span_of("["));
 
   if (hlen >= sizeof(hostbuf))
     return -1;
@@ -680,32 +648,32 @@ static int surt_canon(const char *url, wbuf *out) {
     }
   }
 
-  if (port != NULL && portlen > 0) { /* keep a non-default port */
+  if (!hts_span_empty(v.port)) { /* keep a non-default port */
     int pv = 0, ok = 1;
     size_t k;
-    for (k = 0; k < portlen; k++) {
-      if (port[k] < '0' || port[k] > '9') {
+    for (k = 0; k < v.port.len; k++) {
+      const char c = v.port.p[k];
+      if (c < '0' || c > '9') {
         ok = 0;
         break;
       }
       if (pv <= 65535) /* stop past 65535 so pv cannot overflow */
-        pv = pv * 10 + (port[k] - '0');
+        pv = pv * 10 + (c - '0');
     }
     if (ok && pv != def_port &&
-        (wbuf_add(out, ":", 1) != 0 || wbuf_add(out, port, portlen) != 0))
+        (wbuf_add(out, ":", 1) != 0 ||
+         wbuf_add(out, v.port.p, v.port.len) != 0))
       return -1;
   }
 
   if (wbuf_add(out, ")", 1) != 0)
     return -1;
 
-  { /* path + query, verbatim up to any fragment */
-    const char *frag = authend;
-    while (*frag != '\0' && *frag != '#')
-      frag++;
-    if (surt_add_utf8(out, authend, (size_t) (frag - authend)) != 0)
-      return -1;
-  }
+  /* Copy the path and query verbatim, and stop before the fragment's '#'. */
+  path_end = v.fragment.p != NULL ? v.fragment.p - 1 : url + url_len;
+  path = hts_span_between(v.path.p, path_end);
+  if (surt_add_utf8(out, path.p, path.len) != 0)
+    return -1;
   return 0;
 }
 
