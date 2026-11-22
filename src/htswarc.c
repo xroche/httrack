@@ -500,13 +500,12 @@ static void warc_make_id(warc_writer *w, char out[64]) {
 
 /* Case-insensitive "is this the header named name?" test, tolerating optional
    whitespace before the ':' (non-compliant "Name : value" is still matched). */
-static int header_is(const char *line, size_t line_len, const char *name) {
-  size_t nl = strlen(name), i;
-  if (line_len < nl || hts_strncasecmp(line, name, nl) != 0)
-    return 0;
-  for (i = nl; i < line_len && (line[i] == ' ' || line[i] == '\t'); i++)
-    ;
-  return i < line_len && line[i] == ':';
+static hts_boolean header_is(hts_span line, const char *name) {
+  const hts_span n = hts_span_of(name);
+  return hts_span_starts_with_ci(line, n) &&
+         hts_span_starts_with(
+             hts_span_trim(hts_span_skip(line, n.len), " \t", ""),
+             hts_span_of(":"));
 }
 
 /* Build the normalized HTTP header block from raw resp_hdr into out (no
@@ -524,15 +523,15 @@ static int normalize_http_headers(const char *resp_hdr, long long set_cl,
     return -1;
   all = hts_span_of(resp_hdr);
   for (cur = all.p; hts_span_next(&cur, all.p + all.len, '\n', &line);) {
-    if (line.len > 0 && line.p[line.len - 1] == '\r')
+    if (hts_span_ends_with(line, hts_span_of("\r")))
       line.len--; /* Strip the CR, which is re-added below. */
     if (line.len == 0)
       break; /* blank line: end of headers */
     if (first) {
       first = 0; /* status line: keep verbatim */
-    } else if (header_is(line.p, line.len, "Transfer-Encoding")) {
+    } else if (header_is(line, "Transfer-Encoding")) {
       continue;
-    } else if (set_cl >= 0 && header_is(line.p, line.len, "Content-Length")) {
+    } else if (set_cl >= 0 && header_is(line, "Content-Length")) {
       continue;
     }
     if (wbuf_add(out, line.p, line.len) != 0 || wbuf_add(out, "\r\n", 2) != 0)
@@ -748,12 +747,14 @@ void warc_http_header_value(const char *hdr, const char *name, char *out,
   all = hts_span_of(hdr);
   for (cur = all.p; hts_span_next(&cur, all.p + all.len, '\n', &line);) {
     const char *const p = line.p;
-    size_t len = line.len;
-    if (len > 0 && p[len - 1] == '\r')
-      len--;
+    size_t len;
+    if (hts_span_ends_with(line, hts_span_of("\r")))
+      line.len--;
+    len = line.len;
     if (len == 0)
       break; /* end of headers */
-    if (len > nl && hts_strncasecmp(p, name, nl) == 0 && p[nl] == ':') {
+    if (hts_span_starts_with_ci(line, hts_span_of(name)) &&
+        hts_span_starts_with(hts_span_skip(line, nl), hts_span_of(":"))) {
       const char *v = p + nl + 1;
       size_t vlen, k;
       while (v < p + len && (*v == ' ' || *v == '\t'))

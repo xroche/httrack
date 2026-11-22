@@ -88,6 +88,31 @@ hts_boolean hts_span_split(hts_span s, char c, hts_span *head, hts_span *tail);
    FALSE if it was clipped, or if SIZE is 0, which writes nothing. */
 hts_boolean hts_span_copy(hts_span s, char *dst, size_t size);
 
+/* Return the span over the LEN bytes at P. */
+hts_span hts_span_at(const char *p, size_t len);
+
+/* Return S without its first N bytes, or the empty span at its end when N
+   exceeds its length. */
+hts_span hts_span_skip(hts_span s, size_t n);
+
+/* Do A and B hold the same bytes? Pass a literal as hts_span_of("lit"). */
+hts_boolean hts_span_eq(hts_span a, hts_span b);
+
+/* Do A and B hold the same bytes once A-Z are folded to a-z? */
+hts_boolean hts_span_eq_ci(hts_span a, hts_span b);
+
+/* Does S start with the bytes of PREFIX? */
+hts_boolean hts_span_starts_with(hts_span s, hts_span prefix);
+
+/* Does S start with PREFIX once A-Z are folded to a-z? */
+hts_boolean hts_span_starts_with_ci(hts_span s, hts_span prefix);
+
+/* Does S end with the bytes of SUFFIX? */
+hts_boolean hts_span_ends_with(hts_span s, hts_span suffix);
+
+/* Does S end with SUFFIX once A-Z are folded to a-z? */
+hts_boolean hts_span_ends_with_ci(hts_span s, hts_span suffix);
+
 /* Find parameter NAME (exact, any case) in a header VALUE whose fields are
    split by any byte of SEPS, as in "type; a=1; NAME=\"v\"". The first NAME
    wins. A quoted value unescapes only \" and \\, and a missing end quote

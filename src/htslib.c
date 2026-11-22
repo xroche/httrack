@@ -3862,9 +3862,8 @@ hts_boolean hts_query_key_stripped(const char *arg, size_t keylen,
 
   while (hts_span_next(&cur, end, ',', &tok)) {
     tok = hts_span_trim(tok, " ", " ");
-    if (tok.len == 1 && tok.p[0] == '*')
-      return HTS_TRUE;
-    if (tok.len == keylen && strncmp(tok.p, arg, keylen) == 0)
+    if (hts_span_eq(tok, hts_span_of("*")) ||
+        hts_span_eq(tok, hts_span_at(arg, keylen)))
       return HTS_TRUE;
   }
   return HTS_FALSE;
@@ -4418,14 +4417,6 @@ static size_t engine_scheme_len(const char *s, size_t len) {
   return 0;
 }
 
-static hts_span span_of(const char *from, const char *to) {
-  hts_span r;
-
-  r.p = from;
-  r.len = (size_t) (to - from);
-  return r;
-}
-
 /* Is the span a decimal port in 0..65535? Empty and 0 pass, because
    hts_parse_url_port() checks the 1..65535 range. */
 static hts_boolean port_is_valid(hts_span port) {
@@ -4446,24 +4437,27 @@ hts_boolean hts_url_view_parse(const char *s, size_t len, hts_url_view *v) {
   const char *const end = s + len;
   const char *p = s;
   const char *auth_end, *at, *q;
+  hts_span auth;
   hts_boolean ok = HTS_TRUE;
   size_t n;
 
   memset(v, 0, sizeof(*v));
   if ((n = engine_scheme_len(s, len)) != 0) {
-    v->scheme = span_of(s, s + n - 1);
+    v->scheme = hts_span_at(s, n - 1);
     p = s + n;
   } else if (len != 0 && hts_isalpha((unsigned char) s[0])) {
     for (q = s + 1; q < end && (hts_isalnum((unsigned char) *q) || *q == '+' ||
                                 *q == '-' || *q == '.');
          q++)
       ;
-    if (end - q >= 3 && memcmp(q, "://", 3) == 0) {
-      v->scheme = span_of(s, q);
+    if (hts_span_starts_with(hts_span_at(q, (size_t) (end - q)),
+                             hts_span_of("://"))) {
+      v->scheme = hts_span_at(s, (size_t) (q - s));
       p = q + 1;
     }
   }
-  if (end - p >= 2 && p[0] == '/' && p[1] == '/')
+  if (hts_span_starts_with(hts_span_at(p, (size_t) (end - p)),
+                           hts_span_of("//")))
     p += 2;
 
   // the same set as hts_authority_end(), but a NUL is data here
@@ -4475,43 +4469,41 @@ hts_boolean hts_url_view_parse(const char *s, size_t len, hts_url_view *v) {
     if (*q == '@')
       at = q;
   if (at != NULL) {
-    v->userinfo = span_of(p, at);
+    v->userinfo = hts_span_at(p, (size_t) (at - p));
     p = at + 1;
   }
 
-  if (p < auth_end && *p == '[') {
-    const char *const close = memchr(p, ']', (size_t) (auth_end - p));
+  auth = hts_span_at(p, (size_t) (auth_end - p));
+  if (hts_span_starts_with(auth, hts_span_of("["))) {
+    hts_span inside, rest;
 
-    if (close != NULL && (close + 1 == auth_end || close[1] == ':')) {
-      v->host = span_of(p, close + 1);
-      if (close + 1 != auth_end)
-        v->port = span_of(close + 2, auth_end);
+    if (hts_span_split(auth, ']', &inside, &rest) &&
+        (rest.len == 0 || hts_span_starts_with(rest, hts_span_of(":")))) {
+      v->host = hts_span_at(auth.p, inside.len + 1);
+      if (rest.len != 0)
+        v->port = hts_span_skip(rest, 1);
     } else {
-      v->host = span_of(p, auth_end);
+      v->host = auth;
       ok = HTS_FALSE;
     }
-  } else {
-    const char *const colon = memchr(p, ':', (size_t) (auth_end - p));
-
-    v->host = span_of(p, colon != NULL ? colon : auth_end);
-    if (colon != NULL)
-      v->port = span_of(colon + 1, auth_end);
+  } else if (!hts_span_split(auth, ':', &v->host, &v->port)) {
+    v->host = auth;
   }
   if (v->port.p != NULL && !port_is_valid(v->port))
     ok = HTS_FALSE;
 
   for (q = auth_end; q < end && *q != '?' && *q != '#'; q++)
     ;
-  v->path = span_of(auth_end, q);
+  v->path = hts_span_at(auth_end, (size_t) (q - auth_end));
   if (q < end && *q == '?') {
     const char *const query = q + 1;
 
     for (q = query; q < end && *q != '#'; q++)
       ;
-    v->query = span_of(query, q);
+    v->query = hts_span_at(query, (size_t) (q - query));
   }
   if (q < end)
-    v->fragment = span_of(q + 1, end);
+    v->fragment = hts_span_at(q + 1, (size_t) (end - (q + 1)));
   return ok;
 }
 

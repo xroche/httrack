@@ -93,11 +93,9 @@ hts_boolean hts_parse_url_port(const char *a, int *port) {
 }
 
 hts_span hts_span_of(const char *s) {
-  hts_span r;
-
-  r.p = s != NULL ? s : "";
-  r.len = strlen(r.p);
-  return r;
+  if (s == NULL)
+    s = "";
+  return hts_span_at(s, strlen(s));
 }
 
 hts_boolean hts_span_next(const char **cur, const char *end, char sep,
@@ -108,8 +106,7 @@ hts_boolean hts_span_next(const char **cur, const char *end, char sep,
   if (start >= end)
     return HTS_FALSE;
   stop = memchr(start, sep, (size_t) (end - start));
-  out->p = start;
-  out->len = (size_t) ((stop != NULL ? stop : end) - start);
+  *out = hts_span_at(start, (size_t) ((stop != NULL ? stop : end) - start));
   *cur = stop != NULL ? stop + 1 : end;
   return HTS_TRUE;
 }
@@ -119,10 +116,8 @@ static hts_boolean span_in_set(const char *set, char c) {
 }
 
 hts_span hts_span_trim(hts_span s, const char *left, const char *right) {
-  while (s.len > 0 && span_in_set(left, s.p[0])) {
-    s.p++;
-    s.len--;
-  }
+  while (s.len > 0 && span_in_set(left, s.p[0]))
+    s = hts_span_skip(s, 1);
   while (s.len > 0 && span_in_set(right, s.p[s.len - 1]))
     s.len--;
   return s;
@@ -133,10 +128,8 @@ hts_boolean hts_span_split(hts_span s, char c, hts_span *head, hts_span *tail) {
 
   if (at == NULL)
     return HTS_FALSE;
-  head->p = s.p;
-  head->len = (size_t) (at - s.p);
-  tail->p = at + 1;
-  tail->len = s.len - head->len - 1;
+  *head = hts_span_at(s.p, (size_t) (at - s.p));
+  *tail = hts_span_skip(s, head->len + 1);
   return HTS_TRUE;
 }
 
@@ -151,16 +144,65 @@ hts_boolean hts_span_copy(hts_span s, char *dst, size_t size) {
   return n == s.len;
 }
 
-// Not strncasecmp, which MSVC lacks and this file has no shim for.
-static hts_boolean param_name_is(const char *key, size_t len,
-                                 const char *name) {
+hts_span hts_span_at(const char *p, size_t len) {
+  hts_span r;
+
+  r.p = p;
+  r.len = len;
+  return r;
+}
+
+hts_span hts_span_skip(hts_span s, size_t n) {
+  if (n > s.len)
+    n = s.len;
+  if (n != 0) {
+    s.p += n;
+    s.len -= n;
+  }
+  return s;
+}
+
+// Compare N bytes, where a NUL is a byte like any other.
+static hts_boolean span_bytes_eq(const char *a, const char *b, size_t n,
+                                 hts_boolean fold) {
   size_t i;
 
-  for (i = 0; i < len; i++)
-    if (hts_tolower((unsigned char) key[i]) !=
-        hts_tolower((unsigned char) name[i]))
+  if (n == 0)
+    return HTS_TRUE; // either may be the NULL of an absent view field
+  if (!fold)
+    return memcmp(a, b, n) == 0;
+  for (i = 0; i < n; i++)
+    if (hts_tolower((unsigned char) a[i]) != hts_tolower((unsigned char) b[i]))
       return HTS_FALSE;
-  return name[len] == '\0';
+  return HTS_TRUE;
+}
+
+hts_boolean hts_span_eq(hts_span a, hts_span b) {
+  return a.len == b.len && span_bytes_eq(a.p, b.p, a.len, HTS_FALSE);
+}
+
+hts_boolean hts_span_eq_ci(hts_span a, hts_span b) {
+  return a.len == b.len && span_bytes_eq(a.p, b.p, a.len, HTS_TRUE);
+}
+
+hts_boolean hts_span_starts_with(hts_span s, hts_span prefix) {
+  return s.len >= prefix.len &&
+         span_bytes_eq(s.p, prefix.p, prefix.len, HTS_FALSE);
+}
+
+hts_boolean hts_span_starts_with_ci(hts_span s, hts_span prefix) {
+  return s.len >= prefix.len &&
+         span_bytes_eq(s.p, prefix.p, prefix.len, HTS_TRUE);
+}
+
+hts_boolean hts_span_ends_with(hts_span s, hts_span suffix) {
+  return s.len >= suffix.len &&
+         hts_span_starts_with(hts_span_skip(s, s.len - suffix.len), suffix);
+}
+
+hts_boolean hts_span_ends_with_ci(hts_span s, hts_span suffix) {
+  return s.len >= suffix.len &&
+         hts_span_starts_with_ci(hts_span_skip(s, s.len - suffix.len), suffix);
 }
 
 // Only these two are escapes, so a raw Windows path keeps its backslashes.
@@ -202,7 +244,7 @@ hts_boolean hts_header_param(const char *value, const char *seps,
       ;
     if (*p != '=')
       continue; // a field with no value, such as the media type
-    match = param_name_is(key, key_len, name);
+    match = hts_span_eq_ci(hts_span_at(key, key_len), hts_span_of(name));
     for (p++; span_in_set(" \t", *p); p++)
       ;
     if (*p == '"') {

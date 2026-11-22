@@ -3833,8 +3833,7 @@ static int st_span(httrackp *opt, int argc, char **argv) {
     fprintf(stderr, "span: bad arguments\n");
     return 1;
   }
-  s.p = argv[argc - 1];
-  s.len = strlen(s.p);
+  s = hts_span_of(argv[argc - 1]);
   if (strcmp(argv[0], "next") == 0) {
     const char *cur = s.p;
 
@@ -3903,6 +3902,144 @@ static int st_span(httrackp *opt, int argc, char **argv) {
   }
   StringFree(out);
   return ret;
+}
+
+/* Check the span comparisons and skip on spans that hold NULs. */
+static int st_spancmp(httrackp *opt, int argc, char **argv) {
+  enum { EQ, EQ_CI, STARTS, STARTS_CI, ENDS, ENDS_CI };
+
+  static const char *const names[] = {"eq",          "eq_ci",
+                                      "starts_with", "starts_with_ci",
+                                      "ends_with",   "ends_with_ci"};
+
+  /* "abc" + 1 sees a suffix check that reads before the span */
+  static const struct {
+    int fn;
+    const char *a;
+    size_t alen;
+    const char *b;
+    size_t blen;
+    hts_boolean want;
+  } cases[] = {
+      {EQ, "", 0, "", 0, HTS_TRUE},
+      {EQ, NULL, 0, "", 0, HTS_TRUE},
+      {EQ, "", 0, "a", 1, HTS_FALSE},
+      {EQ, "a", 1, "", 0, HTS_FALSE},
+      {EQ, "*", 1, "*", 1, HTS_TRUE},
+      {EQ, "**", 1, "*", 1, HTS_TRUE},
+      {EQ, "**", 2, "*", 1, HTS_FALSE},
+      {EQ, "a\0b", 3, "a", 1, HTS_FALSE},
+      {EQ, "a\0b", 3, "a\0b", 3, HTS_TRUE},
+      {EQ, "a\0b", 3, "a\0c", 3, HTS_FALSE},
+      {EQ, "ab", 1, "ab", 2, HTS_FALSE},
+      {EQ, "ab", 2, "abc", 2, HTS_TRUE},
+      {EQ, "ab", 2, "aB", 2, HTS_FALSE},
+      {EQ_CI, "", 0, "", 0, HTS_TRUE},
+      {EQ_CI, "aBc", 3, "AbC", 3, HTS_TRUE},
+      {EQ_CI, "aBc", 2, "AbC", 3, HTS_FALSE},
+      {EQ_CI, "aBc", 3, "AbC", 2, HTS_FALSE},
+      {EQ_CI, "a\0b", 3, "a", 1, HTS_FALSE},
+      {EQ_CI, "a\0b", 3, "A\0B", 3, HTS_TRUE},
+      {EQ_CI, "[", 1, "{", 1, HTS_FALSE},
+      {EQ_CI, "@", 1, "`", 1, HTS_FALSE},
+      {EQ_CI, "\xc9", 1, "\xe9", 1, HTS_FALSE},
+      {EQ_CI, "\xe9", 1, "\xe9", 1, HTS_TRUE},
+      {STARTS, "", 0, "", 0, HTS_TRUE},
+      {STARTS, NULL, 0, "", 0, HTS_TRUE},
+      {STARTS, "", 0, "a", 1, HTS_FALSE},
+      {STARTS, "abc", 3, "ab", 2, HTS_TRUE},
+      {STARTS, "abc", 1, "ab", 2, HTS_FALSE},
+      {STARTS, "ab", 2, "ab", 2, HTS_TRUE},
+      {STARTS, "a\0b", 3, "a", 1, HTS_TRUE},
+      {STARTS, "a\0b", 3, "a\0", 2, HTS_TRUE},
+      {STARTS, "a\0b", 3, "a\0c", 3, HTS_FALSE},
+      {STARTS, "\0ab", 3, "ab", 2, HTS_FALSE},
+      {STARTS, "Abc", 3, "ab", 2, HTS_FALSE},
+      {STARTS_CI, "ABc", 3, "ab", 2, HTS_TRUE},
+      {STARTS_CI, "AB", 1, "ab", 2, HTS_FALSE},
+      {STARTS_CI, "\0ab", 3, "ab", 2, HTS_FALSE},
+      {STARTS_CI, "a\0B", 3, "a\0b", 3, HTS_TRUE},
+      {STARTS_CI, "[x", 2, "{", 1, HTS_FALSE},
+      {STARTS_CI, "\xc9x", 2, "\xe9", 1, HTS_FALSE},
+      {ENDS, "", 0, "", 0, HTS_TRUE},
+      {ENDS, NULL, 0, "", 0, HTS_TRUE},
+      {ENDS, "a", 1, "ab", 2, HTS_FALSE},
+      {ENDS, "abc" + 1, 2, "abc", 3, HTS_FALSE},
+      {ENDS, "abc", 3, "bc", 2, HTS_TRUE},
+      {ENDS, "abc", 2, "bc", 2, HTS_FALSE},
+      {ENDS, "abc", 2, "ab", 2, HTS_TRUE},
+      {ENDS, "b\0a", 3, "a", 1, HTS_TRUE},
+      {ENDS, "b\0a", 3, "\0a", 2, HTS_TRUE},
+      {ENDS, "ab\0", 3, "b", 1, HTS_FALSE},
+      {ENDS, "line\r", 5, "\r", 1, HTS_TRUE},
+      {ENDS, "abC", 3, "bc", 2, HTS_FALSE},
+      {ENDS_CI, "aBC", 3, "bc", 2, HTS_TRUE},
+      {ENDS_CI, "aBC", 2, "bc", 2, HTS_FALSE},
+      {ENDS_CI, "ABC" + 1, 2, "abc", 3, HTS_FALSE},
+      {ENDS_CI, "ab\0", 3, "b", 1, HTS_FALSE},
+      {ENDS_CI, "x[", 2, "{", 1, HTS_FALSE},
+      {ENDS_CI, "x\xc9", 2, "\xe9", 1, HTS_FALSE},
+      {ENDS_CI, "c", 1, "bc", 2, HTS_FALSE},
+  };
+
+  /* {offset into "ab\0cd", length, skip, offset and length left} */
+  static const size_t skips[][5] = {
+      {0, 5, 0, 0, 5}, {0, 5, 2, 2, 3}, {0, 5, 3, 3, 2}, {0, 5, 5, 5, 0},
+      {0, 5, 6, 5, 0}, {1, 2, 9, 3, 0}, {0, 0, 1, 0, 0}};
+  static const char skipped[] = "ab\0cd";
+  size_t i, failures = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+    const hts_span a = hts_span_at(cases[i].a, cases[i].alen);
+    const hts_span b = hts_span_at(cases[i].b, cases[i].blen);
+    hts_boolean got;
+
+    switch (cases[i].fn) {
+    case EQ:
+      got = hts_span_eq(a, b);
+      break;
+    case EQ_CI:
+      got = hts_span_eq_ci(a, b);
+      break;
+    case STARTS:
+      got = hts_span_starts_with(a, b);
+      break;
+    case STARTS_CI:
+      got = hts_span_starts_with_ci(a, b);
+      break;
+    case ENDS:
+      got = hts_span_ends_with(a, b);
+      break;
+    default:
+      got = hts_span_ends_with_ci(a, b);
+      break;
+    }
+    if (got != cases[i].want) {
+      printf("spancmp: case %d: %s gave %d\n", (int) i, names[cases[i].fn],
+             (int) got);
+      failures++;
+    }
+  }
+  for (i = 0; i < sizeof(skips) / sizeof(skips[0]); i++) {
+    const hts_span s = hts_span_skip(
+        hts_span_at(skipped + skips[i][0], skips[i][1]), skips[i][2]);
+
+    if (s.p != skipped + skips[i][3] || s.len != skips[i][4]) {
+      printf("spancmp: skip %d gave %d+%d\n", (int) i, (int) (s.p - skipped),
+             (int) s.len);
+      failures++;
+    }
+  }
+  printf("spancmp: %d cases, %d failures\n",
+         (int) (sizeof(cases) / sizeof(cases[0]) +
+                sizeof(skips) / sizeof(skips[0])),
+         (int) failures);
+  if (failures == 0)
+    printf("spancmp: OK\n");
+  return failures != 0;
 }
 
 /* ------------------------------------------------------------ */
@@ -4957,6 +5094,8 @@ const struct selftest_entry selftests_lib[] = {
      st_spandiff},
     {"span", "<next|nextsep|split|trim|copy> <args> <text>",
      "the fields and copies the span primitive makes", st_span},
+    {"spancmp", "", "span compares read a NUL as a byte and fold only A-Z",
+     st_spancmp},
     {"gmtime", "",
      "hts_gmtime() fills the caller's buffer, not a static (#794)", st_gmtime},
     {"secrets", "",

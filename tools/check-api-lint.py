@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """Fail on new ctype calls without an (unsigned char) cast, unsafe function-like
-macros, and header functions that can fail without HTS_CHECK_RESULT.
+macros, header functions that can fail without HTS_CHECK_RESULT, and a span's
+.p handed to a function that reads up to a NUL or printed with %s.
 Known cases live in tools/api-lint/, and --update rewrites those baselines.
 Known limits: tail-call failures, free names inside _Generic, and a function
-defined only in a later branch of an unbalanced #if group go unreported.
+defined only in a later branch of an unbalanced #if group go unreported. A span
+is seen only as a local, a parameter or a URL view field, never through a
+pointer copy, another struct or a macro.
 """
 
 import argparse
@@ -12,7 +15,7 @@ import os
 import re
 import sys
 
-RULES = ("ctype", "macro", "check-result")
+RULES = ("ctype", "macro", "check-result", "span")
 HEADER = "# Known %s violations. Regenerate: tools/check-api-lint.py --update\n"
 
 # Vendored trees follow their upstream's conventions.
@@ -509,6 +512,93 @@ def check_result(files):
             yield path, line, name, msg
 
 
+# Functions that read their argument up to a NUL.
+NUL_SCANNING = re.compile(
+    r"(?<![\w.>])(str\w+|hts_str\w+|ato\w+|sscanf|hts_authority_end|"
+    r"strrchr_limit)\s*\("
+)
+VIEW_FIELDS = r"(?:scheme|userinfo|host|port|path|query|fragment)"
+SPAN_DECL = re.compile(
+    r"[;{}(,]\s*(?:(?:const|static|register)\s+)*hts_span\b(?!\s*\()(?=([^;{}()]*))"
+)
+CAST = re.compile(r"^\(\s*(?:const\s+)?(?:unsigned\s+)?char\s*\*\s*\)\s*")
+CALL = re.compile(r"(?<![\w.>])([A-Za-z_]\w*)\s*\(")
+CONVERSION = re.compile(
+    r"%[-+ #0]*(\*|\d+)?(\.(\*|\d*))?(hh|h|ll|l|L|z|j|t|I64)?([a-zA-Z%])"
+)
+
+
+def span_names(text):
+    """Names declared as hts_span in a function head or body."""
+    names = set()
+    for m in SPAN_DECL.finditer(text):
+        # A later parameter starts with its own type, which is never a name.
+        for item in split_top(m.group(1), ","):
+            name = re.match(r"\s*(?:const\s+)?\**\s*(?:const\s+)?([A-Za-z_]\w*)", item)
+            if name and name.group(1) not in KEYWORDS:
+                names.add(name.group(1))
+    return names
+
+
+def span_ref(arg, spans):
+    """Is arg a span's .p, maybe cast or offset, or a URL view field's?"""
+    names = "|".join(map(re.escape, sorted(spans))) or "(?!)"
+    pat = (
+        r"^(?:(?:%s)\s*(?:\.|->)|[\w\]\)\s.>-]*?(?:\.|->)\s*%s\s*\.)"
+        r"\s*p\b(?!\s*\[)(?:\s*[-+].*)?$" % (names, VIEW_FIELDS)
+    )
+    return re.match(pat, CAST.sub("", arg.strip()), re.S) is not None
+
+
+def format_args(raw, inner_start, args):
+    """Indexes of the arguments a %s with no precision prints, or []."""
+    offset = 0
+    for k, a in enumerate(args):
+        lit = raw[inner_start + offset : inner_start + offset + len(a)].strip()
+        offset += len(a) + 1
+        if not lit.startswith('"'):
+            continue
+        text = "".join(re.findall(r'"((?:[^"\\]|\\.)*)"', lit))
+        found, at = [], k + 1
+        for c in CONVERSION.finditer(text):
+            if c.group(5) == "%":
+                continue
+            at += (c.group(1) == "*") + (c.group(3) == "*")
+            if c.group(5) == "s" and c.group(2) is None:
+                found.append(at)
+            at += 1
+        return found
+    return []
+
+
+def check_span(path, raw, code):
+    """Yield (line, key, message) for a span's .p read as a C string."""
+    for start, head, body in top_level(code):
+        if body is None:
+            continue
+        text = head + body
+        spans = span_names(text)
+        field = re.search(r"(?:\.|->)\s*%s\s*\.\s*p\b" % VIEW_FIELDS, text)
+        if not spans and not field:
+            continue
+        for m in CALL.finditer(text):
+            open_at = m.end() - 1
+            close = matching(text, open_at)
+            args = split_top(text[open_at + 1 : close - 1], ",")
+            at = start + open_at + 1
+            name = m.group(1)
+            hits = []
+            if NUL_SCANNING.match(text, m.start()):
+                hits = [(a, "reads a span up to a NUL") for a in args]
+            for k in format_args(raw, at, args):
+                if k < len(args):
+                    hits.append((args[k], "prints a span with %s, use %.*s"))
+            for arg, why in hits:
+                if span_ref(arg, spans):
+                    call = squash("%s(%s)" % (name, arg.strip()))
+                    yield line_of(code, start + m.start()), call, "%s %s" % (call, why)
+
+
 def scan(root):
     """Map each rule to a list of (path, line, key, message)."""
     paths = []
@@ -519,11 +609,12 @@ def scan(root):
     paths.sort()
     if len(paths) < MIN_SOURCES:
         sys.exit("check-api-lint: only %d sources under %s" % (len(paths), root))
-    files = {}
+    files, raws = {}, {}
     for p in paths:
         rel = os.path.relpath(p, root).replace(os.sep, "/")
         with open(p, encoding="utf-8", errors="surrogateescape") as f:
-            files[rel] = strip_comments(f.read())
+            raws[rel] = f.read()
+        files[rel] = strip_comments(raws[rel])
     found = {rule: [] for rule in RULES}
     types = collect_types(files.values())
     for path, code in files.items():
@@ -535,6 +626,9 @@ def scan(root):
                 key = "%s: %s" % (name, problem)
                 found["macro"].append((path, line, key, "macro " + key))
     found["check-result"] = list(check_result(files))
+    for path, code in files.items():
+        for line, key, msg in check_span(path, raws[path], code):
+            found["span"].append((path, line, key, msg))
     return found
 
 
