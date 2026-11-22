@@ -1261,7 +1261,7 @@ static size_t profile_key_line(FILE *fp, const char *key, char *line,
   return 0;
 }
 
-HTSEXT_API char *hts_getcategory(const char *filename) {
+char *hts_getcategory(const char *filename) {
   String categ = STRING_EMPTY;
   FILE *const fp = fexist(filename) ? fopen(filename, "rb") : NULL;
 

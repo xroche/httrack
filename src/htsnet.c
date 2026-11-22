@@ -53,10 +53,9 @@ HTSNET_API void SOCaddr_inetntoa_(char *namebuf, size_t namebuflen,
   }
 }
 
-HTSNET_API hts_boolean SOCaddr_inetntoa_port_(char *namebuf, size_t namebuflen,
-                                              SOCaddr *const ss,
-                                              const char *file,
-                                              const int line) {
+hts_boolean SOCaddr_inetntoa_port_(char *namebuf, size_t namebuflen,
+                                   SOCaddr *const ss, const char *file,
+                                   const int line) {
   const size_t reserved = sizeof(":65535") - 1;
   size_t used;
 

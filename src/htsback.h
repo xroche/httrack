@@ -135,9 +135,6 @@ void back_slot_attach(struct_back *sback, const int p, const int status,
    keeps the reason already there. The caller closes the connection. */
 void back_slot_fail(httrackp *opt, struct_back *sback, const int p,
                     const int statuscode, const char *msg);
-/* back_slot_fail(), closing the connection first. */
-void back_slot_close_fail(httrackp *opt, struct_back *sback, const int p,
-                          const int statuscode, const char *msg);
 /* Close slot p as non-fatal, keeping a reason already set over fallback. */
 void back_slot_fail_nonfatal(httrackp *opt, struct_back *sback, const int p,
                              const char *fallback);
@@ -160,9 +157,7 @@ hts_boolean back_delayed_settled_empty(const lien_back *back);
    error. */
 hts_boolean back_delayed_rename(httrackp *opt, lien_back *back,
                                 const char *newname);
-int back_clear_entry(lien_back * back);
-int back_flush_output(httrackp * opt, cache_back * cache, struct_back * sback,
-                      const int p);
+int back_clear_entry(lien_back *back);
 void back_delete_all(httrackp * opt, cache_back * cache, struct_back * sback);
 int back_maydelete(httrackp *opt, cache_back *cache, struct_back *sback,
                    const int p);
@@ -210,7 +205,6 @@ void back_info(struct_back * sback, int i, int j, FILE * fp);
 void back_infostr(struct_back *sback, int i, int j, char *s, size_t size);
 LLint back_transferred(LLint add, struct_back * sback);
 
-int back_checksize(httrackp * opt, lien_back * eback, int check_only_totalsize);
 /* Enforce -M/-E quotas: smooth-stops when reached; returns 0 once the -M cap
    or -E deadline overruns its grace period (callers must stop waiting). */
 int back_checkmirror(httrackp * opt);

@@ -35,7 +35,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htssafe.h"
 #include "htsthread.h"
-#include "httrack-library.h"
+#include "htslib.h"
 
 #include <stdarg.h>
 #include <stdint.h>

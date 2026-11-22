@@ -101,6 +101,187 @@ HTS_CHECK_RESULT hts_boolean hts_location_is_safe(const char *location);
 
 #include "htsopt.h"
 
+/* Engine helpers libhttrack does not export. */
+
+/** Load a plugin shared library and run its hts_plug(opt, argv) entry point. On
+    success the handle is recorded in opt and unloaded by hts_free_opt().
+    @return 1 if loaded and hts_plug succeeded; 0 if loaded but hts_plug was
+    missing or refused; -1 if the library could not be loaded. */
+int plug_wrapper(httrackp *opt, const char *moduleName, const char *argv);
+
+/** va_list form of hts_log_print(). @p opt may be NULL (only the callback
+   runs). Preserves errno. @p format must be non-NULL. */
+void hts_log_vprint(httrackp *opt, int type,
+                    HTS_FORMAT_STRING const char *format, va_list args)
+    HTS_PRINTF_FUN(3, 0);
+
+/** Human-readable build/feature string plus the names of plugged modules. The
+    result is written into and aliases a 2048-byte scratch buffer inside opt: it
+    is valid until that buffer is next used, and must not be freed. opt must be
+    non-NULL. */
+const char *hts_get_version_info(httrackp *opt);
+
+/** Return the function pointer registered under @p name in opt as a uintptr_t,
+   or 0 if none or unknown. */
+uintptr_t htswrap_read(httrackp *opt, const char *name);
+
+/** Read the percent-decoded `category=` value from a winprofile.ini file. The
+    result is heap-allocated and owned by the caller (free with freet()), or
+    NULL when the file is missing or has no category line. The bytes are not
+    converted. They are UTF-8 if the file declares Charset=UTF-8, else the
+    legacy encoding (the ANSI codepage on Windows). */
+char *hts_getcategory(const char *filename);
+
+/** Open a capture socket on 127.0.0.1, port *port (0 picks a free port). No
+    other host can reach it, because the request it captures carries the
+    browser's cookies for the target site. Writes the bound port back to *port
+    and its dotted address into @p adr (a caller buffer of at least 128 bytes),
+    and returns the listening socket. Returns INVALID_SOCKET on failure. */
+T_SOC catch_url_init(int *port, char *adr);
+
+/** Whether the directory containing @p path exists. The basename is stripped
+    first, so passing a file path tests its parent directory. @return 1 if it is
+    a directory, 0 otherwise. */
+hts_boolean dir_exists(const char *path);
+
+/** Return the static reason-phrase string for @p statuscode, or NULL if
+   unknown. The pointer is a string literal; do not free it. */
+const char *infostatuscode_const(int statuscode);
+
+/** Format @p n as a decimal string into @p strc and return it. */
+char *int2char(strc_int2bytes2 *strc, int n);
+
+/** Split byte count @p n into number and unit, returning a 2-element array
+    {number, unit} stored inside @p strc. */
+char **int2bytes2(strc_int2bytes2 *strc, LLint n);
+
+/** Like jump_identification() and also strip a leading "www." or "www-4."-style
+    host prefix, returning a pointer into the input to the normalized host. */
+const char *jump_normalized_const(const char *);
+
+/** Return a pointer (into the input) to the ":port" part of a URL's authority,
+    or NULL if there is no explicit port. A ':' in the path, query or fragment
+    is never returned. Handles bracketed IPv6 literals. */
+char *jump_toport(char *);
+
+const char *jump_toport_const(const char *);
+
+/** Canonicalize a URL path into @p dest: collapse duplicate '/' and sort the
+    query-string arguments, so "?b=2&a=1" and "?a=1&b=2" compare equal. Returns
+    @p dest, a caller buffer of at least strlen(source)+1 bytes (the output is
+    never longer than the input). */
+char *fil_normalized(const char *source, char *dest);
+
+/** Percent-escape only spaces (' ' becomes "%20"); copy everything else
+ * verbatim. */
+size_t escape_spc_url(const char *const src, char *const dest,
+                      const size_t size);
+
+/** Percent-escape @p src as a URI: the control and high bytes, plus space,
+    '*', '\'', '"', '&' and '!'. Every other byte is kept as it is, '/' and the
+    other reserved characters included. */
+size_t escape_uri(const char *const src, char *const dest, const size_t size);
+
+/** Percent-escape as escape_uri() does, plus the reserved, delimiter and
+    unwise characters other than '/'. */
+size_t escape_uri_utf(const char *const src, char *const dest,
+                      const size_t size);
+
+/** Percent-escape the C0 control bytes of @p src (0x00-0x1f) and copy every
+    other byte verbatim, so bytes >= 0x7f keep the UTF-8 they carry. */
+size_t escape_control_url(const char *const src, char *const dest,
+                          const size_t size);
+
+/** Append-variant of escape_spc_url(): escapes @p src after the existing
+    NUL-terminated content of @p dest. Returns the bytes appended (excluding the
+    NUL). */
+size_t append_escape_spc_url(const char *const src, char *const dest,
+                             const size_t size);
+
+/** Append-variant of escape_in_url(). See append_escape_spc_url(). */
+size_t append_escape_in_url(const char *const src, char *const dest,
+                            const size_t size);
+
+/** Append-variant of escape_check_url(). See append_escape_spc_url(). */
+size_t append_escape_check_url(const char *const src, char *const dest,
+                               const size_t size);
+
+/** In-place variant of escape_spc_url(): escapes the NUL-terminated string in
+    @p dest back into @p dest. */
+size_t inplace_escape_spc_url(char *const dest, const size_t size);
+
+/** In-place variant of escape_in_url(). See inplace_escape_spc_url(). */
+size_t inplace_escape_in_url(char *const dest, const size_t size);
+
+/** In-place variant of escape_uri(). See inplace_escape_spc_url(). */
+size_t inplace_escape_uri(char *const dest, const size_t size);
+
+/** In-place variant of escape_uri_utf(). See inplace_escape_spc_url(). */
+size_t inplace_escape_uri_utf(char *const dest, const size_t size);
+
+/** Same escaping as escape_check_url() but returns @p dest instead of the byte
+    count. */
+char *escape_check_url_addr(const char *const src, char *const dest,
+                            const size_t size);
+
+/** Build one opaque MIME/MHTML content-id token in @p dest from @p adr and
+    @p fil: escape_in_url() escaping with '-' for '%', so two URLs never share
+    a token. */
+size_t make_content_id(const char *const adr, const char *const fil,
+                       char *const dest, const size_t size);
+
+/** Low-level percent-escaper backing the escape_* family. @p mode selects the
+    character class to escape: 0 check_url, 1 in_url, 2 spc_url, 3 uri,
+    4 control_url, 30 uri_utf. @p max_size is the dest capacity including the
+    NUL. */
+size_t x_escape_http(const char *const s, char *const dest,
+                     const size_t max_size, const int mode);
+
+/** Strip all control characters (byte value < 32) from @p s in place. */
+void escape_remove_control(char *const s);
+
+/** HTML-escape for text output: rewrite '&' to "&amp;" and pass every other
+   byte through unchanged. */
+size_t escape_for_html_print(const char *const s, char *const dest,
+                             const size_t size);
+
+/** Like escape_for_html_print() but also convert every high byte (>= 128) to a
+    numeric entity "&#xNN;". */
+size_t escape_for_html_print_full(const char *const s, char *const dest,
+                                  const size_t size);
+
+/** Classify @p fil by its extension: 0 unknown, 1 known non-HTML, 2 known HTML.
+    Consults the built-in table then user --assume rules. 0 for a NULL @p fil.
+ */
+int is_knowntype(httrackp *opt, const char *fil);
+
+/** Like is_knowntype() but consults only the user --assume rules: 0 no rule,
+    1 non-HTML, 2 HTML. */
+int is_userknowntype(httrackp *opt, const char *fil);
+
+/** 1 if @p fil, an extension such as "asp" or "php" (not a full filename), is a
+    known dynamic-page type, else 0. */
+hts_boolean is_dyntype(const char *fil);
+
+/** Extract the extension of @p fil (text after the last '.', stopping at '?')
+    into caller scratch @p catbuff (capacity @p size) and return it. Returns ""
+    (a literal, not @p catbuff) when there is no extension or it does not fit.
+ */
+const char *get_ext(char *catbuff, size_t size, const char *fil);
+
+/** 1 if MIME type @p st must not be reclassified or renamed (hypertext types
+   and a built-in keep-list of commonly mislabeled types), else 0. */
+hts_boolean may_unknown(httrackp *opt, const char *st);
+
+/** Copy @p a into @p catbuff, converting every '\\' to '/' on all platforms. */
+char *fslash(char *catbuff, size_t size, const char *a);
+
+/** Set the process-global debug verbosity (0 is off); higher levels log more to
+    stderr. Bit 0x80 redirects debug output to "hts-debug.txt". */
+void hts_debug(int level);
+
+#define fslash(A, B, C) (COMPILE_TIME_CHECK_SIZE(B), fslash(A, B, C))
+
 #define READ_ERROR (-1)
 #define READ_EOF (-2)
 #define READ_TIMEOUT (-3)
@@ -338,7 +519,6 @@ T_SOC newhttp_addr(httrackp *opt, const char *iadr, htsblk *retour, int port,
 HTS_INLINE void deletehttp(htsblk * r);
 HTS_INLINE int deleteaddr(htsblk * r);
 HTS_INLINE void deletesoc(T_SOC soc);
-HTS_INLINE void deletesoc_r(htsblk *r);
 /* Return 1 once soc is readable (writable) within timeout seconds, 0 otherwise.
    check_readinput polls r->soc without waiting. */
 int check_readinput(htsblk * r);
@@ -400,10 +580,6 @@ void treatfirstline(htsblk * retour, const char *rcvd);
    in *seen, or -2 for a signed or oversized one. Text that is no number is
    skipped. */
 hts_boolean hts_content_length_agrees(const char *s, LLint *seen);
-
-/* The three-digit HTTP status code at s, or -1 when s does not start with
-   exactly three digits. */
-int hts_status_code(const char *s);
 
 /* The status code of an "HTTP/x.y NNN reason" line, or -1. */
 int hts_status_line_code(const char *line);
@@ -475,12 +651,6 @@ SOCaddr *hts_dns_resolve_nocache2(const char *const hostname,
 SOCaddr *hts_dns_resolve_nocache(const char *const hostname,
                                  SOCaddr *const addr);
 
-#if HTS_DNSCACHE
-/* Return opt's DNS cache hashtable (hostname -> t_dnscache record), creating it
-   on first use. Records are owned by the table and freed on coucal_delete. */
-coucal hts_cache(httrackp *opt);
-#endif
-
 /* How long a name that did not resolve stays negative-cached, and the ceiling
    the wait doubles up to. */
 #define HTS_DNS_NEGATIVE_TTL_MS 60000
@@ -516,13 +686,11 @@ void time_local_rfc822(char *s);
 /* Current UTC time as "YYYY-MM-DDThh:mm:ssZ". */
 void hts_now_iso8601(char out[32]);
 
-int set_filetime(const char *file, struct tm *tm_time);
 int set_filetime_rfc822(const char *file, const char *date);
 /* File mtime as a UTC time_t, or (time_t) -1 if it can not be read. */
 time_t get_filetime(const char *file);
 int get_filetime_rfc822(const char *file, char *date);
 HTS_INLINE void time_rfc822(char *s, struct tm *A);
-HTS_INLINE void time_rfc822_local(char *s, struct tm *A);
 
 HTS_INLINE int sendc(htsblk * r, const char *s);
 /* Returns the advance past the line's terminator. Unlike binput_line(), "max"
@@ -543,7 +711,6 @@ void map_characters(unsigned char *buffer, unsigned int size,
                     unsigned int *map);
 int ishtml(httrackp * opt, const char *urlfil);
 int ishtml_ext(const char *a);
-int ishttperror(int err);
 
 /* Write fil's --assume type into s (capacity ssize, NUL included); too long a
    value is clipped, not fatal. True if a rule matched, s then holding its
@@ -552,7 +719,6 @@ hts_boolean get_userhttptype(httrackp *opt, char *s, size_t ssize,
                              const char *fil);
 int give_mimext(char *s, size_t ssize, const char *st);
 
-int may_bogus_multiple(httrackp * opt, const char *mime, const char *filename);
 int may_unknown2(httrackp * opt, const char *mime, const char *filename);
 
 const char *strrchr_limit(const char *s, char c, const char *limit);
@@ -615,9 +781,6 @@ void hts_secret_add_login(httrackp *opt, const char *url);
 /* Adds the values of the Authorization, Proxy-Authorization and Cookie lines
    of a -%X header block, which may be NULL. */
 void hts_secret_add_headers(httrackp *opt, const char *headers);
-
-/* Writes the len bytes at s to fp, with each secret of opt as ***. */
-void hts_secret_fwrite(httrackp *opt, FILE *fp, const char *s, size_t len);
 
 /* fprintf() to fp, with each secret of opt as ***. */
 void hts_secret_fprintf(httrackp *opt, FILE *fp,

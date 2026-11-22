@@ -92,9 +92,6 @@ typedef struct filecreate_params filecreate_params;
 // main entry point
 #include "htscoremain.h"
 
-// core routines
-#include "htscore.h"
-
 // misc tools for httrack.c
 #include "htstools.h"
 
@@ -361,9 +358,6 @@ int hts_record_link(httrackp * opt,
    test, no import) at the given depth and pass, with the full retry budget. */
 void hts_link_set_self_parented(httrackp *opt, int depth, int pass2);
 
-/* Index of the most recently recorded link. */
-size_t hts_record_link_latest(httrackp *opt);
-
 /* Mark link at index lpos as not to be processed (sets pass2 = -1). */
 void hts_invalidate_link(httrackp * opt, int lpos);
 
@@ -577,11 +571,8 @@ void fspc_count(httrackp *opt, const char *type);
 /* Backing (download-slot) scheduler. Operate on the back[] ring (struct_back).
    Not thread-safe; call from the single crawl loop. */
 
-/* How many new sockets may be opened now, honoring maxsoc and the maxconn rate
-   limit (>=0). _strict ignores reserved-slot headroom; the plain form leaves
-   room for naming tests and stops at 0 when the stack is nearly full. */
-int back_pluggable_sockets(struct_back * sback, httrackp * opt);
-
+/* How many new sockets may be opened now within maxsoc and the maxconn rate,
+   ignoring the headroom reserved for naming tests. */
 int back_pluggable_sockets_strict(struct_back * sback, httrackp * opt);
 /* How many of n connects the -%c limiter and --pause allow now. may_wait
    false skips --pause, as a stop does. */
@@ -607,17 +598,8 @@ int hts_pause_target_ms(TStamp seed, int min_ms, int max_ms);
    A hold already running further out is kept. */
 void back_set_retry_after(struct_back *sback, httrackp *opt, int seconds);
 
-/* Schedule more links from the heap into free slots. Returns the number queued,
-   or <=0 if none could be added (no free slot / paused / stopped). */
-int back_fill(struct_back * sback, httrackp * opt, cache_back * cache,
-              int ptr, int numero_passe);
-
-/* Count of links already finished (in background or served from cache). */
-int backlinks_done(const struct_back *sback, lien_url **liens, int lien_tot,
-                   int ptr);
-
-/* Like back_fill, but a no-op (returns -1) when in-memory buffered data already
-   exceeds opt->maxcache. */
+/* Fill free slots from the heap, or return -1 when in-memory buffered data
+   already exceeds opt->maxcache. */
 int back_fillmax(struct_back * sback, httrackp * opt, cache_back * cache,
                  int ptr, int numero_passe);
 
@@ -630,7 +612,6 @@ int nombre_digit(int n);
 
 // Polling
 #if HTS_POLL
-int check_flot(T_SOC s);
 
 int check_stdin(void);
 #endif

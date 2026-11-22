@@ -127,13 +127,10 @@ int cache_zip_store_stream(zipFile zf, FILE *fp);
 
 #endif
 
-/* Read a whole file into a freshly malloc'd, NUL-terminated buffer; the caller
-   owns it and must release it with freet(). Return NULL on missing/unreadable
-   file (readfile_or substitutes defaultdata instead). The byte content is NOT
-   transcoded except readfile_utf8, which expects a UTF-8 path. readfile2
-   reports the byte size (excluding the NUL) via *size when non-NULL. */
-HTS_CHECK_RESULT char *readfile(const char *fil);
-
+/* Read a whole file into a freshly malloc'd, NUL-terminated buffer the caller
+   frees with freet(), or NULL (readfile_or substitutes defaultdata). Bytes are
+   not transcoded, readfile_utf8 only takes a UTF-8 path, and *size, when
+   non-NULL, gets the byte count without the NUL. */
 HTS_CHECK_RESULT char *readfile2(const char *fil, LLint *size);
 
 /* readfile2() refusing a body too large for the int indexes downstream, on the

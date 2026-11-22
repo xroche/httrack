@@ -1,0 +1,32 @@
+#!/bin/bash
+#
+# libhttrack.so exports exactly the names in 2423_export-list.txt, so a leaked
+# engine helper or a lost front-end call fails here instead of at a user's load.
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+list="${0%"${0##*/}"}./2423_export-list.txt"
+[ -r "$list" ] || fail "no $list"
+lib=${HTTRACK_SHLIB:-}
+[ -f "${lib:-/nonexistent}" ] || skip "no shared libhttrack at '${lib:-unset}'"
+nm=${NM:-nm}
+command -v "$nm" >/dev/null 2>&1 || skip "no nm ($nm)"
+
+tmp=$(mktemp -d) || exit 1
+cleanup_push rm -rf "$tmp"
+
+# ELF only: BSD nm has no -D.
+"$nm" -D --defined-only "$lib" >"$tmp/raw" 2>/dev/null ||
+    skip "$nm cannot read the dynamic table of $lib"
+# Toolchain and sanitizer runtimes export reserved _names, and ours never are.
+awk 'NF >= 3 && $3 !~ /^_/ { sub(/@.*/, "", $3); print $3 }' "$tmp/raw" |
+    LC_ALL=C sort -u >"$tmp/actual"
+LC_ALL=C sort -u "$list" >"$tmp/expected"
+[ "$(lines_of "$tmp/expected")" -ge 100 ] || fail "$list holds too few names to be the list"
+[ "$(lines_of "$tmp/actual")" -ge 50 ] || fail "$lib exports only $(lines_of "$tmp/actual") names"
+
+diff -u "$tmp/expected" "$tmp/actual" ||
+    fail "the export table moved. A '+' line is a new export: give it no HTSEXT_API, or add it to $list if a front end calls it. A '-' line is a lost one, which a front end built against it can no longer load"
+echo "exports: $(lines_of "$tmp/actual")"

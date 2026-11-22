@@ -55,6 +55,9 @@ Please visit our Website: http://www.httrack.com
 /* catch url */
 #include "htscatchurl.h"
 
+/* Read one line off a socket; HTS_TRUE if it did not fit "s". */
+static hts_boolean socinput(T_SOC soc, char *s, int max);
+
 // URL Link catcher
 
 // 0- Init the URL catcher with standard port
@@ -76,7 +79,7 @@ HTSEXT_API T_SOC catch_url_init_std(int *port_prox, char *adr_prox) {
 // 1- Init the URL catcher
 
 // catch_url_init(&port,&return_host);
-HTSEXT_API T_SOC catch_url_init(int *port, /* 128 bytes */ char *adr) {
+T_SOC catch_url_init(int *port, /* 128 bytes */ char *adr) {
   SOCaddr server, bound;
   T_SOC soc;
 
@@ -244,7 +247,7 @@ catch_url_status catch_url_capture(T_SOC soc, char *url, char *method,
 }
 
 // Read one line off a socket; HTS_TRUE if it did not fit "s".
-hts_boolean socinput(T_SOC soc, char *s, int max) {
+static hts_boolean socinput(T_SOC soc, char *s, int max) {
   hts_boolean cut = HTS_FALSE;
   int c;
   int j = 0;

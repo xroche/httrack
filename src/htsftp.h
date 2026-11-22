@@ -140,12 +140,7 @@ hts_boolean ftp_parse_mdtm(const char *line, struct tm *tm_time);
 T_SOC get_datasocket(char *to_send, size_t to_send_size);
 int stop_ftp(lien_back * back);
 char *linejmp(char *line);
-int check_socket(T_SOC soc);
 int check_socket_connect(T_SOC soc);
-/* Wait up to timeout seconds for soc to become readable. Optional back ends the
-   wait on a stop, opt clips it to --max-time. */
-int wait_socket_receive(lien_back *back, T_SOC soc, int timeout,
-                        const httrackp *opt);
 #endif
 
 #endif

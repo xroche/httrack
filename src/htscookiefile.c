@@ -46,7 +46,7 @@ Please visit our Website: http://www.httrack.com
 #endif
 
 /* Flush fp to the disk and close it. Did every step succeed? */
-hts_boolean cookie_close_synced(FILE *fp) {
+static hts_boolean cookie_close_synced(FILE *fp) {
   // a crash after the rename must not leave an empty file behind it
   hts_boolean ok = fflush(fp) == 0;
 
