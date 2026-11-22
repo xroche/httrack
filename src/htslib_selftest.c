@@ -3912,7 +3912,7 @@ static int st_spancmp(httrackp *opt, int argc, char **argv) {
                                       "starts_with", "starts_with_ci",
                                       "ends_with",   "ends_with_ci"};
 
-  /* "abc" + 1 sees a suffix check that reads before the span */
+  /* "abc" + 1 catches an ends_with() that reads before S */
   static const struct {
     int fn;
     const char *a;
@@ -3940,6 +3940,7 @@ static int st_spancmp(httrackp *opt, int argc, char **argv) {
       {EQ_CI, "aBc", 3, "AbC", 2, HTS_FALSE},
       {EQ_CI, "a\0b", 3, "a", 1, HTS_FALSE},
       {EQ_CI, "a\0b", 3, "A\0B", 3, HTS_TRUE},
+      {EQ_CI, "a\0b", 3, "a\0c", 3, HTS_FALSE},
       {EQ_CI, "[", 1, "{", 1, HTS_FALSE},
       {EQ_CI, "@", 1, "`", 1, HTS_FALSE},
       {EQ_CI, "\xc9", 1, "\xe9", 1, HTS_FALSE},
@@ -3948,6 +3949,7 @@ static int st_spancmp(httrackp *opt, int argc, char **argv) {
       {STARTS, NULL, 0, "", 0, HTS_TRUE},
       {STARTS, "", 0, "a", 1, HTS_FALSE},
       {STARTS, "abc", 3, "ab", 2, HTS_TRUE},
+      {STARTS, "ab", 2, "", 0, HTS_TRUE},
       {STARTS, "abc", 1, "ab", 2, HTS_FALSE},
       {STARTS, "ab", 2, "ab", 2, HTS_TRUE},
       {STARTS, "a\0b", 3, "a", 1, HTS_TRUE},
@@ -3959,6 +3961,8 @@ static int st_spancmp(httrackp *opt, int argc, char **argv) {
       {STARTS_CI, "AB", 1, "ab", 2, HTS_FALSE},
       {STARTS_CI, "\0ab", 3, "ab", 2, HTS_FALSE},
       {STARTS_CI, "a\0B", 3, "a\0b", 3, HTS_TRUE},
+      {STARTS_CI, "a\0b", 3, "a\0c", 3, HTS_FALSE},
+      {STARTS_CI, "ab", 2, "", 0, HTS_TRUE},
       {STARTS_CI, "[x", 2, "{", 1, HTS_FALSE},
       {STARTS_CI, "\xc9x", 2, "\xe9", 1, HTS_FALSE},
       {ENDS, "", 0, "", 0, HTS_TRUE},
@@ -3966,6 +3970,7 @@ static int st_spancmp(httrackp *opt, int argc, char **argv) {
       {ENDS, "a", 1, "ab", 2, HTS_FALSE},
       {ENDS, "abc" + 1, 2, "abc", 3, HTS_FALSE},
       {ENDS, "abc", 3, "bc", 2, HTS_TRUE},
+      {ENDS, "ab", 2, "", 0, HTS_TRUE},
       {ENDS, "abc", 2, "bc", 2, HTS_FALSE},
       {ENDS, "abc", 2, "ab", 2, HTS_TRUE},
       {ENDS, "b\0a", 3, "a", 1, HTS_TRUE},
@@ -3974,9 +3979,12 @@ static int st_spancmp(httrackp *opt, int argc, char **argv) {
       {ENDS, "line\r", 5, "\r", 1, HTS_TRUE},
       {ENDS, "abC", 3, "bc", 2, HTS_FALSE},
       {ENDS_CI, "aBC", 3, "bc", 2, HTS_TRUE},
+      {ENDS_CI, "aBc", 3, "AbC", 3, HTS_TRUE},
       {ENDS_CI, "aBC", 2, "bc", 2, HTS_FALSE},
       {ENDS_CI, "ABC" + 1, 2, "abc", 3, HTS_FALSE},
       {ENDS_CI, "ab\0", 3, "b", 1, HTS_FALSE},
+      {ENDS_CI, "a\0b", 3, "a\0c", 3, HTS_FALSE},
+      {ENDS_CI, "ab", 2, "", 0, HTS_TRUE},
       {ENDS_CI, "x[", 2, "{", 1, HTS_FALSE},
       {ENDS_CI, "x\xc9", 2, "\xe9", 1, HTS_FALSE},
       {ENDS_CI, "c", 1, "bc", 2, HTS_FALSE},

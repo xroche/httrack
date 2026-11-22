@@ -106,7 +106,7 @@ hts_boolean hts_span_next(const char **cur, const char *end, char sep,
   if (start >= end)
     return HTS_FALSE;
   stop = memchr(start, sep, (size_t) (end - start));
-  *out = hts_span_at(start, (size_t) ((stop != NULL ? stop : end) - start));
+  *out = hts_span_between(start, stop != NULL ? stop : end);
   *cur = stop != NULL ? stop + 1 : end;
   return HTS_TRUE;
 }
@@ -128,7 +128,7 @@ hts_boolean hts_span_split(hts_span s, char c, hts_span *head, hts_span *tail) {
 
   if (at == NULL)
     return HTS_FALSE;
-  *head = hts_span_at(s.p, (size_t) (at - s.p));
+  *head = hts_span_between(s.p, at);
   *tail = hts_span_skip(s, head->len + 1);
   return HTS_TRUE;
 }
@@ -150,6 +150,10 @@ hts_span hts_span_at(const char *p, size_t len) {
   r.p = p;
   r.len = len;
   return r;
+}
+
+hts_span hts_span_between(const char *from, const char *to) {
+  return hts_span_at(from, (size_t) (to - from));
 }
 
 hts_span hts_span_skip(hts_span s, size_t n) {
@@ -196,11 +200,13 @@ hts_boolean hts_span_starts_with_ci(hts_span s, hts_span prefix) {
 }
 
 hts_boolean hts_span_ends_with(hts_span s, hts_span suffix) {
+  // skip() clamps too, but unclamped, s.len - suffix.len would read before S
   return s.len >= suffix.len &&
          hts_span_starts_with(hts_span_skip(s, s.len - suffix.len), suffix);
 }
 
 hts_boolean hts_span_ends_with_ci(hts_span s, hts_span suffix) {
+  // skip() clamps too, but unclamped, s.len - suffix.len would read before S
   return s.len >= suffix.len &&
          hts_span_starts_with_ci(hts_span_skip(s, s.len - suffix.len), suffix);
 }

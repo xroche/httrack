@@ -26,8 +26,9 @@ Please visit our Website: http://www.httrack.com
 */
 
 /* ------------------------------------------------------------ */
-/* File: bounded decimal, TCP port and separated-field parsers, */
-/*       shared by the engine, htsserver and proxytrack          */
+/* File: bounded decimal and TCP port parsers, byte spans, and  */
+/*       header parameters, shared by the engine, htsserver and  */
+/*       proxytrack                                              */
 /* Author: Xavier Roche                                          */
 /* ------------------------------------------------------------ */
 
@@ -67,14 +68,19 @@ typedef struct {
   size_t len;
 } hts_span;
 
-/* Return the span over the C string S, or an empty span when S is NULL. */
+/* Return the span over the C string S, or an empty span when S is NULL. Pass a
+   literal to a compare as hts_span_of("lit"). */
 hts_span hts_span_of(const char *s);
 
-/* Read the next field of [*cur, end) up to SEP into *out, and move *cur past
-   SEP. Return FALSE once *cur reaches END, so "a," yields only "a". After a
-   TRUE return, [out->p, *cur) is the field plus the SEP it ended on, if any. */
-hts_boolean hts_span_next(const char **cur, const char *end, char sep,
-                          hts_span *out);
+/* Return the span over the LEN bytes at P. */
+hts_span hts_span_at(const char *p, size_t len);
+
+/* Return the span over [FROM, TO), where TO must not precede FROM. */
+hts_span hts_span_between(const char *from, const char *to);
+
+/* Return S without its first N bytes, or the empty span at its end when N
+   exceeds its length. */
+hts_span hts_span_skip(hts_span s, size_t n);
 
 /* Return S without the leading bytes found in LEFT and the trailing ones found
    in RIGHT. A set may be empty, and it never matches a NUL. */
@@ -84,18 +90,13 @@ hts_span hts_span_trim(hts_span s, const char *left, const char *right);
    and leave both unchanged when S holds no C. */
 hts_boolean hts_span_split(hts_span s, char c, hts_span *head, hts_span *tail);
 
-/* Copy S into DST as a terminated string, clipped to SIZE - 1 bytes. Return
-   FALSE if it was clipped, or if SIZE is 0, which writes nothing. */
-hts_boolean hts_span_copy(hts_span s, char *dst, size_t size);
+/* Read the next field of [*cur, end) up to SEP into *out, and move *cur past
+   SEP. Return FALSE once *cur reaches END, so "a," yields only "a". After a
+   TRUE return, [out->p, *cur) is the field plus the SEP it ended on, if any. */
+hts_boolean hts_span_next(const char **cur, const char *end, char sep,
+                          hts_span *out);
 
-/* Return the span over the LEN bytes at P. */
-hts_span hts_span_at(const char *p, size_t len);
-
-/* Return S without its first N bytes, or the empty span at its end when N
-   exceeds its length. */
-hts_span hts_span_skip(hts_span s, size_t n);
-
-/* Do A and B hold the same bytes? Pass a literal as hts_span_of("lit"). */
+/* Do A and B hold the same bytes? */
 hts_boolean hts_span_eq(hts_span a, hts_span b);
 
 /* Do A and B hold the same bytes once A-Z are folded to a-z? */
@@ -112,6 +113,10 @@ hts_boolean hts_span_ends_with(hts_span s, hts_span suffix);
 
 /* Does S end with SUFFIX once A-Z are folded to a-z? */
 hts_boolean hts_span_ends_with_ci(hts_span s, hts_span suffix);
+
+/* Copy S into DST as a terminated string, clipped to SIZE - 1 bytes. Return
+   FALSE if it was clipped, or if SIZE is 0, which writes nothing. */
+hts_boolean hts_span_copy(hts_span s, char *dst, size_t size);
 
 /* Find parameter NAME (exact, any case) in a header VALUE whose fields are
    split by any byte of SEPS, as in "type; a=1; NAME=\"v\"". The first NAME

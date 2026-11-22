@@ -736,8 +736,7 @@ static int cdx_json_str(wbuf *b, const char *s) {
 /* see htswarc.h */
 void warc_http_header_value(const char *hdr, const char *name, char *out,
                             size_t outsz) {
-  size_t nl = strlen(name);
-  hts_span all, line;
+  hts_span all, line, n;
   const char *cur;
   if (outsz == 0)
     return;
@@ -745,30 +744,22 @@ void warc_http_header_value(const char *hdr, const char *name, char *out,
   if (hdr == NULL)
     return;
   all = hts_span_of(hdr);
+  n = hts_span_of(name);
   for (cur = all.p; hts_span_next(&cur, all.p + all.len, '\n', &line);) {
-    const char *const p = line.p;
-    size_t len;
     if (hts_span_ends_with(line, hts_span_of("\r")))
       line.len--;
-    len = line.len;
-    if (len == 0)
+    if (line.len == 0)
       break; /* end of headers */
-    if (hts_span_starts_with_ci(line, hts_span_of(name)) &&
-        hts_span_starts_with(hts_span_skip(line, nl), hts_span_of(":"))) {
-      const char *v = p + nl + 1;
-      size_t vlen, k;
-      while (v < p + len && (*v == ' ' || *v == '\t'))
-        v++;
-      vlen = (size_t) (p + len - v);
-      for (k = 0; k < vlen; k++)
-        if (v[k] == ';' || v[k] == ' ' || v[k] == '\t') {
-          vlen = k;
+    if (hts_span_starts_with_ci(line, n) &&
+        hts_span_starts_with(hts_span_skip(line, n.len), hts_span_of(":"))) {
+      hts_span v = hts_span_trim(hts_span_skip(line, n.len + 1), " \t", "");
+      size_t k;
+      for (k = 0; k < v.len; k++)
+        if (v.p[k] == ';' || v.p[k] == ' ' || v.p[k] == '\t') {
+          v.len = k;
           break;
         }
-      if (vlen >= outsz)
-        vlen = outsz - 1;
-      memcpy(out, v, vlen);
-      out[vlen] = '\0';
+      (void) hts_span_copy(v, out, outsz);
       return;
     }
   }

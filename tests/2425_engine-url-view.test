@@ -14,6 +14,8 @@ selftest_queue 'ok=1 scheme=https userinfo=u host=[::1] port=8 path=/x query=a@b
     urlview 'https://u@[::1]:8/x?a@b'
 selftest_queue 'host=[::1]:8/x?a@b end=[::1]:8/x?a@b login=1' \
     userinfo 'https://u@[::1]:8/x?a@b'
+# an unknown scheme needs "://", so "foo:/x" is host foo
+selftest_queue 'ok=1 host=foo port= path=/x' urlview 'foo:/x'
 # engine schemes match in any case, with or without "//"
 selftest_queue 'host=h/x end=h/x login=1' userinfo 'HTTP://u@h/x'
 selftest_queue 'host=h/x end=h/x login=0' userinfo 'HTTP:h/x'

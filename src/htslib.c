@@ -4450,14 +4450,12 @@ hts_boolean hts_url_view_parse(const char *s, size_t len, hts_url_view *v) {
                                 *q == '-' || *q == '.');
          q++)
       ;
-    if (hts_span_starts_with(hts_span_at(q, (size_t) (end - q)),
-                             hts_span_of("://"))) {
-      v->scheme = hts_span_at(s, (size_t) (q - s));
+    if (hts_span_starts_with(hts_span_between(q, end), hts_span_of("://"))) {
+      v->scheme = hts_span_between(s, q);
       p = q + 1;
     }
   }
-  if (hts_span_starts_with(hts_span_at(p, (size_t) (end - p)),
-                           hts_span_of("//")))
+  if (hts_span_starts_with(hts_span_between(p, end), hts_span_of("//")))
     p += 2;
 
   // the same set as hts_authority_end(), but a NUL is data here
@@ -4469,11 +4467,11 @@ hts_boolean hts_url_view_parse(const char *s, size_t len, hts_url_view *v) {
     if (*q == '@')
       at = q;
   if (at != NULL) {
-    v->userinfo = hts_span_at(p, (size_t) (at - p));
+    v->userinfo = hts_span_between(p, at);
     p = at + 1;
   }
 
-  auth = hts_span_at(p, (size_t) (auth_end - p));
+  auth = hts_span_between(p, auth_end);
   if (hts_span_starts_with(auth, hts_span_of("["))) {
     hts_span inside, rest;
 
@@ -4494,16 +4492,16 @@ hts_boolean hts_url_view_parse(const char *s, size_t len, hts_url_view *v) {
 
   for (q = auth_end; q < end && *q != '?' && *q != '#'; q++)
     ;
-  v->path = hts_span_at(auth_end, (size_t) (q - auth_end));
+  v->path = hts_span_between(auth_end, q);
   if (q < end && *q == '?') {
     const char *const query = q + 1;
 
     for (q = query; q < end && *q != '#'; q++)
       ;
-    v->query = hts_span_at(query, (size_t) (q - query));
+    v->query = hts_span_between(query, q);
   }
   if (q < end)
-    v->fragment = hts_span_at(q + 1, (size_t) (end - (q + 1)));
+    v->fragment = hts_span_between(q + 1, end);
   return ok;
 }
 

@@ -6,7 +6,8 @@ Known cases live in tools/api-lint/, and --update rewrites those baselines.
 Known limits: tail-call failures, free names inside _Generic, and a function
 defined only in a later branch of an unbalanced #if group go unreported. A span
 is seen only as a local, a parameter or a URL view field, never through a
-pointer copy, another struct or a macro.
+pointer copy, another struct or a macro, and only the NUL_READERS functions and
+printf-style %s count, so a span handed to any other function goes unreported.
 """
 
 import argparse
@@ -513,9 +514,17 @@ def check_result(files):
 
 
 # Functions that read their argument up to a NUL.
-NUL_SCANNING = re.compile(
-    r"(?<![\w.>])(str\w+|hts_str\w+|ato\w+|sscanf|hts_authority_end|"
-    r"strrchr_limit)\s*\("
+NUL_READERS = frozenset(
+    """
+    strlen strnlen strcmp strncmp strcasecmp strncasecmp strchr strrchr strstr
+    strspn strcspn strpbrk strcpy strncpy strcat strncat strdup strtok strtol
+    strtoul strtoll strtoull strtod atoi atol atoll atof sscanf fputs puts fopen
+    getaddrinfo hts_strcasecmp hts_strncasecmp hts_strdup hts_strtod_c
+    hts_stringLengthUTF8 strdupt strcpybuff strcatbuff strlcpybuff strlcatbuff
+    strclipbuff strncatbuff strlncatbuff strfield strfield2 streql strstrcase
+    strnotempty strjoker str_begins strrchr_limit hts_authority_end hts_span_of
+    hts_parse_url_port hts_header_param
+    """.split()
 )
 VIEW_FIELDS = r"(?:scheme|userinfo|host|port|path|query|fragment)"
 SPAN_DECL = re.compile(
@@ -535,7 +544,7 @@ def span_names(text):
         # A later parameter starts with its own type, which is never a name.
         for item in split_top(m.group(1), ","):
             name = re.match(r"\s*(?:const\s+)?\**\s*(?:const\s+)?([A-Za-z_]\w*)", item)
-            if name and name.group(1) not in KEYWORDS:
+            if name:
                 names.add(name.group(1))
     return names
 
@@ -545,7 +554,7 @@ def span_ref(arg, spans):
     names = "|".join(map(re.escape, sorted(spans))) or "(?!)"
     pat = (
         r"^(?:(?:%s)\s*(?:\.|->)|[\w\]\)\s.>-]*?(?:\.|->)\s*%s\s*\.)"
-        r"\s*p\b(?!\s*\[)(?:\s*[-+].*)?$" % (names, VIEW_FIELDS)
+        r"\s*p\b(?:\s*[-+].*)?$" % (names, VIEW_FIELDS)
     )
     return re.match(pat, CAST.sub("", arg.strip()), re.S) is not None
 
@@ -571,6 +580,15 @@ def format_args(raw, inner_start, args):
     return []
 
 
+def bounded_strnlen(name, args):
+    """Is this strnlen(x.p, x.len), which stops at the span's end?"""
+    if name != "strnlen" or len(args) != 2:
+        return False
+    m = re.match(r"^(.*?)\s*(\.|->)\s*p$", args[0].strip(), re.S)
+    bare = re.sub(r"\s+", "", args[1])
+    return m is not None and bare == re.sub(r"\s+", "", m.group(1)) + m.group(2) + "len"
+
+
 def check_span(path, raw, code):
     """Yield (line, key, message) for a span's .p read as a C string."""
     for start, head, body in top_level(code):
@@ -588,7 +606,7 @@ def check_span(path, raw, code):
             at = start + open_at + 1
             name = m.group(1)
             hits = []
-            if NUL_SCANNING.match(text, m.start()):
+            if name in NUL_READERS and not bounded_strnlen(name, args):
                 hits = [(a, "reads a span up to a NUL") for a in args]
             for k in format_args(raw, at, args):
                 if k < len(args):
