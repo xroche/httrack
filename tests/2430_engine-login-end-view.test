@@ -1,0 +1,20 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# login_end() finds the login through hts_url_view_parse(), past leading blanks.
+
+ui() { selftest_queue "$2" userinfo "$1"; }
+
+ui ' http://u@h/x' 'host= http://u@h/x end=h/x login=0'
+# with no login, a blank-led adr comes back whole
+ui ' h/x' 'host= h/x end= h/x login=0'
+ui '  u:p@q@h:8?x@y' 'host=h:8?x@y end=h:8?x@y login=1'
+ui ' HTTPS:u@[::1]:8/x' 'host=[::1]:8/x end=[::1]:8/x login=1'
+ui '//u@h' 'host=h end=h login=1'
+ui 'gopher://u@h/x' 'host=gopher://u@h/x end=h/x login=0'
+selftest_run_queued
