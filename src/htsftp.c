@@ -734,6 +734,8 @@ static hts_boolean ftp_connect(lien_back *back, T_SOC soc, SOCaddr *server,
 }
 
 #if !FTP_PASV
+static int check_socket(T_SOC soc);
+
 /* The active-mode counterpart: an unbounded accept() waits for a data
    connection the server may never make (#1074). */
 static T_SOC ftp_accept(lien_back *back, T_SOC soc, int timeout,
