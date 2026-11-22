@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# hts_strcasecmp is 0 only when both strings end together, and sorts bytes unsigned.
+# hts_strcasecmp matches whole strings and sorts bytes unsigned.
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh

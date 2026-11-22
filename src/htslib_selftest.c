@@ -2511,9 +2511,8 @@ static int st_chartab(httrackp *opt, int argc, char **argv) {
   return st_verdict("chartab", err);
 }
 
-/* -#test=strcasecmp: equal only when both strings end together, the order
-   flips with the arguments, and bytes compare unsigned after folding to lower
-   case, as the top index sorts. */
+/* -#test=strcasecmp: folds to lower case, compares unsigned bytes, whole
+ * strings. */
 static int st_strcasecmp(httrackp *opt, int argc, char **argv) {
   static const struct {
     const char *a, *b;
