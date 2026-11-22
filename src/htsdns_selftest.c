@@ -983,7 +983,8 @@ static int dns_status_selftests(httrackp *opt) {
   (void) hts_dns_resolve(opt, "st-fail.test", 0, NULL, &res);
   CHECK(st_is(&res, HTS_DNS_TEMPFAIL, HTS_FALSE, EAI_FAIL,
               "permanent DNS failure"));
-#ifdef EAI_NODATA
+/* Windows defines EAI_NODATA as EAI_NONAME */
+#if defined(EAI_NODATA) && EAI_NODATA != EAI_NONAME
   (void) hts_dns_resolve(opt, "st-nodata.test", 0, NULL, &res);
   CHECK(st_is(&res, HTS_DNS_TEMPFAIL, HTS_FALSE, EAI_NODATA,
               "no address for host name"));
