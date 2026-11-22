@@ -125,7 +125,7 @@ Please visit our Website: http://www.httrack.com
 /* END specific definitions */
 
 static void deletesoc_r(htsblk *r);
-static void time_rfc822_local(char *s, struct tm *A);
+static void time_rfc822_local(char *s, size_t size, struct tm *A);
 
 /* variables globales */
 int _DEBUG_HEAD;
@@ -3085,8 +3085,8 @@ hts_boolean hts_timeout_elapsed(TStamp since_ms, TStamp now_ms, int timeout_s) {
 }
 
 /* Writes t seconds as days, hours, minutes and seconds, dropping the empty
-   leading units. The caller's buffer holds 256 bytes. */
-static void duration_str(char *st, TStamp t, hts_boolean quick) {
+   leading units, clipped to size bytes. */
+static void duration_str(char *st, size_t size, TStamp t, hts_boolean quick) {
   const int j = (int) (t / (3600 * 24));
   int h, m, s;
 
@@ -3098,36 +3098,41 @@ static void duration_str(char *st, TStamp t, hts_boolean quick) {
   s = (int) t;
 
   if (j > 0)
-    snprintf(st, 256,
+    snprintf(st, size,
              quick == HTS_TRUE ? "%dd,%02dh,%02dmin%02ds"
                                : "%d days, %d hours %d minutes %d seconds",
              j, h, m, s);
   else if (h > 0)
-    snprintf(st, 256,
+    snprintf(st, size,
              quick == HTS_TRUE ? "%dh,%02dmin%02ds"
                                : "%d hours %d minutes %d seconds",
              h, m, s);
   else if (m > 0)
-    snprintf(st, 256,
+    snprintf(st, size,
              quick == HTS_TRUE ? "%dmin%02ds" : "%d minutes %d seconds", m, s);
   else
-    snprintf(st, 256, quick == HTS_TRUE ? "%ds" : "%d seconds", s);
+    snprintf(st, size, quick == HTS_TRUE ? "%ds" : "%d seconds", s);
 }
 
-void sec2str(char *st, TStamp t) { duration_str(st, t, HTS_FALSE); }
+void sec2str(char *st, size_t size, TStamp t) {
+  duration_str(st, size, t, HTS_FALSE);
+}
 
-HTSEXT_API void qsec2str(char *st, TStamp t) { duration_str(st, t, HTS_TRUE); }
+// the 32 bytes httrack-library.h documents, which the longest form fits
+HTSEXT_API void qsec2str(char *st, TStamp t) {
+  duration_str(st, 32, t, HTS_TRUE);
+}
 
-// heure actuelle, GMT, format rfc (taille buffer 256o)
-void time_gmt_rfc822(char *s) {
+void time_gmt_rfc822(char *s, size_t size) {
   time_t tt;
   struct tm tmv;
 
+  assertf(size != 0);
   tt = time(NULL);
   /* no local-time fallback: it would format local time and still label it GMT
    * (#806) */
   if (hts_gmtime(tt, &tmv))
-    time_rfc822(s, &tmv);
+    time_rfc822(s, size, &tmv);
   else
     s[0] = '\0';
 }
@@ -3141,14 +3146,14 @@ void hts_now_iso8601(char out[32]) {
   strftime(out, 32, "%Y-%m-%dT%H:%M:%SZ", &tmv);
 }
 
-// heure actuelle, format rfc (taille buffer 256o)
-void time_local_rfc822(char *s) {
+void time_local_rfc822(char *s, size_t size) {
   time_t tt;
   struct tm tmv;
 
+  assertf(size != 0);
   tt = time(NULL);
   if (hts_localtime(tt, &tmv))
-    time_rfc822_local(s, &tmv);
+    time_rfc822_local(s, size, &tmv);
   else
     s[0] = '\0';
 }
@@ -3345,9 +3350,10 @@ hts_boolean hts_file_backdate(const char *file, int seconds) {
 }
 
 /* Note: utf-8 */
-int get_filetime_rfc822(const char *file, char *date) {
+int get_filetime_rfc822(const char *file, char *date, size_t size) {
   STRUCT_STAT buf;
 
+  assertf(size != 0);
   date[0] = '\0';
   if (STAT(file, &buf) == 0) {
     struct tm tmv;
@@ -3356,31 +3362,30 @@ int get_filetime_rfc822(const char *file, char *date) {
     /* no local-time fallback: it would format local time and still label it GMT
      * (#806) */
     if (hts_gmtime(tt, &tmv)) {
-      time_rfc822(date, &tmv);
+      time_rfc822(date, size, &tmv);
       return 1;
     }
   }
   return 0;
 }
 
-// RFC 822 date in GMT (256-byte buffer)
-void time_rfc822(char *s, struct tm *A) {
+void time_rfc822(char *s, size_t size, struct tm *A) {
   if (A == NULL) {
     int localtime_returned_null = 0;
 
     assertf(localtime_returned_null);
   }
-  hts_format_rfc822(s, 256, A, " GMT");
+  hts_format_rfc822(s, size, A, " GMT");
 }
 
-// RFC 822 date in local time (256-byte buffer)
-static void time_rfc822_local(char *s, struct tm *A) {
+// Writes A as an RFC 822 date in local time.
+static void time_rfc822_local(char *s, size_t size, struct tm *A) {
   if (A == NULL) {
     int localtime_returned_null = 0;
 
     assertf(localtime_returned_null);
   }
-  hts_format_rfc822(s, 256, A, "");
+  hts_format_rfc822(s, size, A, "");
 }
 
 // conversion en b,Kb,Mb

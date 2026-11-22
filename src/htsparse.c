@@ -1578,7 +1578,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                            safe_adr, safe_fil);
                   snprintf(status_str, sizeof(status_str), "%d", r->statuscode);
                   snprintf(size_str, sizeof(size_str), LLintP, (LLint) r->size);
-                  time_gmt_rfc822(gmttime);
+                  time_gmt_rfc822(gmttime, sizeof(gmttime));
 
                   {
                     // Network strings go through html_inline_safe(), because a

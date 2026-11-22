@@ -53,7 +53,7 @@ static int st_duration(httrackp *opt, int argc, char **argv) {
   (void) opt;
   if (argc < 1)
     return 1;
-  sec2str(lng, (TStamp) strtoll(argv[0], NULL, 10));
+  sec2str(lng, sizeof(lng), (TStamp) strtoll(argv[0], NULL, 10));
   qsec2str(shrt, (TStamp) strtoll(argv[0], NULL, 10));
   printf("%s|%s\n", lng, shrt);
   return 0;
@@ -2122,7 +2122,7 @@ static int st_localtime(httrackp *opt, int argc, char **argv) {
     if (set_filetime_rfc822(path, "Tue, 29 Feb 2000 00:00:00 GMT") != 0) {
       fprintf(stderr, "localtime: cannot set %s's mtime\n", path);
       err = 1;
-    } else if (!get_filetime_rfc822(path, date)) {
+    } else if (!get_filetime_rfc822(path, date, sizeof(date))) {
       fprintf(stderr, "localtime: get_filetime_rfc822 failed on %s\n", path);
       err = 1;
     } else if (convert_time_rfc822(&parsed, date) == NULL ||
@@ -4866,7 +4866,7 @@ static hts_boolean st_locale_engine_ok(const char *name) {
   int c;
 
   st_locale_date(&tm);
-  time_rfc822(buf, &tm);
+  time_rfc822(buf, sizeof(buf), &tm);
   st_locale_check(&ok, name, strcmp(buf, "Sun, 06 Nov 1994 08:49:37 GMT") == 0,
                   "time_rfc822");
   st_locale_check(&ok, name, optrate_read("0.5", &rate) == 3 && rate == 0.5,
@@ -4934,7 +4934,118 @@ static int st_locale(httrackp *opt, int argc, char **argv) {
   return ok ? 0 : 1;
 }
 
+/* Does buf hold a cap-clipped string of full bytes, canary untouched? */
+static hts_boolean st_sized_len_ok(const char *buf, size_t cap, size_t full) {
+  return memchr(buf, '\0', cap) == buf + (full < cap ? full : cap - 1) &&
+         st_sized_guard_ok(buf, cap);
+}
+
+/* The duration and date writers clip to the size they are given. */
+static int st_lib_sized(httrackp *opt, int argc, char **argv) {
+  /* Each row exercises one branch of the duration formatter. */
+  static const struct {
+    TStamp t;
+    const char *want;
+  } durs[] = {{3 * 86400 + 2 * 3600 + 4 * 60 + 5,
+               "3 days, 2 hours 4 minutes 5 seconds"},
+              {7445, "2 hours 4 minutes 5 seconds"},
+              {245, "4 minutes 5 seconds"},
+              {5, "5 seconds"}};
+
+  static const char qdur[] = "2147483647d,23h,59min59s";
+  static const char date[] = "Sun, 06 Nov 1994 08:49:37 GMT";
+  static const char mdate[] = "Tue, 29 Feb 2000 00:00:00 GMT";
+  /* The caps are 8 bytes, one byte short, and an exact fit. */
+  const size_t rcaps[] = {8, sizeof(date) - 1, sizeof(date)};
+  char path[HTS_URLMAXSIZE];
+  char gmt[256], local[256];
+  struct tm tm;
+  size_t i, k;
+  int fail = 0;
+
+  (void) opt;
+  if (argc < 1)
+    return 1;
+  snprintf(path, sizeof(path), "%s/lib-sized.bin", argv[0]);
+  {
+    FILE *const fp = FOPEN(path, "wb");
+
+    if (fp == NULL || fclose(fp) != 0 ||
+        set_filetime_rfc822(path, mdate) != 0) {
+      printf("lib-sized: cannot prepare %s\n", path);
+      return 1;
+    }
+  }
+  for (i = 0; i < sizeof(durs) / sizeof(durs[0]); i++) {
+    const size_t len = strlen(durs[i].want);
+    const size_t dcaps[] = {8, len, len + 1};
+
+    for (k = 0; k < 3; k++) {
+      char *buf = st_sized_alloc(dcaps[k]);
+
+      sec2str(buf, dcaps[k], durs[i].t);
+      if (!st_sized_clip_ok(buf, dcaps[k], durs[i].want)) {
+        printf("lib-sized: sec2str(%d) into %u bytes\n", (int) durs[i].t,
+               (unsigned) dcaps[k]);
+        fail = 1;
+      }
+      freet(buf);
+    }
+  }
+  /* the clock may tick between calls, so later rows compare only lengths */
+  time_gmt_rfc822(gmt, sizeof(gmt));
+  time_local_rfc822(local, sizeof(local));
+  if (strlen(gmt) < 4 || strcmp(gmt + strlen(gmt) - 4, " GMT") != 0 ||
+      strstr(local, "GMT") != NULL) {
+    printf("lib-sized: GMT is '%s' and local is '%s'\n", gmt, local);
+    fail = 1;
+  }
+  st_locale_date(&tm);
+  for (k = 0; k < 3; k++) {
+    const size_t rcap = rcaps[k];
+    char *buf = st_sized_alloc(rcap);
+
+    time_rfc822(buf, rcap, &tm);
+    if (!st_sized_clip_ok(buf, rcap, date)) {
+      printf("lib-sized: time_rfc822 into %u bytes\n", (unsigned) rcap);
+      fail = 1;
+    }
+    if (!get_filetime_rfc822(path, buf, rcap) ||
+        !st_sized_clip_ok(buf, rcap, mdate)) {
+      printf("lib-sized: get_filetime_rfc822 into %u bytes\n", (unsigned) rcap);
+      fail = 1;
+    }
+    time_gmt_rfc822(buf, rcap);
+    if (!st_sized_len_ok(buf, rcap, strlen(gmt))) {
+      printf("lib-sized: time_gmt_rfc822 into %u bytes\n", (unsigned) rcap);
+      fail = 1;
+    }
+    time_local_rfc822(buf, rcap);
+    if (!st_sized_len_ok(buf, rcap, strlen(local))) {
+      printf("lib-sized: time_local_rfc822 into %u bytes\n", (unsigned) rcap);
+      fail = 1;
+    }
+    freet(buf);
+  }
+  {
+    /* the longest short form fits the 32 bytes qsec2str() documents */
+    char *buf = st_sized_alloc(32);
+
+    qsec2str(buf, (TStamp) 2147483647 * 86400 + 86399);
+    if (!st_sized_clip_ok(buf, 32, qdur)) {
+      printf("lib-sized: qsec2str wrote '%.32s'\n", buf);
+      fail = 1;
+    }
+    freet(buf);
+  }
+  (void) UNLINK(path);
+  return st_verdict("lib-sized", fail);
+}
+
 const struct selftest_entry selftests_lib[] = {
+    {"lib-sized", "<dir>",
+     "the duration and date writers stay inside the buffer they are given",
+     st_lib_sized},
     {"locale", "<locale>...", "text handling ignores the locale a host may set",
      st_locale},
     {"plugoom", "<module>", "a module that cannot be recorded is unplugged",

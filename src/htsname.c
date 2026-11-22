@@ -1589,7 +1589,8 @@ int url_savename(lien_adrfilsave *const afs,
         {
           char md5[32 + 2];
 
-          TMPL_TAILN(url_md5(md5, fil_complete), (tok == 'Q') ? 32 : 4);
+          TMPL_TAILN(url_md5(md5, sizeof(md5), fil_complete),
+                     (tok == 'Q') ? 32 : 4);
         } break;
         case 'r':
         case 'R':              // protocol
@@ -2129,7 +2130,7 @@ void standard_name(char *b, size_t bsize, const char *dot_pos,
   assertf(bsize != 0);
   bb = htsbuff_ptr(b, bsize);
   room = bsize - 1;
-  md5_len = strnlen(url_md5(md5, fil), 4);
+  md5_len = strnlen(url_md5(md5, sizeof(md5), fil), 4);
   ext_len = dot_pos == NULL
                 ? 0
                 : (short_ver ? strnlen(dot_pos + 1, 3) : strlen(dot_pos + 1));
@@ -2164,21 +2165,15 @@ void standard_name(char *b, size_t bsize, const char *dot_pos,
   }
 }
 
-/* Petit md5 */
-char *url_md5(char *digest, const char *fil) {
-  char *a;
+char *url_md5(char *digest, size_t size, const char *fil) {
+  const char *const query = strchr(fil, '?');
+  char hex[33];
 
+  assertf(size != 0);
   digest[0] = '\0';
-  a = strchr(fil, '?');
-  if (a) {
-    if (strlen(a)) {
-      char BIGSTK buff[HTS_URLMAXSIZE * 2];
-
-      a++;
-      digest[0] = buff[0] = '\0';
-      strcatbuff(buff, a);      /* query string MD5 */
-      domd5mem(buff, strlen(buff), digest, 1);
-    }
+  if (query != NULL) {
+    domd5mem(query + 1, strlen(query + 1), hex, 1);
+    (void) strclipbuff(digest, size, hex);
   }
   return digest;
 }
@@ -2195,27 +2190,36 @@ void url_savename_addstr(char *d, size_t dsize, const char *s) {
   d[i] = '\0';
 }
 
-/* "filename" should be at least 64 bytes. */
-void url_savename_refname(const char *adr, const char *fil, char *filename) {
+hts_boolean url_savename_refname(const char *adr, const char *fil,
+                                 char *filename, size_t size) {
   unsigned char bindigest[16];
   char hex[33];
   struct MD5Context ctx;
 
+  assertf(size != 0);
   hts_md5_init(&ctx);
   MD5Update(&ctx, (const unsigned char *) adr, (int) strlen(adr));
   MD5Update(&ctx, (const unsigned char *) ",", 1);
   MD5Update(&ctx, (const unsigned char *) fil, (int) strlen(fil));
   MD5Final(bindigest, &ctx);
   hts_md5_hex(bindigest, hex);
-  sprintf(filename, CACHE_REFNAME "/%s.ref", hex);
+  if (snprintf(filename, size, CACHE_REFNAME "/%s.ref", hex) < (int) size)
+    return HTS_TRUE;
+  filename[0] = '\0';
+  return HTS_FALSE;
 }
 
 /* note: return a local filename */
 char *url_savename_refname_fullpath(httrackp * opt, const char *adr,
                                     const char *fil) {
   char digest_filename[64];
+  HTS_STATIC_ASSERT(sizeof(CACHE_REFNAME "/") + 32 + sizeof(".ref") - 1 <=
+                        sizeof(digest_filename),
+                    refname_fits);
 
-  url_savename_refname(adr, fil, digest_filename);
+  // The assert above guarantees the name fits.
+  (void) !url_savename_refname(adr, fil, digest_filename,
+                               sizeof(digest_filename));
   return hts_logpath(opt, digest_filename);
 }
 

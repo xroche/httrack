@@ -46,7 +46,7 @@ Please visit our Website: http://www.httrack.com
 static void mimehtml_write_header(httrackp *opt, const char *startcid) {
   char BIGSTK currtime[256];
 
-  time_gmt_rfc822(currtime);
+  time_gmt_rfc822(currtime, sizeof(currtime));
   fprintf(opt->state.mimefp,
           "From: HTTrack Website Copier <nobody@localhost>\r\n"
           "Subject: Local mirror\r\n"

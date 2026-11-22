@@ -596,7 +596,7 @@ static void cmdl_print_cache_entry(httrackp *opt, cache_back *cache,
   }
 
   infostatuscode(msg, r.statuscode);
-  time_gmt_rfc822(cdate);
+  time_gmt_rfc822(cdate, sizeof(cdate));
 
   fprintf(stdout, "HTTP/1.1 %d %s\r\n", r.statuscode, r.msg[0] ? r.msg : msg);
   fprintf(stdout, "X-Host: %s\r\n", afs.af.adr);
@@ -2834,7 +2834,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
       char *masked_url;
       const char *shown_url;
 
-      time_local_rfc822(t);     // faut bien que ca serve quelque part l'heure RFC1945 arf'
+      time_local_rfc822(t, sizeof(t)); // stamps the generated file below
 
       /* readme for information purpose */
       {
