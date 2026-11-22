@@ -41,8 +41,15 @@ toport 'http://u@h:80?a@b/x' ':80?a@b/x'
 selftest_queue 'adr=u:p fil=/?w@h:8080' identurl 'http://u:p?w@h:8080'
 # -P escapes a '?' in a proxy password, which keeps its port
 toport 'u:p%3Fw@h:8080' ':8080'
-# no ']' to end the literal: the first ':' stands, and the port parse rejects it
-toport 'https://[::1:8080' '::1:8080'
+# no ']' to end the literal: no port, and the host lookup rejects it
+toport 'https://[::1:8080' '(none)'
+# a stray ']' or text after the literal gives no port to a bracketed host
+toport '[::1]x:8' '(none)'
+toport '[::1]:8]:9' ':8]:9'
+toport 'a:b]' ':b]'
+# an unknown scheme and a bare file:// keep their old port
+toport 'gopher://h:8/' '://h:8/'
+toport 'file://' '://'
 
 ftpaddr() { selftest_queue "$2" ftpaddr "$1"; }
 
@@ -52,7 +59,7 @@ ftpaddr 'ftp://user:pass@[::1]:2121' 'host=[::1] port=2121'
 ftpaddr 'ftp://ftp.example.com:2121' 'host=ftp.example.com port=2121'
 ftpaddr 'ftp://ftp.example.com' 'host=ftp.example.com port=21'
 ftpaddr '[::1]:2121' 'host=[::1] port=2121'
-ftpaddr 'ftp://[::1:2121' 'error=Invalid port: :1:2121'
+ftpaddr 'ftp://[::1:2121' 'host=[::1:2121 port=21'
 ftpaddr 'ftp://[::1]:99999' 'error=Invalid port: 99999'
 # a host that cannot fit is refused, never clipped onto another one
 ftpaddr "ftp://$(printf 'a%.0s' $(seq 1 256))" 'error=Host name too long'
