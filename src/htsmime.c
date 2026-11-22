@@ -635,7 +635,7 @@ int give_mimext(char *s, size_t ssize, const char *st) {
 }
 
 // known extension? 0: no, 1: yes, 2: html
-HTSEXT_API int is_knowntype(httrackp *opt, const char *fil) {
+int is_knowntype(httrackp *opt, const char *fil) {
   char catbuff[CATBUFF_SIZE];
   const char *mime;
 
@@ -655,7 +655,7 @@ HTSEXT_API int is_knowntype(httrackp *opt, const char *fil) {
 //  2 : html
 // setdefs : set mime buffer:
 //   file=(char*) "asp=text/html\nphp=text/html\n"
-HTSEXT_API int is_userknowntype(httrackp *opt, const char *fil) {
+int is_userknowntype(httrackp *opt, const char *fil) {
   char BIGSTK mime[1024];
 
   if (!fil)
@@ -674,7 +674,7 @@ HTSEXT_API int is_userknowntype(httrackp *opt, const char *fil) {
 
 // page dynamique?
 // is_dyntype(get_ext("foo.asp"))
-HTSEXT_API hts_boolean is_dyntype(const char *fil) {
+hts_boolean is_dyntype(const char *fil) {
   int j = 0;
 
   if (!fil)

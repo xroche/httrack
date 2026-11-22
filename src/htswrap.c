@@ -36,20 +36,12 @@ Please visit our Website: http://www.httrack.com
 #include "coucal.h"
 #include "htslib.h"
 
-HTSEXT_API int htswrap_init(void) {     // LEGACY
-  return 1;
-}
-
-HTSEXT_API int htswrap_free(void) {     // LEGACY
-  return 1;
-}
-
 HTSEXT_API int htswrap_add(httrackp * opt, const char *name, void *fct) {
   return hts_set_callback((t_hts_htmlcheck_callbacks *) opt->callbacks_fun,
                           name, fct);
 }
 
-HTSEXT_API uintptr_t htswrap_read(httrackp * opt, const char *name) {
+uintptr_t htswrap_read(httrackp *opt, const char *name) {
   return (uintptr_t) hts_get_callback((t_hts_htmlcheck_callbacks *) opt->
                                       callbacks_fun, name);
 }

@@ -2813,7 +2813,7 @@ static int mkdir_compat(const char *pathname) {
 
 /* path must end with "/" or with the finename (/tmp/bar/ or /tmp/bar/foo.zip) */
 /* Note: preserve errno */
-HTSEXT_API hts_boolean dir_exists(const char *path) {
+hts_boolean dir_exists(const char *path) {
   const int err = errno;
   STRUCT_STAT st;
   char BIGSTK file[HTS_URLMAXSIZE * 2];

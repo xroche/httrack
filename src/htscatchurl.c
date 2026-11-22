@@ -76,7 +76,7 @@ HTSEXT_API T_SOC catch_url_init_std(int *port_prox, char *adr_prox) {
 // 1- Init the URL catcher
 
 // catch_url_init(&port,&return_host);
-HTSEXT_API T_SOC catch_url_init(int *port, /* 128 bytes */ char *adr) {
+T_SOC catch_url_init(int *port, /* 128 bytes */ char *adr) {
   SOCaddr server, bound;
   T_SOC soc;
 

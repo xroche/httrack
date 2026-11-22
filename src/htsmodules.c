@@ -58,7 +58,7 @@ static char WHAT_is_available[64] = "";
 
 /* <<< */
 
-HTSEXT_API const char *hts_get_version_info(httrackp * opt) {
+const char *hts_get_version_info(httrackp *opt) {
   size_t size;
   int i;
 
