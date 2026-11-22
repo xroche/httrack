@@ -1,0 +1,37 @@
+#!/bin/bash
+#
+# shellcheck disable=SC2016 # the templates are for the engine to expand, not us
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# The bounds of the -V expansion buffer: an exact fit, one byte short, a cut
+# inside the $0 rewrite, and the longest template argv lets through.
+
+skip_on_windows "the expansion is quoted for cmd.exe, which bash cannot replay"
+
+usercmd() { # usercmd TEMPLATE FILENAME [ROOM]: prints the verdict line
+    local out
+    out=$(httrack -O /dev/null -#test=usercmd "$1" "$2" ${3+"$3"})
+    printf '%s\n' "${out%%$'\n'*}"
+}
+
+# 'rm "${1}"' is 9 bytes, so it needs a room of 10 with its NUL.
+for room in 1 2 3 4 5 6 7 8 9; do
+    assert_eq TOOLONG "$(usercmd 'rm $0' x.html "$room")" "room $room"
+done
+assert_eq OK "$(usercmd 'rm $0' x.html 10)" 'room 10'
+
+# Each single-quoted $0 becomes the 8 bytes '"${1}"', so 510 of them grow a
+# 1022-byte template to 4082 bytes.
+long="'$(printf '$0%.0s' $(seq 510))'"
+assert_eq OK "$(usercmd "$long" x.html 4083)" 'overlong: exact fit'
+assert_eq TOOLONG "$(usercmd "$long" x.html 4082)" 'overlong: one byte short'
+assert_eq TOOLONG "$(usercmd "$long" x.html 1024)" 'overlong: cut far inside'
+assert_eq OK "$(usercmd "$long" x.html)" 'overlong: default room'
+
+# The spawn path's own buffer takes a 4076-byte expansion and runs it.
+out=$(httrack -O /dev/null -#test=usercmdrun ": '${long:3}" x.html)
+assert_eq "EXIT 0" "$out" 'the spawn path runs a long expansion'

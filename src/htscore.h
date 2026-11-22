@@ -87,6 +87,9 @@ typedef struct filecreate_params filecreate_params;
 // options
 #include "htsopt.h"
 
+// writable buffer with its size
+#include "htsbuf.h"
+
 // HTTrack engine sub-headers
 
 // main entry point
@@ -462,9 +465,8 @@ void mimehtml_add_file(httrackp *opt, const char *save, const char *adr,
 #define USERCOMMAND_EXPAND_REFUSED (-1)
 /* Rewrite a -V template's $0. On POSIX "file" is ignored: usercommand_exe()
    passes it to the shell as $1, so the rewrite does not depend on it. */
-HTS_CHECK_RESULT int usercommand_expand(char *dest, size_t size,
-                                        const char *cmd, const char *file,
-                                        const char **why);
+HTS_CHECK_RESULT int usercommand_expand(hts_buf dest, const char *cmd,
+                                        const char *file, const char **why);
 /* Run a -V template against a save name; returns the shell's exit status, or
    -1 when the command was not run at all. */
 int usercommand_exe(httrackp *opt, const char *cmd, const char *file);
