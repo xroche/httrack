@@ -31,7 +31,6 @@ Please visit our Website: http://www.httrack.com
 /* ------------------------------------------------------------ */
 
 #include <fcntl.h>
-#include <ctype.h>
 #include <limits.h> /* INT_MAX, capping the backing table's size */
 #include <stdint.h> /* uint64_t for the pause mixer (already a hard dep via md5.h) */
 

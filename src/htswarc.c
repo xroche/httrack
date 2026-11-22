@@ -46,7 +46,6 @@ Please visit our Website: http://www.httrack.com
 #include "htszlib.h"
 #include "coucal/coucal.h"
 
-#include <ctype.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -503,7 +502,7 @@ static void warc_make_id(warc_writer *w, char out[64]) {
    whitespace before the ':' (non-compliant "Name : value" is still matched). */
 static int header_is(const char *line, size_t line_len, const char *name) {
   size_t nl = strlen(name), i;
-  if (line_len < nl || strncasecmp(line, name, nl) != 0)
+  if (line_len < nl || hts_strncasecmp(line, name, nl) != 0)
     return 0;
   for (i = nl; i < line_len && (line[i] == ' ' || line[i] == '\t'); i++)
     ;
@@ -598,9 +597,9 @@ static int surt_canon(const char *url, wbuf *out) {
   scheme_end = strstr(url, "://");
   if (scheme_end != NULL) {
     size_t sl = (size_t) (scheme_end - url);
-    if (sl == 4 && strncasecmp(url, "http", 4) == 0)
+    if (sl == 4 && hts_strncasecmp(url, "http", 4) == 0)
       def_port = 80;
-    else if (sl == 5 && strncasecmp(url, "https", 5) == 0)
+    else if (sl == 5 && hts_strncasecmp(url, "https", 5) == 0)
       def_port = 443;
     p = scheme_end + 3;
   }
@@ -641,7 +640,7 @@ static int surt_canon(const char *url, wbuf *out) {
   if (hlen >= sizeof(hostbuf))
     return -1;
   for (i = 0; i < hlen; i++)
-    hostbuf[i] = (char) tolower((unsigned char) host[i]);
+    hostbuf[i] = (char) hts_tolower((unsigned char) host[i]);
   hostbuf[hlen] = '\0';
 
   if (!is_ipv6)
@@ -754,7 +753,7 @@ void warc_http_header_value(const char *hdr, const char *name, char *out,
       len--;
     if (len == 0)
       break; /* end of headers */
-    if (len > nl && strncasecmp(p, name, nl) == 0 && p[nl] == ':') {
+    if (len > nl && hts_strncasecmp(p, name, nl) == 0 && p[nl] == ':') {
       const char *v = p + nl + 1;
       size_t vlen, k;
       while (v < p + len && (*v == ' ' || *v == '\t'))
@@ -1297,7 +1296,7 @@ static int warc_emit(warc_writer *w, const char *type, const char *content_type,
     if (w->wacz_on && target_uri != NULL && target_uri[0] != '\0' &&
         strcmp(type, "response") == 0 && cdx_status != NULL &&
         strcmp(cdx_status, "200") == 0 && cdx_mime != NULL &&
-        strncasecmp(cdx_mime, "text/html", 9) == 0)
+        hts_strncasecmp(cdx_mime, "text/html", 9) == 0)
       warc_page_add(w, target_uri, date);
   }
   if (out_id != NULL)
@@ -1451,8 +1450,8 @@ warc_writer *warc_open(httrackp *opt, const char *path) {
     /* --warc-file NAME: append .warc.gz unless already a .warc/.warc.gz name;
        place bare basenames under the output directory (like the auto name). */
     size_t l = strlen(path);
-    int has_warc = (l >= 5 && strcasecmp(path + l - 5, ".warc") == 0);
-    int has_gz = (l >= 3 && strcasecmp(path + l - 3, ".gz") == 0);
+    int has_warc = (l >= 5 && hts_strcasecmp(path + l - 5, ".warc") == 0);
+    int has_gz = (l >= 3 && hts_strcasecmp(path + l - 3, ".gz") == 0);
     char named[HTS_URLMAXSIZE];
     if (has_warc || has_gz)
       strlcpybuff(named, path, sizeof(named));
@@ -1472,7 +1471,7 @@ warc_writer *warc_open(httrackp *opt, const char *path) {
     return NULL;
   w->opt = opt;
   plen = strlen(path);
-  w->gz = (plen >= 3 && strcasecmp(path + plen - 3, ".gz") == 0);
+  w->gz = (plen >= 3 && hts_strcasecmp(path + plen - 3, ".gz") == 0);
   w->rng = (uint64_t) time(NULL) ^ ((uint64_t) (uintptr_t) w << 16) ^
            0x9e3779b97f4a7c15ULL;
   w->seen = coucal_new(0);
@@ -1509,10 +1508,10 @@ warc_writer *warc_open(httrackp *opt, const char *path) {
   if (opt->warc_cdx) {
     size_t l = strlen(path);
     size_t baselen = l;
-    if (l >= 8 && strcasecmp(path + l - 8, ".warc.gz") == 0) {
+    if (l >= 8 && hts_strcasecmp(path + l - 8, ".warc.gz") == 0) {
       baselen = l - 8;
       w->base_ext = ".warc.gz";
-    } else if (l >= 5 && strcasecmp(path + l - 5, ".warc") == 0) {
+    } else if (l >= 5 && hts_strcasecmp(path + l - 5, ".warc") == 0) {
       baselen = l - 5;
       w->base_ext = ".warc";
     } else {
@@ -1547,10 +1546,10 @@ warc_writer *warc_open(httrackp *opt, const char *path) {
   if (w->max_size > 0) {
     size_t l = strlen(path);
     size_t baselen;
-    if (l >= 8 && strcasecmp(path + l - 8, ".warc.gz") == 0) {
+    if (l >= 8 && hts_strcasecmp(path + l - 8, ".warc.gz") == 0) {
       baselen = l - 8;
       w->seg_ext = ".warc.gz";
-    } else if (l >= 5 && strcasecmp(path + l - 5, ".warc") == 0) {
+    } else if (l >= 5 && hts_strcasecmp(path + l - 5, ".warc") == 0) {
       baselen = l - 5;
       w->seg_ext = ".warc";
     } else {

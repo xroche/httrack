@@ -717,7 +717,7 @@ static int cookie_count_host(char *data, const char *host) {
   char *a;
 
   for (a = data; *a != '\0'; a = cookie_nextfield(a)) {
-    if (strcmp(cookie_get(buf, a, 0), host) == 0)
+    if (strcmp(cookie_get(buf, sizeof(buf), a, 0), host) == 0)
       n++;
   }
   return n;
@@ -852,7 +852,7 @@ static int cookie_hostcap_rows(void) {
 
     if (cookie_set_capped(&jar, "c000", grow, H, "/", NULL) != 0 ||
         (rec = cookie_find_exact(jar.data, "c000", H, "/")) == NULL ||
-        strcmp(cookie_get(buf, rec, 6), grow) != 0 ||
+        strcmp(cookie_get(buf, sizeof(buf), rec, 6), grow) != 0 ||
         cookie_find_exact(jar.data, "c001", H, "/") != NULL)
       HC_FAIL("a growing re-set at the cap was refused or evicted itself");
   }
@@ -1237,7 +1237,7 @@ static void cookiediff_one(parsediff_stats *st, const char *line, char *o,
     memset(n, 'O', COOKIEDIFF_SIZE);
     st->cases++;
     ro = legacy_cookie_get(o, line, param);
-    rn = cookie_get(n, line, param);
+    rn = cookie_get(n, COOKIEDIFF_SIZE, line, param);
     if ((ro == o) != (rn == n) || memcmp(o, n, COOKIEDIFF_SIZE) != 0) {
       snprintf(arg, sizeof(arg), "%d", param);
       parsediff_fail(st, "cookie_get", line, arg, ro, rn);
@@ -1560,7 +1560,8 @@ static int st_cookiesetscope(httrackp *opt, int argc, char **argv) {
     char *const ep = cookie_find(jar.data, "ep", "del.test", "/");
     char field[8192]; // cookie_get's buffer size
 
-    if (ep == NULL || strcmp(cookie_get(field, ep, 2), "/") != 0) {
+    if (ep == NULL ||
+        strcmp(cookie_get(field, sizeof(field), ep, 2), "/") != 0) {
       printf("%s: an empty Path= is not stored as /\n", LABEL);
       err = 1;
     }
@@ -1908,7 +1909,9 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
       strcpybuff(line, lives[i].header);
       treathead(&jar, "jar.test", "/", &r, line);
       rec = cookie_find(jar.data, lives[i].name, "jar.test", "/");
-      when = rec != NULL ? (int64_t) atoll(cookie_get(buffer, rec, 4)) : 0;
+      when = rec != NULL
+                 ? (int64_t) atoll(cookie_get(buffer, sizeof(buffer), rec, 4))
+                 : 0;
       if (when < now + lives[i].low || when > now + lives[i].high) {
         printf("%s: %s stored expiry " LLintP ", now " LLintP "\n", LABEL,
                lives[i].header, (LLint) when, (LLint) now);
@@ -1968,7 +1971,8 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
       memset(&r, 0, sizeof(r));
       treathead(&jar, "jar.test", "/", &r, line);
       rec = cookie_find(jar.data, "sess", "jar.test", "/");
-      if (rec == NULL || strcmp(cookie_get(buffer, rec, 4), "0") != 0) {
+      if (rec == NULL ||
+          strcmp(cookie_get(buffer, sizeof(buffer), rec, 4), "0") != 0) {
         printf("%s: a session cookie is not stored with expiry 0\n", LABEL);
         err = 1;
       }
@@ -3267,7 +3271,70 @@ static int st_cookiesverdict(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Did buf[cap] get want clipped to cap - 1 bytes, and nothing past cap? */
+static int sized_clip_bad(const char *what, const char *got, const char *buf,
+                          size_t cap, const char *want) {
+  if (got != buf || !st_sized_clip_ok(buf, cap, want)) {
+    printf("cookie-sized: %s into %u bytes is '%.*s'\n", what, (unsigned) cap,
+           (int) cap, buf);
+    return 1;
+  }
+  return 0;
+}
+
+/* cookie_get() clips a field, but bauth_prefix() refuses a key that does not
+ * fit. */
+static int st_cookie_sized(httrackp *opt, int argc, char **argv) {
+  static const char value[] = "0123456789abcdefghijklmnopqrstuvwxyz0123456789";
+  static const char rec[] = "example.com\tTRUE\t/\tFALSE\t0\tname\t"
+                            "0123456789abcdefghijklmnopqrstuvwxyz0123456789\n";
+  static const char key[] = "http://www.example.com/secure/";
+  const size_t caps[] = {8, sizeof(value), sizeof(value) - 1};
+  size_t i;
+  int fail = 0;
+
+  for (i = 0; i < sizeof(caps) / sizeof(caps[0]); i++) {
+    const size_t cap = caps[i];
+    char *buf = st_sized_alloc(cap);
+
+    fail |= sized_clip_bad("cookie_get", cookie_get(buf, cap, rec, 6), buf, cap,
+                           value);
+    freet(buf);
+  }
+  /* the key fills its buffer to the last byte, then is one byte too long */
+  for (i = sizeof(key) - 2; i <= sizeof(key); i++) {
+    char *buf = st_sized_alloc(i);
+    const char *got;
+
+    buf[0] = 'Q'; /* so a refusal must clear it */
+    got = bauth_prefix(buf, i, "www.example.com", "/secure/");
+    const hts_boolean fits = i == sizeof(key);
+
+    if (!st_sized_guard_ok(buf, i) ||
+        (fits ? got != buf || strcmp(buf, key) != 0
+              : got != NULL || buf[0] != '\0')) {
+      printf("cookie-sized: bauth_prefix into %u bytes is '%.*s'\n",
+             (unsigned) i, (int) i, buf);
+      fail = 1;
+    }
+    freet(buf);
+  }
+  {
+    char *buf = st_sized_alloc(8);
+
+    /* the only row where scheme and host alone overflow */
+    buf[0] = 'Q';
+    fail |= bauth_prefix(buf, 8, "www.example.com", "/secure/p") != NULL ||
+            buf[0] != '\0' || !st_sized_guard_ok(buf, 8);
+    freet(buf);
+  }
+  return st_verdict("cookie-sized", fail);
+}
+
 const struct selftest_entry selftests_cookie[] = {
+    {"cookie-sized", "",
+     "cookie_get() and bauth_prefix() stay inside the buffer they are given",
+     st_cookie_sized},
     {"cookies", "", "cookie request-header self-test", st_cookies},
     {"cookiecap", "", "cookie_add honours max_len", st_cookiecap},
     {"cookieport", "", "cookies are scoped to a host, not to a port",

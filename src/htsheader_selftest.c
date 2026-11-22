@@ -1303,7 +1303,7 @@ static void legacy_crange(const char *in, char *out, size_t size) {
 
   for (a = in; is_space(*a); a++)
     ;
-  if (strncasecmp(a, "bytes ", 6) == 0) {
+  if (hts_strncasecmp(a, "bytes ", 6) == 0) {
     for (a += 6; is_space(*a); a++)
       ;
     if (sscanf(a, LLintP "-" LLintP "/" LLintP, &crange_start, &crange_end,
@@ -1540,7 +1540,7 @@ static void legacy_port(const char *in, char *out, size_t size) {
   char *end;
   long p;
 
-  if (!isdigit((unsigned char) *in) ||
+  if (!hts_isdigit((unsigned char) *in) ||
       (p = strtol(in, &end, 10), *end != '\0') || p < 1 || p > 65535)
     snprintf(out, size, "refused");
   else

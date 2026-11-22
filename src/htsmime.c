@@ -730,7 +730,7 @@ static int may_bogus_multiple(httrackp *opt, const char *mime,
 
           for (i = 0; file[i] != 0; i++) {
             if (i > 0 && file[i - 1] == '.' &&
-                strncasecmp(&file[i], ext, ext_size) == 0 &&
+                hts_strncasecmp(&file[i], ext, ext_size) == 0 &&
                 (file[i + ext_size] == 0 || file[i + ext_size] == '.' ||
                  file[i + ext_size] == '?')) {
               return 1; /* is ambiguous */

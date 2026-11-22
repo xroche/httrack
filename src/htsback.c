@@ -39,7 +39,6 @@ Please visit our Website: http://www.httrack.com
 #include "htswarc.h"
 #include "htschanges.h"
 #include "htsthread.h"
-#include <ctype.h>
 #include <limits.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -155,14 +154,14 @@ static unsigned long back_spool_owner(const char *name) {
   if (strncmp(p, prefix, sizeof(prefix) - 1) != 0)
     return 0;
   p += sizeof(prefix) - 1;
-  for (; isdigit((unsigned char) *p); p++) {
+  for (; hts_isdigit((unsigned char) *p); p++) {
     if (pid > (ULONG_MAX - 9) / 10)
       return 0;
     pid = pid * 10 + (unsigned long) (*p - '0');
   }
-  if (*p++ != '-' || !isdigit((unsigned char) *p))
+  if (*p++ != '-' || !hts_isdigit((unsigned char) *p))
     return 0;
-  while (isdigit((unsigned char) *p))
+  while (hts_isdigit((unsigned char) *p))
     p++;
   return strcmp(p, ".tmp") == 0 ? pid : 0;
 }
@@ -382,7 +381,7 @@ struct_back *back_new(httrackp *opt, int back_max) {
        spool's memory budget, and 0 forces the disk spool. */
     const char *const max = getenv("HTTRACK_DEBUG_SPOOL_MEM");
 
-    if (max != NULL && isdigit((unsigned char) max[0]))
+    if (max != NULL && hts_isdigit((unsigned char) max[0]))
       sback->ready_mem_max = (LLint) strtoul(max, NULL, 10);
   }
   coucal_value_is_malloc(sback->ready, 1);
@@ -2976,8 +2975,9 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
                 previous_save[0] = '\0';
                 r = cache_readex(opt, cache, adr, fil, /*head */ NULL,
                                  /*bound to back[p] (temporary) */
-                                 back[p].location_buffer, previous_save, /*ro */
-                                 1);
+                                 back[p].location_buffer,
+                                 sizeof(back[p].location_buffer), previous_save,
+                                 sizeof(previous_save), /*ro */ 1);
                 /* Is supposed to be on disk only */
                 if (r.is_write && previous_save[0] != '\0') {
                   /* rename a file saved under an older name */
@@ -3046,9 +3046,12 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
           // lire dans le cache
           if (!test)
             back[p].r =
-              cache_read(opt, cache, adr, fil, save, back[p].location_buffer);
+                cache_read(opt, cache, adr, fil, save, back[p].location_buffer,
+                           sizeof(back[p].location_buffer));
           else
-            back[p].r = cache_read(opt, cache, adr, fil, NULL, back[p].location_buffer);        // charger en tête uniquement du cache
+            back[p].r =
+                cache_read(opt, cache, adr, fil, NULL, back[p].location_buffer,
+                           sizeof(back[p].location_buffer)); // headers only
 
           /* ensure correct location buffer set */
           back[p].r.location = back[p].location_buffer;
@@ -4436,7 +4439,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
                   back[i].chunk_adr[back[i].chunk_size - 1] = '\0';     // octet nul 
                   // skip leading spaces or cr
-                  while (isspace((unsigned char) *chstrip))
+                  while (hts_isspace((unsigned char) *chstrip))
                     chstrip++;
                   chunk_data[0] = '\0';
                   strncatbuff(chunk_data, chstrip, sizeof(chunk_data) - 2);
@@ -4876,7 +4879,9 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                           !is_hypertext_mime(opt, back[i].r.contenttype,
                                              back[i].url_fil) &&
                           strnotempty(back[i].url_sav)) {
-                        htsblk r = cache_read(opt, cache, back[i].url_adr, back[i].url_fil, NULL, NULL);        // lire entrée cache
+                        htsblk r = cache_read(opt, cache, back[i].url_adr,
+                                              back[i].url_fil, NULL, NULL,
+                                              0); // read the cache entry
 
                         if (r.statuscode == HTTP_OK) {  // OK pas d'erreur cache
                           LLint len1, len2;
@@ -5031,9 +5036,10 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                       /* the cache entry overwrites the whole struct, so drop
                          what the 304 response still owns first (#782) */
                       back_free_response(&back[i].r);
-                      back[i].r =
-                        cache_read(opt, cache, back[i].url_adr, back[i].url_fil,
-                                   back[i].url_sav, back[i].location_buffer);
+                      back[i].r = cache_read(opt, cache, back[i].url_adr,
+                                             back[i].url_fil, back[i].url_sav,
+                                             back[i].location_buffer,
+                                             sizeof(back[i].location_buffer));
                       back[i].r.location = back[i].location_buffer;
                       back_connxfr(&tmp, &back[i].r);
                       warc_move_request(&tmp, &back[i].r);

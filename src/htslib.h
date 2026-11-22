@@ -1064,7 +1064,7 @@ void *hts_get_callback(t_hts_htmlcheck_callbacks * callbacks,
 /* One byte per column, so the four classes read side by side. Nothing down
    to the next marker survives clang-format either. */
 #define  is_space(c)      ( ((c)==' ') || ((c)=='\"') || ((c)==10) || ((c)==13) || ((c)==9) || ((c)==12) || ((c)==11) || ((c)=='\'') )
-#define  is_realspace(c)  ( ((c)==' ')                || ((c)==10) || ((c)==13) || ((c)==9) || ((c)==12) || ((c)==11)                )
+#define  is_realspace(c)  hts_isspace(c)
 #define  is_taborspace(c) ( ((c)==' ')                                          || ((c)==9)                             )
 #define  is_retorsep(c)   (                              ((c)==10) || ((c)==13) || ((c)==9)                                          )
 //HTS_INLINE int is_space(char);
@@ -1111,12 +1111,6 @@ HTS_STATIC int strcmpnocase(const char *a, const char *b) {
       return cmp;
   }
 }
-
-#ifdef _WIN32
-#define strcasecmp(a,b) stricmp(a,b)
-#define strncasecmp(a,b,n) strnicmp(a,b,n)
-/* No snprintf alias: _snprintf leaves a truncated string unterminated. */
-#endif
 
 /* MSVC ships these POSIX functions under other names. Kept out of the installed
    headers: they would rewrite the same identifiers in a consumer's own code. */

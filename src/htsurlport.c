@@ -32,8 +32,8 @@ Please visit our Website: http://www.httrack.com
 /* ------------------------------------------------------------ */
 
 #include "htsurlport.h"
+#include "htsctype.h"
 
-#include <ctype.h>
 #include <string.h>
 
 static hts_boolean is_decimal_digit(char c) { return c >= '0' && c <= '9'; }
@@ -67,7 +67,7 @@ hts_scan_result hts_scan_llint(const char **s, LLint min, LLint max,
   const char *end;
   LLint ignored;
 
-  while (isspace((unsigned char) *p))
+  while (hts_isspace((unsigned char) *p))
     p++;
   if (hts_parse_llint(p, &end, min, max, out)) {
     *s = end;
@@ -157,7 +157,8 @@ static hts_boolean param_name_is(const char *key, size_t len,
   size_t i;
 
   for (i = 0; i < len; i++)
-    if (tolower((unsigned char) key[i]) != tolower((unsigned char) name[i]))
+    if (hts_tolower((unsigned char) key[i]) !=
+        hts_tolower((unsigned char) name[i]))
       return HTS_FALSE;
   return name[len] == '\0';
 }

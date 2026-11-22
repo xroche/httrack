@@ -71,7 +71,6 @@ static int linput(FILE * fp, char *s, int max);
 #include <io.h>    /* _isatty, _setmode */
 #include <fcntl.h> /* _O_BINARY */
 #endif
-#include <ctype.h>
 /* END specific definitions */
 
 static int __cdecl htsshow_start(t_hts_callbackarg * carg, httrackp * opt);

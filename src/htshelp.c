@@ -407,7 +407,7 @@ void help_catchurl(const char *dest_path) {
 
   if (soc != INVALID_SOCKET) {
     char BIGSTK url[HTS_URLMAXSIZE * 2];
-    char method[32];
+    char method[CATCH_URL_METHOD_SIZE];
     char BIGSTK data[CATCH_URL_DATA_SIZE];
     catch_url_status status;
 
@@ -418,7 +418,8 @@ void help_catchurl(const char *dest_path) {
     printf("\tProxy's address: \t%s\n\tProxy's port: \t%d\n", adr_prox,
            port_prox);
     //
-    status = catch_url_capture(soc, url, method, data);
+    status = catch_url_capture(soc, url, sizeof(url), method, sizeof(method),
+                               data, sizeof(data));
     if (status == CATCH_URL_OK) {
       char BIGSTK dest[HTS_URLMAXSIZE * 2];
       int i = 0;

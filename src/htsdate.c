@@ -37,9 +37,9 @@ Please visit our Website: http://www.httrack.com
 #include "htssafe.h"
 #include "htsurlport.h"
 
-#include <ctype.h>
 #include <limits.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 
 /* hts_lowcase() lives in the library proxytrack does not link. */
@@ -106,7 +106,7 @@ struct tm *convert_time_rfc822_pivot(struct tm *result, const char *s,
 
         /* A '+' zone such as "+0100" reads as its digits. */
         digits += strspn(digits, HTS_REALSPACES);
-        if (digits[0] == '+' && isdigit((unsigned char) digits[1]))
+        if (digits[0] == '+' && hts_isdigit((unsigned char) digits[1]))
           digits++;
         if (hts_scan_llint(&digits, 0, INT_MAX, &value) == HTS_SCAN_OK) {
           const int number = (int) value;
@@ -205,4 +205,18 @@ hts_boolean hts_tm_filetime(const struct tm *tm, time_t *out) {
   // A date past what time_t holds stamps its last second, never 1901.
   *out = hts_time_clip(t);
   return HTS_TRUE;
+}
+
+void hts_format_rfc822(char *s, size_t size, const struct tm *tm,
+                       const char *suffix) {
+  static const char days[7][4] = {"Sun", "Mon", "Tue", "Wed",
+                                  "Thu", "Fri", "Sat"};
+  static const char months[12][4] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                                     "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+
+  snprintf(s, size, "%s, %02d %s %04d %02d:%02d:%02d%s",
+           tm->tm_wday >= 0 && tm->tm_wday < 7 ? days[tm->tm_wday] : "???",
+           tm->tm_mday,
+           tm->tm_mon >= 0 && tm->tm_mon < 12 ? months[tm->tm_mon] : "???",
+           tm->tm_year + 1900, tm->tm_hour, tm->tm_min, tm->tm_sec, suffix);
 }
