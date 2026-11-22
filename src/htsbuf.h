@@ -62,28 +62,33 @@ static HTS_INLINE HTS_UNUSED hts_buf hts_buf_skip(hts_buf b, size_t off) {
 }
 
 static HTS_INLINE HTS_UNUSED void hts_buf_cpy_(hts_buf b, const char *s,
-                                               const char *file, int line) {
-  (void) strcpy_safe_(b.p, b.size, s, (size_t) -1,
+                                               size_t s_size, const char *file,
+                                               int line) {
+  (void) strcpy_safe_(b.p, b.size, s, s_size,
                       "overflow while copying into a buffer", file, line);
 }
 
-static HTS_INLINE HTS_UNUSED void
-hts_buf_catn_(hts_buf b, const char *s, size_t n, const char *file, int line) {
-  (void) strncat_safe_(b.p, b.size, s, (size_t) -1, n,
+static HTS_INLINE HTS_UNUSED void hts_buf_catn_(hts_buf b, const char *s,
+                                                size_t s_size, size_t n,
+                                                const char *file, int line) {
+  (void) strncat_safe_(b.p, b.size, s, s_size, n,
                        "overflow while appending to a buffer", file, line);
 }
 
-/* Copy, append, or append at most N bytes of S to B's text, aborting unless it
-   fits, as strlcpybuff, strlcatbuff and strlncatbuff. The abort names the
-   caller's line. */
-#define hts_buf_cpy(B, S) hts_buf_cpy_((B), (S), __FILE__, __LINE__)
+/* Copy S into B, aborting at the caller's line unless it fits. */
+#define hts_buf_cpy(B, S)                                                      \
+  hts_buf_cpy_((B), (S), HTS_SIZEOF_SRC_(S), __FILE__, __LINE__)
+/* Append S to B's text, aborting at the caller's line unless it fits. */
 #define hts_buf_cat(B, S)                                                      \
-  hts_buf_catn_((B), (S), (size_t) -1, __FILE__, __LINE__)
-#define hts_buf_catn(B, S, N) hts_buf_catn_((B), (S), (N), __FILE__, __LINE__)
+  hts_buf_catn_((B), (S), HTS_SIZEOF_SRC_(S), (size_t) -1, __FILE__, __LINE__)
+/* Append at most N bytes of S, aborting at the caller's line unless they fit.
+ */
+#define hts_buf_catn(B, S, N)                                                  \
+  hts_buf_catn_((B), (S), HTS_SIZEOF_SRC_(S), (N), __FILE__, __LINE__)
 
 /* Copy S into B, clipped to fit, as strclipbuff. TRUE if it all fit. */
-static HTS_INLINE HTS_UNUSED hts_boolean hts_buf_clip(hts_buf b,
-                                                      const char *s) {
+static HTS_INLINE HTS_UNUSED hts_boolean hts_buf_cpy_clip(hts_buf b,
+                                                          const char *s) {
   return strclipbuff(b.p, b.size, s);
 }
 
