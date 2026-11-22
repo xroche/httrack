@@ -4592,6 +4592,15 @@ static void st_locale_libc_diverges(const char *name) {
   printf("\n");
 }
 
+/* Prints a failed check of the engine under locale name, and clears *ok. */
+static void st_locale_check(hts_boolean *ok, const char *name, int cond,
+                            const char *what) {
+  if (!cond) {
+    printf("locale %s: FAIL %s\n", name, what);
+    *ok = HTS_FALSE;
+  }
+}
+
 /* Do the engine's own parsers and formatters ignore this locale? */
 static hts_boolean st_locale_engine_ok(const char *name) {
   hts_boolean ok = HTS_TRUE;
@@ -4601,45 +4610,43 @@ static hts_boolean st_locale_engine_ok(const char *name) {
   double rate, pmin, pmax;
   int c;
 
-#define ST_LOCALE_CHECK(cond, what)                                            \
-  do {                                                                         \
-    if (!(cond)) {                                                             \
-      printf("locale %s: FAIL %s\n", name, what);                              \
-      ok = HTS_FALSE;                                                          \
-    }                                                                          \
-  } while (0)
   st_locale_date(&tm);
   time_rfc822(buf, &tm);
-  ST_LOCALE_CHECK(strcmp(buf, "Sun, 06 Nov 1994 08:49:37 GMT") == 0,
+  st_locale_check(&ok, name, strcmp(buf, "Sun, 06 Nov 1994 08:49:37 GMT") == 0,
                   "time_rfc822");
-  ST_LOCALE_CHECK(optrate_read("0.5", &rate) == 3 && rate == 0.5,
+  st_locale_check(&ok, name, optrate_read("0.5", &rate) == 3 && rate == 0.5,
                   "optrate_read");
-  ST_LOCALE_CHECK(optpause_read("1.5:2.5", &pmin, &pmax) == 2 && pmin == 1.5 &&
+  st_locale_check(&ok, name,
+                  optpause_read("1.5:2.5", &pmin, &pmax) == 2 && pmin == 1.5 &&
                       pmax == 2.5,
                   "optpause_read");
-  ST_LOCALE_CHECK(hts_strtod_c(" -2.5e1x", &end) == -25 && *end == 'x',
+  st_locale_check(&ok, name,
+                  hts_strtod_c(" -2.5e1x", &end) == -25 && *end == 'x',
                   "hts_strtod_c");
-  ST_LOCALE_CHECK(optpause_read(" 5:10 ", &pmin, &pmax) == 2 &&
+  st_locale_check(&ok, name,
+                  optpause_read(" 5:10 ", &pmin, &pmax) == 2 &&
                       optpause_read("5", &pmin, &pmax) == 1 &&
                       optpause_read("5:", &pmin, &pmax) == 0 &&
                       optpause_read("5x", &pmin, &pmax) == 0 &&
                       optpause_read("0x10", &pmin, &pmax) == 0,
                   "optpause_read junk");
-  ST_LOCALE_CHECK(optrate_read("0x5", &rate) == 3 && rate == -1 &&
+  st_locale_check(&ok, name,
+                  optrate_read("0x5", &rate) == 3 && rate == -1 &&
                       optrate_read("5x", &rate) == 1 && rate == 5 &&
                       optrate_read("10x", &rate) == 2 && rate == 10 &&
                       optrate_read("x", &rate) == 1 && rate == -1 &&
                       optrate_read("1.0x", &rate) == 3 && rate == 1,
                   "optrate_read hex");
-  ST_LOCALE_CHECK(hts_strcasecmp("INDEX.HTML", "index.html") == 0 &&
+  st_locale_check(&ok, name,
+                  hts_strcasecmp("INDEX.HTML", "index.html") == 0 &&
                       hts_strncasecmp("Iz", "iy", 1) == 0 &&
                       hts_strcasecmp("\xc9", "\xe9") != 0,
                   "hts_strcasecmp");
   for (c = 0x80; c <= 0xff; c++)
-    ST_LOCALE_CHECK(!hts_isalpha(c) && hts_toupper(c) == c, "high byte");
-  ST_LOCALE_CHECK(hts_toupper('i') == 'I' && hts_tolower('I') == 'i',
+    st_locale_check(&ok, name, !hts_isalpha(c) && hts_toupper(c) == c,
+                    "high byte");
+  st_locale_check(&ok, name, hts_toupper('i') == 'I' && hts_tolower('I') == 'i',
                   "dotless i");
-#undef ST_LOCALE_CHECK
   return ok;
 }
 

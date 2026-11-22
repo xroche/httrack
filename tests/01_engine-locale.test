@@ -58,6 +58,7 @@ fi
 # BSD and macOS spellings are tried as the system has them.
 set -- tr_TR.ISO8859-9 de_DE.ISO8859-1 fr_FR.ISO8859-1
 built=
+made=
 if command -v localedef >/dev/null 2>&1; then
     locdir=$(mktemp -d ./locale-def.XXXXXX)
     for spec in tr_TR:ISO-8859-9 de_DE:ISO-8859-1 fr_FR:ISO-8859-1; do
@@ -65,14 +66,21 @@ if command -v localedef >/dev/null 2>&1; then
         # localedef exits 1 on mere warnings, so judge by what it wrote
         localedef -i "${spec%%:*}" -f "${spec#*:}" "$locdir/$name" \
             >/dev/null 2>&1 || true
-        if test -d "$locdir/$name"; then
+        test -d "$locdir/$name" || continue
+        made="$made $name"
+        # count only a locale this libc loads, as Ubuntu devel's may not
+        charmap=$(LOCPATH="$locdir" LC_ALL="$name" locale charmap 2>/dev/null ||
+            true)
+        if test "$charmap" = "${spec#*:}"; then
             set -- "$@" "$name"
             built="$built $name"
+        else
+            echo "built $name, but this libc does not load it"
         fi
     done
     export LOCPATH="$locdir"
     # with the sources here, a locale that did not build is a broken probe
-    if test -z "$built" && test -r /usr/share/i18n/locales/tr_TR; then
+    if test -z "$made" && test -r /usr/share/i18n/locales/tr_TR; then
         fail "localedef built no locale from /usr/share/i18n"
     fi
 fi

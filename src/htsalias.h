@@ -66,7 +66,7 @@ hts_boolean optcluster_next(const char *token, size_t *at, char *name,
 size_t optrate_read(const char *val, double *rate);
 /* Reads the whole --pause MIN[:MAX] at VAL. Returns how many numbers it read,
    or 0 when a number is missing or junk follows. */
-int optpause_read(const char *val, double *pmin, double *pmax);
+HTS_CHECK_RESULT int optpause_read(const char *val, double *pmin, double *pmax);
 /* strtod() with a "." decimal point in any locale, rounding as it does up to 15
    digits and 10^22. It reads no hex, inf or nan. end is set as strtod() sets
    it. */
