@@ -5000,6 +5000,9 @@ def main():
     parser.add_argument(
         "--mptcp", action="store_true", help="listen with Multipath TCP"
     )
+    parser.add_argument(
+        "--hold", help="also bind this address on the port, unlistened, so it refuses"
+    )
     args = parser.parse_args()
 
     root = os.path.abspath(args.root)
@@ -5018,11 +5021,24 @@ def main():
             socketserver.TCPServer.server_bind(self)
             self.server_name, self.server_port = self.server_address[:2]
 
-    # An MPTCP listener is what lets a client negotiate multipath instead of
-    # being silently fallen back to TCP, so a test can tell the two apart.
     if ":" in args.bind:  # an IPv6 literal
         BacklogHTTPServer.address_family = socket.AF_INET6
+    # An MPTCP listener is what lets a client negotiate multipath instead of
+    # being silently fallen back to TCP, so a test can tell the two apart.
     httpd = BacklogHTTPServer((args.bind, 0), factory, bind_and_activate=not args.mptcp)
+    held = None
+    for _ in range(50 if args.hold else 0):
+        held = socket.socket(socket.AF_INET6 if ":" in args.hold else socket.AF_INET)
+        try:
+            held.bind((args.hold, httpd.server_address[1]))
+            break
+        except OSError:  # the port is taken there, so try another
+            held.close()
+            held = None
+            httpd.server_close()
+            httpd = BacklogHTTPServer((args.bind, 0), factory)
+    if args.hold and held is None:
+        sys.exit(f"no port free on both {args.bind} and {args.hold}")
     if args.mptcp:
         httpd.socket.close()
         httpd.socket = socket.socket(

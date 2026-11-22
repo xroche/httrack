@@ -1502,7 +1502,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
     // effacer r
     hts_init_htsblk(&r);
     r.location = loc;           // en cas d'erreur 3xx (moved)
-    // recopier proxy
+    // copy the proxy settings
     if ((r.req.proxy.active = opt->proxy.active)) {
       if (StringBuff(opt->proxy.bindhost) != NULL)
         r.req.proxy.bindhost = StringBuff(opt->proxy.bindhost);

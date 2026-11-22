@@ -109,8 +109,8 @@ int hts_dns_negative_wait_ms(int failures) {
                                             : HTS_DNS_NEGATIVE_TTL_MAX_MS;
 }
 
-/* Fixed texts, since gai_strerror() may share one buffer between threads. A
-   table, because some systems give two codes one value. */
+/* These texts are fixed because gai_strerror() may share one buffer between
+   threads. A switch would not compile where two codes share one value. */
 typedef struct dns_gai_text {
   int code;
   const char *text;

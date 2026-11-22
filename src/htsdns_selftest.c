@@ -909,7 +909,7 @@ static hts_boolean st_texts_fit(void) {
   return HTS_TRUE;
 }
 
-/* Backend calls since mock_reset_calls(), each of which releases once. */
+/* How many backend calls since mock_reset_calls()? Each releases once. */
 static int mock_total_calls(void) {
   int n = 0;
 

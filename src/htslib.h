@@ -512,6 +512,13 @@ T_SOC newhttp(httrackp *opt, const char *iadr, htsblk *retour, int port);
    non-NULL, to the address count. */
 T_SOC newhttp_addr(httrackp *opt, const char *iadr, htsblk *retour, int port,
                    int addr_index, int *addr_count);
+/* Like newhttp_addr(), but try up to tries addresses from addr_index on (all
+   of them for -1), skipping one -%b cannot bind for. *skipped gets how many
+   were skipped, *bind_failed whether binding failed the last one; both may be
+   NULL. */
+T_SOC newhttp_addrs(httrackp *opt, const char *iadr, htsblk *retour, int port,
+                    int addr_index, int tries, int *addr_count, int *skipped,
+                    hts_boolean *bind_failed);
 /* Clips the formatted failure reason into r->msg, which also round-trips
    through the cache as X-StatusMessage. Leaves r->statuscode to the caller. */
 #define htsblk_failf(R, ...)                                                   \

@@ -2583,16 +2583,15 @@ static hts_dns_status newhttp_bind_resolve(httrackp *opt, const char *host,
   return hts_dns_resolve(opt, host, opt->timeout, &opt->state.stop, res);
 }
 
-/* Open a non-blocking connect to *server on port, from bind_dns's address of
-   the server's family when bind_dns is set. On failure, set retour's message
-   and return INVALID_SOCKET, with *bind_failed telling whether binding was the
-   cause. */
+/* Open a non-blocking connect to *server, from the first bind_dns address of
+   its family that binds. *bind_failed tells whether binding caused a failure.
+ */
 static T_SOC newhttp_open(httrackp *opt, htsblk *retour, SOCaddr *server,
                           int port, const hts_dns_result *bind_dns,
                           hts_boolean *bind_failed) {
   const int family = SOCaddr_sinfamily(*server);
   const SOCaddr *local = NULL;
-  T_SOC soc;
+  T_SOC soc = INVALID_SOCKET;
   int i;
 
   assertf(retour != NULL);
@@ -2602,38 +2601,42 @@ static T_SOC newhttp_open(httrackp *opt, htsblk *retour, SOCaddr *server,
   retour->address_size = SOCaddr_size(retour->address);
 
   if (bind_dns != NULL) {
-    for (i = 0; i < bind_dns->count && local == NULL; i++)
-      if (SOCaddr_sinfamily(bind_dns->addr[i]) == family)
-        local = &bind_dns->addr[i];
-    if (local == NULL) {
-      htsblk_failf(retour, HTS_DNS_BIND_PREFIX "%s",
-                   "no address of the server's family");
+    htsblk_failf(retour, HTS_DNS_BIND_PREFIX "%s",
+                 "no address of the server's family");
+    for (i = 0; i < bind_dns->count && soc == INVALID_SOCKET; i++) {
+      if (SOCaddr_sinfamily(bind_dns->addr[i]) != family)
+        continue;
+      local = &bind_dns->addr[i];
+      // a socket that binds cannot be a multipath one
+      soc = hts_socket_client(family, opt, HTS_TRUE);
+      retour->debugid = HTS_STAT.stat_sockid++;
+      if (soc == INVALID_SOCKET)
+        break;
+      if (bind(soc, &SOCaddr_sockaddr(*local), SOCaddr_size(*local)) != 0) {
+        const int last_errno = hts_socket_errno();
+        char errbuf[HTS_STRERROR_SIZE];
+
+        htsblk_failf(retour, HTS_DNS_BIND_PREFIX "%s",
+                     hts_strerror(last_errno, errbuf, sizeof(errbuf)));
+        deletesoc(soc);
+        soc = INVALID_SOCKET;
+        local = NULL;
+      }
+    }
+    if (soc == INVALID_SOCKET && local == NULL) {
       *bind_failed = HTS_TRUE;
       return INVALID_SOCKET;
     }
+  } else {
+    soc = hts_socket_client(family, opt, HTS_FALSE);
+    retour->debugid = HTS_STAT.stat_sockid++;
   }
-
-  /* -%b pins the source address, and a socket that binds cannot be a
-     multipath one. */
-  soc = hts_socket_client(family, opt, local != NULL ? HTS_TRUE : HTS_FALSE);
-  retour->debugid = HTS_STAT.stat_sockid++;
   if (soc == INVALID_SOCKET) {
     const int last_errno = hts_socket_errno();
     char errbuf[HTS_STRERROR_SIZE];
 
     htsblk_failf(retour, "Unable to create a socket: %s",
                  hts_strerror(last_errno, errbuf, sizeof(errbuf)));
-    return INVALID_SOCKET;
-  }
-  if (local != NULL &&
-      bind(soc, &SOCaddr_sockaddr(*local), SOCaddr_size(*local)) != 0) {
-    const int last_errno = hts_socket_errno();
-    char errbuf[HTS_STRERROR_SIZE];
-
-    htsblk_failf(retour, HTS_DNS_BIND_PREFIX "%s",
-                 hts_strerror(last_errno, errbuf, sizeof(errbuf)));
-    deletesoc(soc);
-    *bind_failed = HTS_TRUE;
     return INVALID_SOCKET;
   }
   SOCaddr_initport(*server, port);
@@ -2657,18 +2660,31 @@ static T_SOC newhttp_open(httrackp *opt, htsblk *retour, SOCaddr *server,
 
 T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
                    int addr_index, int *addr_count) {
-  T_SOC soc;                    // descipteur de la socket
+  return newhttp_addrs(opt, _iadr, retour, port, addr_index, 1, addr_count,
+                       NULL, NULL);
+}
+
+T_SOC newhttp_addrs(httrackp *opt, const char *_iadr, htsblk *retour, int port,
+                    int addr_index, int tries, int *addr_count, int *skipped,
+                    hts_boolean *bind_failed_out) {
+  T_SOC soc = INVALID_SOCKET; // descipteur de la socket
 
   if (addr_count != NULL) {
     *addr_count = 0;
+  }
+  if (skipped != NULL) {
+    *skipped = 0;
+  }
+  if (bind_failed_out != NULL) {
+    *bind_failed_out = HTS_FALSE;
   }
 
   if (strcmp(_iadr, "file://") != 0) {  /* non fichier */
     SOCaddr server;
     hts_dns_result dns, bind_res;
     const hts_dns_result *bind_dns = NULL;
-    hts_boolean auto_index, bind_failed = HTS_FALSE;
-    int tries, t;
+    hts_boolean bind_failed = HTS_FALSE;
+    int t;
 
     // tester un éventuel id:pass et virer id:pass@ si détecté
     const char *const iadr = jump_identification_const(_iadr);
@@ -2714,8 +2730,8 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
     if (addr_count != NULL) {
       *addr_count = dns.count;
     }
-    auto_index = addr_index < 0 ? HTS_TRUE : HTS_FALSE;
     if (addr_index < 0) {
+      tries = dns.count;
       addr_index = hts_dns_preferred(opt, resolve_host);
       if (addr_index >= dns.count)
         addr_index = 0;
@@ -2741,14 +2757,19 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
       bind_dns = &bind_res;
     }
 
-    /* A first connect moves past an address it cannot bind for; a fallback
-       names its own, and back_connect_next() moves on. */
-    tries = auto_index ? dns.count : 1;
-    for (t = 0; t < tries; t++) {
+    /* A first connect skips addresses it cannot bind for, and
+       back_connect_next() does the same for a fallback. */
+    for (t = 0; t < tries && t < dns.count; t++) {
       SOCaddr_copy_SOCaddr(server, dns.addr[(addr_index + t) % dns.count]);
       soc = newhttp_open(opt, retour, &server, port, bind_dns, &bind_failed);
       if (soc != INVALID_SOCKET || !bind_failed)
         break;
+    }
+    if (skipped != NULL) {
+      *skipped = t;
+    }
+    if (bind_failed_out != NULL) {
+      *bind_failed_out = bind_failed;
     }
 
   } else {                      // on doit ouvrir un fichier local!

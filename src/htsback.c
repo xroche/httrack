@@ -469,40 +469,51 @@ static void back_log_link(httrackp *opt, const lien_back *b, const char *what) {
                 what, adr_nologin(opt, b->url_adr), b->url_fil, b->url_sav);
 }
 
-/* Retry a stuck/failed connecting slot against its next resolved address.
-   Closes the current socket and starts a non-blocking connect to the next
-   candidate, leaving the slot in STATUS_CONNECTING. Returns 1 if a new connect
-   was started, 0 if no fallback address remains (caller fails the slot). */
-static int back_connect_next(httrackp *opt, struct_back *sback, int i) {
+/* Retry a stuck/failed connecting slot against its next resolved address,
+   closing the current socket once a new connect started. Returns 1 if one did,
+   or if keep_pending and -%b could bind for no other address, in which case the
+   current connect keeps its full timeout; 0 if the caller fails the slot. */
+static int back_connect_next(httrackp *opt, struct_back *sback, int i,
+                             hts_boolean keep_pending) {
   hts_connect_fallback *const cf = &sback->connect_fallback[i];
   lien_back *const back = sback->lnk;
-  T_SOC soc = INVALID_SOCKET;
-  int next = cf->addr_index + 1;
+  const int next = cf->addr_index + 1;
+  SOCaddr address;
+  const int address_size = back[i].r.address_size;
+  char msg[sizeof(back[i].r.msg)];
+  hts_boolean bind_failed;
+  int skipped;
+  T_SOC soc;
 
   if (next >= cf->addr_count)
     return 0;
 
+  SOCaddr_copy_SOCaddr(address, back[i].r.address);
+  strcpybuff(msg, back[i].r.msg);
+  soc = newhttp_addrs(opt, back[i].url_adr, &back[i].r, -1,
+                      (cf->addr_first + next) % cf->addr_count,
+                      cf->addr_count - next, NULL, &skipped, &bind_failed);
+  if (soc == INVALID_SOCKET) {
+    cf->addr_index = cf->addr_count - 1; // no fallback left
+    if (!keep_pending || !bind_failed)
+      return 0;
+    SOCaddr_copy_SOCaddr(back[i].r.address, address);
+    back[i].r.address_size = address_size;
+    strcpybuff(back[i].r.msg, msg);
+    return 1;
+  }
+
   if (back[i].r.soc != INVALID_SOCKET) {
     deletehttp(&back[i].r);
   }
-  // an address that cannot be opened, or bound for -%b, fails alone
-  for (; next < cf->addr_count; next++) {
-    soc = newhttp_addr(opt, back[i].url_adr, &back[i].r, -1,
-                       (cf->addr_first + next) % cf->addr_count, NULL);
-    if (soc != INVALID_SOCKET)
-      break;
-  }
-  if (soc == INVALID_SOCKET)
-    return 0;
-
   back[i].r.soc = soc;
-  cf->addr_index = next;
+  cf->addr_index = next + skipped;
   if (back[i].timeout > 0)
     back_timeout_refresh(sback, i);
   back[i].status = STATUS_CONNECTING;
-  hts_log_print(opt, LOG_DEBUG,
-                "connect failed, trying next address (%d/%d) for %s", next + 1,
-                cf->addr_count, adr_nologin(opt, back[i].url_adr));
+  hts_log_print(
+      opt, LOG_DEBUG, "connect failed, trying next address (%d/%d) for %s",
+      cf->addr_index + 1, cf->addr_count, adr_nologin(opt, back[i].url_adr));
   return 1;
 }
 
@@ -3906,7 +3917,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
         if (dispo) { // socket ready: connect() finished (ok or failed)
           // probe SO_ERROR and, on failure, fall back to the next address
           if (connect_socket_error(back[i].r.soc) != 0) {
-            if (!back_connect_next(opt, sback, i)) {
+            if (!back_connect_next(opt, sback, i, HTS_FALSE)) {
               back_slot_close_fail(opt, sback, i, STATUSCODE_CONNERROR,
                                    "Connect Error");
             }
@@ -5325,13 +5336,10 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               if (back_connect_fallback_due(cf->addr_index, cf->addr_count,
                                             act_ms - cf->timeout_since,
                                             back[i].timeout)) {
-                if (back_connect_next(opt, sback, i)) {
-                  continue; // reconnected to the next candidate
+                if (!back_connect_next(opt, sback, i, HTS_TRUE)) {
+                  back_slot_close_fail(opt, sback, i, STATUSCODE_CONNERROR,
+                                       "Connect Error");
                 }
-                // no socket could be opened, so stop rather than spin
-                back[i].r.soc = INVALID_SOCKET;
-                back_slot_fail(opt, sback, i, STATUSCODE_CONNERROR,
-                               "Connect Error");
                 continue;
               }
             }

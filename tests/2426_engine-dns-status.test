@@ -44,6 +44,23 @@ socket.socket(socket.AF_INET6 if ":" in a else socket.AF_INET).bind((a, 0))' \
         "$1" 2>/dev/null
 }
 
+# silent ADDR: does a connect to ADDR stay unanswered, settled and re-probed?
+silent() {
+    "${SRV_PYTHON}" -c 'import socket, sys, time
+for _ in range(2):
+    s = socket.socket()
+    s.settimeout(0.5)
+    try:
+        s.connect((sys.argv[1], 80))
+        sys.exit(1)
+    except socket.timeout:
+        pass
+    except OSError:
+        sys.exit(1)
+    s.close()
+    time.sleep(0.5)' "$1" 2>/dev/null
+}
+
 bind_prefix="Unable to bind the local address: "
 
 # the retry reads the negative cache
@@ -54,6 +71,10 @@ grep -q "Unable to get server's address: host name does not exist (cached)" \
 local_server_start --env LOCAL_SERVER_VERBOSE=1 --log "${tmpdir}/srv4.log" \
     --bind 127.0.0.1
 p4=${SRV_PORT}
+testnet_local=no
+if bindable 192.0.2.1; then
+    testnet_local=yes
+fi
 page=/simple/basic.html
 
 log=$(crawl bindname "gone.invalid:" "http://127.0.0.1:${p4}${page}" \
@@ -66,7 +87,7 @@ log=$(crawl bindpick "two.test:::1,127.0.0.1" "http://127.0.0.1:${p4}${page}" \
     -%b two.test)
 crawled bindpick "${log}"
 
-# the server's ::1 has no IPv4 source, so its 127.0.0.1 is used
+# -%b has no IPv6 address for the server's ::1, so its 127.0.0.1 is used
 log=$(crawl bindskip "two.test:::1,127.0.0.1" "http://two.test:${p4}${page}" \
     -%b 127.0.0.1)
 crawled bindskip "${log}"
@@ -79,11 +100,32 @@ if bindable ::1; then
         fail "an IPv4 -%b against an IPv6 server: ${log}"
     log=$(crawl bindv6 "" "http://[::1]:${p6}${page}" -%b ::1)
     crawled bindv6 "${log}"
+    log=$(crawl bindv6br "" "http://[::1]:${p6}${page}" -%b '[::1]')
+    crawled bindv6br "${log}"
+
+    if test "${testnet_local}" = no; then
+        # 192.0.2.1 cannot be bound, so the first connect goes on to ::1
+        log=$(crawl bindpair "pair.test:192.0.2.1,::1" \
+            "http://pair.test:${p6}${page}" -%b pair.test)
+        crawled bindpair "${log}"
+    fi
+
+    # -%b has no IPv6 address for ::1, so the unanswered connect keeps its timeout
+    if test "${testnet_local}" = no && silent 192.0.2.1; then
+        log=$(crawl bindkeep "slow.test:192.0.2.1,::1" \
+            "http://slow.test:${p6}${page}" -%b 0.0.0.0 --timeout=2)
+        grep -q "Connect Time Out" <<<"${log}" ||
+            fail "the pending connect was not left to time out: ${log}"
+    else
+        echo "192.0.2.1 answers here, skipping the kept-connect case"
+    fi
 else
     echo "no IPv6 loopback, skipping the IPv6 -%b cases"
 fi
 
-if bindable 127.0.0.2; then
+# WSL2's httrack.exe cannot see WSL's 127.0.0.2, and Hurd has one loopback IP
+if test "$HTS_OS" = Linux && test "$(suite_backend)" = posix &&
+    bindable 127.0.0.2; then
     # the server logs each request's peer, so this proves the source address
     log=$(crawl bindsrc "" "http://127.0.0.1:${p4}/simple/link.html" \
         -%b 127.0.0.2)
@@ -91,8 +133,45 @@ if bindable 127.0.0.2; then
     grep -q '^127\.0\.0\.2 .*"GET /simple/link.html' "${tmpdir}/srv4.log" ||
         fail "-%b 127.0.0.2 was not the source: $(<"${tmpdir}/srv4.log")"
 
+    if test "${testnet_local}" = no; then
+        # 192.0.2.1 cannot be bound, so the next IPv4 address, not the last, is
+        log=$(crawl bindfirst "bindpair.test:192.0.2.1,127.0.0.2,127.0.0.3" \
+            "http://127.0.0.1:${p4}${page}?pair" -%b bindpair.test)
+        crawled bindfirst "${log}"
+        grep -q "^127\.0\.0\.2 .*\"GET ${page}?pair" "${tmpdir}/srv4.log" ||
+            fail "-%b skipped to the wrong address: $(<"${tmpdir}/srv4.log")"
+    fi
+
+    # A full accept queue drops SYNs until 11s, past the 10s fallback, and -%b
+    # has no IPv6 address for ::1, so the first connect must be kept open.
+    "${SRV_PYTHON}" -c 'import socket, time
+srv = socket.socket()
+srv.bind(("127.0.0.1", 0))
+srv.listen(0)
+fill = socket.create_connection(srv.getsockname())
+print(srv.getsockname()[1], flush=True)
+time.sleep(11)
+srv.accept()[0].close()
+c = srv.accept()[0]
+c.settimeout(30)
+c.recv(65536)
+c.sendall(b"HTTP/1.0 200 OK\r\nContent-Type: text/html\r\n\r\n<p>late</p>")
+c.close()' >"${tmpdir}/late.port" 2>"${tmpdir}/late.err" &
+    late_pid=$!
+    cleanup_push stop_server "${late_pid}"
+    for _ in $(seq 50); do
+        test -s "${tmpdir}/late.port" && break
+        poll_wait 0.1
+    done
+    late_port=$(<"${tmpdir}/late.port")
+    test -n "${late_port}" || fail "the late server: $(<"${tmpdir}/late.err")"
+    log=$(crawl bindlate "late.test:127.0.0.1,::1" \
+        "http://late.test:${late_port}/" -%b 127.0.0.1 --timeout=25)
+    crawled bindlate "${log}"
+
     # 127.0.0.1 refuses, ::1 cannot be bound for, 127.0.0.2 serves
-    local_server_start --log "${tmpdir}/srv2.log" --bind 127.0.0.2
+    local_server_start --log "${tmpdir}/srv2.log" --bind 127.0.0.2 \
+        --hold 127.0.0.1
     log=$(crawl bindnext "three.test:127.0.0.1,::1,127.0.0.2" \
         "http://three.test:${SRV_PORT}${page}" -%b 127.0.0.1)
     crawled bindnext "${log}"
@@ -101,7 +180,7 @@ else
 fi
 
 # TEST-NET-1 is no local address, so bind() itself fails, direct or proxied
-if bindable 192.0.2.1; then
+if test "${testnet_local}" = yes; then
     echo "this host owns 192.0.2.1, skipping the failed-bind case"
 else
     for via in "" "-P 127.0.0.1:1"; do
