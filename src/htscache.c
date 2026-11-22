@@ -1315,8 +1315,7 @@ void cache_init(cache_back * cache, httrackp * opt) {
   }
 }
 
-// lire un fichier.. (compatible \0)
-/* Note: NOT utf-8 */
+/* Like readfile2 without the size; the path is not UTF-8. */
 static char *readfile(const char *fil) { return readfile2(fil, NULL); }
 
 /* "utf8" says "fil" is UTF-8 rather than in the system codepage. */

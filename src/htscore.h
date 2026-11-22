@@ -571,6 +571,8 @@ void fspc_count(httrackp *opt, const char *type);
 /* Backing (download-slot) scheduler. Operate on the back[] ring (struct_back).
    Not thread-safe; call from the single crawl loop. */
 
+/* How many new sockets may be opened now within maxsoc and the maxconn rate,
+   ignoring the headroom reserved for naming tests. */
 int back_pluggable_sockets_strict(struct_back * sback, httrackp * opt);
 /* How many of n connects the -%c limiter and --pause allow now. may_wait
    false skips --pause, as a stop does. */
@@ -596,8 +598,8 @@ int hts_pause_target_ms(TStamp seed, int min_ms, int max_ms);
    A hold already running further out is kept. */
 void back_set_retry_after(struct_back *sback, httrackp *opt, int seconds);
 
-/* Like back_fill, but a no-op (returns -1) when in-memory buffered data already
-   exceeds opt->maxcache. */
+/* Fill free slots from the heap, or return -1 when in-memory buffered data
+   already exceeds opt->maxcache. */
 int back_fillmax(struct_back * sback, httrackp * opt, cache_back * cache,
                  int ptr, int numero_passe);
 

@@ -3411,9 +3411,7 @@ hts_boolean hts_wait_available_socket(struct_back *sback, httrackp *opt,
   return HTS_TRUE;
 }
 
-/* How many new sockets may be opened now, honoring maxsoc and the maxconn rate
-   limit (>=0). _strict ignores reserved-slot headroom; the plain form leaves
-   room for naming tests and stops at 0 when the stack is nearly full. */
+/* Like back_pluggable_sockets_strict, but leaves room for naming tests. */
 static int back_pluggable_sockets(struct_back *sback, httrackp *opt) {
   int n;
 

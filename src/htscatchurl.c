@@ -55,7 +55,6 @@ Please visit our Website: http://www.httrack.com
 /* catch url */
 #include "htscatchurl.h"
 
-// Fonctions
 /* Read one line off a socket; HTS_TRUE if it did not fit "s". */
 static hts_boolean socinput(T_SOC soc, char *s, int max);
 
