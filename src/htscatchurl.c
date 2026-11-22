@@ -148,7 +148,8 @@ const char *catch_url_strerror(catch_url_status status) {
 // data: 32Kb
 HTSEXT_API hts_boolean catch_url(T_SOC soc, char *url, char *method,
                                  char *data) {
-  return catch_url_capture(soc, url, HTS_URLMAXSIZE * 2, method, 32, data,
+  return catch_url_capture(soc, url, HTS_URLMAXSIZE * 2, method,
+                           CATCH_URL_METHOD_SIZE, data,
                            CATCH_URL_DATA_SIZE) == CATCH_URL_OK;
 }
 
@@ -184,16 +185,16 @@ catch_url_status catch_url_capture(T_SOC soc, char *url, size_t url_size,
     if (soc != INVALID_SOCKET) {
       char BIGSTK line[CATCH_URL_LINE_SIZE];
       char BIGSTK wire_url[HTS_URLMAXSIZE * 2];
-      char wire_method[32];
+      char wire_method[CATCH_URL_METHOD_SIZE];
       char protocol[256];
 
       line[0] = protocol[0] = '\0';
       // a clipped request-line names a URL the browser did not ask for
       if (!socinput(soc, line, (int) sizeof(line)) && strnotempty(line)) {
-        /* widths bound the locals; a clipped method or URL would name a request
-           the browser never made, so one too long for the caller is refused */
-        if (sscanf(line, "%31s %2047s %255s", wire_method, wire_url,
-                   protocol) == 3 &&
+        // a clipped method or URL names another request: refuse what won't fit
+        if (sscanf(line,
+                   "%" CATCH_URL_STR(CATCH_URL_METHOD_MAX) "s %2047s %255s",
+                   wire_method, wire_url, protocol) == 3 &&
             strlen(wire_method) < method_size && strlen(wire_url) < url_size) {
           lien_adrfil af;
 

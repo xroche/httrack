@@ -192,6 +192,14 @@ hts_boolean st_sized_guard_ok(const char *buf, size_t cap) {
   return HTS_TRUE;
 }
 
+hts_boolean st_sized_clip_ok(const char *buf, size_t cap, const char *want) {
+  const size_t full = strlen(want);
+  const size_t n = full < cap ? full : cap - 1;
+
+  return memchr(buf, '\0', cap) == buf + n && strncmp(buf, want, n) == 0 &&
+         st_sized_guard_ok(buf, cap);
+}
+
 // mkdir path, tolerating one that already exists; a failure keeps its errno.
 hts_boolean st_mkdir_at(const char *path, size_t n, const char *who) {
   if (MKDIR(path) != 0 && errno != EEXIST) {

@@ -407,7 +407,7 @@ void help_catchurl(const char *dest_path) {
 
   if (soc != INVALID_SOCKET) {
     char BIGSTK url[HTS_URLMAXSIZE * 2];
-    char method[32];
+    char method[CATCH_URL_METHOD_SIZE];
     char BIGSTK data[CATCH_URL_DATA_SIZE];
     catch_url_status status;
 

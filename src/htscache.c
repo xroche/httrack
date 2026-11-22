@@ -195,8 +195,8 @@ static htsblk cache_readex_(httrackp *opt, cache_back *cache, const char *adr,
                             size_t return_save_size, int readonly,
                             hts_boolean include_kept);
 
-/* Copy the cached save name into return_save. Does it fit? A clipped name
-   would point at a file we never stored, so a long one is left empty. */
+/* Refuses a name too long for return_save, since a clipped one names a file we
+ * never stored. */
 static hts_boolean cache_return_save(htsblk *r, char *return_save,
                                      size_t return_save_size,
                                      const char *save) {

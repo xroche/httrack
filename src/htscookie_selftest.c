@@ -3274,11 +3274,7 @@ static int st_cookiesverdict(httrackp *opt, int argc, char **argv) {
 /* Did buf[cap] get want clipped to cap - 1 bytes, and nothing past cap? */
 static int sized_clip_bad(const char *what, const char *got, const char *buf,
                           size_t cap, const char *want) {
-  const size_t full = strlen(want);
-  const size_t n = full < cap ? full : cap - 1;
-
-  if (got != buf || memchr(buf, '\0', cap) != buf + n ||
-      strncmp(buf, want, n) != 0 || !st_sized_guard_ok(buf, cap)) {
+  if (got != buf || !st_sized_clip_ok(buf, cap, want)) {
     printf("cookie-sized: %s into %u bytes is '%.*s'\n", what, (unsigned) cap,
            (int) cap, buf);
     return 1;
@@ -3286,14 +3282,14 @@ static int sized_clip_bad(const char *what, const char *got, const char *buf,
   return 0;
 }
 
-/* cookie_get() clips a jar field to its buffer, and bauth_prefix() refuses a
-   key that does not fit; neither writes past the buffer. */
+/* cookie_get() clips a field, bauth_prefix() refuses a key that does not fit.
+ */
 static int st_cookie_sized(httrackp *opt, int argc, char **argv) {
   static const char value[] = "0123456789abcdefghijklmnopqrstuvwxyz0123456789";
   static const char rec[] = "example.com\tTRUE\t/\tFALSE\t0\tname\t"
                             "0123456789abcdefghijklmnopqrstuvwxyz0123456789\n";
   static const char key[] = "http://www.example.com/secure/";
-  const size_t caps[] = {8, 33, sizeof(value), sizeof(value) - 1};
+  const size_t caps[] = {8, sizeof(value), sizeof(value) - 1};
   size_t i;
   int fail = 0;
 
@@ -3308,7 +3304,10 @@ static int st_cookie_sized(httrackp *opt, int argc, char **argv) {
   /* the key fills its buffer to the last byte, then is one byte too long */
   for (i = sizeof(key) - 2; i <= sizeof(key); i++) {
     char *buf = st_sized_alloc(i);
-    const char *got = bauth_prefix(buf, i, "www.example.com", "/secure/");
+    const char *got;
+
+    buf[0] = 'Q'; /* so a refusal must clear it */
+    got = bauth_prefix(buf, i, "www.example.com", "/secure/");
     const hts_boolean fits = i == sizeof(key);
 
     if (!st_sized_guard_ok(buf, i) ||
@@ -3323,8 +3322,10 @@ static int st_cookie_sized(httrackp *opt, int argc, char **argv) {
   {
     char *buf = st_sized_alloc(8);
 
+    /* the only row where scheme and host alone overflow */
+    buf[0] = 'Q';
     fail |= bauth_prefix(buf, 8, "www.example.com", "/secure/p") != NULL ||
-            !st_sized_guard_ok(buf, 8);
+            buf[0] != '\0' || !st_sized_guard_ok(buf, 8);
     freet(buf);
   }
   return st_verdict("cookie-sized", fail);

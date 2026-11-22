@@ -257,7 +257,7 @@ void bauth_free(t_cookie *cookie);
 /** Build the auth lookup key (scheme if https, host + path, query string
    stripped, truncated at the last '/') from adr and fil into prefix; returns
    prefix, or NULL when adr+fil does not fit, since a clipped key would match
-   URLs nobody authenticated. prefix holds size bytes. */
+   URLs nobody authenticated. */
 char *bauth_prefix(char *prefix, size_t size, const char *adr, const char *fil);
 
 #endif

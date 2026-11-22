@@ -117,6 +117,10 @@ char *st_sized_alloc(size_t cap);
 /* Is the canary past buf[cap] untouched? */
 HTS_CHECK_RESULT hts_boolean st_sized_guard_ok(const char *buf, size_t cap);
 
+/* Does buf hold want clipped to cap - 1 bytes, with the canary untouched? */
+HTS_CHECK_RESULT hts_boolean st_sized_clip_ok(const char *buf, size_t cap,
+                                              const char *want);
+
 /* UTF-16 units s[0..n) costs, which is what Windows measures MAX_PATH in. */
 size_t st_utf16_units(const char *s, size_t n);
 

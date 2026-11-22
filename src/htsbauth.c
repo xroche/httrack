@@ -731,7 +731,7 @@ char *cookie_find(char *s, const char *cook_name, const char *domain, const char
       t = 1;                    // accepter par défaut
     else
       t = (strcmp(cookie_get(buffer, sizeof(buffer), a, 5), cook_name) ==
-           0);                  // tester si même nom
+           0);                  // same name?
     if (t) {                    // même nom ou nom qualconque
       //
       const char *chk_dom =
@@ -743,7 +743,7 @@ char *cookie_find(char *s, const char *cook_name, const char *domain, const char
           (!cookie_is_host_only(a) || cookie_same_domain(chk_dom, domain))) {
         //
         const char *chk_path = cookie_get(buffer, sizeof(buffer), a,
-                                          2); // chemin concerné par le cookie
+                                          2); // the path the cookie covers
 
         if (cookie_path_covers(chk_path, path))
           return a;
@@ -1697,11 +1697,8 @@ const char *cookie_get(char *buffer, size_t buffer_size,
   for (cur = cookie_base, i = 0; hts_span_next(&cur, limit, '\t', &field);
        i++) {
     if (i >= param) {
-      /* a jar line can be wider than the caller's buffer: clip, never abort */
-      const size_t len = field.len < buffer_size ? field.len : buffer_size - 1;
-
-      memcpy(buffer, field.p, len);
-      buffer[len] = '\0';
+      /* only a caller with a buffer under COOKIE_MAX_LINE can clip here */
+      (void) hts_span_copy(field, buffer, buffer_size);
       return buffer;
     }
   }
