@@ -122,7 +122,7 @@ size_t hts_read_file_head(const char *path, void *buf, size_t len);
 
 /* Is the wire-vs-ext verdict contested and settleable by a body sniff? */
 int hts_ext_sniff_wanted(httrackp *opt, const char *wiremime, const char *file);
-/* Hex MD5 of the query string past '?', clipped to size; "" without one. */
+/* Writes the hex MD5 of the query past '?' clipped to size, or "" if none. */
 char *url_md5(char *digest_buffer, size_t size, const char *fil_complete);
 /* The cache ref name of (adr,fil) into filename; "" and HTS_FALSE if it does
    not fit size. */

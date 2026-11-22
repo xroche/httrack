@@ -3105,6 +3105,7 @@ void time_gmt_rfc822(char *s, size_t size) {
   time_t tt;
   struct tm tmv;
 
+  assertf(size != 0);
   tt = time(NULL);
   /* no local-time fallback: it would format local time and still label it GMT
    * (#806) */
@@ -3127,6 +3128,7 @@ void time_local_rfc822(char *s, size_t size) {
   time_t tt;
   struct tm tmv;
 
+  assertf(size != 0);
   tt = time(NULL);
   if (hts_localtime(tt, &tmv))
     time_rfc822_local(s, size, &tmv);
@@ -3329,6 +3331,7 @@ hts_boolean hts_file_backdate(const char *file, int seconds) {
 int get_filetime_rfc822(const char *file, char *date, size_t size) {
   STRUCT_STAT buf;
 
+  assertf(size != 0);
   date[0] = '\0';
   if (STAT(file, &buf) == 0) {
     struct tm tmv;
@@ -3353,7 +3356,7 @@ void time_rfc822(char *s, size_t size, struct tm *A) {
   hts_format_rfc822(s, size, A, " GMT");
 }
 
-// RFC 822 date in local time
+// Writes A as an RFC 822 date in local time.
 static void time_rfc822_local(char *s, size_t size, struct tm *A) {
   if (A == NULL) {
     int localtime_returned_null = 0;

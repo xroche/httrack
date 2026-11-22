@@ -2123,6 +2123,8 @@ static int st_reserved(httrackp *opt, int argc, char **argv) {
 static int st_name_sized(httrackp *opt, int argc, char **argv) {
   /* MD5 of "a=1" */
   static const char md5[] = "3872c9ae3f427af0be0ead09d07ae2cf";
+  /* 8 bytes, one byte short, then an exact fit */
+  const size_t mcaps[] = {8, sizeof(md5) - 1, sizeof(md5)};
   char want[64];
   size_t k;
   int fail = 0;
@@ -2135,12 +2137,9 @@ static int st_name_sized(httrackp *opt, int argc, char **argv) {
     printf("name-sized: refname is '%s'\n", want);
     return 1;
   }
-  /* 8 bytes, one byte short, then an exact fit */
   for (k = 0; k < 3; k++) {
-    const size_t mcap = k == 0 ? 8 : sizeof(md5) - 2 + k;
-    const size_t rcap = k == 0 ? 8 : strlen(want) - 1 + k;
+    const size_t mcap = mcaps[k];
     char *buf = st_sized_alloc(mcap);
-    hts_boolean fit;
 
     if (url_md5(buf, mcap, "/p?a=1") != buf ||
         !st_sized_clip_ok(buf, mcap, md5)) {
@@ -2155,16 +2154,29 @@ static int st_name_sized(httrackp *opt, int argc, char **argv) {
       fail = 1;
     }
     freet(buf);
-    buf = st_sized_alloc(rcap);
-    buf[0] = 'Q'; /* so a refusal must clear it */
-    fit = url_savename_refname("www.example.com", "/", buf, rcap);
-    if (!st_sized_guard_ok(buf, rcap) ||
-        (k == 2 ? !fit || strcmp(buf, want) != 0 : fit || buf[0] != '\0')) {
-      printf("name-sized: refname into %u bytes is '%.*s'\n", (unsigned) rcap,
-             (int) rcap, buf);
-      fail = 1;
+  }
+  {
+    const size_t len = strlen(want);
+    const size_t rcaps[] = {8, len, len + 1};
+
+    for (k = 0; k < 3; k++) {
+      const size_t rcap = rcaps[k];
+      char *buf = st_sized_alloc(rcap);
+      hts_boolean fit, ok;
+
+      buf[0] = 'Q'; /* so a refusal must clear it */
+      fit = url_savename_refname("www.example.com", "/", buf, rcap);
+      if (rcap == len + 1)
+        ok = fit && strcmp(buf, want) == 0;
+      else
+        ok = !fit && buf[0] == '\0';
+      if (!ok || !st_sized_guard_ok(buf, rcap)) {
+        printf("name-sized: refname into %u bytes is '%.*s'\n", (unsigned) rcap,
+               (int) rcap, buf);
+        fail = 1;
+      }
+      freet(buf);
     }
-    freet(buf);
   }
   return st_verdict("name-sized", fail);
 }

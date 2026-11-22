@@ -4904,14 +4904,25 @@ static hts_boolean st_sized_len_ok(const char *buf, size_t cap, size_t full) {
 
 /* The duration and date writers clip to the size they are given. */
 static int st_lib_sized(httrackp *opt, int argc, char **argv) {
-  static const char dur[] = "3 days, 2 hours 4 minutes 5 seconds";
+  /* one input per branch of the duration formatter */
+  static const struct {
+    TStamp t;
+    const char *want;
+  } durs[] = {{3 * 86400 + 2 * 3600 + 4 * 60 + 5,
+               "3 days, 2 hours 4 minutes 5 seconds"},
+              {7445, "2 hours 4 minutes 5 seconds"},
+              {245, "4 minutes 5 seconds"},
+              {5, "5 seconds"}};
+
   static const char qdur[] = "2147483647d,23h,59min59s";
   static const char date[] = "Sun, 06 Nov 1994 08:49:37 GMT";
   static const char mdate[] = "Tue, 29 Feb 2000 00:00:00 GMT";
-  const TStamp t = 3 * 86400 + 2 * 3600 + 4 * 60 + 5;
+  /* 8 bytes, one byte short, then an exact fit */
+  const size_t rcaps[] = {8, sizeof(date) - 1, sizeof(date)};
   char path[HTS_URLMAXSIZE];
+  char gmt[256], local[256];
   struct tm tm;
-  size_t k;
+  size_t i, k;
   int fail = 0;
 
   (void) opt;
@@ -4927,21 +4938,35 @@ static int st_lib_sized(httrackp *opt, int argc, char **argv) {
       return 1;
     }
   }
-  st_locale_date(&tm);
-  /* 8 bytes, one byte short, then an exact fit */
-  for (k = 0; k < 3; k++) {
-    const size_t dcap = k == 0 ? 8 : sizeof(dur) - 2 + k;
-    const size_t rcap = k == 0 ? 8 : sizeof(date) - 2 + k;
-    char *buf = st_sized_alloc(dcap);
-    char now[256];
+  for (i = 0; i < sizeof(durs) / sizeof(durs[0]); i++) {
+    const size_t len = strlen(durs[i].want);
+    const size_t dcaps[] = {8, len, len + 1};
 
-    sec2str(buf, dcap, t);
-    if (!st_sized_clip_ok(buf, dcap, dur)) {
-      printf("lib-sized: sec2str into %u bytes\n", (unsigned) dcap);
-      fail = 1;
+    for (k = 0; k < 3; k++) {
+      char *buf = st_sized_alloc(dcaps[k]);
+
+      sec2str(buf, dcaps[k], durs[i].t);
+      if (!st_sized_clip_ok(buf, dcaps[k], durs[i].want)) {
+        printf("lib-sized: sec2str(%d) into %u bytes\n", (int) durs[i].t,
+               (unsigned) dcaps[k]);
+        fail = 1;
+      }
+      freet(buf);
     }
-    freet(buf);
-    buf = st_sized_alloc(rcap);
+  }
+  /* the clock may tick between calls, so later rows compare only lengths */
+  time_gmt_rfc822(gmt, sizeof(gmt));
+  time_local_rfc822(local, sizeof(local));
+  if (strlen(gmt) < 4 || strcmp(gmt + strlen(gmt) - 4, " GMT") != 0 ||
+      strstr(local, "GMT") != NULL) {
+    printf("lib-sized: GMT is '%s' and local is '%s'\n", gmt, local);
+    fail = 1;
+  }
+  st_locale_date(&tm);
+  for (k = 0; k < 3; k++) {
+    const size_t rcap = rcaps[k];
+    char *buf = st_sized_alloc(rcap);
+
     time_rfc822(buf, rcap, &tm);
     if (!st_sized_clip_ok(buf, rcap, date)) {
       printf("lib-sized: time_rfc822 into %u bytes\n", (unsigned) rcap);
@@ -4952,16 +4977,13 @@ static int st_lib_sized(httrackp *opt, int argc, char **argv) {
       printf("lib-sized: get_filetime_rfc822 into %u bytes\n", (unsigned) rcap);
       fail = 1;
     }
-    /* the clock may tick between calls, so only the length is compared */
-    time_gmt_rfc822(now, sizeof(now));
     time_gmt_rfc822(buf, rcap);
-    if (!st_sized_len_ok(buf, rcap, strlen(now))) {
+    if (!st_sized_len_ok(buf, rcap, strlen(gmt))) {
       printf("lib-sized: time_gmt_rfc822 into %u bytes\n", (unsigned) rcap);
       fail = 1;
     }
-    time_local_rfc822(now, sizeof(now));
     time_local_rfc822(buf, rcap);
-    if (!st_sized_len_ok(buf, rcap, strlen(now))) {
+    if (!st_sized_len_ok(buf, rcap, strlen(local))) {
       printf("lib-sized: time_local_rfc822 into %u bytes\n", (unsigned) rcap);
       fail = 1;
     }

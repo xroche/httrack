@@ -2196,6 +2196,7 @@ hts_boolean url_savename_refname(const char *adr, const char *fil,
   char hex[33];
   struct MD5Context ctx;
 
+  assertf(size != 0);
   hts_md5_init(&ctx);
   MD5Update(&ctx, (const unsigned char *) adr, (int) strlen(adr));
   MD5Update(&ctx, (const unsigned char *) ",", 1);
@@ -2212,10 +2213,12 @@ hts_boolean url_savename_refname(const char *adr, const char *fil,
 char *url_savename_refname_fullpath(httrackp * opt, const char *adr,
                                     const char *fil) {
   char digest_filename[64];
-  const hts_boolean fits =
-      url_savename_refname(adr, fil, digest_filename, sizeof(digest_filename));
+  HTS_STATIC_ASSERT(sizeof(CACHE_REFNAME "/") + 32 + sizeof(".ref") - 1 <=
+                        sizeof(digest_filename),
+                    refname_fits);
 
-  assertf(fits);
+  (void) !url_savename_refname(adr, fil, digest_filename,
+                               sizeof(digest_filename)); // always fits
   return hts_logpath(opt, digest_filename);
 }
 
