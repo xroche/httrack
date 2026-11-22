@@ -4517,14 +4517,14 @@ hts_boolean hts_url_view_parse(const char *s, size_t len, hts_url_view *v) {
 
 // find the authority's port (:80) or NULL; handles IPv6 literals
 const char *jump_toport_const(const char *source) {
-  // start at the host jump_identification_const() picks, so callers agree
-  const char *const host = jump_identification_const(source);
-  // a ':' or ']' in the path, query or fragment is not the authority's
-  const char *const end = hts_authority_end(host);
-  const char *const bracket = strrchr_limit(host, ']', end);
-  const char *const from = bracket != NULL ? bracket : host;
+  hts_url_view v;
 
-  return memchr(from, ':', (size_t) (end - from));
+  (void) hts_url_view_parse(source, strlen(source), &v);
+  // jump_identification_const() keeps these whole, so their ':' is the port
+  if (v.scheme.p != NULL &&
+      (strcmp(source, "file://") == 0 || jump_protocol_const(source) == source))
+    return source + v.scheme.len;
+  return v.port.p != NULL ? v.port.p - 1 : NULL;
 }
 
 DECLARE_NON_CONST_VERSION(jump_toport)
