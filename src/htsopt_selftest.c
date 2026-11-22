@@ -1758,7 +1758,7 @@ static int st_usercmd(httrackp *opt, int argc, char **argv) {
     }
     room = (size_t) asked;
   }
-  switch (usercommand_expand(dest, room, argv[0], argv[1], &why)) {
+  switch (usercommand_expand(hts_buf_at(dest, room), argv[0], argv[1], &why)) {
   case USERCOMMAND_EXPAND_OK:
     break;
   case USERCOMMAND_EXPAND_REFUSED:
