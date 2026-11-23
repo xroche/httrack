@@ -2589,7 +2589,11 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                       pos2 = strrchr(name, ':');
                       if (pos2 != NULL && pos2[1] != '\0' &&
                           strspn(pos2 + 1, "0123456789") == strlen(pos2 + 1)) {
-                        listHidden = atoi(pos2 + 1);
+                        LLint id;
+
+                        /* past INT_MAX, listHidden stays 0 and hides none */
+                        if (hts_parse_llint(pos2 + 1, NULL, 0, INT_MAX, &id))
+                          listHidden = (int) id;
                         *pos2 = '\0';
                       }
                     } else if ((p = strfield(name, "checked:"))) {

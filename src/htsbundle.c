@@ -551,7 +551,6 @@ static hts_boolean bundle_admit(cookie_filter *filter, t_cookie *cookie,
                                 const char *value, const char *domain,
                                 const char *path, const cookie_attr *attr) {
   bundle_jar *const ctx = (bundle_jar *) filter->ctx;
-  char buffer[8192];
   char host[COOKIE_MAX_DOMAIN];
   const char *bare;
   const char *other = NULL;
@@ -573,7 +572,7 @@ static hts_boolean bundle_admit(cookie_filter *filter, t_cookie *cookie,
              (ctx->mine != NULL
                   ? cookie_find_exact(ctx->mine->data, name, host, path) == NULL
                   : !repeat) &&
-             strcmp(cookie_get(buffer, sizeof(buffer), other, 6), value) != 0) {
+             !hts_span_eq(cookie_field(other, 6), hts_span_of(value))) {
     // outside this bundle's home, a later check decides
     if (ctx->clashes != NULL &&
         !scope_list_covers(ctx->b->home, ctx->b->nhome, bare)) {

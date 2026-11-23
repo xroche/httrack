@@ -161,7 +161,6 @@ static int cookie_set_impl(t_cookie *cookie, const char *cook_name,
                                       .secure = HTS_FALSE,
                                       .http_only = HTS_FALSE,
                                       .expires = 0};
-  char buffer[8192];
   char host[COOKIE_MAX_DOMAIN];
   char *a = cookie->data;
   char *insert;
@@ -226,7 +225,7 @@ static int cookie_set_impl(t_cookie *cookie, const char *cook_name,
 
   insert = a; // the longest path goes first, so insert before shorter ones
   while (*a) {
-    if (strlen(cookie_get(buffer, sizeof(buffer), a, 2)) < strlen(path))
+    if (cookie_field(a, 2).len < strlen(path))
       a = cookie->data + strlen(cookie->data);
     else {
       a = cookie_nextfield(a);
@@ -262,29 +261,23 @@ int cookie_add(t_cookie *cookie, const char *cook_name, const char *cook_value,
 /* Is the record at rec host-only? Field 1 is the Netscape include-subdomains
    flag, and only TRUE, in any case, widens the cookie, as in curl. */
 hts_boolean cookie_is_host_only(const char *rec) {
-  char buffer[8192];
-
-  return hts_strcasecmp(cookie_get(buffer, sizeof(buffer), rec, 1), "TRUE") !=
-         0;
+  return !hts_span_eq_ci(cookie_field(rec, 1), hts_span_of("TRUE"));
 }
 
 /* Is the record at rec Secure? Field 3 is the flag, and only FALSE, in any
    case, lets the cookie go out over http. */
 static hts_boolean cookie_is_secure(const char *rec) {
-  char buffer[8192];
-
-  return hts_strcasecmp(cookie_get(buffer, sizeof(buffer), rec, 3), "FALSE") !=
-         0;
+  return !hts_span_eq_ci(cookie_field(rec, 3), hts_span_of("FALSE"));
 }
 
-/* Do two jar domains name the same domain? The leading dot is the Netscape
-   spelling of the same thing. */
-static hts_boolean cookie_same_domain(const char *a, const char *b) {
-  if (a[0] == '.')
-    a++;
-  if (b[0] == '.')
-    b++;
-  return hts_strcasecmp(a, b) == 0;
+/* D without one leading dot, the Netscape spelling of the same domain. */
+static hts_span cookie_bare(hts_span d) {
+  return hts_span_starts_with(d, hts_span_of(".")) ? hts_span_skip(d, 1) : d;
+}
+
+/* Do two jar domains name the same domain? */
+static hts_boolean cookie_same_domain(hts_span a, const char *b) {
+  return hts_span_eq_ci(cookie_bare(a), cookie_bare(hts_span_of(b)));
 }
 
 /* A host may hold this many records, or this many bytes of them (a quarter of
@@ -331,26 +324,21 @@ typedef struct cookie_host_tally {
 } cookie_host_tally;
 
 /* Is the record at a the one cookie_set replaces? */
-static hts_boolean cookie_is_self(const char *a, const char *domain,
-                                  const char *cook_name, const char *path) {
-  char buffer[8192];
-
-  return strcmp(cookie_get(buffer, sizeof(buffer), a, 5), cook_name) == 0 &&
-                 cookie_same_domain(cookie_get(buffer, sizeof(buffer), a, 0),
-                                    domain) &&
-                 strcmp(cookie_get(buffer, sizeof(buffer), a, 2), path) == 0
-             ? HTS_TRUE
-             : HTS_FALSE;
+static hts_boolean cookie_is_self(const char *a, hts_span name,
+                                  const char *domain, hts_span path) {
+  return hts_span_eq(cookie_field(a, 5), name) &&
+         cookie_same_domain(cookie_field(a, 0), domain) &&
+         hts_span_eq(cookie_field(a, 2), path);
 }
 
 /* Hash of a domain as cookie_same_domain sees it. */
-static size_t cookie_domain_hash(const char *d) {
+static size_t cookie_domain_hash(hts_span d) {
+  const hts_span bare = cookie_bare(d);
   size_t h = 5381;
+  size_t i;
 
-  if (d[0] == '.')
-    d++;
-  for (; *d != '\0'; d++)
-    h = h * 33 + (size_t) hichar((unsigned char) *d);
+  for (i = 0; i < bare.len; i++)
+    h = h * 33 + (size_t) hichar((unsigned char) bare.p[i]);
   return h;
 }
 
@@ -372,7 +360,6 @@ static int cookie_rec_cmp(const void *x, const void *y) {
 static hts_boolean cookie_make_room(char *data, size_t max_len,
                                     const char *domain, const char *cook_name,
                                     const char *path, size_t need) {
-  char buffer[8192];
   const size_t rec_len = need - COOKIE_HEADROOM;
   const size_t total = strlen(data);
   size_t n = 0, nh = 1, used, self_len = 0, freeable = 0, mask, i, k;
@@ -408,28 +395,28 @@ static hts_boolean cookie_make_room(char *data, size_t max_len,
   hosts[0].count = 1;
   hosts[0].bytes = rec_len;
   pool_end += strlen(domain) + 1;
-  table[cookie_domain_hash(domain) & (mask - 1)] = 1;
+  table[cookie_domain_hash(hts_span_of(domain)) & (mask - 1)] = 1;
   for (a = data, i = 0; *a != '\0'; a = cookie_nextfield(a), i++) {
-    const char *const d = cookie_get(buffer, sizeof(buffer), a, 0);
+    const hts_span d = cookie_field(a, 0);
     size_t h = cookie_domain_hash(d) & (mask - 1);
 
-    while (table[h] != 0 && !cookie_same_domain(hosts[table[h] - 1].dom, d))
+    while (table[h] != 0 && !cookie_same_domain(d, hosts[table[h] - 1].dom))
       h = (h + 1) & (mask - 1);
     if (table[h] == 0) {
       hosts[nh].dom = pool_end;
-      memcpy(pool_end, d, strlen(d) + 1);
-      pool_end += strlen(d) + 1;
+      (void) hts_span_copy(d, pool_end, d.len + 1);
+      pool_end += d.len + 1;
       table[h] = ++nh;
     }
     recs[i].p = a;
     recs[i].len = (size_t) (cookie_nextfield(a) - a);
-    recs[i].plen = strlen(cookie_get(buffer, sizeof(buffer), a, 2));
+    recs[i].plen = cookie_field(a, 2).len;
     recs[i].pos = i;
     recs[i].host = table[h] - 1;
     hosts[recs[i].host].count++;
     hosts[recs[i].host].bytes += recs[i].len;
     if (recs[i].host == 0 && self_len == 0 &&
-        cookie_is_self(a, domain, cook_name, path)) {
+        cookie_is_self(a, hts_span_of(cook_name), domain, hts_span_of(path))) {
       self_len = recs[i].len;
       self_pos = i;
     }
@@ -504,13 +491,11 @@ done:
    (RFC 6265 5.3 step 11). */
 char *cookie_find_exact(char *s, const char *cook_name, const char *domain,
                         const char *path) {
-  char buffer[8192];
+  const hts_span name = hts_span_of(cook_name), p = hts_span_of(path);
   char *a;
 
   for (a = s; *a != '\0'; a = cookie_nextfield(a)) {
-    if (strcmp(cookie_get(buffer, sizeof(buffer), a, 5), cook_name) == 0 &&
-        cookie_same_domain(cookie_get(buffer, sizeof(buffer), a, 0), domain) &&
-        strcmp(cookie_get(buffer, sizeof(buffer), a, 2), path) == 0)
+    if (cookie_is_self(a, name, domain, p))
       return a;
   }
   return NULL;
@@ -518,13 +503,12 @@ char *cookie_find_exact(char *s, const char *cook_name, const char *domain,
 
 /* RFC 6265 5.1.4: does chk_path cover path on a "/" boundary? The query is
    not part of the path. */
-static hts_boolean cookie_path_covers(const char *chk_path, const char *path) {
-  const size_t chk_len = strlen(chk_path);
-
-  return chk_len <= strlen(path) && strncmp(path, chk_path, chk_len) == 0 &&
-                 (chk_len == 0 || chk_path[chk_len - 1] == '/' ||
-                  path[chk_len] == '\0' || path[chk_len] == '/' ||
-                  path[chk_len] == '?')
+static hts_boolean cookie_path_covers(hts_span chk, const char *path) {
+  return hts_span_starts_with(hts_span_of(path), chk) &&
+                 (hts_span_empty(chk) ||
+                  hts_span_ends_with(chk, hts_span_of("/")) ||
+                  path[chk.len] == '\0' || path[chk.len] == '/' ||
+                  path[chk.len] == '?')
              ? HTS_TRUE
              : HTS_FALSE;
 }
@@ -541,15 +525,15 @@ hts_boolean cookie_is_secure_record(t_cookie *cookie, const char *cook_name,
     return HTS_FALSE;
   new_dom = host[0] == '.' ? host + 1 : host;
   for (rec = cookie->data; *rec != '\0'; rec = cookie_nextfield((char *) rec)) {
-    const char *const rec_dom = cookie_get(buffer, sizeof(buffer), rec, 0);
-    char other[8192];
+    const char *rec_dom;
 
-    if (strcmp(cookie_get(other, sizeof(other), rec, 5), cook_name) != 0 ||
+    if (!hts_span_eq(cookie_field(rec, 5), hts_span_of(cook_name)) ||
         !cookie_is_secure(rec))
       continue;
+    rec_dom = cookie_get(buffer, sizeof(buffer), rec, 0);
     if ((cookie_domain_match(rec_dom, new_dom) ||
          cookie_domain_match(new_dom, rec_dom)) &&
-        cookie_path_covers(cookie_get(other, sizeof(other), rec, 2), path))
+        cookie_path_covers(cookie_field(rec, 2), path))
       return HTS_TRUE;
   }
   return HTS_FALSE;
@@ -715,38 +699,25 @@ hts_boolean cookie_sendable(const char *rec, hts_boolean https, int64_t now) {
   return https || !cookie_is_secure(rec);
 }
 
-// rechercher cookie à partir de la position s (par exemple s=cookie.data)
-// renvoie pointeur sur ligne, ou NULL si introuvable
-// path est aligné à droite et cook_name peut être vide (chercher alors tout cookie)
-// .doubleclick.net     TRUE    /       FALSE   1999999999      id      A
+/* First record from s on sent to domain and path and named cook_name, or any
+   name when it is empty. NULL if none.
+   .doubleclick.net     TRUE    /       FALSE   1999999999      id      A */
 char *cookie_find(char *s, const char *cook_name, const char *domain, const char *path) {
+  const hts_span name = hts_span_of(cook_name);
   char buffer[8192];
   char *a = s;
 
   while(*a) {
-    int t;
-
-    if (strnotempty(cook_name) == 0)
-      t = 1; // accept by default
-    else
-      t = (strcmp(cookie_get(buffer, sizeof(buffer), a, 5), cook_name) ==
-           0); // same name?
-    if (t) {   // same name, or any name
-      //
-      const char *chk_dom =
-          cookie_get(buffer, sizeof(buffer), a, 0); // cookie's own domain
+    if (hts_span_empty(name) || hts_span_eq(cookie_field(a, 5), name)) {
+      const char *const chk_dom = cookie_get(buffer, sizeof(buffer), a, 0);
 
       /* The path below is byte-exact where the domain is not, because RFC 6265
          folds a host name and matches a path literally. */
       if (cookie_domain_match(chk_dom, domain) &&
-          (!cookie_is_host_only(a) || cookie_same_domain(chk_dom, domain))) {
-        //
-        const char *chk_path = cookie_get(buffer, sizeof(buffer), a,
-                                          2); // the path the cookie covers
-
-        if (cookie_path_covers(chk_path, path))
-          return a;
-      }
+          (!cookie_is_host_only(a) ||
+           cookie_same_domain(hts_span_of(chk_dom), domain)) &&
+          cookie_path_covers(cookie_field(a, 2), path))
+        return a;
     }
     a = cookie_nextfield(a);
   }
@@ -1282,8 +1253,7 @@ static int cookie_load_records(httrackp *opt, t_cookie *cookie, text_src *src,
 
         for (p = strchr(rec, '\t'); p != NULL; p = strchr(p + 1, '\t'))
           tabs++;
-        if (tabs < 6 ||
-            !strnotempty(cookie_get(buffer, sizeof(buffer), rec, 5))) {
+        if (tabs < 6 || hts_span_empty(cookie_field(rec, 5))) {
           cookie_warn(opt, filter, given, &refused,
                       "a cookie line has fewer than 7 fields or no name",
                       "Cookies: ignoring a line with fewer than 7 "
@@ -1291,8 +1261,8 @@ static int cookie_load_records(httrackp *opt, t_cookie *cookie, text_src *src,
                       given);
         } else if (tabs > 7 ||
                    (tabs == 7 &&
-                    strcmp(cookie_get(buffer, sizeof(buffer), rec, 7),
-                           COOKIE_HTTPONLY_FIELD) != 0)) {
+                    !hts_span_eq(cookie_field(rec, 7),
+                                 hts_span_of(COOKIE_HTTPONLY_FIELD)))) {
           // a TAB in the value, because only HTTrack writes an eighth field
           cookie_warn(opt, filter, given, &refused,
                       "a cookie line has more than 7 fields",
@@ -1677,29 +1647,39 @@ void cookie_delete(char *s, size_t s_size, size_t pos) {
   }
 }
 
+/* Pointer identity tells cookie_get a missing field from an empty one. */
+static const char cookie_no_field[] = "";
+
+/* See htsbundle.h. */
+hts_span cookie_field(const char *line, int n) {
+  const char *p = line + strspn(line, "\n");
+  int i;
+
+  /* A negative N reads field 0. */
+  for (i = 0;; i++) {
+    const size_t len = strcspn(p, "\t\n");
+
+    // cookie_get has always read "a<TAB>" as one field, so no empty last field
+    if (p[len] != '\t' && (i < n || len == 0))
+      return hts_span_at(cookie_no_field, 0);
+    if (i >= n)
+      return hts_span_at(p, len);
+    p += len + 1;
+  }
+}
+
 // Return field <param> (0-based, tab-separated) of the cookie line cookie_base,
 // into buffer. ex: cookie_get("ceci est<tab>un<tab>exemple", 1) returns "un".
 const char *cookie_get(char *buffer, size_t buffer_size,
                        const char *cookie_base, int param) {
-  const char *limit;
-  hts_span rest, field;
-  int i;
+  const hts_span field = cookie_field(cookie_base, param);
 
   assertf(buffer_size != 0);
-  cookie_base += strspn(cookie_base, "\n");
-  limit = strchr(cookie_base, '\n');
-  if (limit == NULL)
-    limit = cookie_base + strlen(cookie_base);
-  /* A negative PARAM reads field 0. */
-  rest = hts_span_between(cookie_base, limit);
-  for (i = 0; hts_span_next_in(&rest, '\t', &field); i++) {
-    if (i >= param) {
-      /* only a caller with a buffer under COOKIE_MAX_LINE can clip here */
-      (void) hts_span_copy(field, buffer, buffer_size);
-      return buffer;
-    }
-  }
-  return "";
+  if (field.p == cookie_no_field)
+    return cookie_no_field;
+  /* only a caller with a buffer under COOKIE_MAX_LINE can clip here */
+  (void) hts_span_copy(field, buffer, buffer_size);
+  return buffer;
 }
 
 // fin cookies

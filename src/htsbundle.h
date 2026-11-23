@@ -41,6 +41,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsglobal.h"
 #include "htsopt.h"
 #include "htsbauth.h"
+#include "htsurlport.h"
 
 /* A start URL ending with this names the bundle file <name>.hts. */
 #define HTS_BUNDLE_SUFFIX "#httrack-bundle="
@@ -80,6 +81,10 @@ hts_boolean hts_bundle_has_control(const char *s, size_t len);
    does. */
 HTS_CHECK_RESULT hts_boolean cookie_url_host(const char *url, char *dst,
                                              size_t dst_size);
+
+/* Field n (0-based, TAB-separated) of the jar record at line, as cookie_get
+   reads it, or an empty view when the record has no such field. */
+hts_span cookie_field(const char *line, int n);
 
 /* The record of s named cook_name for exactly domain and path, or NULL. */
 char *cookie_find_exact(char *s, const char *cook_name, const char *domain,
