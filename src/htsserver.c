@@ -284,7 +284,7 @@ HTS_UNUSED static int QLANG_T(int l);
 HTS_UNUSED static const char *LANGSEL(const char *name);
 HTS_UNUSED static const char *LANGINTKEY(const char *name);
 HTS_UNUSED static int LANG_SEARCH(const char *path, const char *iso);
-HTS_UNUSED static int LANG_LIST(const char *path, char *buffer, size_t size);
+HTS_UNUSED static int LANG_LIST(const char *path, hts_buf buffer);
 
 // URL Link catcher
 
@@ -412,7 +412,7 @@ static void collect_self_names(T_SOC soc) {
 
 /** Form of a bound address a client can actually open: a wildcard names no
     reachable host, and an IPv6 literal needs its URL brackets. */
-static void advertised_host(char *dst, size_t size, const char *bound) {
+static void advertised_host(hts_buf dst, const char *bound) {
   const char *host = bound;
 
   /* every address reaches us, and loopback is the one the local browser has */
@@ -422,11 +422,11 @@ static void advertised_host(char *dst, size_t size, const char *bound) {
     host = "::1";
   }
   if (strchr(host, ':') != NULL) {
-    strlcpybuff(dst, "[", size);
-    strlcatbuff(dst, host, size);
-    strlcatbuff(dst, "]", size);
+    hts_buf_cpy(dst, "[");
+    hts_buf_cat(dst, host);
+    hts_buf_cat(dst, "]");
   } else {
-    strlcpybuff(dst, host, size);
+    hts_buf_cpy(dst, host);
   }
 }
 
@@ -462,7 +462,7 @@ static T_SOC smallserver_init(int *port, char *adr, size_t adr_size,
   if (soc != INVALID_SOCKET) {
     char adv[sizeof(h_loc) + 2]; /* + the brackets of an IPv6 literal */
 
-    advertised_host(adv, sizeof(adv), h_loc);
+    advertised_host(HTS_BUF(adv), h_loc);
     strclipbuff(adr, adr_size, adv);
   }
   return soc;
@@ -520,11 +520,11 @@ static hts_boolean origin_is_self(const char *origin, const char *host) {
 
 /** Hostname part of a Host header value, URL brackets and ":port" removed.
     False, and dst empty, when it names no host or does not fit. */
-static hts_boolean host_hostname(char *dst, size_t size, const char *host) {
+static hts_boolean host_hostname(hts_buf dst, const char *host) {
   const char *start = host;
   const char *end;
 
-  dst[0] = '\0';
+  dst.p[0] = '\0';
   if (*start == '[') {
     end = strchr(++start, ']');
     if (end == NULL || (end[1] != '\0' && end[1] != ':')) {
@@ -533,8 +533,7 @@ static hts_boolean host_hostname(char *dst, size_t size, const char *host) {
   } else if ((end = strchr(start, ':')) == NULL) {
     end = start + strlen(start);
   }
-  return end != start &&
-         hts_buf_put_span(hts_buf_at(dst, size), hts_span_between(start, end));
+  return end != start && hts_buf_put_span(dst, hts_span_between(start, end));
 }
 
 /** Is this an address literal rather than a DNS name? A colon survived
@@ -560,7 +559,7 @@ static hts_boolean host_is_self(const char *host, const char *bound) {
   char name[256];
   size_t i;
 
-  if (!host_hostname(name, sizeof(name), host)) {
+  if (!host_hostname(HTS_BUF(name), host)) {
     return HTS_FALSE;
   }
   if (strfield2(name, "localhost") != 0 || host_is_address(name) ||
@@ -576,9 +575,8 @@ static hts_boolean host_is_self(const char *host, const char *bound) {
 }
 
 /** Header value with leading blanks dropped, clipped to fit dst. */
-static void copy_header_value(char *dst, size_t size, const char *value) {
-  value += strspn(value, HTS_TABORSPACES);
-  strclipbuff(dst, size, value);
+static void copy_header_value(hts_buf dst, const char *value) {
+  (void) hts_buf_cpy_clip(dst, value + strspn(value, HTS_TABORSPACES));
 }
 
 /** Copy query parameter "name"'s alphanumeric value into dst, of size >= 1;
@@ -640,22 +638,6 @@ static hts_boolean body_sid_is_valid(const char *body, const char *expected) {
     }
   }
   return seen;
-}
-
-/** Append src to the NUL-terminated dst of capacity size (NUL included).
-    False, leaving dst untouched, if it would not fit: unlike strcatbuff() this
-    never aborts, because every piece appended here is client-supplied. */
-static hts_boolean path_append(char *dst, size_t size, const char *src) {
-  const size_t used = strlen(dst);
-  const size_t len = strlen(src);
-
-  /* dst holds at most size-1 bytes, so "size - used" is >= 1 and the untrusted
-     len stays alone: "used + len < size" could wrap and pass. */
-  if (len >= size - used) {
-    return HTS_FALSE;
-  }
-  memcpy(dst + used, src, len + 1);
-  return HTS_TRUE;
 }
 
 #ifdef _WIN32
@@ -802,7 +784,7 @@ static void browserlogin_run(const browserlogin_post *login) {
 /* Finds the file served as the UI's user.css: the one in the home folder, then
    in the mirror base path, then in sysconfdir. Returns HTS_FALSE, with dst
    empty, when none exists, so the shipped user.css is served. */
-static hts_boolean find_user_stylesheet(char *dst, size_t size) {
+static hts_boolean find_user_stylesheet(hts_buf dst) {
   intptr_t adr = 0;
   const char *const mirror_base =
       coucal_readptr(NewLangList, "path", &adr) ? (const char *) adr : NULL;
@@ -814,14 +796,13 @@ static hts_boolean find_user_stylesheet(char *dst, size_t size) {
   size_t i;
 
   for (i = 0; i < sizeof(dirs) / sizeof(dirs[0]); i++) {
-    dst[0] = '\0';
     if (dirs[i] != NULL && dirs[i][0] != '\0' &&
-        path_append(dst, size, dirs[i]) &&
-        path_append(dst, size, USER_STYLESHEET) && hts_shared_fexist(dst)) {
+        hts_buf_printf(dst, "%s" USER_STYLESHEET, dirs[i]) &&
+        hts_shared_fexist(dst.p)) {
       return HTS_TRUE;
     }
   }
-  dst[0] = '\0';
+  dst.p[0] = '\0';
   return HTS_FALSE;
 }
 
@@ -854,30 +835,21 @@ static hts_boolean theme_name_is_valid(const char *name) {
 }
 
 /* Writes the user's themes folder into dst, or returns false. */
-static hts_boolean user_themes_dir(char *dst, size_t size) {
-  dst[0] = '\0';
-  return path_append(dst, size, gethomedir()) &&
-         path_append(dst, size, USER_THEMES);
+static hts_boolean user_themes_dir(hts_buf dst) {
+  return hts_buf_printf(dst, "%s" USER_THEMES, gethomedir());
 }
 
 /* Writes the installed themes folder into dst, or returns false. */
-static hts_boolean installed_themes_dir(char *dst, size_t size,
-                                        const char *path) {
-  dst[0] = '\0';
-  return path_append(dst, size, path) &&
-         path_append(dst, size, "html/server/themes");
+static hts_boolean installed_themes_dir(hts_buf dst, const char *path) {
+  return hts_buf_printf(dst, "%shtml/server/themes", path);
 }
 
 /* Is name a theme folder holding theme.css in dir? */
 static hts_boolean theme_in(const char *dir, const char *name) {
   char file[1024];
 
-  file[0] = '\0';
   return theme_name_is_valid(name) && strcmp(name, THEME_CLASSIC) != 0 &&
-         path_append(file, sizeof(file), dir) &&
-         path_append(file, sizeof(file), "/") &&
-         path_append(file, sizeof(file), name) &&
-         path_append(file, sizeof(file), "/theme.css") &&
+         hts_buf_printf(HTS_BUF(file), "%s/%s/theme.css", dir, name) &&
          hts_shared_fexist(file);
 }
 
@@ -885,8 +857,8 @@ static hts_boolean theme_in(const char *dir, const char *name) {
 static hts_boolean theme_exists(const char *path, const char *name) {
   char dir[1024];
 
-  return (user_themes_dir(dir, sizeof(dir)) && theme_in(dir, name)) ||
-         (installed_themes_dir(dir, sizeof(dir), path) && theme_in(dir, name));
+  return (user_themes_dir(HTS_BUF(dir)) && theme_in(dir, name)) ||
+         (installed_themes_dir(HTS_BUF(dir), path) && theme_in(dir, name));
 }
 
 /* Is file under /server/themes/, in any spelling the filesystem opens? */
@@ -898,8 +870,7 @@ static hts_boolean is_theme_url(const char *file) {
 
 /* Maps a THEMES_URL "<name>/..." URL to the user's theme of that name, which
    then serves all of the theme's files. Returns false otherwise. */
-static hts_boolean find_user_theme_file(char *dst, size_t size,
-                                        const char *file) {
+static hts_boolean find_user_theme_file(hts_buf dst, const char *file) {
   const char *const start = file + sizeof(THEMES_URL) - 1;
   const char *rest;
   char name[THEME_NAME_MAX + 1];
@@ -909,10 +880,9 @@ static hts_boolean find_user_theme_file(char *dst, size_t size,
       !hts_buf_put_span(HTS_BUF(name), hts_span_between(start, rest))) {
     return HTS_FALSE;
   }
-  if (!user_themes_dir(dst, size) || !theme_in(dst, name) ||
-      !path_append(dst, size, "/") || !path_append(dst, size, name) ||
-      !path_append(dst, size, rest)) {
-    dst[0] = '\0';
+  if (!user_themes_dir(dst) || !theme_in(dst.p, name) ||
+      !hts_buf_printf(hts_buf_skip(dst, strlen(dst.p)), "/%s%s", name, rest)) {
+    dst.p[0] = '\0';
     return HTS_FALSE;
   }
   return HTS_TRUE;
@@ -973,8 +943,8 @@ static char *list_themes(const char *path) {
   for (pass = 0; pass < 2; pass++) {
     find_handle h;
 
-    if (!(pass == 0 ? user_themes_dir(dir, sizeof(dir))
-                    : installed_themes_dir(dir, sizeof(dir), path)) ||
+    if (!(pass == 0 ? user_themes_dir(HTS_BUF(dir))
+                    : installed_themes_dir(HTS_BUF(dir), path)) ||
         (h = hts_findfirst(dir)) == NULL) {
       continue;
     }
@@ -1025,9 +995,7 @@ static void load_ui_settings(void) {
   char file[1024];
   FILE *fp;
 
-  file[0] = '\0';
-  if (!path_append(file, sizeof(file), gethomedir()) ||
-      !path_append(file, sizeof(file), UI_SETTINGS) ||
+  if (!hts_buf_printf(HTS_BUF(file), "%s" UI_SETTINGS, gethomedir()) ||
       (fp = fopen(file, "rb")) == NULL) {
     return;
   }
@@ -1050,9 +1018,7 @@ static void set_ui_theme(const char *name) {
   FILE *fp;
 
   strcpybuff(ui_theme, name);
-  file[0] = '\0';
-  if (path_append(file, sizeof(file), gethomedir()) &&
-      path_append(file, sizeof(file), UI_SETTINGS) &&
+  if (hts_buf_printf(HTS_BUF(file), "%s" UI_SETTINGS, gethomedir()) &&
       (fp = fopen(file, "wb")) != NULL) {
     fprintf(fp, "uitheme=%s\n", ui_theme);
     fclose(fp);
@@ -1640,12 +1606,12 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
               bad_length = HTS_TRUE;
             }
           } else if ((p = strfield(line, "Origin:")) != 0) {
-            copy_header_value(origin, sizeof(origin), line + p);
+            copy_header_value(HTS_BUF(origin), line + p);
           } else if ((p = strfield(line, "Host:")) != 0) {
             /* A repeated header keeps the last value. Safe only because we are
                loopback-direct: behind a proxy honouring the first, the two
                would disagree. */
-            copy_header_value(host, sizeof(host), line + p);
+            copy_header_value(HTS_BUF(host), line + p);
           }
         }
         if (meth == 2) {
@@ -2137,22 +2103,19 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
           }
 
           /* user.css and the user's themes override the shipped files */
-          overridden =
-              !virtualpath &&
-              (strcmp(file, "/server/user.css") == 0
-                   ? find_user_stylesheet(fsfile, sizeof(fsfile))
-                   : find_user_theme_file(fsfile, sizeof(fsfile), file));
+          overridden = !virtualpath &&
+                       (strcmp(file, "/server/user.css") == 0
+                            ? find_user_stylesheet(HTS_BUF(fsfile))
+                            : find_user_theme_file(HTS_BUF(fsfile), file));
+          /* the URL is client text, so a long one fails rather than aborts */
           if (!virtualpath && !overridden) {
-            if (!path_append(fsfile, sizeof(fsfile), path) ||
-                !path_append(fsfile, sizeof(fsfile), "html") ||
-                !path_append(fsfile, sizeof(fsfile), file)) {
+            if (!hts_buf_printf(HTS_BUF(fsfile), "%shtml%s", path, file)) {
               fsfile[0] = '\0';
             }
           } else if (virtualpath && StringNotEmpty(website)) {
             /* Never the posted "projpath": a client root reads any file. */
-            if (!path_append(fsfile, sizeof(fsfile), StringBuff(website)) ||
-                !path_append(fsfile, sizeof(fsfile), "/") ||
-                !path_append(fsfile, sizeof(fsfile), file + 9)) {
+            if (!hts_buf_printf(HTS_BUF(fsfile), "%s/%s", StringBuff(website),
+                                file + 9)) {
               fsfile[0] = '\0';
             }
           }
@@ -2604,7 +2567,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                       if (strfield2(name, "#iso")) {
                         langstr = line2;
                         line2[0] = '\0';
-                        LANG_LIST(path, line2, sizeof(line2));
+                        LANG_LIST(path, HTS_BUF(line2));
                         assertf(strlen(langstr) < sizeof(line2) - 2);
                         needs_ncr = HTS_TRUE;
                       } else {
@@ -3043,13 +3006,13 @@ static void lang_load_catalog(FILE *fp, hts_boolean fallback,
 /* Format "lang/<hashname>.txt" into dst, where hashname is the catalog name
    lang.def gave this language. Refuses an empty name, one carrying a separator
    or "..", and one too long for dst. */
-static HTS_CHECK_RESULT hts_boolean lang_catalog_path(char *dst, size_t size,
+static HTS_CHECK_RESULT hts_boolean lang_catalog_path(hts_buf dst,
                                                       const char *hashname) {
   if (!strnotempty(hashname) || strpbrk(hashname, "/\\") != NULL ||
       strstr(hashname, "..") != NULL) {
     return HTS_FALSE;
   }
-  return slprintfbuff(dst, size, "lang/%s.txt", hashname);
+  return hts_buf_printf(dst, "lang/%s.txt", hashname);
 }
 
 static int htslang_load(char *limit_to, size_t limit_size, const char *path) {
@@ -3140,7 +3103,7 @@ static int htslang_load(char *limit_to, size_t limit_size, const char *path) {
     if (hashname != NULL)
       strclipbuff(limit_to, limit_size, hashname);
     if (limit_to[0] != '\0' &&
-        lang_catalog_path(lbasename, sizeof(lbasename), hashname)) {
+        lang_catalog_path(HTS_BUF(lbasename), hashname)) {
       FILE *fp;
 
       fp = fopen(fconcat(catbuff, sizeof(catbuff), path, lbasename), "rb");
@@ -3181,7 +3144,7 @@ static int htslang_load(char *limit_to, size_t limit_size, const char *path) {
         sprintf(name, "LANGUAGE_%d", (loops == 0) ? (selected_lang + 1) : 1);
         hashname = LANGINTKEY(name);
       }
-      if (!lang_catalog_path(lbasename, sizeof(lbasename), hashname)) {
+      if (!lang_catalog_path(HTS_BUF(lbasename), hashname)) {
         return 0;
       }
       fp = fopen(fconcat(catbuff, sizeof(catbuff), path, lbasename), "rb");
@@ -3319,20 +3282,20 @@ static int LANG_SEARCH(const char *path, const char *iso) {
   return found;
 }
 
-static int LANG_LIST(const char *path, char *buffer, size_t buffer_size) {
+static int LANG_LIST(const char *path, hts_buf buffer) {
   char lang_str[1024];
   int i = 0;
   int curr_lng = LANG_T(path, -1);
 
-  buffer[0] = '\0';
+  buffer.p[0] = '\0';
   do {
     QLANG_T(i);
     strlcpybuff(lang_str, "LANGUAGE_NAME", sizeof(lang_str));
     htslang_load(lang_str, sizeof(lang_str), path);
     if (strlen(lang_str) > 0) {
-      if (buffer[0])
-        strlcatbuff(buffer, "\n", buffer_size);
-      strlcatbuff(buffer, lang_str, buffer_size);
+      if (buffer.p[0])
+        hts_buf_cat(buffer, "\n");
+      hts_buf_cat(buffer, lang_str);
     }
     i++;
   } while(strlen(lang_str) > 0);
