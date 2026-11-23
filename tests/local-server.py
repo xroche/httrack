@@ -952,9 +952,10 @@ class Handler(SimpleHTTPRequestHandler):
             self.wfile.write(body)
 
     # 20 images whose replies offer keep-alive, so most go out on a reused
-    # socket (2371, 2377).
+    # socket (2371, 2377). /kalist/ offers it in a list, as Apache does (2455).
     def route_keepalive(self, path):
-        ka = (("Connection", "keep-alive"),)
+        conn = "Upgrade, Keep-Alive" if path.startswith("/kalist/") else "keep-alive"
+        ka = (("Connection", conn),)
         if path.endswith(".png"):
             self.send_raw(self.FAKE_PNG, "image/png", ka)
             return
@@ -2491,6 +2492,40 @@ class Handler(SimpleHTTPRequestHandler):
             piece = blob[off : off + step]
             self.wfile.write(b"%X\r\n" % len(piece) + piece + b"\r\n")
         self.wfile.write(b"0\r\n\r\n")
+
+    # Transfer-Encoding as a coding list: chunked is the final coding (2455).
+    TELIST = {
+        "plain": "chunked",
+        "gzip": "gzip, chunked",
+        "spaced": "gzip ,  Chunked ",
+        "notlast": "chunked, gzip",
+    }
+
+    def route_telist_index(self):
+        self.send_html(
+            "".join('\t<a href="%s.bin">%s</a>\n' % (k, k) for k in self.TELIST)
+        )
+
+    def route_telist_page(self):
+        name = self.path.rsplit("/", 1)[-1].split(".")[0]
+        coding = self.TELIST[name]
+        body = b"TELIST-%s-BODY\n" % name.encode()
+        codings = [c.strip().lower() for c in coding.split(",")]
+        if "gzip" in codings[: codings.index("chunked")]:
+            body = gzip.compress(body, mtime=0)
+        self.protocol_version = "HTTP/1.1"
+        self.send_response(200)
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Transfer-Encoding", coding)
+        self.send_header("Connection", "close")
+        self.end_headers()
+        if self.command == "HEAD":
+            return
+        if codings[-1] == "chunked":
+            self.wfile.write(b"%X\r\n" % len(body) + body + b"\r\n0\r\n\r\n")
+        else:
+            self.wfile.write(body)
+        self.close_connection = True
 
     # #840: a chunked stream cut before its terminating zero-length chunk.
     CHUNKTRUNC_V1 = b"<html><body><p>CHUNKTRUNC-PAGE-V1</p></body></html>"
@@ -4514,6 +4549,11 @@ class Handler(SimpleHTTPRequestHandler):
         "/size/oversize.bin": route_size_oversize,
         "/chunked/index.html": route_chunked_index,
         "/chunked/page.html": route_chunked_page,
+        "/telist/index.html": route_telist_index,
+        "/telist/plain.bin": route_telist_page,
+        "/telist/gzip.bin": route_telist_page,
+        "/telist/spaced.bin": route_telist_page,
+        "/telist/notlast.bin": route_telist_page,
         "/chunktrunc/index.html": route_chunktrunc_index,
         "/chunktrunc/page.html": route_chunktrunc_page,
         "/chunktrunc/always.html": route_chunktrunc_always,
@@ -4915,7 +4955,7 @@ class Handler(SimpleHTTPRequestHandler):
         if path.startswith("/asset/"):
             self.route_asset()
             return True
-        if path.startswith("/keepalive/"):
+        if path.startswith(("/keepalive/", "/kalist/")):
             self.route_keepalive(path)
             return True
         if path.startswith("/fetchmeta/"):

@@ -1592,20 +1592,34 @@ static size_t cookie_default_path_len(const char *fil, size_t size) {
   return len;
 }
 
-// traiter ligne par ligne l'en tête
-// gestion des cookies
+// Read one response header line, and store any cookie it sets.
 void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * retour,
                char *rcvd) {
   treathead_opt(NULL, cookie, adr, fil, retour, rcvd);
 }
 
+/* Is NAME the header LIT, in any case? The length test skips most calls. */
+#define HEADER_IS(name, lit)                                                   \
+  ((name).len == sizeof(lit) - 1 && hts_span_eq_ci((name), hts_span_of(lit)))
+
+/* VALUE past its leading blanks. */
+static hts_span header_value(const char *value) {
+  return hts_span_trim(hts_span_of(value), " \t\n\v\f\r", "");
+}
+
 /* A header added here also goes into hts_header_is_read(). */
 void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
                    const char *fil, htsblk *retour, char *rcvd) {
-  int p;
+  char *const colon = strchr(rcvd, ':');
+  hts_span name;
+  char *value;
 
-  if ((p = strfield(rcvd, "Content-length:")) != 0) {
-    const char *a = rcvd + p;
+  if (colon == NULL)
+    return;
+  name = hts_span_between(rcvd, colon);
+  value = colon + 1;
+  if (HEADER_IS(name, "Content-length")) {
+    const char *a = value;
     LLint size;
 
     if (hts_scan_llint(&a, 0, INT64_MAX, &size) == HTS_SCAN_OK) {
@@ -1614,10 +1628,10 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
         retour->empty = 1;
       }
     }
-  } else if ((p = strfield(rcvd, "Content-Disposition:")) != 0) {
+  } else if (HEADER_IS(name, "Content-Disposition")) {
     char tmp[256];
 
-    if (hts_header_param(rcvd + p, ";", "filename", tmp, sizeof(tmp))) {
+    if (hts_header_param(value, ";", "filename", tmp, sizeof(tmp))) {
       const char *a = tmp;
       const char *c;
 
@@ -1630,43 +1644,37 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
         strcpybuff(retour->cdispo, a);
       }
     }
-  } else if ((p = strfield(rcvd, "Last-Modified:")) != 0) {
-    while(is_realspace(*(rcvd + p)))
-      p++;                      // sauter espaces
-    if ((int) strlen(rcvd + p) < 64) { // pas trop long?
-      strcpybuff(retour->lastmodified, rcvd + p);
-    }
-  } else if ((p = strfield(rcvd, "Date:")) != 0) {
-    if (retour->lastmodified[0] == '\0') { /* no Last-Modified yet */
-      while(is_realspace(*(rcvd + p)))
-        p++;                    // sauter espaces
-      if ((int) strlen(rcvd + p) < 64) { // pas trop long?
-        strcpybuff(retour->lastmodified, rcvd + p);
-      }
-    }
-  } else if ((p = strfield(rcvd, "Etag:")) != 0) { /* Etag */
+  } else if (HEADER_IS(name, "Last-Modified") ||
+             (HEADER_IS(name, "Date") &&
+              retour->lastmodified[0] == '\0')) { // Date stands in for it
+    const hts_span v = header_value(value);
+
+    if (v.len < sizeof(retour->lastmodified))
+      (void) hts_span_copy(v, retour->lastmodified,
+                           sizeof(retour->lastmodified));
+  } else if (HEADER_IS(name, "Etag")) {
     if (retour) {
-      while(is_realspace(*(rcvd + p)))
-        p++;                    // sauter espaces
-      if ((int) strlen(rcvd + p) < 64)  // pas trop long?
-        strcpybuff(retour->etag, rcvd + p);
-      else                      // erreur.. ignorer
+      const hts_span v = header_value(value);
+
+      if (v.len < 64)
+        (void) hts_span_copy(v, retour->etag, sizeof(retour->etag));
+      else
         retour->etag[0] = '\0';
     }
-  } else if ((p = strfield(rcvd, "Transfer-Encoding:")) != 0) { // chunk!
-    while(is_realspace(*(rcvd + p)))
-      p++;                      // sauter espaces
-    if (strfield(rcvd + p, "chunked")) {
-      retour->is_chunk = 1; // chunked
-    }
-  } else if ((p = strfield(rcvd, "Content-type:")) != 0) {
+  } else if (HEADER_IS(name, "Transfer-Encoding")) {
+    hts_span last;
+
+    // RFC 9112 6.1: only a final chunked frames the body
+    if (hts_span_list_last(hts_span_of(value), ',', &last))
+      retour->is_chunk = hts_span_eq_ci(last, hts_span_of("chunked"));
+  } else if (HEADER_IS(name, "Content-type")) {
     if (retour) {
       char tempo[1100];
 
       char chs[256];
-      char *const semi = strchr(rcvd + p, ';');
+      char *const semi = strchr(value, ';');
 
-      if (hts_header_param(rcvd + p, ";", "charset", chs, sizeof(chs))) {
+      if (hts_header_param(value, ";", "charset", chs, sizeof(chs))) {
         const char *const c = chs + strspn(chs, HTS_SPACES);
         const size_t n = strcspn(c, HTS_SPACES);
 
@@ -1680,7 +1688,7 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
         *semi = '\0';
       // An empty/whitespace Content-Type value yields no token: keep the
       // sentinel default rather than reading an uninitialized tempo.
-      if (sscanf(rcvd + p, "%1099s", tempo) == 1) { // tempo[1100], server data
+      if (sscanf(value, "%1099s", tempo) == 1) { // tempo[1100], server data
         if (strlen(tempo) < sizeof(retour->contenttype) - 2) // pas trop long!!
           strcpybuff(retour->contenttype, tempo);
         else
@@ -1688,11 +1696,12 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
                      "application/octet-stream-unknown"); // erreur
       }
     }
-  } else if ((p = strfield(rcvd, "Content-Range:")) != 0) {
+  } else if (HEADER_IS(name, "Content-Range")) {
     // Content-Range: bytes 0-70870/70871
     const char *a;
 
-    for(a = rcvd + p; is_space(*a); a++) ;
+    for (a = value; is_space(*a); a++)
+      ;
     if (hts_strncasecmp(a, "bytes ", 6) == 0) {
       LLint start = 0, end = 0, total = 0;
       hts_scan_result got;
@@ -1720,7 +1729,7 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
       // Only the total after the first '/' counts, as in "*/N".
       if (got == HTS_SCAN_NONE) {
         start = end = total = 0;
-        a = strchr(rcvd + p, '/');
+        a = strchr(value, '/');
         if (a != NULL) {
           a++;
           if (hts_scan_llint(&a, 1, INT64_MAX, &total) == HTS_SCAN_OK) {
@@ -1736,13 +1745,15 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
       retour->crange_end = end;
       retour->crange = total;
     }
-  } else if ((p = strfield(rcvd, "Connection:")) != 0) {
-    char *a = rcvd + p;
+  } else if (HEADER_IS(name, "Connection")) {
+    const hts_span v = hts_span_of(value);
+    hts_span last;
 
-    while(is_space(*a))
-      a++;
-    if (*a) {
-      if (strfield(a, "Keep-Alive")) {
+    // a list such as "Upgrade, Keep-Alive", where close wins; "" changes
+    // nothing
+    if (hts_span_list_last(v, ',', &last)) {
+      if (hts_span_list_has(v, ',', hts_span_of("Keep-Alive")) &&
+          !hts_span_list_has(v, ',', hts_span_of("close"))) {
         if (!retour->keep_alive) {
           retour->keep_alive_max = 10;
           retour->keep_alive_t = 15;
@@ -1752,8 +1763,8 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
         retour->keep_alive = 0;
       }
     }
-  } else if ((p = strfield(rcvd, "Keep-Alive:")) != 0) {
-    char *a = rcvd + p;
+  } else if (HEADER_IS(name, "Keep-Alive")) {
+    char *a = value;
 
     while(is_space(*a))
       a++;
@@ -1771,8 +1782,8 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
         retour->keep_alive = 0;
       }
     }
-  } else if ((p = strfield(rcvd, "TE:")) != 0) {
-    char *a = rcvd + p;
+  } else if (HEADER_IS(name, "TE")) {
+    char *a = value;
 
     while(is_space(*a))
       a++;
@@ -1781,15 +1792,15 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
         retour->keep_alive_trailers = 1;
       }
     }
-  } else if ((p = strfield(rcvd, "Content-Encoding:")) != 0) {
+  } else if (HEADER_IS(name, "Content-Encoding")) {
     if (retour) {
       char tempo[1100];
-      char *a = rcvd + p;
+      char *a = value;
 
       while(is_space(*a))
         a++;
       {
-        char *a = strchr(rcvd + p, ';');
+        char *a = strchr(value, ';');
 
         if (a)
           *a = '\0';
@@ -1804,18 +1815,18 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
       if (hts_codec_parse(retour->contentencoding) != HTS_CODEC_IDENTITY)
         retour->compressed = 1;
     }
-  } else if ((p = strfield(rcvd, "Retry-After:")) != 0) {
+  } else if (HEADER_IS(name, "Retry-After")) {
     if (retour) {
       /* uncapped: treathead() has no opt, so the caller clips it */
-      retour->retry_after = hts_parse_retry_after(rcvd + p, time(NULL));
+      retour->retry_after = hts_parse_retry_after(value, time(NULL));
     }
-  } else if ((p = strfield(rcvd, "Location:")) != 0) {
+  } else if (HEADER_IS(name, "Location")) {
     if (retour) {
       if (retour->location) {
-        while(is_realspace(*(rcvd + p)))
-          p++; // skip spaces
-        if (strlen(rcvd + p) < HTS_LOCATION_SIZE) {
-          strlcpybuff(retour->location, rcvd + p, HTS_LOCATION_SIZE);
+        const hts_span v = header_value(value);
+
+        if (v.len < HTS_LOCATION_SIZE) {
+          (void) hts_span_copy(v, retour->location, HTS_LOCATION_SIZE);
           if (!hts_location_is_safe(retour->location)) {
             hts_log_print(NULL, LOG_WARNING,
                           "Location naming a post token, redirect ignored");
@@ -1825,14 +1836,13 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
           /* no opt here, so this only reaches a registered log callback */
           hts_log_print(NULL, LOG_WARNING,
                         "Location header too long (%d bytes), redirect ignored",
-                        (int) strlen(rcvd + p));
+                        (int) v.len);
           retour->location[0] = '\0';
         }
       }
     }
-  } else if (((p = strfield(rcvd, "Set-Cookie:")) != 0) &&
-             (cookie)) {        // ohh un cookie
-    char *a = rcvd + p;         // pointeur
+  } else if (HEADER_IS(name, "Set-Cookie") && cookie != NULL) {
+    char *a = value;
     char domain[COOKIE_MAX_DOMAIN]; // .netscape.com
     char scoped[COOKIE_MAX_DOMAIN]; // adr without userinfo, brackets or port
     char path[COOKIE_MAX_PATH];     // /

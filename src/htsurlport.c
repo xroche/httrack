@@ -155,6 +155,31 @@ hts_boolean hts_span_split(hts_span s, char c, hts_span *head, hts_span *tail) {
   return HTS_TRUE;
 }
 
+hts_boolean hts_span_list_has(hts_span list, char sep, hts_span token) {
+  hts_span item;
+
+  while (hts_span_next_in(&list, sep, &item)) {
+    item = hts_span_trim(item, " \t", " \t");
+    if (!hts_span_empty(item) && hts_span_eq_ci(item, token))
+      return HTS_TRUE;
+  }
+  return HTS_FALSE;
+}
+
+hts_boolean hts_span_list_last(hts_span list, char sep, hts_span *last) {
+  hts_boolean found = HTS_FALSE;
+  hts_span item;
+
+  while (hts_span_next_in(&list, sep, &item)) {
+    item = hts_span_trim(item, " \t", " \t");
+    if (!hts_span_empty(item)) {
+      *last = item;
+      found = HTS_TRUE;
+    }
+  }
+  return found;
+}
+
 hts_boolean hts_span_copy(hts_span s, char *dst, size_t size) {
   size_t n;
 
