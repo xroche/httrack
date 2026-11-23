@@ -64,6 +64,7 @@ typedef struct lien_adrfilsave lien_adrfilsave;
 #include "htsglobal.h"
 #include "htsdate.h"
 #include "htsurlport.h"
+#include "htsbuf.h"
 
 /* basic net definitions */
 #include "htsbase.h"
@@ -551,12 +552,11 @@ hts_boolean hts_host_is_ipv4(const char *host, size_t len);
 int hts_basic_auth_value(httrackp *opt, const char *url, char *out,
                          size_t out_size);
 
-/* Copy the bare host name of a URL address into out[size] for the TLS SNI
+/* Copy the bare host name of a URL address into out for the TLS SNI
    extension: no scheme, userinfo or port. FALSE with out emptied when there is
    no DNS name to send (IP literal, empty, or too long), as RFC 6066 forbids
    literals. */
-HTS_CHECK_RESULT hts_boolean hts_sni_hostname(const char *url_adr, char *out,
-                                              size_t size);
+HTS_CHECK_RESULT hts_boolean hts_sni_hostname(const char *url_adr, hts_buf out);
 
 #if HTS_USEOPENSSL
 /* Make ssl's handshake fail unless the server's chain verifies against the
@@ -749,7 +749,7 @@ int ishtml_ext(const char *a);
    value, which "--assume cgi=" leaves empty. */
 hts_boolean get_userhttptype(httrackp *opt, char *s, size_t ssize,
                              const char *fil);
-int give_mimext(char *s, size_t ssize, const char *st);
+int give_mimext(hts_buf s, const char *st);
 
 int may_unknown2(httrackp * opt, const char *mime, const char *filename);
 
@@ -788,7 +788,7 @@ const char *jump_protocol_const(const char *source);
 void hts_parse_proxy(const char *arg, char *name, size_t name_size, int *port);
 void code64(unsigned char *a, int size_a, unsigned char *b, int crlf);
 
-char *convtolower(char *catbuff, size_t catbuffsize, const char *a);
+char *convtolower(hts_buf catbuff, const char *a);
 int multipleStringMatch(const char *s, const char *match);
 
 /* Writes a header block to fp, each line after prefix, with the value of a
@@ -1381,6 +1381,6 @@ hts_boolean hts_host_same_alias(const char *rules, const char *adra,
    copied into DEST, or NULL if every chain settles. Those hosts are left
    unaliased, so the engine reports them rather than picking a hop. */
 const char *hts_host_alias_looping(const char *rules, hts_boolean collapse_www,
-                                   char *dest, size_t destsize);
+                                   hts_buf dest);
 
 #endif

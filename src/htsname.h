@@ -35,6 +35,7 @@ Please visit our Website: http://www.httrack.com
 #define HTSNAME_DEFH
 
 #include "htsglobal.h"
+#include "htsbuf.h"
 
 #define DELAYED_EXT "delayed"
 #define IS_DELAYED_EXT(a) ( ((a) != NULL) && ((a)[0] != 0) && strendwith_(a, "." DELAYED_EXT) )
@@ -101,9 +102,8 @@ void standard_name(char *b, size_t bsize, const char *dot_pos,
                    const char *nom_pos, const char *fil_complete,
                    int short_ver);
 /* Does url's query have a field with an '=' whose key is exactly name? Its
-   value, clipped to size - 1 bytes, goes to dst, of size >= 1. */
-hts_boolean url_query_value(const char *url, const char *name, char *dst,
-                            size_t size);
+   value, clipped to fit, goes to dst, of size >= 1. */
+hts_boolean url_query_value(const char *url, const char *name, hts_buf dst);
 /* Append s to d (mapping '\' to '/'), clipped to dsize bytes including the NUL.
    Clips rather than aborts: s is a crawled link, hostile by construction. */
 void url_savename_addstr(char *d, size_t dsize, const char *s);
@@ -122,13 +122,14 @@ size_t hts_read_file_head(const char *path, void *buf, size_t len);
 
 /* Is the wire-vs-ext verdict contested and settleable by a body sniff? */
 int hts_ext_sniff_wanted(httrackp *opt, const char *wiremime, const char *file);
-/* Writes the hex MD5 of the query past '?' clipped to size, or "" if none. */
-char *url_md5(char *digest_buffer, size_t size, const char *fil_complete);
-/* The cache ref name of (adr,fil) into filename; "" and HTS_FALSE if it does
-   not fit size. */
+/* Write the hex MD5 of the query after '?' into digest, clipped. A URL with no
+   query gets "". */
+char *url_md5(hts_buf digest, const char *fil_complete);
+/* Write the cache ref name of (adr,fil) into filename. When it does not fit,
+   filename is "" and the result is HTS_FALSE. */
 HTS_CHECK_RESULT hts_boolean url_savename_refname(const char *adr,
                                                   const char *fil,
-                                                  char *filename, size_t size);
+                                                  hts_buf filename);
 char *url_savename_refname_fullpath(httrackp * opt, const char *adr,
                                     const char *fil);
 /* Remove the temp-ref for (adr,fil); HTS_TRUE if it was removed. */

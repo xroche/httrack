@@ -76,11 +76,11 @@ const char *hts_strerror(int err, char *buf, size_t size) {
   return buf;
 }
 
-// lower-case conversion into caller buffer (capacity catbuffsize)
-char *convtolower(char *catbuff, size_t catbuffsize, const char *a) {
-  strlcpybuff(catbuff, a, catbuffsize);
-  hts_lowcase(catbuff); // lower case
-  return catbuff;
+// Copy a into catbuff lower-cased, and return catbuff.p.
+char *convtolower(hts_buf catbuff, const char *a) {
+  hts_buf_cpy(catbuff, a);
+  hts_lowcase(catbuff.p);
+  return catbuff.p;
 }
 
 /* File size, -1 if absent */

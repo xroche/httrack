@@ -386,13 +386,13 @@ int hts_ext_sniff_wanted(httrackp *opt, const char *wiremime,
    else 0. ext receives the new extension or replacement filename. */
 static int resolve_extension(httrackp *opt, const sniff_src *src,
                              const char *cdispo, const char *contenttype,
-                             const char *fil, char *ext, size_t ext_size) {
+                             const char *fil, hts_buf ext) {
   if (strnotempty(cdispo)) {
-    strlcpybuff(ext, cdispo, ext_size);
+    hts_buf_cpy(ext, cdispo);
     return 2;
   }
   if (wire_patches_ext(opt, src, contenttype, fil) &&
-      give_mimext(ext, ext_size, contenttype))
+      give_mimext(ext, contenttype))
     return 1;
   return 0;
 }
@@ -456,17 +456,16 @@ static void tmpl_catc(char *d, size_t dsize, char c) {
 #define TMPL_TAIL(S) TMPL_TAILN((S), (size_t) -1)
 #define TMPL_TAILC(C) tmpl_catc(tmpltail, sizeof(tmpltail), (C))
 
-hts_boolean url_query_value(const char *url, const char *name, char *dst,
-                            size_t size) {
+hts_boolean url_query_value(const char *url, const char *name, hts_buf dst) {
   const char *const query = strchr(url, '?');
   hts_query_field f;
 
-  dst[0] = '\0';
+  dst.p[0] = '\0';
   if (query == NULL || !hts_query_find(query + 1, name, &f)) {
     return HTS_FALSE;
   }
   /* crawled query text: clip it */
-  (void) hts_span_copy(f.val, dst, size);
+  (void) hts_span_copy(f.val, dst.p, dst.size);
   return HTS_TRUE;
 }
 
@@ -801,14 +800,12 @@ static hts_boolean savename_walk_skipped(const httrackp *opt, int max_char,
 }
 
 /* Sets ext from the user's --assume type for fil. Did it find one? */
-static hts_boolean user_mime_ext(httrackp *opt, const char *fil, char *ext,
-                                 size_t size) {
+static hts_boolean user_mime_ext(httrackp *opt, const char *fil, hts_buf ext) {
   char BIGSTK mime[1024];
 
-  mime[0] = ext[0] = '\0';
+  mime[0] = ext.p[0] = '\0';
   get_userhttptype(opt, mime, sizeof(mime), fil);
-  return strnotempty(mime) && give_mimext(ext, size, mime) ? HTS_TRUE
-                                                           : HTS_FALSE;
+  return strnotempty(mime) && give_mimext(ext, mime) ? HTS_TRUE : HTS_FALSE;
 }
 
 /* Appends the host directory, without "www." in 8-3 mode. */
@@ -1053,7 +1050,7 @@ int url_savename(lien_adrfilsave *const afs,
   case 0:
     if (!strnotempty(ext)) {
       if (is_userknowntype(opt, fil) && // mime known by user
-          user_mime_ext(opt, fil, ext, sizeof(ext))) {
+          user_mime_ext(opt, fil, HTS_BUF(ext))) {
         ext_chg = 1;
       }
     }
@@ -1086,14 +1083,14 @@ int url_savename(lien_adrfilsave *const afs,
               const sniff_src src = {sback, NULL, adr, fil, previous_save};
 
               ext_chg = resolve_extension(opt, &src, r.cdispo, r.contenttype,
-                                          fil, ext, sizeof(ext));
+                                          fil, HTS_BUF(ext));
             }
           } else if (opt->savename_delayed != HTS_SAVENAME_DELAYED_HARD &&
                      is_userknowntype(opt, fil)) { /* PATCH BY BRIAN SCHRÖDER.
                               Lookup mimetype not only by extension,
                               but also by filename */
             /* "foo.cgi => text/html" saves foo.cgi as ".html" */
-            if (user_mime_ext(opt, fil, ext, sizeof(ext))) {
+            if (user_mime_ext(opt, fil, HTS_BUF(ext))) {
               ext_chg = 1;
             }
           }
@@ -1107,11 +1104,11 @@ int url_savename(lien_adrfilsave *const afs,
 
               ext_chg = resolve_extension(opt, &src, headers->r.cdispo,
                                           headers->r.contenttype,
-                                          headers->url_fil, ext, sizeof(ext));
+                                          headers->url_fil, HTS_BUF(ext));
             } else if (mime_type != NULL) {
               ext[0] = '\0';
               if (*mime_type) {
-                give_mimext(ext, sizeof(ext), mime_type);
+                give_mimext(HTS_BUF(ext), mime_type);
               }
               if (strnotempty(ext)) {
                 char mime_from_file[128];
@@ -1321,9 +1318,9 @@ int url_savename(lien_adrfilsave *const afs,
                   }
 
                   // no error: change the type?
-                  ext_chg = resolve_extension(
-                      opt, NULL, back[b].r.cdispo, back[b].r.contenttype,
-                      back[b].url_fil, ext, sizeof(ext));
+                  ext_chg = resolve_extension(opt, NULL, back[b].r.cdispo,
+                                              back[b].r.contenttype,
+                                              back[b].url_fil, HTS_BUF(ext));
                 }
                 // FIN Si non déplacé, forcer type?
 
@@ -1485,7 +1482,7 @@ int url_savename(lien_adrfilsave *const afs,
             if (*a == ']') {
               a++;
             }
-            if (url_query_value(fil_complete, name[0], value, sizeof(value))) {
+            if (url_query_value(fil_complete, name[0], HTS_BUF(value))) {
               TMPL_TAIL(name[1]); /* prefix */
               d = value[0] != '\0'
                       ? unescape_http(catbuff, sizeof(catbuff), value)
@@ -1595,7 +1592,7 @@ int url_savename(lien_adrfilsave *const afs,
         {
           char md5[32 + 2];
 
-          TMPL_TAILN(url_md5(md5, sizeof(md5), fil_complete),
+          TMPL_TAILN(url_md5(HTS_BUF(md5), fil_complete),
                      (tok == 'Q') ? 32 : 4);
         } break;
         case 'r':
@@ -2136,7 +2133,7 @@ void standard_name(char *b, size_t bsize, const char *dot_pos,
   assertf(bsize != 0);
   bb = htsbuff_ptr(b, bsize);
   room = bsize - 1;
-  md5_len = strnlen(url_md5(md5, sizeof(md5), fil), 4);
+  md5_len = strnlen(url_md5(HTS_BUF(md5), fil), 4);
   ext_len = dot_pos == NULL
                 ? 0
                 : (short_ver ? strnlen(dot_pos + 1, 3) : strlen(dot_pos + 1));
@@ -2171,17 +2168,17 @@ void standard_name(char *b, size_t bsize, const char *dot_pos,
   }
 }
 
-char *url_md5(char *digest, size_t size, const char *fil) {
+char *url_md5(hts_buf digest, const char *fil) {
   const char *const query = strchr(fil, '?');
   char hex[33];
 
-  assertf(size != 0);
-  digest[0] = '\0';
+  assertf(digest.size != 0);
+  digest.p[0] = '\0';
   if (query != NULL) {
     domd5mem(query + 1, strlen(query + 1), hex, 1);
-    (void) strclipbuff(digest, size, hex);
+    hts_buf_cpy_clip(digest, hex);
   }
-  return digest;
+  return digest.p;
 }
 
 void url_savename_addstr(char *d, size_t dsize, const char *s) {
@@ -2197,21 +2194,20 @@ void url_savename_addstr(char *d, size_t dsize, const char *s) {
 }
 
 hts_boolean url_savename_refname(const char *adr, const char *fil,
-                                 char *filename, size_t size) {
+                                 hts_buf filename) {
   unsigned char bindigest[16];
   char hex[33];
   struct MD5Context ctx;
 
-  assertf(size != 0);
   hts_md5_init(&ctx);
   MD5Update(&ctx, (const unsigned char *) adr, (int) strlen(adr));
   MD5Update(&ctx, (const unsigned char *) ",", 1);
   MD5Update(&ctx, (const unsigned char *) fil, (int) strlen(fil));
   MD5Final(bindigest, &ctx);
   hts_md5_hex(bindigest, hex);
-  if (snprintf(filename, size, CACHE_REFNAME "/%s.ref", hex) < (int) size)
+  if (hts_buf_printf(filename, CACHE_REFNAME "/%s.ref", hex))
     return HTS_TRUE;
-  filename[0] = '\0';
+  filename.p[0] = '\0';
   return HTS_FALSE;
 }
 
@@ -2224,8 +2220,7 @@ char *url_savename_refname_fullpath(httrackp * opt, const char *adr,
                     refname_fits);
 
   // The assert above guarantees the name fits.
-  (void) !url_savename_refname(adr, fil, digest_filename,
-                               sizeof(digest_filename));
+  (void) !url_savename_refname(adr, fil, HTS_BUF(digest_filename));
   return hts_logpath(opt, digest_filename);
 }
 

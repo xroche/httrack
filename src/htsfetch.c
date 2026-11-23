@@ -515,10 +515,9 @@ const char *hts_fetch_site_name(int site) {
   }
 }
 
-hts_boolean hts_fetch_origin(const char *adr, char *dst, size_t size) {
+hts_boolean hts_fetch_origin(const char *adr, hts_buf dst) {
   fetch_origin o;
   size_t i;
-  int n;
 
   origin_of(adr, &o);
   if (o.host_len == 0)
@@ -528,12 +527,10 @@ hts_boolean hts_fetch_origin(const char *adr, char *dst, size_t size) {
       return HTS_FALSE;
   }
   if (o.port == (o.https ? 443 : 80))
-    n = snprintf(dst, size, "%s://%.*s", o.https ? "https" : "http",
-                 (int) o.host_len, o.host);
-  else
-    n = snprintf(dst, size, "%s://%.*s:%d", o.https ? "https" : "http",
-                 (int) o.host_len, o.host, o.port);
-  return n > 0 && (size_t) n < size ? HTS_TRUE : HTS_FALSE;
+    return hts_buf_printf(dst, "%s://%.*s", o.https ? "https" : "http",
+                          (int) o.host_len, o.host);
+  return hts_buf_printf(dst, "%s://%.*s:%d", o.https ? "https" : "http",
+                        (int) o.host_len, o.host, o.port);
 }
 
 /* hts_accept_kinds() publishes the --accept kinds in this display order. */

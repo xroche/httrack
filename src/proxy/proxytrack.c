@@ -314,7 +314,7 @@ static void proxytrack_add_DAV_Item(String * item, String * buff,
     char tms[256 + 1];
     const char *name;
 
-    hts_format_rfc822(tms, sizeof(tms), timetm, " GMT");
+    hts_format_rfc822(HTS_SIZED(tms), timetm, " GMT");
 
     if (mime == NULL || *mime == 0)
       mime = "application/octet-stream";

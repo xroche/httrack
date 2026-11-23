@@ -40,7 +40,7 @@ static int st_mime(httrackp *opt, int argc, char **argv) {
     char ext[256];
 
     printf("%s is '%s'\n", argv[0], mime);
-    if (give_mimext(ext, sizeof(ext), mime))
+    if (give_mimext(HTS_BUF(ext), mime))
       printf("and its local type is '.%s'\n", ext);
   } else {
     printf("%s is of an unknown MIME type\n", argv[0]);

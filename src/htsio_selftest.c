@@ -600,7 +600,7 @@ static void datadir_expect(const char *selfpath, const char *builtin,
                            const char *expect) {
   char got[HTS_URLMAXSIZE * 2];
 
-  hts_resolve_datadir(got, sizeof(got), selfpath, builtin);
+  hts_resolve_datadir(HTS_BUF(got), selfpath, builtin);
   if (strcmp(got, expect) != 0) {
     fprintf(stderr,
             "datadir: self=%s builtin=\"%s\" gave \"%s\", expected \"%s\"\n",
@@ -701,7 +701,7 @@ static int st_datadir(httrackp *opt, int argc, char **argv) {
     }
     huge[dirlen - 1] = '/';
     memcpy(huge + dirlen, "httrack", sizeof("httrack"));
-    hts_resolve_datadir(got, sizeof(got), huge, gone);
+    hts_resolve_datadir(HTS_BUF(got), huge, gone);
     assertf(strcmp(got, gone) == 0);
   }
 
