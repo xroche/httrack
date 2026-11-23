@@ -2544,12 +2544,14 @@ class Handler(SimpleHTTPRequestHandler):
         "resume": ("resumete.bin", "resumece.bin"),
         "more": (
             "sniff.jpg",
+            "sniffboth.jpg",
             "bad.bin",
             "badcompress.bin",
             "unknownce.bin",
             "bomb.bin",
         ),
         "headprobe": ("probe.php",),
+        "zstd": ("zstdgzip.html", "zstdsniff.jpg"),
     }
     # 8 MB of zeros coded twice is about 100 bytes: one layer's ratio passes it.
     TECODE_BOMB = gzip.compress(gzip.compress(b"\0" * (8 << 20), mtime=0), mtime=0)
@@ -2613,9 +2615,16 @@ class Handler(SimpleHTTPRequestHandler):
             coding, content_coding = "gzip, chunked", "zstd"
             body = self.CODEC_ZSTD
             ctype = "text/html"
-        elif name == "sniff":
+        elif name in ("sniff", "sniffboth"):
             # declared png, a jpeg once decoded: only the sniff keeps .jpg
             coding, body, ctype = "gzip", self.FAKE_JPEG, "image/png"
+            content_coding = "gzip" if name == "sniffboth" else None
+        elif name == "zstdsniff":
+            # a zstd frame of one raw block: the order of the layers shows
+            jpeg = self.FAKE_JPEG
+            block = ((len(jpeg) << 3) | 1).to_bytes(3, "little")
+            coding, content_coding, ctype = "gzip", "zstd", "image/png"
+            body = b"\x28\xb5\x2f\xfd\x20" + bytes([len(jpeg)]) + block + jpeg
         elif name in ("bad", "badcompress"):
             content_coding = "compress" if name == "badcompress" else None
             self.send_te("gzip", content_coding, self.TECODE_CORRUPT, ctype)
@@ -2635,6 +2644,10 @@ class Handler(SimpleHTTPRequestHandler):
         elif name == "probed":
             coding, ctype = "gzip", "text/html"
             body = b"<html>TECODE-probe-BODY</html>\n"
+        elif name == "big":
+            # small at each layer but the last, which -m must still bound
+            coding, content_coding = "gzip, chunked", "gzip"
+            body = b"TECODE-big-BODY\n" * 2000
         else:
             coding, content_coding = self.TECODE[name]
             body = b"TECODE-%s-BODY\n" % name.encode() * 40

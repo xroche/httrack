@@ -27,7 +27,7 @@ printf '%s\r\n' \
     'Transfer-Encoding: gzip;level=9, chunked' %% \
     'Transfer-Encoding: compress' %% \
     'Transfer-Encoding: br, chunked' %% \
-    'Transfer-Encoding: chunked,' %% \
+    'Transfer-Encoding: chunked, ,' %% \
     'Transfer-Encoding: gzip, , chunked' %% >"$tmpdir/corpus"
 want='chunk=1 compressed=1 te=1
 chunk=1 compressed=1 te=1
@@ -49,6 +49,17 @@ ok "transfer codings read by treathead_opt"
 
 local_server_start
 host=127.0.0.1_$SRV_PORT
+
+# assert_jpeg FILE LOG: FILE holds the decoded jpeg of the sniff fixtures.
+assert_jpeg() {
+    "$SRV_PYTHON" - "$(nativepath "$1")" <<'PY' || fail_dump "$1 is not the decoded jpeg" "$2"
+import sys
+
+with open(sys.argv[1], "rb") as f:
+    got = f.read()
+assert got == b"\xff\xd8\xff\xe0" + b"\x00" * 64, got[:16]
+PY
+}
 
 cat >"$tmpdir/check.py" <<'PY'
 import gzip
@@ -97,10 +108,12 @@ ok "a cache run keeps the decoded bodies"
 
 # The content coding comes off last, which only a second codec can show.
 if test "${ZSTD_ENABLED:-yes}" = "yes"; then
-    local_crawl "$BASEURL/tecode/zstdgzip.html" -O "$tmpdir/z" || fail "crawl failed"
+    local_crawl "$BASEURL/tecode/zstd.html" -O "$tmpdir/z" || fail "crawl failed"
     grep -q 'coded body' "$tmpdir/z/$host/tecode/zstdgzip.html" ||
         fail_dump "gzip transfer coding over zstd content not undone" "$tmpdir/z/hts-log.txt"
     ok "the transfer coding came off before the content coding"
+    assert_jpeg "$tmpdir/z/$host/tecode/zstdsniff.jpg" "$tmpdir/z/hts-log.txt"
+    ok "the type sniff undoes the transfer coding first"
 fi
 
 # A resume answered with a coded 206 restarts the file, as the rest of the body
@@ -130,9 +143,10 @@ ok "a resume answered with a transfer or content coding restarts the file"
 
 local_crawl "$BASEURL/tecode/more.html" -O "$tmpdir/x" || fail "crawl failed"
 log=$tmpdir/x/hts-log.txt
-assert_file "$tmpdir/x/$host/tecode/sniff.jpg" "the sniff saw the coded bytes"
-ok "the type sniff looks under the transfer coding"
-# bad and badcompress fail on the transfer layer, before their content coding
+assert_jpeg "$tmpdir/x/$host/tecode/sniff.jpg" "$log"
+assert_jpeg "$tmpdir/x/$host/tecode/sniffboth.jpg" "$log"
+ok "the type sniff looks under the transfer and content codings"
+# 4 errors: bad and badcompress on the transfer layer, unknownce, bomb
 test "$(count_matching_lines 'Error when decompressing (Transfer-Encoding)' "$log")" = 2 ||
     fail_dump "a bad transfer coding was not named" "$log"
 test "$(count_matching_lines 'Unsupported Content-Encoding (compress)' "$log")" = 1 ||
@@ -152,6 +166,21 @@ test "$(count_log_errors "$log")" = 0 || fail_dump "a HEAD was refused" "$log"
 grep -q TECODE-probe-BODY "$tmpdir/h/$host/tecode/probed.html" ||
     fail_dump "the redirect from probe.php was not followed" "$log"
 ok "a HEAD under an unreadable transfer coding is not refused"
+local_crawl "$BASEURL/tecode/headprobe.html" -O "$tmpdir/g" || fail "crawl failed"
+log=$tmpdir/g/hts-log.txt
+test "$(count_matching_lines 'Unsupported Transfer-Encoding' "$log")" = 1 ||
+    fail_dump "a GET of the coded redirect was not refused" "$log"
+test ! -e "$tmpdir/g/$host/tecode/probed.html" ||
+    fail_dump "the refused redirect was followed" "$log"
+ok "a GET under an unreadable transfer coding is refused, redirect or not"
+
+# -m bounds the content layer too, though the transfer layer fits under it.
+local_crawl "$BASEURL/tecode/big.bin" -O "$tmpdir/b" -m5000 || fail "crawl failed"
+log=$tmpdir/b/hts-log.txt
+test "$(count_matching_lines 'File too big' "$log")" = 1 ||
+    fail_dump "-m did not bound the content coding" "$log"
+test ! -s "$tmpdir/b/$host/tecode/big.bin" || fail "the body over -m was saved"
+ok "-m bounds the body under both codings"
 
 # A WARC record holds the body without its transfer coding.
 local_crawl "$BASEURL/tecode/gzip.bin" -O "$tmpdir/w" --warc-file tewarc || fail "crawl failed"
@@ -166,3 +195,21 @@ with open(sys.argv[1], "rb") as f:
 assert b"TECODE-gzip-BODY\n" * 40 in data, data[-200:]
 PY
 ok "a WARC record stores the decoded body"
+# With both codings, the record keeps the content coding only.
+local_crawl "$BASEURL/tecode/both.bin" -O "$tmpdir/w2" --warc-file tewarc || fail "crawl failed"
+warc=$(find "$tmpdir/w2" -name 'tewarc*.warc.gz' | head -1)
+test -n "$warc" || fail_dump "no WARC written" "$tmpdir/w2/hts-log.txt"
+"$SRV_PYTHON" - "$(nativepath "$warc")" <<'PY' || fail "the WARC lost the content coding"
+import gzip
+import sys
+import zlib
+
+with open(sys.argv[1], "rb") as f:
+    data = gzip.decompress(f.read())
+assert b"Transfer-Encoding" not in data, data[-400:]
+_, _, rest = data.partition(b"Content-Encoding: gzip\r\n")
+payload = rest.partition(b"\r\n\r\n")[2]
+got = zlib.decompressobj(31).decompress(payload)
+assert got == b"TECODE-both-BODY\n" * 40, payload[:40]
+PY
+ok "a WARC record keeps the content coding and drops the transfer coding"

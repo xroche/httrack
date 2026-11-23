@@ -4224,9 +4224,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                 back[i].r.transfer_coding != HTS_TE_NONE;
 
                             back[i].r.is_write = 1; // to disk
-                            /* clear the content coding so back_finalize undoes
-                               only the transfer layer and the .gz stays packed
-                             */
+                            /* leave the .gz packed: back_finalize undoes only
+                               the transfer layer */
                             if (packed && te)
                               back[i].r.contentencoding[0] = '\0';
                             if (back[i].r.compressed && (!packed || te)) {
