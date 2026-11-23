@@ -427,7 +427,7 @@ static hts_span header_name(hts_span line) {
   return name;
 }
 
-/* The first line of the C string S. */
+/* Cut S at its first CR or LF. */
 static hts_span first_line(const char *s) {
   return hts_span_at(s, strcspn(s, "\r\n"));
 }
@@ -488,8 +488,7 @@ static hts_boolean header_refused(hts_span name) {
   return hts_span_index_ci(name, refused) >= 0;
 }
 
-/* Fields a request carries once, so a later custom line overrides an earlier.
- */
+/* A request carries these once, so a later custom line overrides one before. */
 static hts_boolean header_single(hts_span name) {
   static const char *const single[] = {
       HTS_SPAN_WORDS("Host", "Cookie", "Authorization")};
@@ -497,8 +496,7 @@ static hts_boolean header_single(hts_span name) {
   return hts_span_index_ci(name, single) >= 0;
 }
 
-/* An update or a resume writes these fields itself, dropping the custom line.
- */
+/* An update or a resume writes these itself, dropping the custom line. */
 static hts_boolean header_engine_conditional(hts_span name) {
   static const char *const conditional[] = {
       HTS_SPAN_WORDS("Range", "If-Match", "If-None-Match", "If-Modified-Since",
@@ -593,21 +591,21 @@ static void append_custom_headers(buff_struct *bstr, const char *headers) {
 
   while (custom_line_next(&rest, &line)) {
     const hts_span name = header_name(line);
-    hts_span whole = hts_span_between(line.p, rest.p), head;
 
     if (!header_folded(line))
       keep = header_name_valid(name) && !header_refused(name) &&
              !http_headers_have_name(engine, name) &&
              /* the last of a single-valued field wins, as later options do */
              !(header_single(name) && http_headers_have_name(rest, name));
-    /* One write, so a line that does not fit leaves nothing behind. */
-    if (keep && header_folded(line))
-      print_buffer(bstr, "%.*s", (int) whole.len, whole.p);
-    else if (keep && hts_span_split(whole, ':', &head, &whole))
-      /* A blank before the colon is invalid, so the name goes out without it.
-       */
-      print_buffer(bstr, "%.*s:%.*s", (int) name.len, name.p, (int) whole.len,
-                   whole.p);
+    if (keep) {
+      /* a folded line has no name, and a kept named line has a colon */
+      const char *const from =
+          header_folded(line) ? line.p : memchr(line.p, ':', line.len);
+
+      /* One write, so a line that does not fit leaves nothing behind. */
+      print_buffer(bstr, "%.*s%.*s", (int) name.len, name.p,
+                   (int) (rest.p - from), from);
+    }
   }
 }
 

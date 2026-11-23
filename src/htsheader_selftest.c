@@ -2320,7 +2320,7 @@ static hts_boolean legacy_header_name_in(const char *line,
   return hts_span_index_ci(name, names) >= 0;
 }
 
-/* legacy_http_headers_have_field() for a NAME without the colon */
+/* Legacy lookup taking a NAME without the colon. */
 static hts_boolean legacy_http_headers_have_name(const char *headers,
                                                  hts_span name) {
   const char *line;
@@ -2360,8 +2360,7 @@ static hts_boolean legacy_header_line_refused(const char *line) {
   return legacy_header_name_in(line, refused);
 }
 
-/* Fields a request carries once, so a later custom line overrides an earlier.
- */
+/* A request carries these once, so a later custom line overrides one before. */
 static hts_boolean legacy_header_line_single(const char *line) {
   static const char *const single[] = {
       HTS_SPAN_WORDS("Host", "Cookie", "Authorization")};
@@ -2369,8 +2368,7 @@ static hts_boolean legacy_header_line_single(const char *line) {
   return legacy_header_name_in(line, single);
 }
 
-/* An update or a resume writes these fields itself, dropping the custom line.
- */
+/* An update or a resume writes these itself, dropping the custom line. */
 static hts_boolean legacy_header_line_engine_conditional(const char *line) {
   static const char *const conditional[] = {
       HTS_SPAN_WORDS("Range", "If-Match", "If-None-Match", "If-Modified-Since",
