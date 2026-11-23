@@ -38,6 +38,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsopt.h"
 #include "htsthread.h"
+#include "htsbuf.h"
 
 /* Forward definitions */
 #ifndef HTS_DEF_FWSTRUCT_httrackp
@@ -183,8 +184,7 @@ void back_tmpdir_drop(const char *tmp);
 /* Name the spool file of a frozen backlog slot. Consumes an
    opt->state.tmpnameid. Returns HTS_FALSE (dest emptied) if the name does not
    fit. Note: utf-8. */
-HTS_CHECK_RESULT hts_boolean back_spoolname(httrackp *opt, char *dest,
-                                            size_t size);
+HTS_CHECK_RESULT hts_boolean back_spoolname(httrackp *opt, hts_buf dest);
 /* Returns this process's id, as back_spoolname() writes it. */
 unsigned long back_self_pid(void);
 /* Write a slot to its spool file. Returns HTS_FALSE, leaving no file, on
@@ -202,7 +202,7 @@ void back_spool_sweep(httrackp *opt);
 /* Can this slot be swapped out to disk? Hidden, shared with the self-test. */
 int slot_can_be_cached_on_disk(const lien_back *back);
 void back_info(struct_back * sback, int i, int j, FILE * fp);
-void back_infostr(struct_back *sback, int i, int j, char *s, size_t size);
+void back_infostr(struct_back *sback, int i, int j, hts_buf s);
 LLint back_transferred(LLint add, struct_back * sback);
 
 /* Enforce -M/-E quotas: smooth-stops when reached; returns 0 once the -M cap

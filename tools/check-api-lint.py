@@ -57,6 +57,7 @@ UNEVALUATED = (
     "_Alignof",
     "__builtin_types_compatible_p",
     "__builtin_constant_p",
+    "HTS_SIZEOF_SRC_",  # htssafe.h reads its operand through sizeof only
 )
 # Library types a cast may name without a typedef in the tree.
 LIBC_TYPES = {"va_list", "FILE", "DIR", "jmp_buf", "fd_set"}

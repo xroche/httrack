@@ -124,7 +124,7 @@ static void basic_selftests(void) {
     }
     for (idx = 0; idx < n; idx++) {
       line[0] = '\0';
-      back_infostr(&sb, idx, 3, line, sizeof(line));
+      back_infostr(&sb, idx, 3, HTS_BUF(line));
       // Match exactly, because a presence check lets a partial clobber through.
       snprintf(expect, sizeof(expect),
                "%s\"http://h%d.example/p/%d.html\" " LLintP " " LLintP " ",
@@ -159,7 +159,7 @@ static void basic_selftests(void) {
         snprintf(slot->url_adr, sizeof(slot->url_adr), "http://h.example");
         snprintf(slot->url_fil, sizeof(slot->url_fil), "/p");
         line[0] = '\0';
-        back_infostr(&sb, 0, by_status[k].j, line, sizeof(line));
+        back_infostr(&sb, 0, by_status[k].j, HTS_BUF(line));
         assertf(strcmp(line, by_status[k].expect) == 0);
       }
     }
@@ -3856,6 +3856,77 @@ static int st_buf(httrackp *opt, int argc, char **argv) {
   return bad;
 }
 
+/* Announce the line of a call that must abort, before it aborts. */
+static void st_abort_line(int line) {
+  printf("aborts at line %d\n", line);
+  fflush(stdout);
+}
+
+/* bufwrite [cpy|cat|catn|unterminated[-cpy|-catn]]: the hts_buf write helpers.
+   An argument overflows that helper, which must abort at the line it prints. */
+static int st_bufwrite(httrackp *opt, int argc, char **argv) {
+  struct {
+    char name[12]; /* not pointer-sized, so MSVC sees an array */
+    char secret[16];
+  } r;
+
+  char a[8], big[16], out[64];
+  const hts_buf b = HTS_BUF_N(big, 6);
+  const char *const mode = argc >= 1 ? argv[0] : "";
+  int bad = 0;
+
+  (void) opt;
+  memset(r.name, 'N', sizeof(r.name));
+  strcpybuff(r.secret, "SECRET");
+  out[0] = '\0';
+  memset(big, 'X', sizeof(big));
+  big[0] = '\0';
+  if (strcmp(mode, "cpy") == 0) {
+    st_abort_line(__LINE__ + 1);
+    hts_buf_cpy(b, "abcdef");
+  }
+  if (strcmp(mode, "cat") == 0) {
+    st_abort_line(__LINE__ + 1);
+    hts_buf_cat(HTS_BUF_N(big, 4), "abcd");
+  }
+  if (strcmp(mode, "catn") == 0) {
+    st_abort_line(__LINE__ + 1);
+    hts_buf_catn(HTS_BUF_N(big, 2), "abcd", 2);
+  }
+  if (strcmp(mode, "unterminated") == 0) {
+    st_abort_line(__LINE__ + 1);
+    hts_buf_cat(HTS_BUF(out), r.name);
+  }
+  if (strcmp(mode, "unterminated-cpy") == 0) {
+    st_abort_line(__LINE__ + 1);
+    hts_buf_cpy(HTS_BUF(out), r.name);
+  }
+  if (strcmp(mode, "unterminated-catn") == 0) {
+    st_abort_line(__LINE__ + 1);
+    hts_buf_catn(HTS_BUF(out), r.name, 4);
+  }
+  memset(big, 'X', sizeof(big));
+  hts_buf_cpy(b, "ab");
+  hts_buf_cat(b, "c");
+  hts_buf_catn(b, "dxyz", 2);
+  bad |= strcmp(big, "abcdx") != 0 || big[6] != 'X';
+  hts_buf_cpy(HTS_BUF(a), "1234567");
+  bad |= strcmp(a, "1234567") != 0;
+  memset(big, 'Y', sizeof(big));
+  bad |= !hts_buf_cpy_clip(b, "12345") || strcmp(big, "12345") != 0;
+  memset(big, 'Z', sizeof(big));
+  bad |= hts_buf_cpy_clip(b, "abcdef") || strcmp(big, "abcde") != 0;
+  memset(big, 'Y', sizeof(big));
+  bad |= !hts_buf_printf(b, "%d-%s", 12, "ab") || strcmp(big, "12-ab") != 0;
+  memset(big, 'Z', sizeof(big));
+  bad |= hts_buf_printf(b, "%d+%s", 34, "cde") || strcmp(big, "34+cd") != 0;
+  memset(big, 'Y', sizeof(big));
+  hts_buf_printf_clip(b, "%s", "uvwxyz");
+  bad |= strcmp(big, "uvwxy") != 0 || big[6] != 'Y';
+  printf(bad ? "bufwrite: FAILED\n" : "bufwrite: OK\n");
+  return bad;
+}
+
 /* Print what a span primitive reads as [bytes], for next|nextsep|nextin|split C
    TEXT, trim L R TEXT or copy SIZE TEXT. */
 static int st_span(httrackp *opt, int argc, char **argv) {
@@ -5313,6 +5384,9 @@ const struct selftest_entry selftests_lib[] = {
      st_spandiff},
     {"buf", "[tail-overrun]",
      "the sizes HTS_BUF, HTS_BUF_N and hts_buf_skip give", st_buf},
+    {"bufwrite", "[cpy|cat|catn|unterminated[-cpy|-catn]]",
+     "the hts_buf write helpers copy, append, clip and print in bounds",
+     st_bufwrite},
     {"span", "<next|nextsep|split|trim|copy> <args> <text>",
      "the fields and copies the span primitive makes", st_span},
     {"spancmp", "", "span compares read a NUL as a byte and fold only A-Z",

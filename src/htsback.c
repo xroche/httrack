@@ -101,7 +101,7 @@ static size_t back_spool_room(httrackp *opt, const struct_back *sback,
 static int back_record_read(back_source *s, lien_back **dst);
 
 /* Slot operations */
-static hts_boolean back_tmpname(char *dest, size_t size, const char *save,
+static hts_boolean back_tmpname(hts_buf dest, const char *save,
                                 const char *ext);
 
 unsigned long back_self_pid(void) {
@@ -133,13 +133,13 @@ static hts_boolean back_pid_is_alive(unsigned long pid) {
 #endif
 }
 
-hts_boolean back_spoolname(httrackp *opt, char *dest, size_t size) {
+hts_boolean back_spoolname(httrackp *opt, hts_buf dest) {
   /* At the mirror root, so a reply never saved leaves no empty directory.
      path_html_utf8 brings its own separator, and is "" with no -O. */
-  if (!slprintfbuff(dest, size, "%s" HTS_TMPDIR "/tmpfile%lu-%u.tmp",
-                    StringBuff(opt->path_html_utf8), back_self_pid(),
-                    opt->state.tmpnameid++)) {
-    dest[0] = '\0';
+  if (!hts_buf_printf(dest, "%s" HTS_TMPDIR "/tmpfile%lu-%u.tmp",
+                      StringBuff(opt->path_html_utf8), back_self_pid(),
+                      opt->state.tmpnameid++)) {
+    dest.p[0] = '\0';
     return HTS_FALSE;
   }
   return HTS_TRUE;
@@ -760,8 +760,7 @@ int back_cleanup_background(httrackp *opt, cache_back *cache,
         {
           /* filecreate() aborts on a longer name */
           char BIGSTK tmpname[HTS_URLMAXSIZE * 2];
-          const hts_boolean named =
-              back_spoolname(opt, tmpname, sizeof(tmpname));
+          const hts_boolean named = back_spoolname(opt, HTS_BUF(tmpname));
           const size_t namelen = named ? strlen(tmpname) + 1 : 0;
           back_spooled *ondisk =
               named ? malloct(BACK_SPOOLED_HEAD + namelen) : NULL;
@@ -912,14 +911,14 @@ static int back_nsoc_overall(const struct_back *sback) {
 /* Build save's temporary in HTS_TMPDIR beside save, outside the site's name
    space, so a site's own <path>.bak is never taken as the backup (#774).
    HTS_FALSE (dest emptied) if too long. Note: utf-8. */
-static hts_boolean back_tmpname(char *dest, size_t size, const char *save,
+static hts_boolean back_tmpname(hts_buf dest, const char *save,
                                 const char *ext) {
   const char *const slash = strrchr(save, '/');
   const int dirlen = slash != NULL ? (int) (slash - save) + 1 : 0;
 
-  if (!slprintfbuff(dest, size, "%.*s" HTS_TMPDIR "/%s.%s", dirlen, save,
-                    slash != NULL ? slash + 1 : save, ext)) {
-    dest[0] = '\0';
+  if (!hts_buf_printf(dest, "%.*s" HTS_TMPDIR "/%s.%s", dirlen, save,
+                      slash != NULL ? slash + 1 : save, ext)) {
+    dest.p[0] = '\0';
     return HTS_FALSE;
   }
   return HTS_TRUE;
@@ -947,8 +946,7 @@ static int create_back_tmpfile(httrackp *opt, lien_back *const back,
   // do not use tempnam() but a regular filename
   back->tmpfile_buffer[0] = '\0';
   if (back->url_sav[0] != '\0') {
-    if (!back_tmpname(back->tmpfile_buffer, sizeof(back->tmpfile_buffer),
-                      back->url_sav, ext)) {
+    if (!back_tmpname(HTS_BUF(back->tmpfile_buffer), back->url_sav, ext)) {
       hts_log_print(opt, LOG_WARNING, "temporary filename too long for %s",
                     back->url_sav);
       return -1;
@@ -1235,8 +1233,7 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                 LLint size;
 
                 /* fits whenever the .z temp it decodes from did */
-                if (!back_tmpname(unpacked, sizeof(unpacked), back[p].url_sav,
-                                  "u")) {
+                if (!back_tmpname(HTS_BUF(unpacked), back[p].url_sav, "u")) {
                   back[p].r.statuscode = STATUSCODE_INVALID;
                   strcpybuff(back[p].r.msg, "Error when decompressing (the "
                                             "temporary filename is too long)");
@@ -5533,7 +5530,7 @@ void back_info(struct_back * sback, int i, int j, FILE * fp) {
     char BIGSTK s[HTS_URLMAXSIZE * 4 + 1024];
 
     s[0] = '\0';
-    back_infostr(sback, i, j, s, sizeof(s));
+    back_infostr(sback, i, j, HTS_BUF(s));
     strcatbuff(s, LF);
     fprintf(fp, "%s", s);
   }
@@ -5541,7 +5538,7 @@ void back_info(struct_back * sback, int i, int j, FILE * fp) {
 
 // backing info
 // j: 1=show sockets 2=show others 3=show all
-void back_infostr(struct_back *sback, int i, int j, char *s, size_t size) {
+void back_infostr(struct_back *sback, int i, int j, hts_buf s) {
   lien_back *const back = sback->lnk;
   const int back_max = sback->count;
 
@@ -5555,7 +5552,7 @@ void back_infostr(struct_back *sback, int i, int j, char *s, size_t size) {
 
       /* the connect tag is not shown with the URL, and INFOSC has no space */
       if (status == STATUS_CONNECTING || status == STATUS_WAIT_DNS) {
-        strlcatbuff(s, "CONNECT ", size);
+        hts_buf_cat(s, "CONNECT ");
       } else if (status == STATUS_WAIT_HEADERS) {
         tag = "INFOS ";
       } else if (status == STATUS_CHUNK_WAIT || status == STATUS_CHUNK_CR) {
@@ -5564,7 +5561,7 @@ void back_infostr(struct_back *sback, int i, int j, char *s, size_t size) {
         tag = "RECEIVE ";
       }
       if (tag != NULL) {
-        strlcatbuff(s, tag, size);
+        hts_buf_cat(s, tag);
         aff = 1;
       }
     }
@@ -5581,7 +5578,7 @@ void back_infostr(struct_back *sback, int i, int j, char *s, size_t size) {
 
       for (k = 0; k < sizeof(names) / sizeof(names[0]); k++) {
         if (names[k].code == back[i].r.statuscode) {
-          strlcatbuff(s, names[k].text, size);
+          hts_buf_cat(s, names[k].text);
           break;
         }
       }
@@ -5589,7 +5586,7 @@ void back_infostr(struct_back *sback, int i, int j, char *s, size_t size) {
         char s2[256];
 
         snprintf(s2, sizeof(s2), "ERROR(%d)", back[i].r.statuscode);
-        strlcatbuff(s, s2, size);
+        hts_buf_cat(s, s2);
       }
       aff = 1;
     }
@@ -5599,16 +5596,16 @@ void back_infostr(struct_back *sback, int i, int j, char *s, size_t size) {
         char BIGSTK s2[HTS_URLMAXSIZE * 2 + 1024];
 
         snprintf(s2, sizeof(s2), "\"%s", back[i].url_adr);
-        strlcatbuff(s, s2, size);
+        hts_buf_cat(s, s2);
 
         if (back[i].url_fil[0] != '/')
-          strlcatbuff(s, "/", size);
+          hts_buf_cat(s, "/");
         snprintf(s2, sizeof(s2), "%s\" ", back[i].url_fil);
-        strlcatbuff(s, s2, size);
+        hts_buf_cat(s, s2);
         snprintf(s2, sizeof(s2), LLintP " " LLintP " ",
                  hts_load_relaxed_llint(&back[i].r.size),
                  hts_load_relaxed_llint(&back[i].r.totalsize));
-        strlcatbuff(s, s2, size);
+        hts_buf_cat(s, s2);
       }
     }
   }

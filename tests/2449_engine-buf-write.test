@@ -1,0 +1,31 @@
+#!/bin/bash
+#
+# The hts_buf write helpers (-#test=bufwrite), and that an overflow or an
+# unterminated source array aborts at the caller's line.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+assert_selftest "bufwrite: OK" bufwrite
+
+ulimit -c 0 # a deliberate abort must not litter the box with cores
+for row in "cpy:overflow while copying into a buffer" \
+    "cat:overflow while appending to a buffer" \
+    "catn:overflow while appending to a buffer" \
+    "unterminated:size < sizeof_source" \
+    "unterminated-cpy:size < sizeof_source" \
+    "unterminated-catn:size < sizeof_source"; do
+    mode=${row%%:*}
+    kind=${row#*:}
+    rc=0
+    out=$(httrack -O /dev/null "-#test=bufwrite" "$mode" 2>&1) || rc=$?
+    test "$rc" -ne 0 || fail "bufwrite $mode did not abort"
+    line=$(sed -n 's/^aborts at line \([0-9][0-9]*\)$/\1/p' <<<"$out")
+    test -n "$line" || fail "bufwrite $mode announced no line: $out"
+    case "$out" in
+    *"$kind failed at "*"htslib_selftest.c:$line"*) ;;
+    *) fail "bufwrite $mode failed another way (exit $rc, line $line): $out" ;;
+    esac
+done

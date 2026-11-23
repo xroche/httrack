@@ -1662,7 +1662,7 @@ static int st_spoolname(httrackp *opt, int argc, char **argv) {
     opt->getmode = getmode;
     opt->state.tmpnameid = 7;
     snprintf(want, sizeof(want), "%s/~hts-tmp/tmpfile%lu-7.tmp", argv[0], pid);
-    if (!back_spoolname(opt, got, sizeof(got))) {
+    if (!back_spoolname(opt, HTS_BUF(got))) {
       fprintf(stderr, "spoolname: naming failed with -p%d\n", getmode);
       err++;
     } else if (strcmp(got, want) != 0) {
@@ -1680,7 +1680,7 @@ static int st_spoolname(httrackp *opt, int argc, char **argv) {
   StringCopy(opt->path_html_utf8, "");
   opt->state.tmpnameid = 0;
   snprintf(want, sizeof(want), "~hts-tmp/tmpfile%lu-0.tmp", pid);
-  if (!back_spoolname(opt, got, sizeof(got))) {
+  if (!back_spoolname(opt, HTS_BUF(got))) {
     fprintf(stderr, "spoolname: naming failed with no output directory\n");
     err++;
   } else if (strcmp(got, want) != 0) {
@@ -1690,7 +1690,7 @@ static int st_spoolname(httrackp *opt, int argc, char **argv) {
 
   /* too long must empty dest, not hand back a truncated name landing
      somewhere real */
-  if (back_spoolname(opt, got, 8) || got[0] != '\0') {
+  if (back_spoolname(opt, HTS_BUF_N(got, 8)) || got[0] != '\0') {
     fprintf(stderr, "spoolname: an overlong name was not rejected\n");
     err++;
   }
