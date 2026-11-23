@@ -38,7 +38,7 @@ Please visit our Website: http://www.httrack.com
 #include "punycode.h"
 #include "htssafe.h"
 #include "htsckd.h"
-#include "htsbuf.h"
+#include "htsurlport.h"
 
 #include <stdint.h>
 #include <stdarg.h>

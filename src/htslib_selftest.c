@@ -3954,7 +3954,7 @@ static int st_bufwrite(httrackp *opt, int argc, char **argv) {
   memset(big, 'Z', sizeof(big));
   bad |=
       hts_buf_put_span(hts_buf_at(big, 0), hts_span_at("", 0)) || big[0] != 'Z';
-  /* span_dup copies the span's bytes only, a NUL inside included */
+  /* hts_span_dup copies exactly the span, including an inner NUL. */
   {
     char *d = hts_span_dup(hts_span_at("ab\0cdef", 4));
     char *e = hts_span_dup(hts_span_at("x", 0));

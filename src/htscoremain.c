@@ -2009,6 +2009,10 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                     char *moduleName;
 
                     moduleName = hts_span_dup(hts_span_between(argv[na], pos));
+                    if (moduleName == NULL) {
+                      HTS_PANIC_PRINTF("option %%W : out of memory");
+                      return -1;
+                    }
                     if (*pos != '\0')
                       *pos = ','; /* force the separator to ',' */
                     ret = plug_wrapper(opt, moduleName, argv[na]);

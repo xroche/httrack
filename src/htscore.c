@@ -1296,12 +1296,13 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
     if (opt->accept_cookie && strnotempty(StringBuff(opt->cookies_file))) {
       char BIGSTK start_url[HTS_URLMAXSIZE * 2];
       const size_t first = strcspn(primary, "\n");
-
-      cookies_file_refused = cookie_load_from(
-          opt, opt->cookie, "", StringBuff(opt->cookies_file),
+      const char *const seed =
           hts_buf_put_span(HTS_BUF(start_url), hts_span_at(primary, first))
               ? start_url
-              : "");
+              : "";
+
+      cookies_file_refused = cookie_load_from(
+          opt, opt->cookie, "", StringBuff(opt->cookies_file), seed);
     }
 
     // bundle url lines join the start URLs, and bundle cookies go to the jar
@@ -1333,10 +1334,11 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
       const char *const eol = strchr(primary, '\n');
       const size_t len = eol != NULL ? (size_t) (eol - primary) : 0;
 
-      hts_sitemap_seed(
-          opt, hts_buf_put_span(HTS_BUF(first), hts_span_at(primary, len))
-                   ? first
-                   : "");
+      const char *const seed =
+          hts_buf_put_span(HTS_BUF(first), hts_span_at(primary, len)) ? first
+                                                                      : "";
+
+      hts_sitemap_seed(opt, seed);
     }
 
     // Initialiser cache

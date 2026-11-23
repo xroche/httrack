@@ -531,7 +531,10 @@ hts_boolean get_userhttptype(httrackp *opt, char *s, size_t ssize,
                 i++;
                 len = strcspn(&mimedefs[i], "\n");
                 /* clip, as a value that long matches no consumer (#1276) */
-                if (!hts_span_copy(hts_span_at(&mimedefs[i], len), s, ssize))
+                const hts_boolean fit =
+                    hts_span_copy(hts_span_at(&mimedefs[i], len), s, ssize);
+
+                if (!fit)
                   hts_log_print(opt, LOG_WARNING,
                                 "--assume value for '%s' is %d bytes, clipped "
                                 "to %d",

@@ -34,6 +34,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsurlport.h"
 #include "htsctype.h"
 #include "htsbuf.h"
+#include "htssafe.h"
 
 #include <string.h>
 
@@ -165,6 +166,16 @@ hts_boolean hts_span_copy(hts_span s, char *dst, size_t size) {
   memcpy(dst, s.p, n);
   dst[n] = '\0';
   return n == s.len;
+}
+
+char *hts_span_dup(hts_span s) {
+  char *const copy = malloct(s.len + 1);
+
+  if (copy != NULL) {
+    memcpy(copy, s.p, s.len);
+    copy[s.len] = '\0';
+  }
+  return copy;
 }
 
 hts_span hts_span_at(const char *p, size_t len) {

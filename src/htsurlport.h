@@ -133,6 +133,9 @@ HTS_CHECK_RESULT int hts_span_index_ci(hts_span s, const char *const *words);
    FALSE if it was clipped, or if SIZE is 0, which writes nothing. */
 hts_boolean hts_span_copy(hts_span s, char *dst, size_t size);
 
+/* A malloct'ed copy of S as a C string, or NULL when out of memory. */
+HTS_CHECK_RESULT char *hts_span_dup(hts_span s);
+
 /* Is S one or more decimal digits? */
 HTS_CHECK_RESULT hts_boolean hts_span_is_digits(hts_span s);
 

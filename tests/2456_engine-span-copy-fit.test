@@ -14,6 +14,7 @@ dir=$(nativepath "$tmpdir")
 
 # an unquoted header parameter is returned whole or not at all
 selftest_queue "yes [abcdef]" header-param "charset=abcdef" ";" charset 7
+# a refused copy leaves "", so the buffer is empty
 selftest_queue "no []" header-param "charset=abcdef" ";" charset 6
 selftest_queue "yes []" header-param "charset=" ";" charset 1
 
