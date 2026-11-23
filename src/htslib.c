@@ -2394,8 +2394,10 @@ void socket_set_nosigpipe(T_SOC soc) {
 /* Resolved by hts_init(), before any crawl thread reads them. */
 static hts_boolean hts_mptcp_usable = HTS_FALSE;
 static hts_boolean hts_mptcp_on_by_default = HTS_FALSE;
+#if HTS_INET_MPTCP
 /* macOS is left unverified, so its multipath sockets are never peeked. */
 static hts_boolean hts_mptcp_peek_broken = HTS_TRUE;
+#endif
 
 #if HTS_INET_MPTCP && !HTS_INET_MPTCP_DARWIN
 /* Read one small integer sysctl, or -1 when the file cannot be read. */

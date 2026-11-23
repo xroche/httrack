@@ -44,8 +44,9 @@ log="$out/hts-log.txt"
 for n in 1 2 3 4 5 6; do
     test -f "$out/deadhost_${SRV_PORT}/p$n.html" || fail_dump "p$n.html not mirrored" "$log"
 done
-# one fallback for the first connect, none for the six after it
-fallbacks=$(grep -c "trying next address" "$log" || true)
+# one fallback for the first connect, none for the six after it. A connect that
+# fails at once (FreeBSD has no 127.0.0.2) logs "skipping address" instead.
+fallbacks=$(grep -cE "trying next address|skipping address" "$log" || true)
 test "$fallbacks" = 1 || fail_dump "expected 1 fallback, saw $fallbacks" "$log"
 
 # A fallback from the preferred address must go on to the other one: both
