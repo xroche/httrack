@@ -38,6 +38,18 @@ Please visit our Website: http://www.httrack.com
 
 static hts_boolean is_decimal_digit(char c) { return c >= '0' && c <= '9'; }
 
+hts_boolean hts_span_is_digits(hts_span s) {
+  size_t i;
+
+  if (hts_span_empty(s))
+    return HTS_FALSE;
+  for (i = 0; i < s.len; i++) {
+    if (!is_decimal_digit(s.p[i]))
+      return HTS_FALSE;
+  }
+  return HTS_TRUE;
+}
+
 hts_boolean hts_span_parse_llint(hts_span s, LLint min, LLint max, LLint *out) {
   LLint value = 0;
   size_t i;

@@ -1242,7 +1242,8 @@ static int st_pubheaders(httrackp *opt, int argc, char **argv) {
 
 /* <parse|scan|span> <text> <min> <max>: what hts_parse_llint(),
    hts_scan_llint() or hts_span_parse_llint() reads from text, and how many
-   bytes it moves past. The span is followed by a '7' it must not read. */
+   bytes it moves past. A span also gives hts_span_is_digits(), and is
+   followed by a '7' neither may read. */
 static int st_intparse(httrackp *opt, int argc, char **argv) {
   const char *end = argv[1];
   LLint min, max, value = -1;
@@ -1261,7 +1262,8 @@ static int st_intparse(httrackp *opt, int argc, char **argv) {
     memcpy(text, argv[1], len);
     memcpy(text + len, "7", 2);
     ok = hts_span_parse_llint(hts_span_at(text, len), min, max, &value);
-    printf("%s value=" LLintP "\n", ok ? "ok" : "refused", value);
+    printf("%s value=" LLintP " digits=%d\n", ok ? "ok" : "refused", value,
+           hts_span_is_digits(hts_span_at(text, len)) ? 1 : 0);
     freet(text);
   } else if (strcmp(argv[0], "parse") == 0) {
     const hts_boolean ok = hts_parse_llint(argv[1], &end, min, max, &value);

@@ -130,9 +130,12 @@ HTS_CHECK_RESULT int hts_span_index_ci(hts_span s, const char *const *words);
    FALSE if it was clipped, or if SIZE is 0, which writes nothing. */
 hts_boolean hts_span_copy(hts_span s, char *dst, size_t size);
 
+/* Is S one or more decimal digits? */
+HTS_CHECK_RESULT hts_boolean hts_span_is_digits(hts_span s);
+
 /* Is all of S decimal digits, with a value in [MIN, MAX]? On TRUE the value is
-   in *OUT. Signs, blanks and overflow are refused, and *OUT is then untouched.
- */
+   in *OUT. An empty span, signs, blanks and overflow are refused, and *OUT is
+   then untouched. */
 HTS_CHECK_RESULT hts_boolean hts_span_parse_llint(hts_span s, LLint min,
                                                   LLint max, LLint *out);
 

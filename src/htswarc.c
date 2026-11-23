@@ -658,9 +658,7 @@ static int surt_canon(const char *url, wbuf *out) {
     const hts_boolean is_default =
         hts_span_parse_llint(v.port, 0, 65535, &pv) && pv == def_port;
 
-    /* A port past 65535 is kept, and one with a non-digit is dropped. */
-    if (!is_default &&
-        hts_span_empty(hts_span_trim(v.port, "0123456789", "")) &&
+    if (!is_default && hts_span_is_digits(v.port) &&
         (wbuf_add(out, ":", 1) != 0 ||
          wbuf_add(out, v.port.p, v.port.len) != 0))
       return -1;
