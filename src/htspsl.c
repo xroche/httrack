@@ -70,10 +70,8 @@ static void psl_add(coucal rules, const char *rule, size_t len) {
 static void psl_install(coucal rules, const char *version, size_t vlen) {
   coucal_delete(&psl_rules);
   psl_rules = rules;
-  if (vlen >= sizeof(psl_version))
-    vlen = sizeof(psl_version) - 1;
-  memcpy(psl_version, version, vlen);
-  psl_version[vlen] = '\0';
+  (void) hts_span_copy(hts_span_at(version, vlen), psl_version,
+                       sizeof(psl_version));
 }
 
 /* Add the rule on one line of a list file, or note its VERSION stamp. */

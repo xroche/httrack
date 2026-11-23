@@ -89,11 +89,9 @@ void hts_secret_add(httrackp *opt, const char *s, size_t len,
     set->toolong = HTS_TRUE;
   } else if (i == set->count) {
     if (set->count < HTS_SECRET_MAX) {
-      char *const copy = malloct(len + 1);
+      char *const copy = hts_span_dup(hts_span_at(s, len));
 
       if (copy != NULL) {
-        memcpy(copy, s, len);
-        copy[len] = '\0';
         set->item[set->count] = copy;
         set->len[set->count] = len;
         set->kind[set->count] = kind;
@@ -120,6 +118,7 @@ void hts_secret_add(httrackp *opt, const char *s, size_t len,
 
 void hts_secret_add_login(httrackp *opt, const char *url) {
   const char *start, *host, *colon;
+  char pass[HTS_SECRET_MAXLEN];
 
   if (url == NULL)
     return;
@@ -135,14 +134,10 @@ void hts_secret_add_login(httrackp *opt, const char *url) {
                  HTS_SECRET_LOGIN);
   // the Basic login is sent unescaped
   if (memchr(colon + 1, '%', (size_t) (host - 1 - (colon + 1))) != NULL &&
-      (size_t) (host - 1 - (colon + 1)) < HTS_SECRET_MAXLEN) {
-    char pass[HTS_SECRET_MAXLEN + 1];
+      hts_buf_put_span(HTS_BUF(pass), hts_span_between(colon + 1, host - 1))) {
     char plain[HTS_SECRET_MAXLEN + 1];
-    const char *p;
+    const char *const p = unescape_http(plain, sizeof(plain), pass);
 
-    pass[0] = '\0';
-    strncatbuff(pass, colon + 1, (size_t) (host - 1 - (colon + 1)));
-    p = unescape_http(plain, sizeof(plain), pass);
     hts_secret_add(opt, p, strlen(p), HTS_SECRET_LOGIN);
   }
 }
@@ -583,11 +578,8 @@ const char *hts_header_shown(httrackp *opt, const char *line, char *dst,
                       (unsigned long) (len - keep)))
       (void) strclipbuff(dst + n, size - n, "<redacted>");
   } else if (keep < len) {
-    const size_t v =
-        len - keep < sizeof(value) ? len - keep : sizeof(value) - 1;
-
-    memcpy(value, line + keep, v);
-    value[v] = '\0';
+    (void) hts_span_copy(hts_span_at(line + keep, len - keep), value,
+                         sizeof(value));
     if (header_name_in(line, url_fields)) {
       char masked[HTS_URLMAXSIZE * 2];
 

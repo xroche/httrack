@@ -1373,10 +1373,8 @@ static int ini_list_shift(const char *value, size_t len, int delta) {
   char *end;
   long id;
 
-  if (len == 0 || len >= sizeof(digits))
+  if (len == 0 || !hts_buf_put_span(HTS_BUF(digits), hts_span_at(value, len)))
     return -1;
-  memcpy(digits, value, len);
-  digits[len] = '\0';
   id = strtol(digits, &end, 10);
   if (*end != '\0' || id < 0 || id > INT_MAX - 1)
     return -1;

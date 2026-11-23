@@ -377,10 +377,8 @@ static const char *psl_site_key(const fetch_origin *o, size_t n, size_t *len) {
 
   if (!hts_psl_loaded())
     return NULL;
-  if (n >= sizeof(host))
+  if (!hts_buf_put_span(HTS_BUF(host), hts_span_at(o->host, n)))
     return o->host;
-  memcpy(host, o->host, n);
-  host[n] = '\0';
   hts_lowcase(host);
   reg = hts_psl_registrable_domain(host);
   if (reg == NULL)
@@ -609,11 +607,10 @@ static const char *accept_list_find(const char *list, int kind, char *buf,
     }
     line = *end != '\0' ? end + 1 : end;
   }
-  if (found == NULL || found_len >= size)
-    return NULL;
-  memcpy(buf, found, found_len);
-  buf[found_len] = '\0';
-  return buf;
+  return found != NULL && hts_buf_put_span(hts_buf_at(buf, size),
+                                           hts_span_at(found, found_len))
+             ? buf
+             : NULL;
 }
 
 const char *hts_accept_lookup(const char *list, const char *user_default,

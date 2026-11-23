@@ -162,11 +162,9 @@ static const char *dirname_of(char *dst, size_t dstsize, const char *path) {
   if ((sep = strrchr(slashed, '/')) == NULL)
     return NULL;
   len = (size_t) (sep - slashed) + 1;
-  if (len >= dstsize)
-    return NULL;
-  memcpy(dst, slashed, len);
-  dst[len] = '\0';
-  return dst;
+  return hts_buf_put_span(hts_buf_at(dst, dstsize), hts_span_at(slashed, len))
+             ? dst
+             : NULL;
 }
 
 void hts_resolve_datadir(char *dst, size_t dstsize, const char *selfpath,
@@ -668,15 +666,12 @@ static void hts_secret_learn_options(httrackp *opt, const char *urls) {
 
   while (*u != '\0') {
     const size_t n = strcspn(u, HTS_BLANKS);
+    char word[HTS_URLMAXSIZE * 2];
 
     // a start URL never exceeds the URL buffers, so a longer word is no URL
-    if (n != 0 && *u != '+' && *u != '-' && n < HTS_URLMAXSIZE * 2) {
-      char word[HTS_URLMAXSIZE * 2];
-
-      memcpy(word, u, n);
-      word[n] = '\0';
+    if (n != 0 && *u != '+' && *u != '-' &&
+        hts_buf_put_span(HTS_BUF(word), hts_span_at(u, n)))
       hts_secret_add_login(opt, word);
-    }
     u += n != 0 ? n : 1;
   }
   hts_secret_add_login(opt, StringBuff(opt->proxy.name));
@@ -2013,13 +2008,13 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                     int ret;
                     char *moduleName;
 
-                    if (*pos == ',' || *pos == ':') {
-                      *pos = '\0';
-                      moduleName = strdupt(argv[na]);
-                      *pos = ',';       /* foce seperator to ',' */
-                    } else {
-                      moduleName = strdupt(argv[na]);
+                    moduleName = hts_span_dup(hts_span_between(argv[na], pos));
+                    if (moduleName == NULL) {
+                      HTS_PANIC_PRINTF("option %%W : out of memory");
+                      return -1;
                     }
+                    if (*pos != '\0')
+                      *pos = ','; /* force the separator to ',' */
                     ret = plug_wrapper(opt, moduleName, argv[na]);
                     freet(moduleName);
                     if (ret == 0) {

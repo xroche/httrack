@@ -451,16 +451,13 @@ hts_boolean url_query_value(const char *url, const char *name, char *dst,
                             size_t size) {
   const char *const query = strchr(url, '?');
   hts_query_field f;
-  size_t len;
 
   dst[0] = '\0';
   if (query == NULL || !hts_query_find(query + 1, name, &f)) {
     return HTS_FALSE;
   }
   /* crawled query text: clip it */
-  len = f.vallen < size - 1 ? f.vallen : size - 1;
-  memcpy(dst, f.val, len);
-  dst[len] = '\0';
+  (void) hts_span_copy(hts_span_at(f.val, f.vallen), dst, size);
   return HTS_TRUE;
 }
 
