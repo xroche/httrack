@@ -52,6 +52,7 @@ as_user() {
     # The suite must run under its own budget, not the per-step one.
     test "$STEP_TIMEOUT" -eq "$SUITE_TIMEOUT" || return 3
     test "$stub_die" -eq 0 || kill -9 $BASHPID
+    test "$stub_fail" -eq 0 || echo "FAIL: broken.test"
     # Trickles when $stub_stream is set, so a case can keep the log moving
     # while the probes fail.
     if test "$stub_stream" -eq 0; then
@@ -81,8 +82,8 @@ screendump() { :; }
 
 # Each case sets stub_sleep, stub_rc and stub_misses by name first, so the
 # values are readable here rather than counted out against this signature.
-run() { # run NAME WANT-RC WANT-WEDGE(y|n)
-    local name=$1 want_rc=$2 want_wedge=$3 got_wedge=n
+run() { # run NAME WANT-RC WANT-WEDGE(y|n) [WANT-JOB-STATUS]
+    local name=$1 want_rc=$2 want_wedge=$3 want_job=${4:-$2} got_wedge=n
     stub_probes=0
     # shellcheck disable=SC1090
     source "$block" >"$work/out.txt" 2>&1
@@ -98,7 +99,7 @@ run() { # run NAME WANT-RC WANT-WEDGE(y|n)
     # EXIT trap on the verdict's exit.
     local said vrc=0
     said=$(rc=$rc wedged=$wedged work=$work bash "$verdict" 2>&1) || vrc=$?
-    test "$vrc" = "$want_rc" ||
+    test "$vrc" = "$want_job" ||
         fail_dump "$name: the verdict exited $vrc, so the job would report that" \
             "$work/out.txt"
     case "$want_wedge$(command grep -qF 'went down' <<<"$said" && echo y || echo n)" in
@@ -107,17 +108,22 @@ run() { # run NAME WANT-RC WANT-WEDGE(y|n)
     esac
 }
 
-stub_sleep=0 stub_rc=0 stub_misses=0 stub_every=0 stub_stream=0 stub_die=0
+stub_sleep=0 stub_rc=0 stub_misses=0 stub_every=0 stub_stream=0 stub_die=0 stub_fail=0
 run "a passing suite" 0 n
 
 # A failing test must not be blamed on the VM.
 stub_sleep=0 stub_rc=2 stub_misses=0
 run "a failing test" 2 n
 
-# The wedge. The stub has to outlive the watchdog, or it returns on its own and
-# the case proves nothing.
+# The wedge is Hurd's bug, so the job warns and passes. The stub has to outlive
+# the watchdog, or it returns on its own and the case proves nothing.
 stub_sleep=30 stub_rc=0 stub_misses=99
-run "a wedged VM" 124 y
+run "a wedged VM" 124 y 0
+
+# A test that failed before the wedge is ours, so the job still fails.
+stub_fail=1
+run "a wedge after a failing test" 124 y 124
+stub_fail=0
 
 # A test may legitimately run 1200s silent, so silence on a VM that answers is
 # not a wedge.
