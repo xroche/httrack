@@ -656,7 +656,7 @@ static int st_warc_surt(httrackp *opt, int argc, char **argv) {
   size_t i;
   for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
     char out[512];
-    if (warc_surt(cases[i].url, out, sizeof(out)) != 0 ||
+    if (!warc_surt(cases[i].url, HTS_BUF(out)) ||
         strcmp(out, cases[i].want) != 0) {
       fprintf(stderr, "warc-surt: %s -> %s (want %s)\n", cases[i].url, out,
               cases[i].want);
@@ -754,8 +754,8 @@ static int st_warc_offset(httrackp *opt, int argc, char **argv) {
       char got[WARC_CDX_EXTENT_SIZE];
 
       got[0] = '\0';
-      if (warc_cdx_extent(got, sizeof(got), extents[i].length,
-                          extents[i].offset) < 0 ||
+      if (!warc_cdx_extent(HTS_BUF(got), extents[i].length,
+                           extents[i].offset) ||
           strcmp(got, extents[i].want) != 0) {
         fprintf(stderr, "warc-offset: CDXJ extent is '%s', want '%s'\n", got,
                 extents[i].want);
@@ -772,11 +772,10 @@ static int st_warc_offset(httrackp *opt, int argc, char **argv) {
       } tight;
 
       char full[WARC_CDX_EXTENT_SIZE];
-      int n;
 
       memset(&tight, 'C', sizeof(tight));
-      if (warc_cdx_extent(tight.buf, sizeof(tight.buf), 4294967296ULL,
-                          1099511627776ULL) != -1) {
+      if (warc_cdx_extent(HTS_BUF(tight.buf), 4294967296ULL,
+                          1099511627776ULL)) {
         fprintf(stderr, "warc-offset: a clipped CDXJ extent was not refused\n");
         err = 1;
       }
@@ -784,8 +783,7 @@ static int st_warc_offset(httrackp *opt, int argc, char **argv) {
         fprintf(stderr, "warc-offset: the CDXJ extent overran its buffer\n");
         err = 1;
       }
-      n = warc_cdx_extent(full, sizeof(full), UINT64_MAX, UINT64_MAX);
-      if (n < 0 || (size_t) n != strlen(full)) {
+      if (!warc_cdx_extent(HTS_BUF(full), UINT64_MAX, UINT64_MAX)) {
         fprintf(stderr,
                 "warc-offset: the widest CDXJ extent does not fit %d bytes\n",
                 (int) sizeof(full));

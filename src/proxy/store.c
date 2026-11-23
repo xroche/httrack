@@ -1377,7 +1377,7 @@ static int PT_SaveCache__New_Fun(void *arg, const char *url, PT_Element element)
   /* Fields */
   headers[0] = '\0';
   /* */
-  if (!hts_cache_status_line(headers, sizeof(headers), &headersSize,
+  if (!hts_cache_status_line(HTS_BUF(headers), &headersSize,
                              element->statuscode, element->msg)) {
     headersDropped++;
   }

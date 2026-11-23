@@ -96,8 +96,8 @@ typedef struct line_end {
 
 /* hts_readline(), also giving the number of bytes stored and how the whole
    line ends once trimmed, from every byte read, stored or not. */
-static hts_boolean readline_end(FILE *fp, char *s, size_t max, int flags,
-                                size_t *len, line_end *end) {
+static hts_boolean readline_end(FILE *fp, hts_buf s, int flags, size_t *len,
+                                line_end *end) {
   hts_boolean cut = HTS_FALSE;
   hts_boolean lead = HTS_TRUE; /* only spaces and TABs so far */
   hts_boolean gap = HTS_FALSE; /* whitespace kept if a byte follows */
@@ -127,12 +127,12 @@ static hts_boolean readline_end(FILE *fp, char *s, size_t max, int flags,
         end->run = 0;
       }
     }
-    if (j + 1 < max)
-      s[j++] = (char) c;
+    if (j + 1 < s.size)
+      s.p[j++] = (char) c;
     else if (!is_realspace(c))
       cut = HTS_TRUE;
   }
-  s[j] = '\0';
+  s.p[j] = '\0';
   *len = j;
   return cut;
 }
@@ -141,7 +141,7 @@ hts_boolean hts_readline(FILE *fp, hts_buf s, int flags) {
   size_t len;
   line_end end;
 
-  return readline_end(fp, s.p, s.size, flags, &len, &end);
+  return readline_end(fp, s, flags, &len, &end);
 }
 
 int linput(FILE *fp, char *s, int max) {
@@ -150,8 +150,8 @@ int linput(FILE *fp, char *s, int max) {
 
   if (max < 1)
     return 0;
-  (void) readline_end(fp, s, (size_t) max, HTS_LINE_DROP_TAB | HTS_LINE_DROP_FF,
-                      &len, &end);
+  (void) readline_end(fp, hts_buf_at(s, (size_t) max),
+                      HTS_LINE_DROP_TAB | HTS_LINE_DROP_FF, &len, &end);
   return (int) len;
 }
 
@@ -159,7 +159,7 @@ int linput(FILE *fp, char *s, int max) {
 static hts_boolean readline_trim(FILE *fp, hts_buf b, int flags, size_t *len,
                                  line_end *end) {
   char *const s = b.p;
-  const hts_boolean cut = readline_end(fp, s, b.size, flags, len, end);
+  const hts_boolean cut = readline_end(fp, b, flags, len, end);
   size_t n = *len;
   size_t i = 0;
 

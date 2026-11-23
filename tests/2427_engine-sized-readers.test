@@ -15,4 +15,5 @@ assert_selftest 'cache-sized: OK' cache-sized "$dir" 2>/dev/null
 assert_selftest 'cookie-sized: OK' cookie-sized
 assert_selftest 'append-utf8-sized: OK' append-utf8-sized
 assert_selftest 'catchurl-sized: OK' catchurl-sized
+assert_selftest 'cache-fields: OK' cache-fields
 echo "PASS"

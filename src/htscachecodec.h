@@ -37,6 +37,7 @@ Please visit our Website: http://www.httrack.com
    readers expand strfield2() and CACHE_ENTRYNAME_SIZE from the caller's. */
 #include "htsglobal.h"
 #include "htssafe.h"
+#include "htsbuf.h"
 #include "htsdate.h"
 #include "minizip/zip.h"
 #include "minizip/unzip.h"
@@ -71,25 +72,24 @@ Please visit our Website: http://www.httrack.com
     }                                                                          \
   } while (0)
 
-/* Copy the line at p, without its CRs, into line[size] and return where the
-   next one starts. Stops at end or a NUL. A line too long for line is consumed
+/* Copy the line at p, without its CRs, into line and return where the next
+   one starts. Stops at end or a NUL. A line too long for line is consumed
    whole, so its tail never reads as another line, and *cut is set. */
 static HTS_UNUSED const char *hts_cache_line(const char *p, const char *end,
-                                             char *line, size_t size,
-                                             hts_boolean *cut) {
+                                             hts_buf line, hts_boolean *cut) {
   size_t used = 0;
 
   *cut = HTS_FALSE;
   for (; p < end && *p != '\0' && *p != '\n'; p++) {
     if (*p == '\r') {
       continue;
-    } else if (used < size - 1) {
-      line[used++] = *p;
+    } else if (used < line.size - 1) {
+      line.p[used++] = *p;
     } else {
       *cut = HTS_TRUE;
     }
   }
-  line[used] = '\0';
+  line.p[used] = '\0';
   return p < end && *p == '\n' ? p + 1 : p;
 }
 
@@ -142,14 +142,16 @@ typedef void (*hts_cache_field_other)(void *arg, const char *name,
 
 /* Read the header block buff[0..size) of one ZIP cache entry into fields.
    Returns HTS_FALSE on a NUL, which writers never store. */
+/* The longest stored line is "Location: " plus a full-capacity URL, and a
+   shorter buffer truncates it into a valid-looking wrong target. */
+#define HTS_CACHE_LINE_SIZE (HTS_LOCATION_SIZE + 32)
+
 static HTS_UNUSED hts_boolean hts_cache_read_fields(
     const char *buff, size_t size, const hts_cache_field *fields, size_t count,
     hts_cache_field_other other, void *arg) {
   const char *p = buff;
   const char *const end = buff + size;
-  /* the longest stored line is "Location: " plus a full-capacity URL;
-     a shorter buffer truncates it into a valid-looking wrong target */
-  char BIGSTK line[HTS_LOCATION_SIZE + 32];
+  char BIGSTK line[HTS_CACHE_LINE_SIZE];
 
   if (memchr(buff, '\0', size) != NULL) {
     return HTS_FALSE;
@@ -158,7 +160,7 @@ static HTS_UNUSED hts_boolean hts_cache_read_fields(
     hts_boolean cut;
     char *value;
 
-    p = hts_cache_line(p, end, line, sizeof(line) - 1, &cut);
+    p = hts_cache_line(p, end, HTS_BUF(line), &cut);
     if (line[0] == '\0') {
       break;
     }
@@ -179,15 +181,15 @@ static HTS_UNUSED hts_boolean hts_cache_read_fields(
   return HTS_TRUE;
 }
 
-/* Append an entry's first line to headers[*used], capacity size. A message
-   too long for it points at X-StatusMessage instead. HTS_FALSE when it does
+/* Append an entry's first line to headers at *used. A message too long for
+   it points at X-StatusMessage instead. Returns HTS_FALSE when the line does
    not fit. */
 static HTS_INLINE HTS_UNUSED hts_boolean hts_cache_status_line(
-    char *headers, size_t size, size_t *used, int statuscode, const char *msg) {
+    hts_buf headers, size_t *used, int statuscode, const char *msg) {
   const char *const message = strlen(msg) < 32 ? msg : "(See X-StatusMessage)";
 
-  return slcatprintfbuff(headers, size, used, "HTTP/1.%c %d %s\r\n", '1',
-                         statuscode, message);
+  return slcatprintfbuff(headers.p, headers.size, used, "HTTP/1.%c %d %s\r\n",
+                         '1', statuscode, message);
 }
 
 /* Reset fi, then date it from an RFC 822 Last-Modified value when it parses. */
@@ -226,7 +228,7 @@ hts_cache_header_says_data_in_zip(const char *buff, size_t size) {
     char line[1024];
     hts_boolean cut;
 
-    p = hts_cache_line(p, end, line, sizeof(line), &cut);
+    p = hts_cache_line(p, end, HTS_BUF(line), &cut);
     if (strfield(line, "X-In-Cache:")) {
       return strfield2(line, "X-In-Cache: 1") ? HTS_TRUE : HTS_FALSE;
     }

@@ -738,12 +738,10 @@ static int cdx_lines_add(warc_writer *w, char *line) {
 }
 
 /* Use PRIu64, because an `(unsigned long)` cast truncates on LLP64. */
-int warc_cdx_extent(char *out, size_t outsz, uint64_t length, uint64_t offset) {
-  const int n = snprintf(
-      out, outsz, ", \"length\": \"%" PRIu64 "\", \"offset\": \"%" PRIu64 "\"",
-      length, offset);
-
-  return (n < 0 || (size_t) n >= outsz) ? -1 : n;
+hts_boolean warc_cdx_extent(hts_buf out, uint64_t length, uint64_t offset) {
+  return hts_buf_printf(
+      out, ", \"length\": \"%" PRIu64 "\", \"offset\": \"%" PRIu64 "\"", length,
+      offset);
 }
 
 /* Build and stash one CDXJ line for a record. Best-effort: an OOM drops the
@@ -773,7 +771,7 @@ static void warc_cdx_add(warc_writer *w, const char *target_uri,
   {
     char extent[WARC_CDX_EXTENT_SIZE];
 
-    if (warc_cdx_extent(extent, sizeof(extent), length, offset) < 0 ||
+    if (!warc_cdx_extent(HTS_BUF(extent), length, offset) ||
         wbuf_puts(&line, extent) != 0)
       goto fail;
   }
@@ -1264,12 +1262,12 @@ uint64_t warc_stream_offset(FILE *f, uint64_t current) {
 
 /* Path to open for the segment whose final path is `final`: that path itself,
    or a sibling temp while a previous archive must survive until close. */
-static const char *warc_open_path(warc_writer *w, const char *final, char *buf,
-                                  size_t bufsz) {
+static const char *warc_open_path(warc_writer *w, const char *final,
+                                  hts_buf buf) {
   if (!w->protect_prev)
     return final;
-  snprintf(buf, bufsz, "%s" WARC_TMP_SUFFIX, final);
-  return buf;
+  hts_buf_printf_clip(buf, "%s" WARC_TMP_SUFFIX, final);
+  return buf.p;
 }
 
 /* Emit the warcinfo that heads a segment; sets w->info_id for its records. */
@@ -1290,8 +1288,7 @@ static int warc_rotate(warc_writer *w) {
            w->seg_ext);
   /* Open before advancing: w->seg must only ever name a segment that exists,
      or close-time packaging and swapping would work on a missing file. */
-  f = hts_fopen_private(warc_open_path(w, namebuf, openbuf, sizeof(openbuf)),
-                        "wb");
+  f = hts_fopen_private(warc_open_path(w, namebuf, HTS_BUF(openbuf)), "wb");
   if (f == NULL)
     return -1;
   if (w->f != NULL)
@@ -1516,8 +1513,7 @@ warc_writer *warc_open(httrackp *opt, const char *path) {
   /* Set only once arc_path is recorded, so a half-built writer never swaps. */
   w->protect_prev = fsize_utf8(path) > 0 ? HTS_TRUE : HTS_FALSE;
   /* the archive keeps Cookie and Authorization headers: owner-only */
-  w->f = hts_fopen_private(warc_open_path(w, path, openbuf, sizeof(openbuf)),
-                           "wb");
+  w->f = hts_fopen_private(warc_open_path(w, path, HTS_BUF(openbuf)), "wb");
   if (w->f == NULL) {
     warc_close(w);
     return NULL;
@@ -1534,12 +1530,11 @@ warc_writer *warc_open(httrackp *opt, const char *path) {
 }
 
 /* Final path of segment s (the run's only archive when rotation is off). */
-static const char *warc_seg_path(warc_writer *w, unsigned s, char *buf,
-                                 size_t bufsz) {
+static const char *warc_seg_path(warc_writer *w, unsigned s, hts_buf buf) {
   if (w->max_size == 0)
     return w->arc_path;
-  snprintf(buf, bufsz, "%s-%05u%s", w->seg_base, s, w->seg_ext);
-  return buf;
+  hts_buf_printf_clip(buf, "%s-%05u%s", w->seg_base, s, w->seg_ext);
+  return buf.p;
 }
 
 /* Swap this run's archive into place, unless it only holds revisits naming
@@ -1561,13 +1556,13 @@ static hts_boolean warc_commit(warc_writer *w) {
   swap = w->opened && !w->failed && w->unbacked_revisits == 0;
   for (s = 0; s < nseg && swap; s++) {
     snprintf(tmpbuf, sizeof(tmpbuf), "%s" WARC_TMP_SUFFIX,
-             warc_seg_path(w, s, finalbuf, sizeof(finalbuf)));
+             warc_seg_path(w, s, HTS_BUF(finalbuf)));
     swap = fsize_utf8(tmpbuf) > 0;
   }
 
   if (swap) {
     for (s = 0; s < nseg; s++) {
-      const char *final = warc_seg_path(w, s, finalbuf, sizeof(finalbuf));
+      const char *final = warc_seg_path(w, s, HTS_BUF(finalbuf));
       snprintf(tmpbuf, sizeof(tmpbuf), "%s" WARC_TMP_SUFFIX, final);
       if (!hts_rename_over(w->opt, tmpbuf, final)) {
         hts_log_print(w->opt, LOG_ERROR | LOG_ERRNO,
@@ -1580,7 +1575,7 @@ static hts_boolean warc_commit(warc_writer *w) {
 
   for (s = 0; s < nseg; s++) {
     snprintf(tmpbuf, sizeof(tmpbuf), "%s" WARC_TMP_SUFFIX,
-             warc_seg_path(w, s, finalbuf, sizeof(finalbuf)));
+             warc_seg_path(w, s, HTS_BUF(finalbuf)));
     (void) UNLINK(fconv(catbuff, sizeof(catbuff), tmpbuf));
   }
   if (w->unbacked_revisits > 0)
@@ -1590,7 +1585,7 @@ static hts_boolean warc_commit(warc_writer *w) {
         "this archive doesn't hold their current content; kept the previous %s "
         "(re-run with -C0, or --warc-file with a name of its own)",
         (unsigned long long) w->unbacked_revisits,
-        warc_seg_path(w, 0, finalbuf, sizeof(finalbuf)));
+        warc_seg_path(w, 0, HTS_BUF(finalbuf)));
   return HTS_FALSE;
 }
 
@@ -1627,13 +1622,14 @@ void warc_close(warc_writer *w) {
   freet(w);
 }
 
-int warc_surt(const char *url, char *out, size_t outsz) {
+hts_boolean warc_surt(const char *url, hts_buf out) {
   wbuf b;
-  int rc = -1;
+  hts_boolean rc = HTS_FALSE;
   memset(&b, 0, sizeof(b));
-  if (surt_canon(url, &b) == 0 && wbuf_add(&b, "", 1) == 0 && b.len <= outsz) {
-    strlcpybuff(out, b.data, outsz);
-    rc = 0;
+  if (surt_canon(url, &b) == 0 && wbuf_add(&b, "", 1) == 0 &&
+      b.len <= out.size) {
+    hts_buf_cpy(out, b.data);
+    rc = HTS_TRUE;
   }
   wbuf_free(&b);
   return rc;
