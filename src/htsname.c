@@ -678,17 +678,15 @@ static int savename_collision_next(char *save, size_t size, const httrackp *opt,
                                    hts_boolean *regular) {
   char BIGSTK tempo[HTS_URLMAXSIZE * 2];
   char suffix[16];
-  char *a = hts_lastcharptr(save);
+  const char *const dot = hts_path_ext_dot(save, "/\\");
   size_t stem;
   int n = 2;
   const char collisionSeparator =
       ((opt->savename_83 != HTS_SAVENAME_83_ISO9660) ? '-' : '_');
 
   tempo[0] = '\0';
-  while ((a > save) && (*a != '.') && (*a != '\\') && (*a != '/'))
-    a--;
-  if (*a == '.')
-    strncatbuff(tempo, save, a - save);
+  if (dot != NULL)
+    strncatbuff(tempo, save, dot - save);
   else
     strcatbuff(tempo, save);
 
@@ -730,8 +728,8 @@ static int savename_collision_next(char *save, size_t size, const httrackp *opt,
   // add the suffix, then the extension
   snprintf(suffix, sizeof(suffix), "%c%d", collisionSeparator, n);
   strcatbuff(tempo, suffix);
-  if (*a == '.')
-    strcatbuff(tempo, a);
+  if (dot != NULL)
+    strcatbuff(tempo, dot);
 
   strlcpybuff(save, tempo, size);
   return n;
@@ -1397,14 +1395,13 @@ int url_savename(lien_adrfilsave *const afs,
       const int known_ext = !*old_ext || strfield2(old_ext, ext) ||
                             is_knowntype(opt, fil) || is_dyntype(old_ext) ||
                             ishtml_ext(old_ext) != -1;
+      const char *const dot = hts_path_ext_dot(fil, "/");
       char dot_ext[sizeof(ext) + 1];
 
-      while((a > fil) && (*a != '.') && (*a != '/'))
-        a--;
       /* the placeholder is temporary, so it keeps the name an undelayed run
          would have picked */
-      if (*a == '.' && known_ext && !ext_chg_delayed)
-        *a = '\0'; // cut
+      if (dot != NULL && known_ext && !ext_chg_delayed)
+        fil[dot - fil] = '\0'; // cut
       dot_ext[0] = '.';
       strlcpybuff(dot_ext + 1, ext, sizeof(dot_ext) - 1);
       save_append_tail(fil, sizeof(fil), dot_ext);
@@ -1696,11 +1693,9 @@ int url_savename(lien_adrfilsave *const afs,
         if (opt->savename_type % 100 == 5)
           strcatbuff(afs->save, "html/");
       } else {
-        const char *a = hts_lastcharptr(fil);
+        const char *const a = hts_path_ext_dot(fil, "/");
 
-        while ((a > fil) && (*a != '/') && (*a != '.'))
-          a--;
-        if (*a != '.')
+        if (a == NULL)
           strcatbuff(afs->save, "other");
         else /* an extension off the wire, clipped to leave room for the "/" */
           url_savename_addstr(afs->save, sizeof(afs->save) - 1, a + 1);
@@ -1738,10 +1733,8 @@ int url_savename(lien_adrfilsave *const afs,
         }
         afs->save[i + j] = '\0';
         // append the extension
-        a = hts_lastcharptr(fil);
-        while((a > fil) && (*a != '/') && (*a != '.'))
-          a--;
-        if (*a == '.') {
+        a = hts_path_ext_dot(fil, "/");
+        if (a != NULL) {
           save_append_tail(afs->save, sizeof(afs->save), a);
         }
       }
@@ -1764,11 +1757,7 @@ int url_savename(lien_adrfilsave *const afs,
   // so /a/b and /a/b/index.html cannot clash.
   if (opt->savename_type != -1 &&
       opt->savename_delayed != HTS_SAVENAME_DELAYED_HARD) {
-    char *a = hts_lastcharptr(afs->save);
-
-    while((a > afs->save) && (*a != '.') && (*a != '/'))
-      a--;
-    if (*a != '.') {
+    if (hts_path_ext_dot(afs->save, "/") == NULL) {
       save_append_tail(afs->save, sizeof(afs->save), ".html");
       hts_log_print(opt, LOG_DEBUG, "Default HTML type set for %s%s => %s",
                     adr_nologin(opt, adr_complete), fil_complete, afs->save);
@@ -1832,15 +1821,9 @@ int url_savename(lien_adrfilsave *const afs,
   // L2: 31 characters
   // A-Z,0-9,_
   if (opt->savename_83 > 0) {
-    char *a, *last;
+    const char *const last = hts_path_ext_dot(afs->save, "/\\");
+    char *a;
 
-    for (last = hts_lastcharptr(afs->save);
-         last != afs->save && *last != '/' && *last != '\\' && *last != '.';
-         last--)
-      ;
-    if (*last != '.') {
-      last = NULL;
-    }
     for(a = afs->save; *a != '\0'; a++) {
       if (*a >= 'a' && *a <= 'z') {
         *a -= 'a' - 'A';

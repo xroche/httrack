@@ -3526,6 +3526,7 @@ int ishtml(httrackp * opt, const char *fil) {
   char BIGSTK fil_noquery[HTS_URLMAXSIZE * 2];
   char mime[256];
   char *a;
+  const char *dotted;
 
   strcpybuff(fil_noquery, fil);
   if ((a = strchr(fil_noquery, '?')) != NULL) {
@@ -3544,22 +3545,10 @@ int ishtml(httrackp * opt, const char *fil) {
   }
 
   /* Search for known ext */
-  for (a = hts_lastcharptr(fil_noquery);
-       *a != '.' && *a != '/' && a > fil_noquery; a--)
-    ;
-  if (*a == '.') {              // a une extension
-    char BIGSTK fil_noquery[HTS_URLMAXSIZE * 2];
-    char *b;
-    int ret;
-    char *dotted = a;
+  dotted = hts_path_ext_dot(fil_noquery, "/");
+  if (dotted != NULL) {
+    int ret = ishtml_ext(dotted + 1);
 
-    fil_noquery[0] = '\0';
-    a++;                        // pointer sur extension
-    strncatbuff(fil_noquery, a, HTS_URLMAXSIZE);
-    b = strchr(fil_noquery, '?');
-    if (b)
-      *b = '\0';
-    ret = ishtml_ext(fil_noquery);      // retour
     if (ret == -1) {
       switch (is_knowntype(opt, dotted)) {
       case 1:

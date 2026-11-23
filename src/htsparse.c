@@ -2750,14 +2750,10 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                 // vérifier que l'on ne doit pas ajouter de .class
                 if (!error) {
                   if (add_class) {
-                    char *a = hts_lastcharptr(lien);
+                    const char *const a = hts_path_ext_dot(lien, "/");
 
-                    while((a > lien) && (*a != '/') && (*a != '.'))
-                      a--;
-                    if (*a != '.')
-                      strcatbuff(lien, ".class");       // ajouter .class
-                    else if (!strfield2(a, ".class"))
-                      strcatbuff(lien, ".class");       // idem
+                    if (a == NULL || !strfield2(a, ".class"))
+                      strcatbuff(lien, ".class");
                   }
                 }
                 // si c'est un chemin, alors vérifier (toto/toto.html -> http://www/toto/)

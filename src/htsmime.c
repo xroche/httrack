@@ -442,11 +442,9 @@ HTSEXT_API hts_boolean get_httptype_sized(httrackp *opt, char *s, size_t ssize,
     return 1;
   } else {
     /* Check html -> text/html */
-    const char *a = hts_lastcharptr(fil);
+    const char *a = hts_path_ext_dot(fil, "/");
 
-    while ((a > fil) && (*a != '.') && (*a != '/'))
-      a--;
-    if (a >= fil && *a == '.' && strlen(a) < 32) {
+    if (a != NULL && strlen(a) < 32) {
       const char *mime;
 
       a++;
