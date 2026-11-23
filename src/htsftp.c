@@ -533,10 +533,10 @@ hts_boolean ftp_split_userpass(const char *src, const char *end, char *user,
 /* Build "<verb> <path>" (see htsftp.h). */
 hts_boolean ftp_command(hts_buf line, const char *verb, const char *path) {
   /* A leading '-' would reach a server that shells out to ls as a flag. */
-  const char *const q =
+  const char *const quote =
       path[0] == '-' || strpbrk(path, " \"'") != NULL ? "\"" : "";
 
-  if (hts_buf_printf(line, "%s %s%s%s", verb, q, path, q))
+  if (hts_buf_printf(line, "%s %s%s%s", verb, quote, path, quote))
     return HTS_TRUE;
   line.p[0] = '\0'; // fail safe for a caller that ignores the result
   return HTS_FALSE;

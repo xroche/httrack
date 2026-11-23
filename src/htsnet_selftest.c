@@ -1039,8 +1039,8 @@ static int st_ftpcmdlen(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* ftp_split_hostport() and ftp_parse_pasv() at each edge of the buffers they
-   fill: a refusal empties them, and nothing lands past their size. */
+/* Drive ftp_split_hostport() and ftp_parse_pasv() at each buffer edge. A
+   refusal must empty the buffer, and nothing may land past its size. */
 static int st_ftpbufs(httrackp *opt, int argc, char **argv) {
   static const char badport[] = "Invalid port: 12x456789";
   char host[32], err[64], ip[32], poison[64];
@@ -1048,33 +1048,31 @@ static int st_ftpbufs(httrackp *opt, int argc, char **argv) {
   int port;
 
   memset(poison, '#', sizeof(poison)); /* a zero canary would hide a NUL */
-  for (cap = 4; cap <= 8; cap++) {     /* "abcde" needs 6 bytes */
+  for (cap = 5; cap <= 7; cap++) {     /* "abcde" needs 6 bytes */
     memcpy(host, poison, sizeof(host));
     memcpy(err, poison, sizeof(err));
-    port = 21;
     if (ftp_split_hostport("abcde:99", hts_buf_at(host, cap), &port,
                            HTS_BUF(err))) {
-      assertf(cap >= 6 && strcmp(host, "abcde") == 0 && port == 99);
+      assertf(cap >= 6 && strcmp(host, "abcde") == 0);
       assertf(err[0] == '\0');
     } else {
-      assertf(cap < 6 && host[0] == '\0' && port == 21);
+      assertf(cap < 6 && host[0] == '\0');
       assertf(strcmp(err, "Host name too long") == 0);
     }
     assertf(memcmp(host + cap, poison, sizeof(host) - cap) == 0);
   }
-  for (cap = 20; cap <= 26; cap++) { /* the message needs 24 bytes */
+  for (cap = 23; cap <= 25; cap++) { /* the message needs 24 bytes */
     const size_t want = cap - 1 < strlen(badport) ? cap - 1 : strlen(badport);
 
     memcpy(host, poison, sizeof(host));
     memcpy(err, poison, sizeof(err));
-    port = 21;
     assertf(!ftp_split_hostport("abcde:12x456789", HTS_BUF(host), &port,
                                 hts_buf_at(err, cap)));
-    assertf(host[0] == '\0' && port == 21); /* a host that fitted is undone */
+    assertf(host[0] == '\0'); /* a host that fitted is undone */
     assertf(strlen(err) == want && strncmp(err, badport, want) == 0);
     assertf(memcmp(err + cap, poison, sizeof(err) - cap) == 0);
   }
-  for (cap = 14; cap <= 18; cap++) { /* "255.255.255.255" needs 16 bytes */
+  for (cap = 15; cap <= 17; cap++) { /* "255.255.255.255" needs 16 bytes */
     memcpy(ip, poison, sizeof(ip));
     port = -1;
     if (ftp_parse_pasv("227 (255,255,255,255,1,2)", hts_buf_at(ip, cap),

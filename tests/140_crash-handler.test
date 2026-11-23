@@ -51,7 +51,7 @@ rc=0
 err=$(httrack -#c=bogus 2>&1) || rc=$?
 test "$rc" -eq 255 || exit 1
 grep -q "expects one of:" <<<"$err" || exit 1
-grep -q "segv" <<<"$err" || exit 1
+grep -q "segv, abort, trap" <<<"$err" || exit 1
 if grep -q "Deliberate" <<<"$err"; then
     exit 1
 fi

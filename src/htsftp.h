@@ -113,10 +113,10 @@ hts_boolean ftp_split_userpass(const char *src, const char *end, char *user,
                       sizeof(pass) + sizeof("PASS ") - 1 <= FTP_LINE_SIZE),    \
    ftp_split_userpass((src), (end), (user), sizeof(user), (pass),              \
                       sizeof(pass)))
-/* Build "<verb> <path>" into line. The path is quoted whenever a
-   bare one would give the server a second token; it must already have been
-   screened for control bytes. Returns HTS_FALSE and empties line when the
-   command does not fit, as a clipped one would name a different file. */
+/* Build "<verb> <path>" into line. The path is quoted whenever a bare one
+   would give the server a second token; it must already have been screened
+   for control bytes. Returns HTS_FALSE and empties line when the command does
+   not fit, as a clipped one would name a different file. */
 HTS_CHECK_RESULT hts_boolean ftp_command(hts_buf line, const char *verb,
                                          const char *path);
 /* ftp_command() into a control line of the one capacity every FTP buffer has;
@@ -124,9 +124,9 @@ HTS_CHECK_RESULT hts_boolean ftp_command(hts_buf line, const char *verb,
 #define ftp_command_line(line, verb, path)                                     \
   (HTS_COMPILE_ASSERT(sizeof(line) == FTP_LINE_SIZE),                          \
    ftp_command(HTS_BUF(line), (verb), (path)))
-/* Parse a PASV reply's "(h1,h2,h3,h4,p1,p2)" into ip as a dotted
-   address and *port. Each field must be 1 to 3 digits in 0..255. Returns
-   HTS_FALSE and leaves *port alone for any other reply, or a zero port. */
+/* Parse a PASV reply's "(h1,h2,h3,h4,p1,p2)" into ip as a dotted address and
+   *port. Each field must be 1 to 3 digits in 0..255. Returns HTS_FALSE and
+   leaves *port alone for any other reply, or a zero port. */
 hts_boolean ftp_parse_pasv(const char *line, hts_buf ip, int *port);
 /* Parse an EPSV reply's "(|||port|)" into *port, which must be 1..65535.
    Returns HTS_FALSE and leaves *port alone for any other reply. */
