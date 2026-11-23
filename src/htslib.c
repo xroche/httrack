@@ -3683,7 +3683,7 @@ const char *login_end(const char *adr) {
   while (hts_isspace((unsigned char) *s))
     s++;
   (void) hts_url_view_parse(s, strlen(s), &v);
-  return v.userinfo.p != NULL ? v.host.p : login_start(adr);
+  return hts_span_present(v.userinfo) ? v.host.p : login_start(adr);
 }
 
 hts_boolean hts_escape_typed_login(const char *url, char *dst, size_t size) {
@@ -3745,7 +3745,7 @@ HTSEXT_API const char *jump_identification_const(const char *source) {
     return source;
   (void) hts_url_view_parse(source, strlen(source), &v);
   // a scheme the engine does not know is kept whole
-  if (v.scheme.p != NULL && jump_protocol_const(source) == source)
+  if (hts_span_present(v.scheme) && jump_protocol_const(source) == source)
     return source;
   return v.host.p;
 }
@@ -4474,7 +4474,7 @@ hts_boolean hts_url_view_parse(const char *s, size_t len, hts_url_view *v) {
   } else if (!hts_span_split(auth, ':', &v->host, &v->port)) {
     v->host = auth;
   }
-  if (v->port.p != NULL && !port_is_valid(v->port))
+  if (hts_span_present(v->port) && !port_is_valid(v->port))
     ok = HTS_FALSE;
 
   for (q = auth_end; q < end && *q != '?' && *q != '#'; q++)
@@ -4498,10 +4498,10 @@ const char *jump_toport_const(const char *source) {
 
   (void) hts_url_view_parse(source, strlen(source), &v);
   // jump_identification_const() keeps these whole, so their ':' is the port
-  if (v.scheme.p != NULL &&
+  if (hts_span_present(v.scheme) &&
       (strcmp(source, "file://") == 0 || jump_protocol_const(source) == source))
     return source + v.scheme.len;
-  return v.port.p != NULL ? v.port.p - 1 : NULL;
+  return hts_span_present(v.port) ? v.port.p - 1 : NULL;
 }
 
 DECLARE_NON_CONST_VERSION(jump_toport)

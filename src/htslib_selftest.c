@@ -4120,7 +4120,7 @@ static int st_spancmp(httrackp *opt, int argc, char **argv) {
       {0, 5, 0, 0, 5}, {0, 5, 2, 2, 3}, {0, 5, 3, 3, 2}, {0, 5, 5, 5, 0},
       {0, 5, 6, 5, 0}, {1, 2, 9, 3, 0}, {0, 0, 1, 0, 0}};
   static const char skipped[] = "ab\0cd";
-  size_t i, failures = 0;
+  size_t i, failures = 0, spans_checked = 0;
 
   (void) opt;
   (void) argc;
@@ -4169,20 +4169,23 @@ static int st_spancmp(httrackp *opt, int argc, char **argv) {
   {
     static const char one[] = "x";
     const hts_span spans[] = {hts_span_at(NULL, 0), hts_span_at(one, 0),
-                              hts_span_at(one, 1)};
-    const hts_boolean want[] = {HTS_TRUE, HTS_TRUE, HTS_FALSE};
+                              hts_span_at(one, 1), hts_span_of(NULL)};
+    const hts_boolean empty[] = {HTS_TRUE, HTS_TRUE, HTS_FALSE, HTS_TRUE};
+    const hts_boolean present[] = {HTS_FALSE, HTS_TRUE, HTS_TRUE, HTS_TRUE};
 
-    for (i = 0; i < sizeof(spans) / sizeof(spans[0]); i++) {
-      if (hts_span_empty(spans[i]) != want[i]) {
-        printf("spancmp: empty %d gave %d\n", (int) i,
-               (int) hts_span_empty(spans[i]));
+    for (i = 0; i < sizeof(spans) / sizeof(spans[0]); i++, spans_checked++) {
+      if (hts_span_empty(spans[i]) != empty[i] ||
+          hts_span_present(spans[i]) != present[i]) {
+        printf("spancmp: span %d gave empty %d present %d\n", (int) i,
+               (int) hts_span_empty(spans[i]),
+               (int) hts_span_present(spans[i]));
         failures++;
       }
     }
   }
   printf("spancmp: %d cases, %d failures\n",
          (int) (sizeof(cases) / sizeof(cases[0]) +
-                sizeof(skips) / sizeof(skips[0])),
+                sizeof(skips) / sizeof(skips[0]) + spans_checked),
          (int) failures);
   if (failures == 0)
     printf("spancmp: OK\n");
@@ -4669,7 +4672,7 @@ static void urlview_field(char *out, size_t size, const char *name,
   size_t len = strlen(out);
   size_t i;
 
-  if (sp.p == NULL)
+  if (!hts_span_present(sp))
     return;
   snprintf(out + len, size - len, " %s=", name);
   for (i = 0; i < sp.len; i++) {
@@ -4703,13 +4706,13 @@ static hts_boolean urlview_tiles(const char *s, size_t len,
   size_t i;
 
   /* memchr() over 4 bytes, because strchr() would match a NUL */
-  if (v->host.p == NULL || v->path.p == NULL ||
+  if (!hts_span_present(v->host) || !hts_span_present(v->path) ||
       (!hts_span_empty(v->path) && memchr("/?#\\", v->path.p[0], 4) == NULL))
     return HTS_FALSE;
   for (i = 0; i < sizeof(parts) / sizeof(parts[0]); i++) {
     const hts_span *const sp = parts[i];
 
-    if (sp->p == NULL)
+    if (!hts_span_present(*sp))
       continue;
     if (sp->p < at || sp->len > (size_t) (s + len - sp->p))
       return HTS_FALSE;
