@@ -908,7 +908,7 @@ static hts_boolean cookie_resolve(hts_buf file, const char *name) {
     const hts_boolean fits = strlen(real) < file.size;
 
     if (fits)
-      strlcpybuff(file.p, real, file.size);
+      hts_buf_cpy(file, real);
     freet(real);
     return fits;
   }
