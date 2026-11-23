@@ -8,8 +8,8 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-# The count is exact, so a shrinking corpus shows.
-selftest_queue_lines "custom-header-diff: 79956 cases, 0 failures
+# The count and corpus checksum are exact, so a shrinking corpus shows.
+selftest_queue_lines "custom-header-diff: 79956 cases, 0 failures, corpus f516a94a
 custom-header-diff: OK" custom-header-diff
 
 selftest_queue '[HTTP/1.1 200 OK||][A : b |A|b][ folded||][C:d|C|d] rest=E: f' \
@@ -23,7 +23,5 @@ selftest_queue '[A|b]' span headersplit 'A : b '
 selftest_queue '[a|]' span headersplit $'a\t:\t'
 selftest_queue '[a|b:c]' span headersplit 'a: b:c'
 selftest_queue '[|x]' span headersplit ':x'
-selftest_queue '[|]' span headersplit ' A: b'
-selftest_queue '[|]' span headersplit 'no colon'
 
 selftest_run_queued

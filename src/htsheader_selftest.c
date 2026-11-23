@@ -2602,7 +2602,7 @@ static int st_customheaderdiff(httrackp *opt, int argc, char **argv) {
       "Content-Length", ":",      " ",   "\t",           "\r", "\n",
       "\r\n",           "v",      "(",   "Authorization"};
   parsediff_stats st = {0, 0};
-  uint32_t seed = 2470;
+  uint32_t seed = 2470, corpus = 2166136261u;
   size_t i, j;
   int r;
 
@@ -2613,18 +2613,26 @@ static int st_customheaderdiff(httrackp *opt, int argc, char **argv) {
       customdiff_one(&st, hand[i], lines[j]);
   for (r = 0; r < 3000; r++) {
     String h = STRING_EMPTY, l = STRING_EMPTY;
+    const char *hs, *ls, *c;
 
     parsediff_random(&h, &seed, alphabet,
                      sizeof(alphabet) / sizeof(alphabet[0]), 16);
     parsediff_random(&l, &seed, alphabet,
                      sizeof(alphabet) / sizeof(alphabet[0]), 6);
-    customdiff_one(&st, StringBuff(h) != NULL ? StringBuff(h) : "",
-                   StringBuff(l) != NULL ? StringBuff(l) : "");
+    hs = StringBuff(h) != NULL ? StringBuff(h) : "";
+    ls = StringBuff(l) != NULL ? StringBuff(l) : "";
+
+    /* FNV-1a, so a generator that shrinks or empties shows in the output */
+    for (c = hs; *c != '\0'; c++)
+      corpus = (corpus ^ (unsigned char) *c) * 16777619u;
+    for (c = ls; *c != '\0'; c++)
+      corpus = (corpus ^ (unsigned char) *c) * 16777619u;
+    customdiff_one(&st, hs, ls);
     StringFree(h);
     StringFree(l);
   }
-  printf("custom-header-diff: %lu cases, %lu failures\n", st.cases,
-         st.failures);
+  printf("custom-header-diff: %lu cases, %lu failures, corpus %08x\n", st.cases,
+         st.failures, (unsigned) corpus);
   if (st.failures == 0)
     printf("custom-header-diff: OK\n");
   return st.failures != 0;

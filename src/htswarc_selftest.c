@@ -2445,6 +2445,7 @@ static int st_warcspandiff(httrackp *opt, int argc, char **argv) {
       "HTTP/1.1 200 OK\r\nContent-Type:text/html\r\r\nX: y",
       "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nContent-Length: 5\r\n",
       "HTTP/1.1 200 OK\r\nContent-Length : 5\r\ntransfer-encoding\t: x\r\n",
+      "HTTP/1.1 200 OK\r\ncontent-length: 5\r\nX: y\r\n",
       "HTTP/1.1 200 OK\r\n\r\nContent-Type: late\r\n",
       "\nContent-Type: text/html\n",
       "HTTP/1.1 200 OK\r\nContent-Type:\r\n",
