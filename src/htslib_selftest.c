@@ -4352,10 +4352,12 @@ static int st_headerparse(httrackp *opt, int argc, char **argv) {
         treathead_opt(opt, &jar, "www.example.com", "/dir/page.html", &r, rcvd);
     }
     printf("#%d size=" LLintP " empty=%d chunk=%d keep=%d/%d/%d trailers=%d"
-           " compressed=%d range=" LLintP "-" LLintP "/" LLintP " retry=%d\n",
+           " compressed=%d te=%d range=" LLintP "-" LLintP "/" LLintP
+           " retry=%d\n",
            record++, r.totalsize, r.empty, r.is_chunk, r.keep_alive,
            r.keep_alive_max, r.keep_alive_t, r.keep_alive_trailers,
-           r.compressed, r.crange_start, r.crange_end, r.crange, r.retry_after);
+           r.compressed, r.transfer_coding, r.crange_start, r.crange_end,
+           r.crange, r.retry_after);
     printf(" type=[%s] charset=[%s] encoding=[%s] cdispo=[%s]\n", r.contenttype,
            r.charset, r.contentencoding, r.cdispo);
     printf(" lastmod=[%s] etag=[%s] location=[%s]\n", r.lastmodified, r.etag,

@@ -1656,11 +1656,31 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
         retour->etag[0] = '\0';
     }
   } else if (HEADER_IS(name, "Transfer-Encoding")) {
-    hts_span last;
+    static const char *const compression[] = {
+        HTS_SPAN_WORDS("gzip", "x-gzip", "deflate")};
+    hts_span rest = hts_span_of(value);
+    hts_span item;
 
-    // RFC 9112 6.1: only a final chunked frames the body
-    if (hts_span_list_last(hts_span_of(value), ',', &last))
-      retour->is_chunk = hts_span_eq_ci(last, hts_span_of("chunked"));
+    // RFC 9112 6.1: codings in the order applied, chunked once and final
+    while (hts_span_next_in(&rest, ',', &item)) {
+      item = hts_span_trim(item, HTS_REALSPACES, HTS_REALSPACES);
+      if (hts_span_empty(item))
+        continue;
+      if (retour->is_chunk)
+        retour->transfer_coding = -1;
+      retour->is_chunk = hts_span_eq_ci(item, hts_span_of("chunked"));
+      if (retour->is_chunk || hts_span_eq_ci(item, hts_span_of("identity")))
+        continue;
+      /* one compression layer, as for Content-Encoding: a parameter, a second
+         layer or an unknown coding leaves a body we can not read */
+      retour->transfer_coding =
+          retour->transfer_coding == 0 &&
+                  hts_span_index_ci(item, compression) >= 0
+              ? 1
+              : -1;
+    }
+    if (retour->transfer_coding != 0)
+      retour->compressed = 1;
   } else if (HEADER_IS(name, "Content-type")) {
     if (retour) {
       char tempo[1100];

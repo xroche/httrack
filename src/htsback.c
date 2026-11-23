@@ -1097,6 +1097,30 @@ static void back_report_write_failure(httrackp *opt, lien_back *const back) {
   }
 }
 
+/* Decode back->tmpfile into unpacked: the transfer coding, then the content
+   coding. Returns as hts_codec_unpack_max(), *layer naming the one decoded
+   last. Between the two, tmpfile holds the content-coded body. */
+static int back_unpack_body(httrackp *opt, lien_back *const back,
+                            hts_codec codec, const char *unpacked,
+                            const char **layer, LLint cap) {
+  int size;
+
+  *layer = back->r.contentencoding;
+  if (back->r.transfer_coding == 0)
+    return hts_codec_unpack_max(codec, back->tmpfile, unpacked, cap);
+  *layer = "Transfer-Encoding";
+  size = hts_codec_unpack_max(HTS_CODEC_DEFLATE, back->tmpfile, unpacked, cap);
+  if (size < 0 || codec == HTS_CODEC_IDENTITY)
+    return size;
+  if (!hts_rename_over(opt, unpacked, back->tmpfile)) {
+    if (errno == 0)
+      errno = EIO;
+    return -1;
+  }
+  *layer = back->r.contentencoding;
+  return hts_codec_unpack_max(codec, back->tmpfile, unpacked, cap);
+}
+
 hts_boolean back_set_decoded_size(htsblk *r, LLint size) {
   if (!r->is_write && !hts_inmem_size_fits(size)) {
     r->statuscode = STATUSCODE_INVALID;
@@ -1230,6 +1254,7 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                 /* Never decode over url_sav: a failed decode would destroy the
                    copy an --update re-fetch is supposed to refresh (#557). */
                 char BIGSTK unpacked[HTS_URLMAXSIZE * 2];
+                const char *layer = back[p].r.contentencoding;
                 LLint size;
 
                 /* fits whenever the .z temp it decodes from did */
@@ -1241,8 +1266,8 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                      bytes be committed as the page */
                   if (!back[p].r.is_write)
                     deleteaddr(&back[p].r);
-                } else if ((size = hts_codec_unpack_max(
-                                codec, back[p].tmpfile, unpacked,
+                } else if ((size = back_unpack_body(
+                                opt, &back[p], codec, unpacked, &layer,
                                 hts_codec_decode_cap(
                                     is_hypertext_mime(opt,
                                                       back[p].r.contenttype, "")
@@ -1304,10 +1329,11 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                   if (errno != 0)
                     back_report_write_failure(opt, &back[p]);
                   htsblk_failf(&back[p].r,
-                               codec == HTS_CODEC_UNSUPPORTED
+                               codec == HTS_CODEC_UNSUPPORTED &&
+                                       layer == back[p].r.contentencoding
                                    ? "Unsupported Content-Encoding (%s)"
                                    : "Error when decompressing (%s)",
-                               back[p].r.contentencoding);
+                               layer);
                   /* Drop the undecoded body so the writer can't commit the
                      coded bytes as the page; url_sav is left untouched. */
                   if (!back[p].r.is_write)
@@ -1322,7 +1348,11 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
               /* Keep the compressed spool so the WARC record stores the body
                  verbatim (Content-Encoding preserved) instead of unlinking it.
                */
-              if (StringNotEmpty(opt->warc_file)) {
+              /* with only a transfer coding, tmpfile is not what the record
+                 stores */
+              if (StringNotEmpty(opt->warc_file) &&
+                  hts_codec_parse(back[p].r.contentencoding) !=
+                      HTS_CODEC_IDENTITY) {
                 warc_adopt_rawspool(&back[p].r, back[p].tmpfile);
                 if (back[p].r.warc_rawpath != NULL)
                   back[p].tmpfile =
@@ -4175,15 +4205,19 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                           if (opt->getmode & HTS_GETMODE_NONHTML) {
                             int fcheck = 0;
                             int last_errno = 0;
-
-                            back[i].r.is_write = 1;     // écrire
                             /* a .gz/.br/.zst saved under its own coding stays
                                packed on disk */
+                            const hts_boolean packed = hts_codec_is_archive_ext(
+                                hts_codec_parse(back[i].r.contentencoding),
+                                get_ext(catbuff, sizeof(catbuff),
+                                        back[i].url_sav));
+
+                            back[i].r.is_write = 1; // to disk
+                            /* a transfer coding comes off all the same */
+                            if (packed && back[i].r.transfer_coding != 0)
+                              back[i].r.contentencoding[0] = '\0';
                             if (back[i].r.compressed &&
-                                !hts_codec_is_archive_ext(
-                                    hts_codec_parse(back[i].r.contentencoding),
-                                    get_ext(catbuff, sizeof(catbuff),
-                                            back[i].url_sav))) {
+                                (!packed || back[i].r.transfer_coding != 0)) {
                               if (create_back_tmpfile(opt, &back[i], "z") ==
                                   0) {
                                 assertf(back[i].tmpfile != NULL);
@@ -4630,6 +4664,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                   LLint content_length = -1;
                   hts_boolean length_conflict = HTS_FALSE;
                   hts_boolean has_te = HTS_FALSE;
+                  hts_boolean te_unreadable = HTS_FALSE;
                   /* binput_line stops at a NUL, hiding the fields after it */
                   const hts_boolean has_nul =
                       back[i].r.adr[0] != '<' &&
@@ -4734,13 +4769,16 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                     /* RFC 9112 6.3: a coding list not ending in chunked runs
                        to close, whatever Content-Length says, except on the
                        statuses that never carry a body */
-                    if (has_te && !back[i].r.is_chunk &&
-                        back[i].r.statuscode / 100 != 1 &&
+                    if (has_te && back[i].r.statuscode / 100 != 1 &&
                         back[i].r.statuscode != HTTP_NO_CONTENT &&
                         back[i].r.statuscode != HTTP_NOT_MODIFIED) {
-                      back[i].r.totalsize = -1;
-                      back[i].r.empty = 0;
-                      back[i].r.keep_alive = 0;
+                      if (!back[i].r.is_chunk) {
+                        back[i].r.totalsize = -1;
+                        back[i].r.empty = 0;
+                        back[i].r.keep_alive = 0;
+                      }
+                      te_unreadable = back[i].r.transfer_coding < 0 &&
+                                      !back[i].head_request;
                     }
                     // ----------------------------------------
 
@@ -4762,6 +4800,10 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                   back[i].url_fil);
                     back_slot_close_fail(opt, sback, i, STATUSCODE_INVALID,
                                          "Conflicting Content-Length");
+                  } else if (te_unreadable) {
+                    /* saving the coded bytes would pass them off as the page */
+                    back_slot_close_fail(opt, sback, i, STATUSCODE_INVALID,
+                                         "Unsupported Transfer-Encoding");
                   } else if (!has_nul) {
                     /* a plugin must not see the header of a dropped response */
                     int test_head = RUN_CALLBACK6(opt, receivehead,

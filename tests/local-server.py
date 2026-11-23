@@ -2498,7 +2498,6 @@ class Handler(SimpleHTTPRequestHandler):
         "plain": "chunked",
         "gzip": "gzip, chunked",
         "spaced": "gzip ,  Chunked ",
-        "notlast": "chunked, gzip",
     }
 
     def route_telist(self, path):
@@ -2524,6 +2523,60 @@ class Handler(SimpleHTTPRequestHandler):
         if codings[-1] == "chunked":
             self.wfile.write(b"%X\r\n" % len(body) + body + b"\r\n0\r\n\r\n")
         else:
+            self.wfile.write(body)
+        self.close_connection = True
+
+    # Bodies under a gzip or deflate transfer coding, which httrack must
+    # remove before it saves them (2467): name -> (Transfer-Encoding,
+    # Content-Encoding).
+    TECODE = {
+        "gzip": ("gzip", None),
+        "xgzip": ("x-gzip", None),
+        "gzipchunked": ("gzip, chunked", None),
+        "deflatechunked": ("deflate, chunked", None),
+        "both": ("gzip, chunked", "gzip"),
+        "pkg": ("gzip, chunked", "gzip"),
+        "chunkedgzip": ("chunked, gzip", None),
+        "compress": ("compress, chunked", None),
+    }
+
+    @staticmethod
+    def tecode_plain(name):
+        return b"TECODE-%s-BODY\n" % name.encode() * 40
+
+    def route_tecode(self, path):
+        name = path.rsplit("/", 1)[-1].split(".")[0]
+        if name == "index":
+            coding, content = "gzip, chunked", None
+            body = "".join(
+                '<a href="%s.%s">%s</a>\n' % (k, "gz" if k == "pkg" else "bin", k)
+                for k in self.TECODE
+            ).encode()
+            body = b"<html><body>\n%s</body></html>\n" % body
+            ctype = "text/html"
+        else:
+            coding, content = self.TECODE[name]
+            body = self.tecode_plain(name)
+            ctype = "application/octet-stream"
+        if content == "gzip":
+            body = gzip.compress(body, mtime=0)
+        codings = [c.strip() for c in coding.split(",")]
+        for c in codings:
+            if c in ("gzip", "x-gzip"):
+                body = gzip.compress(body, mtime=0)
+            elif c == "deflate":
+                body = zlib.compress(body)
+            elif c == "chunked":
+                body = b"%X\r\n" % len(body) + body + b"\r\n0\r\n\r\n"
+        self.protocol_version = "HTTP/1.1"
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Transfer-Encoding", coding)
+        if content:
+            self.send_header("Content-Encoding", content)
+        self.send_header("Connection", "close")
+        self.end_headers()
+        if self.command != "HEAD":
             self.wfile.write(body)
         self.close_connection = True
 
@@ -2554,12 +2607,13 @@ class Handler(SimpleHTTPRequestHandler):
         self.protocol_version = "HTTP/1.1"
         self.send_response(200)
         self.send_header("Content-Type", "application/octet-stream")
-        self.send_header("Transfer-Encoding", "chunked, gzip")
-        self.send_header("Content-Length", "5")
+        hello = gzip.compress(b"HELLO", mtime=0)
+        self.send_header("Transfer-Encoding", "gzip")
+        self.send_header("Content-Length", str(len(hello)))
         self.send_header("Connection", "keep-alive")
         self.end_headers()
         if self.command != "HEAD":
-            self.wfile.write(b"HELLO")
+            self.wfile.write(hello)
             self.wfile.flush()
             # late, so a client that trusted the length reads it as the next reply
             time.sleep(0.5)
@@ -4996,6 +5050,9 @@ class Handler(SimpleHTTPRequestHandler):
             return True
         if path.startswith("/telist/"):
             self.route_telist(path)
+            return True
+        if path.startswith("/tecode/"):
+            self.route_tecode(path)
             return True
         if path.startswith("/teclose/"):
             self.route_teclose(path)

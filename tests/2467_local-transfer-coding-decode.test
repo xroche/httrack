@@ -1,0 +1,89 @@
+#!/bin/bash
+#
+# A gzip or deflate transfer coding is removed before the body is saved, in
+# the reverse order it was applied, and a coding we can not undo fails (#2365).
+
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_2467.XXXXXX") || exit 1
+cleanup() {
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+# One response per %% record; te is 1 for a layer to undo, -1 for a refusal.
+printf '%s\r\n' \
+    'Transfer-Encoding: gzip, chunked' %% \
+    'Transfer-Encoding: X-GZIP , Chunked' %% \
+    'Transfer-Encoding: deflate' %% \
+    'Transfer-Encoding: identity, chunked' %% \
+    'Transfer-Encoding: chunked, gzip' %% \
+    'Transfer-Encoding: chunked' 'Transfer-Encoding: gzip' %% \
+    'Transfer-Encoding: chunked, chunked' %% \
+    'Transfer-Encoding: gzip, gzip, chunked' %% \
+    'Transfer-Encoding: gzip;level=9, chunked' %% \
+    'Transfer-Encoding: compress' %% \
+    'Transfer-Encoding: br, chunked' %% >"$tmpdir/corpus"
+want='chunk=1 compressed=1 te=1
+chunk=1 compressed=1 te=1
+chunk=0 compressed=1 te=1
+chunk=1 compressed=0 te=0
+chunk=0 compressed=1 te=-1
+chunk=0 compressed=1 te=-1
+chunk=1 compressed=1 te=-1
+chunk=1 compressed=1 te=-1
+chunk=1 compressed=1 te=-1
+chunk=0 compressed=1 te=-1
+chunk=1 compressed=1 te=-1'
+out=$(httrack -O /dev/null -#test=headerparse "$(nativepath "$tmpdir/corpus")")
+got=$(sed -n 's/^#[0-9]* .*\(chunk=[0-9]*\) .*\(compressed=[0-9]* te=-*[0-9]*\) .*/\1 \2/p' <<<"$out")
+assert_eq "$want" "$got" "transfer codings read by treathead_opt"
+ok "transfer codings read by treathead_opt"
+
+local_server_start
+host=127.0.0.1_$SRV_PORT
+
+cat >"$tmpdir/check.py" <<'PY'
+import gzip
+import os
+import sys
+
+root = sys.argv[1]
+for name in ("gzip", "xgzip", "gzipchunked", "deflatechunked", "both", "pkg"):
+    plain = b"TECODE-%s-BODY\n" % name.encode() * 40
+    if name == "pkg":
+        # a .gz keeps its Content-Encoding, and only the transfer coding goes
+        plain = gzip.compress(plain, mtime=0)
+        name = "pkg.gz"
+    else:
+        name += ".bin"
+    with open(os.path.join(root, name), "rb") as f:
+        got = f.read()
+    assert got == plain, (name, got[:40])
+for name in ("chunkedgzip", "compress"):
+    assert not os.path.exists(os.path.join(root, name + ".bin")), name
+PY
+
+local_crawl "$BASEURL/tecode/index.html" -O "$tmpdir/m" || fail "crawl failed"
+log=$tmpdir/m/hts-log.txt
+# index.html itself came gzip, chunked: its links are what found the rest.
+"$SRV_PYTHON" "$(nativepath "$tmpdir/check.py")" "$(nativepath "$tmpdir/m/$host/tecode")" ||
+    fail_dump "a body was saved with its transfer coding" "$log"
+ok "gzip, x-gzip and deflate transfer codings decoded, alone and with chunked"
+
+test "$(count_matching_lines 'Unsupported Transfer-Encoding' "$log")" = 2 ||
+    fail_dump "chunked, gzip and compress were not both refused" "$log"
+test "$(count_log_errors "$log")" = 2 ||
+    fail_dump "errors beyond the two refused codings" "$log"
+ok "a non-final chunked and an unknown coding fail instead of saving garbage"
+
+# The cache holds the decoded index, so a run from it finds the same links.
+local_crawl "$BASEURL/tecode/index.html" -O "$tmpdir/m" -C1 || fail "update failed"
+"$SRV_PYTHON" "$(nativepath "$tmpdir/check.py")" "$(nativepath "$tmpdir/m/$host/tecode")" ||
+    fail_dump "the cache run damaged the mirror" "$log"
+test "$(count_matching_lines 'no files updated' "$log")" = 1 ||
+    fail_dump "the cache run fetched again" "$log"
+ok "a cache run keeps the decoded bodies"
