@@ -313,7 +313,6 @@ static int append_cookie_header(buff_struct *bstr, t_cookie *cookie,
   const hts_boolean https = strfield(adr, "https://") != 0;
   const int64_t now = (int64_t) time(NULL);
   const char *domain;
-  char buffer[8192];
   char host[COOKIE_MAX_DOMAIN];
   char *b;
   int count = 0;
@@ -347,12 +346,14 @@ static int append_cookie_header(buff_struct *bstr, t_cookie *cookie,
       hts_boolean kept = HTS_FALSE;
 
       if (mark < max_pos) {
+        const hts_span name = cookie_field(b, 5), value = cookie_field(b, 6);
+
         if (count == 0)
           print_buffer(bstr, "Cookie: ");
         else
           print_buffer(bstr, "; ");
-        print_buffer(bstr, "%s", cookie_get(buffer, sizeof(buffer), b, 5));
-        print_buffer(bstr, "=%s", cookie_get(buffer, sizeof(buffer), b, 6));
+        print_buffer(bstr, "%.*s=%.*s", (int) name.len, name.p, (int) value.len,
+                     value.p);
         kept = !bstr->overflow && bstr->pos <= max_pos;
       }
       if (kept) {
