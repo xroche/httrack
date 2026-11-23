@@ -41,6 +41,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htslib.h"
 #include "htsio.h"
+#include "htsbuf.h"
 #include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -532,12 +533,8 @@ static hts_boolean host_hostname(char *dst, size_t size, const char *host) {
   } else if ((end = strchr(start, ':')) == NULL) {
     end = start + strlen(start);
   }
-  if (end == start || (size_t) (end - start) >= size) {
-    return HTS_FALSE;
-  }
-  memcpy(dst, start, (size_t) (end - start));
-  dst[end - start] = '\0';
-  return HTS_TRUE;
+  return end != start &&
+         hts_buf_put_span(hts_buf_at(dst, size), hts_span_between(start, end));
 }
 
 /** Is this an address literal rather than a DNS name? A colon survived
@@ -623,13 +620,11 @@ static hts_boolean body_sid_is_valid(const char *body, const char *expected) {
   while (hts_query_next(&cur, &f)) {
     if (f.val != NULL && f.keylen == 3 && strncmp(f.key, "sid", 3) == 0) {
       hts_boolean match = HTS_FALSE;
+      char raw[SID_VALUE_MAX];
 
-      if (f.vallen < SID_VALUE_MAX) {
-        char raw[SID_VALUE_MAX];
+      if (hts_buf_put_span(HTS_BUF(raw), hts_span_at(f.val, f.vallen))) {
         String value = STRING_EMPTY;
 
-        memcpy(raw, f.val, f.vallen);
-        raw[f.vallen] = '\0';
         hts_unescapehttp(raw, &value);
         /* StringBuff is NULL until written, so an empty value lands here. */
         if (StringBuff(value) != NULL &&
@@ -911,11 +906,9 @@ static hts_boolean find_user_theme_file(char *dst, size_t size,
 
   if (strncmp(file, THEMES_URL, sizeof(THEMES_URL) - 1) != 0 ||
       (rest = strchr(start, '/')) == NULL ||
-      (size_t) (rest - start) > THEME_NAME_MAX) {
+      !hts_buf_put_span(HTS_BUF(name), hts_span_between(start, rest))) {
     return HTS_FALSE;
   }
-  memcpy(name, start, rest - start);
-  name[rest - start] = '\0';
   if (!user_themes_dir(dst, size) || !theme_in(dst, name) ||
       !path_append(dst, size, "/") || !path_append(dst, size, name) ||
       !path_append(dst, size, rest)) {
@@ -1648,15 +1641,6 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
               length = -1;
               bad_length = HTS_TRUE;
             }
-          } else if ((p = strfield(line, "Accept-language:")) != 0) {
-            char tmp[32];
-            char *s = line + p;
-
-            /*int l; */
-            s += strspn(s, " ");
-            tmp[0] = '\0';
-            strncatbuff(tmp, s, 2);
-            /*l = LANG_SEARCH(path, tmp); */
           } else if ((p = strfield(line, "Origin:")) != 0) {
             copy_header_value(origin, sizeof(origin), line + p);
           } else if ((p = strfield(line, "Host:")) != 0) {
@@ -2587,11 +2571,11 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                         char dname[32];
                         int n2 = (int) (pos2 - name);
 
-                        if (n2 > 0 && (size_t) n2 < sizeof(dname) - 2) {
+                        if (n2 > 0 && hts_buf_put_span(
+                                          HTS_BUF_N(dname, sizeof(dname) - 2),
+                                          hts_span_at(name, (size_t) n2))) {
                           intptr_t adr = 0;
 
-                          dname[0] = '\0';
-                          strncatbuff(dname, name, n2);
                           if (coucal_readptr(NewLangList, dname, &adr)) {
                             int n = 0;
 
