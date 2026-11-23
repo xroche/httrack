@@ -411,11 +411,11 @@ void long_to_83(int mode, hts_buf n83, char *save) {
     fnl[j] = '\0';
     // conversion
     longfile_to_83(mode, HTS_BUF(fn83), fnl);
-    strlcatbuff(n83.p, fn83, n83.size);
+    hts_buf_cat(n83, fn83);
 
     save += i;
     if (*save == '/') {
-      strlcatbuff(n83.p, "/", n83.size);
+      hts_buf_cat(n83, "/");
       save++;
     }
   }
