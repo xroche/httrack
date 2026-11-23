@@ -49,7 +49,7 @@ static void ftp_parse_reply(char *line) {
   LLint fsize = -1;
   struct tm tm;
 
-  if (ftp_parse_pasv(line, ip, sizeof(ip), &port) &&
+  if (ftp_parse_pasv(line, HTS_BUF(ip), &port) &&
       (port < 1 || port > 65535 || strlen(ip) < 7))
     ftp_fail("pasv", line);
   port = -1;
@@ -81,7 +81,7 @@ static void ftp_split_url(char *url) {
   path = strchr(adr, '/');
   if (path != NULL)
     *path++ = '\0';
-  if (ftp_split_hostport(adr, host, sizeof(host), &port, err, sizeof(err)) &&
+  if (ftp_split_hostport(adr, HTS_BUF(host), &port, HTS_BUF(err)) &&
       (port < 1 || port > 65535))
     ftp_fail("hostport", adr);
   if (path != NULL && ftp_command_line(line, "RETR", path) &&
