@@ -37,6 +37,7 @@ Please visit our Website: http://www.httrack.com
 /* specific definitions */
 #include "htsglobal.h"
 #include "httrack-library.h"
+#include "htsbuf.h"
 
 /* Forward definitions */
 #ifndef HTS_DEF_FWSTRUCT_httrackp
@@ -62,7 +63,7 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
 const char *hts_memstr(const char *hay, size_t haylen, const char *needle,
                        size_t nlen);
 
-int lienrelatif(char *s, size_t ssize, const char *link, const char *curr);
+int lienrelatif(hts_buf s, const char *link, const char *curr);
 int link_has_authority(const char *lien);
 /* Does a base href with no authority name a host rather than the relative
    reference RFC 3986 5.2 makes it? True only when its first segment holds a
@@ -79,7 +80,7 @@ hts_boolean link_dir_is_multisegment(const char *lien);
 hts_boolean link_dir_has_fragment_or_query(const char *lien);
 int link_has_authorization(const char *lien);
 void long_to_83(int mode, char *n83, size_t n83size, char *save);
-void longfile_to_83(int mode, char *n83, size_t n83size, char *save);
+void longfile_to_83(int mode, hts_buf n83, char *save);
 /* Byte before adr, or a space where adr[-1] would underflow, because the tag
    guards read a space as a word boundary. */
 HTS_INLINE char html_prevc(const char *adr, const char *start);
@@ -109,10 +110,10 @@ typedef enum {
   HTS_FOOTER_FIELD_COUNT
 } hts_footer_field_id;
 
-// Join the field names as "{addr} {path} ..." into buffer (size includes the
-// NUL, and it aborts if they do not fit) and return it. Internal on purpose:
-// hts_footer_field_ok() is the exported surface, and a predicate cannot list.
-const char *hts_footer_field_list(char *buffer, size_t size);
+// Join the field names as "{addr} {path} ..." into buffer (it aborts if they
+// do not fit) and return it. Internal on purpose: hts_footer_field_ok() is the
+// exported surface, and a predicate cannot list.
+const char *hts_footer_field_list(hts_buf buffer);
 
 // Expand a footer template. A "%s" in it selects the legacy positional model,
 // consuming addr, path, date and version in that order; otherwise "{name}" is

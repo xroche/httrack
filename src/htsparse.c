@@ -310,23 +310,23 @@ static const char *html_inline_safe(const char *src, char *dst, size_t size) {
 /* Copies the first max bytes of the page text s, len bytes long, into buf
    for a debug line, with a URL login masked, or "(hidden)" when a login
    cannot be told apart. */
-static const char *text_excerpt(httrackp *opt, char *buf, size_t size,
-                                const char *s, size_t len, size_t max) {
+static const char *text_excerpt(httrackp *opt, hts_buf buf, const char *s,
+                                size_t len, size_t max) {
   char *copy = malloct(len + 1);
   const char *shown;
 
-  buf[0] = '\0';
+  buf.p[0] = '\0';
   if (copy == NULL)
-    return buf;
+    return buf.p;
   memcpy(copy, s, len);
   copy[len] = '\0';
   shown = url_nologin(opt, copy);
   if (shown == copy && jump_protocol_const(copy) == copy &&
       strchr(copy, '@') != NULL)
     shown = "(hidden)";
-  strlncatbuff(buf, shown, size, minimum(strlen(shown), max));
+  hts_buf_catn(buf, shown, max);
   freet(copy);
-  return buf;
+  return buf.p;
 }
 
 /* Return the first '>' in the first max bytes of s, or NULL. The bound stops a
@@ -1402,7 +1402,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                           b = strchr(a, '<');   // prochain tag
                         }
                       }
-                      if (lienrelatif(tempo, sizeof(tempo), heap(ptr)->sav,
+                      if (lienrelatif(HTS_BUF(tempo), heap(ptr)->sav,
                                       concat(OPT_GET_BUFF(opt),
                                              OPT_GET_BUFF_SIZE(opt),
                                              StringBuff(opt->path_html_utf8),
@@ -1868,7 +1868,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                 opt, LOG_DEBUG,
                                 "active code (%s) detected in javascript: %s",
                                 "parse",
-                                text_excerpt(opt, str, sizeof(str), b,
+                                text_excerpt(opt, HTS_BUF(str), b,
                                              (size_t) (a - b + 1), 32));
                           }
                         }
@@ -2124,7 +2124,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
                         hts_log_print(opt, LOG_DEBUG,
                                       "link detected in javascript: %s",
-                                      text_excerpt(opt, str, sizeof(str),
+                                      text_excerpt(opt, HTS_BUF(str),
                                                    html + jslink.offset,
                                                    (size_t) jslink.length, 32));
                       }
@@ -2492,9 +2492,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                 char *shown = malloct(len + 8);
 
                 if (shown != NULL)
-                  hts_log_print(
-                      opt, LOG_DEBUG, "data attribute is no URL: %s",
-                      text_excerpt(opt, shown, len + 8, html, len, len + 7));
+                  hts_log_print(opt, LOG_DEBUG, "data attribute is no URL: %s",
+                                text_excerpt(opt, hts_buf_at(shown, len + 8),
+                                             html, len, len + 7));
                 freet(shown);
                 not_url = HTS_TRUE;
               }
@@ -3240,7 +3240,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
                             strcpybuff(save, StringBuff(opt->path_html_utf8));
                             strcatbuff(save, cat_name);
-                            if (lienrelatif(tempo, sizeof(tempo), save,
+                            if (lienrelatif(HTS_BUF(tempo), save,
                                             relativesavename()) == 0) {
                               /* Never escape high-chars (we don't know the
                                * encoding!!) */
@@ -3407,7 +3407,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       tempo[0] = '\0';
                       // calculer le lien relatif
 
-                      if (lienrelatif(tempo, sizeof(tempo), afs.save,
+                      if (lienrelatif(HTS_BUF(tempo), afs.save,
                                       relativesavename()) == 0) {
                         if (!in_media) {        // In media (such as real audio): don't patch
                           /* Never escape high-chars (we don't know the encoding!!) */

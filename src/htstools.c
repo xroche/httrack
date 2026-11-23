@@ -249,7 +249,7 @@ const char *hts_memstr(const char *hay, size_t haylen, const char *needle,
 
 // créer dans s, à partir du chemin courant curr_fil, le lien vers link (absolu)
 // un ident_url_relatif a déja été fait avant, pour que link ne soit pas un chemin relatif
-int lienrelatif(char *s, size_t ssize, const char *link, const char *curr_fil) {
+int lienrelatif(hts_buf s, const char *link, const char *curr_fil) {
   char BIGSTK _curr[HTS_URLMAXSIZE * 2];
   char BIGSTK newcurr_fil[HTS_URLMAXSIZE * 2], newlink[HTS_URLMAXSIZE * 2];
   char *curr;
@@ -288,7 +288,7 @@ int lienrelatif(char *s, size_t ssize, const char *link, const char *curr_fil) {
     *(a + 1) = '\0';            // couper dernier /
 
   // "effacer" s
-  s[0] = '\0';
+  s.p[0] = '\0';
 
   // sauter ce qui est commun aux 2 chemins
   {
@@ -319,16 +319,16 @@ int lienrelatif(char *s, size_t ssize, const char *link, const char *curr_fil) {
     a++;
   while(*a)
     if (*(a++) == '/')
-      strlcatbuff(s, "../", ssize);
+      hts_buf_cat(s, "../");
 
   if (slash)
-    strlcatbuff(s, "/", ssize); // keep it absolute!
+    hts_buf_cat(s, "/"); // keep it absolute!
 
   // we are in the starting directory, copy
-  strlcatbuff(s, link + ((*link == '/') ? 1 : 0), ssize);
+  hts_buf_cat(s, link + ((*link == '/') ? 1 : 0));
 
   /* Security check */
-  if (strlen(s) >= HTS_URLMAXSIZE)
+  if (strlen(s.p) >= HTS_URLMAXSIZE)
     return -1;
 
   // on a maintenant une chaine de la forme ../../test/truc.html  
@@ -410,7 +410,7 @@ void long_to_83(int mode, char *n83, size_t n83size, char *save) {
     }
     fnl[j] = '\0';
     // conversion
-    longfile_to_83(mode, fn83, sizeof(fn83), fnl);
+    longfile_to_83(mode, HTS_BUF(fn83), fnl);
     strlcatbuff(n83, fn83, n83size);
 
     save += i;
@@ -422,7 +422,7 @@ void long_to_83(int mode, char *n83, size_t n83size, char *save) {
 }
 
 // conversion nom de fichier/dossier isolé vers 8-3 ou ISO9660
-void longfile_to_83(int mode, char *n83, size_t n83size, char *save) {
+void longfile_to_83(int mode, hts_buf n83, char *save) {
   int j = 0, max = 0;
   int i = 0;
   char nom[256];
@@ -510,11 +510,11 @@ void longfile_to_83(int mode, char *n83, size_t n83size, char *save) {
     }
   }
   // corriger vers 8-3
-  n83[0] = '\0';
-  strlncatbuff(n83, nom, n83size, max);
+  n83.p[0] = '\0';
+  hts_buf_catn(n83, nom, max);
   if (strnotempty(ext)) {
-    strlcatbuff(n83, ".", n83size);
-    strlncatbuff(n83, ext, n83size, 3);
+    hts_buf_cat(n83, ".");
+    hts_buf_catn(n83, ext, 3);
   }
 }
 
@@ -866,8 +866,8 @@ enum {
                  HTS_FOOTER_FIELD_COUNT + 1)
 };
 
-const char *hts_footer_field_list(char *buffer, size_t size) {
-  htsbuff fields = htsbuff_ptr(buffer, size);
+const char *hts_footer_field_list(hts_buf buffer) {
+  htsbuff fields = htsbuff_ptr(buffer.p, buffer.size);
   size_t i;
 
   for (i = 0; i < HTS_FOOTER_FIELD_COUNT; i++) {
@@ -1525,18 +1525,17 @@ HTSEXT_API hts_boolean hts_findissystem(find_handle find) {
 }
 
 /* Park cdst under a free sibling name; caside receives it. */
-static hts_boolean rename_park_aside(char *caside, size_t size,
-                                     const char *cdst) {
+static hts_boolean rename_park_aside(hts_buf caside, const char *cdst) {
   int i;
 
   for (i = 0; i < 16; i++) {
-    if (!slprintfbuff(caside, size, "%s.hts-old%d", cdst, i))
+    if (!hts_buf_printf(caside, "%s.hts-old%d", cdst, i))
       return HTS_FALSE;
     /* Skip a name the mirror already holds: POSIX rename() would clobber it
        (#774). A non-regular entry reads as free and the rename refuses it. */
-    if (fexist_utf8(caside))
+    if (fexist_utf8(caside.p))
       continue;
-    if (RENAME(cdst, caside) == 0)
+    if (RENAME(cdst, caside.p) == 0)
       return HTS_TRUE;
   }
   return HTS_FALSE;
@@ -1553,7 +1552,7 @@ static hts_boolean rename_over_aside(httrackp *opt, const char *csrc,
      caller asked to replace, and parking it orphans it (UNLINK cannot drop). */
   if (!fexist_utf8(cdst))
     return HTS_FALSE;
-  if (!rename_park_aside(caside, sizeof(caside), cdst))
+  if (!rename_park_aside(HTS_BUF(caside), cdst))
     return HTS_FALSE;
   if (RENAME(csrc, cdst) == 0) {
     (void) UNLINK(caside);

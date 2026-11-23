@@ -618,7 +618,7 @@ void help(const char *app, int more) {
   snprintf(info, sizeof(info),
            " %%F  footer string in Html code (-%%F \"Mirrored from {url} on "
            "{date}\"; fields %s, or legacy %%s)",
-           hts_footer_field_list(fields, sizeof(fields)));
+           hts_footer_field_list(HTS_BUF(fields)));
   infomsg(info);
   infomsg(" %l  preferred language (-%l \"fr, en, jp, *\"");
   infomsg(" %a  accepted formats (-%a \"text/html,image/png;q=0.9,*/*;q=0.1\""
