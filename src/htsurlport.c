@@ -33,6 +33,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsurlport.h"
 #include "htsctype.h"
+#include "htsbuf.h"
 
 #include <string.h>
 
@@ -302,13 +303,8 @@ hts_boolean hts_header_param(const char *value, const char *seps,
         ;
       for (n = (size_t) (p - v); n != 0 && span_in_set(" \t", v[n - 1]); n--)
         ;
-      if (match) {
-        if (n > size - 1)
-          return HTS_FALSE;
-        memcpy(out, v, n);
-        out[n] = '\0';
-        return HTS_TRUE;
-      }
+      if (match)
+        return hts_buf_put_span(hts_buf_at(out, size), hts_span_at(v, n));
     }
   }
   return HTS_FALSE;

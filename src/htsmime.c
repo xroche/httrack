@@ -531,15 +531,11 @@ hts_boolean get_userhttptype(httrackp *opt, char *s, size_t ssize,
                 i++;
                 len = strcspn(&mimedefs[i], "\n");
                 /* clip, as a value that long matches no consumer (#1276) */
-                if (len >= ssize) {
+                if (!hts_span_copy(hts_span_at(&mimedefs[i], len), s, ssize))
                   hts_log_print(opt, LOG_WARNING,
                                 "--assume value for '%s' is %d bytes, clipped "
                                 "to %d",
                                 fil, (int) len, (int) (ssize - 1));
-                  len = ssize - 1;
-                }
-                memcpy(s, &mimedefs[i], len);
-                s[len] = '\0';
                 return HTS_TRUE; /* SUCCESS! */
               }
             }

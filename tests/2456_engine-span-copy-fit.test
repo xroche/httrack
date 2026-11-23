@@ -1,0 +1,34 @@
+#!/bin/bash
+#
+# Copies moved onto hts_buf_put_span and hts_span_copy keep their limit: a
+# refused copy still refuses at the same length, and a clipped one still clips.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+tmpdir=$(mktemp -d)
+cleanup_push rm -rf "$tmpdir"
+dir=$(nativepath "$tmpdir")
+
+# an unquoted header parameter is returned whole or not at all
+selftest_queue "yes [abcdef]" header-param "charset=abcdef" ";" charset 7
+selftest_queue "no []" header-param "charset=abcdef" ";" charset 6
+selftest_queue "yes []" header-param "charset=" ";" charset 1
+
+# a query value is clipped to the room
+selftest_queue "[abc]" queryparam "http://h/?a=1&k=abcdef" k 4
+selftest_queue "[abcdef]" queryparam "http://h/?a=1&k=abcdef" k 7
+
+# a list file's VERSION stamp is clipped to 63 bytes
+for n in 63 64; do
+    {
+        printf '// VERSION: %s\ncom\n' "$(repeat_chars "$n" 9)"
+        for i in $(seq 1 1100); do printf 'r%d.example\n' "$i"; done
+    } >"$tmpdir/psl$n.dat"
+done
+selftest_queue "$(repeat_chars 63 9)" pslinit "$dir/psl63.dat"
+selftest_queue "$(repeat_chars 63 9)" pslinit "$dir/psl64.dat"
+
+selftest_run_queued

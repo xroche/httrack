@@ -225,10 +225,8 @@ int hts_sitemap_scan(const char *body, size_t size, int maxurls,
       stop--;
     len = (size_t) (stop - val);
     /* Overflow-safe: the untrusted length alone against the room left. */
-    if (len == 0 || len >= sizeof(url))
+    if (len == 0 || !hts_buf_put_span(HTS_BUF(url), hts_span_at(val, len)))
       continue;
-    memcpy(url, val, len);
-    url[len] = '\0';
     /* hts_unescapeEntities decodes in place and tolerates src == dest; a
        reference to a control byte survives as one and sitemap_url_ok drops it.
      */
@@ -423,9 +421,7 @@ void hts_sitemap_robots(httrackp *opt, const char *adr, const char *sitemaps) {
       char BIGSTK line[HTS_URLMAXSIZE];
       lien_adrfil af;
 
-      if (len > 0 && len < sizeof(line)) {
-        memcpy(line, p, len);
-        line[len] = '\0';
+      if (len > 0 && hts_buf_put_span(HTS_BUF(line), hts_span_at(p, len))) {
         /* Same host: a Sitemap: line must not aim the fetcher elsewhere. */
         if (sitemap_url_ok(line) && ident_url_absolute(line, &af) >= 0 &&
             strfield2(af.adr, adr) &&

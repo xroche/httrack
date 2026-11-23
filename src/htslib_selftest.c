@@ -1910,6 +1910,24 @@ static int st_secrets(httrackp *opt, int argc, char **argv) {
   // a user alone is no password
   hts_secret_add_login(o, "http://ZPWUSERONLY@h/");
   err |= secrets_row(o, fp, "ZPWUSERONLY@h", "ZPWUSERONLY@h", NULL);
+  // the unescaped login is learnt while the escaped one is under the cap
+  {
+    char url[sizeof(big) + 16], line[sizeof(big) + 16];
+    size_t n;
+
+    for (n = HTS_SECRET_MAXLEN - 1; n <= HTS_SECRET_MAXLEN; n++) {
+      const hts_boolean fits = n < HTS_SECRET_MAXLEN;
+
+      memset(big, fits ? 'F' : 'G', n);
+      memcpy(big, "%41", 3);
+      big[n] = '\0';
+      snprintf(url, sizeof(url), "http://u:%s@h/", big);
+      hts_secret_add_login(o, url);
+      snprintf(line, sizeof(line), "u:A%s@h", big + 3);
+      err |= secrets_row(o, fp, line, fits ? "u:***@h" : line,
+                         fits ? NULL : "***");
+    }
+  }
   // too long to keep: one warning
   memset(big, 'Z', sizeof(big) - 1);
   big[sizeof(big) - 1] = '\0';
@@ -3936,6 +3954,15 @@ static int st_bufwrite(httrackp *opt, int argc, char **argv) {
   memset(big, 'Z', sizeof(big));
   bad |=
       hts_buf_put_span(hts_buf_at(big, 0), hts_span_at("", 0)) || big[0] != 'Z';
+  /* span_dup copies the span's bytes only, a NUL inside included */
+  {
+    char *d = hts_span_dup(hts_span_at("ab\0cdef", 4));
+    char *e = hts_span_dup(hts_span_at("x", 0));
+
+    bad |= d == NULL || memcmp(d, "ab\0c", 5) != 0 || e == NULL || e[0] != '\0';
+    freet(d);
+    freet(e);
+  }
   printf(bad ? "bufwrite: FAILED\n" : "bufwrite: OK\n");
   return bad;
 }

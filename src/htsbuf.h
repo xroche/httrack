@@ -108,6 +108,17 @@ hts_buf_put_span(hts_buf b, hts_span s) {
   return HTS_TRUE;
 }
 
+/* A malloct'ed copy of S as a C string, or NULL when out of memory. */
+static HTS_INLINE HTS_UNUSED char *hts_span_dup(hts_span s) {
+  char *const copy = malloct(s.len + 1);
+
+  if (copy != NULL) {
+    memcpy(copy, s.p, s.len);
+    copy[s.len] = '\0';
+  }
+  return copy;
+}
+
 /* Print into B, clipped to fit, as slprintfbuff. TRUE if it all fit. */
 static HTS_INLINE HTS_UNUSED HTS_CHECK_RESULT HTS_PRINTF_FUN(2, 3) hts_boolean
     hts_buf_printf(hts_buf b, HTS_FORMAT_STRING const char *fmt, ...) {

@@ -4365,10 +4365,8 @@ hts_boolean hts_ssl_check_cert(SSL *ssl, const char *url_adr) {
     const char *const start = host[0] == '[' ? host + 1 : host;
     const size_t len = strcspn(start, host[0] == '[' ? "]" : ":/?#\\");
 
-    if (len == 0 || len >= sizeof(name))
+    if (len == 0 || !hts_buf_put_span(HTS_BUF(name), hts_span_at(start, len)))
       return HTS_FALSE;
-    name[0] = '\0';
-    strlncatbuff(name, start, sizeof(name), len);
     if (X509_VERIFY_PARAM_set1_ip_asc(param, name) != 1)
       return HTS_FALSE;
   }

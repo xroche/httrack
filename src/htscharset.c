@@ -38,6 +38,7 @@ Please visit our Website: http://www.httrack.com
 #include "punycode.h"
 #include "htssafe.h"
 #include "htsckd.h"
+#include "htsbuf.h"
 
 #include <stdint.h>
 #include <stdarg.h>
@@ -79,14 +80,7 @@ static int hts_equalsAlphanum(const char *a, const char *b) {
 
 /* Copy the memory region [s .. s + size - 1 ] as a \0-terminated string. */
 static char *hts_stringMemCopy(const char *s, size_t size) {
-  char *dest = malloct(size + 1);
-
-  if (dest != NULL) {
-    memcpy(dest, s, size);
-    dest[size] = '\0';
-    return dest;
-  }
-  return NULL;
+  return hts_span_dup(hts_span_at(s, size));
 }
 
 #ifdef _WIN32

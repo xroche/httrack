@@ -336,10 +336,8 @@ static hts_boolean optreal_or_alias(const char *token) {
     return HTS_FALSE;
   eq = strchr(token + 2, '=');
   len = eq != NULL ? (size_t) (eq - (token + 2)) : strlen(token + 2);
-  if (len == 0 || len >= sizeof(name))
+  if (len == 0 || !hts_buf_put_span(HTS_BUF(name), hts_span_at(token + 2, len)))
     return HTS_FALSE;
-  memcpy(name, token + 2, len);
-  name[len] = '\0';
   if (optalias_find(name) >= 0)
     return HTS_TRUE;
   if (strncmp(name, "no", 2) == 0 && optalias_find(name + 2) >= 0)

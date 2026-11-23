@@ -122,10 +122,9 @@ hts_boolean cookie_host(const char *adr, char *dst, size_t dst_size) {
     len = port != NULL ? (size_t) (port - host) : strlen(host);
   }
   // an empty domain is a suffix of every host, so it would match all of them
-  if (len == 0 || len >= dst_size)
+  if (len == 0 ||
+      !hts_buf_put_span(hts_buf_at(dst, dst_size), hts_span_at(host, len)))
     return HTS_FALSE;
-  dst[0] = '\0';
-  strlncatbuff(dst, host, dst_size, len);
   // host names are case-insensitive, so one folded spelling reaches one entry
   hts_lowcase(dst);
   // a request names an international host in ASCII, so the jar keys on ASCII
@@ -615,10 +614,8 @@ static hts_boolean cookie_domain_is_suffix(const char *domain) {
   if (len == 0 || !hts_psl_loaded() || hts_host_is_address(domain, len))
     return HTS_FALSE;
   // no caller passes a longer one, and a clipped copy names another domain
-  if (len >= sizeof(dom))
+  if (!hts_buf_put_span(HTS_BUF(dom), hts_span_at(domain, len)))
     return HTS_FALSE;
-  dom[0] = '\0';
-  strlncatbuff(dom, domain, sizeof(dom), len);
   hts_lowcase(dom);
   return hts_psl_registrable_domain(dom) == NULL;
 }
@@ -1032,16 +1029,13 @@ hts_boolean cookie_url_host(const char *url, char *dst, size_t dst_size) {
   const size_t len = (size_t) (hts_authority_end(rest) - rest);
   char adr[HTS_URLMAXSIZE];
 
-  if (len >= sizeof(adr))
-    return HTS_FALSE;
   // file://C:/x names a Windows drive, not a host
   if (strfield(url, "file:") && len == 2 &&
       hts_isalpha((unsigned char) rest[0]) &&
       (rest[1] == ':' || rest[1] == '|'))
     return HTS_FALSE;
-  adr[0] = '\0';
-  strlncatbuff(adr, rest, sizeof(adr), len);
-  return cookie_host(adr, dst, dst_size);
+  return hts_buf_put_span(HTS_BUF(adr), hts_span_at(rest, len)) &&
+         cookie_host(adr, dst, dst_size);
 }
 
 /* A document.cookie string logs this many ignored cookies, then a count. */
