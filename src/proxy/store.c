@@ -1579,7 +1579,7 @@ static hts_boolean cache_rint(FILE *fp, long int datSize, int *i) {
   char s[256];
 
   *i = 0;
-  if (!cache_rstr(fp, s, sizeof(s), datSize))
+  if (!cache_rstr(fp, HTS_SIZED(s), datSize))
     return HTS_FALSE;
   return sscanf(s, "%d", i) == 1 ? HTS_TRUE : HTS_FALSE;
 }
@@ -1592,7 +1592,7 @@ static hts_boolean cache_rLLint(FILE *fp, long int datSize, unsigned long *i) {
   const char *num = s;
 
   *i = 0;
-  if (!cache_rstr(fp, s, sizeof(s), datSize))
+  if (!cache_rstr(fp, HTS_SIZED(s), datSize))
     return HTS_FALSE;
   if (hts_scan_llint(&num, 0, INT_MAX, &l) != HTS_SCAN_OK)
     return HTS_FALSE;
