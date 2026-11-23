@@ -236,7 +236,8 @@ static hts_boolean st_poison_intact(const char *label, const char *buf,
   return HTS_TRUE;
 }
 
-/* The tail of PATH from the '.' hts_path_ext_dot() found, or "(none)". */
+/* Return the tail of PATH from the '.' that hts_path_ext_dot() finds, or
+   "(none)". */
 static const char *st_ext_dot(const char *path, const char *seps) {
   const char *const dot = hts_path_ext_dot(path, seps);
 
@@ -291,12 +292,13 @@ static int st_getext(httrackp *opt, int argc, char **argv) {
   /* a parameterised URL types as the bare one, in any case */
   if (!is_dyntype(hts_fil_ext("x.php?id=3")) ||
       !is_dyntype(hts_fil_ext("x.PHP")) || is_dyntype(hts_fil_ext("x.php5")) ||
-      is_dyntype(hts_fil_ext("x"))) {
+      is_dyntype(hts_fil_ext("x")) || !is_dyntype(hts_fil_ext("x.cgi"))) {
     fprintf(stderr, "getext: is_dyntype is wrong\n");
     rc = 1;
   }
   if (ishtml_ext(hts_span_of("HTM")) != 1 ||
       ishtml_ext(hts_span_of("htmx")) != 1 ||
+      ishtml_ext(hts_span_of("html")) != 1 ||
       ishtml_ext(hts_span_of("xhtml")) != -1 ||
       ishtml_ext(hts_span_of("")) != -1) {
     fprintf(stderr, "getext: ishtml_ext is wrong\n");

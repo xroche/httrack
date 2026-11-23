@@ -736,7 +736,7 @@ void fil_simplifie(char *f);
 void map_characters(unsigned char *buffer, unsigned int size,
                     unsigned int *map);
 int ishtml(httrackp * opt, const char *urlfil);
-/* 1 if EXT is an HTML extension such as "htm", else -1. */
+/* Return 1 if EXT is an HTML extension such as "htm", else -1. */
 int ishtml_ext(hts_span ext);
 
 /* Write fil's --assume type into s (capacity ssize, NUL included); too long a
