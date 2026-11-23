@@ -131,7 +131,7 @@ hts_boolean cookie_host(const char *adr, char *dst, size_t dst_size) {
   if (!hts_isStringAscii(dst, strlen(dst)) &&
       cookie_host_refusal(dst, strlen(dst)) != NULL)
     return HTS_FALSE;
-  if (!hts_host_to_ascii(hts_buf_at(dst, dst_size), dst, strlen(dst)))
+  if (!hts_host_to_ascii(dst, dst_size, dst, strlen(dst)))
     return HTS_FALSE;
   /* "%25" is RFC 6874's URI spelling of a zone id's '%'. Only a bracketed
      literal carries it, because a bare host's '%' is already literal. */

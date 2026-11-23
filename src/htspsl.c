@@ -59,7 +59,7 @@ static void psl_add(coucal rules, const char *rule, size_t len) {
     rule++;
     len--;
   }
-  if (hts_host_to_ascii(HTS_BUF(key), rule, len) && key[0] != '\0') {
+  if (hts_host_to_ascii(key, sizeof(key), rule, len) && key[0] != '\0') {
     hts_lowcase(key);
     (void) coucal_read(rules, key, &old);
     coucal_write(rules, key, old | kind);

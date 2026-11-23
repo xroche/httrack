@@ -1176,7 +1176,7 @@ static const char *curl_ansi_quote(const char **pp, char *dst, size_t *len) {
       return "an escape in $'...' is out of range";
     {
       char enc[5];
-      const size_t n = hts_writeUTF8((hts_UCS4) cp, HTS_BUF(enc));
+      const size_t n = hts_writeUTF8((hts_UCS4) cp, enc, sizeof(enc));
 
       memcpy(dst + *len, enc, n);
       *len += n;

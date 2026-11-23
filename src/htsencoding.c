@@ -119,12 +119,12 @@ int hts_unescapeEntitiesWithCharsetSpecial(const char *src, char *dest,
           const size_t maxOut = max - ampStartDest;
           /* write at position */
           if (charset != NULL && hts_isCharsetUTF8(charset)) {
-            len = hts_writeUTF8(uc, hts_buf_at(&dest[ampStartDest], maxOut));
+            len = hts_writeUTF8(uc, &dest[ampStartDest], maxOut);
           } else {
             size_t ulen;
             char buffer[32];
             len = 0;
-            if ((ulen = hts_writeUTF8(uc, HTS_BUF(buffer))) != 0) {
+            if ( ( ulen = hts_writeUTF8(uc, buffer, sizeof(buffer)) ) != 0) {
               const hts_boolean urlQuery =
                   (flags & UNESCAPE_ENTITIES_URL_QUERY) != 0;
               char *s;

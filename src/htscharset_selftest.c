@@ -240,6 +240,7 @@ static int host_ascii_case(const char *host, size_t len, size_t size,
                            hts_boolean inplace, const char *want) {
   char buf[64], before[64];
   const char *src = host;
+  const size_t keep = want != NULL ? strlen(want) + 1 : 0;
 
   memset(buf, 'Z', sizeof(buf) - 1);
   buf[sizeof(buf) - 1] = '\0';
@@ -248,9 +249,10 @@ static int host_ascii_case(const char *host, size_t len, size_t size,
     src = buf;
   }
   memcpy(before, buf, sizeof(buf));
-  if (hts_host_to_ascii(hts_buf_at(buf, size), src, len) != (want != NULL) ||
+  // nothing past the NUL may change, and nothing at all on a refusal
+  if (hts_host_to_ascii(buf, size, src, len) != (want != NULL) ||
       (want != NULL && strcmp(buf, want) != 0) ||
-      (want == NULL && memcmp(buf, before, sizeof(buf)) != 0)) {
+      memcmp(buf + keep, before + keep, sizeof(buf) - keep) != 0) {
     printf("host-ascii: '%s' (%u bytes into %u) gave '%s'\n", host,
            (unsigned) len, (unsigned) size, buf);
     return 1;
@@ -381,8 +383,7 @@ static void entity_sweep_one(const entity_ref *refs, const size_t n,
     /* the caller maps U+00A0 to a space */
     snprintf(want, sizeof(want), " ");
   } else {
-    const size_t len =
-        hts_writeUTF8(hit->cp, HTS_BUF_N(want, sizeof(want) - 1));
+    const size_t len = hts_writeUTF8(hit->cp, want, sizeof(want) - 1);
 
     want[len] = '\0';
   }
@@ -511,6 +512,22 @@ static int utf8_strict_pin(const char *what, const char *in, const char *got,
   return 0;
 }
 
+/* Does writing the n-byte cp need n + 1 bytes, leaving a short buffer
+   untouched? */
+static hts_boolean utf8_write_edge(hts_UCS4 cp, size_t n) {
+  char buf[8];
+  size_t i;
+
+  memset(buf, 'X', sizeof(buf));
+  if (hts_writeUTF8(cp, buf, n) != 0)
+    return HTS_FALSE;
+  for (i = 0; i < sizeof(buf); i++) {
+    if (buf[i] != 'X')
+      return HTS_FALSE;
+  }
+  return hts_writeUTF8(cp, buf, n + 1) == n;
+}
+
 static int st_utf8_strict(httrackp *opt, int argc, char **argv) {
   static const unsigned char tails[] = {0x00, 0x41, 0x7f, 0x80, 0x8f, 0x90,
                                         0x9f, 0xa0, 0xbf, 0xc0, 0xff};
@@ -560,11 +577,9 @@ static int st_utf8_strict(httrackp *opt, int argc, char **argv) {
     const hts_boolean ok = cp <= 0x10ffff && (cp < 0xd800 || cp > 0xdfff);
     hts_UCS4 back = 0;
 
-    n = hts_writeUTF8(cp, HTS_BUF(buf));
-    // n bytes leave no room for the caller's NUL
-    if ((n != 0) != ok ||
-        (ok && (hts_readUTF8(buf, n, &back) != n || back != cp ||
-                hts_writeUTF8(cp, hts_buf_at(buf, n)) != 0))) {
+    n = hts_writeUTF8(cp, buf, sizeof(buf));
+    if ((n != 0) != ok || (ok && (hts_readUTF8(buf, n, &back) != n ||
+                                  back != cp || !utf8_write_edge(cp, n)))) {
       printf("utf8-strict: U+%X wrote %u bytes\n", (unsigned) cp, (unsigned) n);
       return 1;
     }
