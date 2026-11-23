@@ -109,7 +109,7 @@ static int st_warc(httrackp *opt, int argc, char **argv) {
 
   /* 200 HTML, plaintext body: bogus Content-Length rewritten, hop-by-hop
      Transfer-Encoding dropped. The whitespace before its ':' exercises
-     header_is tolerating "Name : value". */
+     the name match tolerating "Name : value". */
   warc_write_transaction(
       w, "http://test.local/a.html", "127.0.0.1",
       "GET /a.html HTTP/1.1\r\nHost: test.local\r\n\r\n",
@@ -219,7 +219,7 @@ static int st_warc(httrackp *opt, int argc, char **argv) {
         warc_memstr((char *) rec, "WARC-Type: revisit", hdr_len, 18) != NULL)
       nm_cl_ok = (block_len == 2);
     /* a.html response body round-trips; no Content-Encoding (plaintext) and the
-       whitespaced Transfer-Encoding was dropped (header_is robustness). */
+       whitespaced Transfer-Encoding was dropped. */
     if (warc_memstr((char *) rec, "WARC-Target-URI: http://test.local/a.html",
                     hdr_len, 41) != NULL &&
         warc_memstr((char *) rec, "msgtype=response", hdr_len, 16) != NULL) {

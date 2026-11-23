@@ -498,26 +498,6 @@ static void warc_make_id(warc_writer *w, char out[64]) {
            b[11], b[12], b[13], b[14], b[15]);
 }
 
-/* Case-insensitive "is this the header named name?" test, tolerating optional
-   whitespace before the ':' (non-compliant "Name : value" is still matched). */
-static hts_boolean header_is(hts_span line, const char *name) {
-  const hts_span n = hts_span_of(name);
-  return hts_span_starts_with_ci(line, n) &&
-         hts_span_starts_with(
-             hts_span_trim(hts_span_skip(line, n.len), " \t", ""),
-             hts_span_of(":"));
-}
-
-/* Read the next line of the header block *REST into *LINE, minus one CR.
-   Return FALSE at the end of *REST or at the blank line that ends the block. */
-static hts_boolean header_next(hts_span *rest, hts_span *line) {
-  if (!hts_span_next_in(rest, '\n', line))
-    return HTS_FALSE;
-  if (hts_span_ends_with(*line, hts_span_of("\r")))
-    line->len--;
-  return !hts_span_empty(*line);
-}
-
 /* Build the normalized HTTP header block from raw resp_hdr into out (no
    trailing CRLF terminator). Always drops the hop-by-hop Transfer-Encoding.
    When set_cl>=0 (a body is stored), drops the original Content-Length and
@@ -526,20 +506,23 @@ static hts_boolean header_next(hts_span *rest, hts_span *line) {
    sent. Returns 0. */
 static int normalize_http_headers(const char *resp_hdr, long long set_cl,
                                   wbuf *out) {
-  hts_span rest, line;
+  hts_span rest;
+  hts_header_field f;
   int first = 1;
   if (resp_hdr == NULL)
     return -1;
   rest = hts_span_of(resp_hdr);
-  while (header_next(&rest, &line)) {
+  while (hts_header_next(&rest, &f)) {
     if (first) {
       first = 0; /* status line: keep verbatim */
-    } else if (header_is(line, "Transfer-Encoding")) {
+    } else if (hts_span_eq_ci(f.name, hts_span_of("Transfer-Encoding"))) {
       continue;
-    } else if (set_cl >= 0 && header_is(line, "Content-Length")) {
+    } else if (set_cl >= 0 &&
+               hts_span_eq_ci(f.name, hts_span_of("Content-Length"))) {
       continue;
     }
-    if (wbuf_add(out, line.p, line.len) != 0 || wbuf_add(out, "\r\n", 2) != 0)
+    if (wbuf_add(out, f.line.p, f.line.len) != 0 ||
+        wbuf_add(out, "\r\n", 2) != 0)
       return -1;
   }
   if (set_cl >= 0 && wbuf_printf(out, "Content-Length: %lld\r\n", set_cl) != 0)
@@ -702,7 +685,8 @@ static int cdx_json_str(wbuf *b, const char *s) {
 /* see htswarc.h */
 void warc_http_header_value(const char *hdr, const char *name, char *out,
                             size_t outsz) {
-  hts_span rest, line, n;
+  hts_span rest, n;
+  hts_header_field f;
   if (outsz == 0)
     return;
   out[0] = '\0';
@@ -710,10 +694,11 @@ void warc_http_header_value(const char *hdr, const char *name, char *out,
     return;
   rest = hts_span_of(hdr);
   n = hts_span_of(name);
-  while (header_next(&rest, &line)) {
-    if (hts_span_starts_with_ci(line, n) &&
-        hts_span_starts_with(hts_span_skip(line, n.len), hts_span_of(":"))) {
-      hts_span v = hts_span_trim(hts_span_skip(line, n.len + 1), " \t", "");
+  while (hts_header_next(&rest, &f)) {
+    /* no blank before the colon, as the engine reads "Content-Type:" */
+    if (hts_span_starts_with_ci(f.line, n) &&
+        hts_span_starts_with(hts_span_skip(f.line, n.len), hts_span_of(":"))) {
+      hts_span v = f.value;
       size_t k;
       for (k = 0; k < v.len; k++)
         if (v.p[k] == ';' || v.p[k] == ' ' || v.p[k] == '\t') {

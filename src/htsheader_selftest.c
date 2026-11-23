@@ -2246,6 +2246,392 @@ static int st_headerparamdiff(httrackp *opt, int argc, char **argv) {
   return failures != 0;
 }
 
+/* Compare the custom header walks with frozen copies. */
+
+typedef struct {
+  char *buffer;
+  size_t capacity;
+  size_t pos;
+  hts_boolean overflow;
+} legacy_buf;
+
+static HTS_PRINTF_FUN(2,
+                      3) void legacy_print(legacy_buf *str,
+                                           HTS_FORMAT_STRING const char *format,
+                                           ...) {
+  size_t result, remaining;
+  char *position;
+  va_list args;
+
+  if (str->overflow)
+    return;
+  position = &str->buffer[str->pos];
+  remaining = str->capacity - str->pos;
+  va_start(args, format);
+  result = (size_t) vsnprintf(position, remaining, format, args);
+  va_end(args);
+  if (result >= remaining) {
+    position[0] = '\0';
+    str->overflow = HTS_TRUE;
+    return;
+  }
+  str->pos += strlen(position);
+}
+
+/* Length of the field name that opens the line, without blanks before the
+   colon, or 0 for a folded line or one with no colon. Servers differ on
+   "Host : x", so the engine sends it as Host without the blank. */
+static size_t legacy_header_name_len(const char *line) {
+  size_t len;
+
+  if (*line == ' ' || *line == '\t')
+    return 0;
+  for (len = 0; line[len] != '\0' && line[len] != ':' && line[len] != '\r' &&
+                line[len] != '\n';
+       len++)
+    ;
+  if (line[len] != ':')
+    return 0;
+  while (len > 0 && (line[len - 1] == ' ' || line[len - 1] == '\t'))
+    len--;
+  return len;
+}
+
+/* Does the line open with an RFC 7230 token name and a colon? */
+static hts_boolean legacy_header_line_valid(const char *line) {
+  const size_t len = legacy_header_name_len(line);
+  size_t i;
+
+  for (i = 0; i < len; i++) {
+    const unsigned char c = (unsigned char) line[i];
+
+    if (!(c >= 'a' && c <= 'z') && !(c >= 'A' && c <= 'Z') &&
+        !(c >= '0' && c <= '9') && strchr("!#$%&'*+-.^_`|~", c) == NULL)
+      return HTS_FALSE;
+  }
+  return len != 0;
+}
+
+/* No list may hold "", which would match a line with no name. */
+static hts_boolean legacy_header_name_in(const char *line,
+                                         const char *const *names) {
+  const hts_span name = hts_span_at(line, legacy_header_name_len(line));
+
+  return hts_span_index_ci(name, names) >= 0;
+}
+
+/* legacy_http_headers_have_field() for a NAME without the colon */
+static hts_boolean legacy_http_headers_have_name(const char *headers,
+                                                 hts_span name) {
+  const char *line;
+
+  if (headers == NULL || hts_span_empty(name))
+    return HTS_FALSE;
+  /* anchored, so a folded line or a name inside a value cannot match */
+  for (line = headers; *line != '\0';) {
+    if (hts_span_eq_ci(hts_span_at(line, legacy_header_name_len(line)), name))
+      return HTS_TRUE;
+    while (*line != '\0' && *line != '\n' && *line != '\r')
+      line++;
+    while (*line == '\n' || *line == '\r')
+      line++;
+  }
+  return HTS_FALSE;
+}
+
+static hts_boolean legacy_http_headers_have_field(const char *headers,
+                                                  const char *field_name) {
+  size_t len;
+
+  if (field_name == NULL)
+    return HTS_FALSE;
+  len = strlen(field_name);
+  if (len != 0 && field_name[len - 1] == ':') /* the tree spells it both ways */
+    len--;
+  return legacy_http_headers_have_name(headers, hts_span_at(field_name, len));
+}
+
+/* These fields frame the message or act per hop. */
+static hts_boolean legacy_header_line_refused(const char *line) {
+  static const char *const refused[] = {
+      HTS_SPAN_WORDS("Content-Length", "Transfer-Encoding", "Connection",
+                     "Keep-Alive", "TE", "Upgrade", "Expect")};
+
+  return legacy_header_name_in(line, refused);
+}
+
+/* Fields a request carries once, so a later custom line overrides an earlier.
+ */
+static hts_boolean legacy_header_line_single(const char *line) {
+  static const char *const single[] = {
+      HTS_SPAN_WORDS("Host", "Cookie", "Authorization")};
+
+  return legacy_header_name_in(line, single);
+}
+
+/* An update or a resume writes these fields itself, dropping the custom line.
+ */
+static hts_boolean legacy_header_line_engine_conditional(const char *line) {
+  static const char *const conditional[] = {
+      HTS_SPAN_WORDS("Range", "If-Match", "If-None-Match", "If-Modified-Since",
+                     "If-Unmodified-Since")};
+
+  return legacy_header_name_in(line, conditional);
+}
+
+/* Return the last unfolded line of headers, or NULL. */
+static const char *legacy_last_unfolded_line(const char *headers) {
+  const char *last = NULL;
+  const char *line;
+
+  for (line = headers; *line != '\0';) {
+    if (*line != ' ' && *line != '\t')
+      last = line;
+    while (*line != '\0' && *line != '\r' && *line != '\n')
+      line++;
+    if (line[0] == '\r' && line[1] == '\n')
+      line += 2;
+    else if (*line != '\0')
+      line++;
+  }
+  return last;
+}
+
+static hts_header_verdict legacy_hts_custom_header_verdict(const char *headers,
+                                                           const char *line) {
+  if (line == NULL)
+    return HTS_HEADER_DROPPED_MALFORMED;
+  if (*line == ' ' || *line == '\t') {
+    const char *const parent =
+        headers != NULL ? legacy_last_unfolded_line(headers) : NULL;
+
+    /* alone, or the parent would find its own field in headers */
+    return parent != NULL ? legacy_hts_custom_header_verdict(NULL, parent)
+                          : HTS_HEADER_DROPPED_ORPHAN_FOLD;
+  }
+  if (!legacy_header_line_valid(line))
+    return HTS_HEADER_DROPPED_MALFORMED;
+  if (legacy_header_line_refused(line))
+    return HTS_HEADER_DROPPED_FRAMING;
+  if (legacy_header_line_single(line) &&
+      legacy_http_headers_have_name(
+          headers, hts_span_at(line, legacy_header_name_len(line))))
+    return HTS_HEADER_SENT_REPLACES_EARLIER;
+  if (legacy_header_line_engine_conditional(line))
+    return HTS_HEADER_SENT_UNLESS_ENGINE_OVERRIDES;
+  return HTS_HEADER_SENT;
+}
+
+static const char *legacy_http_custom_header_warning(const char *headers,
+                                                     const char *line) {
+  /* a fold's parent line already got its warning */
+  if ((*line == ' ' || *line == '\t') && headers != NULL && *headers != '\0')
+    return NULL;
+  switch (legacy_hts_custom_header_verdict(headers, line)) {
+  case HTS_HEADER_DROPPED_ORPHAN_FOLD:
+    return "folded line with no header to continue ignored";
+  case HTS_HEADER_DROPPED_MALFORMED:
+    return "malformed header ignored";
+  case HTS_HEADER_DROPPED_FRAMING:
+    return "framing header ignored";
+  case HTS_HEADER_SENT_REPLACES_EARLIER:
+    return "header replaces an earlier one";
+  case HTS_HEADER_SENT_UNLESS_ENGINE_OVERRIDES: /* valid, so a bundle may carry
+                                                   it */
+  case HTS_HEADER_SENT:
+    break;
+  }
+  return NULL;
+}
+
+/* Dropping a line drops its folded continuations too: kept, that value would
+   attach to whichever header precedes it in the request. */
+static void legacy_append_custom_headers(legacy_buf *bstr,
+                                         const char *headers) {
+  const size_t base = bstr->pos;
+  /* a leading folded line would attach to the engine's last header */
+  hts_boolean keep = HTS_FALSE;
+  const char *line;
+
+  for (line = headers; *line != '\0';) {
+    const char *eol = line;
+    const char *next;
+
+    while (*eol != '\0' && *eol != '\r' && *eol != '\n')
+      eol++;
+    next = eol;
+    if (next[0] == '\r' && next[1] == '\n')
+      next += 2;
+    else if (*next != '\0')
+      next++;
+
+    if (*line != ' ' && *line != '\t') { /* not a folded continuation */
+      const hts_span field = hts_span_at(line, legacy_header_name_len(line));
+
+      keep =
+          legacy_header_line_valid(line) && !legacy_header_line_refused(line);
+      if (keep) {
+        const char cut = bstr->buffer[base];
+
+        /* only what the engine wrote, so the box may repeat its own fields */
+        bstr->buffer[base] = '\0';
+        keep = !legacy_http_headers_have_name(bstr->buffer, field);
+        bstr->buffer[base] = cut;
+        /* the last of a single-valued field wins, as later options do */
+        if (keep && legacy_header_line_single(line) &&
+            legacy_http_headers_have_name(next, field))
+          keep = HTS_FALSE;
+      }
+    }
+    if (keep) {
+      const size_t len = legacy_header_name_len(line);
+      const char *rest = line + len;
+
+      /* A blank before the colon is invalid, so the name goes out without it.
+         One write, so a line that does not fit leaves nothing behind. */
+      while (len != 0 && *rest != ':')
+        rest++;
+      legacy_print(bstr, "%.*s%.*s", (int) len, line, (int) (next - rest),
+                   rest);
+    }
+    line = next;
+  }
+}
+
+static void legacy_http_append_custom_headers(char *dst, size_t dst_size,
+                                              const char *headers) {
+  legacy_buf bstr = {dst, dst_size, 0};
+
+  assertf(dst != NULL && dst_size > 0);
+  bstr.pos = strlen(dst);
+  legacy_append_custom_headers(&bstr, headers);
+}
+
+static void customdiff_one(parsediff_stats *st, const char *headers,
+                           const char *line) {
+  static const char *const fields[] = {"Host", "host:", "Cookie", "X-A",
+                                       "X-A:", "",      ":",      "Range",
+                                       "TE",   "a",     NULL};
+  static const char *const words[] = {HTS_SPAN_WORDS("Host", "x-a", "TE")};
+  static const char *const reqs[] = {
+      "", "GET / HTTP/1.1\r\nHost: a\r\n",
+      "GET / HTTP/1.1\r\nhost : a\r\nCookie: c=1\r\nX-A: 0\r\n", NULL};
+  static const size_t extra[] = {1, 9, 24, 4096};
+  const char *const shown = headers != NULL ? headers : "(null)";
+  const char *wo, *wn;
+  size_t i, j;
+  char o[16], n[16];
+
+  st->cases++;
+  if (legacy_hts_custom_header_verdict(headers, line) !=
+      hts_custom_header_verdict(headers, line)) {
+    snprintf(o, sizeof(o), "%d",
+             legacy_hts_custom_header_verdict(headers, line));
+    snprintf(n, sizeof(n), "%d", hts_custom_header_verdict(headers, line));
+    parsediff_fail(st, "verdict", shown, line, o, n);
+  }
+  st->cases++;
+  wo = legacy_http_custom_header_warning(headers, line);
+  wn = http_custom_header_warning(headers, line);
+  if ((wo == NULL) != (wn == NULL) || (wo != NULL && strcmp(wo, wn) != 0))
+    parsediff_fail(st, "warning", shown, line, wo != NULL ? wo : "(null)",
+                   wn != NULL ? wn : "(null)");
+  st->cases++;
+  if (legacy_header_name_len(line) != header_name_len(line) ||
+      legacy_header_name_in(line, words) != header_name_in(line, words))
+    parsediff_fail(st, "header_name", line, "", "", "");
+  for (i = 0; fields[i] != NULL; i++) {
+    st->cases++;
+    if (legacy_http_headers_have_field(headers, fields[i]) !=
+        http_headers_have_field(headers, fields[i]))
+      parsediff_fail(st, "have_field", shown, fields[i], "", "");
+  }
+  if (headers == NULL)
+    return;
+  for (i = 0; reqs[i] != NULL; i++) {
+    for (j = 0; j < sizeof(extra) / sizeof(extra[0]); j++) {
+      const size_t cap = strlen(reqs[i]) + extra[j];
+      char *bo = malloct(cap), *bn = malloct(cap);
+
+      memset(bo, 'O', cap);
+      memset(bn, 'O', cap);
+      memcpy(bo, reqs[i], strlen(reqs[i]) + 1);
+      memcpy(bn, reqs[i], strlen(reqs[i]) + 1);
+      legacy_http_append_custom_headers(bo, cap, headers);
+      http_append_custom_headers(bn, cap, headers);
+      st->cases++;
+      if (memcmp(bo, bn, cap) != 0)
+        parsediff_fail(st, "append", headers, reqs[i], bo, bn);
+      freet(bo);
+      freet(bn);
+    }
+  }
+}
+
+static int st_customheaderdiff(httrackp *opt, int argc, char **argv) {
+  static const char *const hand[] = {"",
+                                     "\r\n",
+                                     "\r",
+                                     "\n\n",
+                                     "X-A: 1",
+                                     "X-A: 1\r\n",
+                                     "X-A : 1\r\nX-B:2\n",
+                                     "X-A: 1\r\n continued\r\nX-B: 2",
+                                     " leading fold\r\nX-A: 1",
+                                     "Host: a\r\nHost: b\r\n",
+                                     "Cookie: a=1\rcookie : b=2\r",
+                                     "Content-Length: 5\r\n\tfold\r\nX: y",
+                                     "Range: bytes=0-\r\nIf-Match: x\r\n",
+                                     "bad name: x\r\n(x): y\r\n:z\r\n",
+                                     "X-A: 1\r\r\nX-A: 2\n\r",
+                                     "Authorization: x\r\n\r\nAuthorization: y",
+                                     NULL};
+  static const char *const lines[] = {"",
+                                      "X-A: 1",
+                                      " fold",
+                                      "\tfold",
+                                      "Host: x",
+                                      "host :",
+                                      "TE: trailers",
+                                      "Range: bytes=",
+                                      "no colon",
+                                      ":",
+                                      "X-A: 1\r\nHost: y",
+                                      "Cookie\r: x",
+                                      NULL};
+  static const char *const alphabet[] = {
+      "Host",           "Cookie", "X-A", "x-a",          "TE", "Range",
+      "Content-Length", ":",      " ",   "\t",           "\r", "\n",
+      "\r\n",           "v",      "(",   "Authorization"};
+  parsediff_stats st = {0, 0};
+  uint32_t seed = 2470;
+  size_t i, j;
+  int r;
+
+  for (j = 0; lines[j] != NULL; j++)
+    customdiff_one(&st, NULL, lines[j]);
+  for (i = 0; hand[i] != NULL; i++)
+    for (j = 0; lines[j] != NULL; j++)
+      customdiff_one(&st, hand[i], lines[j]);
+  for (r = 0; r < 3000; r++) {
+    String h = STRING_EMPTY, l = STRING_EMPTY;
+
+    parsediff_random(&h, &seed, alphabet,
+                     sizeof(alphabet) / sizeof(alphabet[0]), 16);
+    parsediff_random(&l, &seed, alphabet,
+                     sizeof(alphabet) / sizeof(alphabet[0]), 6);
+    customdiff_one(&st, StringBuff(h) != NULL ? StringBuff(h) : "",
+                   StringBuff(l) != NULL ? StringBuff(l) : "");
+    StringFree(h);
+    StringFree(l);
+  }
+  printf("custom-header-diff: %lu cases, %lu failures\n", st.cases,
+         st.failures);
+  if (st.failures == 0)
+    printf("custom-header-diff: OK\n");
+  return st.failures != 0;
+}
+
 const struct selftest_entry selftests_header[] = {
     {"pubheaders", "",
      "layout of the installed structs configure's switches decide",
@@ -2264,6 +2650,9 @@ const struct selftest_entry selftests_header[] = {
     {"headerdedup", "<request> <headers> [capacity]",
      "what the custom header block adds to a request that has some (#1340)",
      st_headerdedup},
+    {"custom-header-diff", "",
+     "the custom header walks match frozen copies of the old ones",
+     st_customheaderdiff},
     {"headerlong", "[header-name:]",
      "over-long header value must not overflow the parse scratch",
      st_headerlong},
