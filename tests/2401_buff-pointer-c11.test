@@ -2,8 +2,8 @@
 #
 # On a C11 compiler without GNU extensions (MSVC /std:c17), the buff() family
 # must refuse a pointer destination at compile time and bound an array by its
-# size. Clang with -U__GNUC__ stands in for MSVC. HTS_BUF and HTS_BUF_N are
-# checked on that path and on the GNU one.
+# size. Clang with -U__GNUC__ stands in for MSVC. HTS_BUF, HTS_BUF_N and
+# HTS_SIZED are checked on that path and on the GNU one.
 
 set -euo pipefail
 
@@ -129,8 +129,11 @@ cat >"$tmp/buf.c" <<'PROBE'
 struct s {
   char f[48];
 };
+static size_t sized(const char *p, size_t n, const char *want) {
+  return p == want ? n : 0;
+}
 int main(void) {
-  char a[64];
+  char a[64], eight[8];
   struct s st;
   char *ptr = a;
   char *const cptr = a;
@@ -140,9 +143,15 @@ int main(void) {
 #ifdef NEG
   b = NEG;
 #endif
+#ifdef NEGS
+  (void) sized(NEGS, a);
+#endif
   return b.size == 64 && HTS_BUF_N(a, 64).size == 64 &&
                  HTS_BUF_N(a, 10).size == 10 && HTS_BUF(st.f).size == 48 &&
-                 HTS_BUF_N(st.f, 1).p == st.f
+                 HTS_BUF_N(st.f, 1).p == st.f &&
+                 sized(HTS_SIZED(a), a) == 64 &&
+                 sized(HTS_SIZED(st.f), st.f) == 48 &&
+                 sized(HTS_SIZED(eight), eight) == 8
              ? 0
              : 1;
 }
@@ -155,6 +164,12 @@ check_buf() {
     for neg in 'HTS_BUF(ptr)' 'HTS_BUF(cptr)' 'HTS_BUF_N(ptr, 1)' 'HTS_BUF_N(a, 65)' \
         'HTS_BUF_N(st.f, 49)'; do
         if "${c[@]}" -fsyntax-only "-DNEG=$neg" "$tmp/buf.c" 2>"$tmp/neg.err"; then
+            fail "$neg compiles: ${c[*]}"
+        fi
+        grep -q 'negative' "$tmp/neg.err" || fail_dump "$neg fails for another reason" "$tmp/neg.err"
+    done
+    for neg in 'HTS_SIZED(ptr)' 'HTS_SIZED(cptr)'; do
+        if "${c[@]}" -fsyntax-only "-DNEGS=$neg" "$tmp/buf.c" 2>"$tmp/neg.err"; then
             fail "$neg compiles: ${c[*]}"
         fi
         grep -q 'negative' "$tmp/neg.err" || fail_dump "$neg fails for another reason" "$tmp/neg.err"

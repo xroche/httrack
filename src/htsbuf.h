@@ -108,6 +108,20 @@ hts_buf_put_span(hts_buf b, hts_span s) {
   return HTS_TRUE;
 }
 
+/* Copy S as hts_buf_put_span does, but clip it to fit rather than empty B.
+   TRUE if it all fit. */
+static HTS_INLINE HTS_UNUSED HTS_CHECK_RESULT hts_boolean
+hts_buf_put_span_clip(hts_buf b, hts_span s) {
+  size_t n;
+
+  if (b.size == 0)
+    return HTS_FALSE;
+  n = s.len < b.size ? s.len : b.size - 1;
+  memcpy(b.p, s.p, n);
+  b.p[n] = '\0';
+  return n == s.len;
+}
+
 /* Print into B, clipped to fit, as slprintfbuff. TRUE if it all fit. */
 static HTS_INLINE HTS_UNUSED HTS_CHECK_RESULT HTS_PRINTF_FUN(2, 3) hts_boolean
     hts_buf_printf(hts_buf b, HTS_FORMAT_STRING const char *fmt, ...) {
@@ -141,5 +155,8 @@ static HTS_INLINE HTS_UNUSED HTS_PRINTF_FUN(2, 3) void hts_buf_printf_clip(
 #define HTS_BUF_N(ARR, N)                                                      \
   (HTS_COMPILE_ASSERT((N) <= sizeof(ARR)),                                     \
    hts_buf_at((ARR), (N) + HTS_BUF_GUARD_(ARR)))
+/* Pass ARR and sizeof(ARR) to a (char *, size_t) callee. A pointer does not
+   compile. */
+#define HTS_SIZED(ARR) (ARR), sizeof(ARR) + HTS_BUF_GUARD_(ARR)
 
 #endif
