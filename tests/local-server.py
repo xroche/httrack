@@ -2498,7 +2498,6 @@ class Handler(SimpleHTTPRequestHandler):
         "plain": "chunked",
         "gzip": "gzip, chunked",
         "spaced": "gzip ,  Chunked ",
-        "notlast": "chunked, gzip",
     }
 
     def route_telist(self, path):
@@ -2527,6 +2526,142 @@ class Handler(SimpleHTTPRequestHandler):
             self.wfile.write(body)
         self.close_connection = True
 
+    # Bodies under a gzip or deflate transfer coding, which httrack must
+    # remove before it saves them (2467): name -> (Transfer-Encoding,
+    # Content-Encoding).
+    TECODE = {
+        "gzip": ("gzip", None),
+        "xgzip": ("x-gzip", None),
+        "gzipchunked": ("gzip, chunked", None),
+        "deflatechunked": ("deflate, chunked", None),
+        "both": ("gzip, chunked", "gzip"),
+        "pkg": ("gzip, chunked", "gzip"),
+        "chunkedgzip": ("chunked, gzip", None),
+        "compress": ("compress, chunked", None),
+    }
+    # Pages crawled apart from the index, each for one behaviour of 2467.
+    TECODE_PAGES = {
+        "resume": ("resumete.bin", "resumece.bin"),
+        "more": (
+            "sniff.jpg",
+            "sniffboth.jpg",
+            "bad.bin",
+            "badcompress.bin",
+            "unknownce.bin",
+            "bomb.bin",
+        ),
+        "headprobe": ("probe.php",),
+        "zstd": ("zstdgzip.html", "zstdsniff.jpg"),
+    }
+    # 8 MB of zeros coded twice is about 100 bytes: one layer's ratio passes it.
+    TECODE_BOMB = gzip.compress(gzip.compress(b"\0" * (8 << 20), mtime=0), mtime=0)
+    TECODE_CORRUPT = b"\x1f\x8b\x08\x00" + b"\xff" * 64
+
+    def send_te(self, coding, content_coding, body, ctype, status=200, extra=()):
+        """Send body, already coded, under these codings, delimited by the close."""
+        self.protocol_version = "HTTP/1.1"
+        self.send_response(status)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Transfer-Encoding", coding)
+        if content_coding:
+            self.send_header("Content-Encoding", content_coding)
+        for name, value in extra:
+            self.send_header(name, value)
+        self.send_header("Connection", "close")
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(body)
+        self.close_connection = True
+
+    def route_tecode_resume(self, name):
+        body = b"TECODE-%s-BODY\n" % name.encode() * 40
+        m = re.match(r"bytes=(\d+)-", self.headers.get("Range") or "")
+        if not m:
+            self.send_raw(body, "application/octet-stream")
+            return
+        # the rest of the file, coded, which can not be appended as it is
+        start = int(m.group(1))
+        crange = ("Content-Range", "bytes %d-%d/%d" % (start, len(body) - 1, len(body)))
+        coded = gzip.compress(body[start:], mtime=0)
+        if name == "resumete":
+            self.send_te("gzip", None, coded, "application/octet-stream", 206, [crange])
+            return
+        self.send_response(206, "Partial Content")
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Content-Encoding", "gzip")
+        self.send_header(*crange)
+        self.send_header("Connection", "close")
+        self.end_headers()
+        self.wfile.write(coded)
+        self.close_connection = True
+
+    def route_tecode(self, path):
+        name = path.rsplit("/", 1)[-1].split(".")[0]
+        ctype = "application/octet-stream"
+        content_coding = None
+        if name == "index" or name in self.TECODE_PAGES:
+            coding = "gzip, chunked"
+            links = self.TECODE_PAGES.get(name) or [
+                "%s.%s" % (k, "gz" if k == "pkg" else "bin") for k in self.TECODE
+            ]
+            body = "".join('<a href="%s">%s</a>\n' % (k, k) for k in links).encode()
+            body = b"<html><body>\n%s</body></html>\n" % body
+            ctype = "text/html"
+        elif name in ("resumete", "resumece"):
+            self.route_tecode_resume(name)
+            return
+        elif name == "zstdgzip":
+            # unlisted, for builds with zstd: two codecs make the order visible
+            coding, content_coding = "gzip, chunked", "zstd"
+            body = self.CODEC_ZSTD
+            ctype = "text/html"
+        elif name in ("sniff", "sniffboth"):
+            # declared png, a jpeg once decoded: only the sniff keeps .jpg
+            coding, body, ctype = "gzip", self.FAKE_JPEG, "image/png"
+            content_coding = "gzip" if name == "sniffboth" else None
+        elif name == "zstdsniff":
+            # a zstd frame of one raw block: the order of the layers shows
+            jpeg = self.FAKE_JPEG
+            block = ((len(jpeg) << 3) | 1).to_bytes(3, "little")
+            coding, content_coding, ctype = "gzip", "zstd", "image/png"
+            body = b"\x28\xb5\x2f\xfd\x20" + bytes([len(jpeg)]) + block + jpeg
+        elif name in ("bad", "badcompress"):
+            content_coding = "compress" if name == "badcompress" else None
+            self.send_te("gzip", content_coding, self.TECODE_CORRUPT, ctype)
+            return
+        elif name == "unknownce":
+            coding, content_coding = "gzip", "compress"
+            body = b"TECODE-%s-BODY\n" % name.encode() * 40
+        elif name == "bomb":
+            self.send_te("gzip", "gzip", self.TECODE_BOMB, ctype)
+            return
+        elif name == "probe":
+            # the HEAD -%N0 sends finds the move: it has no body to decode
+            body = b"5\r\nmoved\r\n0\r\n\r\n"
+            loc = [("Location", "probed.html")]
+            self.send_te("compress, chunked", None, body, "text/html", 301, loc)
+            return
+        elif name == "probed":
+            coding, ctype = "gzip", "text/html"
+            body = b"<html>TECODE-probe-BODY</html>\n"
+        elif name == "big":
+            # small at each layer but the last, which -m must still bound
+            coding, content_coding = "gzip, chunked", "gzip"
+            body = b"TECODE-big-BODY\n" * 2000
+        else:
+            coding, content_coding = self.TECODE[name]
+            body = b"TECODE-%s-BODY\n" % name.encode() * 40
+        if content_coding == "gzip":
+            body = gzip.compress(body, mtime=0)
+        for c in (c.strip() for c in coding.split(",")):
+            if c in ("gzip", "x-gzip"):
+                body = gzip.compress(body, mtime=0)
+            elif c == "deflate":
+                body = zlib.compress(body)
+            elif c == "chunked":
+                body = b"%X\r\n" % len(body) + body + b"\r\n0\r\n\r\n"
+        self.send_te(coding, content_coding, body, ctype)
+
     # A coding list not ending in chunked runs to the close, so the
     # Content-Length and the keep-alive here are lies (2455).
     TECLOSE_SMUGGLED = b"HTTP/1.1 200 OK\r\nContent-Length: 8\r\n\r\nSMUGGLED"
@@ -2554,12 +2689,13 @@ class Handler(SimpleHTTPRequestHandler):
         self.protocol_version = "HTTP/1.1"
         self.send_response(200)
         self.send_header("Content-Type", "application/octet-stream")
-        self.send_header("Transfer-Encoding", "chunked, gzip")
-        self.send_header("Content-Length", "5")
+        hello = gzip.compress(b"HELLO", mtime=0)
+        self.send_header("Transfer-Encoding", "gzip")
+        self.send_header("Content-Length", str(len(hello)))
         self.send_header("Connection", "keep-alive")
         self.end_headers()
         if self.command != "HEAD":
-            self.wfile.write(b"HELLO")
+            self.wfile.write(hello)
             self.wfile.flush()
             # late, so a client that trusted the length reads it as the next reply
             time.sleep(0.5)
@@ -4996,6 +5132,9 @@ class Handler(SimpleHTTPRequestHandler):
             return True
         if path.startswith("/telist/"):
             self.route_telist(path)
+            return True
+        if path.startswith("/tecode/"):
+            self.route_tecode(path)
             return True
         if path.startswith("/teclose/"):
             self.route_teclose(path)

@@ -51,19 +51,16 @@ ok "token lists read by treathead_opt"
 local_server_start
 host=127.0.0.1_$SRV_PORT
 
-# A final chunked is unframed; "chunked, gzip" is read to the close.
+# A final chunked is unframed, and the gzip under it comes off too.
 local_crawl "$BASEURL/telist/index.html" -O "$tmpdir/te" || fail "crawl failed"
 test "$(count_log_errors "$tmpdir/te/hts-log.txt")" = 0 ||
     fail_dump "errors in the crawl" "$tmpdir/te/hts-log.txt"
 "$SRV_PYTHON" - "$(nativepath "$tmpdir/te/$host/telist")" <<'PY'
-import gzip
 import sys
 
-for name, coded in (("plain", 0), ("gzip", 1), ("spaced", 1), ("notlast", 0)):
+for name in ("plain", "gzip", "spaced"):
     with open("%s/%s.bin" % (sys.argv[1], name), "rb") as f:
         body = f.read()
-    if coded:
-        body = gzip.decompress(body)
     marker = b"TELIST-%s-BODY" % name.encode()
     assert marker in body and b"\r" not in body, (name, body[:80])
 PY
@@ -75,8 +72,8 @@ reused=$(count_matching_lines '(Keep-Alive): successfully linked' "$tmpdir/ka/ht
 test "$reused" -ge 10 || fail_dump "only $reused reused sockets" "$tmpdir/ka/hts-log.txt"
 ok "$reused sockets reused from a Connection list"
 
-# "chunked, gzip" with a Content-Length runs to the close, so nothing it sent
-# past that length reaches the next page.
+# "gzip" with a Content-Length runs to the close, so nothing it sent past that
+# length reaches the next page.
 local_crawl "$BASEURL/teclose/index.html" -O "$tmpdir/tc" -c1 || fail "crawl failed"
 grep -q TECLOSE-SECOND "$tmpdir/tc/$host/teclose/second.html" ||
     fail_dump "second page damaged" "$tmpdir/tc/hts-log.txt"
