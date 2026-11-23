@@ -44,7 +44,7 @@ Please visit our Website: http://www.httrack.com
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
 
-#include "htsurlport.h"
+#include "htsbuf.h"
 
 /* Read the digits glued after the option letter at *com (as in -c8) into *out
    if in [min, max], and move *com onto the last digit, refused or not. Unlike
@@ -57,10 +57,10 @@ hts_scan_result cmdl_glued_int(char **com, int min, int max, int *out);
    and argv[0] is the only clue left. Fills dst (dstsize bytes). */
 const char *hts_self_path(char *dst, size_t dstsize);
 
-/* Write the data directory holding the HTML templates into dst (dstsize bytes,
-   NUL-terminated, trailing '/' included): builtin when it is there, else a
-   layout under selfpath's directory. selfpath may be NULL, builtin empty. */
-void hts_resolve_datadir(char *dst, size_t dstsize, const char *selfpath,
+/* Write the data directory holding the HTML templates into dst (clipped,
+   trailing '/' included): builtin when it is there, else a layout under
+   selfpath's directory. selfpath may be NULL, builtin empty. */
+void hts_resolve_datadir(hts_buf dst, const char *selfpath,
                          const char *builtin);
 
 #endif

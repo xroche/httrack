@@ -64,7 +64,7 @@ static coucal_key key_duphandler(void *arg, coucal_key_const name) {
 /* Key sav hashes are using case-insensitive version */
 static coucal_hashkeys key_sav_hashes(void *arg, coucal_key_const key) {
   hash_struct *const hash = (hash_struct*) arg;
-  convtolower(hash->catbuff, sizeof(hash->catbuff), (const char *) key);
+  convtolower(HTS_BUF(hash->catbuff), (const char *) key);
   return coucal_hash_string(hash->catbuff);
 }
 
@@ -444,8 +444,7 @@ int hash_read(const hash_struct * hash, const char *nom1, const char *nom2,
 
 /* KEY matches the host in any case and the path exactly, as url_savename()
    compares links. */
-static void savename_owner_key(char *key, size_t size, const char *adr,
-                               const char *fil) {
+static void savename_owner_key(hts_buf key, const char *adr, const char *fil) {
   char BIGSTK low[HTS_URLMAXSIZE * 2];
   coucal_hashkeys ha, hf;
 
@@ -453,9 +452,9 @@ static void savename_owner_key(char *key, size_t size, const char *adr,
   hts_lowcase(low);
   ha = coucal_hash_string(low);
   hf = coucal_hash_string(fil);
-  snprintf(key, size, "%x.%x.%x.%x", (unsigned int) ha.hash1,
-           (unsigned int) ha.hash2, (unsigned int) hf.hash1,
-           (unsigned int) hf.hash2);
+  hts_buf_printf_clip(key, "%x.%x.%x.%x", (unsigned int) ha.hash1,
+                      (unsigned int) ha.hash2, (unsigned int) hf.hash1,
+                      (unsigned int) hf.hash2);
 }
 
 /* see htshash.h */
@@ -463,7 +462,7 @@ int hash_savename_owner(hash_struct *hash, const char *adr, const char *fil) {
   char key[64];
   intptr_t value;
 
-  savename_owner_key(key, sizeof(key), adr, fil);
+  savename_owner_key(HTS_BUF(key), adr, fil);
   return coucal_read(hash->savename_owner, key, &value) ? (int) value : -1;
 }
 
@@ -504,7 +503,7 @@ void hash_write(hash_struct * hash, size_t lpos) {
     char key[64];
     intptr_t prev;
 
-    savename_owner_key(key, sizeof(key), link->adr, link->fil);
+    savename_owner_key(HTS_BUF(key), link->adr, link->fil);
     if (!coucal_read(hash->savename_owner, key, &prev))
       coucal_write(hash->savename_owner, key, (intptr_t) lpos);
     else if (prev >= 0 &&

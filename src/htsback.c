@@ -4043,8 +4043,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               if (back[i].r.ssl_con) {
                 char hostname[256];
                 // some servers expect the hostname on the clienthello (SNI TLS extension)
-                if (hts_sni_hostname(back[i].url_adr, hostname,
-                                     sizeof(hostname)))
+                if (hts_sni_hostname(back[i].url_adr, HTS_BUF(hostname)))
                   SSL_set_tlsext_host_name(back[i].r.ssl_con, hostname);
                 SSL_clear(back[i].r.ssl_con);
                 if (opt->check_cert == HTS_TRUE &&

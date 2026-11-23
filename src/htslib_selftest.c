@@ -215,27 +215,27 @@ static void basic_selftests(void) {
   {
     char ext[16];
 
-    assertf(give_mimext(ext, sizeof(ext), "image/gif") == 1);
+    assertf(give_mimext(HTS_BUF(ext), "image/gif") == 1);
     assertf(strcmp(ext, "gif") == 0);
-    assertf(give_mimext(ext, sizeof(ext), "text/html") == 1);
+    assertf(give_mimext(HTS_BUF(ext), "text/html") == 1);
     assertf(strcmp(ext, "html") == 0);
-    assertf(give_mimext(ext, sizeof(ext), "no/such-mime-type") == 0);
+    assertf(give_mimext(HTS_BUF(ext), "no/such-mime-type") == 0);
     assertf(ext[0] == '\0');
     // modern web formats -> extension. Avoid MIME types the
     // application/<=4-char-subtype fallback could fabricate without a row.
-    assertf(give_mimext(ext, sizeof(ext), "image/webp") == 1);
+    assertf(give_mimext(HTS_BUF(ext), "image/webp") == 1);
     assertf(strcmp(ext, "webp") == 0);
-    assertf(give_mimext(ext, sizeof(ext), "application/manifest+json") == 1);
+    assertf(give_mimext(HTS_BUF(ext), "application/manifest+json") == 1);
     assertf(strcmp(ext, "webmanifest") == 0);
-    assertf(give_mimext(ext, sizeof(ext), "font/woff2") == 1);
+    assertf(give_mimext(HTS_BUF(ext), "font/woff2") == 1);
     assertf(strcmp(ext, "woff2") == 0);
   }
   // convtolower(): lower-cases into the caller buffer (bounded by its size).
   {
     char low[64];
 
-    assertf(strcmp(convtolower(low, sizeof(low), "ABC/Def.HTML"),
-                   "abc/def.html") == 0);
+    assertf(strcmp(convtolower(HTS_BUF(low), "ABC/Def.HTML"), "abc/def.html") ==
+            0);
   }
   // cut_path(): splits a path into directory (with trailing '/') and basename,
   // each bounded by its buffer size.
@@ -3230,7 +3230,7 @@ static int st_queryparam(httrackp *opt, int argc, char **argv) {
     }
   }
   memset(buff, QUERYPARAM_POISON, sizeof(buff));
-  found = url_query_value(argv[0], argv[1], buff, size);
+  found = url_query_value(argv[0], argv[1], hts_buf_at(buff, size));
   for (i = size; i < sizeof(buff); i++) {
     if (buff[i] != QUERYPARAM_POISON)
       overrun = " OVERRUN";
@@ -3258,7 +3258,7 @@ static void querysweep_one(parsediff_stats *st, const char *url,
   size_t i;
 
   memset(oracle, QUERYPARAM_POISON, sizeof(oracle));
-  oracle_found = url_query_value(url, name, oracle, sizeof(oracle));
+  oracle_found = url_query_value(url, name, HTS_BUF(oracle));
   if (memchr(oracle, '\0', sizeof(oracle)) == NULL) {
     parsediff_fail(st, "url_query_value left no terminator", url, name, "", "");
     return;
@@ -3271,7 +3271,7 @@ static void querysweep_one(parsediff_stats *st, const char *url,
 
     st->cases++;
     memset(buff, QUERYPARAM_POISON, sizeof(buff));
-    found = url_query_value(url, name, buff, size);
+    found = url_query_value(url, name, hts_buf_at(buff, size));
     for (j = size; j < sizeof(buff); j++) {
       if (buff[j] != QUERYPARAM_POISON) {
         parsediff_fail(st, "url_query_value wrote past the size", url, name,
@@ -3697,7 +3697,7 @@ static void spandiff_one(parsediff_stats *st, const char *rules,
       memset(n, 'O', sizeof(n));
       st->cases++;
       ro = legacy_hts_host_alias_looping(rules, www, o, sizes[j]);
-      rn = hts_host_alias_looping(rules, www, n, sizes[j]);
+      rn = hts_host_alias_looping(rules, www, hts_buf_at(n, sizes[j]));
       if ((ro == NULL) != (rn == NULL) || (rn != NULL && rn != n) ||
           memcmp(o, n, sizeof(o)) != 0)
         parsediff_fail(st, "hts_host_alias_looping", rules, "",

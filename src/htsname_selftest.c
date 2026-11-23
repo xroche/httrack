@@ -36,7 +36,7 @@ Please visit our Website: http://www.httrack.com
 static int st_refname(httrackp *opt, int argc, char **argv) {
   char name[64];
 
-  if (!url_savename_refname(argv[0], argv[1], name, sizeof(name)))
+  if (!url_savename_refname(argv[0], argv[1], HTS_BUF(name)))
     return 1;
   printf("refname=%s\n", name);
   return 0;
@@ -1308,10 +1308,8 @@ static int st_hostalias(httrackp *opt, int argc, char **argv) {
                "d.com") == 0);
     assertf(hts_host_alias(wwwchain, dest, HTS_TRUE, again, sizeof(again)) ==
             NULL);
-    assertf(hts_host_alias_looping(chain, HTS_TRUE, looping, sizeof(looping)) ==
-            NULL);
-    assertf(hts_host_alias_looping(rules, HTS_TRUE, looping, sizeof(looping)) ==
-            NULL);
+    assertf(hts_host_alias_looping(chain, HTS_TRUE, HTS_BUF(looping)) == NULL);
+    assertf(hts_host_alias_looping(rules, HTS_TRUE, HTS_BUF(looping)) == NULL);
 
     /* rules pointing in a circle name no canonical host: leave them alone */
     {
@@ -1321,8 +1319,7 @@ static int st_hostalias(httrackp *opt, int argc, char **argv) {
               NULL);
       assertf(hts_host_alias(loop, "b.com", HTS_TRUE, dest, sizeof(dest)) ==
               NULL);
-      assertf(strcmp(hts_host_alias_looping(loop, HTS_TRUE, looping,
-                                            sizeof(looping)),
+      assertf(strcmp(hts_host_alias_looping(loop, HTS_TRUE, HTS_BUF(looping)),
                      "b.com") == 0);
     }
   }
@@ -2087,7 +2084,7 @@ static int st_name_sized(httrackp *opt, int argc, char **argv) {
   (void) opt;
   (void) argc;
   (void) argv;
-  if (!url_savename_refname("www.example.com", "/", want, sizeof(want)) ||
+  if (!url_savename_refname("www.example.com", "/", HTS_BUF(want)) ||
       strlen(want) != strlen(CACHE_REFNAME "/") + 32 + strlen(".ref")) {
     printf("name-sized: refname is '%s'\n", want);
     return 1;
@@ -2096,14 +2093,15 @@ static int st_name_sized(httrackp *opt, int argc, char **argv) {
     const size_t mcap = mcaps[k];
     char *buf = st_sized_alloc(mcap);
 
-    if (url_md5(buf, mcap, "/p?a=1") != buf ||
+    if (url_md5(hts_buf_at(buf, mcap), "/p?a=1") != buf ||
         !st_sized_clip_ok(buf, mcap, md5)) {
       printf("name-sized: url_md5 into %u bytes is '%.*s'\n", (unsigned) mcap,
              (int) mcap, buf);
       fail = 1;
     }
     buf[0] = 'Q';
-    if (url_md5(buf, mcap, "/p") != buf || !st_sized_clip_ok(buf, mcap, "")) {
+    if (url_md5(hts_buf_at(buf, mcap), "/p") != buf ||
+        !st_sized_clip_ok(buf, mcap, "")) {
       printf("name-sized: url_md5 without a query into %u bytes\n",
              (unsigned) mcap);
       fail = 1;
@@ -2120,7 +2118,7 @@ static int st_name_sized(httrackp *opt, int argc, char **argv) {
       hts_boolean fit, ok;
 
       buf[0] = 'Q'; /* so a refusal must clear it */
-      fit = url_savename_refname("www.example.com", "/", buf, rcap);
+      fit = url_savename_refname("www.example.com", "/", hts_buf_at(buf, rcap));
       if (rcap == len + 1)
         ok = fit && strcmp(buf, want) == 0;
       else
@@ -2136,7 +2134,53 @@ static int st_name_sized(httrackp *opt, int argc, char **argv) {
   return st_verdict("name-sized", fail);
 }
 
+/* The SNI and Origin writers refuse a short buffer. */
+static int st_leaf_sized(httrackp *opt, int argc, char **argv) {
+  static const char sni[] = "www.example.com";
+  static const char origin[] = "https://www.example.com:8443";
+  char *buf;
+  size_t k;
+  int fail = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  for (k = 0; k < 2; k++) {
+    const hts_boolean fit = k == 1 ? HTS_TRUE : HTS_FALSE;
+    const size_t scap = sizeof(sni) - 1 + k, ocap = sizeof(origin) - 1 + k;
+
+    buf = st_sized_alloc(scap);
+    buf[0] = 'Q'; /* so a refusal must clear it */
+    if (hts_sni_hostname("u@www.example.com:8443", hts_buf_at(buf, scap)) !=
+            fit ||
+        strcmp(buf, fit ? sni : "") != 0 || !st_sized_guard_ok(buf, scap)) {
+      printf("leaf-sized: sni into %u bytes\n", (unsigned) scap);
+      fail = 1;
+    }
+    freet(buf);
+    buf = st_sized_alloc(ocap);
+    if (hts_fetch_origin("https://www.example.com:8443/x",
+                         hts_buf_at(buf, ocap)) != fit ||
+        (fit && strcmp(buf, origin) != 0) || !st_sized_guard_ok(buf, ocap)) {
+      printf("leaf-sized: origin into %u bytes\n", (unsigned) ocap);
+      fail = 1;
+    }
+    freet(buf);
+  }
+  buf = st_sized_alloc(sizeof(sni));
+  buf[0] = 'Q';
+  if (hts_sni_hostname("1.2.3.4:80", hts_buf_at(buf, sizeof(sni))) ||
+      buf[0] != '\0') {
+    printf("leaf-sized: sni of an address\n");
+    fail = 1;
+  }
+  freet(buf);
+  return st_verdict("leaf-sized", fail);
+}
+
 const struct selftest_entry selftests_name[] = {
+    {"leaf-sized", "",
+     "the internal sized writers never write past their buffer", st_leaf_sized},
     {"name-sized", "",
      "url_md5() and url_savename_refname() stay inside the buffer they are "
      "given",
