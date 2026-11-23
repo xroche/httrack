@@ -50,4 +50,5 @@ pasted "refused: a cookie in the paste has no name" "a=1; =2"
 pasted "refused: a cookie in the paste has no name" "a=1; b"
 pasted "name=shop.test cookies=2 hosts=shop.test" " ;;a = 1 ; ;b=2;;"
 # The paste trims the spaces around the name and the value.
-grep -q "${TAB}a${TAB}1\$" "$tmpdir/b/shop.test.hts" || fail "a = 1 not stored as a=1"
+bundle=$(tr -d '\r' <"$tmpdir/b/shop.test.hts") # CRLF on Windows
+grep -q "${TAB}a${TAB}1\$" <<<"$bundle" || fail "a = 1 not stored as a=1"
