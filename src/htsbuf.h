@@ -39,6 +39,7 @@ Please visit our Website: http://www.httrack.com
 
 #include <stdarg.h>
 #include <stddef.h>
+#include <string.h>
 
 /* P holds SIZE writable bytes. It never converts implicitly to hts_span, and
    unlike htssafe.h's htsbuff it has no cursor. */
@@ -93,8 +94,8 @@ static HTS_INLINE HTS_UNUSED hts_boolean hts_buf_cpy_clip(hts_buf b,
   return strclipbuff(b.p, b.size, s);
 }
 
-/* Copy S into B as a C string, whole or not at all: FALSE, with B holding ""
-   (when it has a byte), unless it fits. */
+/* Copy S into B as a C string. If it does not fit, return FALSE and leave B
+   empty (a size-0 B is untouched). */
 static HTS_INLINE HTS_UNUSED HTS_CHECK_RESULT hts_boolean
 hts_buf_put_span(hts_buf b, hts_span s) {
   if (s.len >= b.size) {

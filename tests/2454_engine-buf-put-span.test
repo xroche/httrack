@@ -25,7 +25,10 @@ selftest_queue "invalid login bundle name: a Windows device name" bundlename lpt
 selftest_queue "ok" bundlename comx
 
 selftest_queue "sent-replaces-earlier=4" headerverdict "host: v" "Host: w"
-selftest_queue "sent=0" headerverdict "X-$(repeat_chars 200 a): v" "X-$(repeat_chars 200 a): w"
+# A repeated name of 128 bytes or more is dropped like a short one.
+n128="X-$(repeat_chars 126 a)"
+selftest_queue "" headerdedup "hex:$(printf '%s: 1\r\n' "$n128" | od -An -v -t x1 | tr -d '[:space:]')" \
+    "hex:$(printf '%s: w\r\n' "$n128" | od -An -v -t x1 | tr -d '[:space:]')" 600
 
 # 1024 bytes is the paste agent and address capacity, the NUL included.
 paste() { # paste NAME LINE -- write a cURL paste, its name in $in
