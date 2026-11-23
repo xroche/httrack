@@ -1240,19 +1240,30 @@ static int st_pubheaders(httrackp *opt, int argc, char **argv) {
 /* Registry: this module's tests, in the order -#test lists them. */
 /* ------------------------------------------------------------ */
 
-/* <parse|scan> <text> <min> <max>: what hts_parse_llint() or hts_scan_llint()
-   reads from text, and how many bytes it moves past. */
+/* <parse|scan|span> <text> <min> <max>: what hts_parse_llint(),
+   hts_scan_llint() or hts_span_parse_llint() reads from text, and how many
+   bytes it moves past. The span is followed by a '7' it must not read. */
 static int st_intparse(httrackp *opt, int argc, char **argv) {
   const char *end = argv[1];
   LLint min, max, value = -1;
 
   if (argc != 4) {
-    fprintf(stderr, "int-parse: needs parse|scan <text> <min> <max>\n");
+    fprintf(stderr, "int-parse: needs parse|scan|span <text> <min> <max>\n");
     return 1;
   }
   min = (LLint) strtoll(argv[2], NULL, 10);
   max = (LLint) strtoll(argv[3], NULL, 10);
-  if (strcmp(argv[0], "parse") == 0) {
+  if (strcmp(argv[0], "span") == 0) {
+    const size_t len = strlen(argv[1]);
+    char *text = malloct(len + 2);
+    hts_boolean ok;
+
+    memcpy(text, argv[1], len);
+    memcpy(text + len, "7", 2);
+    ok = hts_span_parse_llint(hts_span_at(text, len), min, max, &value);
+    printf("%s value=" LLintP "\n", ok ? "ok" : "refused", value);
+    freet(text);
+  } else if (strcmp(argv[0], "parse") == 0) {
     const hts_boolean ok = hts_parse_llint(argv[1], &end, min, max, &value);
 
     printf("%s value=" LLintP " end=%d\n", ok ? "ok" : "refused", value,
@@ -2263,7 +2274,7 @@ const struct selftest_entry selftests_header[] = {
      "binput() consumes a clipped line whole (#1294)", st_binputline},
     {"crange", "<raw-content-range-line> ...",
      "Content-Range parse integer safety", st_crange},
-    {"int-parse", "parse|scan <text> <min> <max>",
+    {"int-parse", "parse|scan|span <text> <min> <max>",
      "bounded decimal parse: value and end offset", st_intparse},
     {"int-parse-diff", "[<site> <input>]",
      "integer header and reply fields parse as before, out-of-range refused",

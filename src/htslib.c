@@ -671,23 +671,19 @@ static hts_boolean hts_request_is_secure(const htsblk *retour) {
 static hts_boolean ua_product_is(const char *s, size_t n, const char *name,
                                  int *major) {
   const size_t len = strlen(name);
-  long v = 0;
-  size_t i;
+  hts_span version, head, tail;
+  LLint v;
 
   if (n <= len || strncmp(s, name, len) != 0 || s[len] != '/')
     return HTS_FALSE;
   *major = -1;
-  if (s[len + 1] == '0')
+  version = hts_span_at(s + len + 1, n - len - 1);
+  if (!hts_span_split(version, '.', &head, &tail))
+    head = version;
+  if (hts_span_starts_with(version, hts_span_of("0")) ||
+      !hts_span_parse_llint(head, 0, 99999, &v) ||
+      !hts_span_empty(hts_span_trim(version, "0123456789.", "")))
     return HTS_TRUE;
-  for (i = len + 1; i < n && hts_isdigit((unsigned char) s[i]) && v < 100000;
-       i++)
-    v = v * 10 + (s[i] - '0');
-  if (i == len + 1 || v >= 100000)
-    return HTS_TRUE;
-  for (; i < n; i++) {
-    if (s[i] != '.' && !hts_isdigit((unsigned char) s[i]))
-      return HTS_TRUE;
-  }
   *major = (int) v;
   return HTS_TRUE;
 }
@@ -4421,17 +4417,9 @@ static size_t engine_scheme_len(const char *s, size_t len) {
 /* Is the span a decimal port in 0..65535? Empty and 0 pass, because
    hts_parse_url_port() checks the 1..65535 range. */
 static hts_boolean port_is_valid(hts_span port) {
-  unsigned int value = 0;
-  size_t i;
+  LLint value;
 
-  for (i = 0; i < port.len; i++) {
-    if (!hts_isdigit((unsigned char) port.p[i]))
-      return HTS_FALSE;
-    value = value * 10 + (unsigned int) (port.p[i] - '0');
-    if (value > 65535)
-      return HTS_FALSE;
-  }
-  return HTS_TRUE;
+  return hts_span_empty(port) || hts_span_parse_llint(port, 0, 65535, &value);
 }
 
 hts_boolean hts_url_view_parse(const char *s, size_t len, hts_url_view *v) {

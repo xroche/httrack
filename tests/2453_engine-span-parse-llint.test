@@ -1,0 +1,59 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# hts_span_parse_llint() reads a whole span, never the '7' after it, and the
+# sites converted to it keep their old verdicts.
+
+max64=9223372036854775807
+
+span() {
+    local want=$1
+    shift
+    selftest_queue "$want" int-parse span "$@"
+}
+
+span 'refused value=-1' '' 0 100
+span 'ok value=0' 0 0 100
+span 'ok value=12' 12 0 100
+span 'ok value=42' 000042 0 100
+span 'ok value=5' 00000000000000000000000000000005 0 100
+span 'refused value=-1' +5 0 100
+span 'refused value=-1' -5 0 100
+span 'refused value=-1' ' 5' 0 100
+span 'refused value=-1' '5 ' 0 100
+span 'refused value=-1' 12ab 0 100
+span 'refused value=-1' 1.5 0 100
+span 'ok value=65535' 65535 0 65535
+span 'refused value=-1' 65536 0 65535
+span 'refused value=-1' 4 5 9
+span "ok value=$max64" "$max64" 0 "$max64"
+span 'refused value=-1' 9223372036854775808 0 "$max64"
+# 2^64 + 10: an unchecked accumulator wraps it to 10.
+span 'refused value=-1' 18446744073709551626 0 "$max64"
+span 'refused value=-1' 99999999999999999999999999999999999999 0 "$max64"
+# U+0661 ARABIC-INDIC DIGIT ONE and U+FF11 FULLWIDTH DIGIT ONE are not ASCII.
+span 'refused value=-1' $'\xd9\xa1' 0 100
+span 'refused value=-1' $'1\xef\xbc\x91' 0 100
+
+# port_is_valid(): empty and 0 pass, past 65535 or a sign does not.
+selftest_queue 'ok=1 scheme=http host=h port=0080 path=/' urlview 'http://h:0080/'
+selftest_queue 'ok=1 scheme=http host=h port=65535 path=/' urlview 'http://h:65535/'
+selftest_queue 'ok=0 scheme=http host=h port=65536 path=/' urlview 'http://h:65536/'
+selftest_queue 'ok=0 scheme=http host=h port=+80 path=/' urlview 'http://h:+80/'
+
+# ua_product_is(): a major past 99999 or with a leading zero is malformed.
+chrome() {
+    printf 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/%s Safari/537.36' "$1"
+}
+selftest_queue 'ua="Google Chrome";v="99999", "Not?A_Brand";v="8", "Chromium";v="99999" mobile=?0 platform="Linux"' \
+    clienthints "$(chrome 99999.0)"
+selftest_queue none clienthints "$(chrome 100000.0)"
+selftest_queue none clienthints "$(chrome 0141.0.0.0)"
+selftest_queue none clienthints "$(chrome 141.0a)"
+
+selftest_run_queued

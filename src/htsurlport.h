@@ -130,6 +130,12 @@ HTS_CHECK_RESULT int hts_span_index_ci(hts_span s, const char *const *words);
    FALSE if it was clipped, or if SIZE is 0, which writes nothing. */
 hts_boolean hts_span_copy(hts_span s, char *dst, size_t size);
 
+/* Is all of S decimal digits, with a value in [MIN, MAX]? On TRUE the value is
+   in *OUT. Signs, blanks and overflow are refused, and *OUT is then untouched.
+ */
+HTS_CHECK_RESULT hts_boolean hts_span_parse_llint(hts_span s, LLint min,
+                                                  LLint max, LLint *out);
+
 /* Find parameter NAME (exact, any case) in a header VALUE whose fields are
    split by any byte of SEPS, as in "type; a=1; NAME=\"v\"". The first NAME
    wins. A quoted value unescapes only \" and \\, and a missing end quote

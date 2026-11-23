@@ -654,18 +654,13 @@ static int surt_canon(const char *url, wbuf *out) {
   }
 
   if (!hts_span_empty(v.port)) { /* keep a non-default port */
-    int pv = 0, ok = 1;
-    size_t k;
-    for (k = 0; k < v.port.len; k++) {
-      const char c = v.port.p[k];
-      if (c < '0' || c > '9') {
-        ok = 0;
-        break;
-      }
-      if (pv <= 65535) /* stop past 65535 so pv cannot overflow */
-        pv = pv * 10 + (c - '0');
-    }
-    if (ok && pv != def_port &&
+    LLint pv;
+    const hts_boolean is_default =
+        hts_span_parse_llint(v.port, 0, 65535, &pv) && pv == def_port;
+
+    /* A port past 65535 is kept, and one with a non-digit is dropped. */
+    if (!is_default &&
+        hts_span_empty(hts_span_trim(v.port, "0123456789", "")) &&
         (wbuf_add(out, ":", 1) != 0 ||
          wbuf_add(out, v.port.p, v.port.len) != 0))
       return -1;
