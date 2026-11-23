@@ -108,8 +108,8 @@ hts_buf_put_span(hts_buf b, hts_span s) {
   return HTS_TRUE;
 }
 
-/* hts_buf_put_span that clips S to fit rather than emptying B. TRUE if it all
-   fit. */
+/* Copy S as hts_buf_put_span does, but clip it to fit rather than empty B.
+   TRUE if it all fit. */
 static HTS_INLINE HTS_UNUSED HTS_CHECK_RESULT hts_boolean
 hts_buf_put_span_clip(hts_buf b, hts_span s) {
   size_t n;
@@ -155,8 +155,8 @@ static HTS_INLINE HTS_UNUSED HTS_PRINTF_FUN(2, 3) void hts_buf_printf_clip(
 #define HTS_BUF_N(ARR, N)                                                      \
   (HTS_COMPILE_ASSERT((N) <= sizeof(ARR)),                                     \
    hts_buf_at((ARR), (N) + HTS_BUF_GUARD_(ARR)))
-/* ARR, sizeof(ARR) as two arguments for a (char *, size_t) callee. A pointer
-   does not compile. */
+/* Pass ARR and sizeof(ARR) to a (char *, size_t) callee. A pointer does not
+   compile. */
 #define HTS_SIZED(ARR) (ARR), sizeof(ARR) + HTS_BUF_GUARD_(ARR)
 
 #endif

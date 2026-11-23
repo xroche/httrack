@@ -4046,6 +4046,7 @@ static int st_bufwrite(httrackp *opt, int argc, char **argv) {
          strcmp(big, "abcde") != 0 || big[6] != 'Z';
   memset(big, 'Z', sizeof(big));
   bad |= hts_buf_put_span_clip(hts_buf_at(big, 0), hts_span_at("a", 1)) ||
+         hts_buf_put_span_clip(hts_buf_at(big, 0), hts_span_at("", 0)) ||
          big[0] != 'Z';
   /* hts_span_dup copies exactly the span, including an inner NUL. */
   {
