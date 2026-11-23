@@ -460,28 +460,26 @@ char *ftp_jump_authority(char *url_adr) {
 }
 
 /* Split "host[:port]" (see htsftp.h). */
-hts_boolean ftp_split_hostport(const char *adr, char *host, size_t host_size,
-                               int *port, char *err, size_t err_size) {
-  static const char portmsg[] = "Invalid port: ";
+hts_boolean ftp_split_hostport(const char *adr, hts_buf host, int *port,
+                               hts_buf err) {
   const char *const a = jump_toport_const(adr);
   const size_t len = a != NULL ? (size_t) (a - adr) : strlen(adr);
 
-  /* the caller owns err[], so a size too small for either message is a bug */
-  assertf(host_size > 0 && err_size > sizeof("Host name too long"));
-  host[0] = err[0] = '\0';
+  /* the caller owns err, so a size too small for either message is a bug */
+  assertf(host.size > 0 && err.size > sizeof("Host name too long"));
+  err.p[0] = '\0';
   /* no resolvable name is this long, and clipping would query another host */
-  if (len >= host_size) {
-    strlcpybuff(err, "Host name too long", err_size);
+  if (!hts_buf_put_span(host, hts_span_at(adr, len))) {
+    hts_buf_cpy(err, "Host name too long");
     return HTS_FALSE;
   }
   /* folding a nonsense port into 1..65535 fetches one the link never named */
   if (a != NULL && a[1] != '\0' && !hts_parse_url_port(a + 1, port)) {
-    strlcpybuff(err, portmsg, err_size);
+    host.p[0] = '\0';
     /* wire data: clip the echoed port rather than abort on an over-long one */
-    strlncatbuff(err, a + 1, err_size, err_size - sizeof(portmsg));
+    hts_buf_printf_clip(err, "Invalid port: %s", a + 1);
     return HTS_FALSE;
   }
-  strlncatbuff(host, adr, host_size, len);
   return HTS_TRUE;
 }
 
@@ -533,21 +531,15 @@ hts_boolean ftp_split_userpass(const char *src, const char *end, char *user,
 }
 
 /* Build "<verb> <path>" (see htsftp.h). */
-hts_boolean ftp_command(char *line, size_t line_size, const char *verb,
-                        const char *path) {
-  int n;
-
+hts_boolean ftp_command(hts_buf line, const char *verb, const char *path) {
   /* A leading '-' would reach a server that shells out to ls as a flag. */
-  if (path[0] == '-' || strchr(path, ' ') != NULL ||
-      strchr(path, '\"') != NULL || strchr(path, '\'') != NULL)
-    n = snprintf(line, line_size, "%s \"%s\"", verb, path);
-  else
-    n = snprintf(line, line_size, "%s %s", verb, path);
-  if (n < 0 || (size_t) n >= line_size) {
-    line[0] = '\0'; // fail safe for a caller that ignores the result
-    return HTS_FALSE;
-  }
-  return HTS_TRUE;
+  const char *const quote =
+      path[0] == '-' || strpbrk(path, " \"'") != NULL ? "\"" : "";
+
+  if (hts_buf_printf(line, "%s %s%s%s", verb, quote, path, quote))
+    return HTS_TRUE;
+  line.p[0] = '\0'; // fail safe for a caller that ignores the result
+  return HTS_FALSE;
 }
 
 /* Read 1..max_digits decimal digits at s into *value, if it is at most max.
@@ -564,11 +556,10 @@ static const char *ftp_parse_decimal(const char *s, int max_digits, int max,
   return end;
 }
 
-hts_boolean ftp_parse_pasv(const char *line, char *ip, size_t ip_size,
-                           int *port) {
+hts_boolean ftp_parse_pasv(const char *line, hts_buf ip, int *port) {
   const char *s = strchr(line, '(');
   int n[6];
-  int i, len;
+  int i;
 
   if (s == NULL)
     return HTS_FALSE;
@@ -581,9 +572,8 @@ hts_boolean ftp_parse_pasv(const char *line, char *ip, size_t ip_size,
   }
   if ((n[4] | n[5]) == 0) // port 0 means no data connection
     return HTS_FALSE;
-  len = snprintf(ip, ip_size, "%d.%d.%d.%d", n[0], n[1], n[2], n[3]);
-  if (len < 0 || (size_t) len >= ip_size) {
-    ip[0] = '\0';
+  if (!hts_buf_printf(ip, "%d.%d.%d.%d", n[0], n[1], n[2], n[3])) {
+    ip.p[0] = '\0';
     return HTS_FALSE;
   }
   *port = (n[4] << 8) + n[5];
@@ -882,7 +872,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
 
     memset(&server, 0, sizeof(server));
 
-    if (!ftp_split_hostport(adr, _adr, sizeof(_adr), &port, err, sizeof(err))) {
+    if (!ftp_split_hostport(adr, HTS_BUF(_adr), &port, HTS_BUF(err))) {
       ftp_fail(&back->r, "%s", err); // permanent, unlike a DNS miss
       goto done;
     }
@@ -992,8 +982,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
           // e.g. 227 Entering Passive Mode (123,45,67,89,177,27)
           char ignored_ip[64]; // data goes to the control peer
 
-          if (!ftp_parse_pasv(line, ignored_ip, sizeof(ignored_ip),
-                              &port_pasv)) {
+          if (!ftp_parse_pasv(line, HTS_BUF(ignored_ip), &port_pasv)) {
             ftp_fail(&back->r, "PASV incorrect: %s", linejmp(line));
           }
         } else {
@@ -1145,7 +1134,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
 #else
         //T_SOC soc_servdat;
         strcpybuff(back->info, "listening");
-        if ((soc_servdat = get_datasocket(line, sizeof(line))) != INVALID_SOCKET) {
+        if ((soc_servdat = get_datasocket(HTS_BUF(line))) != INVALID_SOCKET) {
           if (stop_ftp(back))
             goto done;
           send_line(soc_ctl, line);     // envoi du RETR
@@ -1316,12 +1305,12 @@ done:
 
 /* Listen on this host's own address for an active-mode data connection, and
    write the PORT or EPRT command naming it into to_send. */
-T_SOC get_datasocket(char *to_send, size_t to_send_size) {
+T_SOC get_datasocket(hts_buf to_send) {
   T_SOC soc = INVALID_SOCKET;
   char h_loc[256 + 2];
   SOCaddr server, server2;
 
-  to_send[0] = '\0';
+  to_send.p[0] = '\0';
   if (gethostname(h_loc, 256) == 0 &&
       hts_dns_resolve_nocache(h_loc, &server) != NULL &&
       (soc = hts_shared_listen(&server, SOCK_STREAM, 1, &server2, NULL)) !=
@@ -1332,22 +1321,19 @@ T_SOC get_datasocket(char *to_send, size_t to_send_size) {
     SOCaddr_inetntoa(dot, 256, server2);
 #if HTS_INET6 == 0
     {
-      const unsigned int n1 = port >> 8, n2 = port & 0xff;
-      char dots[256 + 2];
       char *a;
 
-      dots[0] = '\0';
-      strncatbuff(dots, dot, 128);
-      while ((a = strchr(dots, '.')))
-        *a = ',';
-      while ((a = strchr(dots, ':')))
-        *a = ',';
-      snprintf(to_send, to_send_size, "PORT %s,%u,%u", dots, n1, n2);
+      for (a = dot; *a != '\0'; a++) {
+        if (*a == '.' || *a == ':')
+          *a = ',';
+      }
+      hts_buf_printf_clip(to_send, "PORT %s,%u,%u", dot, port >> 8,
+                          port & 0xff);
     }
 #else
     /* EPRT |1|132.235.1.2|6275| or EPRT |2|1080::8:800:200C:417A|5282| */
-    snprintf(to_send, to_send_size, "EPRT |%c|%s|%u|",
-             SOCaddr_getproto(server2), dot, port);
+    hts_buf_printf_clip(to_send, "EPRT |%c|%s|%u|", SOCaddr_getproto(server2),
+                        dot, port);
 #endif
   }
   return soc;

@@ -205,26 +205,17 @@ static const struct {
 
 #define CRASH_KINDS_COUNT (sizeof(crash_kinds) / sizeof(crash_kinds[0]))
 
-/* Appends what fits and drops the rest, where strcatbuff() would abort. */
-static void kinds_append(char *dest, size_t size, const char *src) {
-  const size_t used = strlen(dest);
-
-  strlncatbuff(dest, src, size, size - used - 1);
-}
-
 const char *hts_crash_test_kinds(void) {
   /* Clipped rather than aborted: a table outgrowing this must not cost the
      process, the string only feeds a usage line. */
   static char list[256];
 
   if (list[0] == '\0') {
-    size_t i;
+    size_t i, used = 0;
 
     for (i = 0; i < CRASH_KINDS_COUNT; i++) {
-      if (i != 0) {
-        kinds_append(list, sizeof(list), ", ");
-      }
-      kinds_append(list, sizeof(list), crash_kinds[i].name);
+      slcatprintfbuff_clip(list, sizeof(list), &used, "%s%s",
+                           i != 0 ? ", " : "", crash_kinds[i].name);
     }
   }
   return list;
