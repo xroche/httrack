@@ -1598,7 +1598,7 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
 
 /* VALUE past its leading blanks. */
 static hts_span header_value(const char *value) {
-  return hts_span_trim(hts_span_of(value), " \t\n\v\f\r", "");
+  return hts_span_trim(hts_span_of(value), HTS_REALSPACES, "");
 }
 
 /* A header added here also goes into hts_header_is_read(). */
@@ -1741,11 +1741,9 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
     }
   } else if (HEADER_IS(name, "Connection")) {
     const hts_span v = hts_span_of(value);
-    hts_span last;
 
-    // a list such as "Upgrade, Keep-Alive", where close wins; "" changes
-    // nothing
-    if (hts_span_list_last(v, ',', &last)) {
+    // a list such as "Upgrade, Keep-Alive", where close wins
+    if (!hts_span_empty(header_value(value))) {
       if (hts_span_list_has(v, ',', hts_span_of("Keep-Alive")) &&
           !hts_span_list_has(v, ',', hts_span_of("close"))) {
         if (!retour->keep_alive) {

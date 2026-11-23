@@ -27,7 +27,10 @@ printf '%s\r\n' \
     'Connection: Upgrade, Keep-Alive' %% \
     'Connection: keep-alive, close' %% \
     'Connection: Keep-Alive-x' %% \
-    'Connection: keep-alive' %% >"$tmpdir/corpus"
+    'Connection: keep-alive' %% \
+    $'Transfer-Encoding: chunked\v' %% \
+    $'Transfer-Encoding: chunked\f' %% \
+    $'Connection: keep-alive\v' %% >"$tmpdir/corpus"
 want='chunk=1 keep=0/0/0
 chunk=0 keep=0/0/0
 chunk=0 keep=0/0/0
@@ -36,6 +39,9 @@ chunk=1 keep=0/0/0
 chunk=0 keep=1/10/15
 chunk=0 keep=0/0/0
 chunk=0 keep=0/0/0
+chunk=0 keep=1/10/15
+chunk=1 keep=0/0/0
+chunk=1 keep=0/0/0
 chunk=0 keep=1/10/15'
 out=$(httrack -O /dev/null -#test=headerparse "$(nativepath "$tmpdir/corpus")")
 got=$(sed -n 's/^#[0-9]* .*\(chunk=[0-9]*\) \(keep=[0-9/]*\) .*/\1 \2/p' <<<"$out")
@@ -68,3 +74,12 @@ local_crawl "$BASEURL/kalist/index.html" -O "$tmpdir/ka" -Z || fail "crawl faile
 reused=$(count_matching_lines '(Keep-Alive): successfully linked' "$tmpdir/ka/hts-log.txt")
 test "$reused" -ge 10 || fail_dump "only $reused reused sockets" "$tmpdir/ka/hts-log.txt"
 ok "$reused sockets reused from a Connection list"
+
+# "chunked, gzip" with a Content-Length runs to the close, so nothing it sent
+# past that length reaches the next page.
+local_crawl "$BASEURL/teclose/index.html" -O "$tmpdir/tc" -c1 || fail "crawl failed"
+grep -q TECLOSE-SECOND "$tmpdir/tc/$host/teclose/second.html" ||
+    fail_dump "second page damaged" "$tmpdir/tc/hts-log.txt"
+test "$(count_log_errors "$tmpdir/tc/hts-log.txt")" = 0 ||
+    fail_dump "errors in the crawl" "$tmpdir/tc/hts-log.txt"
+ok "a Transfer-Encoding ending in gzip read to the close"

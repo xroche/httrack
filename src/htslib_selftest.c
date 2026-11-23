@@ -4287,63 +4287,53 @@ static int st_spanlist(httrackp *opt, int argc, char **argv) {
 }
 
 /* Feed each line of a file to treathead_opt() the way the response loop does,
-   and print what it read. A "%%" line starts a new response. LOOPS repeats
-   the whole parse, to time it. */
+   and print what it read. A "%%" line starts a new response. */
 static int st_headerparse(httrackp *opt, int argc, char **argv) {
   static t_cookie jar;
   char location[HTS_LOCATION_SIZE];
   size_t len;
   char *data;
-  int loops, n;
+  const char *p, *end;
+  int record = 0;
 
   if (argc < 1 || (data = st_slurp(argv[0], &len)) == NULL) {
     fprintf(stderr, "headerparse: cannot read the corpus\n");
     return 1;
   }
-  loops = argc > 1 ? atoi(argv[1]) : 1;
-  for (n = 0; n < loops; n++) {
-    const char *p = data;
-    const char *const end = data + len;
-    int record = 0;
+  p = data;
+  end = data + len;
+  while (p < end) {
+    htsblk r;
+    char rcvd[2048];
+    int offset;
 
-    while (p < end) {
-      htsblk r;
-      char rcvd[2048];
-      int offset;
+    memset(&r, 0, sizeof(r));
+    r.totalsize = -1;
+    r.retry_after = -1;
+    r.location = location;
+    location[0] = '\0';
+    jar.max_len = sizeof(jar.data);
+    jar.data[0] = '\0';
+    for (; p < end; p += offset) {
+      const hts_boolean cut = binput_line(p, end, rcvd, sizeof(rcvd), &offset);
 
-      memset(&r, 0, sizeof(r));
-      r.totalsize = -1;
-      r.retry_after = -1;
-      r.location = location;
-      location[0] = '\0';
-      jar.max_len = sizeof(jar.data);
-      jar.data[0] = '\0';
-      for (; p < end; p += offset) {
-        const hts_boolean cut =
-            binput_line(p, end, rcvd, sizeof(rcvd), &offset);
-
-        if (strcmp(rcvd, "%%") == 0) {
-          p += offset;
-          break;
-        }
-        if (!cut && strnotempty(rcvd))
-          treathead_opt(opt, &jar, "www.example.com", "/dir/page.html", &r,
-                        rcvd);
+      if (strcmp(rcvd, "%%") == 0) {
+        p += offset;
+        break;
       }
-      if (n + 1 < loops)
-        continue;
-      printf("#%d size=" LLintP " empty=%d chunk=%d keep=%d/%d/%d trailers=%d"
-             " compressed=%d range=" LLintP "-" LLintP "/" LLintP " retry=%d\n",
-             record++, r.totalsize, r.empty, r.is_chunk, r.keep_alive,
-             r.keep_alive_max, r.keep_alive_t, r.keep_alive_trailers,
-             r.compressed, r.crange_start, r.crange_end, r.crange,
-             r.retry_after);
-      printf(" type=[%s] charset=[%s] encoding=[%s] cdispo=[%s]\n",
-             r.contenttype, r.charset, r.contentencoding, r.cdispo);
-      printf(" lastmod=[%s] etag=[%s] location=[%s]\n", r.lastmodified, r.etag,
-             location);
-      printf(" jar=[%s]\n", jar.data);
+      if (!cut && strnotempty(rcvd))
+        treathead_opt(opt, &jar, "www.example.com", "/dir/page.html", &r, rcvd);
     }
+    printf("#%d size=" LLintP " empty=%d chunk=%d keep=%d/%d/%d trailers=%d"
+           " compressed=%d range=" LLintP "-" LLintP "/" LLintP " retry=%d\n",
+           record++, r.totalsize, r.empty, r.is_chunk, r.keep_alive,
+           r.keep_alive_max, r.keep_alive_t, r.keep_alive_trailers,
+           r.compressed, r.crange_start, r.crange_end, r.crange, r.retry_after);
+    printf(" type=[%s] charset=[%s] encoding=[%s] cdispo=[%s]\n", r.contenttype,
+           r.charset, r.contentencoding, r.cdispo);
+    printf(" lastmod=[%s] etag=[%s] location=[%s]\n", r.lastmodified, r.etag,
+           location);
+    printf(" jar=[%s]\n", jar.data);
   }
   freet(data);
   return 0;
@@ -5523,7 +5513,7 @@ const struct selftest_entry selftests_lib[] = {
      st_spanindex},
     {"spanlist", "", "the token a span list holds, and its last one",
      st_spanlist},
-    {"headerparse", "<file> [loops]",
+    {"headerparse", "<file>",
      "the fields treathead_opt() reads from each response in a file",
      st_headerparse},
     {"gmtime", "",

@@ -4629,6 +4629,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                   int noFreebuff = 0;
                   LLint content_length = -1;
                   hts_boolean length_conflict = HTS_FALSE;
+                  hts_boolean has_te = HTS_FALSE;
                   /* binput_line stops at a NUL, hiding the fields after it */
                   const hts_boolean has_nul =
                       back[i].r.adr[0] != '<' &&
@@ -4711,6 +4712,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                            rcvd + cl, &content_length))
                           length_conflict = HTS_TRUE;
                       }
+                      if (strfield(rcvd, "Transfer-Encoding:"))
+                        has_te = HTS_TRUE;
                       if (strnotempty(rcvd))
                         treathead_opt(opt, opt->cookie, back[i].url_adr,
                                       back[i].url_fil, &back[i].r, rcvd);
@@ -4728,6 +4731,13 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                         }
 
                     } while(strnotempty(rcvd));
+                    /* RFC 9112 6.3: a coding list not ending in chunked runs
+                       to close, whatever Content-Length says */
+                    if (has_te && !back[i].r.is_chunk) {
+                      back[i].r.totalsize = -1;
+                      back[i].r.empty = 0;
+                      back[i].r.keep_alive = 0;
+                    }
                     // ----------------------------------------
 
                   } else {

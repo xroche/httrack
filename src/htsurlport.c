@@ -155,11 +155,14 @@ hts_boolean hts_span_split(hts_span s, char c, hts_span *head, hts_span *tail) {
   return HTS_TRUE;
 }
 
+/* the blanks treathead_opt() skips, which HTS_REALSPACES also lists */
+#define LIST_BLANKS " \t\n\v\f\r"
+
 hts_boolean hts_span_list_has(hts_span list, char sep, hts_span token) {
   hts_span item;
 
   while (hts_span_next_in(&list, sep, &item)) {
-    item = hts_span_trim(item, " \t", " \t");
+    item = hts_span_trim(item, LIST_BLANKS, LIST_BLANKS);
     if (!hts_span_empty(item) && hts_span_eq_ci(item, token))
       return HTS_TRUE;
   }
@@ -171,7 +174,7 @@ hts_boolean hts_span_list_last(hts_span list, char sep, hts_span *last) {
   hts_span item;
 
   while (hts_span_next_in(&list, sep, &item)) {
-    item = hts_span_trim(item, " \t", " \t");
+    item = hts_span_trim(item, LIST_BLANKS, LIST_BLANKS);
     if (!hts_span_empty(item)) {
       *last = item;
       found = HTS_TRUE;

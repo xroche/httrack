@@ -134,12 +134,13 @@ HTS_CHECK_RESULT int hts_span_index_ci(hts_span s, const char *const *words);
 hts_boolean hts_span_copy(hts_span s, char *dst, size_t size);
 
 /* Does the SEP-separated LIST hold TOKEN, A-Z compared as a-z? Each item is
-   trimmed of SP and HT first, and an empty item never matches. */
+   trimmed of " \t\n\v\f\r" first, and an empty item never matches. */
 HTS_CHECK_RESULT hts_boolean hts_span_list_has(hts_span list, char sep,
                                                hts_span token);
 
 /* Set *LAST to the last item of the SEP-separated LIST that is not empty once
-   trimmed of SP and HT. Return FALSE, *LAST untouched, if there is none. */
+   trimmed of " \t\n\v\f\r". Return FALSE, *LAST untouched, if there is
+   none. */
 HTS_CHECK_RESULT hts_boolean hts_span_list_last(hts_span list, char sep,
                                                 hts_span *last);
 
