@@ -142,14 +142,16 @@ typedef void (*hts_cache_field_other)(void *arg, const char *name,
 
 /* Read the header block buff[0..size) of one ZIP cache entry into fields.
    Returns HTS_FALSE on a NUL, which writers never store. */
+/* The longest stored line is "Location: " plus a full-capacity URL, and a
+   shorter buffer truncates it into a valid-looking wrong target. */
+#define HTS_CACHE_LINE_SIZE (HTS_LOCATION_SIZE + 32)
+
 static HTS_UNUSED hts_boolean hts_cache_read_fields(
     const char *buff, size_t size, const hts_cache_field *fields, size_t count,
     hts_cache_field_other other, void *arg) {
   const char *p = buff;
   const char *const end = buff + size;
-  /* the longest stored line is "Location: " plus a full-capacity URL;
-     a shorter buffer truncates it into a valid-looking wrong target */
-  char BIGSTK line[HTS_LOCATION_SIZE + 32];
+  char BIGSTK line[HTS_CACHE_LINE_SIZE];
 
   if (memchr(buff, '\0', size) != NULL) {
     return HTS_FALSE;
@@ -158,7 +160,7 @@ static HTS_UNUSED hts_boolean hts_cache_read_fields(
     hts_boolean cut;
     char *value;
 
-    p = hts_cache_line(p, end, HTS_BUF_N(line, sizeof(line) - 1), &cut);
+    p = hts_cache_line(p, end, HTS_BUF(line), &cut);
     if (line[0] == '\0') {
       break;
     }
@@ -180,7 +182,8 @@ static HTS_UNUSED hts_boolean hts_cache_read_fields(
 }
 
 /* Append an entry's first line to headers at *used. A message too long for
-   it points at X-StatusMessage instead. HTS_FALSE when it does not fit. */
+   it points at X-StatusMessage instead. Returns HTS_FALSE when the line does
+   not fit. */
 static HTS_INLINE HTS_UNUSED hts_boolean hts_cache_status_line(
     hts_buf headers, size_t *used, int statuscode, const char *msg) {
   const char *const message = strlen(msg) < 32 ? msg : "(See X-StatusMessage)";

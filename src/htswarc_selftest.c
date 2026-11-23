@@ -656,7 +656,7 @@ static int st_warc_surt(httrackp *opt, int argc, char **argv) {
   size_t i;
   for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
     char out[512];
-    if (warc_surt(cases[i].url, HTS_BUF(out)) != 0 ||
+    if (!warc_surt(cases[i].url, HTS_BUF(out)) ||
         strcmp(out, cases[i].want) != 0) {
       fprintf(stderr, "warc-surt: %s -> %s (want %s)\n", cases[i].url, out,
               cases[i].want);

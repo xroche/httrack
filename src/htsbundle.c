@@ -1653,8 +1653,8 @@ static void paste_trim_host_dots(char *url) {
   memmove(p, end, strlen(end) + 1);
 }
 
-/* Write the host of the URL in url in its ASCII form, as the engine requests
-   it. NULL, or why it has none. */
+/* Rewrite the host of url in its ASCII form, as the engine requests it.
+   Returns NULL, or why it has none. */
 static const char *paste_host_idna(hts_buf url) {
   char *const host = strstr(url.p, "://") + 3;
   const size_t len = strcspn(host, ":/?\\");

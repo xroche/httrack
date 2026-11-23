@@ -1622,14 +1622,14 @@ void warc_close(warc_writer *w) {
   freet(w);
 }
 
-int warc_surt(const char *url, hts_buf out) {
+hts_boolean warc_surt(const char *url, hts_buf out) {
   wbuf b;
-  int rc = -1;
+  hts_boolean rc = HTS_FALSE;
   memset(&b, 0, sizeof(b));
   if (surt_canon(url, &b) == 0 && wbuf_add(&b, "", 1) == 0 &&
       b.len <= out.size) {
     hts_buf_cpy(out, b.data);
-    rc = 0;
+    rc = HTS_TRUE;
   }
   wbuf_free(&b);
   return rc;

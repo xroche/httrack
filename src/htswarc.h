@@ -120,9 +120,9 @@ warc_writer *warc_open(httrackp *opt, const char *path);
 /* Flush, close and free the writer (NULL-safe). */
 void warc_close(warc_writer *w);
 
-/* SURT-canonicalize url into out (the CDXJ sort key). Returns 0 on success,
-   -1 on error or truncation. Exposed for the -#test=warc-surt test. */
-int warc_surt(const char *url, hts_buf out);
+/* SURT-canonicalize url into out (the CDXJ sort key). Returns HTS_FALSE on
+   error or truncation. Exposed for the -#test=warc-surt test. */
+hts_boolean warc_surt(const char *url, hts_buf out);
 
 /* Byte offset of f, or `current` if the tell failed. Exposed for the
    -#test=warc-offset test, which pins it wide past the 2GB `long` ceiling. */
