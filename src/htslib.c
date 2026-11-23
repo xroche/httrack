@@ -1883,11 +1883,12 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
       strcpybuff(cook_name, "");
       strcpybuff(cook_value, "");
       // read every pair up to the end of the header
-      while (hts_param_next(&rest, ';', HTS_REALSPACES, &n, &v)) {
+      while (hts_param_next(&rest, ';', &n, &v)) {
         // a name stops at a blank or a quote, so "a b=c" is the bare word a
         const hts_span key = hts_span_trim(n, HTS_SPACES, HTS_SPACES);
         size_t word = 0;
 
+        v = hts_span_trim(v, HTS_REALSPACES, HTS_REALSPACES);
         while (word < key.len && !is_space(key.p[word]))
           word++;
         if (hts_span_present(v) && word == key.len) {

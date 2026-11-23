@@ -8,23 +8,24 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-# [name=value], or [name] when the field has no '='
-selftest_queue "[a=1][b=2][][c][d=e=f][]" span param ';' " " "a=1; b = 2 ;; c; d=e=f; ;"
-selftest_queue "[=x][y=]" span param ';' " " "  =x;y="
-selftest_queue "[a=b][]" span param ';' x "xax=xbx;x;"
-selftest_queue '[a="q "][b]' span param ',' " " 'a = "q " ,b'
-selftest_queue "" span param ';' " " "hex:"
-# hex keeps the CR and the high byte that Windows stdin and argv would not
-selftest_queue '[a=\r][\r\nb=c]' span param ';' " " "hex:61203d0d3b0d0a623d63"
-selftest_queue "[a=$(printf '\351')]" span param ';' " " "hex:613de9"
+# [name|value] split at the first '=', or [name] when there is none, untrimmed
+selftest_queue "[a|1][ b | 2 ][][ c][ d|e=f][ ]" span param ';' "a=1; b = 2 ;; c; d=e=f; ;"
+selftest_queue "[d | e = f]" span param ';' "d = e = f"
+selftest_queue "[  |x][y|]" span param ';' "  =x;y="
+selftest_queue '[a | "q " ][b]' span param ',' 'a = "q " ,b'
+selftest_queue "" span param ';' "hex:"
+# hex keeps the CR that Windows text-mode stdin would fold
+selftest_queue '[a |\r][\r\nb|c]' span param ';' "hex:61203d0d3b0d0a623d63"
 
 REC="example.com|FALSE|/|FALSE|0"
 jar() { # jar STORED SENT HEADER
     selftest_queue_lines "stored=$1
 sent=$2" cookiequote "$3"
 }
-# A name ends at a blank, so "na me=v" is a bare attribute and sets nothing.
-jar '' '' 'Set-Cookie: na me=v'
+# A bare first attribute leaves no cookie, and a name ends at a blank.
+jar '' '' 'Set-Cookie: na me=v; d=e'
+jar '' '' 'Set-Cookie: foo; d=e'
+jar "$REC|a|b=c" 'Cookie: a=b=c' 'Set-Cookie: a=b=c'
 # The word before a blank is the attribute.
 jar "$REC|a|1|HttpOnly" 'Cookie: a=1' 'Set-Cookie: a=1; httponly x=2'
 # Quotes around a name go, the value keeps them, empty fields are skipped.
@@ -48,5 +49,5 @@ pasted "refused: a cookie holds a TAB" "a=1; b=x${TAB}y"
 pasted "refused: a cookie in the paste has no name" "a=1; =2"
 pasted "refused: a cookie in the paste has no name" "a=1; b"
 pasted "name=shop.test cookies=2 hosts=shop.test" " ;;a = 1 ; ;b=2;;"
-# Only spaces are trimmed, around the name and the value.
+# The paste trims the spaces around the name and the value.
 grep -q "${TAB}a${TAB}1\$" "$tmpdir/b/shop.test.hts" || fail "a = 1 not stored as a=1"

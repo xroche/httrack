@@ -3983,7 +3983,7 @@ static int st_bufwrite(httrackp *opt, int argc, char **argv) {
 }
 
 /* Print what a span primitive reads as [bytes], for next|nextsep|nextin|split C
-   TEXT, param C BLANKS TEXT, trim L R TEXT, copy SIZE TEXT, or
+   TEXT, param C TEXT, trim L R TEXT, copy SIZE TEXT, or
    header|headersplit TEXT. */
 static int st_span(httrackp *opt, int argc, char **argv) {
   String out = STRING_EMPTY;
@@ -4033,23 +4033,21 @@ static int st_span(httrackp *opt, int argc, char **argv) {
       StringCat(out, "none");
     }
   } else if (strcmp(argv[0], "param") == 0) {
-    /* param SEP BLANKS TEXT: each field shows as [name=value], or [name] with
-       no value. A "hex:" text keeps its CRs, which Windows text-mode stdin
-       folds. */
+    /* Each field shows as [name|value], or [name] with no value. A "hex:" text
+       keeps its CRs, which Windows text-mode stdin folds. */
     char text[256];
-    const size_t n = st_decode_body(argv[argc - 1], text, sizeof(text));
+    const size_t n = st_decode_body(argv[2], text, sizeof(text));
 
-    if (argc < 4 || n + 1 >= sizeof(text)) {
-      fprintf(stderr, "span: param takes SEP BLANKS TEXT, below 255 bytes\n");
+    if (n + 1 >= sizeof(text)) {
+      fprintf(stderr, "span: param takes a text below 255 bytes\n");
       StringFree(out);
       return 1;
     }
-    for (s = hts_span_at(text, n);
-         hts_param_next(&s, argv[1][0], argv[2], &a, &b);) {
+    for (s = hts_span_at(text, n); hts_param_next(&s, argv[1][0], &a, &b);) {
       StringAddchar(out, '[');
       span_add_visible(&out, a.p, a.len);
       if (hts_span_present(b)) {
-        StringAddchar(out, '=');
+        StringAddchar(out, '|');
         span_add_visible(&out, b.p, b.len);
       }
       StringAddchar(out, ']');

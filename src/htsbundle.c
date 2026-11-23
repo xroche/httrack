@@ -1404,7 +1404,9 @@ static const char *paste_curl_cookies(httrackp *opt, t_cookie *jar,
   String pair = STRING_EMPTY;
   int ignored = 0;
 
-  while (why == NULL && hts_param_next(&rest, ';', " ", &name, &value)) {
+  while (why == NULL && hts_param_next(&rest, ';', &name, &value)) {
+    name = hts_span_trim(name, " ", " ");
+    value = hts_span_trim(value, " ", " ");
     if (hts_span_empty(name) && !hts_span_present(value))
       continue;
     if (memchr(name.p, '\t', name.len) != NULL ||

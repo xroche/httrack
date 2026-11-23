@@ -171,8 +171,8 @@ hts_boolean hts_span_list_has(hts_span list, char sep, hts_span token) {
   return HTS_FALSE;
 }
 
-hts_boolean hts_param_next(hts_span *rest, char sep, const char *blanks,
-                           hts_span *name, hts_span *value) {
+hts_boolean hts_param_next(hts_span *rest, char sep, hts_span *name,
+                           hts_span *value) {
   hts_span field;
 
   if (!hts_span_next_in(rest, sep, &field))
@@ -180,8 +180,6 @@ hts_boolean hts_param_next(hts_span *rest, char sep, const char *blanks,
   *value = hts_span_at(NULL, 0);
   if (!hts_span_split(field, '=', name, value))
     *name = field;
-  *name = hts_span_trim(*name, blanks, blanks);
-  *value = hts_span_trim(*value, blanks, blanks);
   return HTS_TRUE;
 }
 
