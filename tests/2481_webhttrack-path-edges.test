@@ -12,10 +12,21 @@ htsserver_require
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_edges.XXXXXX") || fail "no tmpdir"
 cleanup_push htsserver_cleanup_dir "${work}"
+# The kernel's limit counts the resolved path (macOS: /var is /private/var).
+work=$(cd "${work}" && pwd -P)
 test "${#work}" -lt 900 || skip "TMPDIR is too long: ${work}"
 
-htsserver_distroot
-root=${HTS_DISTROOT}
+# A real html/server, since a symlink there lengthens the resolved path.
+root=${work}/root
+mkdir -p "${root}/html"
+for entry in "${HTS_DISTDIR}"/*; do
+    test "${entry##*/}" = html || ln -s "${entry}" "${root}/${entry##*/}"
+done
+for entry in "${HTS_DISTDIR}"/html/*; do
+    test "${entry##*/}" = server || ln -s "${entry}" "${root}/html/${entry##*/}"
+done
+cp -R "${HTS_DISTDIR}/html/server" "${root}/html/server"
+chmod -R u+w "${root}/html/server"
 installed=modern
 test -r "${root}/html/server/themes/${installed}/theme.css" || fail "no ${installed} theme"
 mkdir -p "${work}/home/.httrack/themes/zz" "${work}/proj"
