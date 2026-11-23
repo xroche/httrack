@@ -13,6 +13,9 @@ cleanup_push rm -rf "${tmpdir}"
 out=$(httrack -O "${tmpdir}/st" "-#test=ftp-cmdlen" run 2>&1) ||
     fail "self-test exited non-zero: ${out}"
 grep -q "ftp-cmdlen self-test OK" <<<"${out}" || fail "unexpected output: ${out}"
+out=$(httrack -O "${tmpdir}/st" "-#test=ftp-bufs" 2>&1) ||
+    fail "ftp-bufs self-test exited non-zero: ${out}"
+grep -q "ftp-bufs self-test OK" <<<"${out}" || fail "unexpected output: ${out}"
 
 # The reachable half: the copy into _adr[256] aborted on a long host.
 probe_host() {

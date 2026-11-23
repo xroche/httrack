@@ -108,8 +108,8 @@ static int st_ftpaddr(httrackp *opt, int argc, char **argv) {
     int port = 21;
 
     strcpybuff(url, argv[i]);
-    if (ftp_split_hostport(jump_identification(ftp_jump_authority(url)), host,
-                           sizeof(host), &port, err, sizeof(err)))
+    if (ftp_split_hostport(jump_identification(ftp_jump_authority(url)),
+                           HTS_BUF(host), &port, HTS_BUF(err)))
       printf("host=%s port=%d\n", host, port);
     else
       printf("error=%s\n", err);
@@ -166,9 +166,8 @@ static int st_ftppasv(httrackp *opt, int argc, char **argv) {
     return 1;
   }
   strcpybuff(ip, "-");
-  if (strcmp(argv[0], "pasv") == 0
-          ? ftp_parse_pasv(argv[1], ip, sizeof(ip), &port)
-          : ftp_parse_epsv(argv[1], &port))
+  if (strcmp(argv[0], "pasv") == 0 ? ftp_parse_pasv(argv[1], HTS_BUF(ip), &port)
+                                   : ftp_parse_epsv(argv[1], &port))
     printf("ip=%s port=%d\n", ip, port);
   else
     printf("refused port=%d\n", port);
@@ -806,7 +805,7 @@ static int st_ftp_datasocket(httrackp *opt, int argc, char **argv) {
 
   memset(line, 'x', sizeof(line) - 1);
   line[sizeof(line) - 1] = '\0';
-  srv = get_datasocket(line, sizeof(line));
+  srv = get_datasocket(HTS_BUF(line));
   assertf(srv != INVALID_SOCKET);
   assertf(getsockname(srv, &SOCaddr_sockaddr(bound), &len) == 0);
   port = ntohs(SOCaddr_sinport(bound));
@@ -1002,10 +1001,10 @@ static int st_ftpcmdlen(httrackp *opt, int argc, char **argv) {
           path[0] = ' '; /* any of these forces the quoted form */
         memcpy(buf, poison, sizeof(buf)); /* a zero canary would hide a NUL */
         if (len > fit) {
-          assertf(ftp_command(buf, cap, "RETR", path) == HTS_FALSE);
+          assertf(ftp_command(hts_buf_at(buf, cap), "RETR", path) == HTS_FALSE);
           assertf(buf[0] == '\0'); /* fail-safe for an ignored result */
         } else {
-          assertf(ftp_command(buf, cap, "RETR", path) == HTS_TRUE);
+          assertf(ftp_command(hts_buf_at(buf, cap), "RETR", path) == HTS_TRUE);
           assertf(strlen(buf) == verb + len);
           assertf(strncmp(buf, "RETR ", 5) == 0);
           assertf(buf[verb + len - 1] == (quoted ? '\"' : 'p'));
@@ -1037,6 +1036,54 @@ static int st_ftpcmdlen(httrackp *opt, int argc, char **argv) {
   assertf(memcmp(wire, path, FTP_LINE_SIZE - 1) == 0);
   assertf(memcmp(wire + FTP_LINE_SIZE - 1, "\r\n", 2) == 0);
   printf("ftp-cmdlen self-test OK (%d bytes sent)\n", (int) got);
+  return 0;
+}
+
+/* Drive ftp_split_hostport() and ftp_parse_pasv() at each buffer edge. A
+   refusal must empty the buffer, and nothing may land past its size. */
+static int st_ftpbufs(httrackp *opt, int argc, char **argv) {
+  static const char badport[] = "Invalid port: 12x456789";
+  char host[32], err[64], ip[32], poison[64];
+  size_t cap;
+  int port;
+
+  memset(poison, '#', sizeof(poison)); /* a zero canary would hide a NUL */
+  for (cap = 5; cap <= 7; cap++) {     /* "abcde" needs 6 bytes */
+    memcpy(host, poison, sizeof(host));
+    memcpy(err, poison, sizeof(err));
+    if (ftp_split_hostport("abcde:99", hts_buf_at(host, cap), &port,
+                           HTS_BUF(err))) {
+      assertf(cap >= 6 && strcmp(host, "abcde") == 0);
+      assertf(err[0] == '\0');
+    } else {
+      assertf(cap < 6 && host[0] == '\0');
+      assertf(strcmp(err, "Host name too long") == 0);
+    }
+    assertf(memcmp(host + cap, poison, sizeof(host) - cap) == 0);
+  }
+  for (cap = 23; cap <= 25; cap++) { /* the message needs 24 bytes */
+    const size_t want = cap - 1 < strlen(badport) ? cap - 1 : strlen(badport);
+
+    memcpy(host, poison, sizeof(host));
+    memcpy(err, poison, sizeof(err));
+    assertf(!ftp_split_hostport("abcde:12x456789", HTS_BUF(host), &port,
+                                hts_buf_at(err, cap)));
+    assertf(host[0] == '\0'); /* a host that fitted is undone */
+    assertf(strlen(err) == want && strncmp(err, badport, want) == 0);
+    assertf(memcmp(err + cap, poison, sizeof(err) - cap) == 0);
+  }
+  for (cap = 15; cap <= 17; cap++) { /* "255.255.255.255" needs 16 bytes */
+    memcpy(ip, poison, sizeof(ip));
+    port = -1;
+    if (ftp_parse_pasv("227 (255,255,255,255,1,2)", hts_buf_at(ip, cap),
+                       &port)) {
+      assertf(cap >= 16 && strcmp(ip, "255.255.255.255") == 0 && port == 258);
+    } else {
+      assertf(cap < 16 && ip[0] == '\0' && port == -1);
+    }
+    assertf(memcmp(ip + cap, poison, sizeof(ip) - cap) == 0);
+  }
+  printf("ftp-bufs self-test OK\n");
   return 0;
 }
 
@@ -1076,7 +1123,7 @@ static int st_ftpctrl(httrackp *opt, int argc, char **argv) {
   assertf(send_line(sv[0], "USER bob\001") == 0); // any field, not just a path
   for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
     assertf(
-        ftp_command(cmd, sizeof(cmd), cases[i].verb,
+        ftp_command(HTS_BUF(cmd), cases[i].verb,
                     unescape_http(catbuff, sizeof(catbuff), cases[i].path)));
     if (cases[i].sent == NULL) {
       assertf(strstr(cmd, "DELE") != NULL); // the payload did reach the builder
@@ -1854,5 +1901,8 @@ const struct selftest_entry selftests_net[] = {
      st_ftpctrl},
     {"ftp-cmdlen", "",
      "an FTP command too long for its control line is refused", st_ftpcmdlen},
+    {"ftp-bufs", "",
+     "FTP host, port error and PASV address stay inside their buffers",
+     st_ftpbufs},
     {NULL, NULL, NULL, NULL},
 };

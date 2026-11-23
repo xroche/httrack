@@ -38,6 +38,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsbacktrace.h"
 
 #include "htsglobal.h"
+#include "htsbuf.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -185,18 +186,6 @@ static void print_hex(char *buffer, uintptr_t value) {
   }
 }
 
-/* HTS_FALSE if src does not fit: a truncated module path would point the
-   symbolizer at the wrong file. */
-static hts_boolean copy_bounded(char *dest, size_t size, const char *src) {
-  size_t i;
-
-  for (i = 0; i < size - 1 && src[i] != '\0'; i++) {
-    dest[i] = src[i];
-  }
-  dest[i] = '\0';
-  return src[i] == '\0' ? HTS_TRUE : HTS_FALSE;
-}
-
 /* Run the symbolizer on argv within *budget ticks. HTS_FALSE if none ran.
    fork() would deadlock on glibc's malloc atfork handler (#968). */
 static hts_boolean spawn_symbolizer(char **argv, int *budget) {
@@ -281,10 +270,10 @@ static void symbolize_backtrace(void *const *stack, int size) {
       argv[argc++] = hex[j];
     }
     argv[argc] = NULL;
-    /* access(): skip pseudo-modules like linux-vdso, which have no file and
+    /* A truncated path would point the symbolizer at the wrong file.
+       access(): skip pseudo-modules like linux-vdso, which have no file and
        would draw nothing but an addr2line complaint. */
-    if (copy_bounded(module, sizeof(module), path) &&
-        access(module, R_OK) == 0) {
+    if (hts_buf_cpy_clip(HTS_BUF(module), path) && access(module, R_OK) == 0) {
       const size_t len = strlen(module);
 
       /* addr2line -a prints offsets only: say which module they are in. */

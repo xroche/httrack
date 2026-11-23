@@ -534,15 +534,14 @@ static hts_boolean optalias_param_takes(const char *command,
 
 /* The row's help line, indented and terminated, or nothing where it has none:
    19 param rows carry no help and the tab alone read as a truncated message. */
-static const char *optalias_help_line(char *dest, size_t dest_size,
-                                      const char *name) {
+static const char *optalias_help_line(hts_buf dest, const char *name) {
   const char *const help = optalias_help(name);
 
   if (help == NULL || help[0] == '\0')
-    dest[0] = '\0';
+    dest.p[0] = '\0';
   else
-    slprintfbuff_clip(dest, dest_size, "\t%s\n", help);
-  return dest;
+    hts_buf_printf_clip(dest, "\t%s\n", help);
+  return dest.p;
 }
 
 /* Tell the user why SPELLING did not get the parameter REAL needs. The run
@@ -556,8 +555,7 @@ static void optparam_error(optparam_state state, const char *spelling,
   char help[256];
 
   /* by long name: optalias_help() looks the short form up in vain */
-  optalias_help_line(help, sizeof(help),
-                     pos >= 0 ? hts_optalias[pos][0] : real);
+  optalias_help_line(HTS_BUF(help), pos >= 0 ? hts_optalias[pos][0] : real);
   if (state == OPTPARAM_ABSENT)
     slprintfbuff_clip(return_error, return_error_size,
                       "Syntax error:\n\tOption %s needs to be followed by a "
@@ -582,7 +580,7 @@ static void optvalue_error(const char *name, const char *param,
                            char *return_error, size_t return_error_size) {
   char help[256];
 
-  optalias_help_line(help, sizeof(help), name);
+  optalias_help_line(HTS_BUF(help), name);
   if (hts_is_quoted(param, strlen(param)))
     slprintfbuff_clip(return_error, return_error_size,
                       "Syntax error:\n\tOption --%s: %s " HTS_QUOTED_HINT

@@ -342,8 +342,7 @@ static int HTS_RESOLVER_CALL override_getaddrinfo(const char *node,
     char buf[256];
     char *p;
 
-    buf[0] = '\0';
-    strncatbuff(buf, colon + 1, sizeof(buf) - 1);
+    strclipbuff(buf, sizeof(buf), colon + 1);
     for (p = strtok(buf, ","); p != NULL; p = strtok(NULL, ",")) {
       struct addrinfo *const ai = resolver_make_ai(p, want);
 
@@ -633,11 +632,11 @@ static hts_boolean hts_dns_resolve_nocache_list_bounded(
 }
 
 /* Cache key and resolver input: identification and any ":port" stripped. */
-static void dns_cache_key(char *host, size_t size, const char *iadr) {
+static void dns_cache_key(hts_buf host, const char *iadr) {
   char *a;
 
-  strlcpybuff(host, jump_identification_const(iadr), size);
-  if ((a = jump_toport(host)))
+  hts_buf_cpy(host, jump_identification_const(iadr));
+  if ((a = jump_toport(host.p)))
     *a = '\0';
 }
 
@@ -664,7 +663,7 @@ int hts_dns_preferred(httrackp *opt, const char *iadr) {
   assertf(opt != NULL);
   if (!strnotempty(iadr))
     return 0;
-  dns_cache_key(host, sizeof(host), iadr);
+  dns_cache_key(HTS_BUF(host), iadr);
   hts_mutexlock(&opt->state.lock);
   if (coucal_read_pvoid(hts_cache(opt), host, &ptr))
     preferred = ((const t_dnscache *) ptr)->preferred;
@@ -680,7 +679,7 @@ void hts_dns_set_preferred(httrackp *opt, const char *iadr,
   assertf(opt != NULL);
   if (!strnotempty(iadr))
     return;
-  dns_cache_key(host, sizeof(host), iadr);
+  dns_cache_key(HTS_BUF(host), iadr);
   hts_mutexlock(&opt->state.lock);
   if (coucal_read_pvoid(hts_cache(opt), host, &ptr)) {
     t_dnscache *const record = (t_dnscache *) ptr;
@@ -750,7 +749,7 @@ hts_dns_status hts_dns_resolve(httrackp *opt, const char *iadr, int timeout,
     return res->status;
   }
 
-  dns_cache_key(host, sizeof(host), iadr);
+  dns_cache_key(HTS_BUF(host), iadr);
 
   hts_mutexlock(&opt->state.lock);
 #if HTS_INET6 != 0
@@ -793,7 +792,7 @@ hts_boolean hts_dns_cached(httrackp *opt, const char *iadr) {
   assertf(opt != NULL);
   if (!strnotempty(iadr))
     return HTS_TRUE; /* nothing to resolve */
-  dns_cache_key(host, sizeof(host), iadr);
+  dns_cache_key(HTS_BUF(host), iadr);
   hts_mutexlock(&opt->state.lock);
   hit = hts_ghbn_all(hts_cache(opt), host, &scratch);
   hts_mutexrelease(&opt->state.lock);
@@ -804,7 +803,7 @@ hts_dns_job *hts_dns_start(httrackp *opt, const char *iadr) {
   char BIGSTK host[HTS_URLMAXSIZE * 2];
 
   assertf(opt != NULL);
-  dns_cache_key(host, sizeof(host), iadr);
+  dns_cache_key(HTS_BUF(host), iadr);
 #if HTS_INET6 != 0
   hts_mutexlock(&opt->state.lock);
   hts_resolver_check_env(); /* settle the backend before a worker reads it */
@@ -816,7 +815,7 @@ hts_dns_job *hts_dns_start(httrackp *opt, const char *iadr) {
 hts_boolean hts_dns_job_is(const hts_dns_job *job, const char *iadr) {
   char BIGSTK host[HTS_URLMAXSIZE * 2];
 
-  dns_cache_key(host, sizeof(host), iadr);
+  dns_cache_key(HTS_BUF(host), iadr);
   return strcmp(job->hostname, host) == 0 ? HTS_TRUE : HTS_FALSE;
 }
 

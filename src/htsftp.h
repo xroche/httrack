@@ -36,6 +36,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsbase.h"
 #include "htsbasenet.h"
 #include "htsthread.h"
+#include "htsbuf.h"
 
 /* Forward definitions */
 #ifndef HTS_DEF_FWSTRUCT_lien_back
@@ -92,12 +93,12 @@ int get_ftp_line(lien_back *back, T_SOC soc, char *line, size_t line_size,
 /* Start of the authority in a URL address: the scheme and its slashes skipped.
    Bracket-aware, unlike a hand-rolled split on the first ':'. */
 char *ftp_jump_authority(char *url_adr);
-/* Split "host[:port]" (host may be a "[IPv6]" literal) into host[host_size] and
-   *port. Returns HTS_FALSE with host emptied and the reason in err[err_size]
-   when the host does not fit or the port is malformed; an empty ":" keeps the
-   caller's default port (#614). */
-hts_boolean ftp_split_hostport(const char *adr, char *host, size_t host_size,
-                               int *port, char *err, size_t err_size);
+/* Split "host[:port]" (host may be a "[IPv6]" literal) into host and *port.
+   Returns HTS_FALSE with host emptied and the reason in err when the host does
+   not fit or the port is malformed; an empty ":" keeps the caller's default
+   port (#614). */
+hts_boolean ftp_split_hostport(const char *adr, hts_buf host, int *port,
+                               hts_buf err);
 /* Split a "user[:pass]@" prefix (end = jump_identification result) on its
    first raw colon and percent-decode each field into NUL-terminated user/pass
    buffers. Returns HTS_FALSE and empties both when a decoded field does not
@@ -112,22 +113,21 @@ hts_boolean ftp_split_userpass(const char *src, const char *end, char *user,
                       sizeof(pass) + sizeof("PASS ") - 1 <= FTP_LINE_SIZE),    \
    ftp_split_userpass((src), (end), (user), sizeof(user), (pass),              \
                       sizeof(pass)))
-/* Build "<verb> <path>" into line[line_size]. The path is quoted whenever a
-   bare one would give the server a second token; it must already have been
-   screened for control bytes. Returns HTS_FALSE and empties line when the
-   command does not fit, as a clipped one would name a different file. */
-HTS_CHECK_RESULT hts_boolean ftp_command(char *line, size_t line_size,
-                                         const char *verb, const char *path);
+/* Build "<verb> <path>" into line. The path is quoted whenever a bare one
+   would give the server a second token; it must already have been screened
+   for control bytes. Returns HTS_FALSE and empties line when the command does
+   not fit, as a clipped one would name a different file. */
+HTS_CHECK_RESULT hts_boolean ftp_command(hts_buf line, const char *verb,
+                                         const char *path);
 /* ftp_command() into a control line of the one capacity every FTP buffer has;
    anything narrower fails the build rather than refusing a path that fits. */
 #define ftp_command_line(line, verb, path)                                     \
   (HTS_COMPILE_ASSERT(sizeof(line) == FTP_LINE_SIZE),                          \
-   ftp_command((line), sizeof(line), (verb), (path)))
-/* Parse a PASV reply's "(h1,h2,h3,h4,p1,p2)" into ip[ip_size] as a dotted
-   address and *port. Each field must be 1 to 3 digits in 0..255. Returns
-   HTS_FALSE and leaves *port alone for any other reply, or a zero port. */
-hts_boolean ftp_parse_pasv(const char *line, char *ip, size_t ip_size,
-                           int *port);
+   ftp_command(HTS_BUF(line), (verb), (path)))
+/* Parse a PASV reply's "(h1,h2,h3,h4,p1,p2)" into ip as a dotted address and
+   *port. Each field must be 1 to 3 digits in 0..255. Returns HTS_FALSE and
+   leaves *port alone for any other reply, or a zero port. */
+hts_boolean ftp_parse_pasv(const char *line, hts_buf ip, int *port);
 /* Parse an EPSV reply's "(|||port|)" into *port, which must be 1..65535.
    Returns HTS_FALSE and leaves *port alone for any other reply. */
 hts_boolean ftp_parse_epsv(const char *line, int *port);
@@ -137,7 +137,7 @@ hts_boolean ftp_parse_size(const char *line, LLint *size);
 /* Parse an MDTM reply "213 YYYYMMDDHHMMSS" (UTC) into *tm_time. Returns
    HTS_FALSE for any other reply or an out-of-range field. */
 hts_boolean ftp_parse_mdtm(const char *line, struct tm *tm_time);
-T_SOC get_datasocket(char *to_send, size_t to_send_size);
+T_SOC get_datasocket(hts_buf to_send);
 int stop_ftp(lien_back * back);
 char *linejmp(char *line);
 int check_socket_connect(T_SOC soc);
