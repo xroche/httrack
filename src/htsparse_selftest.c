@@ -67,7 +67,7 @@ static hts_boolean dirtylink_model(httrackp *opt, const char *str, char lastc,
     return HTS_FALSE;
 
   by_ext = (get_httptype_sized(opt, type, sizeof(type), cut, 0) ||
-            is_dyntype(get_ext(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), cut)))
+            is_dyntype(hts_fil_ext(cut)))
                ? HTS_TRUE
                : HTS_FALSE;
 

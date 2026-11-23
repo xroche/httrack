@@ -492,19 +492,14 @@ void longfile_to_83(int mode, hts_buf n83, char *save) {
   }                             // recopier nom
   nom[i] = '\0';
   if (save[j]) {                // il reste au moins un point
-    i = (int) strlen(save) - 1;
-    while((i > 0) && (save[i] != '.') && (save[i] != '/'))
-      i--;                      // rechercher dernier .
-    if (save[i] == '.') {       // point!
+    const char *a = hts_path_ext_dot(save, "/");
+
+    if (a != NULL) {
       int j = 0;
 
-      i++;
-      while((j < 3) && (save[i])) {
-        if (save[i] != ' ') {
-          ext[j] = save[i];
-          j++;
-        }
-        i++;
+      for (a++; j < 3 && *a != '\0'; a++) {
+        if (*a != ' ')
+          ext[j++] = *a;
       }
       ext[j] = '\0';
     }

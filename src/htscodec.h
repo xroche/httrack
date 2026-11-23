@@ -34,6 +34,7 @@ Please visit our Website: http://www.httrack.com
 #define HTS_DEFCODEC
 
 #include "htsglobal.h"
+#include "htsurlport.h"
 
 /* Content codings we may meet in a Content-Encoding header. */
 typedef enum {
@@ -55,7 +56,7 @@ extern const char *hts_acceptencoding(hts_boolean compressible,
                                       hts_boolean secure);
 
 /* Is ext the codec's archive extension, which stays packed on disk? */
-extern hts_boolean hts_codec_is_archive_ext(hts_codec codec, const char *ext);
+extern hts_boolean hts_codec_is_archive_ext(hts_codec codec, hts_span ext);
 
 /* Decode filename into newfile and return its size, or -1 on failure. On -1,
    errno is the local failure's, or 0 when the coded body was at fault. */

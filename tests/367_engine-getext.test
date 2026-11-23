@@ -5,23 +5,38 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-# get_ext() must stop at '?' and copy the length it measured, or a long query
-# writes a terminator one byte past the buffer (#1433).
+# hts_fil_ext() must stop at '?', and the finders keep their own rules.
 
 assert_selftest "getext self-test OK" getext
 
 # url_savename() strips '?' before it percent-decodes, so a %3F reaches
-# get_ext() as '?'. Mirrors holding such a name rename once.
+# hts_fil_ext() as '?'. Mirrors holding such a name rename once.
 selftest_queue 'savename: /dev/null/www.example.com/x.html' savename \
     '/x.php%3Fid=3' text/html
 selftest_queue 'savename: /dev/null/www.example.com/a.html' savename \
     '/a.gz%3Fk' text/html
 
-# A plain query is untouched: it never reaches get_ext() at all.
+# A plain query is untouched: it never reaches hts_fil_ext() at all.
 selftest_queue 'savename: /dev/null/www.example.com/xd708.html' savename \
     '/x.php?id=3' text/html
 # And an unknown trailing token still is not an extension (#115).
 selftest_queue 'savename: /dev/null/www.example.com/article-1.884291.html' \
     savename '/article-1.884291' text/html
+
+# A type change cuts the old extension only from the last segment, so a dot
+# in a directory leaves the name whole.
+selftest_queue 'savename: /dev/null/www.example.com/v1.2/page.gif' savename \
+    '/v1.2/page' image/gif
+selftest_queue 'savename: /dev/null/www.example.com/v1.2/page.x.gif' savename \
+    '/v1.2/page.x' image/gif
+selftest_queue 'savename: /dev/null/www.example.com/a.b/c.gif' savename \
+    '/a.b/c.cgi' image/gif
+selftest_queue 'savename: /dev/null/www.example.com/x.gif' savename \
+    '/x.' image/gif
+selftest_queue 'savename: /dev/null/www.example.com/v1._/page.gif' savename \
+    '/v1.%3F/page' image/gif
+# A decoded %3F ends the extension, so ".y" is cut after the known "php".
+selftest_queue 'savename: /dev/null/www.example.com/a.php_x=1.gif' savename \
+    '/a.php%3Fx=1.y' image/gif
 
 selftest_run_queued

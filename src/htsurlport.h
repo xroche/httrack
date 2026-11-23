@@ -174,6 +174,17 @@ HTS_CHECK_RESULT hts_boolean hts_span_is_digits(hts_span s);
 HTS_CHECK_RESULT hts_boolean hts_span_parse_llint(hts_span s, LLint min,
                                                   LLint max, LLint *out);
 
+/* Return a pointer to the '.' that starts the extension of PATH's last
+   segment, or NULL. A byte of SEPS ends a segment, '?' is a plain byte, and a
+   '.' at PATH[0] counts. */
+HTS_CHECK_RESULT const char *hts_path_ext_dot(const char *path,
+                                              const char *seps);
+
+/* Return a span of the text after FIL's last '.' before the first '?', or an
+   empty span. The search crosses directories, so "/v1.2/page" gives "2/page".
+ */
+hts_span hts_fil_ext(const char *fil);
+
 /* Find parameter NAME (exact, any case) in a header VALUE whose fields are
    split by any byte of SEPS, as in "type; a=1; NAME=\"v\"". The first NAME
    wins. A quoted value unescapes only \" and \\, and a missing end quote

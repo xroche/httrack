@@ -236,118 +236,73 @@ static hts_boolean st_poison_intact(const char *label, const char *buf,
   return HTS_TRUE;
 }
 
-/* One get_ext() into a poisoned arena of `cap` bytes: the extension must come
-   out whole and nothing may be written past `cap`. */
-static hts_boolean st_getext_case(char *arena, size_t cap, size_t guard,
-                                  const char *fil, const char *want) {
-  hts_boolean ok = HTS_TRUE;
-  const char *ext;
-  size_t from;
+/* Return the tail of PATH from the '.' that hts_path_ext_dot() finds, or
+   "(none)". */
+static const char *st_ext_dot(const char *path, const char *seps) {
+  const char *const dot = hts_path_ext_dot(path, seps);
 
-  memset(arena, ST_POISON, cap + guard);
-  ext = get_ext(arena, cap, fil);
-  /* every check runs: a wrong answer must not stop the canary from reporting */
-  if (strcmp(ext, want) != 0) {
-    fprintf(stderr, "getext: [%s] in %d bytes gave [%s], wanted [%s]\n", fil,
-            (int) cap, ext, want);
-    ok = HTS_FALSE;
-  }
-  /* the answer is built in the caller's buffer, and only the refusal is not */
-  if ((ext == arena) != (*want != '\0')) {
-    fprintf(stderr, "getext: [%s] in %d bytes answered from the wrong buffer\n",
-            fil, (int) cap);
-    ok = HTS_FALSE;
-  }
-  /* an extension that did not fit leaves the whole arena poisoned; one that
-     fitted ends on its own NUL */
-  from = ext == arena ? strlen(ext) + 1 : 0;
-  if (!st_poison_intact("getext: inside the destination", arena, from, cap))
-    ok = HTS_FALSE;
-  if (!st_poison_intact("getext: past the destination", arena, cap,
-                        cap + guard))
-    ok = HTS_FALSE;
-  return ok;
+  return dot != NULL ? dot : "(none)";
 }
 
-/* get_ext() reads the extension before '?' and stays in bounds (#1433). */
+/* hts_fil_ext() stops at '?' and counts a dot in a directory, while
+   hts_path_ext_dot() stays in the last segment and ignores '?'. */
 static int st_getext(httrackp *opt, int argc, char **argv) {
   static const struct {
     const char *fil;
-    const char *want;
+    const char *ext;   /* hts_fil_ext */
+    const char *slash; /* hts_path_ext_dot(fil, "/") */
+    const char *both;  /* hts_path_ext_dot(fil, "/\\") */
   } cases[] = {
-      {"x.php", "php"},
-      {"x.php?id=3", "php"},
-      /* the query is not scanned for dots */
-      {"x.php?id=3.txt", "php"},
-      {"/a/b.c?Q123456789012345678901234567890", "c"},
-      {"x.PHP?a", "PHP"}, /* no case folding */
-      {"x.php?", "php"},
-      {"foo", ""},
-      {"x.", ""},
-      {"?x.php", ""},
+      {"x.php", "php", ".php", ".php"},
+      {"x.php?id=3", "php", ".php?id=3", ".php?id=3"},
+      {"x.php?id=3.txt", "php", ".txt", ".txt"},
+      {"x.PHP?a", "PHP", ".PHP?a", ".PHP?a"},
+      {"x.php?", "php", ".php?", ".php?"},
+      {"?x.php", "", ".php", ".php"},
+      {"foo", "", "(none)", "(none)"},
+      {"", "", "(none)", "(none)"},
+      {"x.", "", ".", "."},
+      {"a..", "", ".", "."},
+      {".htaccess", "htaccess", ".htaccess", ".htaccess"},
+      {"/v1.2/page", "2/page", "(none)", "(none)"},
+      {"/v1.2/", "2/", "(none)", "(none)"},
+      {"/a.b\\c", "b\\c", ".b\\c", "(none)"},
+      {"/a\\b.c", "c", ".c", ".c"},
+      {"a.html#f.g", "g", ".g", ".g"},
+      {"/a.b/c.d/e.f", "f", ".f", ".f"},
   };
 
-  /* no sizeof(void *), which the size check takes for a pointer argument */
-  static const size_t caps[] = {1, 2, 3, 5, 6, 16, 64};
-  /* longer than any capacity below, so a size-bounded copy runs off the end */
-  static const char query[] = "?q=00000000001111111111222222222233333333334"
-                              "4444444445555555555666666666677777777778888";
-  const size_t guard = 64;
-  size_t c, k;
+  size_t k;
   int rc = 0;
 
-  /* the semantics, in a destination nothing here comes close to filling */
-  {
-    char *arena = malloct(256 + guard);
+  for (k = 0; k < sizeof(cases) / sizeof(cases[0]); k++) {
+    const hts_span ext = hts_fil_ext(cases[k].fil);
+    const char *const slash = st_ext_dot(cases[k].fil, "/");
+    const char *const both = st_ext_dot(cases[k].fil, "/\\");
 
-    assertf(arena != NULL);
-    for (k = 0; k < sizeof(cases) / sizeof(cases[0]); k++) {
-      if (!st_getext_case(arena, 256, guard, cases[k].fil, cases[k].want))
-        rc = 1;
-    }
-    freet(arena);
-  }
-
-  /* the point of the query half: a parameterised URL types as the bare one */
-  {
-    char buf[16];
-
-    if (!is_dyntype(get_ext(buf, sizeof(buf), "x.php?id=3")) ||
-        !is_dyntype(get_ext(buf, sizeof(buf), "x.php"))) {
-      fprintf(stderr, "getext: a parameterised .php is not a dynamic type\n");
+    if (!hts_span_eq(ext, hts_span_of(cases[k].ext)) ||
+        strcmp(slash, cases[k].slash) != 0 ||
+        strcmp(both, cases[k].both) != 0) {
+      fprintf(stderr, "getext: [%s] gave [%.*s] [%s] [%s]\n", cases[k].fil,
+              (int) ext.len, ext.p, slash, both);
       rc = 1;
     }
   }
 
-  /* a one-size-fits-all bound fails on the small capacities */
-  for (c = 0; c < sizeof(caps) / sizeof(caps[0]); c++) {
-    const size_t cap = caps[c];
-    const size_t maxext = cap + guard;
-    char *arena = malloct(cap + guard);
-    char *fil = malloct(5 + maxext + sizeof(query));
-    char *want = malloct(maxext + 1);
-
-    assertf(arena != NULL && fil != NULL && want != NULL);
-    for (k = 1; k <= maxext; k++) {
-      size_t i;
-
-      /* bytes that vary, or a copy taken from the wrong offset would match */
-      memcpy(fil, "/d/f.", 5);
-      for (i = 0; i < k; i++)
-        fil[5 + i] = (char) ('a' + i % 26);
-      fil[5 + k] = '\0';
-      memcpy(want, fil + 5, k + 1);
-      if (k >= cap) /* k characters plus the NUL do not fit */
-        want[0] = '\0';
-      if (!st_getext_case(arena, cap, guard, fil, want))
-        rc = 1;
-      memcpy(fil + 5 + k, query, sizeof(query));
-      if (!st_getext_case(arena, cap, guard, fil, want))
-        rc = 1;
-    }
-    freet(arena);
-    freet(fil);
-    freet(want);
+  /* a parameterised URL types as the bare one, in any case */
+  if (!is_dyntype(hts_fil_ext("x.php?id=3")) ||
+      !is_dyntype(hts_fil_ext("x.PHP")) || is_dyntype(hts_fil_ext("x.php5")) ||
+      is_dyntype(hts_fil_ext("x")) || !is_dyntype(hts_fil_ext("x.cgi"))) {
+    fprintf(stderr, "getext: is_dyntype is wrong\n");
+    rc = 1;
+  }
+  if (ishtml_ext(hts_span_of("HTM")) != 1 ||
+      ishtml_ext(hts_span_of("htmx")) != 1 ||
+      ishtml_ext(hts_span_of("html")) != 1 ||
+      ishtml_ext(hts_span_of("xhtml")) != -1 ||
+      ishtml_ext(hts_span_of("")) != -1) {
+    fprintf(stderr, "getext: ishtml_ext is wrong\n");
+    rc = 1;
   }
 
   printf("getext self-test %s\n", rc == 0 ? "OK" : "FAILED");
@@ -2261,8 +2216,7 @@ const struct selftest_entry selftests_name[] = {
     {"stripport", "", "default :80 port strip preserves host (#627)",
      st_stripport},
     {"getext", "",
-     "extension parsing stops at the query and inside the buffer (#1433)",
-     st_getext},
+     "extension finders: the query, directory dots and separators", st_getext},
     {"savename", "<fil> <content-type> [key=value ...]",
      "local save-name for a URL", st_savename},
     {"savename-collide", "",

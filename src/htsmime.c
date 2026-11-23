@@ -45,11 +45,9 @@ static const char *hts_mime_bogus_multiple[] = {
     ""};
 
 /* pas de type mime connu, mais extension connue */
-static const char *hts_ext_dynamic[] = {"php3", "php", "php4", "php2", "cgi",
-                                        "asp", "jsp", "pl",
-                                        /*"exe", */
-                                        "cfm", "nsf", /* lotus */
-                                        ""};
+static const char *const hts_ext_dynamic[] = {
+    HTS_SPAN_WORDS("php3", "php", "php4", "php2", "cgi", "asp", "jsp", "pl",
+                   "cfm", "nsf" /* lotus */)};
 
 /* types MIME
    note: application/octet-stream should not be used here
@@ -410,18 +408,19 @@ void guess_httptype(httrackp *opt, char *s, const char *fil) {
 // column (0=mime, 1=ext); returns the other column, or NULL if no row matches
 // (a "*" partner means the row carries no value).
 static const char *hts_mime_lookup(const char *(*table)[2], int key,
-                                   const char *needle) {
+                                   hts_span needle) {
   int j;
 
   for (j = 0; strnotempty(table[j][1]); j++) {
-    if (strfield2(table[j][key], needle) && table[j][!key][0] != '*')
+    if (hts_span_eq_ci(hts_span_of(table[j][key]), needle) &&
+        table[j][!key][0] != '*')
       return table[j][!key];
   }
   return NULL;
 }
 
 // hts_mime_lookup() over the legacy table, then the modern one
-static const char *hts_mime_find(int key, const char *needle) {
+static const char *hts_mime_find(int key, hts_span needle) {
   const char *const found = hts_mime_lookup(hts_mime, key, needle);
 
   return found != NULL ? found : hts_mime_lookup(hts_mime_modern, key, needle);
@@ -442,15 +441,13 @@ HTSEXT_API hts_boolean get_httptype_sized(httrackp *opt, char *s, size_t ssize,
     return 1;
   } else {
     /* Check html -> text/html */
-    const char *a = hts_lastcharptr(fil);
+    const char *a = hts_path_ext_dot(fil, "/");
 
-    while ((a > fil) && (*a != '.') && (*a != '/'))
-      a--;
-    if (a >= fil && *a == '.' && strlen(a) < 32) {
+    if (a != NULL && strlen(a) < 32) {
       const char *mime;
 
       a++;
-      mime = hts_mime_find(1, a);
+      mime = hts_mime_find(1, hts_span_of(a));
       if (mime != NULL) {
         strlcpybuff(s, mime, ssize);
         return 1;
@@ -604,7 +601,7 @@ int give_mimext(hts_buf s, const char *st) {
 
   st = hts_effective_mime(st); /* no declared type: derive an html ext */
   s.p[0] = '\0';
-  ext = hts_mime_find(0, st);
+  ext = hts_mime_find(0, hts_span_of(st));
   if (ext != NULL) {
     hts_buf_cpy(s, ext);
     ok = 1;
@@ -635,12 +632,11 @@ int give_mimext(hts_buf s, const char *st) {
 
 // known extension? 0: no, 1: yes, 2: html
 int is_knowntype(httrackp *opt, const char *fil) {
-  char catbuff[CATBUFF_SIZE];
   const char *mime;
 
   if (!fil)
     return 0;
-  mime = hts_mime_find(1, get_ext(catbuff, sizeof(catbuff), fil));
+  mime = hts_mime_find(1, hts_fil_ext(fil));
   if (mime != NULL)
     return is_html_mime_type(mime) ? 2 : 1;
 
@@ -671,22 +667,8 @@ int is_userknowntype(httrackp *opt, const char *fil) {
     return 1;
 }
 
-// page dynamique?
-// is_dyntype(get_ext("foo.asp"))
-hts_boolean is_dyntype(const char *fil) {
-  int j = 0;
-
-  if (!fil)
-    return 0;
-  if (!strnotempty(fil))
-    return 0;
-  while (strnotempty(hts_ext_dynamic[j])) {
-    if (strfield2(hts_ext_dynamic[j], fil)) {
-      return 1;
-    }
-    j++;
-  }
-  return 0;
+hts_boolean is_dyntype(hts_span ext) {
+  return hts_span_index_ci(ext, hts_ext_dynamic) >= 0;
 }
 
 // types critiques qui ne doivent pas être changés car renvoyés par des serveurs

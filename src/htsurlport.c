@@ -441,6 +441,27 @@ static const struct {
     {505, "HTTP Version Not Supported"},
 };
 
+const char *hts_path_ext_dot(const char *path, const char *seps) {
+  size_t i;
+
+  for (i = strlen(path); i > 0; i--) {
+    if (path[i - 1] == '.')
+      return &path[i - 1];
+    if (span_in_set(seps, path[i - 1]))
+      return NULL;
+  }
+  return NULL;
+}
+
+hts_span hts_fil_ext(const char *fil) {
+  const char *const end = fil + strcspn(fil, "?");
+  const char *dot = end;
+
+  while (dot != fil && dot[-1] != '.')
+    dot--;
+  return dot != fil ? hts_span_between(dot, end) : hts_span_at(end, 0);
+}
+
 const char *hts_status_reason(int code) {
   size_t i;
 

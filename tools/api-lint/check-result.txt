@@ -130,7 +130,6 @@ src/htslib.h: http_bundle_header_refusal
 src/htslib.h: http_custom_header_warning
 src/htslib.h: http_sendhead
 src/htslib.h: ident_url_absolute
-src/htslib.h: is_dyntype
 src/htslib.h: ishtml
 src/htslib.h: may_unknown
 src/htslib.h: openFunctionLib

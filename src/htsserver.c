@@ -167,8 +167,7 @@ static const struct {
 /* Content type of file, NULL if its extension is unlisted. Matched on the last
    segment's whole extension, never on a substring of the path. */
 static const char *server_content_type(const char *file) {
-  const char *const slash = strrchr(file, '/');
-  const char *const dot = strrchr(slash != NULL ? slash : file, '.');
+  const char *const dot = hts_path_ext_dot(file, "/");
   int i;
 
   if (dot == NULL) {
