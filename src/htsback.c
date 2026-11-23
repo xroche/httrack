@@ -1106,6 +1106,11 @@ static int back_unpack_body(httrackp *opt, lien_back *const back,
   int size;
 
   *layer = back->r.contentencoding;
+  if (back->r.transfer_coding < 0) {
+    *layer = "Transfer-Encoding";
+    errno = 0;
+    return -1;
+  }
   if (back->r.transfer_coding == 0)
     return hts_codec_unpack_max(codec, back->tmpfile, unpacked, cap);
   *layer = "Transfer-Encoding";
@@ -1348,8 +1353,7 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
               /* Keep the compressed spool so the WARC record stores the body
                  verbatim (Content-Encoding preserved) instead of unlinking it.
                */
-              /* with only a transfer coding, tmpfile is not what the record
-                 stores */
+              /* a transfer coding alone leaves nothing verbatim to keep */
               if (StringNotEmpty(opt->warc_file) &&
                   hts_codec_parse(back[p].r.contentencoding) !=
                       HTS_CODEC_IDENTITY) {
