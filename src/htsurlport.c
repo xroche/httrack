@@ -215,14 +215,7 @@ hts_boolean hts_header_next(hts_span *rest, hts_header_field *f) {
 }
 
 hts_boolean hts_span_copy(hts_span s, char *dst, size_t size) {
-  size_t n;
-
-  if (size == 0)
-    return HTS_FALSE;
-  n = s.len < size ? s.len : size - 1;
-  memcpy(dst, s.p, n);
-  dst[n] = '\0';
-  return n == s.len;
+  return hts_buf_put_span_clip(hts_buf_at(dst, size), s);
 }
 
 char *hts_span_dup(hts_span s) {
