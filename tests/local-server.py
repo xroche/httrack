@@ -2554,6 +2554,11 @@ class Handler(SimpleHTTPRequestHandler):
             ).encode()
             body = b"<html><body>\n%s</body></html>\n" % body
             ctype = "text/html"
+        elif name == "zstdgzip":
+            # unlisted, for builds with zstd: two codecs make the order visible
+            coding, content = "gzip, chunked", "zstd"
+            body = self.CODEC_ZSTD
+            ctype = "text/html"
         else:
             coding, content = self.TECODE[name]
             body = self.tecode_plain(name)

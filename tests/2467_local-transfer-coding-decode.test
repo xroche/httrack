@@ -87,3 +87,11 @@ local_crawl "$BASEURL/tecode/index.html" -O "$tmpdir/m" -C1 || fail "update fail
 test "$(count_matching_lines 'no files updated' "$log")" = 1 ||
     fail_dump "the cache run fetched again" "$log"
 ok "a cache run keeps the decoded bodies"
+
+# The content coding comes off last, which only a second codec can show.
+if test "${ZSTD_ENABLED:-yes}" = "yes"; then
+    local_crawl "$BASEURL/tecode/zstdgzip.html" -O "$tmpdir/z" || fail "crawl failed"
+    grep -q 'coded body' "$tmpdir/z/$host/tecode/zstdgzip.html" ||
+        fail_dump "gzip transfer coding over zstd content not undone" "$tmpdir/z/hts-log.txt"
+    ok "the transfer coding came off before the content coding"
+fi
