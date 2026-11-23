@@ -4264,6 +4264,108 @@ static int st_spanindex(httrackp *opt, int argc, char **argv) {
   return failures != 0;
 }
 
+/* Check hts_span_list_has and hts_span_list_last on comma lists. */
+static int st_spanlist(httrackp *opt, int argc, char **argv) {
+  static const struct {
+    const char *list;
+    const char *token; // NULL: the list has no last item
+    hts_boolean has;   // does the list hold "chunked"?
+  } cases[] = {
+      {"chunked", "chunked", HTS_TRUE},
+      {"gzip, chunked", "chunked", HTS_TRUE},
+      {"  Chunked\t", "Chunked", HTS_TRUE},
+      {"chunked, gzip", "gzip", HTS_TRUE},
+      {"gzip,chunked,", "chunked", HTS_TRUE},
+      {"gzip ,  ,", "gzip", HTS_FALSE},
+      {"xchunked, chunkedx", "chunkedx", HTS_FALSE},
+      {"chunk ed", "chunk ed", HTS_FALSE},
+      {"\"chunked\"", "\"chunked\"", HTS_FALSE},
+      {"", NULL, HTS_FALSE},
+      {" , \t,", NULL, HTS_FALSE},
+  };
+
+  size_t i, failures = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+    const hts_span list = hts_span_of(cases[i].list);
+    hts_span last = hts_span_of("unset");
+    const hts_boolean found = hts_span_list_last(list, ',', &last);
+
+    if (hts_span_list_has(list, ',', hts_span_of("chunked")) != cases[i].has ||
+        found != (cases[i].token != NULL) ||
+        !hts_span_eq(last, hts_span_of(found ? cases[i].token : "unset"))) {
+      printf("spanlist: case %d failed\n", (int) i);
+      failures++;
+    }
+  }
+  // An empty token matches no item, even an empty one.
+  if (hts_span_list_has(hts_span_of("a,,b"), ',', hts_span_of(""))) {
+    printf("spanlist: an empty item matched\n");
+    failures++;
+  }
+  printf("spanlist: %d cases, %d failures\n",
+         (int) (sizeof(cases) / sizeof(cases[0])), (int) failures);
+  if (failures == 0)
+    printf("spanlist: OK\n");
+  return failures != 0;
+}
+
+/* Feed each line of a file to treathead_opt() the way the response loop does,
+   and print what it read. A "%%" line starts a new response. */
+static int st_headerparse(httrackp *opt, int argc, char **argv) {
+  static t_cookie jar;
+  char location[HTS_LOCATION_SIZE];
+  size_t len;
+  char *data;
+  const char *p, *end;
+  int record = 0;
+
+  if (argc < 1 || (data = st_slurp(argv[0], &len)) == NULL) {
+    fprintf(stderr, "headerparse: cannot read the corpus\n");
+    return 1;
+  }
+  p = data;
+  end = data + len;
+  while (p < end) {
+    htsblk r;
+    char rcvd[2048];
+    int offset;
+
+    memset(&r, 0, sizeof(r));
+    r.totalsize = -1;
+    r.retry_after = -1;
+    r.location = location;
+    location[0] = '\0';
+    jar.max_len = sizeof(jar.data);
+    jar.data[0] = '\0';
+    for (; p < end; p += offset) {
+      const hts_boolean cut = binput_line(p, end, rcvd, sizeof(rcvd), &offset);
+
+      if (strcmp(rcvd, "%%") == 0) {
+        p += offset;
+        break;
+      }
+      if (!cut && strnotempty(rcvd))
+        treathead_opt(opt, &jar, "www.example.com", "/dir/page.html", &r, rcvd);
+    }
+    printf("#%d size=" LLintP " empty=%d chunk=%d keep=%d/%d/%d trailers=%d"
+           " compressed=%d range=" LLintP "-" LLintP "/" LLintP " retry=%d\n",
+           record++, r.totalsize, r.empty, r.is_chunk, r.keep_alive,
+           r.keep_alive_max, r.keep_alive_t, r.keep_alive_trailers,
+           r.compressed, r.crange_start, r.crange_end, r.crange, r.retry_after);
+    printf(" type=[%s] charset=[%s] encoding=[%s] cdispo=[%s]\n", r.contenttype,
+           r.charset, r.contentencoding, r.cdispo);
+    printf(" lastmod=[%s] etag=[%s] location=[%s]\n", r.lastmodified, r.etag,
+           location);
+    printf(" jar=[%s]\n", jar.data);
+  }
+  freet(data);
+  return 0;
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: this module's tests, in the order -#test lists them. */
 /* ------------------------------------------------------------ */
@@ -5436,6 +5538,11 @@ const struct selftest_entry selftests_lib[] = {
      st_spancmp},
     {"spanindex", "", "the word a span matches in a NULL-terminated list",
      st_spanindex},
+    {"spanlist", "", "the token a span list holds, and its last one",
+     st_spanlist},
+    {"headerparse", "<file>",
+     "the fields treathead_opt() reads from each response in a file",
+     st_headerparse},
     {"gmtime", "",
      "hts_gmtime() fills the caller's buffer, not a static (#794)", st_gmtime},
     {"secrets", "",

@@ -1,0 +1,90 @@
+#!/bin/bash
+#
+# Transfer-Encoding and Connection are token lists: chunked counts only as the
+# final coding (RFC 9112 6.1), and keep-alive anywhere unless close is there.
+
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+assert_selftest $'spanlist: 11 cases, 0 failures\nspanlist: OK' spanlist
+ok "spanlist self-test"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_2455.XXXXXX") || exit 1
+cleanup() {
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+# One response per %% record, and want holds what treathead_opt reads from each.
+printf '%s\r\n' \
+    'Transfer-Encoding: gzip, chunked' %% \
+    'Transfer-Encoding: chunked, gzip' %% \
+    'Transfer-Encoding: chunkedx' %% \
+    'Transfer-Encoding: chunked' 'Transfer-Encoding: gzip' %% \
+    'transfer-encoding:  Chunked ' %% \
+    'Connection: Upgrade, Keep-Alive' %% \
+    'Connection: keep-alive, close' %% \
+    'Connection: Keep-Alive-x' %% \
+    'Connection: keep-alive' %% \
+    $'Transfer-Encoding: chunked\v' %% \
+    $'Transfer-Encoding: chunked\f' %% \
+    $'Connection: keep-alive\v' %% >"$tmpdir/corpus"
+want='chunk=1 keep=0/0/0
+chunk=0 keep=0/0/0
+chunk=0 keep=0/0/0
+chunk=0 keep=0/0/0
+chunk=1 keep=0/0/0
+chunk=0 keep=1/10/15
+chunk=0 keep=0/0/0
+chunk=0 keep=0/0/0
+chunk=0 keep=1/10/15
+chunk=1 keep=0/0/0
+chunk=1 keep=0/0/0
+chunk=0 keep=1/10/15'
+out=$(httrack -O /dev/null -#test=headerparse "$(nativepath "$tmpdir/corpus")")
+got=$(sed -n 's/^#[0-9]* .*\(chunk=[0-9]*\) \(keep=[0-9/]*\) .*/\1 \2/p' <<<"$out")
+assert_eq "$want" "$got" "token lists read by treathead_opt"
+ok "token lists read by treathead_opt"
+
+local_server_start
+host=127.0.0.1_$SRV_PORT
+
+# A final chunked is unframed; "chunked, gzip" is read to the close.
+local_crawl "$BASEURL/telist/index.html" -O "$tmpdir/te" || fail "crawl failed"
+test "$(count_log_errors "$tmpdir/te/hts-log.txt")" = 0 ||
+    fail_dump "errors in the crawl" "$tmpdir/te/hts-log.txt"
+"$SRV_PYTHON" - "$(nativepath "$tmpdir/te/$host/telist")" <<'PY'
+import gzip
+import sys
+
+for name, coded in (("plain", 0), ("gzip", 1), ("spaced", 1), ("notlast", 0)):
+    with open("%s/%s.bin" % (sys.argv[1], name), "rb") as f:
+        body = f.read()
+    if coded:
+        body = gzip.decompress(body)
+    marker = b"TELIST-%s-BODY" % name.encode()
+    assert marker in body and b"\r" not in body, (name, body[:80])
+PY
+ok "every Transfer-Encoding list framed right"
+
+# "Upgrade, Keep-Alive" is what Apache sends next to an h2c offer.
+local_crawl "$BASEURL/kalist/index.html" -O "$tmpdir/ka" -Z || fail "crawl failed"
+reused=$(count_matching_lines '(Keep-Alive): successfully linked' "$tmpdir/ka/hts-log.txt")
+test "$reused" -ge 10 || fail_dump "only $reused reused sockets" "$tmpdir/ka/hts-log.txt"
+ok "$reused sockets reused from a Connection list"
+
+# "chunked, gzip" with a Content-Length runs to the close, so nothing it sent
+# past that length reaches the next page.
+local_crawl "$BASEURL/teclose/index.html" -O "$tmpdir/tc" -c1 || fail "crawl failed"
+grep -q TECLOSE-SECOND "$tmpdir/tc/$host/teclose/second.html" ||
+    fail_dump "second page damaged" "$tmpdir/tc/hts-log.txt"
+# The 204 must be logged at once, never after a wait for a body.
+grep -q '"No Content" (204)' "$tmpdir/tc/hts-log.txt" ||
+    fail_dump "the 204 was not reported" "$tmpdir/tc/hts-log.txt"
+! grep -q 'Receive Time Out' "$tmpdir/tc/hts-log.txt" ||
+    fail_dump "a body was awaited" "$tmpdir/tc/hts-log.txt"
+test "$(count_log_errors "$tmpdir/tc/hts-log.txt")" = 1 ||
+    fail_dump "errors beyond the 204 in the crawl" "$tmpdir/tc/hts-log.txt"
+ok "a Transfer-Encoding ending in gzip read to the close, and a 204 with one did not wait"
