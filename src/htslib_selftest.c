@@ -3296,8 +3296,7 @@ static int st_querynext(httrackp *opt, int argc, char **argv) {
   return bad;
 }
 
-/* Prints fil_normalized_filtered() of argv[0], stripping the keys in argv[1].
- */
+/* Prints fil_normalized_filtered() of argv[0], stripping argv[1]'s keys. */
 static int st_normfil(httrackp *opt, int argc, char **argv) {
   char dest[HTS_URLMAXSIZE * 2];
 
