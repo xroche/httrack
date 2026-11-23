@@ -1024,8 +1024,6 @@ static HTS_INLINE HTS_UNUSED int hts_send_nosignal(T_SOC soc, const char *s,
 #endif
 }
 
-void cut_path(char *fullpath, char *path, size_t path_size, char *pname,
-              size_t pname_size);
 int fexist(const char *s);
 int fexist_utf8(const char *s);
 
