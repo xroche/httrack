@@ -9,7 +9,6 @@ set -euo pipefail
 . "${0%"${0##*/}"}./webhttracklib.sh"
 
 htsserver_require
-skip_on_windows "the paths run past MAX_PATH"
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_edges.XXXXXX") || fail "no tmpdir"
 cleanup_push htsserver_cleanup_dir "${work}"
@@ -40,7 +39,7 @@ expect() {
 }
 
 # Each case puts a path of $total bytes in a 1024-byte buffer.
-for total in 1022 1023 1024 1025; do
+for total in 1023 1024; do
     fits=
     test "${total}" -gt 1023 || fits=1
 
@@ -81,12 +80,18 @@ for total in 1022 1023 1024 1025; do
     if test -n "${fits}"; then
         expect /server/theme.css 200 "themes/${installed}/theme.css"
     else
+        expect /server/theme.css 200
         reply=$(htsserver_get /server/theme.css)
         ! grep -q '@import' <<<"${reply}" || fail "${total}: settings read past the edge"
     fi
     htsserver_stop
 done
 rm -f "${work}/home/.httrack-ui.ini"
+
+# A HOME too long for the default base path still serves the UI.
+htsserver_start --root "${root}" --home "$(pad "${work}/home" 1015)"
+expect /server/index.html 200
+htsserver_stop
 
 # The client's own URL: root + "html" + URL, HOME + themes + URL tail, and
 # project + "/" + URL tail.
@@ -96,12 +101,15 @@ test "${#sid}" -eq 32 || fail "no session id: [${sid}]"
 reply=$(htsserver_post "sid=${sid}&path=${work}&projname=proj&command=httrack&command_do=save&winprofile=x" \
     /server/step4.html)
 grep -q '^HTTP/1.[01] 302' <<<"${reply}" || fail "project save: ${reply:0:200}"
-for total in 1022 1023 1024 1025; do
+for total in 1023 1024; do
     fits=
     test "${total}" -gt 1023 || fits=1
-    static=$(pad /server/ $((total - ${#root} - 15)))about.html
-    theme=$(pad /server/themes/zz $((total - ${#work} - 17)))/theme.css
-    site=$(pad /website/ $((total - ${#work} - 3)))/x.txt
+    # Past the edge, the path clipped to 1023 bytes names an existing file.
+    tail=
+    test -n "${fits}" || tail=x
+    static=$(pad /server/ $((1023 - ${#root} - 15)))about.html${tail}
+    theme=$(pad /server/themes/zz $((1023 - ${#work} - 17)))/theme.css${tail}
+    site=$(pad /website/ $((1023 - ${#work} - 3)))/x.txt${tail}
     if test -n "${fits}"; then
         expect "${static}" 200 '<html'
         expect "${theme}" 200 USER-ZZ

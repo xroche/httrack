@@ -576,7 +576,7 @@ static hts_boolean host_is_self(const char *host, const char *bound) {
 
 /** Header value with leading blanks dropped, clipped to fit dst. */
 static void copy_header_value(hts_buf dst, const char *value) {
-  (void) hts_buf_cpy_clip(dst, value + strspn(value, HTS_TABORSPACES));
+  hts_buf_cpy_clip(dst, value + strspn(value, HTS_TABORSPACES));
 }
 
 /** Copy query parameter "name"'s alphanumeric value into dst, of size >= 1;
@@ -874,14 +874,15 @@ static hts_boolean find_user_theme_file(hts_buf dst, const char *file) {
   const char *const start = file + sizeof(THEMES_URL) - 1;
   const char *rest;
   char name[THEME_NAME_MAX + 1];
+  char dir[1024];
 
   if (strncmp(file, THEMES_URL, sizeof(THEMES_URL) - 1) != 0 ||
       (rest = strchr(start, '/')) == NULL ||
       !hts_buf_put_span(HTS_BUF(name), hts_span_between(start, rest))) {
     return HTS_FALSE;
   }
-  if (!user_themes_dir(dst) || !theme_in(dst.p, name) ||
-      !hts_buf_printf(hts_buf_skip(dst, strlen(dst.p)), "/%s%s", name, rest)) {
+  if (!user_themes_dir(HTS_BUF(dir)) || !theme_in(dir, name) ||
+      !hts_buf_printf(dst, "%s/%s%s", dir, name, rest)) {
     dst.p[0] = '\0';
     return HTS_FALSE;
   }
@@ -1487,9 +1488,9 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
       coucal_write(NewLangList, initStr[i].name,
                    (intptr_t) strdupt(initStr[i].value));
     }
-    if (!path_from_cmdline) {
-      strcpybuff(pth, gethomedir());
-      strcatbuff(pth, "/websites");
+    /* a HOME too long for pth leaves no default base path */
+    if (!path_from_cmdline &&
+        hts_buf_printf(HTS_BUF(pth), "%s/websites", gethomedir())) {
       coucal_write(NewLangList, "path", (intptr_t) strdupt(pth));
     }
   }
