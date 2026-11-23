@@ -836,11 +836,7 @@ static hts_boolean data_attr_is_not_url(const char *s, size_t len) {
     if (s[i] == '{' || s[i] == '}' || s[i] == '<' || s[i] == '>' || s[i] == '"')
       return HTS_TRUE;
   }
-  for (i = 0; words[i] != NULL; i++) {
-    if (strlen(words[i]) == len && hts_strncasecmp(s, words[i], len) == 0)
-      return HTS_TRUE;
-  }
-  return HTS_FALSE;
+  return hts_span_index_ci(hts_span_at(s, len), words) >= 0;
 }
 
 /* Percent-encode '(' and ')' in a link emitted into an unquoted url(...) (CSS

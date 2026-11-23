@@ -386,12 +386,16 @@ mkdir -p "$siteph"
 gif "$siteph/photo"
 gif "$siteph/lazy" # real, but on the placeholder list: refused on purpose
 gif "$siteph/{{url}}"
+gif "$siteph/NULL"     # the list ignores case
+gif "$siteph/nullable" # a listed word that is only a prefix is a URL
 cat >"$siteph/index.html" <<EOF
 <html><body>
 <img data-src="{{url}}">
 <img data-src='{"src":"a.jpg"}'>
 <img data-src="lazy">
 <img data-src="photo">
+<img data-src=" NULL ">
+<img data-src="nullable">
 </body></html>
 EOF
 outph="$tmp/placeholder-out"
@@ -399,7 +403,8 @@ rm -rf "$outph"
 mkdir -p "$outph"
 httrack "file://$siteph/index.html" -O "$outph" --quiet -r2 >"$outph/.log" 2>&1 || true
 found "photo" "$outph"
-for f in '*url*' 'lazy*' '*src*'; do notfound "$f" "$outph"; done
+found "nullable" "$outph"
+for f in '*url*' 'lazy*' '*src*' 'NULL*'; do notfound "$f" "$outph"; done
 pageph=$(find "$outph" -path '*placeholder/index.html' | head -1)
 for v in 'data-src="{{url}}"' "data-src='{\"src\":\"a.jpg\"}'" 'data-src="lazy"'; do
     grep -Fq "$v" "$pageph" || fail "placeholder rewritten, want $v kept"
