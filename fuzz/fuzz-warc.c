@@ -213,7 +213,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
       char out[HTS_URLMAXSIZE * 2];
 
       out[0] = '\0';
-      (void) warc_surt(line, out, sizeof(out));
+      (void) warc_surt(line, HTS_BUF(out));
       wc_sink += (size_t) out[0] + strlen(out);
     } else if (keylen == 8 && memcmp(p, "hdrvalue", 8) == 0) {
       char *bar = strchr(line, '|');
@@ -310,7 +310,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     char ext[WARC_CDX_EXTENT_SIZE];
 
     out[0] = '\0';
-    (void) warc_surt(uri, out, sizeof(out));
+    (void) warc_surt(uri, HTS_BUF(out));
     wc_sink += (size_t) out[0];
     memset(norm, 0, sizeof(norm));
     if (resphdr_len > 0) {
@@ -327,8 +327,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
       wc_sink += (size_t) hv[0];
     }
     memset(ext, 0, sizeof(ext));
-    wc_sink += (size_t) warc_cdx_extent(ext, sizeof(ext), 4294967296ULL,
-                                        1099511627776ULL);
+    wc_sink +=
+        (size_t) warc_cdx_extent(HTS_BUF(ext), 4294967296ULL, 1099511627776ULL);
     wc_sink += (size_t) (warc_truncated_reason(truncated) != NULL);
     /* warc_stream_offset() tells f and falls back on a tell failure; f must
        be a real stream, so probe it on the just-written archive. */

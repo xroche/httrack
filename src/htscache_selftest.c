@@ -39,6 +39,7 @@ Please visit our Website: http://www.httrack.com
    bodies (zlib deflate/inflate). Reached via `httrack -#A <dir>`. */
 
 #include "htsselftest_int.h"
+#include "htscachecodec.h"
 
 #include <errno.h>
 #ifndef _WIN32
@@ -5053,6 +5054,91 @@ static int st_cache_sized(httrackp *opt, int argc, char **argv) {
   return st_verdict("cache-sized", fail);
 }
 
+/* Longest header line hts_cache_read_fields keeps: its buffer less a reserve
+   byte and the NUL. */
+#define FIELDS_LINE_MAX (HTS_LOCATION_SIZE + 32 - 2)
+
+/* Read "Etag: " padded to len bytes (plus CRs, which do not count) back
+   through hts_cache_read_fields, and return the value length kept. */
+static size_t fields_etag_kept(size_t len, size_t crs) {
+  char BIGSTK etag[HTS_LOCATION_SIZE + 64];
+  const hts_cache_field fields[] = {
+      {"Etag", HTS_CACHE_FIELD_STRING, etag, sizeof(etag)}};
+  String block = STRING_EMPTY;
+  size_t i;
+
+  etag[0] = '\0';
+  StringCat(block, "X-In-Cache: 1\r\nEtag: ");
+  for (i = 0; i < crs; i++)
+    StringAddchar(block, '\r');
+  for (i = strlen("Etag: "); i < len; i++)
+    StringAddchar(block, 'e');
+  StringCat(block, "\r\nX-Size: 1\r\n");
+  if (!hts_cache_read_fields(StringBuff(block), StringLength(block), fields, 1,
+                             NULL, NULL))
+    etag[0] = 'X';
+  StringFree(block);
+  return strlen(etag);
+}
+
+/* Cache header lines read back off disk: kept up to the reader's line cap,
+   dropped whole past it, and the status line points at X-StatusMessage. */
+static int st_cache_fields(httrackp *opt, int argc, char **argv) {
+  char status[64];
+  char BIGSTK first[HTS_LOCATION_SIZE * 2];
+  size_t used, len;
+  int fail = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  len = fields_etag_kept(FIELDS_LINE_MAX, 0);
+  if (len != FIELDS_LINE_MAX - strlen("Etag: ")) {
+    fprintf(stderr, "cache-fields: a full line kept %d bytes\n", (int) len);
+    fail = 1;
+  }
+  len = fields_etag_kept(FIELDS_LINE_MAX + 1, 0);
+  if (len != 0) {
+    fprintf(stderr, "cache-fields: a cut line kept %d bytes\n", (int) len);
+    fail = 1;
+  }
+  len = fields_etag_kept(FIELDS_LINE_MAX, 5000);
+  if (len != FIELDS_LINE_MAX - strlen("Etag: ")) {
+    fprintf(stderr, "cache-fields: CRs counted, kept %d bytes\n", (int) len);
+    fail = 1;
+  }
+
+  /* a first line past the scan buffer is consumed whole */
+  memset(first, 'M', sizeof(first));
+  memcpy(first + sizeof(first) - 17, "\nX-In-Cache: 1\n", 16);
+  if (!hts_cache_header_says_data_in_zip(first, sizeof(first) - 1)) {
+    fprintf(stderr, "cache-fields: X-In-Cache after a long line missed\n");
+    fail = 1;
+  }
+
+  used = 0;
+  if (!hts_cache_status_line(HTS_BUF(status), &used, 200,
+                             "0123456789012345678901234567890") ||
+      strcmp(status, "HTTP/1.1 200 0123456789012345678901234567890\r\n") != 0) {
+    fprintf(stderr, "cache-fields: 31-byte message: %s\n", status);
+    fail = 1;
+  }
+  used = 0;
+  if (!hts_cache_status_line(HTS_BUF(status), &used, 200,
+                             "01234567890123456789012345678901") ||
+      strcmp(status, "HTTP/1.1 200 (See X-StatusMessage)\r\n") != 0) {
+    fprintf(stderr, "cache-fields: 32-byte message: %s\n", status);
+    fail = 1;
+  }
+  used = 0;
+  if (hts_cache_status_line(HTS_BUF_N(status, 10), &used, 200, "OK") ||
+      used != 0) {
+    fprintf(stderr, "cache-fields: a status line that does not fit\n");
+    fail = 1;
+  }
+  return st_verdict("cache-fields", fail);
+}
+
 const struct selftest_entry selftests_cache[] = {
     {"changes", "", "--changes bucket accounting and JSON escaping (#714)",
      st_changes},
@@ -5092,6 +5178,9 @@ const struct selftest_entry selftests_cache[] = {
      st_cache_nul},
     {"cache-walk", "<dir>", "the cache index walk keys and flags each entry",
      st_cache_walk},
+    {"cache-fields", "",
+     "cache header lines read back are kept to the line cap or dropped",
+     st_cache_fields},
     {"cache-sized", "<dir>",
      "sized cache readers clip Location and refuse a save name that overflows",
      st_cache_sized},

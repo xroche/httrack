@@ -308,8 +308,8 @@ static void cache_add_ex(httrackp *opt, cache_back *cache, const htsblk *r,
   headers[0] = '\0';
   headersSize = 0;
   /* */
-  if (!hts_cache_status_line(headers, sizeof(headers), &headersSize,
-                             r->statuscode, r->msg)) {
+  if (!hts_cache_status_line(HTS_BUF(headers), &headersSize, r->statuscode,
+                             r->msg)) {
     headersDropped++;
   }
 

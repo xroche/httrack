@@ -156,29 +156,28 @@ static const char *bundle_name_refusal(const char *name) {
 }
 
 /* Write dir/name.hts into dst. HTS_FALSE when it does not fit. */
-static hts_boolean bundle_path(char *dst, size_t dst_size, const char *dir,
-                               const char *name) {
+static hts_boolean bundle_path(hts_buf dst, const char *dir, const char *name) {
   const size_t dlen = strlen(dir);
 
-  return slprintfbuff(
-      dst, dst_size, "%s%s%s.hts", dir,
+  return hts_buf_printf(
+      dst, "%s%s%s.hts", dir,
       dlen != 0 && dir[dlen - 1] != '/' && dir[dlen - 1] != '\\' ? "/" : "",
       name);
 }
 
 /* Cut the suffix off url into name ("" if none). Returns NULL, or why the name
  * is refused. */
-static const char *bundle_cut(char *url, char *name, size_t name_size) {
+static const char *bundle_cut(char *url, hts_buf name) {
   char *const at = strstr(url, HTS_BUNDLE_SUFFIX);
   const char *why;
 
-  name[0] = '\0';
+  name.p[0] = '\0';
   if (at == NULL)
     return NULL;
   why = bundle_name_refusal(at + strlen(HTS_BUNDLE_SUFFIX));
   if (why != NULL)
     return why;
-  strlcpybuff(name, at + strlen(HTS_BUNDLE_SUFFIX), name_size);
+  hts_buf_cpy(name, at + strlen(HTS_BUNDLE_SUFFIX));
   *at = '\0';
   return NULL;
 }
@@ -234,7 +233,7 @@ static hts_boolean bundle_add(httrackp *opt, const char *name,
 const char *hts_bundle_take(httrackp *opt, char *url) {
   char name[HTS_BUNDLE_NAME_MAX];
   char BIGSTK typed[HTS_URLMAXSIZE * 3];
-  const char *const why = bundle_cut(url, name, sizeof(name));
+  const char *const why = bundle_cut(url, HTS_BUF(name));
 
   if (why != NULL || name[0] == '\0')
     return why;
@@ -698,7 +697,7 @@ static hts_boolean bundle_load(httrackp *opt, bundle *b, const char *jar_file,
   text_src src;
   FILE *fp;
 
-  if (!bundle_path(b->file, sizeof(b->file), dir, b->name))
+  if (!bundle_path(HTS_BUF(b->file), dir, b->name))
     BUNDLE_FAIL("bundle %s: the folder path is too long", b->name);
   fp = FOPEN(b->file, "rb");
   if (fp == NULL)
@@ -925,7 +924,7 @@ HTSEXT_API hts_boolean hts_bundle_cookie_in_scope(const char *const *urls,
       why = "invalid url";
     else {
       strcpybuff(url, urls[i]);
-      why = bundle_cut(url, name, sizeof(name));
+      why = bundle_cut(url, HTS_BUF(name));
     }
     if (why == NULL)
       why = bundle_note_url(&b, url);
@@ -956,7 +955,7 @@ static const char *names_note(char ***names, size_t *n, const char *url) {
   const char *why;
 
   strcpybuff(copy, url);
-  why = bundle_cut(copy, name, sizeof(name));
+  why = bundle_cut(copy, HTS_BUF(name));
   if (why == NULL && name[0] != '\0' && !names_add_once(names, n, name))
     why = "out of memory";
   return why;
@@ -1654,10 +1653,10 @@ static void paste_trim_host_dots(char *url) {
   memmove(p, end, strlen(end) + 1);
 }
 
-/* Write the host of url, of size bytes, in its ASCII form, as the engine
-   requests it. NULL, or why it has none. */
-static const char *paste_host_idna(char *url, size_t size) {
-  char *const host = strstr(url, "://") + 3;
+/* Write the host of the URL in url in its ASCII form, as the engine requests
+   it. NULL, or why it has none. */
+static const char *paste_host_idna(hts_buf url) {
+  char *const host = strstr(url.p, "://") + 3;
   const size_t len = strcspn(host, ":/?\\");
   const char *const rest = host + len;
   char *idna;
@@ -1667,7 +1666,7 @@ static const char *paste_host_idna(char *url, size_t size) {
     return NULL;
   idna = hts_convertStringUTF8ToIDNA(host, len);
   if (idna == NULL ||
-      strlen(idna) >= size - (size_t) (host - url) - strlen(rest))
+      strlen(idna) >= url.size - (size_t) (host - url.p) - strlen(rest))
     why = "the address is too long once its host is in ASCII";
   else {
     hts_lowcase(idna);
@@ -1857,7 +1856,7 @@ HTSEXT_API hts_boolean hts_bundle_from_paste_hosts(
   if (why != NULL)
     PASTE_FAIL("%s", why);
   paste_trim_host_dots(base);
-  why = paste_host_idna(base, sizeof(base));
+  why = paste_host_idna(HTS_BUF(base));
   if (why != NULL)
     PASTE_FAIL("%s", why);
   if (strlen(name) + strlen(HTS_BUNDLE_SUFFIX) >= HTS_CDLMAXSIZE - strlen(base))
@@ -1921,7 +1920,7 @@ HTSEXT_API hts_boolean hts_bundle_from_paste_hosts(
     PASTE_FAIL("the paste holds no cookie for %s", name);
 
   if (!dry_run) {
-    if (!bundle_path(path, sizeof(path), folder, name))
+    if (!bundle_path(HTS_BUF(path), folder, name))
       PASTE_FAIL("the folder path is too long");
     if (!cookie_write_replace(path, StringBuff(text), StringLength(text)))
       PASTE_FAIL("cannot write %s: %s", path, strerror(errno));
