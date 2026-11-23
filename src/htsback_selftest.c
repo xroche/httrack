@@ -870,7 +870,7 @@ static st_cap_result st_spool_capped_write(httrackp *opt,
   void (*oldxfsz)(int);
   hts_boolean written;
 
-  if (!back_spoolname(opt, name, sizeof(name))) {
+  if (!back_spoolname(opt, HTS_BUF(name))) {
     fprintf(stderr, "spoolwrite: naming failed\n");
     return ST_CAP_FAIL;
   }
@@ -939,7 +939,7 @@ static int st_spoolwrite(httrackp *opt, int argc, char **argv) {
   }
 
   /* control: an unhindered write keeps its file */
-  if (!back_spoolname(opt, name, sizeof(name)) ||
+  if (!back_spoolname(opt, HTS_BUF(name)) ||
       !back_spool_write(opt, name, &back) || !fexist_utf8(name)) {
     fprintf(stderr, "spoolwrite: a good write did not keep %s\n", name);
     err++;
@@ -1389,7 +1389,7 @@ static int st_spoolsweep(httrackp *opt, int argc, char **argv) {
   /* a file of our own pid predates this run, so it is stale */
   memset(&back, 0, sizeof(back));
   back.status = STATUS_READY;
-  if (!back_spoolname(opt, own, sizeof(own)) ||
+  if (!back_spoolname(opt, HTS_BUF(own)) ||
       !back_spool_write(opt, own, &back)) {
     fprintf(stderr, "spoolsweep: could not plant %s\n", own);
     return 1;

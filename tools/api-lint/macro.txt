@@ -267,17 +267,11 @@ src/htssafe.h: sprintfbuff: evaluates ARR twice
 src/htssafe.h: strcatbuff: evaluates A twice
 src/htssafe.h: strcatbuff: evaluates A twice
 src/htssafe.h: strcatbuff: evaluates B twice
-src/htssafe.h: strcatbuff: evaluates B twice
 src/htssafe.h: strcpybuff: evaluates A twice
 src/htssafe.h: strcpybuff: evaluates A twice
 src/htssafe.h: strcpybuff: evaluates B twice
-src/htssafe.h: strcpybuff: evaluates B twice
-src/htssafe.h: strlcatbuff: evaluates B twice
-src/htssafe.h: strlcpybuff: evaluates B twice
-src/htssafe.h: strlncatbuff: evaluates B twice
 src/htssafe.h: strncatbuff: evaluates A twice
 src/htssafe.h: strncatbuff: evaluates A twice
-src/htssafe.h: strncatbuff: evaluates B twice
 src/htssafe.h: strncatbuff: evaluates B twice
 src/htssafe.h: strncatbuff: evaluates N twice
 src/htsserver.c: SET_ERROR: uses free name NewLangList
