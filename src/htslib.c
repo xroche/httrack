@@ -60,6 +60,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscodec.h"
 #include "htslines.h"
 #include "htsckd.h"
+#include "htsbuf.h"
 
 #include <limits.h>
 
@@ -1818,18 +1819,15 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
       if (retour->location) {
         const hts_span v = header_value(value);
 
-        if (v.len < HTS_LOCATION_SIZE) {
-          (void) hts_span_copy(v, retour->location, HTS_LOCATION_SIZE);
-          if (!hts_location_is_safe(retour->location)) {
-            hts_log_print(NULL, LOG_WARNING,
-                          "Location naming a post token, redirect ignored");
-            retour->location[0] = '\0';
-          }
-        } else {
+        if (!hts_buf_put_span(hts_buf_at(retour->location, HTS_LOCATION_SIZE),
+                              v)) {
           /* no opt here, so this only reaches a registered log callback */
           hts_log_print(NULL, LOG_WARNING,
                         "Location header too long (%d bytes), redirect ignored",
                         (int) v.len);
+        } else if (!hts_location_is_safe(retour->location)) {
+          hts_log_print(NULL, LOG_WARNING,
+                        "Location naming a post token, redirect ignored");
           retour->location[0] = '\0';
         }
       }
