@@ -271,13 +271,14 @@ static hts_boolean cookie_is_secure(const char *rec) {
   return !hts_span_eq_ci(cookie_field(rec, 3), hts_span_of("FALSE"));
 }
 
-/* Do two jar domains name the same domain? The leading dot is the Netscape
-   spelling of the same thing. */
-static hts_boolean cookie_same_domain(hts_span a, const char *b) {
-  const hts_span dot = hts_span_of(".");
+/* D without one leading dot, the Netscape spelling of the same domain. */
+static hts_span cookie_bare(hts_span d) {
+  return hts_span_starts_with(d, hts_span_of(".")) ? hts_span_skip(d, 1) : d;
+}
 
-  return hts_span_eq_ci(hts_span_starts_with(a, dot) ? hts_span_skip(a, 1) : a,
-                        hts_span_of(b[0] == '.' ? b + 1 : b));
+/* Do two jar domains name the same domain? */
+static hts_boolean cookie_same_domain(hts_span a, const char *b) {
+  return hts_span_eq_ci(cookie_bare(a), cookie_bare(hts_span_of(b)));
 }
 
 /* A host may hold this many records, or this many bytes of them (a quarter of
@@ -333,11 +334,12 @@ static hts_boolean cookie_is_self(const char *a, hts_span name,
 
 /* Hash of a domain as cookie_same_domain sees it. */
 static size_t cookie_domain_hash(hts_span d) {
+  const hts_span bare = cookie_bare(d);
   size_t h = 5381;
   size_t i;
 
-  for (i = hts_span_starts_with(d, hts_span_of(".")) ? 1 : 0; i < d.len; i++)
-    h = h * 33 + (size_t) hichar((unsigned char) d.p[i]);
+  for (i = 0; i < bare.len; i++)
+    h = h * 33 + (size_t) hichar((unsigned char) bare.p[i]);
   return h;
 }
 
@@ -1651,7 +1653,7 @@ void cookie_delete(char *s, size_t s_size, size_t pos) {
   }
 }
 
-/* The view of a field a record lacks, and cookie_get's answer for it. */
+/* Pointer identity tells cookie_get a missing field from an empty one. */
 static const char cookie_no_field[] = "";
 
 /* See htsbundle.h. */
@@ -1659,10 +1661,11 @@ hts_span cookie_field(const char *line, int n) {
   const char *p = line + strspn(line, "\n");
   int i;
 
-  /* A negative N reads field 0, and an empty last field does not exist. */
+  /* A negative N reads field 0. */
   for (i = 0;; i++) {
     const size_t len = strcspn(p, "\t\n");
 
+    // cookie_get has always read "a<TAB>" as one field, so no empty last field
     if (p[len] != '\t' && (i < n || len == 0))
       return hts_span_at(cookie_no_field, 0);
     if (i >= n)

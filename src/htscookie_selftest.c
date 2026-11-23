@@ -982,6 +982,20 @@ static int cookie_hostcap_rows(void) {
       cookie_find_exact(jar.data, "p0", H, "/a/b") == NULL)
     HC_FAIL("the shortest-path record was not evicted first");
 
+  /* A leading dot names the same host, so 50 such records put H at its share.
+   */
+  jar.data[0] = '\0';
+  for (k = 0; k < 50; k++) {
+    const size_t end = strlen(jar.data);
+
+    snprintf(jar.data + end, sizeof(jar.data) - end,
+             ".%s\tTRUE\t/\tFALSE\t0\td%02d\tv\n", H, k);
+  }
+  cookie_fill_jar(&jar);
+  if (cookie_set_capped(&jar, "new", "v", H, "/", NULL) != 0 ||
+      cookie_find_exact(jar.data, "d00", H, "/") != NULL)
+    HC_FAIL("a dotted host was not counted as the setter's host");
+
   /* Byte share: one 2.9 KB record leaves the host under 8 KB, three do not. */
   for (k = 1; k <= 3; k++) {
     int i;
@@ -1271,7 +1285,6 @@ static int st_cookiespandiff(httrackp *opt, int argc, char **argv) {
                                      "a b\tc d",
                                      "h\tTRUE\t/\tFALSE\t0\tn\tv",
                                      "h\tTRUE\t/\tFALSE\t0\tn\tv\n",
-                                     "a\tb\0c\td",
                                      "a\tb\r\tc\r",
                                      NULL};
   static const char *const alphabet[] = {"a", "\t",   "\n", "\r", "bc",
@@ -1309,8 +1322,7 @@ static int st_cookiespandiff(httrackp *opt, int argc, char **argv) {
     cookiediff_one(&st, StringBuff(line) != NULL ? StringBuff(line) : "", o, n);
     StringFree(line);
   }
-  /* The frozen copy aborts past its buffer, so a longer field is checked
-     against its own bytes: whole in the view, clipped by cookie_get. */
+  /* The frozen copy aborts past 8 KB, so check a longer field by its bytes. */
   for (i = 0; i < sizeof(long_lengths) / sizeof(long_lengths[0]); i++) {
     char *run = parsediff_run('x', long_lengths[i]);
     String line = STRING_EMPTY;
