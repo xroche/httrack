@@ -2604,7 +2604,9 @@ hts_boolean back_delayed_rename(httrackp *opt, lien_back *back,
   if (!back->r.is_write) {
     /* an earlier run may have left it */
     /* finalized: back_finalize reloaded a small page this run wrote */
-    if ((!opt->html_tree_new || back->finalized) && UNLINK(back->url_sav) == 0)
+    if ((!HTS_NEW_TREE_SKIPS_UNLINK || !opt->html_tree_new ||
+         back->finalized) &&
+        UNLINK(back->url_sav) == 0)
       hts_log_print(opt, LOG_DEBUG, "removed a stale placeholder %s",
                     back->url_sav);
     return HTS_TRUE;

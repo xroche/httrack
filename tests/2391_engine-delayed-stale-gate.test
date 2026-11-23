@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # A placeholder an earlier run may have left is still removed; only a mirror
-# whose tree was absent at start skips that unlink.
+# whose tree was absent at start skips that unlink, and never on Hurd (#2366).
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh

@@ -153,6 +153,13 @@ void back_delayed_discard(httrackp *opt, lien_back *back);
 /* Did back_add() settle this slot without a reply or a body, as a cache hit
    whose .delayed file is missing does? A reused socket still waiting is not. */
 hts_boolean back_delayed_settled_empty(const lien_back *back);
+/* Can a new tree skip the stale placeholder unlink? Hurd's ext2fs asserts and
+   takes the system down far more often without it (#2366). */
+#ifdef __GNU__
+#define HTS_NEW_TREE_SKIPS_UNLINK HTS_FALSE
+#else
+#define HTS_NEW_TREE_SKIPS_UNLINK HTS_TRUE
+#endif
 /* Move back's .delayed placeholder (and open stream) to newname, or remove
    one an earlier run may have left; HTS_FALSE = file lost, slot flagged in
    error. */

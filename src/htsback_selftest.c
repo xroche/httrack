@@ -3274,7 +3274,7 @@ static int st_delayedstale(httrackp *opt, int argc, char **argv) {
   opt->html_tree_new = HTS_TRUE;
   CHECK(stale_removed(opt, back, argv[0]));
   back->finalized = 0;
-  CHECK(!stale_removed(opt, back, argv[0]));
+  CHECK(stale_removed(opt, back, argv[0]) == !HTS_NEW_TREE_SKIPS_UNLINK);
   opt->html_tree_new = HTS_FALSE;
   (void) UNLINK(back->url_sav);
 #undef CHECK
