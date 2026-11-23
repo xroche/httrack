@@ -2627,9 +2627,14 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_te("gzip", "gzip", self.TECODE_BOMB, ctype)
             return
         elif name == "probe":
-            # a HEAD carries no body to decode, so its coding must not matter
-            coding = "compress, chunked" if self.command == "HEAD" else "gzip"
-            body, ctype = b"<html>TECODE-probe-BODY</html>\n", "text/html"
+            # the HEAD -%N0 sends finds the move: it has no body to decode
+            body = b"5\r\nmoved\r\n0\r\n\r\n"
+            loc = [("Location", "probed.html")]
+            self.send_te("compress, chunked", None, body, "text/html", 301, loc)
+            return
+        elif name == "probed":
+            coding, ctype = "gzip", "text/html"
+            body = b"<html>TECODE-probe-BODY</html>\n"
         else:
             coding, content_coding = self.TECODE[name]
             body = b"TECODE-%s-BODY\n" % name.encode() * 40

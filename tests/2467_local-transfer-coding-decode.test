@@ -144,12 +144,13 @@ test ! -s "$tmpdir/x/$host/tecode/bomb.bin" || fail "the two-layer bomb was save
 test "$(count_log_errors "$log")" = 4 || fail_dump "unexpected errors" "$log"
 ok "the ratio guard counts from the bytes received"
 
-# -%N0 asks a HEAD for the type of probe.php, and a HEAD has no body to decode.
+# -%N0 asks a HEAD for the type of probe.php, whose redirect carries a coding
+# we can not undo: a HEAD has no body, so the move is still followed.
 local_crawl "$BASEURL/tecode/headprobe.html" -O "$tmpdir/h" -%N0 || fail "crawl failed"
 log=$tmpdir/h/hts-log.txt
 test "$(count_log_errors "$log")" = 0 || fail_dump "a HEAD was refused" "$log"
-grep -q TECODE-probe-BODY "$tmpdir/h/$host/tecode/probe.html" ||
-    fail_dump "probe.php was not saved" "$log"
+grep -q TECODE-probe-BODY "$tmpdir/h/$host/tecode/probed.html" ||
+    fail_dump "the redirect from probe.php was not followed" "$log"
 ok "a HEAD under an unreadable transfer coding is not refused"
 
 # A WARC record holds the body without its transfer coding.
