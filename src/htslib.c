@@ -396,145 +396,153 @@ hts_boolean hts_body_missing_unexpectedly(const htsblk *r) {
   return HTS_TRUE;
 }
 
-/* Length of the field name that opens the line, without blanks before the
-   colon, or 0 for a folded line or one with no colon. Servers differ on
-   "Host : x", so the engine sends it as Host without the blank. */
-size_t header_name_len(const char *line) {
-  size_t len;
+/* Read the next line of the custom block *REST, ended by CRLF, CR or LF.
+   Unlike hts_header_next, a blank line does not end the block. */
+static hts_boolean custom_line_next(hts_span *rest, hts_span *line) {
+  const char *const p = rest->p;
+  size_t n = 0;
 
-  if (*line == ' ' || *line == '\t')
-    return 0;
-  for (len = 0; line[len] != '\0' && line[len] != ':' && line[len] != '\r' &&
-                line[len] != '\n';
-       len++)
-    ;
-  if (line[len] != ':')
-    return 0;
-  while (len > 0 && (line[len - 1] == ' ' || line[len - 1] == '\t'))
-    len--;
-  return len;
+  if (hts_span_empty(*rest))
+    return HTS_FALSE;
+  while (n < rest->len && p[n] != '\r' && p[n] != '\n')
+    n++;
+  *line = hts_span_at(p, n);
+  if (n + 1 < rest->len && p[n] == '\r' && p[n + 1] == '\n')
+    n++;
+  *rest = hts_span_skip(*rest, n + 1);
+  return HTS_TRUE;
 }
 
-/* Does the line open with an RFC 7230 token name and a colon? */
-static hts_boolean header_line_valid(const char *line) {
-  const size_t len = header_name_len(line);
+/* Does LINE continue the line before it? */
+static hts_boolean header_folded(hts_span line) {
+  return !hts_span_empty(line) && (line.p[0] == ' ' || line.p[0] == '\t');
+}
+
+/* Servers differ on "Host : x", so the engine sends it as Host without the
+   blank. */
+static hts_span header_name(hts_span line) {
+  hts_span name, value;
+
+  hts_header_split(line, &name, &value);
+  return name;
+}
+
+/* Cut S at its first CR or LF. */
+static hts_span first_line(const char *s) {
+  return hts_span_at(s, strcspn(s, "\r\n"));
+}
+
+size_t header_name_len(const char *line) {
+  return header_name(first_line(line)).len;
+}
+
+/* Is NAME an RFC 7230 token? */
+static hts_boolean header_name_valid(hts_span name) {
   size_t i;
 
-  for (i = 0; i < len; i++) {
-    const unsigned char c = (unsigned char) line[i];
+  for (i = 0; i < name.len; i++) {
+    const unsigned char c = (unsigned char) name.p[i];
 
     if (!(c >= 'a' && c <= 'z') && !(c >= 'A' && c <= 'Z') &&
         !(c >= '0' && c <= '9') && strchr("!#$%&'*+-.^_`|~", c) == NULL)
       return HTS_FALSE;
   }
-  return len != 0;
+  return !hts_span_empty(name);
 }
 
 /* No list may hold "", which would match a line with no name. */
 hts_boolean header_name_in(const char *line, const char *const *names) {
-  const hts_span name = hts_span_at(line, header_name_len(line));
-
-  return hts_span_index_ci(name, names) >= 0;
+  return hts_span_index_ci(header_name(first_line(line)), names) >= 0;
 }
 
 /* http_headers_have_field() for a NAME without the colon */
-static hts_boolean http_headers_have_name(const char *headers, hts_span name) {
-  const char *line;
+static hts_boolean http_headers_have_name(hts_span headers, hts_span name) {
+  hts_span line;
 
-  if (headers == NULL || hts_span_empty(name))
+  if (hts_span_empty(name))
     return HTS_FALSE;
   /* anchored, so a folded line or a name inside a value cannot match */
-  for (line = headers; *line != '\0';) {
-    if (hts_span_eq_ci(hts_span_at(line, header_name_len(line)), name))
+  while (custom_line_next(&headers, &line))
+    /* the prefix test first, because most lines fail it */
+    if (hts_span_starts_with_ci(line, name) &&
+        hts_span_eq_ci(header_name(line), name))
       return HTS_TRUE;
-    while (*line != '\0' && *line != '\n' && *line != '\r')
-      line++;
-    while (*line == '\n' || *line == '\r')
-      line++;
-  }
   return HTS_FALSE;
 }
 
 hts_boolean http_headers_have_field(const char *headers,
                                     const char *field_name) {
-  size_t len;
+  hts_span name = hts_span_of(field_name);
 
-  if (field_name == NULL)
-    return HTS_FALSE;
-  len = strlen(field_name);
-  if (len != 0 && field_name[len - 1] == ':') /* the tree spells it both ways */
-    len--;
-  return http_headers_have_name(headers, hts_span_at(field_name, len));
+  if (hts_span_ends_with(name, hts_span_of(":"))) /* the tree spells both */
+    name.len--;
+  return http_headers_have_name(hts_span_of(headers), name);
 }
 
 /* These fields frame the message or act per hop. */
-static hts_boolean header_line_refused(const char *line) {
+static hts_boolean header_refused(hts_span name) {
   static const char *const refused[] = {
       HTS_SPAN_WORDS("Content-Length", "Transfer-Encoding", "Connection",
                      "Keep-Alive", "TE", "Upgrade", "Expect")};
 
-  return header_name_in(line, refused);
+  return hts_span_index_ci(name, refused) >= 0;
 }
 
-/* Fields a request carries once, so a later custom line overrides an earlier.
- */
-static hts_boolean header_line_single(const char *line) {
+/* A request carries these once, so a later custom line overrides one before. */
+static hts_boolean header_single(hts_span name) {
   static const char *const single[] = {
       HTS_SPAN_WORDS("Host", "Cookie", "Authorization")};
 
-  return header_name_in(line, single);
+  return hts_span_index_ci(name, single) >= 0;
 }
 
-/* An update or a resume writes these fields itself, dropping the custom line.
- */
-static hts_boolean header_line_engine_conditional(const char *line) {
+/* An update or a resume writes these itself, dropping the custom line. */
+static hts_boolean header_engine_conditional(hts_span name) {
   static const char *const conditional[] = {
       HTS_SPAN_WORDS("Range", "If-Match", "If-None-Match", "If-Modified-Since",
                      "If-Unmodified-Since")};
 
-  return header_name_in(line, conditional);
+  return hts_span_index_ci(name, conditional) >= 0;
 }
 
-/* Return the last unfolded line of headers, or NULL. */
-static const char *last_unfolded_line(const char *headers) {
-  const char *last = NULL;
-  const char *line;
+/* Find the last unfolded line of HEADERS. */
+static hts_boolean last_unfolded_line(hts_span headers, hts_span *last) {
+  hts_boolean found = HTS_FALSE;
+  hts_span line;
 
-  for (line = headers; *line != '\0';) {
-    if (*line != ' ' && *line != '\t')
-      last = line;
-    while (*line != '\0' && *line != '\r' && *line != '\n')
-      line++;
-    if (line[0] == '\r' && line[1] == '\n')
-      line += 2;
-    else if (*line != '\0')
-      line++;
-  }
-  return last;
+  while (custom_line_next(&headers, &line))
+    if (!header_folded(line)) {
+      *last = line;
+      found = HTS_TRUE;
+    }
+  return found;
+}
+
+static hts_header_verdict header_verdict(hts_span headers, hts_span line) {
+  const hts_span name = header_name(line);
+  hts_span parent;
+
+  if (header_folded(line))
+    /* alone, or the parent would find its own field in headers */
+    return last_unfolded_line(headers, &parent)
+               ? header_verdict(hts_span_of(NULL), parent)
+               : HTS_HEADER_DROPPED_ORPHAN_FOLD;
+  if (!header_name_valid(name))
+    return HTS_HEADER_DROPPED_MALFORMED;
+  if (header_refused(name))
+    return HTS_HEADER_DROPPED_FRAMING;
+  if (header_single(name) && http_headers_have_name(headers, name))
+    return HTS_HEADER_SENT_REPLACES_EARLIER;
+  if (header_engine_conditional(name))
+    return HTS_HEADER_SENT_UNLESS_ENGINE_OVERRIDES;
+  return HTS_HEADER_SENT;
 }
 
 HTSEXT_API hts_header_verdict hts_custom_header_verdict(const char *headers,
                                                         const char *line) {
   if (line == NULL)
     return HTS_HEADER_DROPPED_MALFORMED;
-  if (*line == ' ' || *line == '\t') {
-    const char *const parent =
-        headers != NULL ? last_unfolded_line(headers) : NULL;
-
-    /* alone, or the parent would find its own field in headers */
-    return parent != NULL ? hts_custom_header_verdict(NULL, parent)
-                          : HTS_HEADER_DROPPED_ORPHAN_FOLD;
-  }
-  if (!header_line_valid(line))
-    return HTS_HEADER_DROPPED_MALFORMED;
-  if (header_line_refused(line))
-    return HTS_HEADER_DROPPED_FRAMING;
-  if (header_line_single(line) &&
-      http_headers_have_name(headers, hts_span_at(line, header_name_len(line))))
-    return HTS_HEADER_SENT_REPLACES_EARLIER;
-  if (header_line_engine_conditional(line))
-    return HTS_HEADER_SENT_UNLESS_ENGINE_OVERRIDES;
-  return HTS_HEADER_SENT;
+  return header_verdict(hts_span_of(headers), first_line(line));
 }
 
 const char *http_custom_header_warning(const char *headers, const char *line) {
@@ -575,52 +583,29 @@ const char *http_bundle_header_refusal(const char *headers, const char *line) {
 /* Dropping a line drops its folded continuations too: kept, that value would
    attach to whichever header precedes it in the request. */
 static void append_custom_headers(buff_struct *bstr, const char *headers) {
-  const size_t base = bstr->pos;
+  /* only what the engine wrote, so the box may repeat its own fields */
+  const hts_span engine = hts_span_at(bstr->buffer, bstr->pos);
+  hts_span rest = hts_span_of(headers), line;
   /* a leading folded line would attach to the engine's last header */
   hts_boolean keep = HTS_FALSE;
-  const char *line;
 
-  for (line = headers; *line != '\0';) {
-    const char *eol = line;
-    const char *next;
+  while (custom_line_next(&rest, &line)) {
+    const hts_span name = header_name(line);
 
-    while (*eol != '\0' && *eol != '\r' && *eol != '\n')
-      eol++;
-    next = eol;
-    if (next[0] == '\r' && next[1] == '\n')
-      next += 2;
-    else if (*next != '\0')
-      next++;
-
-    if (*line != ' ' && *line != '\t') { /* not a folded continuation */
-      const hts_span field = hts_span_at(line, header_name_len(line));
-
-      keep = header_line_valid(line) && !header_line_refused(line);
-      if (keep) {
-        const char cut = bstr->buffer[base];
-
-        /* only what the engine wrote, so the box may repeat its own fields */
-        bstr->buffer[base] = '\0';
-        keep = !http_headers_have_name(bstr->buffer, field);
-        bstr->buffer[base] = cut;
-        /* the last of a single-valued field wins, as later options do */
-        if (keep && header_line_single(line) &&
-            http_headers_have_name(next, field))
-          keep = HTS_FALSE;
-      }
-    }
+    if (!header_folded(line))
+      keep = header_name_valid(name) && !header_refused(name) &&
+             !http_headers_have_name(engine, name) &&
+             /* the last of a single-valued field wins, as later options do */
+             !(header_single(name) && http_headers_have_name(rest, name));
     if (keep) {
-      const size_t len = header_name_len(line);
-      const char *rest = line + len;
+      /* a folded line has no name, and a kept named line has a colon */
+      const char *const from =
+          header_folded(line) ? line.p : memchr(line.p, ':', line.len);
 
-      /* A blank before the colon is invalid, so the name goes out without it.
-         One write, so a line that does not fit leaves nothing behind. */
-      while (len != 0 && *rest != ':')
-        rest++;
-      print_buffer(bstr, "%.*s%.*s", (int) len, line, (int) (next - rest),
-                   rest);
+      /* One write, so a line that does not fit leaves nothing behind. */
+      print_buffer(bstr, "%.*s%.*s", (int) name.len, name.p,
+                   (int) (rest.p - from), from);
     }
-    line = next;
   }
 }
 

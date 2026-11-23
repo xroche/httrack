@@ -171,6 +171,37 @@ hts_boolean hts_span_list_has(hts_span list, char sep, hts_span token) {
   return HTS_FALSE;
 }
 
+static hts_boolean header_blank(char c) { return c == ' ' || c == '\t'; }
+
+void hts_header_split(hts_span line, hts_span *name, hts_span *value) {
+  const char *const colon = !hts_span_empty(line) && !header_blank(line.p[0])
+                                ? memchr(line.p, ':', line.len)
+                                : NULL;
+
+  if (colon == NULL) {
+    *name = *value = hts_span_at(line.p, 0);
+    return;
+  }
+  /* hand-trimmed, because hts_span_trim costs a strchr per byte here */
+  *name = hts_span_between(line.p, colon);
+  *value = hts_span_between(colon + 1, line.p + line.len);
+  while (!hts_span_empty(*name) && header_blank(name->p[name->len - 1]))
+    name->len--;
+  while (!hts_span_empty(*value) && header_blank(value->p[0]))
+    *value = hts_span_skip(*value, 1);
+  while (!hts_span_empty(*value) && header_blank(value->p[value->len - 1]))
+    value->len--;
+}
+
+hts_boolean hts_header_next(hts_span *rest, hts_header_field *f) {
+  if (!hts_span_next_in(rest, '\n', &f->line))
+    return HTS_FALSE;
+  if (!hts_span_empty(f->line) && f->line.p[f->line.len - 1] == '\r')
+    f->line.len--;
+  hts_header_split(f->line, &f->name, &f->value);
+  return !hts_span_empty(f->line);
+}
+
 hts_boolean hts_span_copy(hts_span s, char *dst, size_t size) {
   size_t n;
 

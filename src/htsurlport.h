@@ -138,6 +138,24 @@ hts_boolean hts_span_copy(hts_span s, char *dst, size_t size);
 HTS_CHECK_RESULT hts_boolean hts_span_list_has(hts_span list, char sep,
                                                hts_span token);
 
+/* One line of a header block. NAME is empty on the status line, a fold, or a
+   line with no ':'. */
+typedef struct {
+  hts_span line;  /* without its LF and one CR */
+  hts_span name;  /* without the blanks before the colon */
+  hts_span value; /* trimmed of SP and HT */
+} hts_header_field;
+
+/* Split LINE at its first ':' into *NAME and *VALUE as hts_header_field has
+   them. Both are empty for a fold (LINE opens with SP or HT) or a line with no
+   ':'. */
+void hts_header_split(hts_span line, hts_span *name, hts_span *value);
+
+/* Read the next line of the header block *REST, ended by LF or CRLF, into *F.
+   Return FALSE at the end of *REST or at the blank line ending the block. */
+HTS_CHECK_RESULT hts_boolean hts_header_next(hts_span *rest,
+                                             hts_header_field *f);
+
 /* A malloct'ed copy of S as a C string, or NULL when out of memory. */
 HTS_CHECK_RESULT char *hts_span_dup(hts_span s);
 

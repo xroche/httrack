@@ -128,7 +128,6 @@ src/htslib.h: hts_socket_is_mptcp
 src/htslib.h: hts_status_line_code
 src/htslib.h: http_bundle_header_refusal
 src/htslib.h: http_custom_header_warning
-src/htslib.h: http_headers_have_field
 src/htslib.h: http_sendhead
 src/htslib.h: ident_url_absolute
 src/htslib.h: is_dyntype

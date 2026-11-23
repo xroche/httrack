@@ -3968,13 +3968,14 @@ static int st_bufwrite(httrackp *opt, int argc, char **argv) {
 }
 
 /* Print what a span primitive reads as [bytes], for next|nextsep|nextin|split C
-   TEXT, trim L R TEXT or copy SIZE TEXT. */
+   TEXT, trim L R TEXT, copy SIZE TEXT, or header|headersplit TEXT. */
 static int st_span(httrackp *opt, int argc, char **argv) {
   String out = STRING_EMPTY;
   hts_span s, a, b;
   int ret = 0;
 
-  if (argc < 3 || (strcmp(argv[0], "trim") == 0 && argc < 4)) {
+  if (argc < 2 || (strncmp(argv[0], "header", 6) != 0 && argc < 3) ||
+      (strcmp(argv[0], "trim") == 0 && argc < 4)) {
     fprintf(stderr, "span: bad arguments\n");
     return 1;
   }
@@ -4015,6 +4016,32 @@ static int st_span(httrackp *opt, int argc, char **argv) {
     } else {
       StringCat(out, "none");
     }
+  } else if (strcmp(argv[0], "header") == 0) {
+    /* Each line shows as [line|name|value], then what stopped the walk. A
+       "hex:" text keeps its CRLFs, which Windows text-mode stdin folds. */
+    char text[256];
+    hts_header_field f;
+
+    s = hts_span_at(text, st_decode_body(argv[argc - 1], text, sizeof(text)));
+
+    while (hts_header_next(&s, &f)) {
+      StringAddchar(out, '[');
+      span_add_visible(&out, f.line.p, f.line.len);
+      StringAddchar(out, '|');
+      span_add_visible(&out, f.name.p, f.name.len);
+      StringAddchar(out, '|');
+      span_add_visible(&out, f.value.p, f.value.len);
+      StringAddchar(out, ']');
+    }
+    StringCat(out, " rest=");
+    span_add_visible(&out, s.p, s.len);
+  } else if (strcmp(argv[0], "headersplit") == 0) {
+    hts_header_split(s, &a, &b);
+    StringAddchar(out, '[');
+    span_add_visible(&out, a.p, a.len);
+    StringAddchar(out, '|');
+    span_add_visible(&out, b.p, b.len);
+    StringAddchar(out, ']');
   } else if (strcmp(argv[0], "trim") == 0) {
     a = hts_span_trim(s, argv[1], argv[2]);
     StringAddchar(out, '[');
@@ -5528,7 +5555,7 @@ const struct selftest_entry selftests_lib[] = {
     {"bufwrite", "[cpy|cat|catn|unterminated[-cpy|-catn]]",
      "the hts_buf write helpers copy, append, clip and print in bounds",
      st_bufwrite},
-    {"span", "<next|nextsep|split|trim|copy> <args> <text>",
+    {"span", "<next|nextsep|split|trim|copy|header|headersplit> [args] <text>",
      "the fields and copies the span primitive makes", st_span},
     {"spancmp", "", "span compares read a NUL as a byte and fold only A-Z",
      st_spancmp},

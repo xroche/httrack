@@ -11,7 +11,7 @@ set -euo pipefail
 # The counts are exact, so a shrinking corpus shows.
 selftest_queue_lines "cookiespandiff: 44299 cases, 0 failures
 cookiespandiff: OK" cookiespandiff
-selftest_queue_lines "warcspandiff: 138575 cases, 0 failures
+selftest_queue_lines "warcspandiff: 138598 cases, 0 failures
 warcspandiff: OK" warcspandiff
 selftest_queue_lines "spancmp: 78 cases, 0 failures
 spancmp: OK" spancmp
