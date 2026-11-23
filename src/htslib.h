@@ -858,8 +858,6 @@ hts_boolean hts_escape_span(const char *src, size_t n, const char *from,
                             const char *to, const char *set, char *dst,
                             size_t size);
 
-/* Header line helpers shared by the request writer and the redaction code. */
-size_t header_name_len(const char *line);
 /* Is the name opening LINE one of the NULL-terminated NAMES, in any case? */
 hts_boolean header_name_in(const char *line, const char *const *names);
 

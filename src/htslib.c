@@ -432,10 +432,6 @@ static hts_span first_line(const char *s) {
   return hts_span_at(s, strcspn(s, "\r\n"));
 }
 
-size_t header_name_len(const char *line) {
-  return header_name(first_line(line)).len;
-}
-
 /* Is NAME an RFC 7230 token? */
 static hts_boolean header_name_valid(hts_span name) {
   size_t i;

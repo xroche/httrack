@@ -1841,6 +1841,64 @@ static int secrets_full(void) {
   return err;
 }
 
+/* Prints S with CR and LF spelt out. */
+static void secretheaders_print(const char *s) {
+  for (; *s != '\0'; s++)
+    if (*s == '\r' || *s == '\n')
+      printf("%s", *s == '\r' ? "\\r" : "\\n");
+    else
+      putchar(*s);
+}
+
+/* Prints, per argument, the tokens learnt, then the shown and logged forms. */
+static int st_secretheaders(httrackp *opt, int argc, char **argv) {
+  int a;
+
+  (void) opt;
+  for (a = 0; a < argc; a++) {
+    httrackp *const o = hts_create_opt();
+    FILE *const fp = tmpfile();
+    char text[128], probe[128], got[1024];
+    size_t n, i, j;
+
+    if (o == NULL || fp == NULL) {
+      fprintf(stderr, "secretheaders: out of memory\n");
+      if (fp != NULL)
+        fclose(fp);
+      if (o != NULL)
+        hts_free_opt(o);
+      return 1;
+    }
+    if (st_decode_body(argv[a], text, sizeof(text)) + 1 >= sizeof(text)) {
+      fprintf(stderr, "secretheaders: input over %d bytes\n",
+              (int) sizeof(text) - 2);
+      fclose(fp);
+      hts_free_opt(o);
+      return 1;
+    }
+    n = strlen(text);
+    hts_secret_add_headers(o, text);
+    for (i = 0; i < n; i++)
+      for (j = i + HTS_SECRET_TOKEN; j <= n; j++) {
+        memcpy(probe, text + i, j - i);
+        probe[j - i] = '\0';
+        hts_hide_secrets(o, probe, sizeof(probe));
+        if (strcmp(probe, "***") == 0)
+          printf("[%.*s]", (int) (j - i), text + i);
+      }
+    printf(" shown=");
+    secretheaders_print(hts_header_shown(o, text, got, sizeof(got)));
+    fprintfio(fp, text, "> ", o);
+    secrets_read(fp, 0, got, sizeof(got));
+    printf(" log=");
+    secretheaders_print(got);
+    printf("\n");
+    fclose(fp);
+    hts_free_opt(o);
+  }
+  return 0;
+}
+
 static int st_secrets(httrackp *opt, int argc, char **argv) {
   httrackp *const o = hts_create_opt();
   FILE *const fp = tmpfile();
@@ -5584,6 +5642,9 @@ const struct selftest_entry selftests_lib[] = {
      st_headerparse},
     {"gmtime", "",
      "hts_gmtime() fills the caller's buffer, not a static (#794)", st_gmtime},
+    {"secretheaders", "<text|hex:..>...",
+     "the header tokens the log learns from each block, and how it shows it",
+     st_secretheaders},
     {"secrets", "",
      "the log hides a password it has seen in a login, and a header token "
      "anywhere",
