@@ -395,8 +395,8 @@ int link_has_authorization(const char *lien) {
 }
 
 // conversion chemin de fichier/dossier vers 8-3 ou ISO9660
-void long_to_83(int mode, char *n83, size_t n83size, char *save) {
-  n83[0] = '\0';
+void long_to_83(int mode, hts_buf n83, char *save) {
+  n83.p[0] = '\0';
 
   while(*save) {
     char fn83[256], fnl[256];
@@ -411,11 +411,11 @@ void long_to_83(int mode, char *n83, size_t n83size, char *save) {
     fnl[j] = '\0';
     // conversion
     longfile_to_83(mode, HTS_BUF(fn83), fnl);
-    strlcatbuff(n83, fn83, n83size);
+    strlcatbuff(n83.p, fn83, n83.size);
 
     save += i;
     if (*save == '/') {
-      strlcatbuff(n83, "/", n83size);
+      strlcatbuff(n83.p, "/", n83.size);
       save++;
     }
   }

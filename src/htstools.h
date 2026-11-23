@@ -79,7 +79,7 @@ hts_boolean link_dir_is_multisegment(const char *lien);
    the source bytes, because unescape_amp forges a '#' out of "&#35;". */
 hts_boolean link_dir_has_fragment_or_query(const char *lien);
 int link_has_authorization(const char *lien);
-void long_to_83(int mode, char *n83, size_t n83size, char *save);
+void long_to_83(int mode, hts_buf n83, char *save);
 void longfile_to_83(int mode, hts_buf n83, char *save);
 /* Byte before adr, or a space where adr[-1] would underflow, because the tag
    guards read a space as a word boundary. */

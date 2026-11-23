@@ -5220,30 +5220,6 @@ int hts_read(htsblk * r, char *buff, int size) {
 
 // -- divers //
 
-// cut path and project name
-// patch also initial path
-void cut_path(char *fullpath, char *path, size_t path_size, char *pname,
-              size_t pname_size) {
-  path[0] = pname[0] = '\0';
-  if (strnotempty(fullpath)) {
-    if (!hts_striplastchar(fullpath, '/'))
-      hts_striplastchar(fullpath, '\\');
-    if (strlen(fullpath) > 1) {
-      char *a;
-
-      while((a = strchr(fullpath, '\\')))
-        *a = '/';               // remplacer par /
-      a = fullpath + strlen(fullpath) - 2;
-      while((*a != '/') && (a > fullpath))
-        a--;
-      if (*a == '/')
-        a++;
-      strlcpybuff(pname, a, pname_size);
-      strlncatbuff(path, fullpath, path_size, (size_t) (a - fullpath));
-    }
-  }
-}
-
 int hts_realloct_fault_selftest = 0;
 
 static void hts_debug_log_print(HTS_FORMAT_STRING const char *format, ...)

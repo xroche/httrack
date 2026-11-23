@@ -237,33 +237,6 @@ static void basic_selftests(void) {
     assertf(strcmp(convtolower(HTS_BUF(low), "ABC/Def.HTML"), "abc/def.html") ==
             0);
   }
-  // cut_path(): splits a path into directory (with trailing '/') and basename,
-  // each bounded by its buffer size.
-  {
-    char path[256];
-    char pname[256];
-
-    {
-      char full[] = "/dir/sub/file.html";
-
-      cut_path(full, path, sizeof(path), pname, sizeof(pname));
-      assertf(strcmp(path, "/dir/sub/") == 0);
-      assertf(strcmp(pname, "file.html") == 0);
-    }
-    { // a trailing slash is trimmed before the split
-      char full[] = "/dir/sub/";
-
-      cut_path(full, path, sizeof(path), pname, sizeof(pname));
-      assertf(strcmp(path, "/dir/") == 0);
-      assertf(strcmp(pname, "sub") == 0);
-    }
-    { // a path of length <= 1 yields empty results
-      char full[] = "/";
-
-      cut_path(full, path, sizeof(path), pname, sizeof(pname));
-      assertf(path[0] == '\0' && pname[0] == '\0');
-    }
-  }
   // get_httptype_sized() writes a long MIME type (73 chars for OOXML) whole.
   {
     httrackp *opt = hts_create_opt();
@@ -430,8 +403,14 @@ static void basic_selftests(void) {
     char n83[HTS_URLMAXSIZE * 2];
     char save[] = "dir/longfilename.html";
 
-    long_to_83(1, n83, sizeof(n83), save);
+    long_to_83(1, HTS_BUF(n83), save);
     assertf(strcmp(n83, "DIR/LONGFILE.HTM") == 0);
+    { // exact fit: 16 chars plus the NUL
+      char fit[sizeof("DIR/LONGFILE.HTM")];
+
+      long_to_83(1, HTS_BUF(fit), save);
+      assertf(strcmp(fit, "DIR/LONGFILE.HTM") == 0);
+    }
   }
   // lienrelatif(): relative path from the directory of curr_fil to link.
   {
