@@ -436,22 +436,15 @@ hts_boolean header_name_in(const char *line, const char *const *names) {
   return hts_span_index_ci(name, names) >= 0;
 }
 
-hts_boolean http_headers_have_field(const char *headers,
-                                    const char *field_name) {
-  size_t len;
+/* http_headers_have_field() for a NAME without the colon */
+static hts_boolean http_headers_have_name(const char *headers, hts_span name) {
   const char *line;
 
-  if (headers == NULL || field_name == NULL)
-    return HTS_FALSE;
-  len = strlen(field_name);
-  if (len != 0 && field_name[len - 1] == ':') /* the tree spells it both ways */
-    len--;
-  if (len == 0)
+  if (headers == NULL || hts_span_empty(name))
     return HTS_FALSE;
   /* anchored, so a folded line or a name inside a value cannot match */
   for (line = headers; *line != '\0';) {
-    if (hts_span_eq_ci(hts_span_at(line, header_name_len(line)),
-                       hts_span_at(field_name, len)))
+    if (hts_span_eq_ci(hts_span_at(line, header_name_len(line)), name))
       return HTS_TRUE;
     while (*line != '\0' && *line != '\n' && *line != '\r')
       line++;
@@ -459,6 +452,18 @@ hts_boolean http_headers_have_field(const char *headers,
       line++;
   }
   return HTS_FALSE;
+}
+
+hts_boolean http_headers_have_field(const char *headers,
+                                    const char *field_name) {
+  size_t len;
+
+  if (field_name == NULL)
+    return HTS_FALSE;
+  len = strlen(field_name);
+  if (len != 0 && field_name[len - 1] == ':') /* the tree spells it both ways */
+    len--;
+  return http_headers_have_name(headers, hts_span_at(field_name, len));
 }
 
 /* These fields frame the message or act per hop. */
@@ -523,18 +528,9 @@ HTSEXT_API hts_header_verdict hts_custom_header_verdict(const char *headers,
     return HTS_HEADER_DROPPED_MALFORMED;
   if (header_line_refused(line))
     return HTS_HEADER_DROPPED_FRAMING;
-  if (header_line_single(line) && headers != NULL) {
-    char field[128];
-    const size_t len = header_name_len(line);
-
-    /* bounded here, not by the longest name in single[] */
-    if (len < sizeof(field)) {
-      memcpy(field, line, len);
-      field[len] = '\0';
-      if (http_headers_have_field(headers, field))
-        return HTS_HEADER_SENT_REPLACES_EARLIER;
-    }
-  }
+  if (header_line_single(line) &&
+      http_headers_have_name(headers, hts_span_at(line, header_name_len(line))))
+    return HTS_HEADER_SENT_REPLACES_EARLIER;
   if (header_line_engine_conditional(line))
     return HTS_HEADER_SENT_UNLESS_ENGINE_OVERRIDES;
   return HTS_HEADER_SENT;
@@ -596,22 +592,19 @@ static void append_custom_headers(buff_struct *bstr, const char *headers) {
       next++;
 
     if (*line != ' ' && *line != '\t') { /* not a folded continuation */
-      const size_t len = header_name_len(line);
-      char field[128];
+      const hts_span field = hts_span_at(line, header_name_len(line));
 
       keep = header_line_valid(line) && !header_line_refused(line);
-      if (keep && len < sizeof(field)) {
+      if (keep) {
         const char cut = bstr->buffer[base];
 
-        memcpy(field, line, len);
-        field[len] = '\0';
         /* only what the engine wrote, so the box may repeat its own fields */
         bstr->buffer[base] = '\0';
-        keep = !http_headers_have_field(bstr->buffer, field);
+        keep = !http_headers_have_name(bstr->buffer, field);
         bstr->buffer[base] = cut;
         /* the last of a single-valued field wins, as later options do */
         if (keep && header_line_single(line) &&
-            http_headers_have_field(next, field))
+            http_headers_have_name(next, field))
           keep = HTS_FALSE;
       }
     }
@@ -4091,10 +4084,8 @@ static const char *hts_host_alias_resolve_rules(const char *rules,
   proto = jump_protocol_const(adr);      /* after the scheme */
   host = jump_identification_const(adr); /* after the credentials */
   schemelen = (size_t) (proto - adr);
-  if (schemelen >= sizeof(schemebuf))
+  if (!hts_buf_put_span(HTS_BUF(schemebuf), hts_span_between(adr, proto)))
     return NULL;
-  memcpy(schemebuf, adr, schemelen);
-  schemebuf[schemelen] = '\0';
   /* Match the host as the dedup layer does, so with the www. collapse on, a
      rule naming example.com also covers www.example.com. */
   hostsubj = collapse_www ? jump_normalized_const(host) : host;
@@ -4114,23 +4105,18 @@ static const char *hts_host_alias_resolve_rules(const char *rules,
 
     /* A rule may name the canonical host's scheme. If not, the scheme in
        effect stays, which may come from an earlier rule in the chain. */
-    if (canonlen >= sizeof(canonbuf))
+    if (!hts_buf_put_span(HTS_BUF(canonbuf), hts_span_at(canon, canonlen)))
       return NULL;
-    memcpy(canonbuf, canon, canonlen);
-    canonbuf[canonlen] = '\0';
     /* the link's credentials are the ones kept, so drop any the rule carries:
        they would otherwise be prepended to them again on every re-fold */
     cproto = jump_protocol_const(canonbuf);
     chost = jump_identification_const(cproto);
     hostlen = canonlen - (size_t) (chost - canonbuf);
     if (cproto != canonbuf) { /* the rule names a scheme */
-      const size_t len = (size_t) (cproto - canonbuf);
-
-      if (len >= sizeof(schemebuf))
+      if (!hts_buf_put_span(HTS_BUF(schemebuf),
+                            hts_span_between(canonbuf, cproto)))
         return NULL;
-      memcpy(schemebuf, canonbuf, len);
-      schemebuf[len] = '\0';
-      schemelen = len;
+      schemelen = (size_t) (cproto - canonbuf);
     }
     credlen = (size_t) (host - proto);
 
@@ -4325,7 +4311,7 @@ int hts_basic_auth_value(httrackp *opt, const char *url, char *out,
   char user_pass[768];
 
   assertf(out_size >= 1100); /* base-64 of 765 bytes is 1020 */
-  out[0] = user_pass[0] = '\0';
+  out[0] = '\0';
   (void) hts_url_view_parse(url, strlen(url), &v);
   // no login where jump_identification_const() keeps the URL whole
   idlen = jump_identification_const(url) == v.host.p ? v.userinfo.len : 0;
@@ -4333,10 +4319,9 @@ int hts_basic_auth_value(httrackp *opt, const char *url, char *out,
     return 0;
   /* a clipped credential authenticates as somebody else, and an encoded one
      wider than bauth_chain.auth could not be stored for the child pages */
-  if (idlen > (sizeof(((bauth_chain *) 0)->auth) - 1) / 4 * 3)
+  if (idlen > (sizeof(((bauth_chain *) 0)->auth) - 1) / 4 * 3 ||
+      !hts_buf_put_span(HTS_BUF(user_pass), v.userinfo))
     return -1;
-  memcpy(user_pass, v.userinfo.p, idlen);
-  user_pass[idlen] = '\0';
   strcpybuff(user_pass, unescape_http(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                                       user_pass));
   code64((unsigned char *) user_pass, (int) strlen(user_pass),
@@ -4350,11 +4335,11 @@ hts_boolean hts_sni_hostname(const char *url_adr, char *out, size_t size) {
 
   (void) hts_url_view_parse(url_adr, strlen(url_adr), &v);
   out[0] = '\0';
-  if (hts_span_empty(v.host) || v.host.len >= size ||
+  if (hts_span_empty(v.host) ||
       hts_span_starts_with(v.host, hts_span_of("[")) ||
       hts_host_is_ipv4(v.host.p, v.host.len))
     return HTS_FALSE;
-  return hts_span_copy(v.host, out, size);
+  return hts_buf_put_span(hts_buf_at(out, size), v.host);
 }
 
 #if HTS_USEOPENSSL
