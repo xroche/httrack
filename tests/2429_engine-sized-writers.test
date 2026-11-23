@@ -1,8 +1,6 @@
 #!/bin/bash
 #
-# The internal duration, date, query-digest, ref-name, SNI, Origin,
-# mime-extension and path-split writers take their output size, and never
-# write past it.
+# The internal sized writers never write past their buffer.
 
 set -euo pipefail
 

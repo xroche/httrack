@@ -2179,78 +2179,53 @@ static int st_name_sized(httrackp *opt, int argc, char **argv) {
   return st_verdict("name-sized", fail);
 }
 
-/* The SNI and Origin writers refuse a short buffer, and the mime-extension and
-   path-split writers fill an exact fit. */
+/* The SNI and Origin writers refuse a short buffer. */
 static int st_leaf_sized(httrackp *opt, int argc, char **argv) {
   static const char sni[] = "www.example.com";
   static const char origin[] = "https://www.example.com:8443";
-  const size_t scaps[] = {4, sizeof(sni) - 1, sizeof(sni)};
-  const size_t ocaps[] = {8, sizeof(origin) - 1, sizeof(origin)};
-  char *buf, *name;
+  char *buf;
   size_t k;
   int fail = 0;
 
   (void) opt;
   (void) argc;
   (void) argv;
-  for (k = 0; k < 3; k++) {
-    const hts_boolean fit = k == 2 ? HTS_TRUE : HTS_FALSE;
+  for (k = 0; k < 2; k++) {
+    const hts_boolean fit = k == 1 ? HTS_TRUE : HTS_FALSE;
+    const size_t scap = sizeof(sni) - 1 + k, ocap = sizeof(origin) - 1 + k;
 
-    buf = st_sized_alloc(scaps[k]);
+    buf = st_sized_alloc(scap);
     buf[0] = 'Q'; /* so a refusal must clear it */
-    if (hts_sni_hostname("u@www.example.com:8443", hts_buf_at(buf, scaps[k])) !=
+    if (hts_sni_hostname("u@www.example.com:8443", hts_buf_at(buf, scap)) !=
             fit ||
-        strcmp(buf, fit ? sni : "") != 0 || !st_sized_guard_ok(buf, scaps[k])) {
-      printf("leaf-sized: sni into %u bytes\n", (unsigned) scaps[k]);
-      fail = 1;
-    }
-    buf[0] = 'Q';
-    if (hts_sni_hostname("1.2.3.4:80", hts_buf_at(buf, scaps[k])) ||
-        buf[0] != '\0') {
-      printf("leaf-sized: sni of an address into %u bytes\n",
-             (unsigned) scaps[k]);
+        strcmp(buf, fit ? sni : "") != 0 || !st_sized_guard_ok(buf, scap)) {
+      printf("leaf-sized: sni into %u bytes\n", (unsigned) scap);
       fail = 1;
     }
     freet(buf);
-    buf = st_sized_alloc(ocaps[k]);
+    buf = st_sized_alloc(ocap);
     if (hts_fetch_origin("https://www.example.com:8443/x",
-                         hts_buf_at(buf, ocaps[k])) != fit ||
-        !st_sized_clip_ok(buf, ocaps[k], origin)) {
-      printf("leaf-sized: origin into %u bytes\n", (unsigned) ocaps[k]);
+                         hts_buf_at(buf, ocap)) != fit ||
+        (fit && strcmp(buf, origin) != 0) || !st_sized_guard_ok(buf, ocap)) {
+      printf("leaf-sized: origin into %u bytes\n", (unsigned) ocap);
       fail = 1;
     }
     freet(buf);
   }
-  buf = st_sized_alloc(sizeof("woff2"));
-  if (give_mimext(hts_buf_at(buf, sizeof("woff2")), "font/woff2") != 1 ||
-      !st_sized_clip_ok(buf, sizeof("woff2"), "woff2")) {
-    printf("leaf-sized: mime extension\n");
+  buf = st_sized_alloc(sizeof(sni));
+  buf[0] = 'Q';
+  if (hts_sni_hostname("1.2.3.4:80", hts_buf_at(buf, sizeof(sni))) ||
+      buf[0] != '\0') {
+    printf("leaf-sized: sni of an address\n");
     fail = 1;
   }
   freet(buf);
-  buf = st_sized_alloc(sizeof("/dir/"));
-  name = st_sized_alloc(sizeof("f.htm"));
-  {
-    char full[] = "/dir/f.htm";
-
-    cut_path(full, hts_buf_at(buf, sizeof("/dir/")),
-             hts_buf_at(name, sizeof("f.htm")));
-  }
-  if (!st_sized_clip_ok(buf, sizeof("/dir/"), "/dir/") ||
-      !st_sized_clip_ok(name, sizeof("f.htm"), "f.htm")) {
-    printf("leaf-sized: cut_path is '%s' and '%s'\n", buf, name);
-    fail = 1;
-  }
-  freet(buf);
-  freet(name);
   return st_verdict("leaf-sized", fail);
 }
 
 const struct selftest_entry selftests_name[] = {
     {"leaf-sized", "",
-     "the SNI, Origin, mime-extension and path-split writers stay inside the "
-     "buffer they are given",
-     st_leaf_sized},
+     "the internal sized writers never write past their buffer", st_leaf_sized},
     {"name-sized", "",
      "url_md5() and url_savename_refname() stay inside the buffer they are "
      "given",

@@ -465,7 +465,7 @@ hts_boolean url_query_value(const char *url, const char *name, hts_buf dst) {
     return HTS_FALSE;
   }
   /* crawled query text: clip it */
-  (void) !hts_buf_put_span_clip(dst, f.val);
+  (void) hts_span_copy(f.val, dst.p, dst.size);
   return HTS_TRUE;
 }
 
@@ -2172,10 +2172,12 @@ char *url_md5(hts_buf digest, const char *fil) {
   const char *const query = strchr(fil, '?');
   char hex[33];
 
-  hex[0] = '\0';
-  if (query != NULL)
+  assertf(digest.size != 0);
+  digest.p[0] = '\0';
+  if (query != NULL) {
     domd5mem(query + 1, strlen(query + 1), hex, 1);
-  hts_buf_cpy_clip(digest, hex);
+    hts_buf_cpy_clip(digest, hex);
+  }
   return digest.p;
 }
 

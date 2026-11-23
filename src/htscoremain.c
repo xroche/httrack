@@ -183,7 +183,7 @@ void hts_resolve_datadir(hts_buf dst, const char *selfpath,
     for (i = 0; i < sizeof(layout) / sizeof(layout[0]); i++) {
       char cand[HTS_URLMAXSIZE * 2];
 
-      /* A long argv[0] can overflow cand, and a clipped path is no probe. */
+      /* A long argv[0] can overflow cand, so skip a clipped path. */
       if (!hts_buf_printf(HTS_BUF(cand), "%s%s", base, layout[i]))
         continue;
       if (datadir_has_templates(cand)) {

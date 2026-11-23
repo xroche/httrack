@@ -122,10 +122,11 @@ size_t hts_read_file_head(const char *path, void *buf, size_t len);
 
 /* Is the wire-vs-ext verdict contested and settleable by a body sniff? */
 int hts_ext_sniff_wanted(httrackp *opt, const char *wiremime, const char *file);
-/* Writes the hex MD5 of the query past '?' clipped to digest, or "" if none. */
+/* Write the hex MD5 of the query after '?' into digest, clipped. A URL with no
+   query gets "". */
 char *url_md5(hts_buf digest, const char *fil_complete);
-/* The cache ref name of (adr,fil) into filename; "" and HTS_FALSE if it does
-   not fit. */
+/* Write the cache ref name of (adr,fil) into filename. When it does not fit,
+   filename is "" and the result is HTS_FALSE. */
 HTS_CHECK_RESULT hts_boolean url_savename_refname(const char *adr,
                                                   const char *fil,
                                                   hts_buf filename);

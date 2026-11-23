@@ -3330,7 +3330,7 @@ void time_rfc822(char *s, size_t size, struct tm *A) {
 
     assertf(localtime_returned_null);
   }
-  hts_format_rfc822(hts_buf_at(s, size), A, " GMT");
+  hts_format_rfc822(s, size, A, " GMT");
 }
 
 // Writes A as an RFC 822 date in local time.
@@ -3340,7 +3340,7 @@ static void time_rfc822_local(char *s, size_t size, struct tm *A) {
 
     assertf(localtime_returned_null);
   }
-  hts_format_rfc822(hts_buf_at(s, size), A, "");
+  hts_format_rfc822(s, size, A, "");
 }
 
 // conversion en b,Kb,Mb
@@ -5222,8 +5222,9 @@ int hts_read(htsblk * r, char *buff, int size) {
 
 // cut path and project name
 // patch also initial path
-void cut_path(char *fullpath, hts_buf path, hts_buf pname) {
-  path.p[0] = pname.p[0] = '\0';
+void cut_path(char *fullpath, char *path, size_t path_size, char *pname,
+              size_t pname_size) {
+  path[0] = pname[0] = '\0';
   if (strnotempty(fullpath)) {
     if (!hts_striplastchar(fullpath, '/'))
       hts_striplastchar(fullpath, '\\');
@@ -5237,8 +5238,8 @@ void cut_path(char *fullpath, hts_buf path, hts_buf pname) {
         a--;
       if (*a == '/')
         a++;
-      hts_buf_cpy(pname, a);
-      hts_buf_catn(path, fullpath, (size_t) (a - fullpath));
+      strlcpybuff(pname, a, pname_size);
+      strlncatbuff(path, fullpath, path_size, (size_t) (a - fullpath));
     }
   }
 }

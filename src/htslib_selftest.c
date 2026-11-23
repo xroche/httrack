@@ -246,21 +246,21 @@ static void basic_selftests(void) {
     {
       char full[] = "/dir/sub/file.html";
 
-      cut_path(full, HTS_BUF(path), HTS_BUF(pname));
+      cut_path(full, path, sizeof(path), pname, sizeof(pname));
       assertf(strcmp(path, "/dir/sub/") == 0);
       assertf(strcmp(pname, "file.html") == 0);
     }
     { // a trailing slash is trimmed before the split
       char full[] = "/dir/sub/";
 
-      cut_path(full, HTS_BUF(path), HTS_BUF(pname));
+      cut_path(full, path, sizeof(path), pname, sizeof(pname));
       assertf(strcmp(path, "/dir/") == 0);
       assertf(strcmp(pname, "sub") == 0);
     }
     { // a path of length <= 1 yields empty results
       char full[] = "/";
 
-      cut_path(full, HTS_BUF(path), HTS_BUF(pname));
+      cut_path(full, path, sizeof(path), pname, sizeof(pname));
       assertf(path[0] == '\0' && pname[0] == '\0');
     }
   }

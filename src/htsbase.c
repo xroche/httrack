@@ -76,7 +76,7 @@ const char *hts_strerror(int err, char *buf, size_t size) {
   return buf;
 }
 
-// lower-case conversion into caller buffer
+// Copy a into catbuff lower-cased, and return catbuff.p.
 char *convtolower(hts_buf catbuff, const char *a) {
   hts_buf_cpy(catbuff, a);
   hts_lowcase(catbuff.p);
