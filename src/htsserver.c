@@ -1393,12 +1393,13 @@ static int ini_list_shift(const char *value, size_t len, int delta) {
 /* Copy INI to OUT with the ids of ini_list_keys shifted by DELTA, so what
    reaches the file is the 0-based index WinHTTrack reads (#1314). */
 static void ini_rebase_lists(const char *ini, int delta, String *out) {
-  const hts_span all = hts_span_of(ini);
-  const char *cur;
+  hts_span rest = hts_span_of(ini);
   hts_span line, key, value;
 
   StringClear(*out);
-  for (cur = all.p; hts_span_next(&cur, all.p + all.len, '\n', &line);) {
+  while (hts_span_next_in(&rest, '\n', &line)) {
+    /* The line with the CRs and newline it keeps in the copy. */
+    const hts_span raw = hts_span_between(line.p, rest.p);
     char name[64];
     char shifted[16];
     int id = -1;
@@ -1409,15 +1410,15 @@ static void ini_rebase_lists(const char *ini, int delta, String *out) {
       if (hts_span_copy(key, name, sizeof(name)) && ini_key_is_list(name))
         id = ini_list_shift(value.p, value.len, delta);
     }
-    /* Each line keeps its own CRs and newline, which [line.p, cur) holds. */
     if (id >= 0) {
+      const hts_span tail = hts_span_skip(raw, key.len + 1 + value.len);
+
       snprintf(shifted, sizeof(shifted), "%d", id);
-      StringMemcat(*out, line.p, key.len + 1);
+      StringMemcat(*out, raw.p, key.len + 1);
       StringCat(*out, shifted);
-      StringMemcat(*out, value.p + value.len,
-                   (size_t) (cur - (value.p + value.len)));
+      StringMemcat(*out, tail.p, tail.len);
     } else {
-      StringMemcat(*out, line.p, (size_t) (cur - line.p));
+      StringMemcat(*out, raw.p, raw.len);
     }
   }
 }

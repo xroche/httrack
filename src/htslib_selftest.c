@@ -3540,8 +3540,7 @@ static void spandiff_one(parsediff_stats *st, const char *rules,
   static const size_t sizes[] = {1, 2, 8, 4096};
   size_t i, j;
   int www;
-  const hts_span all = hts_span_of(rules);
-  const char *cur;
+  hts_span rest = hts_span_of(rules);
   hts_span line;
 
   for (i = 0; keys[i] != NULL; i++) {
@@ -3604,7 +3603,7 @@ static void spandiff_one(parsediff_stats *st, const char *rules,
     }
   }
   /* each line alone, which is what --host-alias hands the validator */
-  for (cur = all.p; hts_span_next(&cur, all.p + all.len, '\n', &line);) {
+  while (hts_span_next_in(&rest, '\n', &line)) {
     char *one = malloct(line.len + 1);
 
     assertf(one != NULL);
@@ -3703,17 +3702,16 @@ static int st_spandiff(httrackp *opt, int argc, char **argv) {
   {
     static const char nul[] = " a\0b ";
     const hts_span s = {nul, sizeof(nul) - 1};
-    const char *cur = nul;
-    hts_span f, t;
+    hts_span rest = s, f, t;
     char d[8];
 
     t = hts_span_trim(s, " ab", " ab");
     if (t.p != nul + 2 || t.len != 1)
       parsediff_fail(&st, "hts_span_trim NUL", "' a\\0b '", "", "", "");
-    if (!hts_span_next(&cur, nul + s.len, '\0', &f) || f.len != 2 ||
-        !hts_span_next(&cur, nul + s.len, '\0', &f) || f.p != nul + 3 ||
-        f.len != 2 || hts_span_next(&cur, nul + s.len, '\0', &f))
-      parsediff_fail(&st, "hts_span_next NUL", "' a\\0b '", "", "", "");
+    if (!hts_span_next_in(&rest, '\0', &f) || f.len != 2 ||
+        !hts_span_next_in(&rest, '\0', &f) || f.p != nul + 3 || f.len != 2 ||
+        hts_span_next_in(&rest, '\0', &f))
+      parsediff_fail(&st, "hts_span_next_in NUL", "' a\\0b '", "", "", "");
     if (!hts_span_copy(s, d, sizeof(d)) || memcmp(d, nul, sizeof(nul)) != 0)
       parsediff_fail(&st, "hts_span_copy NUL", "' a\\0b '", "", "", "");
   }
@@ -3722,19 +3720,17 @@ static int st_spandiff(httrackp *opt, int argc, char **argv) {
     static const char text[] = " a,b=c/";
     const size_t len = sizeof(text) - 1;
     char *buf = malloct(len);
-    const char *cur;
-    hts_span s, f, h, t;
+    hts_span s, rest, f, h, t;
     char d[sizeof(text)];
     size_t n = 0;
 
     assertf(buf != NULL);
     memcpy(buf, text, len);
-    s.p = buf;
-    s.len = len;
-    for (cur = buf; hts_span_next(&cur, buf + len, ',', &f);)
+    s = hts_span_at(buf, len);
+    for (rest = s; hts_span_next_in(&rest, ',', &f);)
       n++;
     if (n != 2 || f.p != buf + 3 || f.len != len - 3)
-      parsediff_fail(&st, "hts_span_next unterminated", text, "", "", "");
+      parsediff_fail(&st, "hts_span_next_in unterminated", text, "", "", "");
     if (hts_span_split(f, ';', &h, &t) || !hts_span_split(f, '=', &h, &t) ||
         t.p != buf + 5 || t.len != 2)
       parsediff_fail(&st, "hts_span_split unterminated", text, "", "", "");
@@ -3931,8 +3927,8 @@ static int st_bufwrite(httrackp *opt, int argc, char **argv) {
   return bad;
 }
 
-/* Print what a span primitive reads as [bytes], for next|nextsep|split C TEXT,
-   trim L R TEXT or copy SIZE TEXT. */
+/* Print what a span primitive reads as [bytes], for next|nextsep|nextin|split C
+   TEXT, trim L R TEXT or copy SIZE TEXT. */
 static int st_span(httrackp *opt, int argc, char **argv) {
   String out = STRING_EMPTY;
   hts_span s, a, b;
@@ -3944,22 +3940,29 @@ static int st_span(httrackp *opt, int argc, char **argv) {
   }
   s = hts_span_of(argv[argc - 1]);
   if (strcmp(argv[0], "next") == 0) {
-    const char *cur = s.p;
+    const char *const end = s.p + s.len;
 
-    while (hts_span_next(&cur, s.p + s.len, argv[1][0], &a)) {
+    while (hts_span_next_in(&s, argv[1][0], &a)) {
       StringAddchar(out, '[');
       StringMemcat(out, a.p, a.len);
       StringAddchar(out, ']');
     }
-    if (cur != s.p + s.len)
+    if (s.p != end)
       StringCat(out, " BADEND");
   } else if (strcmp(argv[0], "nextsep") == 0) {
-    const char *cur = s.p;
-
     /* Each field shows with the separator it ended on. */
-    while (hts_span_next(&cur, s.p + s.len, argv[1][0], &a)) {
+    while (hts_span_next_in(&s, argv[1][0], &a)) {
       StringAddchar(out, '[');
-      span_add_visible(&out, a.p, (size_t) (cur - a.p));
+      span_add_visible(&out, a.p, (size_t) (s.p - a.p));
+      StringAddchar(out, ']');
+    }
+  } else if (strcmp(argv[0], "nextin") == 0) {
+    /* Each field shows with what is left after it. */
+    while (hts_span_next_in(&s, argv[1][0], &a)) {
+      StringAddchar(out, '[');
+      span_add_visible(&out, a.p, a.len);
+      StringAddchar(out, '|');
+      span_add_visible(&out, s.p, s.len);
       StringAddchar(out, ']');
     }
   } else if (strcmp(argv[0], "split") == 0) {
@@ -4170,6 +4173,51 @@ static int st_spancmp(httrackp *opt, int argc, char **argv) {
          (int) failures);
   if (failures == 0)
     printf("spancmp: OK\n");
+  return failures != 0;
+}
+
+/* Check hts_span_index: the first match wins, and _ci folds only A-Z. */
+static int st_spanindex(httrackp *opt, int argc, char **argv) {
+  static const char *const words[] = {"ab", "Ab", "", "abc", NULL};
+  static const char *const high[] = {"{", "\xe9", NULL};
+  static const char *const none[] = {NULL};
+
+  static const struct {
+    const char *const *words;
+    const char *s;
+    size_t len;
+    hts_boolean ci;
+    int want;
+  } cases[] = {
+      {words, "ab", 2, HTS_FALSE, 0},   {words, "Ab", 2, HTS_FALSE, 1},
+      {words, "AB", 2, HTS_FALSE, -1},  {words, "AB", 2, HTS_TRUE, 0},
+      {words, NULL, 0, HTS_FALSE, 2},   {words, "x", 0, HTS_TRUE, 2},
+      {words, "a", 1, HTS_TRUE, -1},    {words, "abcd", 4, HTS_FALSE, -1},
+      {words, "abcd", 3, HTS_FALSE, 3}, {words, "ab\0", 3, HTS_FALSE, -1},
+      {words, "ABC", 3, HTS_TRUE, 3},   {high, "[", 1, HTS_TRUE, -1},
+      {high, "\xc9", 1, HTS_TRUE, -1},  {high, "\xe9", 1, HTS_TRUE, 1},
+      {none, "", 0, HTS_FALSE, -1},     {none, "a", 1, HTS_TRUE, -1},
+  };
+
+  size_t i, failures = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+    const hts_span s = hts_span_at(cases[i].s, cases[i].len);
+    const int got = cases[i].ci ? hts_span_index_ci(s, cases[i].words)
+                                : hts_span_index(s, cases[i].words);
+
+    if (got != cases[i].want) {
+      printf("spanindex: case %d gave %d\n", (int) i, got);
+      failures++;
+    }
+  }
+  printf("spanindex: %d cases, %d failures\n",
+         (int) (sizeof(cases) / sizeof(cases[0])), (int) failures);
+  if (failures == 0)
+    printf("spanindex: OK\n");
   return failures != 0;
 }
 
@@ -5343,6 +5391,8 @@ const struct selftest_entry selftests_lib[] = {
      "the fields and copies the span primitive makes", st_span},
     {"spancmp", "", "span compares read a NUL as a byte and fold only A-Z",
      st_spancmp},
+    {"spanindex", "", "the word a span matches in a NULL-terminated list",
+     st_spanindex},
     {"gmtime", "",
      "hts_gmtime() fills the caller's buffer, not a static (#794)", st_gmtime},
     {"secrets", "",

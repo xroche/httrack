@@ -96,27 +96,22 @@ static hts_boolean usercommand_push(shell_frame_t *stack, size_t *depth,
   return HTS_TRUE;
 }
 
-/*
- * Append "len" bytes of "src" at "*pos" in "dest" (capacity "size", kept
- * NUL-terminated). Returns HTS_FALSE and parks *pos at "size" when the result
- * would not fit, so the caller drops the command instead of aborting: both the
- * template and the save name expanded into it can be arbitrarily long.
- */
-static hts_boolean usercommand_append(char *dest, size_t size, size_t *pos,
+/* Appends len bytes of src at *pos in dest and keeps it NUL-terminated.
+   Returns HTS_FALSE and parks *pos at dest.size when it does not fit. */
+static hts_boolean usercommand_append(hts_buf dest, size_t *pos,
                                       const char *src, size_t len) {
-  if (*pos >= size || len >= size - *pos) {
-    *pos = size;
+  if (*pos >= dest.size || len >= dest.size - *pos) {
+    *pos = dest.size;
     return HTS_FALSE;
   }
-  memcpy(dest + *pos, src, len);
+  memcpy(dest.p + *pos, src, len);
   *pos += len;
-  dest[*pos] = '\0';
+  dest.p[*pos] = '\0';
   return HTS_TRUE;
 }
 
-static hts_boolean usercommand_append_char(char *dest, size_t size, size_t *pos,
-                                           char c) {
-  return usercommand_append(dest, size, pos, &c, 1);
+static hts_boolean usercommand_append_char(hts_buf dest, size_t *pos, char c) {
+  return usercommand_append(dest, pos, &c, 1);
 }
 
 #ifndef _WIN32
@@ -149,8 +144,8 @@ static const char *usercommand_param(shell_ctx_t ctx) {
  * one literal word. Windows keeps this route because "cmd /c" has no
  * positional parameters to hand the name to.
  */
-static hts_boolean usercommand_append_quoted(char *dest, size_t size,
-                                             size_t *pos, const char *value,
+static hts_boolean usercommand_append_quoted(hts_buf dest, size_t *pos,
+                                             const char *value,
                                              shell_ctx_t ctx) {
   size_t i;
 
@@ -158,16 +153,15 @@ static hts_boolean usercommand_append_quoted(char *dest, size_t size,
      but & | < > ( ) ^ are inert between double quotes. A " would end that
      protection and cannot be escaped portably, so it is replaced. */
   if (ctx != SHELL_CTX_DOUBLE) {
-    if (!usercommand_append_char(dest, size, pos, '\"'))
+    if (!usercommand_append_char(dest, pos, '\"'))
       return HTS_FALSE;
   }
   for (i = 0; value[i] != '\0'; i++) {
-    if (!usercommand_append_char(dest, size, pos,
-                                 value[i] == '\"' ? '_' : value[i]))
+    if (!usercommand_append_char(dest, pos, value[i] == '\"' ? '_' : value[i]))
       return HTS_FALSE;
   }
   if (ctx != SHELL_CTX_DOUBLE) {
-    if (!usercommand_append_char(dest, size, pos, '\"'))
+    if (!usercommand_append_char(dest, pos, '\"'))
       return HTS_FALSE;
   }
   return HTS_TRUE;
@@ -188,8 +182,8 @@ static int usercommand_refuse(const char **why, const char *reason) {
  * USERCOMMAND_EXPAND_OK, _TOOLONG, or _REFUSED with "*why" set. Except on OK,
  * "dest" holds a prefix that must not be run.
  */
-int usercommand_expand(char *dest, size_t size, const char *cmd,
-                       const char *file, const char **why) {
+int usercommand_expand(hts_buf dest, const char *cmd, const char *file,
+                       const char **why) {
   static const char too_deep[] = "the template nests substitutions deeper than "
                                  "the scanner tracks";
   shell_frame_t stack[SHELL_CTX_MAX_DEPTH];
@@ -202,9 +196,9 @@ int usercommand_expand(char *dest, size_t size, const char *cmd,
 #ifndef _WIN32
   (void) file; /* the name travels as a parameter, not in the command text */
 #endif
-  if (size == 0)
+  if (dest.size == 0)
     return USERCOMMAND_EXPAND_TOOLONG;
-  dest[0] = '\0';
+  dest.p[0] = '\0';
   for (i = 0; cmd[i] != '\0'; i++) {
     const char c = cmd[i];
 
@@ -222,18 +216,18 @@ int usercommand_expand(char *dest, size_t size, const char *cmd,
          character. This keeps the documented -V "rm \$0" working. */
       if (escaped) {
         /* the flag is set only by a backslash this loop just emitted */
-        assertf(pos > 0 && dest[pos - 1] == '\\');
-        dest[--pos] = '\0';
+        assertf(pos > 0 && dest.p[pos - 1] == '\\');
+        dest.p[--pos] = '\0';
       }
       {
         const char *const param = usercommand_param(ctx);
 
         if (param == NULL ||
-            !usercommand_append(dest, size, &pos, param, strlen(param)))
+            !usercommand_append(dest, &pos, param, strlen(param)))
           return USERCOMMAND_EXPAND_TOOLONG;
       }
 #else
-      if (!usercommand_append_quoted(dest, size, &pos, file, ctx))
+      if (!usercommand_append_quoted(dest, &pos, file, ctx))
         return USERCOMMAND_EXPAND_TOOLONG;
 #endif
       /* the backslash applied to this $0 and is spent; leaving it set would
@@ -275,10 +269,10 @@ int usercommand_expand(char *dest, size_t size, const char *cmd,
                   : SHELL_CTX_OPAQUE;
         /* copy the "$", then the bracket, which for arithmetic is the first of
            two and the second is counted below, so it takes both to close */
-        if (!usercommand_append_char(dest, size, &pos, c))
+        if (!usercommand_append_char(dest, &pos, c))
           return USERCOMMAND_EXPAND_TOOLONG;
         i++;
-        if (!usercommand_append_char(dest, size, &pos, cmd[i]))
+        if (!usercommand_append_char(dest, &pos, cmd[i]))
           return USERCOMMAND_EXPAND_TOOLONG;
         continue;
       } else if (!escaped && c == '[') {
@@ -294,10 +288,10 @@ int usercommand_expand(char *dest, size_t size, const char *cmd,
              evaluates arithmetic and =~ takes a regex. Its own region. */
           if (!usercommand_push(stack, &depth, ctx, ']', 2))
             return usercommand_refuse(why, too_deep);
-          if (!usercommand_append_char(dest, size, &pos, c))
+          if (!usercommand_append_char(dest, &pos, c))
             return USERCOMMAND_EXPAND_TOOLONG;
           i++;
-          if (!usercommand_append_char(dest, size, &pos, cmd[i]))
+          if (!usercommand_append_char(dest, &pos, cmd[i]))
             return USERCOMMAND_EXPAND_TOOLONG;
           continue;
         }
@@ -309,10 +303,10 @@ int usercommand_expand(char *dest, size_t size, const char *cmd,
         if (!usercommand_push(stack, &depth, ctx, ')', 2))
           return usercommand_refuse(why, too_deep);
         ctx = SHELL_CTX_OPAQUE;
-        if (!usercommand_append_char(dest, size, &pos, c))
+        if (!usercommand_append_char(dest, &pos, c))
           return USERCOMMAND_EXPAND_TOOLONG;
         i++;
-        if (!usercommand_append_char(dest, size, &pos, cmd[i]))
+        if (!usercommand_append_char(dest, &pos, cmd[i]))
           return USERCOMMAND_EXPAND_TOOLONG;
         continue;
       } else if (!escaped && depth != 0 && stack[depth - 1].closer != '`' &&
@@ -349,7 +343,7 @@ int usercommand_expand(char *dest, size_t size, const char *cmd,
       escaped = HTS_FALSE;
     }
 
-    if (!usercommand_append_char(dest, size, &pos, c))
+    if (!usercommand_append_char(dest, &pos, c))
       return USERCOMMAND_EXPAND_TOOLONG;
   }
 
@@ -420,7 +414,7 @@ int usercommand_exe(httrackp *opt, const char *cmd, const char *file) {
   const char *why = "$0 cannot be quoted safely here";
 
   /* Truncating a shell command is how a "rm '$0'" becomes a "rm". */
-  switch (usercommand_expand(temp, sizeof(temp), cmd, file, &why)) {
+  switch (usercommand_expand(HTS_BUF(temp), cmd, file, &why)) {
   case USERCOMMAND_EXPAND_OK:
     break;
   case USERCOMMAND_EXPAND_TOOLONG:

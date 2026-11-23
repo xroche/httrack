@@ -1,0 +1,14 @@
+#!/bin/bash
+#
+# hts_span_index returns the first word a span equals, folding only A-Z.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# The count is exact, so a shrinking table shows.
+selftest_queue_lines "spanindex: 16 cases, 0 failures
+spanindex: OK" spanindex
+
+selftest_run_queued

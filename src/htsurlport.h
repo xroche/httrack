@@ -90,11 +90,11 @@ hts_span hts_span_trim(hts_span s, const char *left, const char *right);
    and leave both unchanged when S holds no C. */
 hts_boolean hts_span_split(hts_span s, char c, hts_span *head, hts_span *tail);
 
-/* Read the next field of [*cur, end) up to SEP into *out, and move *cur past
-   SEP. Return FALSE once *cur reaches END, so "a," yields only "a". After a
-   TRUE return, [out->p, *cur) is the field plus the SEP it ended on, if any. */
-hts_boolean hts_span_next(const char **cur, const char *end, char sep,
-                          hts_span *out);
+/* Read the field of *REST up to SEP into *FIELD and shrink *REST past that SEP.
+   Return FALSE once *REST is empty, so "" yields nothing and "a," yields only
+   "a". After a TRUE return, [field->p, rest->p) is the field plus its SEP. */
+HTS_CHECK_RESULT hts_boolean hts_span_next_in(hts_span *rest, char sep,
+                                              hts_span *field);
 
 /* Does S hold no bytes? Its pointer does not matter. */
 hts_boolean hts_span_empty(hts_span s);
@@ -116,6 +116,15 @@ hts_boolean hts_span_ends_with(hts_span s, hts_span suffix);
 
 /* Does S end with SUFFIX once A-Z are folded to a-z? */
 hts_boolean hts_span_ends_with_ci(hts_span s, hts_span suffix);
+
+/* The words of a list for hts_span_index, then the NULL it ends at. */
+#define HTS_SPAN_WORDS(...) __VA_ARGS__, NULL
+
+/* Return the index of S in the NULL-terminated WORDS, or -1. */
+HTS_CHECK_RESULT int hts_span_index(hts_span s, const char *const *words);
+
+/* hts_span_index with A-Z compared as a-z. */
+HTS_CHECK_RESULT int hts_span_index_ci(hts_span s, const char *const *words);
 
 /* Copy S into DST as a terminated string, clipped to SIZE - 1 bytes. Return
    FALSE if it was clipped, or if SIZE is 0, which writes nothing. */

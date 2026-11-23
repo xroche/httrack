@@ -413,18 +413,6 @@ size_t header_name_len(const char *line) {
   return len;
 }
 
-/* Does the name on this line equal name, ignoring case? */
-hts_boolean header_name_is(const char *line, size_t len, const char *name,
-                           size_t name_len) {
-  size_t i = 0;
-
-  if (len != name_len)
-    return HTS_FALSE;
-  while (i < len && streql(line[i], name[i]))
-    i++;
-  return i == len;
-}
-
 /* Does the line open with an RFC 7230 token name and a colon? */
 static hts_boolean header_line_valid(const char *line) {
   const size_t len = header_name_len(line);
@@ -440,16 +428,11 @@ static hts_boolean header_line_valid(const char *line) {
   return len != 0;
 }
 
-hts_boolean header_name_in(const char *line, const char *const *names,
-                           size_t count) {
-  const size_t len = header_name_len(line);
-  size_t i;
+/* No list may hold "", which would match a line with no name. */
+hts_boolean header_name_in(const char *line, const char *const *names) {
+  const hts_span name = hts_span_at(line, header_name_len(line));
 
-  for (i = 0; len != 0 && i < count; i++) {
-    if (header_name_is(line, len, names[i], strlen(names[i])))
-      return HTS_TRUE;
-  }
-  return HTS_FALSE;
+  return hts_span_index_ci(name, names) >= 0;
 }
 
 hts_boolean http_headers_have_field(const char *headers,
@@ -466,7 +449,8 @@ hts_boolean http_headers_have_field(const char *headers,
     return HTS_FALSE;
   /* anchored, so a folded line or a name inside a value cannot match */
   for (line = headers; *line != '\0';) {
-    if (header_name_is(line, header_name_len(line), field_name, len))
+    if (hts_span_eq_ci(hts_span_at(line, header_name_len(line)),
+                       hts_span_at(field_name, len)))
       return HTS_TRUE;
     while (*line != '\0' && *line != '\n' && *line != '\r')
       line++;
@@ -478,34 +462,30 @@ hts_boolean http_headers_have_field(const char *headers,
 
 /* These fields frame the message or act per hop. */
 static hts_boolean header_line_refused(const char *line) {
-  static const char *const refused[] = {"Content-Length",
-                                        "Transfer-Encoding",
-                                        "Connection",
-                                        "Keep-Alive",
-                                        "TE",
-                                        "Upgrade",
-                                        "Expect"};
+  static const char *const refused[] = {
+      HTS_SPAN_WORDS("Content-Length", "Transfer-Encoding", "Connection",
+                     "Keep-Alive", "TE", "Upgrade", "Expect")};
 
-  return header_name_in(line, refused, sizeof(refused) / sizeof(refused[0]));
+  return header_name_in(line, refused);
 }
 
 /* Fields a request carries once, so a later custom line overrides an earlier.
  */
 static hts_boolean header_line_single(const char *line) {
-  static const char *const single[] = {"Host", "Cookie", "Authorization"};
+  static const char *const single[] = {
+      HTS_SPAN_WORDS("Host", "Cookie", "Authorization")};
 
-  return header_name_in(line, single, sizeof(single) / sizeof(single[0]));
+  return header_name_in(line, single);
 }
 
 /* An update or a resume writes these fields itself, dropping the custom line.
  */
 static hts_boolean header_line_engine_conditional(const char *line) {
   static const char *const conditional[] = {
-      "Range", "If-Match", "If-None-Match", "If-Modified-Since",
-      "If-Unmodified-Since"};
+      HTS_SPAN_WORDS("Range", "If-Match", "If-None-Match", "If-Modified-Since",
+                     "If-Unmodified-Since")};
 
-  return header_name_in(line, conditional,
-                        sizeof(conditional) / sizeof(conditional[0]));
+  return header_name_in(line, conditional);
 }
 
 /* Return the last unfolded line of headers, or NULL. */
@@ -582,12 +562,12 @@ const char *http_custom_header_warning(const char *headers, const char *line) {
 
 /* The -%X warnings, plus Host, Cookie and Proxy-*. */
 const char *http_bundle_header_refusal(const char *headers, const char *line) {
-  static const char *const engine[] = {"Host", "Cookie"};
+  static const char *const engine[] = {HTS_SPAN_WORDS("Host", "Cookie")};
   const char *const why = http_custom_header_warning(headers, line);
 
   if (why != NULL)
     return why;
-  if (header_name_in(line, engine, sizeof(engine) / sizeof(engine[0])))
+  if (header_name_in(line, engine))
     return "Host and Cookie are the engine's";
   if (strfield(line, "Proxy-"))
     return "a proxy header is not for the site";
@@ -3885,12 +3865,10 @@ char *fil_normalized(const char *source, char *dest) {
 /* see htscore.h */
 hts_boolean hts_query_key_stripped(const char *arg, size_t keylen,
                                    const char *strip) {
-  const hts_span list = hts_span_of(strip);
-  const char *const end = list.p + list.len;
-  const char *cur = list.p;
+  hts_span rest = hts_span_of(strip);
   hts_span tok;
 
-  while (hts_span_next(&cur, end, ',', &tok)) {
+  while (hts_span_next_in(&rest, ',', &tok)) {
     tok = hts_span_trim(tok, " ", " ");
     if (hts_span_eq(tok, hts_span_of("*")) ||
         hts_span_eq(tok, hts_span_at(arg, keylen)))
@@ -3943,9 +3921,9 @@ char *fil_normalized_filtered(const char *source, char *dest,
 static const char *hts_query_strip_keys_match(const char *rules,
                                               const char *adr, const char *fil,
                                               char *dest, size_t destsize) {
-  const char *cur, *end, *q;
+  const char *q;
   const char *result = NULL;
-  hts_span all, line;
+  hts_span rest, line;
   /* holds a host and a path, each up to HTS_URLMAXSIZE * 2 */
   char BIGSTK url[HTS_URLMAXSIZE * 4];
 
@@ -3963,11 +3941,10 @@ static const char *hts_query_strip_keys_match(const char *rules,
     strlncatbuff(url, fil, sizeof(url), fillen < room ? fillen : room);
   }
 
-  all = hts_span_of(rules);
-  end = all.p + all.len;
+  rest = hts_span_of(rules);
   /* Walk the '\n' entries; last match wins (like the +/- filter eval). Each is
      "pattern=keys"; no '=' is the bare form, pattern "*". */
-  for (cur = all.p; hts_span_next(&cur, end, '\n', &line);) {
+  while (hts_span_next_in(&rest, '\n', &line)) {
     hts_span pattern, keys;
     char BIGSTK pat[HTS_URLMAXSIZE * 2];
 
@@ -4023,20 +4000,16 @@ static hts_boolean hts_host_alias_split(hts_span rule, hts_span *aliases,
 const char *hts_host_alias_match(const char *rules, const char *host,
                                  const char *full, hts_boolean collapse_www,
                                  size_t *canonlen) {
-  const hts_span all = hts_span_of(rules);
-  const char *const rules_end = all.p + all.len;
-  const char *rest;
+  hts_span rest = hts_span_of(rules);
   const char *found = NULL;
   hts_span line;
 
-  for (rest = all.p; hts_span_next(&rest, rules_end, '\n', &line);) {
+  while (hts_span_next_in(&rest, '\n', &line)) {
     hts_span aliases, canon, alias;
-    const char *cur, *end;
 
     if (!hts_host_alias_split(line, &aliases, &canon))
       continue;
-    end = aliases.p + aliases.len;
-    for (cur = aliases.p; hts_span_next(&cur, end, ',', &alias);) {
+    while (hts_span_next_in(&aliases, ',', &alias)) {
       char BIGSTK glob[HTS_URLMAXSIZE * 2];
 
       /* A trailing slash is not part of a path. */
@@ -4284,13 +4257,11 @@ static hts_boolean hts_host_alias_token_ok(hts_span token, hts_boolean glob) {
 /* see httrack-library.h */
 HTSEXT_API hts_boolean hts_host_alias_rule_ok(const char *rule) {
   hts_span aliases, canon, alias;
-  const char *cur, *end;
 
   if (!hts_host_alias_split(hts_span_of(rule), &aliases, &canon) ||
       !hts_host_alias_token_ok(canon, HTS_FALSE))
     return HTS_FALSE;
-  end = aliases.p + aliases.len;
-  for (cur = aliases.p; hts_span_next(&cur, end, ',', &alias);) {
+  while (hts_span_next_in(&aliases, ',', &alias)) {
     if (!hts_host_alias_token_ok(alias, HTS_TRUE))
       return HTS_FALSE;
   }
@@ -4300,13 +4271,12 @@ HTSEXT_API hts_boolean hts_host_alias_rule_ok(const char *rule) {
 /* see htscore.h */
 const char *hts_host_alias_looping(const char *rules, hts_boolean collapse_www,
                                    char *dest, size_t destsize) {
-  hts_span all, line, aliases, target;
-  const char *cur;
+  hts_span rest, line, aliases, target;
 
   if (rules == NULL || destsize == 0)
     return NULL;
-  all = hts_span_of(rules);
-  for (cur = all.p; hts_span_next(&cur, all.p + all.len, '\n', &line);) {
+  rest = hts_span_of(rules);
+  while (hts_span_next_in(&rest, '\n', &line)) {
     char BIGSTK canon[HTS_URLMAXSIZE * 2], tmp[HTS_URLMAXSIZE * 2];
     hts_boolean settled;
 
