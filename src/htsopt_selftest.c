@@ -474,17 +474,21 @@ static int st_upperlinksnote(httrackp *opt, int argc, char **argv) {
 
   strcpybuff(note, "stale");
   /* a fresh opt refused nothing, and must empty the buffer */
-  ST_FAIL_IF(err,
-             hts_upper_links_note(to, note, sizeof(note)) || note[0] != '\0');
+  ST_FAIL_IF(err, hts_upper_links_note(to, HTS_BUF(note)) || note[0] != '\0');
 
   to->upper_links_refused = HTS_TRUE;
   /* the note must name the option that lifts the refusal */
-  ST_FAIL_IF(err, !hts_upper_links_note(to, note, sizeof(note)) ||
+  ST_FAIL_IF(err, !hts_upper_links_note(to, HTS_BUF(note)) ||
                       strstr(note, "-B") == NULL);
+  /* a short buffer clips the note, and an empty one is left alone */
+  ST_FAIL_IF(err, !hts_upper_links_note(to, HTS_BUF_N(note, 8)) ||
+                      strlen(note) != 7 || strncmp(note, "Some li", 7) != 0);
+  strcpybuff(note, "stale");
+  ST_FAIL_IF(err, hts_upper_links_note(to, HTS_BUF_N(note, 0)) ||
+                      strcmp(note, "stale") != 0);
 
   to->upper_links_refused = HTS_FALSE;
-  ST_FAIL_IF(err,
-             hts_upper_links_note(to, note, sizeof(note)) || note[0] != '\0');
+  ST_FAIL_IF(err, hts_upper_links_note(to, HTS_BUF(note)) || note[0] != '\0');
 
   /* the flag never travels onto another opt */
   from->upper_links_refused = HTS_TRUE;

@@ -402,19 +402,26 @@ static void basic_selftests(void) {
     {
       char save[] = "longfilename.html";
 
-      longfile_to_83(1, n83, sizeof(n83), save); // 8-3: name->8, ext->3
+      longfile_to_83(1, HTS_BUF(n83), save); // 8-3: name->8, ext->3
       assertf(strcmp(n83, "LONGFILE.HTM") == 0);
     }
     {
       char save[] = "longfilename.html";
 
-      longfile_to_83(2, n83, sizeof(n83), save); // ISO9660: name->31, ext->3
+      // exact fit: 12 chars + NUL
+      longfile_to_83(1, HTS_BUF_N(n83, sizeof("LONGFILE.HTM")), save);
+      assertf(strcmp(n83, "LONGFILE.HTM") == 0);
+    }
+    {
+      char save[] = "longfilename.html";
+
+      longfile_to_83(2, HTS_BUF(n83), save); // ISO9660: name->31, ext->3
       assertf(strcmp(n83, "LONGFILENAME.HTM") == 0);
     }
     { // sanitization: leading '.'->'_', interior dots
       char save[] = ".a b.c.d e"; // collapse to '_', spaces/specials -> '_'
                                   // (only the last dot stays as the separator)
-      longfile_to_83(1, n83, sizeof(n83), save);
+      longfile_to_83(1, HTS_BUF(n83), save);
       assertf(strcmp(n83, "_A_B_C.D_E") == 0);
     }
   }
@@ -431,16 +438,16 @@ static void basic_selftests(void) {
     char s[HTS_URLMAXSIZE * 2];
 
     // same directory -> just the basename
-    assertf(lienrelatif(s, sizeof(s), "dir/page.html", "dir/index.html") == 0);
+    assertf(lienrelatif(HTS_BUF(s), "dir/page.html", "dir/index.html") == 0);
     assertf(strcmp(s, "page.html") == 0);
     // link one level up -> a "../" prefix
-    assertf(lienrelatif(s, sizeof(s), "a.html", "dir/index.html") == 0);
+    assertf(lienrelatif(HTS_BUF(s), "a.html", "dir/index.html") == 0);
     assertf(strcmp(s, "../a.html") == 0);
     // an empty current path: the trim used to walk off the front of it, which
     // "?x" reaches too because the query pre-pass hands on the part before it
-    assertf(lienrelatif(s, sizeof(s), "dir/page.html", "") == 0);
+    assertf(lienrelatif(HTS_BUF(s), "dir/page.html", "") == 0);
     assertf(strcmp(s, "dir/page.html") == 0);
-    assertf(lienrelatif(s, sizeof(s), "dir/page.html", "?x") == 0);
+    assertf(lienrelatif(HTS_BUF(s), "dir/page.html", "?x") == 0);
     assertf(strcmp(s, "dir/page.html") == 0);
   }
 }

@@ -67,16 +67,16 @@ static int hts_acceptlink_(httrackp *opt, int ptr, const char *adr,
                            int *set_prio_to, int *just_test_it,
                            int *upper_refused_out);
 
-hts_boolean hts_upper_links_note(httrackp *opt, char *dst, size_t dstsize) {
-  if (dst == NULL || dstsize == 0)
+hts_boolean hts_upper_links_note(httrackp *opt, hts_buf dst) {
+  if (dst.size == 0)
     return HTS_FALSE;
-  dst[0] = '\0';
+  dst.p[0] = '\0';
   if (!opt->upper_links_refused)
     return HTS_FALSE;
   /* no count: one refused URL named by ten pages is refused ten times */
-  slprintfbuff_clip(dst, dstsize,
-                    "Some links above the start directory were not mirrored. "
-                    "Pass -B (--can-go-up-and-down) to mirror them.");
+  hts_buf_printf_clip(dst,
+                      "Some links above the start directory were not mirrored. "
+                      "Pass -B (--can-go-up-and-down) to mirror them.");
   return HTS_TRUE;
 }
 
@@ -445,14 +445,14 @@ void hts_wizard_apply_verdict(httrackp *opt, int n, const char *adr,
 }
 
 /* Copy the host of adr into dst, without scheme, login, port or path. */
-static hts_boolean travel_host(const char *adr, char *dst, size_t size) {
+static hts_boolean travel_host(const char *adr, hts_buf dst) {
   const char *const host = jump_identification_const(adr);
   const char *const port = jump_toport_const(adr);
   size_t len = strcspn(host, "/");
 
   if (port != NULL && port >= host && (size_t) (port - host) < len)
     len = (size_t) (port - host);
-  return hts_buf_put_span(hts_buf_at(dst, size), hts_span_at(host, len));
+  return hts_buf_put_span(dst, hts_span_at(host, len));
 }
 
 /* The last two labels of host with their leading dot, or NULL. */
@@ -474,7 +474,7 @@ static int travel_same_domain(const char *a, const char *b) {
   char ra[HTS_URLMAXSIZE], rb[HTS_URLMAXSIZE];
   const char *la, *lb;
 
-  if (!travel_host(a, ha, sizeof(ha)) || !travel_host(b, hb, sizeof(hb)) ||
+  if (!travel_host(a, HTS_BUF(ha)) || !travel_host(b, HTS_BUF(hb)) ||
       strlen(ha) >= COOKIE_MAX_DOMAIN || strlen(hb) >= COOKIE_MAX_DOMAIN)
     return 0; /* too long for the PSL lookup */
   if (hts_registrable_domain(ha, ra, sizeof(ra)) &&
@@ -601,15 +601,15 @@ static int hts_acceptlink_(httrackp *opt, int ptr, const char *adr,
       // problème: si un fichier est virtuellement accessible via une page mais dont le lien est sur une autre *uniquement*..
       char BIGSTK tempo[HTS_URLMAXSIZE * 2];
       char BIGSTK tempo2[HTS_URLMAXSIZE * 2];
+      const char *const primary_fil = heap(heap(ptr)->premier)->fil;
 
       tempo[0] = tempo2[0] = '\0';
 
       // note (up/down): on calcule à partir du lien primaire, ET du lien précédent.
       // ex: si on descend 2 fois on peut remonter 1 fois
 
-      if (lienrelatif(tempo, sizeof(tempo), fil,
-                      heap(heap(ptr)->premier)->fil) == 0) {
-        if (lienrelatif(tempo2, sizeof(tempo2), fil, heap(ptr)->fil) == 0) {
+      if (lienrelatif(HTS_BUF(tempo), fil, primary_fil) == 0) {
+        if (lienrelatif(HTS_BUF(tempo2), fil, heap(ptr)->fil) == 0) {
           hts_log_print(opt, LOG_DEBUG,
                         "build relative links to test: %s %s (with %s and %s)",
                         url_nologin(opt, tempo), url_nologin(opt, tempo2),
