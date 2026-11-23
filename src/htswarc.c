@@ -675,7 +675,7 @@ static int surt_canon(const char *url, wbuf *out) {
     return -1;
 
   /* Copy the path and query verbatim, and stop before the fragment's '#'. */
-  path_end = v.fragment.p != NULL ? v.fragment.p - 1 : url + url_len;
+  path_end = hts_span_present(v.fragment) ? v.fragment.p - 1 : url + url_len;
   path = hts_span_between(v.path.p, path_end);
   if (surt_add_utf8(out, path.p, path.len) != 0)
     return -1;

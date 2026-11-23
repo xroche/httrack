@@ -82,6 +82,9 @@ hts_span hts_span_between(const char *from, const char *to);
    exceeds its length. */
 hts_span hts_span_skip(hts_span s, size_t n);
 
+/* Is S present? An absent hts_url_view part is not, but an empty one is. */
+hts_boolean hts_span_present(hts_span s);
+
 /* Return S without the leading bytes found in LEFT and the trailing ones found
    in RIGHT. A set may be empty, and it never matches a NUL. */
 hts_span hts_span_trim(hts_span s, const char *left, const char *right);

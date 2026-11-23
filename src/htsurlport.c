@@ -168,6 +168,10 @@ hts_span hts_span_skip(hts_span s, size_t n) {
   return s;
 }
 
+hts_boolean hts_span_present(hts_span s) {
+  return s.p != NULL ? HTS_TRUE : HTS_FALSE;
+}
+
 // Compare N bytes, where a NUL is a byte like any other.
 static hts_boolean span_bytes_eq(const char *a, const char *b, size_t n,
                                  hts_boolean fold) {
