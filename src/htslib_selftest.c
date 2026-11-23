@@ -3223,7 +3223,7 @@ static int st_queryparam(httrackp *opt, int argc, char **argv) {
     }
   }
   memset(buff, QUERYPARAM_POISON, sizeof(buff));
-  found = url_query_value(argv[0], argv[1], buff, size);
+  found = url_query_value(argv[0], argv[1], hts_buf_at(buff, size));
   for (i = size; i < sizeof(buff); i++) {
     if (buff[i] != QUERYPARAM_POISON)
       overrun = " OVERRUN";
@@ -3251,7 +3251,7 @@ static void querysweep_one(parsediff_stats *st, const char *url,
   size_t i;
 
   memset(oracle, QUERYPARAM_POISON, sizeof(oracle));
-  oracle_found = url_query_value(url, name, oracle, sizeof(oracle));
+  oracle_found = url_query_value(url, name, HTS_BUF(oracle));
   if (memchr(oracle, '\0', sizeof(oracle)) == NULL) {
     parsediff_fail(st, "url_query_value left no terminator", url, name, "", "");
     return;
@@ -3264,7 +3264,7 @@ static void querysweep_one(parsediff_stats *st, const char *url,
 
     st->cases++;
     memset(buff, QUERYPARAM_POISON, sizeof(buff));
-    found = url_query_value(url, name, buff, size);
+    found = url_query_value(url, name, hts_buf_at(buff, size));
     for (j = size; j < sizeof(buff); j++) {
       if (buff[j] != QUERYPARAM_POISON) {
         parsediff_fail(st, "url_query_value wrote past the size", url, name,

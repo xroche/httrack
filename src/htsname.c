@@ -456,17 +456,16 @@ static void tmpl_catc(char *d, size_t dsize, char c) {
 #define TMPL_TAIL(S) TMPL_TAILN((S), (size_t) -1)
 #define TMPL_TAILC(C) tmpl_catc(tmpltail, sizeof(tmpltail), (C))
 
-hts_boolean url_query_value(const char *url, const char *name, char *dst,
-                            size_t size) {
+hts_boolean url_query_value(const char *url, const char *name, hts_buf dst) {
   const char *const query = strchr(url, '?');
   hts_query_field f;
 
-  dst[0] = '\0';
+  dst.p[0] = '\0';
   if (query == NULL || !hts_query_find(query + 1, name, &f)) {
     return HTS_FALSE;
   }
   /* crawled query text: clip it */
-  (void) hts_span_copy(f.val, dst, size);
+  (void) !hts_buf_put_span_clip(dst, f.val);
   return HTS_TRUE;
 }
 
@@ -1483,7 +1482,7 @@ int url_savename(lien_adrfilsave *const afs,
             if (*a == ']') {
               a++;
             }
-            if (url_query_value(fil_complete, name[0], value, sizeof(value))) {
+            if (url_query_value(fil_complete, name[0], HTS_BUF(value))) {
               TMPL_TAIL(name[1]); /* prefix */
               d = value[0] != '\0'
                       ? unescape_http(catbuff, sizeof(catbuff), value)

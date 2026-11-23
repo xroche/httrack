@@ -1,7 +1,8 @@
 #!/bin/bash
 #
-# The internal duration, date, query-digest and ref-name writers take their
-# output size, and never write past it.
+# The internal duration, date, query-digest, ref-name, SNI, Origin,
+# mime-extension and path-split writers take their output size, and never
+# write past it.
 
 set -euo pipefail
 
@@ -13,4 +14,5 @@ cleanup_push rm -rf "$dir"
 
 assert_selftest 'lib-sized: OK' lib-sized "$dir"
 assert_selftest 'name-sized: OK' name-sized
+assert_selftest 'leaf-sized: OK' leaf-sized
 echo "PASS"

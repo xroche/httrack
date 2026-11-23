@@ -96,7 +96,7 @@ static void fuzz_line(const char *line, httrackp *opt, cache_back *cache,
   {
     char dst[64];
 
-    (void) url_query_value(line, "id", dst, sizeof(dst));
+    (void) url_query_value(line, "id", HTS_BUF(dst));
     savename_sink += (unsigned long) strlen(dst);
   }
 
