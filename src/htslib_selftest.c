@@ -234,8 +234,8 @@ static void basic_selftests(void) {
   {
     char low[64];
 
-    assertf(strcmp(convtolower(HTS_BUF(low), "ABC/Def.HTML"),
-                   "abc/def.html") == 0);
+    assertf(strcmp(convtolower(HTS_BUF(low), "ABC/Def.HTML"), "abc/def.html") ==
+            0);
   }
   // cut_path(): splits a path into directory (with trailing '/') and basename,
   // each bounded by its buffer size.

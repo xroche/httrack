@@ -1318,9 +1318,9 @@ int url_savename(lien_adrfilsave *const afs,
                   }
 
                   // no error: change the type?
-                  ext_chg = resolve_extension(
-                      opt, NULL, back[b].r.cdispo, back[b].r.contenttype,
-                      back[b].url_fil, HTS_BUF(ext));
+                  ext_chg = resolve_extension(opt, NULL, back[b].r.cdispo,
+                                              back[b].r.contenttype,
+                                              back[b].url_fil, HTS_BUF(ext));
                 }
                 // FIN Si non déplacé, forcer type?
 

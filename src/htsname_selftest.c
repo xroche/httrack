@@ -1353,10 +1353,8 @@ static int st_hostalias(httrackp *opt, int argc, char **argv) {
                "d.com") == 0);
     assertf(hts_host_alias(wwwchain, dest, HTS_TRUE, again, sizeof(again)) ==
             NULL);
-    assertf(hts_host_alias_looping(chain, HTS_TRUE, HTS_BUF(looping)) ==
-            NULL);
-    assertf(hts_host_alias_looping(rules, HTS_TRUE, HTS_BUF(looping)) ==
-            NULL);
+    assertf(hts_host_alias_looping(chain, HTS_TRUE, HTS_BUF(looping)) == NULL);
+    assertf(hts_host_alias_looping(rules, HTS_TRUE, HTS_BUF(looping)) == NULL);
 
     /* rules pointing in a circle name no canonical host: leave them alone */
     {
@@ -2147,7 +2145,8 @@ static int st_name_sized(httrackp *opt, int argc, char **argv) {
       fail = 1;
     }
     buf[0] = 'Q';
-    if (url_md5(hts_buf_at(buf, mcap), "/p") != buf || !st_sized_clip_ok(buf, mcap, "")) {
+    if (url_md5(hts_buf_at(buf, mcap), "/p") != buf ||
+        !st_sized_clip_ok(buf, mcap, "")) {
       printf("name-sized: url_md5 without a query into %u bytes\n",
              (unsigned) mcap);
       fail = 1;
