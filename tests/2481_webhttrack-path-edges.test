@@ -1,0 +1,147 @@
+#!/bin/bash
+#
+# The server builds its file paths in 1024-byte buffers. A path of 1023 bytes is
+# opened, and a longer one is refused without aborting the server.
+
+set -euo pipefail
+
+# shellcheck source=tests/webhttracklib.sh
+. "${0%"${0##*/}"}./webhttracklib.sh"
+
+htsserver_require
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_edges.XXXXXX") || fail "no tmpdir"
+cleanup_push htsserver_cleanup_dir "${work}"
+# The kernel's limit counts the resolved path (macOS: /var is /private/var).
+work=$(cd "${work}" && pwd -P)
+test "${#work}" -lt 900 || skip "TMPDIR is too long: ${work}"
+
+# A real html/server, since a symlink there lengthens the resolved path.
+root=${work}/root
+mkdir -p "${root}/html"
+for entry in "${HTS_DISTDIR}"/*; do
+    test "${entry##*/}" = html || ln -s "${entry}" "${root}/${entry##*/}"
+done
+for entry in "${HTS_DISTDIR}"/html/*; do
+    test "${entry##*/}" = server || ln -s "${entry}" "${root}/html/${entry##*/}"
+done
+cp -R "${HTS_DISTDIR}/html/server" "${root}/html/server"
+chmod -R u+w "${root}/html/server"
+installed=modern
+test -r "${root}/html/server/themes/${installed}/theme.css" || fail "no ${installed} theme"
+mkdir -p "${work}/home/.httrack/themes/zz" "${work}/proj"
+printf '/* HOME-CSS */\n' >"${work}/home/.httrack.css"
+printf '/* USER-ZZ */\n' >"${work}/home/.httrack/themes/zz/theme.css"
+printf 'WEBSITE-PAGE\n' >"${work}/proj/x.txt"
+
+# Prints $1 followed by slashes, $2 bytes in all.
+pad() {
+    local s=$1
+    while test "${#s}" -lt "$2"; do s+=/; done
+    printf '%s' "${s}"
+}
+
+# Fails unless the reply to $1 has status $2 and, when given, contains $3.
+expect() {
+    local reply
+    reply=$(htsserver_get "$1")
+    grep -q "^HTTP/1.[01] $2" <<<"${reply}" || fail "GET ${1:0:40}... (${#1}): not $2: ${reply:0:200}"
+    test -z "${3:-}" || grep -qF "$3" <<<"${reply}" || fail "GET ${1:0:40}... (${#1}): no $3"
+}
+
+# Each case puts a path of $total bytes in a 1024-byte buffer.
+for total in 1023 1024; do
+    fits=
+    test "${total}" -gt 1023 || fits=1
+
+    # HOME + "/.httrack.css", else the shipped user.css.
+    htsserver_start --root "${root}" --home "$(pad "${work}/home" $((total - 13)))"
+    if test -n "${fits}"; then
+        expect /server/user.css 200 HOME-CSS
+    else
+        expect /server/user.css 200 'Shipped empty'
+    fi
+    htsserver_stop
+
+    # HOME + "/.httrack/themes/zz/theme.css" (theme_in, then the served file).
+    htsserver_start --root "${root}" --home "$(pad "${work}/home" $((total - 29)))"
+    if test -n "${fits}"; then
+        expect /server/themes/zz/theme.css 200 USER-ZZ
+    else
+        expect /server/themes/zz/theme.css 404
+    fi
+    htsserver_stop
+
+    # HOME + "/.httrack-ui.ini", written on a choice and read at start.
+    home=$(pad "${work}/home" $((total - 16)))
+    rm -f "${work}/home/.httrack-ui.ini"
+    htsserver_start --root "${root}" --home "${home}"
+    sid=$(htsserver_sid)
+    test "${#sid}" -eq 32 || fail "no session id: [${sid}]"
+    reply=$(htsserver_post "sid=${sid}&uitheme=${installed}&redirect=index.html" /server/step2.html)
+    grep -q '^HTTP/1.[01] 302' <<<"${reply}" || fail "theme choice: ${reply}"
+    htsserver_stop
+    if test -n "${fits}"; then
+        grep -qx "uitheme=${installed}" "${work}/home/.httrack-ui.ini" || fail "${total}: settings not saved"
+    else
+        test ! -e "${work}/home/.httrack-ui.ini" || fail "${total}: settings saved past the edge"
+    fi
+    printf 'uitheme=%s\n' "${installed}" >"${work}/home/.httrack-ui.ini"
+    htsserver_start --root "${root}" --home "${home}"
+    if test -n "${fits}"; then
+        expect /server/theme.css 200 "themes/${installed}/theme.css"
+    else
+        expect /server/theme.css 200
+        reply=$(htsserver_get /server/theme.css)
+        ! grep -q '@import' <<<"${reply}" || fail "${total}: settings read past the edge"
+    fi
+    htsserver_stop
+done
+rm -f "${work}/home/.httrack-ui.ini"
+
+# A HOME too long for the default base path still serves the UI.
+htsserver_start --root "${root}" --home "$(pad "${work}/home" 1015)"
+expect /server/index.html 200
+htsserver_stop
+
+# The client's own URL: root + "html" + URL, HOME + themes + URL tail, and
+# project + "/" + URL tail.
+htsserver_start --root "${root}" --home "${work}/home"
+sid=$(htsserver_sid)
+test "${#sid}" -eq 32 || fail "no session id: [${sid}]"
+reply=$(htsserver_post "sid=${sid}&path=${work}&projname=proj&command=httrack&command_do=save&winprofile=x" \
+    /server/step4.html)
+grep -q '^HTTP/1.[01] 302' <<<"${reply}" || fail "project save: ${reply:0:200}"
+for total in 1023 1024; do
+    fits=
+    test "${total}" -gt 1023 || fits=1
+    # Past the edge, the path clipped to 1023 bytes names an existing file.
+    tail=
+    test -n "${fits}" || tail=x
+    static=$(pad /server/ $((1023 - ${#root} - 15)))about.html${tail}
+    theme=$(pad /server/themes/zz $((1023 - ${#work} - 17)))/theme.css${tail}
+    site=$(pad /website/ $((1023 - ${#work} - 3)))/x.txt${tail}
+    if test -n "${fits}"; then
+        expect "${static}" 200 '<html'
+        expect "${theme}" 200 USER-ZZ
+        expect "${site}" 200 WEBSITE-PAGE
+    else
+        expect "${static}" 404
+        expect "${theme}" 404
+        expect "${site}" 404
+    fi
+done
+
+# A 255-byte Host header is read whole: an address passes, a name does not.
+host=1
+while test "${#host}" -lt 255; do host+=.1; done
+for h in "${host:0:255}" "${host:0:254}x"; do
+    status=200
+    test "${h: -1}" != x || status=403
+    reply=$(htsserver_client --host "${h}" --path /server/index.html)
+    grep -q "^HTTP/1.[01] ${status}" <<<"${reply}" || fail "Host ...${h: -8}: not ${status}: ${reply:0:200}"
+done
+htsserver_stop
+htsserver_assert_reaped
+
+echo OK
