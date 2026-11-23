@@ -39,6 +39,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsglobal.h"
 #include "htssafe.h"
+#include "htsbuf.h"
 
 /* Forward definitions */
 #ifndef HTS_DEF_FWSTRUCT_httrackp
@@ -119,10 +120,10 @@ hts_boolean hts_cmp_tag_token(const char *tag, const char *cmp);
    referer: its URL does not look like hypertext, and the hosts differ. */
 hts_boolean hts_link_is_foreign_asset(httrackp *opt, int ptr);
 
-/* Writes into `dst` (capacity `dstsize`) the end-of-mirror note that links
-   above the start directory were refused, and what lifts the refusal. Returns
-   HTS_FALSE with `dst` empty when no such link was refused. */
-hts_boolean hts_upper_links_note(httrackp *opt, char *dst, size_t dstsize);
+/* Writes into `dst` the end-of-mirror note that links above the start
+   directory were refused, and what lifts the refusal. Returns HTS_FALSE with
+   `dst` empty when no such link was refused. */
+hts_boolean hts_upper_links_note(httrackp *opt, hts_buf dst);
 
 /* `tag` and `attribute` name the markup the link came from, or are NULL where
    there is none. `in_css_file` says it came from a stylesheet, where url() has

@@ -31,6 +31,10 @@ rel 'img.cdn/photo.jpg' 'www.site/articles/2020/post.html' '../../../img.cdn/pho
 rel 'h/a/' 'h/a/sub/page.html' '../' # link is ancestor dir
 rel 'x.html' 'page.html' 'x.html'
 rel 'dir/page.html?x=1' 'dir/index.html?y=2' 'page.html' # ? stripped
+# the result must stay under HTS_URLMAXSIZE (1024)
+long=$(printf '%01023d' 0)
+rel "$long" 'index.html' "$long"
+rel "${long}0" 'index.html' '<ERROR>'
 
 ### ident_url_relatif
 

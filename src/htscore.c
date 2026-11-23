@@ -2356,7 +2356,7 @@ cleanup:
   if (opt->log != NULL) {
     char BIGSTK upperNote[256];
 
-    if (hts_upper_links_note(opt, upperNote, sizeof(upperNote)))
+    if (hts_upper_links_note(opt, HTS_BUF(upperNote)))
       fprintf(opt->log, "(%s)" LF, upperNote);
   }
   /* Set the verdict first, because XH_uninit below fires the end callback that
@@ -2863,19 +2863,19 @@ static hts_boolean structcheck_stat(const char *file, hts_boolean utf8,
 }
 
 /* Finds a free "<file>.txt" or "<file>.N.txt"; sets errno when none fits. */
-static hts_boolean structcheck_aside(char *aside, size_t size, const char *file,
+static hts_boolean structcheck_aside(hts_buf aside, const char *file,
                                      hts_boolean utf8) {
   int i;
 
   for (i = 0; i < 100; i++) {
     int mode;
 
-    if (!(i == 0 ? slprintfbuff(aside, size, "%s.txt", file)
-                 : slprintfbuff(aside, size, "%s.%d.txt", file, i))) {
+    if (!(i == 0 ? hts_buf_printf(aside, "%s.txt", file)
+                 : hts_buf_printf(aside, "%s.%d.txt", file, i))) {
       errno = ENAMETOOLONG;
       return HTS_FALSE;
     }
-    if (!structcheck_stat(aside, utf8, &mode))
+    if (!structcheck_stat(aside.p, utf8, &mode))
       return HTS_TRUE;
   }
   errno = EEXIST;
@@ -2996,7 +2996,7 @@ static int structcheck_impl(const char *path, hts_boolean utf8) {
         /* Regular file in place: move it and create directory */
         if (S_ISREG(mode)) {
           /* the path-length guard above does not bound this */
-          if (!structcheck_aside(tmpbuf, sizeof(tmpbuf), file, utf8))
+          if (!structcheck_aside(HTS_BUF(tmpbuf), file, utf8))
             return -1;
           if ((utf8 ? RENAME(file, tmpbuf) : rename(file, tmpbuf)) != 0) {
             return -1;
@@ -3139,14 +3139,13 @@ int filecreateempty(filenote_strc * strc, const char *filename) {
     return 0;
 }
 
-void hts_savename_listed(const char *root, const char *s, char *dest,
-                         size_t destsize) {
+void hts_savename_listed(const char *root, const char *s, hts_buf dest) {
   char catbuff[CATBUFF_SIZE];
 
-  strlcpybuff(dest, fslash(catbuff, sizeof(catbuff), s), destsize);
-  if (strnotempty(root) && strncmp(fslash(catbuff, sizeof(catbuff), root), dest,
-                                   strlen(root)) == 0) {
-    strlcpybuff(dest, s + strlen(root), destsize);
+  hts_buf_cpy(dest, fslash(catbuff, sizeof(catbuff), s));
+  if (strnotempty(root) && strncmp(fslash(catbuff, sizeof(catbuff), root),
+                                   dest.p, strlen(root)) == 0) {
+    hts_buf_cpy(dest, s + strlen(root));
   }
 }
 
@@ -3160,7 +3159,7 @@ int filenote(filenote_strc * strc, const char *s, filecreate_params * params) {
   } else if (strc->lst) {
     char BIGSTK savelst[HTS_URLMAXSIZE * 2];
 
-    hts_savename_listed(strc->path, s, savelst, sizeof(savelst));
+    hts_savename_listed(strc->path, s, HTS_BUF(savelst));
     fprintf(strc->lst, "[%s]" LF, savelst);
     fflush(strc->lst);
   }
@@ -4134,8 +4133,7 @@ int htsAddLink(htsmoduleStruct * str, char *link) {
             opt->savename_83 = b;
             if (r != -1 && !forbidden_url) {
               if (savename()) {
-                if (lienrelatif(tempo, sizeof(tempo), afs.save, savename()) ==
-                    0) {
+                if (lienrelatif(HTS_BUF(tempo), afs.save, savename()) == 0) {
                   hts_log_print(
                       opt, LOG_DEBUG,
                       "(module): relative link at %s build with %s and %s: %s",

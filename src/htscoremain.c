@@ -3059,7 +3059,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
       if (!opt->shell && opt->log != stdout) {
         char BIGSTK note[256];
 
-        if (hts_upper_links_note(opt, note, sizeof(note)))
+        if (hts_upper_links_note(opt, HTS_BUF(note)))
           printf("%s\n", note);
       }
     }

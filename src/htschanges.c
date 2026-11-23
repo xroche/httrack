@@ -247,7 +247,7 @@ void hts_changes_notify(httrackp *opt, const char *adr, const char *fil,
       (!strnotempty(adr) && !strnotempty(fil)))
     return;
 
-  hts_savename_listed(StringBuff(opt->path_html), save, file, sizeof(file));
+  hts_savename_listed(StringBuff(opt->path_html), save, HTS_BUF(file));
 
   hts_mutexlock(&changes_mutex);
   changes = changes_get(opt);
@@ -327,7 +327,7 @@ void hts_changes_html(httrackp *opt, cache_back *cache, const htsblk *r,
   changes = changes_get(opt);
   /* file_notify() records the entry; this call only refines it. */
   if (changes != NULL) {
-    hts_savename_listed(StringBuff(opt->path_html), save, file, sizeof(file));
+    hts_savename_listed(StringBuff(opt->path_html), save, HTS_BUF(file));
     slot = changes_find(changes, file);
     if (slot >= 0) {
       changes_entry *const entry = &TypedArrayNth(changes->entries, slot);

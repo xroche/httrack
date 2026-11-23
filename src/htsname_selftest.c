@@ -61,7 +61,7 @@ static int st_expandhome(httrackp *opt, int argc, char **argv) {
 static int st_relative(httrackp *opt, int argc, char **argv) {
   char s[HTS_URLMAXSIZE * 2];
 
-  if (lienrelatif(s, sizeof(s), argv[0], argv[1]) == 0)
+  if (lienrelatif(HTS_BUF(s), argv[0], argv[1]) == 0)
     printf("relative=%s\n", s);
   else
     printf("relative=<ERROR>\n");
