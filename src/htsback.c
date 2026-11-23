@@ -4732,8 +4732,12 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
                     } while(strnotempty(rcvd));
                     /* RFC 9112 6.3: a coding list not ending in chunked runs
-                       to close, whatever Content-Length says */
-                    if (has_te && !back[i].r.is_chunk) {
+                       to close, whatever Content-Length says, except on the
+                       statuses that never carry a body */
+                    if (has_te && !back[i].r.is_chunk &&
+                        back[i].r.statuscode / 100 != 1 &&
+                        back[i].r.statuscode != HTTP_NO_CONTENT &&
+                        back[i].r.statuscode != HTTP_NOT_MODIFIED) {
                       back[i].r.totalsize = -1;
                       back[i].r.empty = 0;
                       back[i].r.keep_alive = 0;

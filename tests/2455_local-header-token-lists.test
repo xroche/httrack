@@ -80,6 +80,11 @@ ok "$reused sockets reused from a Connection list"
 local_crawl "$BASEURL/teclose/index.html" -O "$tmpdir/tc" -c1 || fail "crawl failed"
 grep -q TECLOSE-SECOND "$tmpdir/tc/$host/teclose/second.html" ||
     fail_dump "second page damaged" "$tmpdir/tc/hts-log.txt"
-test "$(count_log_errors "$tmpdir/tc/hts-log.txt")" = 0 ||
-    fail_dump "errors in the crawl" "$tmpdir/tc/hts-log.txt"
-ok "a Transfer-Encoding ending in gzip read to the close"
+# The 204 must be logged at once, never after a wait for a body.
+grep -q '"No Content" (204)' "$tmpdir/tc/hts-log.txt" ||
+    fail_dump "the 204 was not reported" "$tmpdir/tc/hts-log.txt"
+! grep -q 'Receive Time Out' "$tmpdir/tc/hts-log.txt" ||
+    fail_dump "a body was awaited" "$tmpdir/tc/hts-log.txt"
+test "$(count_log_errors "$tmpdir/tc/hts-log.txt")" = 1 ||
+    fail_dump "errors beyond the 204 in the crawl" "$tmpdir/tc/hts-log.txt"
+ok "a Transfer-Encoding ending in gzip read to the close, and a 204 with one did not wait"

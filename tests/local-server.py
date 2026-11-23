@@ -2533,7 +2533,19 @@ class Handler(SimpleHTTPRequestHandler):
 
     def route_teclose(self, path):
         if path.endswith("/index.html"):
-            self.send_html('<a href="first.bin">1</a>\n<a href="second.html">2</a>\n')
+            self.send_html(
+                '<a href="first.bin">1</a>\n<a href="second.html">2</a>\n'
+                '<a href="nobody.bin">3</a>\n'
+            )
+            return
+        if path.endswith("/nobody.bin"):
+            # a 204 has no body whatever its TE says, so the client must not wait
+            self.protocol_version = "HTTP/1.1"
+            self.send_response(204)
+            self.send_header("Content-Length", "0")
+            self.send_header("Transfer-Encoding", "gzip")
+            self.send_header("Connection", "keep-alive")
+            self.end_headers()
             return
         if path.endswith("/second.html"):
             body = b"<html><body>TECLOSE-SECOND</body></html>\n"
