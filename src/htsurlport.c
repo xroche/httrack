@@ -171,6 +171,18 @@ hts_boolean hts_span_list_has(hts_span list, char sep, hts_span token) {
   return HTS_FALSE;
 }
 
+hts_boolean hts_param_next(hts_span *rest, char sep, hts_span *name,
+                           hts_span *value) {
+  hts_span field;
+
+  if (!hts_span_next_in(rest, sep, &field))
+    return HTS_FALSE;
+  *value = hts_span_at(NULL, 0);
+  if (!hts_span_split(field, '=', name, value))
+    *name = field;
+  return HTS_TRUE;
+}
+
 static hts_boolean header_blank(char c) { return c == ' ' || c == '\t'; }
 
 void hts_header_split(hts_span line, hts_span *name, hts_span *value) {

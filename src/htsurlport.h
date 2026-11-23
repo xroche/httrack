@@ -138,6 +138,12 @@ hts_boolean hts_span_copy(hts_span s, char *dst, size_t size);
 HTS_CHECK_RESULT hts_boolean hts_span_list_has(hts_span list, char sep,
                                                hts_span token);
 
+/* Read the next SEP-separated field of *REST as NAME=VALUE, split at its first
+   '=' and not trimmed. VALUE is absent (see hts_span_present) when the field
+   has no '='. Return FALSE once *REST is empty, as hts_span_next_in does. */
+HTS_CHECK_RESULT hts_boolean hts_param_next(hts_span *rest, char sep,
+                                            hts_span *name, hts_span *value);
+
 /* One line of a header block. NAME is empty on the status line, a fold, or a
    line with no ':'. */
 typedef struct {

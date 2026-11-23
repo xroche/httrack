@@ -1399,52 +1399,34 @@ static const char *paste_curl_cookies(httrackp *opt, t_cookie *jar,
   char host[COOKIE_MAX_DOMAIN];
   cookie_attr attr;
   const char *const domain = cookie_flat_bind(url, host, sizeof(host), &attr);
-  char *pairs =
-      strdupt(StringNotEmpty(c->cookies) ? StringBuff(c->cookies) : "");
-  const char *why = NULL;
-  char *p = pairs;
+  const char *why = domain == NULL ? "the address has no host" : NULL;
+  hts_span rest = hts_span_of(StringBuff(c->cookies)), name, value;
+  String pair = STRING_EMPTY;
   int ignored = 0;
 
-  if (pairs == NULL)
-    return "out of memory";
-  if (domain == NULL)
-    why = "the address has no host";
-  while (why == NULL && *p != '\0') {
-    char *const end = p + strcspn(p, ";");
-    char *pair = p, *eq, *name_end;
-    const char *value;
-    size_t len;
-
-    p = *end != '\0' ? end + 1 : end;
-    *end = '\0';
-    pair += strspn(pair, " ");
-    for (len = strlen(pair); len > 0 && pair[len - 1] == ' ';)
-      pair[--len] = '\0';
-    if (*pair == '\0')
+  while (why == NULL && hts_param_next(&rest, ';', &name, &value)) {
+    name = hts_span_trim(name, " ", " ");
+    value = hts_span_trim(value, " ", " ");
+    if (hts_span_empty(name) && !hts_span_present(value))
       continue;
-    if (strchr(pair, '\t') != NULL) {
+    if (memchr(name.p, '\t', name.len) != NULL ||
+        (hts_span_present(value) && memchr(value.p, '\t', value.len) != NULL)) {
       why = "a cookie holds a TAB";
-      break;
-    }
-    eq = strchr(pair, '=');
-    for (name_end = eq;
-         name_end != NULL && name_end > pair && name_end[-1] == ' ';)
-      name_end--;
-    if (eq == NULL || name_end == pair) {
+    } else if (hts_span_empty(name) || !hts_span_present(value)) {
       why = "a cookie in the paste has no name";
-      break;
+    } else {
+      // "g = h" is the cookie g, as a browser reads it
+      StringMemcpy(pair, name.p, name.len);
+      if (cookie_find_exact(jar->data, StringBuff(pair), domain, "/") != NULL)
+        continue; // a browser lists the most specific path first, so it wins
+      StringAddchar(pair, '=');
+      StringMemcat(pair, value.p, value.len);
+      if (!cookie_flat_pair(opt, jar, StringBuffRW(pair), domain, &attr,
+                            "the paste", &ignored))
+        why = "the cookies of the paste do not fit in a bundle";
     }
-    // "g = h" is the cookie g, as a browser reads it
-    value = eq + 1 + strspn(eq + 1, " ");
-    *name_end = '\0';
-    if (cookie_find_exact(jar->data, pair, domain, "/") != NULL)
-      continue; // a browser lists the most specific path first, so it wins
-    *name_end = '=';
-    memmove(name_end + 1, value, strlen(value) + 1);
-    if (!cookie_flat_pair(opt, jar, pair, domain, &attr, "the paste", &ignored))
-      why = "the cookies of the paste do not fit in a bundle";
   }
-  freet(pairs);
+  StringFree(pair);
   return why;
 }
 

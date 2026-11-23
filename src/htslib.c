@@ -1833,7 +1833,7 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
       }
     }
   } else if (HEADER_IS(name, "Set-Cookie") && cookie != NULL) {
-    char *a = value;
+    hts_span rest = hts_span_of(value), n, v;
     char domain[COOKIE_MAX_DOMAIN]; // .netscape.com
     char scoped[COOKIE_MAX_DOMAIN]; // adr without userinfo, brackets or port
     char path[COOKIE_MAX_PATH];     // /
@@ -1848,8 +1848,6 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
                         !cookie_host(adr, scoped, sizeof(scoped))))
       return;
     {
-      char *token_st, *token_end;
-      char *value_st, *value_end;
       char name[256];
       char BIGSTK value[8192];
       hts_boolean has_domain = HTS_FALSE;
@@ -1881,46 +1879,27 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
       strcpybuff(cook_name, "");
       strcpybuff(cook_value, "");
       // read every pair up to the end of the header
-      do {
-        while(is_space(*a))
-          a++;                  // sauter espaces
-        token_st = a;           // départ token
-        while((!is_space(*a)) && (*a) && (*a != ';') && (*a != '='))
-          a++;                  // arrêter si espace, point virgule
-        token_end = a;
-        while(is_space(*a))
-          a++;                  // sauter espaces
-        if (*a == '=') {        // name=value
-          a++;
-          /* RFC 6265 4.1.1 makes the quotes part of a quoted cookie-value. */
-          while (is_realspace(*a))
-            a++;
-          value_st = a;
-          while((*a != ';') && (*a))
-            a++; // prochain ;
-          value_end = a;
-          // RFC 6265 5.2 trims the value
-          while (value_end > value_st && is_realspace(value_end[-1]))
-            value_end--;
-          // vérifier débordements
-          if ((((int) (token_end - token_st)) < 200) &&
-              (((int) (value_end - value_st)) < 8000) &&
-              (((int) (token_end - token_st)) > 0)) {
-            int name_len = (int) (token_end - token_st);
-            int value_len = (int) (value_end - value_st);
+      while (hts_param_next(&rest, ';', &n, &v)) {
+        // a name stops at a blank or a quote, so "a b=c" is the bare word a
+        const hts_span key = hts_span_trim(n, HTS_SPACES, HTS_SPACES);
+        size_t word = 0;
 
-            name[0] = '\0';
-            value[0] = '\0';
-            strncatbuff(name, token_st, name_len);
-            strncatbuff(value, value_st, value_len);
+        v = hts_span_trim(v, HTS_REALSPACES, HTS_REALSPACES);
+        while (word < key.len && !is_space(key.p[word]))
+          word++;
+        if (hts_span_present(v) && word == key.len) {
+          /* RFC 6265 4.1.1 makes the quotes part of a quoted cookie-value. */
+          if (key.len > 0 && key.len < 200 && v.len < 8000) {
+            hts_span_copy(key, name, sizeof(name));
+            hts_span_copy(v, value, sizeof(value));
             if (first) {
               // the first pair is the cookie, and "name=" may erase one
               strcpybuff(cook_name, name);
               strcpybuff(cook_value, value);
             } else if (strfield2(name, "domain")) {
-              if (value_len == 0 || strcmp(value, ".") == 0) {
+              if (v.len == 0 || strcmp(value, ".") == 0) {
                 // ignored, so the cookie stays on the host
-              } else if ((size_t) value_len < sizeof(domain) - 1) {
+              } else if (v.len < sizeof(domain) - 1) {
                 strcpybuff(domain, value);
                 has_domain = HTS_TRUE;
               } else {
@@ -1930,7 +1909,7 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
             } else if (strfield2(name, "path")) {
               if (value[0] != '/') {
                 strcpybuff(path, defpath); // RFC 6265 5.2.4
-              } else if ((size_t) value_len < sizeof(path) - 1) {
+              } else if (v.len < sizeof(path) - 1) {
                 strcpybuff(path, value);
               } else {
                 cook_name[0] = 0;
@@ -1958,21 +1937,17 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
             }
             // RFC 6265 5.2 ignores any other attribute, SameSite for example
           }
-        } else { // a bare attribute
-          const size_t len = (size_t) (token_end - token_st);
+        } else { // a bare attribute, or the word before a blank
+          const hts_span attribute = hts_span_at(key.p, word);
 
-          if (len == 6 && strfield(token_st, "secure"))
+          if (hts_span_eq_ci(attribute, hts_span_of("secure")))
             attr.secure = HTS_TRUE;
-          else if (len == 8 && strfield(token_st, "httponly"))
+          else if (hts_span_eq_ci(attribute, hts_span_of("httponly")))
             attr.http_only = HTS_TRUE;
         }
         // an unusable first pair leaves no cookie, so the header is ignored
         first = HTS_FALSE;
-        while ((*a != ';') && (*a))
-          a++;
-        while (*a == ';')
-          a++;
-      } while (*a);
+      }
       if (strnotempty(cook_name)) {     // cookie?
         /* Max-Age outranks Expires (RFC 6265 5.3 step 3) */
         attr.expires =
