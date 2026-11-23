@@ -454,55 +454,55 @@ char *hts_mask_passwords(const char *s, hts_mask_mode mode) {
   return dst;
 }
 
-/* Returns the length of the secret field name opening line, a line len bytes
-   long, even with no colon behind it, or 0. */
-static size_t secret_name_len(const char *line, size_t len) {
-  size_t word;
+/* Where is the first blank of S, or its end? */
+static size_t blank_at(hts_span s) {
+  size_t n = 0;
 
-  if (header_name_in(line, secret_fields))
-    return header_name_len(line);
-  if (memchr(line, ':', len) != NULL)
-    return 0;
-  word = strcspn(line, HTS_BLANKS);
-  if (hts_span_index_ci(hts_span_at(line, word), secret_fields) >= 0)
-    return word;
-  return 0;
+  while (n < s.len && s.p[n] != ' ' && s.p[n] != '\t')
+    n++;
+  return n;
+}
+
+/* Does LINE, without its CR or LF, carry a secret field? A name with no colon
+   behind it counts, its value then starting after the next blank. */
+static hts_boolean secret_field(hts_span line, hts_span *name,
+                                hts_span *value) {
+  hts_header_split(line, name, value);
+  if (hts_span_empty(*name)) {
+    *name = hts_span_at(line.p, blank_at(line));
+    *value = hts_span_trim(hts_span_skip(line, name->len), HTS_TABORSPACES,
+                           HTS_TABORSPACES);
+  }
+  return hts_span_index_ci(*name, secret_fields) >= 0;
+}
+
+/* The length of the secret field name opening LINE, LEN bytes long, or 0. */
+static size_t secret_name_len(const char *line, size_t len) {
+  hts_span name, value;
+
+  return secret_field(hts_span_at(line, len), &name, &value) ? name.len : 0;
 }
 
 void hts_secret_add_headers(httrackp *opt, const char *headers) {
-  const char *line = headers;
+  const char *p = headers;
 
-  while (line != NULL && *line != '\0') {
-    const size_t len = strcspn(line, "\r\n");
-    const size_t name = len != 0 ? secret_name_len(line, len) : 0;
+  while (p != NULL && *p != '\0') {
+    const hts_span line = hts_span_at(p, strcspn(p, "\r\n"));
+    hts_span name, value;
 
-    if (name != 0) {
-      const char *const colon = memchr(line, ':', len);
-      const char *v = colon != NULL ? colon + 1 : line + name;
-      const char *end = line + len;
-      const hts_span field = hts_span_at(line, name);
+    // a cookie value is often a plain word, and -%H hides the whole header
+    if (secret_field(line, &name, &value) &&
+        !hts_span_eq_ci(name, hts_span_of("Cookie")) &&
+        !hts_span_eq_ci(name, hts_span_of("Set-Cookie"))) {
+      // the whole value, then the credentials after the scheme ("Basic TOKEN")
+      const hts_span cred = hts_span_trim(hts_span_skip(value, blank_at(value)),
+                                          HTS_TABORSPACES, "");
 
-      while (v < end && (*v == ' ' || *v == '\t'))
-        v++;
-      while (end > v && (end[-1] == ' ' || end[-1] == '\t'))
-        end--;
-      // a cookie value is often a plain word, and -%H hides the whole header
-      if (!hts_span_eq_ci(field, hts_span_of("Cookie")) &&
-          !hts_span_eq_ci(field, hts_span_of("Set-Cookie"))) {
-        // the whole value, then the credentials after the scheme ("Basic
-        // TOKEN")
-        const char *cred = v + strcspn(v, " \t");
-
-        hts_secret_add(opt, v, (size_t) (end - v), HTS_SECRET_HEADER);
-        while (cred < end && (*cred == ' ' || *cred == '\t'))
-          cred++;
-        if (cred < end)
-          hts_secret_add(opt, cred, (size_t) (end - cred), HTS_SECRET_HEADER);
-      }
+      hts_secret_add(opt, value.p, value.len, HTS_SECRET_HEADER);
+      hts_secret_add(opt, cred.p, cred.len, HTS_SECRET_HEADER);
     }
-    line += len;
-    while (*line == '\r' || *line == '\n')
-      line++;
+    p = line.p + line.len;
+    p += strspn(p, "\r\n");
   }
 }
 

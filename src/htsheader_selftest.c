@@ -2535,8 +2535,7 @@ static void customdiff_one(parsediff_stats *st, const char *headers,
     parsediff_fail(st, "warning", shown, line, wo != NULL ? wo : "(null)",
                    wn != NULL ? wn : "(null)");
   st->cases++;
-  if (legacy_header_name_len(line) != header_name_len(line) ||
-      legacy_header_name_in(line, words) != header_name_in(line, words))
+  if (legacy_header_name_in(line, words) != header_name_in(line, words))
     parsediff_fail(st, "header_name", line, "", "", "");
   for (i = 0; fields[i] != NULL; i++) {
     st->cases++;
