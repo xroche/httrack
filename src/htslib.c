@@ -1661,25 +1661,26 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
     hts_span rest = hts_span_of(value);
     hts_span item;
 
-    // RFC 9112 6.1: codings in the order applied, chunked once and final
+    // RFC 2616 3.6: codings in the order applied, chunked once and final
     while (hts_span_next_in(&rest, ',', &item)) {
       item = hts_span_trim(item, HTS_REALSPACES, HTS_REALSPACES);
       if (hts_span_empty(item))
         continue;
+      /* a chunked before this item was not the final coding */
       if (retour->is_chunk)
-        retour->transfer_coding = -1;
+        retour->transfer_coding = HTS_TE_UNREADABLE;
       retour->is_chunk = hts_span_eq_ci(item, hts_span_of("chunked"));
       if (retour->is_chunk || hts_span_eq_ci(item, hts_span_of("identity")))
         continue;
       /* one compression layer, as for Content-Encoding: a parameter, a second
          layer or an unknown coding leaves a body we can not read */
       retour->transfer_coding =
-          retour->transfer_coding == 0 &&
+          retour->transfer_coding == HTS_TE_NONE &&
                   hts_span_index_ci(item, compression) >= 0
-              ? 1
-              : -1;
+              ? HTS_TE_INFLATE
+              : HTS_TE_UNREADABLE;
     }
-    if (retour->transfer_coding != 0)
+    if (retour->transfer_coding != HTS_TE_NONE)
       retour->compressed = 1;
   } else if (HEADER_IS(name, "Content-type")) {
     if (retour) {

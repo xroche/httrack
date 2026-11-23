@@ -1097,21 +1097,16 @@ static void back_report_write_failure(httrackp *opt, lien_back *const back) {
   }
 }
 
-/* Decode back->tmpfile into unpacked: the transfer coding, then the content
-   coding. Returns as hts_codec_unpack_max(), *layer naming the one decoded
-   last. Between the two, tmpfile holds the content-coded body. */
+/* Decode tmpfile into unpacked: the transfer coding, then the content coding.
+ *layer names the last one run. */
 static int back_unpack_body(httrackp *opt, lien_back *const back,
                             hts_codec codec, const char *unpacked,
                             const char **layer, LLint cap) {
+  const LLint coded = fsize_utf8(back->tmpfile);
   int size;
 
   *layer = back->r.contentencoding;
-  if (back->r.transfer_coding < 0) {
-    *layer = "Transfer-Encoding";
-    errno = 0;
-    return -1;
-  }
-  if (back->r.transfer_coding == 0)
+  if (back->r.transfer_coding == HTS_TE_NONE)
     return hts_codec_unpack_max(codec, back->tmpfile, unpacked, cap);
   *layer = "Transfer-Encoding";
   size = hts_codec_unpack_max(HTS_CODEC_DEFLATE, back->tmpfile, unpacked, cap);
@@ -1123,7 +1118,14 @@ static int back_unpack_body(httrackp *opt, lien_back *const back,
     return -1;
   }
   *layer = back->r.contentencoding;
-  return hts_codec_unpack_max(codec, back->tmpfile, unpacked, cap);
+  /* the ratio guard counts from the bytes received, or two layers square it */
+  size = hts_codec_unpack_max(codec, back->tmpfile, unpacked,
+                              hts_codec_budget(coded, cap));
+  if (size == HTS_CODEC_TOOBIG && !hts_codec_cap_binds(coded, cap)) {
+    errno = 0;
+    return -1;
+  }
+  return size;
 }
 
 hts_boolean back_set_decoded_size(htsblk *r, LLint size) {
@@ -4216,12 +4218,18 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                 get_ext(catbuff, sizeof(catbuff),
                                         back[i].url_sav));
 
+                            /* HTS_TE_UNREADABLE failed at the header, so
+                               any coding here is one to undo */
+                            const hts_boolean te =
+                                back[i].r.transfer_coding != HTS_TE_NONE;
+
                             back[i].r.is_write = 1; // to disk
-                            /* a transfer coding comes off all the same */
-                            if (packed && back[i].r.transfer_coding != 0)
+                            /* clear the content coding so back_finalize undoes
+                               only the transfer layer and the .gz stays packed
+                             */
+                            if (packed && te)
                               back[i].r.contentencoding[0] = '\0';
-                            if (back[i].r.compressed &&
-                                (!packed || back[i].r.transfer_coding != 0)) {
+                            if (back[i].r.compressed && (!packed || te)) {
                               if (create_back_tmpfile(opt, &back[i], "z") ==
                                   0) {
                                 assertf(back[i].tmpfile != NULL);
@@ -4781,8 +4789,9 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                         back[i].r.empty = 0;
                         back[i].r.keep_alive = 0;
                       }
-                      te_unreadable = back[i].r.transfer_coding < 0 &&
-                                      !back[i].head_request;
+                      te_unreadable =
+                          back[i].r.transfer_coding == HTS_TE_UNREADABLE &&
+                          !back[i].head_request;
                     }
                     // ----------------------------------------
 
@@ -5176,9 +5185,10 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                       /* Resume at the server's Content-Range start, which
                          may be earlier than asked (#198). */
                       const LLint resume = back[i].r.crange_start;
+                      /* a coded tail can not be appended to the plain prefix */
                       const hts_boolean range_ok =
-                          back[i].r.crange > 0 && resume >= 0 &&
-                          resume <= (LLint) sz &&
+                          !back[i].r.compressed && back[i].r.crange > 0 &&
+                          resume >= 0 && resume <= (LLint) sz &&
                           back[i].r.crange_end == back[i].r.crange - 1 &&
                           (back[i].r.totalsize < 0 ||
                            back[i].r.totalsize ==

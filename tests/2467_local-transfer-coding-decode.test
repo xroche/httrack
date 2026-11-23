@@ -26,7 +26,9 @@ printf '%s\r\n' \
     'Transfer-Encoding: gzip, gzip, chunked' %% \
     'Transfer-Encoding: gzip;level=9, chunked' %% \
     'Transfer-Encoding: compress' %% \
-    'Transfer-Encoding: br, chunked' %% >"$tmpdir/corpus"
+    'Transfer-Encoding: br, chunked' %% \
+    'Transfer-Encoding: chunked,' %% \
+    'Transfer-Encoding: gzip, , chunked' %% >"$tmpdir/corpus"
 want='chunk=1 compressed=1 te=1
 chunk=1 compressed=1 te=1
 chunk=0 compressed=1 te=1
@@ -37,7 +39,9 @@ chunk=1 compressed=1 te=-1
 chunk=1 compressed=1 te=-1
 chunk=1 compressed=1 te=-1
 chunk=0 compressed=1 te=-1
-chunk=1 compressed=1 te=-1'
+chunk=1 compressed=1 te=-1
+chunk=1 compressed=0 te=0
+chunk=1 compressed=1 te=1'
 out=$(httrack -O /dev/null -#test=headerparse "$(nativepath "$tmpdir/corpus")")
 got=$(sed -n 's/^#[0-9]* .*\(chunk=[0-9]*\) .*\(compressed=[0-9]* te=-*[0-9]*\) .*/\1 \2/p' <<<"$out")
 assert_eq "$want" "$got" "transfer codings read by treathead_opt"
@@ -80,10 +84,13 @@ test "$(count_log_errors "$log")" = 2 ||
     fail_dump "errors beyond the two refused codings" "$log"
 ok "a non-final chunked and an unknown coding fail instead of saving garbage"
 
-# The cache holds the decoded index, so a run from it finds the same links.
+# The cache holds the decoded index, so a run from it writes back the same page.
+page=$tmpdir/m/$host/tecode/index.html
+grep -v 'Mirrored from' "$page" >"$tmpdir/index.ref"
+rm "$page"
 local_crawl "$BASEURL/tecode/index.html" -O "$tmpdir/m" -C1 || fail "update failed"
-"$SRV_PYTHON" "$(nativepath "$tmpdir/check.py")" "$(nativepath "$tmpdir/m/$host/tecode")" ||
-    fail_dump "the cache run damaged the mirror" "$log"
+grep -v 'Mirrored from' "$page" | cmp -s "$tmpdir/index.ref" - ||
+    fail_dump "the cache run did not restore the decoded index" "$log"
 test "$(count_matching_lines 'no files updated' "$log")" = 1 ||
     fail_dump "the cache run fetched again" "$log"
 ok "a cache run keeps the decoded bodies"
@@ -95,3 +102,66 @@ if test "${ZSTD_ENABLED:-yes}" = "yes"; then
         fail_dump "gzip transfer coding over zstd content not undone" "$tmpdir/z/hts-log.txt"
     ok "the transfer coding came off before the content coding"
 fi
+
+# A resume answered with a coded 206 restarts the file, as the rest of the body
+# can not be appended to the prefix on disk.
+res=$tmpdir/r/$host/tecode
+mkdir -p "$res"
+"$SRV_PYTHON" - "$(nativepath "$res")" <<'PY'
+import sys
+
+for name in ("resumete", "resumece"):
+    with open("%s/%s.bin" % (sys.argv[1], name), "wb") as f:
+        f.write((b"TECODE-%s-BODY\n" % name.encode() * 40)[:200])
+PY
+local_crawl "$BASEURL/tecode/resume.html" -O "$tmpdir/r" || fail "crawl failed"
+log=$tmpdir/r/hts-log.txt
+test "$(count_matching_lines 'Unusable partial-content range' "$log")" = 2 ||
+    fail_dump "the coded 206 replies were not both turned down" "$log"
+"$SRV_PYTHON" - "$(nativepath "$res")" <<'PY' || fail_dump "a coded 206 was appended to the prefix" "$log"
+import sys
+
+for name in ("resumete", "resumece"):
+    with open("%s/%s.bin" % (sys.argv[1], name), "rb") as f:
+        got = f.read()
+    assert got == b"TECODE-%s-BODY\n" % name.encode() * 40, (name, got[190:240])
+PY
+ok "a resume answered with a transfer or content coding restarts the file"
+
+local_crawl "$BASEURL/tecode/more.html" -O "$tmpdir/x" || fail "crawl failed"
+log=$tmpdir/x/hts-log.txt
+assert_file "$tmpdir/x/$host/tecode/sniff.jpg" "the sniff saw the coded bytes"
+ok "the type sniff looks under the transfer coding"
+# bad and badcompress fail on the transfer layer, before their content coding
+test "$(count_matching_lines 'Error when decompressing (Transfer-Encoding)' "$log")" = 2 ||
+    fail_dump "a bad transfer coding was not named" "$log"
+test "$(count_matching_lines 'Unsupported Content-Encoding (compress)' "$log")" = 1 ||
+    fail_dump "the content coding under a good transfer coding was not named" "$log"
+ok "a decode error names the layer that failed"
+test "$(count_matching_lines 'Error when decompressing (gzip)' "$log")" = 1 ||
+    fail_dump "two gzip layers got past the ratio guard" "$log"
+test ! -s "$tmpdir/x/$host/tecode/bomb.bin" || fail "the two-layer bomb was saved"
+test "$(count_log_errors "$log")" = 4 || fail_dump "unexpected errors" "$log"
+ok "the ratio guard counts from the bytes received"
+
+# -%N0 asks a HEAD for the type of probe.php, and a HEAD has no body to decode.
+local_crawl "$BASEURL/tecode/headprobe.html" -O "$tmpdir/h" -%N0 || fail "crawl failed"
+log=$tmpdir/h/hts-log.txt
+test "$(count_log_errors "$log")" = 0 || fail_dump "a HEAD was refused" "$log"
+grep -q TECODE-probe-BODY "$tmpdir/h/$host/tecode/probe.html" ||
+    fail_dump "probe.php was not saved" "$log"
+ok "a HEAD under an unreadable transfer coding is not refused"
+
+# A WARC record holds the body without its transfer coding.
+local_crawl "$BASEURL/tecode/gzip.bin" -O "$tmpdir/w" --warc-file tewarc || fail "crawl failed"
+warc=$(find "$tmpdir/w" -name 'tewarc*.warc.gz' | head -1)
+test -n "$warc" || fail_dump "no WARC written" "$tmpdir/w/hts-log.txt"
+"$SRV_PYTHON" - "$(nativepath "$warc")" <<'PY' || fail "the WARC kept the transfer coding"
+import gzip
+import sys
+
+with open(sys.argv[1], "rb") as f:
+    data = gzip.decompress(f.read())
+assert b"TECODE-gzip-BODY\n" * 40 in data, data[-200:]
+PY
+ok "a WARC record stores the decoded body"

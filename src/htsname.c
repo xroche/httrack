@@ -304,7 +304,7 @@ static size_t sniff_slot_head(const lien_back *slot, void *buf, size_t len) {
       n = sizeof(raw);
     memcpy(raw, buf, n);
     /* the transfer coding was applied last, so it comes off first */
-    if (r->transfer_coding != 0) {
+    if (r->transfer_coding != HTS_TE_NONE) {
       n = hts_codec_head(HTS_CODEC_DEFLATE, raw, n, buf, len);
       if (n > sizeof(raw))
         n = sizeof(raw);

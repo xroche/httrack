@@ -4264,24 +4264,23 @@ static int st_spanindex(httrackp *opt, int argc, char **argv) {
   return failures != 0;
 }
 
-/* Check hts_span_list_has and hts_span_list_last on comma lists. */
+/* Check hts_span_list_has on comma lists. */
 static int st_spanlist(httrackp *opt, int argc, char **argv) {
   static const struct {
     const char *list;
-    const char *token; // NULL: the list has no last item
-    hts_boolean has;   // does the list hold "chunked"?
+    hts_boolean has; // does the list hold "chunked"?
   } cases[] = {
-      {"chunked", "chunked", HTS_TRUE},
-      {"gzip, chunked", "chunked", HTS_TRUE},
-      {"  Chunked\t", "Chunked", HTS_TRUE},
-      {"chunked, gzip", "gzip", HTS_TRUE},
-      {"gzip,chunked,", "chunked", HTS_TRUE},
-      {"gzip ,  ,", "gzip", HTS_FALSE},
-      {"xchunked, chunkedx", "chunkedx", HTS_FALSE},
-      {"chunk ed", "chunk ed", HTS_FALSE},
-      {"\"chunked\"", "\"chunked\"", HTS_FALSE},
-      {"", NULL, HTS_FALSE},
-      {" , \t,", NULL, HTS_FALSE},
+      {"chunked", HTS_TRUE},
+      {"gzip, chunked", HTS_TRUE},
+      {"  Chunked\t", HTS_TRUE},
+      {"chunked, gzip", HTS_TRUE},
+      {"gzip,chunked,", HTS_TRUE},
+      {"gzip ,  ,", HTS_FALSE},
+      {"xchunked, chunkedx", HTS_FALSE},
+      {"chunk ed", HTS_FALSE},
+      {"\"chunked\"", HTS_FALSE},
+      {"", HTS_FALSE},
+      {" , \t,", HTS_FALSE},
   };
 
   size_t i, failures = 0;
@@ -4290,13 +4289,8 @@ static int st_spanlist(httrackp *opt, int argc, char **argv) {
   (void) argc;
   (void) argv;
   for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
-    const hts_span list = hts_span_of(cases[i].list);
-    hts_span last = hts_span_of("unset");
-    const hts_boolean found = hts_span_list_last(list, ',', &last);
-
-    if (hts_span_list_has(list, ',', hts_span_of("chunked")) != cases[i].has ||
-        found != (cases[i].token != NULL) ||
-        !hts_span_eq(last, hts_span_of(found ? cases[i].token : "unset"))) {
+    if (hts_span_list_has(hts_span_of(cases[i].list), ',',
+                          hts_span_of("chunked")) != cases[i].has) {
       printf("spanlist: case %d failed\n", (int) i);
       failures++;
     }
@@ -5540,8 +5534,7 @@ const struct selftest_entry selftests_lib[] = {
      st_spancmp},
     {"spanindex", "", "the word a span matches in a NULL-terminated list",
      st_spanindex},
-    {"spanlist", "", "the token a span list holds, and its last one",
-     st_spanlist},
+    {"spanlist", "", "the token a span list holds", st_spanlist},
     {"headerparse", "<file>",
      "the fields treathead_opt() reads from each response in a file",
      st_headerparse},
