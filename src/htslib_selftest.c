@@ -1850,8 +1850,7 @@ static void secretheaders_print(const char *s) {
       putchar(*s);
 }
 
-/* Prints, one line per argument, each token hts_secret_add_headers() learns
-   from it, then what hts_header_shown() and the -%H log show of it. */
+/* Prints, per argument, the tokens learnt, then the shown and logged forms. */
 static int st_secretheaders(httrackp *opt, int argc, char **argv) {
   int a;
 
@@ -1864,9 +1863,19 @@ static int st_secretheaders(httrackp *opt, int argc, char **argv) {
 
     if (o == NULL || fp == NULL) {
       fprintf(stderr, "secretheaders: out of memory\n");
+      if (fp != NULL)
+        fclose(fp);
+      if (o != NULL)
+        hts_free_opt(o);
       return 1;
     }
-    (void) st_decode_body(argv[a], text, sizeof(text));
+    if (st_decode_body(argv[a], text, sizeof(text)) + 1 >= sizeof(text)) {
+      fprintf(stderr, "secretheaders: input over %d bytes\n",
+              (int) sizeof(text) - 2);
+      fclose(fp);
+      hts_free_opt(o);
+      return 1;
+    }
     n = strlen(text);
     hts_secret_add_headers(o, text);
     for (i = 0; i < n; i++)
