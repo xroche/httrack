@@ -5,7 +5,8 @@
 
 set -euo pipefail
 
-out=$(httrack -#test=dnsaddr run)
+# a failing self-test exits non-zero, and its FAIL lines are the diagnosis
+out=$(httrack -#test=dnsaddr run) || true
 
 test "$out" = "dns-addr-selftest: OK" || {
     echo "expected 'dns-addr-selftest: OK', got: $out" >&2
