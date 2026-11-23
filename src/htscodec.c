@@ -121,17 +121,18 @@ const char *hts_acceptencoding(hts_boolean compressible, hts_boolean secure) {
   return "gzip, deflate, identity;q=0.9";
 }
 
-hts_boolean hts_codec_is_archive_ext(hts_codec codec, const char *ext) {
-  if (ext == NULL || ext[0] == '\0')
-    return HTS_FALSE;
+hts_boolean hts_codec_is_archive_ext(hts_codec codec, hts_span ext) {
+  static const char *const gz[] = {HTS_SPAN_WORDS("gz", "tgz")};
+  static const char *const br[] = {HTS_SPAN_WORDS("br")};
+  static const char *const zst[] = {HTS_SPAN_WORDS("zst", "tzst")};
+
   switch (codec) {
   case HTS_CODEC_DEFLATE:
-    return strfield2(ext, "gz") || strfield2(ext, "tgz") ? HTS_TRUE : HTS_FALSE;
+    return hts_span_index_ci(ext, gz) >= 0;
   case HTS_CODEC_BROTLI:
-    return strfield2(ext, "br") ? HTS_TRUE : HTS_FALSE;
+    return hts_span_index_ci(ext, br) >= 0;
   case HTS_CODEC_ZSTD:
-    return strfield2(ext, "zst") || strfield2(ext, "tzst") ? HTS_TRUE
-                                                           : HTS_FALSE;
+    return hts_span_index_ci(ext, zst) >= 0;
   default:
     return HTS_FALSE;
   }

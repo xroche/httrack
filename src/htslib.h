@@ -259,15 +259,9 @@ int is_knowntype(httrackp *opt, const char *fil);
     1 non-HTML, 2 HTML. */
 int is_userknowntype(httrackp *opt, const char *fil);
 
-/** 1 if @p fil, an extension such as "asp" or "php" (not a full filename), is a
-    known dynamic-page type, else 0. */
-hts_boolean is_dyntype(const char *fil);
-
-/** Extract the extension of @p fil (text after the last '.', stopping at '?')
-    into caller scratch @p catbuff (capacity @p size) and return it. Returns ""
-    (a literal, not @p catbuff) when there is no extension or it does not fit.
- */
-const char *get_ext(char *catbuff, size_t size, const char *fil);
+/** Is @p ext, an extension such as "asp" or "php" (not a full filename), a
+    known dynamic-page type? */
+hts_boolean is_dyntype(hts_span ext);
 
 /** 1 if MIME type @p st must not be reclassified or renamed (hypertext types
    and a built-in keep-list of commonly mislabeled types), else 0. */
@@ -742,7 +736,8 @@ void fil_simplifie(char *f);
 void map_characters(unsigned char *buffer, unsigned int size,
                     unsigned int *map);
 int ishtml(httrackp * opt, const char *urlfil);
-int ishtml_ext(const char *a);
+/* 1 if EXT is an HTML extension such as "htm", else -1. */
+int ishtml_ext(hts_span ext);
 
 /* Write fil's --assume type into s (capacity ssize, NUL included); too long a
    value is clipped, not fatal. True if a rule matched, s then holding its

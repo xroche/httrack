@@ -3547,7 +3547,7 @@ int ishtml(httrackp * opt, const char *fil) {
   /* Search for known ext */
   dotted = hts_path_ext_dot(fil_noquery, "/");
   if (dotted != NULL) {
-    int ret = ishtml_ext(dotted + 1);
+    int ret = ishtml_ext(hts_span_of(dotted + 1));
 
     if (ret == -1) {
       switch (is_knowntype(opt, dotted)) {
@@ -3567,48 +3567,11 @@ int ishtml(httrackp * opt, const char *fil) {
     return -2;                  // indéterminé, par exemple /truc
 }
 
-// idem, mais pour uniquement l'extension
-int ishtml_ext(const char *a) {
-  int html = 0;
+int ishtml_ext(hts_span ext) {
+  static const char *const html_exts[] = {HTS_SPAN_WORDS(
+      "html", "htm", "shtml", "phtml", "htmlx", "shtm", "phtm", "htmx")};
 
-  //
-  if (strfield2(a, "html"))
-    html = 1;
-  else if (strfield2(a, "htm"))
-    html = 1;
-  else if (strfield2(a, "shtml"))
-    html = 1;
-  else if (strfield2(a, "phtml"))
-    html = 1;
-  else if (strfield2(a, "htmlx"))
-    html = 1;
-  else if (strfield2(a, "shtm"))
-    html = 1;
-  else if (strfield2(a, "phtm"))
-    html = 1;
-  else if (strfield2(a, "htmx"))
-    html = 1;
-  //
-  // insuccès..
-  else {
-#if 1
-    html = -1;                  // inconnu..
-#else
-    // XXXXXX not suitable (ext)
-    switch (is_knownext(a)) {
-    case 1:
-      html = 0;                 // connu, non html
-      break;
-    case 2:
-      html = 1;                 // connu, html
-      break;
-    default:
-      html = -1;                // inconnu..
-      break;
-    }
-#endif
-  }
-  return html;
+  return hts_span_index_ci(ext, html_exts) >= 0 ? 1 : -1;
 }
 
 /* Declare a non-const version of FUN */

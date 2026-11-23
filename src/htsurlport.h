@@ -176,7 +176,8 @@ HTS_CHECK_RESULT hts_boolean hts_span_parse_llint(hts_span s, LLint min,
 
 /* The '.' that starts the extension of PATH's last segment, or NULL. A byte
    of SEPS ends a segment, and a '.' at PATH[0] counts. */
-const char *hts_path_ext_dot(const char *path, const char *seps);
+HTS_CHECK_RESULT const char *hts_path_ext_dot(const char *path,
+                                              const char *seps);
 
 /* The text after FIL's last '.' before any '?', or an empty span. Unlike
    hts_path_ext_dot, a '.' in a directory counts: "/v1.2/page" gives "2/page".

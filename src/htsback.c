@@ -4215,8 +4215,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                packed on disk */
                             const hts_boolean packed = hts_codec_is_archive_ext(
                                 hts_codec_parse(back[i].r.contentencoding),
-                                get_ext(catbuff, sizeof(catbuff),
-                                        back[i].url_sav));
+                                hts_fil_ext(back[i].url_sav));
 
                             /* HTS_TE_UNREADABLE failed at the header, so
                                any coding here is one to undo */

@@ -436,8 +436,7 @@ hts_boolean hts_dirty_link_is_url(httrackp *opt, const char *str, size_t len,
     if (get_httptype_sized(opt, type, sizeof(type), tempo,
                            0)) // recognized type
       url_ok = HTS_TRUE;
-    else if (is_dyntype(get_ext(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                                tempo))) // php, cgi, asp
+    else if (is_dyntype(hts_fil_ext(tempo))) // php, cgi, asp
       url_ok = HTS_TRUE;
     // but not foobar@aol.com
     if (strchr(tempo, '@'))
@@ -1790,7 +1789,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
                     tmp[0] = '\0';
                     strncat(tmp, a + dot + 1, n - dot - 1);
-                    if (is_knowntype(opt, tmp) || ishtml_ext(tmp) != -1) {
+                    if (is_knowntype(opt, tmp) ||
+                        ishtml_ext(hts_span_of(tmp)) != -1) {
                       html++;
                       p = 0;
                       valid_p = 1;

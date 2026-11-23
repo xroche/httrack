@@ -103,29 +103,3 @@ char *fslash(char *catbuff, size_t size, const char *a) {
   RUNTIME_TIME_CHECK_SIZE(size);
   return __fslash(concat(catbuff, size, a, NULL));
 }
-
-// extension : html,gif..
-const char *get_ext(char *catbuff, size_t size, const char *fil) {
-  size_t i, last;
-
-  RUNTIME_TIME_CHECK_SIZE(size);
-
-  for(i = 0, last = 0 ; fil[i] != '\0' && fil[i] != '?' ; i++) {
-    if (fil[i] == '.') {
-      last = i + 1;
-    }
-  }
-
-  if (last != 0 && i > last) {
-    const size_t len = i - last;
-    /* len characters plus the terminator, with the untrusted len alone */
-    if (len < size) {
-      /* bounded on len, so the copy stops at the '?' the loop stopped at; the
-         guard above leaves strlncatbuff's abort arm unreachable */
-      catbuff[0] = '\0';
-      strlncatbuff(catbuff, &fil[last], size, len);
-      return catbuff;
-    }
-  }
-  return "";
-}

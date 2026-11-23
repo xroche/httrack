@@ -1081,10 +1081,10 @@ static int st_contentcodings(httrackp *opt, int argc, char **argv) {
           (HTS_USEBROTLI ? HTS_CODEC_BROTLI : HTS_CODEC_UNSUPPORTED));
   assertf(hts_codec_parse("zstd") ==
           (HTS_USEZSTD ? HTS_CODEC_ZSTD : HTS_CODEC_UNSUPPORTED));
-  assertf(hts_codec_is_archive_ext(HTS_CODEC_DEFLATE, "tgz"));
-  assertf(!hts_codec_is_archive_ext(HTS_CODEC_DEFLATE, "html"));
-  assertf(hts_codec_is_archive_ext(HTS_CODEC_BROTLI, "br"));
-  assertf(hts_codec_is_archive_ext(HTS_CODEC_ZSTD, "zst"));
+  assertf(hts_codec_is_archive_ext(HTS_CODEC_DEFLATE, hts_span_of("tgz")));
+  assertf(!hts_codec_is_archive_ext(HTS_CODEC_DEFLATE, hts_span_of("html")));
+  assertf(hts_codec_is_archive_ext(HTS_CODEC_BROTLI, hts_span_of("br")));
+  assertf(hts_codec_is_archive_ext(HTS_CODEC_ZSTD, hts_span_of("zst")));
   /* decoded-size budget: 4096x, floor 1 MiB, ceiling INT_MAX */
   assertf(hts_codec_maxout(1) == 1024 * 1024);
   assertf(hts_codec_maxout(1024) == 4096 * 1024);

@@ -1040,14 +1040,14 @@ int url_savename(lien_adrfilsave *const afs,
   else
     is_html = ishtml(opt, fil);
   switch (is_html) {            /* .html,.shtml,.. */
-  case 1:
-    if ((strfield2(get_ext(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), fil), "html") == 0)
-        && (strfield2(get_ext(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), fil), "htm") == 0)
-      ) {
+  case 1: {
+    static const char *const html_htm[] = {HTS_SPAN_WORDS("html", "htm")};
+
+    if (hts_span_index_ci(hts_fil_ext(fil), html_htm) < 0) {
       strcpybuff(ext, "html");
       ext_chg = 1;
     }
-    break;
+  } break;
   case 0:
     if (!strnotempty(ext)) {
       if (is_userknowntype(opt, fil) && // mime known by user
@@ -1391,8 +1391,9 @@ int url_savename(lien_adrfilsave *const afs,
       // Cut the old extension only when it is empty (a bare trailing dot), the
       // new one, or a recognized one; an unknown trailing ".token" (e.g.
       // /article-1.884291, #115) is part of the name, not an extension.
-      const char *const old_ext = get_ext(catbuff, sizeof(catbuff), fil);
-      const int known_ext = !*old_ext || strfield2(old_ext, ext) ||
+      const hts_span old_ext = hts_fil_ext(fil);
+      const int known_ext = hts_span_empty(old_ext) ||
+                            hts_span_eq_ci(old_ext, hts_span_of(ext)) ||
                             is_knowntype(opt, fil) || is_dyntype(old_ext) ||
                             ishtml_ext(old_ext) != -1;
       const char *const dot = hts_path_ext_dot(fil, "/");
@@ -1667,7 +1668,8 @@ int url_savename(lien_adrfilsave *const afs,
       }
     }
     // si un html à coup sûr
-    if ((ext_chg != 0) ? (ishtml_ext(ext) == 1) : (ishtml(opt, fil) == 1)) {
+    if ((ext_chg != 0) ? (ishtml_ext(hts_span_of(ext)) == 1)
+                       : (ishtml(opt, fil) == 1)) {
       if (opt->savename_type % 100 == 2) {      // html/
         strcatbuff(afs->save, "html/");
       }
@@ -1689,7 +1691,8 @@ int url_savename(lien_adrfilsave *const afs,
         a++;
 
       // html?
-      if ((ext_chg != 0) ? (ishtml_ext(ext) == 1) : (ishtml(opt, fil) == 1)) {
+      if ((ext_chg != 0) ? (ishtml_ext(hts_span_of(ext)) == 1)
+                         : (ishtml(opt, fil) == 1)) {
         if (opt->savename_type % 100 == 5)
           strcatbuff(afs->save, "html/");
       } else {
