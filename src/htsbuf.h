@@ -36,6 +36,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htssafe.h"
 
+#include <stdarg.h>
 #include <stddef.h>
 
 /* P holds SIZE writable bytes. It never converts implicitly to hts_span, and
@@ -58,6 +59,59 @@ static HTS_INLINE HTS_UNUSED hts_buf hts_buf_at(char *p, size_t size) {
 static HTS_INLINE HTS_UNUSED hts_buf hts_buf_skip(hts_buf b, size_t off) {
   assertf(off < b.size);
   return hts_buf_at(b.p + off, b.size - off);
+}
+
+static HTS_INLINE HTS_UNUSED void hts_buf_cpy_(hts_buf b, const char *s,
+                                               size_t s_size, const char *file,
+                                               int line) {
+  (void) strcpy_safe_(b.p, b.size, s, s_size,
+                      "overflow while copying into a buffer", file, line);
+}
+
+static HTS_INLINE HTS_UNUSED void hts_buf_catn_(hts_buf b, const char *s,
+                                                size_t s_size, size_t n,
+                                                const char *file, int line) {
+  (void) strncat_safe_(b.p, b.size, s, s_size, n,
+                       "overflow while appending to a buffer", file, line);
+}
+
+/* Copy S into B, aborting at the caller's line unless it fits. */
+#define hts_buf_cpy(B, S)                                                      \
+  hts_buf_cpy_((B), (S), HTS_SIZEOF_SRC_(S), __FILE__, __LINE__)
+/* Append S to B's text, aborting at the caller's line unless it fits. */
+#define hts_buf_cat(B, S)                                                      \
+  hts_buf_catn_((B), (S), HTS_SIZEOF_SRC_(S), (size_t) -1, __FILE__, __LINE__)
+/* Append at most N bytes of S, aborting at the caller's line unless they fit.
+ */
+#define hts_buf_catn(B, S, N)                                                  \
+  hts_buf_catn_((B), (S), HTS_SIZEOF_SRC_(S), (N), __FILE__, __LINE__)
+
+/* Copy S into B, clipped to fit, as strclipbuff. TRUE if it all fit. */
+static HTS_INLINE HTS_UNUSED hts_boolean hts_buf_cpy_clip(hts_buf b,
+                                                          const char *s) {
+  return strclipbuff(b.p, b.size, s);
+}
+
+/* Print into B, clipped to fit, as slprintfbuff. TRUE if it all fit. */
+static HTS_INLINE HTS_UNUSED HTS_CHECK_RESULT HTS_PRINTF_FUN(2, 3) hts_boolean
+    hts_buf_printf(hts_buf b, HTS_FORMAT_STRING const char *fmt, ...) {
+  va_list args;
+  hts_boolean fit;
+
+  va_start(args, fmt);
+  fit = vslprintfbuff(b.p, b.size, fmt, args);
+  va_end(args);
+  return fit;
+}
+
+/* hts_buf_printf for text meant to be clipped, as slprintfbuff_clip. */
+static HTS_INLINE HTS_UNUSED HTS_PRINTF_FUN(2, 3) void hts_buf_printf_clip(
+    hts_buf b, HTS_FORMAT_STRING const char *fmt, ...) {
+  va_list args;
+
+  va_start(args, fmt);
+  (void) vslprintfbuff(b.p, b.size, fmt, args);
+  va_end(args);
 }
 
 /* HTS_BUF(ARR) is the buffer over array ARR, and a pointer does not compile.
