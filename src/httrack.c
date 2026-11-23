@@ -686,9 +686,11 @@ static void sig_doback(int blind) { // go to the background
     out = open("hts-nohup.out", O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR);
   if (out == -1)
     out = open("/dev/null", O_WRONLY, S_IRUSR | S_IWUSR);
-  dup2(out, 0);
-  dup2(out, 1);
-  dup2(out, 2);
+  if (out != -1) {
+    dup2(out, 0);
+    dup2(out, 1);
+    dup2(out, 2);
+  }
   //
   switch (fork()) {
   case 0:

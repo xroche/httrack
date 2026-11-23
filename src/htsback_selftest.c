@@ -3394,8 +3394,12 @@ static int st_reqstrings(httrackp *opt, int argc, char **argv) {
 #define CHECK(cond) ST_CHECK(err, cond)
   (void) argc;
   (void) argv;
-  if (sback == NULL || from == NULL || big == NULL)
+  if (sback == NULL || from == NULL || big == NULL) {
+    back_free(&sback);
+    hts_free_opt(from);
+    freet(big);
     return 77;
+  }
   opt->maxsoc = SLOTS;
   opt->timeout = 0;
   opt->rateout = 0;

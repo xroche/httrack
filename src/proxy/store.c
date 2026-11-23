@@ -1640,7 +1640,8 @@ static int PT_LoadCache__Old(PT_Index index_, const char *filename) {
       if (use == NULL || !hts_fread_exact(use, (size_t) ndxSize, cache->ndx)) {
         freet(use);
       } else {
-        char firstline[256];
+        /* zeroed: the analyzer cannot tie firstline[8] to the strncmp() */
+        char firstline[256] = "";
         char *a = use;
 
         use[ndxSize] = '\0';
