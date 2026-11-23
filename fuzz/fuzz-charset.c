@@ -74,7 +74,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
       if (nr == 0)
         break;
-      hts_writeUTF8(uc, out, sizeof(out));
+      hts_writeUTF8(uc, HTS_BUF(out));
       i += nr;
     }
   }

@@ -204,11 +204,11 @@ static void cookie_sync_dir(const char *file) {
 #endif
 
 /* Name in dst a temporary beside path that no other run or thread writes. */
-hts_boolean cookie_tmpname(char *dst, size_t size, const char *path) {
+hts_boolean cookie_tmpname(hts_buf dst, const char *path) {
   static volatile int calls = 0;
 
-  return slprintfbuff(dst, size, "%s.%lu.%u.tmp", path, back_self_pid(),
-                      (unsigned int) hts_increment_int(&calls));
+  return hts_buf_printf(dst, "%s.%lu.%u.tmp", path, back_self_pid(),
+                        (unsigned int) hts_increment_int(&calls));
 }
 
 /* Make bak hold what file holds, leaving file in place. The old bak stays
@@ -218,7 +218,7 @@ hts_boolean cookie_backup(const char *file, const char *bak) {
   hts_boolean ok;
   int err;
 
-  if (!cookie_tmpname(next, sizeof(next), bak))
+  if (!cookie_tmpname(HTS_BUF(next), bak))
     return HTS_FALSE;
   (void) UNLINK(next);
 #ifndef _WIN32
@@ -258,7 +258,7 @@ hts_boolean cookie_write_replace(const char *file, const char *data,
   FILE *fp;
   int err;
 
-  if (!cookie_tmpname(tmp, sizeof(tmp), file)) {
+  if (!cookie_tmpname(HTS_BUF(tmp), file)) {
     errno = ENAMETOOLONG;
     return HTS_FALSE;
   }

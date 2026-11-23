@@ -563,7 +563,7 @@ static char *hts_codepageToUTF8(const char *codepage, const char *s,
       dest = grown;
       capa = want;
     }
-    k += hts_writeUTF8(uc, &dest[k], MAX_UTF);
+    k += hts_writeUTF8(uc, hts_buf_at(&dest[k], MAX_UTF));
     assertf(k < capa);
   }
   dest[k] = '\0';
@@ -1043,8 +1043,7 @@ char *hts_convertStringUTF8ToIDNA(const char *s, size_t size) {
   return dest;
 }
 
-hts_boolean hts_host_to_ascii(char *dst, size_t size, const char *host,
-                              size_t len) {
+hts_boolean hts_host_to_ascii(hts_buf dst, const char *host, size_t len) {
   char *idna = NULL;
   const char *src = host;
   size_t n = len;
@@ -1057,11 +1056,11 @@ hts_boolean hts_host_to_ascii(char *dst, size_t size, const char *host,
     src = idna;
     n = strlen(idna);
   }
-  fits = n < size;
+  fits = n < dst.size;
   if (fits) {
     // dst may be host itself
-    memmove(dst, src, n);
-    dst[n] = '\0';
+    memmove(dst.p, src, n);
+    dst.p[n] = '\0';
   }
   freet(idna);
   return fits;
@@ -1234,15 +1233,15 @@ char *hts_convertUCS4StringToUTF8(const hts_UCS4 *s, size_t nChars) {
   return dest;
 }
 
-size_t hts_writeUTF8(hts_UCS4 uc, char *dest, size_t size) {
+size_t hts_writeUTF8(hts_UCS4 uc, hts_buf dest) {
   unsigned char seq[4];
   const size_t n = utf8_encode(uc, seq);
 
   /* keep room for a NUL the caller may add */
-  if (n == 0 || n >= size) {
+  if (n == 0 || n >= dest.size) {
     return 0;
   }
-  memcpy(dest, seq, n);
+  memcpy(dest.p, seq, n);
   return n;
 }
 

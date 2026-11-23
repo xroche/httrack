@@ -40,6 +40,7 @@ Please visit our Website: http://www.httrack.com
 #include <stdlib.h>
 #include <string.h>
 #include "htswin32.h"
+#include "htsbuf.h"
 
 /** UCS4 type. **/
 typedef unsigned int hts_UCS4;
@@ -71,11 +72,10 @@ HTS_CHECK_RESULT extern char *hts_convertStringUTF8ToIDNA(const char *s,
                                                           size_t size);
 
 /**
- * Write the ASCII (IDNA) form of the len-byte host into dst, of size bytes;
- * dst may be host. HTS_FALSE, dst untouched, if it has none or does not fit.
+ * Write the ASCII (IDNA) form of the len-byte host into dst; dst.p may be
+ * host. HTS_FALSE, dst untouched, if it has none or does not fit.
  **/
-extern hts_boolean hts_host_to_ascii(char *dst, size_t size, const char *host,
-                                     size_t len);
+extern hts_boolean hts_host_to_ascii(hts_buf dst, const char *host, size_t len);
 
 /**
  * Convert an IDNA (RFC 3492) string to an UTF-8 string.
@@ -146,12 +146,12 @@ HTS_CHECK_RESULT extern char *hts_convertUCS4StringToUTF8(const hts_UCS4 *s,
                                                           size_t nChars);
 
 /**
- * Write the Unicode character 'uc' in 'dest' of maximum size 'size'.
+ * Write the Unicode character 'uc' in 'dest'.
  * Return the number of bytes written, or 0 upon error, a surrogate or a
  * code point above U+10FFFF.
  * Note: does not \0-terminate the destination buffer.
  **/
-extern size_t hts_writeUTF8(hts_UCS4 uc, char *dest, size_t size);
+extern size_t hts_writeUTF8(hts_UCS4 uc, hts_buf dest);
 
 /**
  * Read the next Unicode character within 'src' of size 'size' and, upon

@@ -131,7 +131,7 @@ hts_boolean cookie_host(const char *adr, char *dst, size_t dst_size) {
   if (!hts_isStringAscii(dst, strlen(dst)) &&
       cookie_host_refusal(dst, strlen(dst)) != NULL)
     return HTS_FALSE;
-  if (!hts_host_to_ascii(dst, dst_size, dst, strlen(dst)))
+  if (!hts_host_to_ascii(hts_buf_at(dst, dst_size), dst, strlen(dst)))
     return HTS_FALSE;
   /* "%25" is RFC 6874's URI spelling of a zone id's '%'. Only a bracketed
      literal carries it, because a bare host's '%' is already literal. */
@@ -899,16 +899,16 @@ static hts_boolean cookie_known_comment(const char *line) {
 /* Copy into file the path that name names once symbolic links are followed,
    so the load and the save find the same .bak. Returns HTS_FALSE when name
    is a dangling link or the path does not fit. */
-static hts_boolean cookie_resolve(char *file, size_t size, const char *name) {
+static hts_boolean cookie_resolve(hts_buf file, const char *name) {
 #ifndef _WIN32
   char *real = realpath(name, NULL);
   struct stat st;
 
   if (real != NULL) {
-    const hts_boolean fits = strlen(real) < size;
+    const hts_boolean fits = strlen(real) < file.size;
 
     if (fits)
-      strlcpybuff(file, real, size);
+      strlcpybuff(file.p, real, file.size);
     freet(real);
     return fits;
   }
@@ -916,7 +916,7 @@ static hts_boolean cookie_resolve(char *file, size_t size, const char *name) {
   if (lstat(name, &st) == 0 && S_ISLNK(st.st_mode))
     return HTS_FALSE;
 #endif
-  return slprintfbuff(file, size, "%s", name);
+  return hts_buf_printf(file, "%s", name);
 }
 
 /* Warn, naming shown, and return HTS_TRUE when file is missing beside bak or
@@ -1353,7 +1353,7 @@ static int cookie_load_file(httrackp *opt, t_cookie *cookie, const char *given,
   FILE *fp;
 
   *why = HTS_COOKIES_REWRITTEN;
-  if (!cookie_resolve(file, sizeof(file), given)) {
+  if (!cookie_resolve(HTS_BUF(file), given)) {
     hts_log_print(opt, LOG_WARNING,
                   "Cookies: %s is a symbolic link to a missing file, so it "
                   "is left unchanged",
@@ -1544,7 +1544,7 @@ static int cookie_commit(httrackp *opt, t_cookie *cookie, const char *file,
                          const char *bak, const char *name) {
   char tmp[CATBUFF_SIZE];
 
-  if (!cookie_tmpname(tmp, sizeof(tmp), file)) {
+  if (!cookie_tmpname(HTS_BUF(tmp), file)) {
     hts_log_print(opt, LOG_WARNING,
                   "Cookies: cannot rewrite %s because its name is too long",
                   name);
@@ -1584,7 +1584,7 @@ static int cookie_save_to(httrackp *opt, t_cookie *cookie, const char *name,
   char file[CATBUFF_SIZE];
   char bak[CATBUFF_SIZE];
 
-  if (!cookie_resolve(file, sizeof(file), fconv(bak, sizeof(bak), name))) {
+  if (!cookie_resolve(HTS_BUF(file), fconv(bak, sizeof(bak), name))) {
     hts_log_print(opt, LOG_WARNING,
                   "Cookies: cannot rewrite %s, because it is a symbolic link "
                   "to a missing file",

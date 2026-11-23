@@ -248,7 +248,7 @@ static int host_ascii_case(const char *host, size_t len, size_t size,
     src = buf;
   }
   memcpy(before, buf, sizeof(buf));
-  if (hts_host_to_ascii(buf, size, src, len) != (want != NULL) ||
+  if (hts_host_to_ascii(hts_buf_at(buf, size), src, len) != (want != NULL) ||
       (want != NULL && strcmp(buf, want) != 0) ||
       (want == NULL && memcmp(buf, before, sizeof(buf)) != 0)) {
     printf("host-ascii: '%s' (%u bytes into %u) gave '%s'\n", host,
@@ -381,7 +381,8 @@ static void entity_sweep_one(const entity_ref *refs, const size_t n,
     /* the caller maps U+00A0 to a space */
     snprintf(want, sizeof(want), " ");
   } else {
-    const size_t len = hts_writeUTF8(hit->cp, want, sizeof(want) - 1);
+    const size_t len =
+        hts_writeUTF8(hit->cp, HTS_BUF_N(want, sizeof(want) - 1));
 
     want[len] = '\0';
   }
@@ -559,9 +560,11 @@ static int st_utf8_strict(httrackp *opt, int argc, char **argv) {
     const hts_boolean ok = cp <= 0x10ffff && (cp < 0xd800 || cp > 0xdfff);
     hts_UCS4 back = 0;
 
-    n = hts_writeUTF8(cp, buf, sizeof(buf));
+    n = hts_writeUTF8(cp, HTS_BUF(buf));
+    // n bytes leave no room for the caller's NUL
     if ((n != 0) != ok ||
-        (ok && (hts_readUTF8(buf, n, &back) != n || back != cp))) {
+        (ok && (hts_readUTF8(buf, n, &back) != n || back != cp ||
+                hts_writeUTF8(cp, hts_buf_at(buf, n)) != 0))) {
       printf("utf8-strict: U+%X wrote %u bytes\n", (unsigned) cp, (unsigned) n);
       return 1;
     }
