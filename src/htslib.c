@@ -3803,12 +3803,12 @@ const char *jump_normalized_const(const char *source) {
 static int sortNormFnc(const void *a_, const void *b_) {
   const hts_query_field *const a = (const hts_query_field *) a_;
   const hts_query_field *const b = (const hts_query_field *) b_;
-  const size_t n = a->len < b->len ? a->len : b->len;
-  const int c = memcmp(a->key, b->key, n);
+  const size_t n = a->all.len < b->all.len ? a->all.len : b->all.len;
+  const int c = memcmp(a->all.p, b->all.p, n);
 
   if (c != 0)
     return c;
-  return a->len < b->len ? -1 : a->len > b->len ? 1 : 0;
+  return a->all.len < b->all.len ? -1 : a->all.len > b->all.len ? 1 : 0;
 }
 
 /* Path normalizer core: optionally collapse redundant '//' (DO_SLASH) and/or
@@ -3862,7 +3862,7 @@ static char *fil_normalized_ex(const char *source, char *dest, int do_slash,
       cb = htsbuff_ptr(copyBuff, qLen + 1);
       for (i = 0; i < nfields; i++) {
         htsbuff_catc(&cb, i == 0 ? '?' : '&');
-        htsbuff_catn(&cb, fields[i].key, fields[i].len);
+        htsbuff_catn(&cb, fields[i].all.p, fields[i].all.len);
       }
       assertf(cb.len == qLen);
       strlcpybuff(query, copyBuff, qLen + 1);
@@ -3880,15 +3880,13 @@ char *fil_normalized(const char *source, char *dest) {
 }
 
 /* see htscore.h */
-hts_boolean hts_query_key_stripped(const char *arg, size_t keylen,
-                                   const char *strip) {
+hts_boolean hts_query_key_stripped(hts_span key, const char *strip) {
   hts_span rest = hts_span_of(strip);
   hts_span tok;
 
   while (hts_span_next_in(&rest, ',', &tok)) {
     tok = hts_span_trim(tok, " ", " ");
-    if (hts_span_eq(tok, hts_span_of("*")) ||
-        hts_span_eq(tok, hts_span_at(arg, keylen)))
+    if (hts_span_eq(tok, hts_span_of("*")) || hts_span_eq(tok, key))
       return HTS_TRUE;
   }
   return HTS_FALSE;
@@ -3918,9 +3916,9 @@ char *fil_normalized_filtered_ex(const char *source, char *dest,
 
     htsbuff_catn(&cb, source, (size_t) (query - source));
     for (cur = query + 1; hts_query_next(&cur, &f);) {
-      if (!hts_query_key_stripped(f.key, f.keylen, strip)) {
+      if (!hts_query_key_stripped(f.key, strip)) {
         htsbuff_catc(&cb, wrote ? '&' : '?');
-        htsbuff_catn(&cb, f.key, f.len);
+        htsbuff_catn(&cb, f.all.p, f.all.len);
         wrote = 1;
       }
     }

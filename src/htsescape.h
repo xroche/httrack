@@ -36,6 +36,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsencoding.h"
 #include "htsstrings.h"
+#include "htsurlport.h"
 
 /* Decode form-urlencoded 's' into 'tempo': "%%" is '%', '+' is space, and a
    bad escape stays literal. */
@@ -48,11 +49,9 @@ extern void hts_unescapeini(const char *s, String *tempo);
 /* This holds one "key[=value]" field of an '&'-separated query. The spans
    point into the query and are not NUL-terminated. */
 typedef struct hts_query_field {
-  const char *key;
-  size_t keylen;
-  const char *val; /* NULL when the field has no '=' */
-  size_t vallen;   /* 0 when val is NULL */
-  size_t len;      /* the whole field: key, '=' and value */
+  hts_span key;
+  hts_span val; /* absent (NULL, 0) when the field has no '=' */
+  hts_span all; /* the whole field: key, '=' and value */
 } hts_query_field;
 
 /* Reads the next '&'-separated field at *cur, empty fields included. The key

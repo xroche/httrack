@@ -91,22 +91,22 @@ hts_boolean hts_query_next(const char **cur, hts_query_field *field) {
   if (p == NULL) {
     return HTS_FALSE;
   }
-  field->key = p;
+  field->all.p = field->key.p = p;
   while (*p != '\0' && *p != '&') {
     if (eq == NULL && *p == '=') {
       eq = p;
     }
     p++;
   }
-  field->len = (size_t) (p - field->key);
+  field->all.len = (size_t) (p - field->all.p);
   if (eq != NULL) {
-    field->keylen = (size_t) (eq - field->key);
-    field->val = eq + 1;
-    field->vallen = (size_t) (p - field->val);
+    field->key.len = (size_t) (eq - field->key.p);
+    field->val.p = eq + 1;
+    field->val.len = (size_t) (p - field->val.p);
   } else {
-    field->keylen = field->len;
-    field->val = NULL;
-    field->vallen = 0;
+    field->key.len = field->all.len;
+    field->val.p = NULL;
+    field->val.len = 0;
   }
   *cur = *p == '&' ? p + 1 : NULL;
   return HTS_TRUE;
@@ -114,12 +114,11 @@ hts_boolean hts_query_next(const char **cur, hts_query_field *field) {
 
 hts_boolean hts_query_find(const char *query, const char *name,
                            hts_query_field *field) {
-  const size_t namelen = strlen(name);
+  const hts_span key = hts_span_of(name);
   const char *cur = query;
 
   while (hts_query_next(&cur, field)) {
-    if (field->val != NULL && field->keylen == namelen &&
-        strncmp(field->key, name, namelen) == 0) {
+    if (field->val.p != NULL && hts_span_eq(field->key, key)) {
       return HTS_TRUE;
     }
   }
