@@ -3983,7 +3983,8 @@ static int st_bufwrite(httrackp *opt, int argc, char **argv) {
 }
 
 /* Print what a span primitive reads as [bytes], for next|nextsep|nextin|split C
-   TEXT, trim L R TEXT, copy SIZE TEXT, or header|headersplit TEXT. */
+   TEXT, param C BLANKS TEXT, trim L R TEXT, copy SIZE TEXT, or
+   header|headersplit TEXT. */
 static int st_span(httrackp *opt, int argc, char **argv) {
   String out = STRING_EMPTY;
   hts_span s, a, b;
@@ -4031,6 +4032,30 @@ static int st_span(httrackp *opt, int argc, char **argv) {
     } else {
       StringCat(out, "none");
     }
+  } else if (strcmp(argv[0], "param") == 0) {
+    /* param SEP BLANKS TEXT: each field shows as [name=value], or [name] with
+       no value. A "hex:" text keeps its CRs, which Windows text-mode stdin
+       folds. */
+    char text[256];
+    const size_t n = st_decode_body(argv[argc - 1], text, sizeof(text));
+
+    if (argc < 4 || n + 1 >= sizeof(text)) {
+      fprintf(stderr, "span: param takes SEP BLANKS TEXT, below 255 bytes\n");
+      StringFree(out);
+      return 1;
+    }
+    for (s = hts_span_at(text, n);
+         hts_param_next(&s, argv[1][0], argv[2], &a, &b);) {
+      StringAddchar(out, '[');
+      span_add_visible(&out, a.p, a.len);
+      if (hts_span_present(b)) {
+        StringAddchar(out, '=');
+        span_add_visible(&out, b.p, b.len);
+      }
+      StringAddchar(out, ']');
+    }
+    if (s.p != text + n)
+      StringCat(out, " BADEND");
   } else if (strcmp(argv[0], "header") == 0) {
     /* Each line shows as [line|name|value], then what stopped the walk. A
        "hex:" text keeps its CRLFs, which Windows text-mode stdin folds. */
@@ -5572,7 +5597,8 @@ const struct selftest_entry selftests_lib[] = {
     {"bufwrite", "[cpy|cat|catn|unterminated[-cpy|-catn]]",
      "the hts_buf write helpers copy, append, clip and print in bounds",
      st_bufwrite},
-    {"span", "<next|nextsep|split|trim|copy|header|headersplit> [args] <text>",
+    {"span",
+     "<next|nextsep|split|param|trim|copy|header|headersplit> [args] <text>",
      "the fields and copies the span primitive makes", st_span},
     {"spancmp", "", "span compares read a NUL as a byte and fold only A-Z",
      st_spancmp},
