@@ -14,8 +14,8 @@ custom-header-diff: OK" custom-header-diff
 
 selftest_queue '[HTTP/1.1 200 OK||][A : b |A|b][ folded||][C:d|C|d] rest=E: f' \
     span header $'HTTP/1.1 200 OK\r\nA : b \r\n folded\r\nC:d\r\n\r\nE: f'
-# only one CR goes before the LF
-selftest_queue '[x\r||][y||] rest=' span header $'x\r\r\ny'
+# only one CR goes before the LF, in hex because Windows stdin folds CRLF
+selftest_queue '[x\r||][y||] rest=' span header hex:780d0d0a79
 selftest_queue '[a:|a|][b||] rest=' span header $'a:\nb'
 selftest_queue ' rest=X: y' span header $'\r\nX: y'
 

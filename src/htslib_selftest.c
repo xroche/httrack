@@ -4017,8 +4017,12 @@ static int st_span(httrackp *opt, int argc, char **argv) {
       StringCat(out, "none");
     }
   } else if (strcmp(argv[0], "header") == 0) {
-    /* Each line shows as [line|name|value], then what stopped the walk. */
+    /* Each line shows as [line|name|value], then what stopped the walk. A
+       "hex:" text keeps its CRLFs, which Windows text-mode stdin folds. */
+    char text[256];
     hts_header_field f;
+
+    s = hts_span_at(text, st_decode_body(argv[argc - 1], text, sizeof(text)));
 
     while (hts_header_next(&s, &f)) {
       StringAddchar(out, '[');
