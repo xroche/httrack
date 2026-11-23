@@ -3734,6 +3734,8 @@ const char *url_nologin_r(char *buf, size_t size, const char *url) {
 }
 
 const char *adr_nologin(httrackp *opt, const char *adr) {
+  if (adr == NULL) // treathead() logs a cookie its caller gave no URL for
+    return "";
   if (!has_login(adr))
     return adr;
   // no buffer to mask into: drop the whole login

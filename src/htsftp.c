@@ -1390,7 +1390,8 @@ int send_line(T_SOC soc, const char *data) {
   n = snprintf(line, sizeof(line), "%s\x0d\x0a", data);
   if (n < 0 || n >= (int) sizeof(line))
     return 0;
-  if (check_socket_connect(soc) != 1) {
+  // check_socket_connect() refuses it too, but the analyzer does not follow it
+  if (!hts_soc_selectable(soc) || check_socket_connect(soc) != 1) {
 #if FTP_DEBUG
     printf("!SOC WRITE ERROR\n");
 #endif
@@ -1422,6 +1423,12 @@ int get_ftp_line(lien_back *back, T_SOC soc, char *ptrline, size_t line_size,
   data[0] = '\0';
   i = ok = multiline = 0;
   data[3] = '\0';
+  // wait_socket_receive() refuses it too, but the analyzer does not follow it
+  if (!hts_soc_selectable(soc)) {
+    if (ptrline)
+      snprintf(ptrline, line_size, "500 *read error");
+    return 0;
+  }
   do {
     char b;
 

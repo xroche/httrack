@@ -49,7 +49,7 @@ status=0
     >"$reportdir/scan.log" 2>&1 || status=$?
 summary=$(verdict "$reportdir/scan.log")
 grep -E 'warning: .*\[[a-zA-Z]+\.[a-zA-Z.]+\]$' "$reportdir/scan.log" |
-    grep -v -e "^$srcdir/src/coucal/" -e "^$srcdir/src/minizip/" || true
+    grep -v -E "(^|/)(coucal|minizip)/" || true
 echo "${summary:-scan-build printed no verdict}"
 if test -z "$summary"; then
     tail -50 "$reportdir/scan.log"

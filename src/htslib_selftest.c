@@ -1771,6 +1771,10 @@ static int nologin_rows(httrackp *opt) {
     fprintf(stderr, "nologin: a NULL opt kept the login\n");
     err = 1;
   }
+  if (strcmp(adr_nologin(opt, NULL), "") != 0) {
+    fprintf(stderr, "nologin: a NULL address did not read as empty\n");
+    err = 1;
+  }
   return err;
 }
 

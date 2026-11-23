@@ -155,6 +155,8 @@ static int wbuf_reserve(wbuf *b, size_t n) {
 
 /* Append n bytes; returns 0 on success, -1 on OOM/overflow. */
 static int wbuf_add(wbuf *b, const void *p, size_t n) {
+  if (n == 0) /* an empty source may be NULL, and memcpy forbids that */
+    return 0;
   if (wbuf_reserve(b, n) != 0)
     return -1;
   memcpy(b->data + b->len, p, n);

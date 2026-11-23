@@ -678,14 +678,13 @@ static hts_boolean cookie_is_expiry(const char *s) {
 static int64_t cookie_record_expiry(const char *rec) {
   char buffer[8192];
   const char *const field = cookie_get(buffer, sizeof(buffer), rec, 4);
-  const size_t ndigits = strspn(field, "0123456789");
   int64_t when = 0;
   size_t i;
 
   if (!cookie_is_number(field))
     return 0;
   // saturate rather than overflow on a hand-edited value
-  for (i = 0; i < ndigits && when < INT64_MAX / 10 - 9; i++)
+  for (i = 0; field[i] != '\0' && when < INT64_MAX / 10 - 9; i++)
     when = when * 10 + (field[i] - '0');
   return when;
 }
