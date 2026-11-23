@@ -417,10 +417,9 @@ static int socks5_credentials(httrackp *opt, const char *proxy_name, char *user,
   char userinfo[1024];
   char *colon;
 
-  if (a <= astart || (size_t) (a - astart) - 1 >= sizeof(userinfo))
+  if (a <= astart ||
+      !hts_buf_put_span(HTS_BUF(userinfo), hts_span_between(astart, a - 1)))
     return socks5_fail(msg, msgsize, "SOCKS5: credentials too long");
-  userinfo[0] = '\0';
-  strncatbuff(userinfo, astart, (int) (a - astart) - 1);
   colon = strchr(userinfo, ':');
   if (colon != NULL)
     *colon++ = '\0';

@@ -325,7 +325,7 @@ static hts_boolean sf_resolve(const sf_ctx *ctx, const char *base_dir,
     if (r.p[n] == '#' || r.p[n] == '?')
       break;
   }
-  if (n == 0 || n >= sizeof(raw))
+  if (n == 0)
     return HTS_FALSE;
   /* Site-root-relative: no base to resolve it against. */
   if (sf_is_sep((unsigned char) r.p[0]))
@@ -339,8 +339,8 @@ static hts_boolean sf_resolve(const sf_ctx *ctx, const char *base_dir,
         (!hts_isalnum((unsigned char) c) && c != '+' && c != '.' && c != '-'))
       break;
   }
-  memcpy(raw, r.p, n);
-  raw[n] = '\0';
+  if (!hts_buf_put_span(HTS_BUF(raw), hts_span_at(r.p, n)))
+    return HTS_FALSE;
   unescape_amp(raw); /* HTML entities first, then the percent escapes */
   unescape_http(decoded, sizeof(decoded), raw);
   if (decoded[0] == '\0')

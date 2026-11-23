@@ -483,13 +483,10 @@ static hts_dns_status hts_dns_resolve_nocache_list(const char *const hostname,
     return res->status;
   }
   if ((hostname[0] == '[') && (hts_lastchar(hostname) == ']')) {
-    size_t size = strlen(hostname);
-    char *copy = malloct(size + 1);
+    char *copy = hts_span_dup(hts_span_at(hostname + 1, strlen(hostname) - 2));
     hts_dns_status st;
 
     assertf(copy != NULL);
-    copy[0] = '\0';
-    strncat(copy, hostname + 1, size - 2);
     st = hts_dns_resolve_nocache_list_(copy, res);
     freet(copy);
     return st;

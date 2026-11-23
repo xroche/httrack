@@ -470,16 +470,14 @@ hts_boolean hts_scan_token(char **ptr, char *dest, size_t destsize) {
   char *a = *ptr;
   /* the token's real length, which may exceed the room */
   const size_t len = strcspn(a, HTS_REALSPACES);
-  size_t kept;
+  hts_boolean fit;
 
   assertf(destsize != 0);
-  kept = len < destsize ? len : destsize - 1;
-  memcpy(dest, a, kept);
-  dest[kept] = '\0';
+  fit = hts_span_copy(hts_span_at(a, len), dest, destsize);
   a += len;
   a += strspn(a, HTS_REALSPACES);
   *ptr = a;
-  return len < destsize ? HTS_TRUE : HTS_FALSE;
+  return fit;
 }
 
 /* Read the 16-bit code unit at byte offset 'i' of 'src'. */
@@ -744,10 +742,8 @@ static hts_boolean filter_rule_decode_(const char *rule, char *dest,
   const size_t plen = (size_t) (query - rule);
   size_t len;
 
-  if (plen >= sizeof(path))
+  if (!hts_buf_put_span(HTS_BUF(path), hts_span_at(rule, plen)))
     return HTS_FALSE;
-  memcpy(path, rule, plen);
-  path[plen] = '\0';
   len = strlen(unescape_http_unharm(dec, sizeof(dec), path, 1 | 2));
   if (strlen(query) >= size || len >= size - strlen(query))
     return HTS_FALSE;
@@ -1300,12 +1296,13 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
     if (opt->accept_cookie && strnotempty(StringBuff(opt->cookies_file))) {
       char BIGSTK start_url[HTS_URLMAXSIZE * 2];
       const size_t first = strcspn(primary, "\n");
+      const char *const seed =
+          hts_buf_put_span(HTS_BUF(start_url), hts_span_at(primary, first))
+              ? start_url
+              : "";
 
-      start_url[0] = '\0';
-      if (first < sizeof(start_url))
-        strlncatbuff(start_url, primary, sizeof(start_url), first);
       cookies_file_refused = cookie_load_from(
-          opt, opt->cookie, "", StringBuff(opt->cookies_file), start_url);
+          opt, opt->cookie, "", StringBuff(opt->cookies_file), seed);
     }
 
     // bundle url lines join the start URLs, and bundle cookies go to the jar
@@ -1337,12 +1334,11 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
       const char *const eol = strchr(primary, '\n');
       const size_t len = eol != NULL ? (size_t) (eol - primary) : 0;
 
-      first[0] = '\0';
-      if (len > 0 && len < sizeof(first)) {
-        memcpy(first, primary, len);
-        first[len] = '\0';
-      }
-      hts_sitemap_seed(opt, first);
+      const char *const seed =
+          hts_buf_put_span(HTS_BUF(first), hts_span_at(primary, len)) ? first
+                                                                      : "";
+
+      hts_sitemap_seed(opt, seed);
     }
 
     // Initialiser cache

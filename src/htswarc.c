@@ -1745,14 +1745,10 @@ int warc_write_transaction(warc_writer *w, const char *target_uri,
       is_revisit = 1;
       profile =
           "http://netpreserve.org/warc/1.1/revisit/identical-payload-digest";
-      if (sep != NULL) {
-        size_t n = (size_t) (sep - slot);
-        if (n < sizeof(refers_buf)) {
-          memcpy(refers_buf, slot, n);
-          refers_buf[n] = '\0';
-          refers_uri = refers_buf;
-          refers_date = sep + 1;
-        }
+      if (sep != NULL &&
+          hts_buf_put_span(HTS_BUF(refers_buf), hts_span_between(slot, sep))) {
+        refers_uri = refers_buf;
+        refers_date = sep + 1;
       }
     }
   }

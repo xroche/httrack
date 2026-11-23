@@ -144,6 +144,9 @@ HTS_CHECK_RESULT hts_boolean hts_span_list_has(hts_span list, char sep,
 HTS_CHECK_RESULT hts_boolean hts_span_list_last(hts_span list, char sep,
                                                 hts_span *last);
 
+/* A malloct'ed copy of S as a C string, or NULL when out of memory. */
+HTS_CHECK_RESULT char *hts_span_dup(hts_span s);
+
 /* Is S one or more decimal digits? */
 HTS_CHECK_RESULT hts_boolean hts_span_is_digits(hts_span s);
 

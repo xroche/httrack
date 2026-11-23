@@ -205,7 +205,6 @@ void hts_wizard_prompt_url(char *dst, size_t dstsize, const char *adr,
 HTSEXT_API hts_boolean hts_wizard_host_scope(const char *question, int k,
                                              char *dst, size_t dstsize) {
   const char *host, *port, *slash, *end, *scope;
-  size_t len;
 
   if (dst == NULL || dstsize == 0)
     return HTS_FALSE;
@@ -244,12 +243,8 @@ HTSEXT_API hts_boolean hts_wizard_host_scope(const char *question, int k,
   if (memchr(scope, '.', (size_t) (slash - scope)) == NULL)
     return HTS_FALSE;
 
-  len = (size_t) (end - scope);
-  if (len >= dstsize)
-    return HTS_FALSE;
-  memcpy(dst, scope, len);
-  dst[len] = '\0';
-  return HTS_TRUE;
+  return hts_buf_put_span(hts_buf_at(dst, dstsize),
+                          hts_span_between(scope, end));
 }
 
 hts_tristate hts_wizard_scope_answer(int n) {
@@ -457,11 +452,7 @@ static hts_boolean travel_host(const char *adr, char *dst, size_t size) {
 
   if (port != NULL && port >= host && (size_t) (port - host) < len)
     len = (size_t) (port - host);
-  if (len >= size)
-    return HTS_FALSE;
-  memcpy(dst, host, len);
-  dst[len] = '\0';
-  return HTS_TRUE;
+  return hts_buf_put_span(hts_buf_at(dst, size), hts_span_at(host, len));
 }
 
 /* The last two labels of host with their leading dot, or NULL. */
