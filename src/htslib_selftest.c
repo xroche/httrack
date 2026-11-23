@@ -3914,8 +3914,13 @@ static void span_add_visible(String *out, const char *p, size_t len) {
   }
 }
 
-/* buf [tail-overrun]: the sizes HTS_BUF, HTS_BUF_N and hts_buf_skip give.
-   tail-overrun takes a tail with no byte left, which must abort. */
+/* N if P is WANT, for checking what HTS_SIZED passes. */
+static size_t st_sized(const char *p, size_t n, const char *want) {
+  return p == want ? n : 0;
+}
+
+/* buf [tail-overrun]: the sizes HTS_BUF, HTS_BUF_N, HTS_SIZED and hts_buf_skip
+   give. tail-overrun takes a tail with no byte left, which must abort. */
 static int st_buf(httrackp *opt, int argc, char **argv) {
   struct {
     char f[7];
@@ -3932,7 +3937,8 @@ static int st_buf(httrackp *opt, int argc, char **argv) {
     (void) hts_buf_skip(b, b.size);
   if (b.p != a || b.size != sizeof(a) || HTS_BUF(st.f).p != st.f ||
       HTS_BUF(st.f).size != 7 || HTS_BUF_N(st.g, 64).size != 64 ||
-      HTS_BUF_N(a, 1).p != a || HTS_BUF_N(a, 1).size != 1) {
+      HTS_BUF_N(a, 1).p != a || HTS_BUF_N(a, 1).size != 1 ||
+      st_sized(HTS_SIZED(a), a) != 32 || st_sized(HTS_SIZED(st.f), st.f) != 7) {
     printf("buf: wrong array size\n");
     bad = 1;
   }
@@ -4031,6 +4037,17 @@ static int st_bufwrite(httrackp *opt, int argc, char **argv) {
   memset(big, 'Z', sizeof(big));
   bad |=
       hts_buf_put_span(hts_buf_at(big, 0), hts_span_at("", 0)) || big[0] != 'Z';
+  /* put_span_clip: a misfit keeps its first size - 1 bytes */
+  memset(big, 'Y', sizeof(big));
+  bad |= !hts_buf_put_span_clip(b, hts_span_at("abcdefgh", 5)) ||
+         strcmp(big, "abcde") != 0 || big[6] != 'Y';
+  memset(big, 'Z', sizeof(big));
+  bad |= hts_buf_put_span_clip(b, hts_span_at("abcdefgh", 6)) ||
+         strcmp(big, "abcde") != 0 || big[6] != 'Z';
+  memset(big, 'Z', sizeof(big));
+  bad |= hts_buf_put_span_clip(hts_buf_at(big, 0), hts_span_at("a", 1)) ||
+         hts_buf_put_span_clip(hts_buf_at(big, 0), hts_span_at("", 0)) ||
+         big[0] != 'Z';
   /* hts_span_dup copies exactly the span, including an inner NUL. */
   {
     char *d = hts_span_dup(hts_span_at("ab\0cdef", 4));
