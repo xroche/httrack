@@ -38,27 +38,47 @@ Please visit our Website: http://www.httrack.com
 
 static hts_boolean is_decimal_digit(char c) { return c >= '0' && c <= '9'; }
 
-hts_boolean hts_parse_llint(const char *s, const char **end, LLint min,
-                            LLint max, LLint *out) {
-  const char *p;
-  LLint value = 0;
-  hts_boolean fits = HTS_TRUE;
+hts_boolean hts_span_is_digits(hts_span s) {
+  size_t i;
 
-  for (p = s; is_decimal_digit(*p); p++) {
-    const int digit = *p - '0';
+  if (hts_span_empty(s))
+    return HTS_FALSE;
+  for (i = 0; i < s.len; i++) {
+    if (!is_decimal_digit(s.p[i]))
+      return HTS_FALSE;
+  }
+  return HTS_TRUE;
+}
+
+hts_boolean hts_span_parse_llint(hts_span s, LLint min, LLint max, LLint *out) {
+  LLint value = 0;
+  size_t i;
+
+  if (hts_span_empty(s))
+    return HTS_FALSE;
+  for (i = 0; i < s.len; i++) {
+    const int digit = s.p[i] - '0';
 
     // Checked before the multiply, so value * 10 + digit never passes max.
-    if (!fits || digit > max || value > (max - digit) / 10)
-      fits = HTS_FALSE;
-    else
-      value = value * 10 + digit;
+    if (!is_decimal_digit(s.p[i]) || digit > max || value > (max - digit) / 10)
+      return HTS_FALSE;
+    value = value * 10 + digit;
   }
-  if (end != NULL)
-    *end = p;
-  if (p == s || !fits || value < min)
+  if (value < min)
     return HTS_FALSE;
   *out = value;
   return HTS_TRUE;
+}
+
+hts_boolean hts_parse_llint(const char *s, const char **end, LLint min,
+                            LLint max, LLint *out) {
+  const char *p = s;
+
+  while (is_decimal_digit(*p))
+    p++;
+  if (end != NULL)
+    *end = p;
+  return hts_span_parse_llint(hts_span_between(s, p), min, max, out);
 }
 
 hts_scan_result hts_scan_llint(const char **s, LLint min, LLint max,
