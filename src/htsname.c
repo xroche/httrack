@@ -466,7 +466,7 @@ hts_boolean url_query_value(const char *url, const char *name, char *dst,
     return HTS_FALSE;
   }
   /* crawled query text: clip it */
-  (void) hts_span_copy(hts_span_at(f.val, f.vallen), dst, size);
+  (void) hts_span_copy(f.val, dst, size);
   return HTS_TRUE;
 }
 

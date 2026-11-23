@@ -49,4 +49,15 @@ selftest_queue "[$(repeat_chars 255 x)]" queryparam "/p?id=$(repeat_chars 300 x)
 selftest_queue_lines "querysweep: 160336 cases, 0 failures
 querysweep: OK" querysweep
 
+# Keys match case-sensitively, so A=1 is skipped.
+selftest_queue "[2]" queryparam "/p?A=1&a=2" a
+
+# The dedup key sorts whole fields, puts a prefix first, and drops stripped
+# keys.
+selftest_queue "[/p?a&a=2&ab=1]" normfil "/p?ab=1&a=2&a"
+selftest_queue "[/d/p?&a&b]" normfil "/d//p?b&&a"
+selftest_queue "[/p?a=1&bb]" normfil "/p?sid=x&a=1&b=2&bb" "sid, b"
+# The sort reads past the key, so "12" sorts before "=".
+selftest_queue "[/p?12&=]" normfil "/p?=&12"
+
 selftest_run_queued

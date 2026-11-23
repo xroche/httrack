@@ -1332,10 +1332,9 @@ char *fil_normalized_filtered_ex(const char *source, char *dest,
 const char *hts_query_strip_keys(const char *rules, const char *adr,
                                  const char *fil, char *dest, size_t destsize);
 
-/* Is the key ARG[0..KEYLEN) in the comma list STRIP? Tokens are space-trimmed
-   and case-sensitive, and "*" matches any key. */
-hts_boolean hts_query_key_stripped(const char *arg, size_t keylen,
-                                   const char *strip);
+/* Is KEY in the comma list STRIP? Tokens are space-trimmed and
+   case-sensitive, and "*" matches any key. */
+hts_boolean hts_query_key_stripped(hts_span key, const char *strip);
 
 /* Return the canonical host (length *CANONLEN) of the last RULES entry whose
    aliases match HOST or FULL ("scheme://host"), or NULL. COLLAPSE_WWW ignores

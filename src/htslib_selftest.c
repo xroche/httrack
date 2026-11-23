@@ -3279,19 +3279,34 @@ static int st_querynext(httrackp *opt, int argc, char **argv) {
   }
   for (cur = argc == 1 ? argv[0] : ""; hts_query_next(&cur, &f);) {
     StringAddchar(out, '[');
-    StringMemcat(out, f.key, f.keylen);
-    if (f.val != NULL) {
+    StringMemcat(out, f.key.p, f.key.len);
+    bad |= f.whole.p != f.key.p;
+    if (hts_span_present(f.val)) {
       StringAddchar(out, '|');
-      StringMemcat(out, f.val, f.vallen);
-      bad |= f.len != f.keylen + 1 + f.vallen || f.val != f.key + f.keylen + 1;
+      StringMemcat(out, f.val.p, f.val.len);
+      bad |= f.whole.len != f.key.len + 1 + f.val.len ||
+             f.val.p != f.key.p + f.key.len + 1;
     } else {
-      bad |= f.len != f.keylen || f.vallen != 0;
+      bad |= f.whole.len != f.key.len || f.val.len != 0;
     }
     StringAddchar(out, ']');
   }
   printf("%s%s\n", StringBuff(out), bad ? " BADLEN" : "");
   StringFree(out);
   return bad;
+}
+
+/* Prints fil_normalized_filtered() of argv[0], stripping argv[1]'s keys. */
+static int st_normfil(httrackp *opt, int argc, char **argv) {
+  char dest[HTS_URLMAXSIZE * 2];
+
+  if (argc < 1 || argc > 2 || strlen(argv[0]) >= HTS_URLMAXSIZE) {
+    fprintf(stderr, "normfil: takes a path and an optional strip list\n");
+    return 1;
+  }
+  printf("[%s]\n",
+         fil_normalized_filtered(argv[0], dest, argc == 2 ? argv[1] : NULL));
+  return 0;
 }
 
 /* This is the old --strip-query rule matcher. */
@@ -3563,7 +3578,7 @@ static void spandiff_one(parsediff_stats *st, const char *rules,
 
   for (i = 0; keys[i] != NULL; i++) {
     st->cases++;
-    if (hts_query_key_stripped(keys[i], strlen(keys[i]), rules) !=
+    if (hts_query_key_stripped(hts_span_of(keys[i]), rules) !=
         (legacy_hts_query_key_stripped(keys[i], strlen(keys[i]), rules) != 0))
       parsediff_fail(st, "hts_query_key_stripped", rules, keys[i], "", "");
   }
@@ -5547,6 +5562,8 @@ const struct selftest_entry selftests_lib[] = {
      st_querysweep},
     {"querynext", "[query]", "the fields the shared query iterator reads",
      st_querynext},
+    {"normfil", "<path> [strip]", "the dedup key of a path, query sorted",
+     st_normfil},
     {"spandiff", "",
      "the span iterator matches the rule-list parsers it replaced",
      st_spandiff},

@@ -38,10 +38,10 @@ page_sid() {
     firstline "$(get "$1" /server/index.html |
         sed -n 's/.*name="sid" value="\([0-9a-f]*\)".*/\1/p')"
 }
-# A farewell as the page sends one: a POST holding that id.
+# A farewell as the page sends one: a POST holding that id. $4 replaces the verb.
 bye() {
     "${HTS_PYTHON}" "${testdir}/httpclient.py" --port "$1" \
-        --path "/ping?w=$2&t=${RANDOM}&e=bye" --field "sid=$3" >/dev/null
+        --path "/ping?w=$2&t=${RANDOM}&e=${4:-bye}" --field "sid=$3" >/dev/null
 }
 
 # Wait up to $2 seconds for $1 to go away.
@@ -92,13 +92,15 @@ kill -0 "${bye_pid}" 2>/dev/null ||
     fail "closing one window ended a session another window still had open"
 
 # 3. An unsigned farewell must not end the session, because any local page
-# can send /ping. Only a heartbeat may go unproven.
+# can send /ping. Only a heartbeat may go unproven. A verb that only starts
+# with "bye" is no farewell either.
 ping "${bye_port}" w2 e=bye
+bye "${bye_port}" w2 "${sid}" bye-x
 w2_at=${SECONDS}
 sleep $((grace + 2))
 still_in_window "${w2_at}" "the unsigned goodbye and its grace"
 kill -0 "${bye_pid}" 2>/dev/null ||
-    fail "an unauthenticated goodbye ended the session"
+    fail "an unsigned or misspelt goodbye ended the session"
 
 # 4. A flood of window ids must not evict a real window. w2 holds one of
 # sixteen slots, so two of the seventeen ids are refused.

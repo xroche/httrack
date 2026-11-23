@@ -593,15 +593,15 @@ static hts_boolean query_alnum_value(char *dst, size_t size, const char *query,
   if (!hts_query_find(query, name, &f)) {
     return HTS_FALSE;
   }
-  while (n < f.vallen && n + 1 < size &&
-         hts_isalnum((unsigned char) f.val[n])) {
-    dst[n] = f.val[n];
+  while (n < f.val.len && n + 1 < size &&
+         hts_isalnum((unsigned char) f.val.p[n])) {
+    dst[n] = f.val.p[n];
     n++;
   }
   dst[n] = '\0';
   /* Truncated, or not alphanumeric to its end, is no value at all: it must
      not reach a caller that trusted the return. */
-  if (n > 0 && n == f.vallen) {
+  if (n > 0 && n == f.val.len) {
     return HTS_TRUE;
   }
   dst[0] = '\0';
@@ -618,11 +618,11 @@ static hts_boolean body_sid_is_valid(const char *body, const char *expected) {
   hts_boolean seen = HTS_FALSE;
 
   while (hts_query_next(&cur, &f)) {
-    if (f.val != NULL && f.keylen == 3 && strncmp(f.key, "sid", 3) == 0) {
+    if (hts_span_present(f.val) && hts_span_eq(f.key, hts_span_of("sid"))) {
       hts_boolean match = HTS_FALSE;
       char raw[SID_VALUE_MAX];
 
-      if (hts_buf_put_span(HTS_BUF(raw), hts_span_at(f.val, f.vallen))) {
+      if (hts_buf_put_span(HTS_BUF(raw), f.val)) {
         String value = STRING_EMPTY;
 
         hts_unescapehttp(raw, &value);
@@ -1757,14 +1757,14 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
         memset(&login, 0, sizeof(login));
         /* A field without '=' has no value to store, so it is skipped. */
         while (hts_query_next(&cur, &f)) {
-          if (f.val != NULL) {
-            char *const key = buffer + (f.key - buffer);
-            const char *ua = key + f.keylen + 1;
+          if (hts_span_present(f.val)) {
+            char *const key = buffer + (f.key.p - buffer);
+            const char *ua = key + f.key.len + 1;
             String sua = STRING_EMPTY;
 
             /* Both ends are a separator or the NUL, already walked past. */
-            key[f.keylen] = '\0';
-            key[f.len] = '\0';
+            key[f.key.len] = '\0';
+            key[f.whole.len] = '\0';
             if (strfield2(ua, "on")) /* hack : "on" == 1 */
               ua = "1";
             hts_unescapehttp(ua, &sua);
