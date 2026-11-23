@@ -110,8 +110,8 @@ typedef enum {
   HTS_FOOTER_FIELD_COUNT
 } hts_footer_field_id;
 
-// Join the field names as "{addr} {path} ..." into buffer (it aborts if they
-// do not fit) and return it. Internal on purpose: hts_footer_field_ok() is the
+// Join the field names as "{addr} {path} ..." into buffer and return it. It
+// aborts if they do not fit. Internal on purpose: hts_footer_field_ok() is the
 // exported surface, and a predicate cannot list.
 const char *hts_footer_field_list(hts_buf buffer);
 

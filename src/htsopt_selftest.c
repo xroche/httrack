@@ -482,7 +482,7 @@ static int st_upperlinksnote(httrackp *opt, int argc, char **argv) {
                       strstr(note, "-B") == NULL);
   /* a short buffer clips the note, and an empty one is left alone */
   ST_FAIL_IF(err, !hts_upper_links_note(to, HTS_BUF_N(note, 8)) ||
-                      strlen(note) != 7);
+                      strlen(note) != 7 || strncmp(note, "Some li", 7) != 0);
   strcpybuff(note, "stale");
   ST_FAIL_IF(err, hts_upper_links_note(to, HTS_BUF_N(note, 0)) ||
                       strcmp(note, "stale") != 0);

@@ -408,6 +408,7 @@ static void basic_selftests(void) {
     {
       char save[] = "longfilename.html";
 
+      // exact fit: 12 chars + NUL
       longfile_to_83(1, HTS_BUF_N(n83, sizeof("LONGFILE.HTM")), save);
       assertf(strcmp(n83, "LONGFILE.HTM") == 0);
     }

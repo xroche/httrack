@@ -601,14 +601,14 @@ static int hts_acceptlink_(httrackp *opt, int ptr, const char *adr,
       // problème: si un fichier est virtuellement accessible via une page mais dont le lien est sur une autre *uniquement*..
       char BIGSTK tempo[HTS_URLMAXSIZE * 2];
       char BIGSTK tempo2[HTS_URLMAXSIZE * 2];
+      const char *const primary_fil = heap(heap(ptr)->premier)->fil;
 
       tempo[0] = tempo2[0] = '\0';
 
       // note (up/down): on calcule à partir du lien primaire, ET du lien précédent.
       // ex: si on descend 2 fois on peut remonter 1 fois
 
-      if (lienrelatif(HTS_BUF(tempo), fil, heap(heap(ptr)->premier)->fil) ==
-          0) {
+      if (lienrelatif(HTS_BUF(tempo), fil, primary_fil) == 0) {
         if (lienrelatif(HTS_BUF(tempo2), fil, heap(ptr)->fil) == 0) {
           hts_log_print(opt, LOG_DEBUG,
                         "build relative links to test: %s %s (with %s and %s)",
