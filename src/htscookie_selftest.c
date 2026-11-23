@@ -1182,7 +1182,7 @@ static int st_cookieimport(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* Compare cookie_get with a frozen copy. */
+/* Compare cookie_get and cookie_field with a frozen copy. */
 
 #define COOKIEDIFF_SIZE 8192
 
@@ -1227,6 +1227,7 @@ static const char *legacy_cookie_get(char *buffer, const char *cookie_base,
 /* Both getters run on canary-filled buffers, which must come out equal. */
 static void cookiediff_one(parsediff_stats *st, const char *line, char *o,
                            char *n) {
+  hts_span field;
   int param;
 
   for (param = -2; param <= 8; param++) {
@@ -1238,7 +1239,9 @@ static void cookiediff_one(parsediff_stats *st, const char *line, char *o,
     st->cases++;
     ro = legacy_cookie_get(o, line, param);
     rn = cookie_get(n, COOKIEDIFF_SIZE, line, param);
-    if ((ro == o) != (rn == n) || memcmp(o, n, COOKIEDIFF_SIZE) != 0) {
+    field = cookie_field(line, param);
+    if ((ro == o) != (rn == n) || memcmp(o, n, COOKIEDIFF_SIZE) != 0 ||
+        !hts_span_eq(field, hts_span_of(ro))) {
       snprintf(arg, sizeof(arg), "%d", param);
       parsediff_fail(st, "cookie_get", line, arg, ro, rn);
     }
@@ -1268,11 +1271,14 @@ static int st_cookiespandiff(httrackp *opt, int argc, char **argv) {
                                      "a b\tc d",
                                      "h\tTRUE\t/\tFALSE\t0\tn\tv",
                                      "h\tTRUE\t/\tFALSE\t0\tn\tv\n",
+                                     "a\tb\0c\td",
+                                     "a\tb\r\tc\r",
                                      NULL};
   static const char *const alphabet[] = {"a", "\t",   "\n", "\r", "bc",
                                          " ", "\t\t", "/",  "x"};
   /* A field one byte under the 8192-byte buffer still fits. */
   static const size_t lengths[] = {8190, 8191};
+  static const size_t long_lengths[] = {8192, 9000};
   parsediff_stats st = {0, 0};
   char *o = malloct(COOKIEDIFF_SIZE);
   char *n = malloct(COOKIEDIFF_SIZE);
@@ -1302,6 +1308,27 @@ static int st_cookiespandiff(httrackp *opt, int argc, char **argv) {
                      sizeof(alphabet) / sizeof(alphabet[0]), 16);
     cookiediff_one(&st, StringBuff(line) != NULL ? StringBuff(line) : "", o, n);
     StringFree(line);
+  }
+  /* The frozen copy aborts past its buffer, so a longer field is checked
+     against its own bytes: whole in the view, clipped by cookie_get. */
+  for (i = 0; i < sizeof(long_lengths) / sizeof(long_lengths[0]); i++) {
+    char *run = parsediff_run('x', long_lengths[i]);
+    String line = STRING_EMPTY;
+    hts_span field;
+
+    StringCat(line, "a\t");
+    StringCat(line, run);
+    StringCat(line, "\tb");
+    field = cookie_field(StringBuff(line), 1);
+    st.cases++;
+    if (!hts_span_eq(field, hts_span_of(run)) ||
+        strlen(cookie_get(n, COOKIEDIFF_SIZE, StringBuff(line), 1)) !=
+            COOKIEDIFF_SIZE - 1 ||
+        strncmp(n, run, COOKIEDIFF_SIZE - 1) != 0 ||
+        !hts_span_eq(cookie_field(StringBuff(line), 2), hts_span_of("b")))
+      parsediff_fail(&st, "cookie_field", "a\t<run>\tb", "1", run, n);
+    StringFree(line);
+    freet(run);
   }
   freet(o);
   freet(n);
