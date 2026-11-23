@@ -151,7 +151,7 @@ const char *hts_self_path(char *dst, size_t dstsize) {
 
 /* Directory part of path, trailing '/' kept, or NULL when it carries none: a
    bare name came from a PATH lookup and locates nothing. */
-static const char *dirname_of(char *dst, size_t dstsize, const char *path) {
+static const char *dirname_of(hts_buf dst, const char *path) {
   char catbuff[CATBUFF_SIZE];
   const char *slashed, *sep;
   size_t len;
@@ -162,12 +162,10 @@ static const char *dirname_of(char *dst, size_t dstsize, const char *path) {
   if ((sep = strrchr(slashed, '/')) == NULL)
     return NULL;
   len = (size_t) (sep - slashed) + 1;
-  return hts_buf_put_span(hts_buf_at(dst, dstsize), hts_span_at(slashed, len))
-             ? dst
-             : NULL;
+  return hts_buf_put_span(dst, hts_span_at(slashed, len)) ? dst.p : NULL;
 }
 
-void hts_resolve_datadir(char *dst, size_t dstsize, const char *selfpath,
+void hts_resolve_datadir(hts_buf dst, const char *selfpath,
                          const char *builtin) {
   /* An installed tree that was moved, then a flat one with templates/ beside
      the binary. */
@@ -177,22 +175,19 @@ void hts_resolve_datadir(char *dst, size_t dstsize, const char *selfpath,
   const char *fallback;
 
   if (!datadir_has_templates(builtin)) {
-    base = dirname_of(exedir, sizeof(exedir), selfpath);
+    base = dirname_of(HTS_BUF(exedir), selfpath);
   }
   if (base != NULL) {
     size_t i;
 
     for (i = 0; i < sizeof(layout) / sizeof(layout[0]); i++) {
       char cand[HTS_URLMAXSIZE * 2];
-      /* snprintf, not the strlncatbuff idiom: appending to a non-empty buffer
-         aborts on overflow, and a long enough argv[0] reaches it. */
-      const int n = snprintf(cand, sizeof(cand), "%s%s", base, layout[i]);
 
-      if (n < 0 || (size_t) n >= sizeof(cand)) {
-        continue; /* truncated, so not the path we meant to probe */
-      }
+      /* A long argv[0] can overflow cand, and a clipped path is no probe. */
+      if (!hts_buf_printf(HTS_BUF(cand), "%s%s", base, layout[i]))
+        continue;
       if (datadir_has_templates(cand)) {
-        snprintf(dst, dstsize, "%s", cand);
+        hts_buf_cpy_clip(dst, cand);
         return;
       }
     }
@@ -202,7 +197,7 @@ void hts_resolve_datadir(char *dst, size_t dstsize, const char *selfpath,
   fallback = (builtin != NULL && *builtin != '\0') ? builtin
              : (base != NULL)                      ? base
                                                    : "";
-  snprintf(dst, dstsize, "%s", fallback);
+  hts_buf_cpy_clip(dst, fallback);
 }
 
 /* Append CMD's arguments to the pending request, each behind a space, ending
@@ -782,7 +777,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
     if (self == NULL && argc > 0) {
       self = argv[0];
     }
-    hts_resolve_datadir(datadir, sizeof(datadir), self, builtin);
+    hts_resolve_datadir(HTS_BUF(datadir), self, builtin);
     StringCopy(opt->path_bin, datadir);
   }
 
@@ -3013,8 +3008,8 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
       char BIGSTK looping[HTS_URLMAXSIZE * 2];
 
       if (hts_host_alias_looping(hts_host_alias_rules(opt),
-                                 hts_host_alias_collapse_www(opt), looping,
-                                 sizeof(looping)) != NULL) {
+                                 hts_host_alias_collapse_www(opt),
+                                 HTS_BUF(looping)) != NULL) {
         hts_log_print(opt, LOG_WARNING,
                       "* host-alias rules for '%s' point in a circle: those "
                       "hosts are left alone, point them all at one host",

@@ -598,15 +598,15 @@ hts_boolean get_userhttptype(httrackp *opt, char *s, size_t ssize,
 
 // give the file extension for a mime type (e.g. "image/gif" -> "gif")
 // returns 1 if an extension was found (and written to s), 0 otherwise
-int give_mimext(char *s, size_t ssize, const char *st) {
+int give_mimext(hts_buf s, const char *st) {
   int ok = 0;
   const char *ext;
 
   st = hts_effective_mime(st); /* no declared type: derive an html ext */
-  s[0] = '\0';
+  s.p[0] = '\0';
   ext = hts_mime_find(0, st);
   if (ext != NULL) {
-    strlcpybuff(s, ext, ssize);
+    hts_buf_cpy(s, ext);
     ok = 1;
   }
   // wrap "x" mimetypes, such as:
@@ -624,7 +624,7 @@ int give_mimext(char *s, size_t ssize, const char *st) {
     if (a) {
       if ((int) strlen(a) >= 1) {
         if ((int) strlen(a) <= 4) {
-          strlcpybuff(s, a, ssize);
+          hts_buf_cpy(s, a);
           ok = 1;
         }
       }
@@ -719,8 +719,7 @@ static int may_bogus_multiple(httrackp *opt, const char *mime,
                   mime)) { /* found mime type in suspicious list */
       char ext[64];
 
-      if (give_mimext(ext, sizeof(ext),
-                      mime)) { /* we have an extension for that */
+      if (give_mimext(HTS_BUF(ext), mime)) { /* we have an extension for that */
         const size_t ext_size = strlen(ext);
         const char *file = strrchr(filename, '/'); /* fetch terminal filename */
 

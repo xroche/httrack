@@ -44,6 +44,7 @@ typedef enum hts_browser_family {
 
 #include "htsglobal.h"
 #include "htsopt.h"
+#include "htsbuf.h"
 
 /* A destination the parser cannot name stays UNKNOWN, because a wrong value
    can draw a 403 where none passes. */
@@ -122,8 +123,7 @@ const char *hts_fetch_site_name(int site);
 
 /* Write the "scheme://host[:port]" origin of adr into dst. Return HTS_FALSE
    when the host holds a byte a header line cannot carry or dst is too small. */
-HTS_CHECK_RESULT hts_boolean hts_fetch_origin(const char *adr, char *dst,
-                                              size_t size);
+HTS_CHECK_RESULT hts_boolean hts_fetch_origin(const char *adr, hts_buf dst);
 
 /* httrack sends this Accept when neither -%a nor a browser table names one. */
 #define HTS_ACCEPT_LEGACY                                                      \

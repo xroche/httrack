@@ -124,7 +124,7 @@ static int st_sniname(httrackp *opt, int argc, char **argv) {
   for (i = 0; i < argc; i++) {
     char host[256];
 
-    if (hts_sni_hostname(argv[i], host, sizeof(host)))
+    if (hts_sni_hostname(argv[i], HTS_BUF(host)))
       printf("sni=%s\n", host);
     else
       printf("sni=none\n");

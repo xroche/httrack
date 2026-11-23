@@ -36,7 +36,7 @@ Please visit our Website: http://www.httrack.com
 static int st_refname(httrackp *opt, int argc, char **argv) {
   char name[64];
 
-  if (!url_savename_refname(argv[0], argv[1], name, sizeof(name)))
+  if (!url_savename_refname(argv[0], argv[1], HTS_BUF(name)))
     return 1;
   printf("refname=%s\n", name);
   return 0;
@@ -1353,9 +1353,9 @@ static int st_hostalias(httrackp *opt, int argc, char **argv) {
                "d.com") == 0);
     assertf(hts_host_alias(wwwchain, dest, HTS_TRUE, again, sizeof(again)) ==
             NULL);
-    assertf(hts_host_alias_looping(chain, HTS_TRUE, looping, sizeof(looping)) ==
+    assertf(hts_host_alias_looping(chain, HTS_TRUE, HTS_BUF(looping)) ==
             NULL);
-    assertf(hts_host_alias_looping(rules, HTS_TRUE, looping, sizeof(looping)) ==
+    assertf(hts_host_alias_looping(rules, HTS_TRUE, HTS_BUF(looping)) ==
             NULL);
 
     /* rules pointing in a circle name no canonical host: leave them alone */
@@ -1366,8 +1366,7 @@ static int st_hostalias(httrackp *opt, int argc, char **argv) {
               NULL);
       assertf(hts_host_alias(loop, "b.com", HTS_TRUE, dest, sizeof(dest)) ==
               NULL);
-      assertf(strcmp(hts_host_alias_looping(loop, HTS_TRUE, looping,
-                                            sizeof(looping)),
+      assertf(strcmp(hts_host_alias_looping(loop, HTS_TRUE, HTS_BUF(looping)),
                      "b.com") == 0);
     }
   }
@@ -2132,7 +2131,7 @@ static int st_name_sized(httrackp *opt, int argc, char **argv) {
   (void) opt;
   (void) argc;
   (void) argv;
-  if (!url_savename_refname("www.example.com", "/", want, sizeof(want)) ||
+  if (!url_savename_refname("www.example.com", "/", HTS_BUF(want)) ||
       strlen(want) != strlen(CACHE_REFNAME "/") + 32 + strlen(".ref")) {
     printf("name-sized: refname is '%s'\n", want);
     return 1;
@@ -2141,14 +2140,14 @@ static int st_name_sized(httrackp *opt, int argc, char **argv) {
     const size_t mcap = mcaps[k];
     char *buf = st_sized_alloc(mcap);
 
-    if (url_md5(buf, mcap, "/p?a=1") != buf ||
+    if (url_md5(hts_buf_at(buf, mcap), "/p?a=1") != buf ||
         !st_sized_clip_ok(buf, mcap, md5)) {
       printf("name-sized: url_md5 into %u bytes is '%.*s'\n", (unsigned) mcap,
              (int) mcap, buf);
       fail = 1;
     }
     buf[0] = 'Q';
-    if (url_md5(buf, mcap, "/p") != buf || !st_sized_clip_ok(buf, mcap, "")) {
+    if (url_md5(hts_buf_at(buf, mcap), "/p") != buf || !st_sized_clip_ok(buf, mcap, "")) {
       printf("name-sized: url_md5 without a query into %u bytes\n",
              (unsigned) mcap);
       fail = 1;
@@ -2165,7 +2164,7 @@ static int st_name_sized(httrackp *opt, int argc, char **argv) {
       hts_boolean fit, ok;
 
       buf[0] = 'Q'; /* so a refusal must clear it */
-      fit = url_savename_refname("www.example.com", "/", buf, rcap);
+      fit = url_savename_refname("www.example.com", "/", hts_buf_at(buf, rcap));
       if (rcap == len + 1)
         ok = fit && strcmp(buf, want) == 0;
       else

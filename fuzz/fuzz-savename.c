@@ -78,7 +78,7 @@ static void fuzz_line(const char *line, httrackp *opt, cache_back *cache,
   {
     char refname[HTS_URLMAXSIZE * 2];
 
-    if (url_savename_refname(afs.af.adr, afs.af.fil, refname, sizeof(refname)))
+    if (url_savename_refname(afs.af.adr, afs.af.fil, HTS_BUF(refname)))
       savename_sink += (unsigned long) strlen(refname);
   }
 
@@ -123,7 +123,7 @@ static void fuzz_line(const char *line, httrackp *opt, cache_back *cache,
     char digest[32 + 1];
 
     savename_sink +=
-        (unsigned long) strlen(url_md5(digest, sizeof(digest), afs.af.fil));
+        (unsigned long) strlen(url_md5(HTS_BUF(digest), afs.af.fil));
   }
 }
 

@@ -1287,7 +1287,7 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
                 : NULL;
         char origin[HTS_URLMAXSIZE * 2];
 
-        if (from != NULL && hts_fetch_origin(from, origin, sizeof(origin)) &&
+        if (from != NULL && hts_fetch_origin(from, HTS_BUF(origin)) &&
             (family == HTS_BROWSER_CHROME ||
              hts_fetch_site_of(from, adr) != HTS_FETCH_SITE_SAME_ORIGIN)) {
           HDR_OPEN(HDR_ORIGIN);
@@ -3330,7 +3330,7 @@ void time_rfc822(char *s, size_t size, struct tm *A) {
 
     assertf(localtime_returned_null);
   }
-  hts_format_rfc822(s, size, A, " GMT");
+  hts_format_rfc822(hts_buf_at(s, size), A, " GMT");
 }
 
 // Writes A as an RFC 822 date in local time.
@@ -3340,7 +3340,7 @@ static void time_rfc822_local(char *s, size_t size, struct tm *A) {
 
     assertf(localtime_returned_null);
   }
-  hts_format_rfc822(s, size, A, "");
+  hts_format_rfc822(hts_buf_at(s, size), A, "");
 }
 
 // conversion en b,Kb,Mb
@@ -4238,10 +4238,10 @@ HTSEXT_API hts_boolean hts_host_alias_rule_ok(const char *rule) {
 
 /* see htscore.h */
 const char *hts_host_alias_looping(const char *rules, hts_boolean collapse_www,
-                                   char *dest, size_t destsize) {
+                                   hts_buf dest) {
   hts_span rest, line, aliases, target;
 
-  if (rules == NULL || destsize == 0)
+  if (rules == NULL || dest.size == 0)
     return NULL;
   rest = hts_span_of(rules);
   while (hts_span_next_in(&rest, '\n', &line)) {
@@ -4254,10 +4254,10 @@ const char *hts_host_alias_looping(const char *rules, hts_boolean collapse_www,
     (void) hts_host_alias_resolve(rules, canon, collapse_www, tmp, sizeof(tmp),
                                   &settled);
     if (!settled) {
-      if (strlen(canon) >= destsize)
+      if (strlen(canon) >= dest.size)
         continue; /* Skip a name that does not fit. */
-      strlcpybuff(dest, canon, destsize);
-      return dest;
+      hts_buf_cpy(dest, canon);
+      return dest.p;
     }
   }
   return NULL;
@@ -4305,16 +4305,16 @@ int hts_basic_auth_value(httrackp *opt, const char *url, char *out,
   return 1;
 }
 
-hts_boolean hts_sni_hostname(const char *url_adr, char *out, size_t size) {
+hts_boolean hts_sni_hostname(const char *url_adr, hts_buf out) {
   hts_url_view v;
 
   (void) hts_url_view_parse(url_adr, strlen(url_adr), &v);
-  out[0] = '\0';
+  out.p[0] = '\0';
   if (hts_span_empty(v.host) ||
       hts_span_starts_with(v.host, hts_span_of("[")) ||
       hts_host_is_ipv4(v.host.p, v.host.len))
     return HTS_FALSE;
-  return hts_buf_put_span(hts_buf_at(out, size), v.host);
+  return hts_buf_put_span(out, v.host);
 }
 
 #if HTS_USEOPENSSL
@@ -4333,7 +4333,7 @@ hts_boolean hts_ssl_check_cert(SSL *ssl, const char *url_adr) {
   hts_mutexrelease(&ssl_ca_lock);
   if (state != 1 || param == NULL)
     return HTS_FALSE;
-  if (hts_sni_hostname(url_adr, name, sizeof(name))) {
+  if (hts_sni_hostname(url_adr, HTS_BUF(name))) {
     const size_t len = strlen(name);
 
     /* certificates name "host", never the absolute "host." */
@@ -5222,9 +5222,8 @@ int hts_read(htsblk * r, char *buff, int size) {
 
 // cut path and project name
 // patch also initial path
-void cut_path(char *fullpath, char *path, size_t path_size, char *pname,
-              size_t pname_size) {
-  path[0] = pname[0] = '\0';
+void cut_path(char *fullpath, hts_buf path, hts_buf pname) {
+  path.p[0] = pname.p[0] = '\0';
   if (strnotempty(fullpath)) {
     if (!hts_striplastchar(fullpath, '/'))
       hts_striplastchar(fullpath, '\\');
@@ -5238,8 +5237,8 @@ void cut_path(char *fullpath, char *path, size_t path_size, char *pname,
         a--;
       if (*a == '/')
         a++;
-      strlcpybuff(pname, a, pname_size);
-      strlncatbuff(path, fullpath, path_size, (size_t) (a - fullpath));
+      hts_buf_cpy(pname, a);
+      hts_buf_catn(path, fullpath, (size_t) (a - fullpath));
     }
   }
 }

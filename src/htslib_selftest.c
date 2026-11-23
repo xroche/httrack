@@ -215,26 +215,26 @@ static void basic_selftests(void) {
   {
     char ext[16];
 
-    assertf(give_mimext(ext, sizeof(ext), "image/gif") == 1);
+    assertf(give_mimext(HTS_BUF(ext), "image/gif") == 1);
     assertf(strcmp(ext, "gif") == 0);
-    assertf(give_mimext(ext, sizeof(ext), "text/html") == 1);
+    assertf(give_mimext(HTS_BUF(ext), "text/html") == 1);
     assertf(strcmp(ext, "html") == 0);
-    assertf(give_mimext(ext, sizeof(ext), "no/such-mime-type") == 0);
+    assertf(give_mimext(HTS_BUF(ext), "no/such-mime-type") == 0);
     assertf(ext[0] == '\0');
     // modern web formats -> extension. Avoid MIME types the
     // application/<=4-char-subtype fallback could fabricate without a row.
-    assertf(give_mimext(ext, sizeof(ext), "image/webp") == 1);
+    assertf(give_mimext(HTS_BUF(ext), "image/webp") == 1);
     assertf(strcmp(ext, "webp") == 0);
-    assertf(give_mimext(ext, sizeof(ext), "application/manifest+json") == 1);
+    assertf(give_mimext(HTS_BUF(ext), "application/manifest+json") == 1);
     assertf(strcmp(ext, "webmanifest") == 0);
-    assertf(give_mimext(ext, sizeof(ext), "font/woff2") == 1);
+    assertf(give_mimext(HTS_BUF(ext), "font/woff2") == 1);
     assertf(strcmp(ext, "woff2") == 0);
   }
   // convtolower(): lower-cases into the caller buffer (bounded by its size).
   {
     char low[64];
 
-    assertf(strcmp(convtolower(low, sizeof(low), "ABC/Def.HTML"),
+    assertf(strcmp(convtolower(HTS_BUF(low), "ABC/Def.HTML"),
                    "abc/def.html") == 0);
   }
   // cut_path(): splits a path into directory (with trailing '/') and basename,
@@ -246,21 +246,21 @@ static void basic_selftests(void) {
     {
       char full[] = "/dir/sub/file.html";
 
-      cut_path(full, path, sizeof(path), pname, sizeof(pname));
+      cut_path(full, HTS_BUF(path), HTS_BUF(pname));
       assertf(strcmp(path, "/dir/sub/") == 0);
       assertf(strcmp(pname, "file.html") == 0);
     }
     { // a trailing slash is trimmed before the split
       char full[] = "/dir/sub/";
 
-      cut_path(full, path, sizeof(path), pname, sizeof(pname));
+      cut_path(full, HTS_BUF(path), HTS_BUF(pname));
       assertf(strcmp(path, "/dir/") == 0);
       assertf(strcmp(pname, "sub") == 0);
     }
     { // a path of length <= 1 yields empty results
       char full[] = "/";
 
-      cut_path(full, path, sizeof(path), pname, sizeof(pname));
+      cut_path(full, HTS_BUF(path), HTS_BUF(pname));
       assertf(path[0] == '\0' && pname[0] == '\0');
     }
   }
@@ -3690,7 +3690,7 @@ static void spandiff_one(parsediff_stats *st, const char *rules,
       memset(n, 'O', sizeof(n));
       st->cases++;
       ro = legacy_hts_host_alias_looping(rules, www, o, sizes[j]);
-      rn = hts_host_alias_looping(rules, www, n, sizes[j]);
+      rn = hts_host_alias_looping(rules, www, hts_buf_at(n, sizes[j]));
       if ((ro == NULL) != (rn == NULL) || (rn != NULL && rn != n) ||
           memcmp(o, n, sizeof(o)) != 0)
         parsediff_fail(st, "hts_host_alias_looping", rules, "",
