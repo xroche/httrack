@@ -3280,14 +3280,14 @@ static int st_querynext(httrackp *opt, int argc, char **argv) {
   for (cur = argc == 1 ? argv[0] : ""; hts_query_next(&cur, &f);) {
     StringAddchar(out, '[');
     StringMemcat(out, f.key.p, f.key.len);
-    bad |= f.all.p != f.key.p;
+    bad |= f.whole.p != f.key.p;
     if (hts_span_present(f.val)) {
       StringAddchar(out, '|');
       StringMemcat(out, f.val.p, f.val.len);
-      bad |= f.all.len != f.key.len + 1 + f.val.len ||
+      bad |= f.whole.len != f.key.len + 1 + f.val.len ||
              f.val.p != f.key.p + f.key.len + 1;
     } else {
-      bad |= f.all.len != f.key.len || f.val.len != 0;
+      bad |= f.whole.len != f.key.len || f.val.len != 0;
     }
     StringAddchar(out, ']');
   }
@@ -3296,8 +3296,8 @@ static int st_querynext(httrackp *opt, int argc, char **argv) {
   return bad;
 }
 
-/* Prints the dedup key fil_normalized_filtered() makes of argv[0], minus the
-   keys in the optional strip list argv[1], as [key]. */
+/* Prints fil_normalized_filtered() of argv[0], stripping the keys in argv[1].
+ */
 static int st_normfil(httrackp *opt, int argc, char **argv) {
   char dest[HTS_URLMAXSIZE * 2];
 

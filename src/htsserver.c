@@ -1764,7 +1764,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 
             /* Both ends are a separator or the NUL, already walked past. */
             key[f.key.len] = '\0';
-            key[f.all.len] = '\0';
+            key[f.whole.len] = '\0';
             if (strfield2(ua, "on")) /* hack : "on" == 1 */
               ua = "1";
             hts_unescapehttp(ua, &sua);

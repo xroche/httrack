@@ -3803,12 +3803,12 @@ const char *jump_normalized_const(const char *source) {
 static int sortNormFnc(const void *a_, const void *b_) {
   const hts_query_field *const a = (const hts_query_field *) a_;
   const hts_query_field *const b = (const hts_query_field *) b_;
-  const size_t n = a->all.len < b->all.len ? a->all.len : b->all.len;
-  const int c = memcmp(a->all.p, b->all.p, n);
+  const size_t n = a->whole.len < b->whole.len ? a->whole.len : b->whole.len;
+  const int c = memcmp(a->whole.p, b->whole.p, n);
 
   if (c != 0)
     return c;
-  return a->all.len < b->all.len ? -1 : a->all.len > b->all.len ? 1 : 0;
+  return a->whole.len < b->whole.len ? -1 : a->whole.len > b->whole.len ? 1 : 0;
 }
 
 /* Path normalizer core: optionally collapse redundant '//' (DO_SLASH) and/or
@@ -3862,7 +3862,7 @@ static char *fil_normalized_ex(const char *source, char *dest, int do_slash,
       cb = htsbuff_ptr(copyBuff, qLen + 1);
       for (i = 0; i < nfields; i++) {
         htsbuff_catc(&cb, i == 0 ? '?' : '&');
-        htsbuff_catn(&cb, fields[i].all.p, fields[i].all.len);
+        htsbuff_catn(&cb, fields[i].whole.p, fields[i].whole.len);
       }
       assertf(cb.len == qLen);
       strlcpybuff(query, copyBuff, qLen + 1);
@@ -3918,7 +3918,7 @@ char *fil_normalized_filtered_ex(const char *source, char *dest,
     for (cur = query + 1; hts_query_next(&cur, &f);) {
       if (!hts_query_key_stripped(f.key, strip)) {
         htsbuff_catc(&cb, wrote ? '&' : '?');
-        htsbuff_catn(&cb, f.all.p, f.all.len);
+        htsbuff_catn(&cb, f.whole.p, f.whole.len);
         wrote = 1;
       }
     }

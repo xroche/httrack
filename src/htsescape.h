@@ -50,8 +50,8 @@ extern void hts_unescapeini(const char *s, String *tempo);
    point into the query and are not NUL-terminated. */
 typedef struct hts_query_field {
   hts_span key;
-  hts_span val; /* absent (NULL, 0) when the field has no '=' */
-  hts_span all; /* the whole field: key, '=' and value */
+  hts_span val;   /* absent (NULL, 0) when the field has no '=' */
+  hts_span whole; /* key, '=' and value */
 } hts_query_field;
 
 /* Reads the next '&'-separated field at *cur, empty fields included. The key

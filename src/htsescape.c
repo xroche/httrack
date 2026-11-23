@@ -91,20 +91,21 @@ hts_boolean hts_query_next(const char **cur, hts_query_field *field) {
   if (p == NULL) {
     return HTS_FALSE;
   }
-  field->all.p = field->key.p = p;
+  field->whole.p = p;
+  field->key.p = p;
   while (*p != '\0' && *p != '&') {
     if (eq == NULL && *p == '=') {
       eq = p;
     }
     p++;
   }
-  field->all.len = (size_t) (p - field->all.p);
+  field->whole.len = (size_t) (p - field->whole.p);
   if (eq != NULL) {
     field->key.len = (size_t) (eq - field->key.p);
     field->val.p = eq + 1;
     field->val.len = (size_t) (p - field->val.p);
   } else {
-    field->key.len = field->all.len;
+    field->key.len = field->whole.len;
     field->val.p = NULL;
     field->val.len = 0;
   }
@@ -118,7 +119,7 @@ hts_boolean hts_query_find(const char *query, const char *name,
   const char *cur = query;
 
   while (hts_query_next(&cur, field)) {
-    if (field->val.p != NULL && hts_span_eq(field->key, key)) {
+    if (hts_span_present(field->val) && hts_span_eq(field->key, key)) {
       return HTS_TRUE;
     }
   }
