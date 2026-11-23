@@ -1,0 +1,45 @@
+#!/bin/bash
+#
+# Copies made with hts_buf_put_span keep their fit limit: the longest value that
+# fits is used whole, and one byte more is refused.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+tmpdir=$(mktemp -d)
+cleanup_push rm -rf "$tmpdir"
+dir=$(nativepath "$tmpdir")
+
+h255=$(repeat_chars 255 a)
+selftest_queue "sni=$h255" sniname "http://$h255/"
+selftest_queue "sni=none" sniname "http://${h255}a/"
+
+d255=$(repeat_chars 251 a).com
+selftest_queue "$d255 $d255" regdomain "$d255"
+selftest_queue "a$d255 none" regdomain "a$d255"
+
+selftest_queue "invalid login bundle name: a Windows device name" bundlename com1
+selftest_queue "invalid login bundle name: a Windows device name" bundlename lpt9.txt
+selftest_queue "ok" bundlename comx
+
+selftest_queue "sent-replaces-earlier=4" headerverdict "host: v" "Host: w"
+selftest_queue "sent=0" headerverdict "X-$(repeat_chars 200 a): v" "X-$(repeat_chars 200 a): w"
+
+# 1024 bytes is the paste agent and address capacity, the NUL included.
+paste() { # paste NAME LINE -- write a cURL paste, its name in $in
+    printf '%s\n' "$2" >"$tmpdir/$1"
+    in="$dir/$1"
+}
+paste a1023 "curl 'https://example.com/a' -A '$(repeat_chars 1023 A)' -H 'Cookie: a=b'"
+selftest_queue_tail "agent=$(repeat_chars 1023 A)" paste "$dir/o1" "$in" dry
+paste a1024 "curl 'https://example.com/a' -A '$(repeat_chars 1024 A)' -H 'Cookie: a=b'"
+selftest_queue "refused: the user agent cannot be used" paste "$dir/o2" "$in" dry
+paste u1023 "curl 'https://example.com/$(repeat_chars 1003 p)' -H 'Cookie: a=b'"
+selftest_queue "refused: the address is longer than 1023 bytes once the bundle name is added" \
+    paste "$dir/o3" "$in" dry
+paste u1024 "curl 'https://example.com/$(repeat_chars 1004 p)' -H 'Cookie: a=b'"
+selftest_queue "refused: the address cannot be used" paste "$dir/o4" "$in" dry
+
+selftest_run_queued

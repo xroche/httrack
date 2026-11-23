@@ -124,10 +124,9 @@ static hts_boolean bundle_name_is_device(const char *name) {
   char dev[5];
   size_t i;
 
-  if (base < 3 || base > 4)
+  if (base < 3 || base > 4 ||
+      !hts_buf_put_span(HTS_BUF(dev), hts_span_at(name, base)))
     return HTS_FALSE;
-  dev[0] = '\0';
-  strlncatbuff(dev, name, sizeof(dev), base);
   hts_lowcase(dev);
   if (base == 4)
     return (strncmp(dev, "com", 3) == 0 || strncmp(dev, "lpt", 3) == 0) &&
@@ -888,10 +887,8 @@ HTSEXT_API hts_boolean hts_registrable_domain(const char *host, char *out,
   len = strlen(host);
   if (len != 0 && host[len - 1] == '.')
     len--;
-  if (len == 0 || len >= sizeof(dom))
+  if (len == 0 || !hts_buf_put_span(HTS_BUF(dom), hts_span_at(host, len)))
     return HTS_FALSE;
-  dom[0] = '\0';
-  strlncatbuff(dom, host, sizeof(dom), len);
   hts_lowcase(dom);
   if (hts_host_is_address(dom, len))
     return HTS_FALSE;
@@ -1489,10 +1486,8 @@ static hts_boolean paste_host_entry(const char *host, size_t len,
     host++;
     len--;
   }
-  if (len == 0 || len >= sizeof(given))
+  if (len == 0 || !hts_buf_put_span(HTS_BUF(given), hts_span_at(host, len)))
     return HTS_FALSE;
-  memcpy(given, host, len);
-  given[len] = '\0';
   if (!cookie_host(given, folded, sizeof(folded)))
     return HTS_FALSE;
   reg = hts_host_is_address(folded, strlen(folded))
@@ -1756,12 +1751,12 @@ static const char *paste_agent(const char **ua,
     len--;
   if (len == 0)
     return "the user agent is blank";
-  if (len >= HTS_PASTE_AGENT_SIZE || hts_bundle_has_control(s, len))
+  if (!hts_buf_put_span(hts_buf_at(buf, HTS_PASTE_AGENT_SIZE),
+                        hts_span_at(s, len)) ||
+      hts_bundle_has_control(s, len))
     return "the user agent cannot be used";
   if (paste_has_bidi(s, len))
     return "the user agent holds a text direction control";
-  buf[0] = '\0';
-  strlncatbuff(buf, s, HTS_PASTE_AGENT_SIZE, len);
   *ua = buf;
   return NULL;
 }
@@ -1861,12 +1856,11 @@ HTSEXT_API hts_boolean hts_bundle_from_paste_hosts(
   len = strcspn(url, "#");
   if (!strfield(url, "http://") && !strfield(url, "https://"))
     PASTE_FAIL("the address is not an http or https URL");
-  if (len >= sizeof(base) || hts_bundle_has_control(url, len))
+  if (!hts_buf_put_span(HTS_BUF(base), hts_span_at(url, len)) ||
+      hts_bundle_has_control(url, len))
     PASTE_FAIL("the address cannot be used");
   if (paste_has_bidi(url, len))
     PASTE_FAIL("the address holds a text direction control");
-  base[0] = '\0';
-  strlncatbuff(base, url, sizeof(base), len);
   {
     const char *const auth = strstr(base, "://") + 3;
 

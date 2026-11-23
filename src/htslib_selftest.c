@@ -3923,6 +3923,19 @@ static int st_bufwrite(httrackp *opt, int argc, char **argv) {
   memset(big, 'Y', sizeof(big));
   hts_buf_printf_clip(b, "%s", "uvwxyz");
   bad |= strcmp(big, "uvwxy") != 0 || big[6] != 'Y';
+  /* put_span: the span stops before the source's NUL, and a misfit is "" */
+  memset(big, 'Y', sizeof(big));
+  bad |= !hts_buf_put_span(b, hts_span_at("abcdefgh", 5)) ||
+         strcmp(big, "abcde") != 0 || big[6] != 'Y';
+  memset(big, 'Z', sizeof(big));
+  bad |= hts_buf_put_span(b, hts_span_at("abcdefgh", 6)) || big[0] != '\0' ||
+         big[1] != 'Z';
+  memset(big, 'Y', sizeof(big));
+  bad |= !hts_buf_put_span(b, hts_span_at("", 0)) || big[0] != '\0' ||
+         big[1] != 'Y';
+  memset(big, 'Z', sizeof(big));
+  bad |=
+      hts_buf_put_span(hts_buf_at(big, 0), hts_span_at("", 0)) || big[0] != 'Z';
   printf(bad ? "bufwrite: FAILED\n" : "bufwrite: OK\n");
   return bad;
 }
