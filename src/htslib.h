@@ -530,7 +530,7 @@ int check_writeinput_t(T_SOC soc, int timeout);
 /* TRUE if S holds no byte below ' '. A control byte in a value the
    client puts on a protocol line (an FTP command, a CONNECT authority, a
    SOCKS5 host) smuggles a line or a field of its own. */
-HTS_CHECK_RESULT hts_boolean hts_is_control_free_span(hts_span s);
+HTS_CHECK_RESULT hts_boolean hts_span_is_control_free(hts_span s);
 
 /* Same over a NUL-terminated string. */
 HTS_CHECK_RESULT hts_boolean hts_is_control_free(const char *str);

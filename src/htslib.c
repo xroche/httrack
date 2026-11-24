@@ -645,15 +645,13 @@ static hts_boolean hts_request_is_secure(const htsblk *retour) {
    match, *major is the version's first number, or -1 when the version is
    malformed. */
 static hts_boolean ua_product_is(hts_span tok, const char *name, int *major) {
-  const hts_span prefix = hts_span_of(name);
-  hts_span version, head, tail;
+  hts_span product, version, head, tail;
   LLint v;
 
-  if (tok.len <= prefix.len || !hts_span_starts_with(tok, prefix) ||
-      tok.p[prefix.len] != '/')
+  if (!hts_span_split(tok, '/', &product, &version) ||
+      !hts_span_eq(product, hts_span_of(name)))
     return HTS_FALSE;
   *major = -1;
-  version = hts_span_skip(tok, prefix.len + 1);
   if (!hts_span_split(version, '.', &head, &tail))
     head = version;
   if (hts_span_starts_with(version, hts_span_of("0")) ||
@@ -3650,7 +3648,6 @@ const char *adr_nologin_r(char *buf, size_t size, const char *adr) {
   if (!has_login(adr) || size == 0)
     return adr;
   colon = memchr(scheme, ':', (size_t) (host - scheme));
-  buf[0] = '\0';
   if (colon != NULL) {
     append_clipped(out, &len, hts_span_between(adr, colon));
     append_clipped(out, &len, hts_span_of(":***@"));
@@ -4319,9 +4316,13 @@ hts_boolean hts_ssl_check_cert(SSL *ssl, const char *url_adr) {
 
 const char *hts_authority_end(const char *s) { return s + strcspn(s, "/?#\\"); }
 
-/* jump_protocol_const() and the view both read these schemes. */
-static const char *const hts_engine_schemes[] = {
+/* jump_protocol_const() and the view both read these schemes. A scheme longer
+   than a row does not compile. */
+static const char hts_engine_schemes[][8] = {
     "http", "ftp", "https", "file", "socks5h", "socks5", "connect"};
+
+/* The most bytes an engine scheme and its ':' span. */
+#define ENGINE_SCHEME_SPAN (sizeof(hts_engine_schemes[0]) + 1)
 
 /* Return the length of the engine scheme and ':' that start S, or 0. */
 static size_t engine_scheme_len(hts_span s) {
@@ -4330,11 +4331,13 @@ static size_t engine_scheme_len(hts_span s) {
   for (i = 0; i < sizeof(hts_engine_schemes) / sizeof(hts_engine_schemes[0]);
        i++) {
     const char *const name = hts_engine_schemes[i];
+    const size_t n = sizeof(hts_engine_schemes[i]);
     size_t j;
 
-    for (j = 0; name[j] != '\0' && j < s.len && streql(s.p[j], name[j]); j++)
+    for (j = 0;
+         j < n && name[j] != '\0' && j < s.len && streql(s.p[j], name[j]); j++)
       ;
-    if (name[j] == '\0' && j < s.len && s.p[j] == ':')
+    if ((j == n || name[j] == '\0') && j < s.len && s.p[j] == ':')
       return j + 1;
   }
   return 0;
@@ -4457,9 +4460,8 @@ const char *strrchr_limit(const char *s, char c, const char *limit) {
 // Returns source past its engine scheme and "//", if any.
 const char *jump_protocol_const(const char *source) {
   // "Comparisons of scheme names MUST be case-insensitive" (RFC2616)
-  // a scheme and its ':' fit in sizeof("socks5h:") - 1 bytes
   source += engine_scheme_len(
-      hts_span_at(source, strnlen(source, sizeof("socks5h:") - 1)));
+      hts_span_at(source, strnlen(source, ENGINE_SCHEME_SPAN)));
   // net_path
   if (strncmp(source, "//", 2) == 0)
     source += 2;
@@ -4468,7 +4470,7 @@ const char *jump_protocol_const(const char *source) {
 
 DECLARE_NON_CONST_VERSION(jump_protocol)
 
-hts_boolean hts_is_control_free_span(hts_span s) {
+hts_boolean hts_span_is_control_free(hts_span s) {
   size_t i;
 
   for (i = 0; i < s.len; i++) {
@@ -4479,7 +4481,7 @@ hts_boolean hts_is_control_free_span(hts_span s) {
 }
 
 hts_boolean hts_is_control_free(const char *str) {
-  return hts_is_control_free_span(hts_span_of(str));
+  return hts_span_is_control_free(hts_span_of(str));
 }
 
 hts_boolean hts_host_is_ipv4(hts_span host) {

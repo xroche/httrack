@@ -4387,6 +4387,12 @@ static int st_spanindex(httrackp *opt, int argc, char **argv) {
       failures++;
     }
   }
+  {
+    unsigned int map[256];
+
+    map_characters(hts_span_at("\0\xff\xff", 3), map);
+    assertf(map[0] == 1 && map[255] == 2);
+  }
   printf("spanindex: %d cases, %d failures\n",
          (int) (sizeof(cases) / sizeof(cases[0])), (int) failures);
   if (failures == 0)
