@@ -1315,11 +1315,12 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
     }
 
     // lien primaire
-    if (!hts_record_link(opt, "primary", "/primary",
-                        fslash(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                        fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                        StringBuff(opt->path_html_utf8), "index.html")),
-                        "", "", NULL)) {
+    if (!hts_record_link(
+            opt, "primary", "/primary",
+            fslash(OPT_GET_HTS_BUF(opt),
+                   fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                           StringBuff(opt->path_html_utf8), "index.html")),
+            "", "", NULL)) {
       freet(primary);
       XH_extuninit;             // désallocation mémoire & buffers
       return 0;
@@ -3141,9 +3142,9 @@ int filecreateempty(filenote_strc * strc, const char *filename) {
 void hts_savename_listed(const char *root, const char *s, hts_buf dest) {
   char catbuff[CATBUFF_SIZE];
 
-  hts_buf_cpy(dest, fslash(catbuff, sizeof(catbuff), s));
-  if (strnotempty(root) && strncmp(fslash(catbuff, sizeof(catbuff), root),
-                                   dest.p, strlen(root)) == 0) {
+  hts_buf_cpy(dest, fslash(HTS_BUF(catbuff), s));
+  if (strnotempty(root) &&
+      strncmp(fslash(HTS_BUF(catbuff), root), dest.p, strlen(root)) == 0) {
     hts_buf_cpy(dest, s + strlen(root));
   }
 }

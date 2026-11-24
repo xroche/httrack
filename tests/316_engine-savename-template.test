@@ -57,6 +57,11 @@ selftest_queue "savename: /dev/null/http/$host/dir/page.html" savename \
     '/dir/page.html' text/html "adr=$host" 'userdef=%r/%H%p/%N'
 selftest_queue "savename: /dev/null/$host/dir/longpage.htm" savename \
     '/dir/longpagename.html' text/html "adr=$host" 'userdef=%h%p/%sN'
+selftest_queue "savename: /dev/null/$host/dir/page%.html" savename \
+    '/dir/page.html' text/html "adr=$host" 'userdef=%h%p/%n%%.%t'
+# Template text past tmpltail[] is clipped one byte at a time, never overrun.
+selftest_queue_head 'savename: /dev/null/bbbbbbbb' savename '/dir/page.html' \
+    text/html "adr=$host" 'userdef=%h%p/%n*.%t' tplpad=2100 padunit=b
 # An extensionless link takes the type's extension.
 selftest_queue "savename: /dev/null/$host/dir/page.html" savename \
     '/dir/page' text/html "adr=$host" 'userdef=%h%p/%N'

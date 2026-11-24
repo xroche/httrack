@@ -232,8 +232,8 @@ int hts_unescapeEntitiesWithCharsetSpecial(const char *src, char *dest,
   return 0;
 }
 
-int hts_unescapeEntities(const char *src, char *dest, const size_t max) {
-  return hts_unescapeEntitiesWithCharset(src, dest, max, "UTF-8");
+int hts_unescapeEntities(const char *src, hts_buf dest) {
+  return hts_unescapeEntitiesWithCharset(src, dest.p, dest.size, "UTF-8");
 }
 
 int hts_unescapeUrlSpecial(const char *src, char *dest, const size_t max,

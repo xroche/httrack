@@ -269,14 +269,12 @@ hts_boolean is_dyntype(hts_span ext);
    and a built-in keep-list of commonly mislabeled types), else 0. */
 hts_boolean may_unknown(httrackp *opt, const char *st);
 
-/** Copy @p a into @p catbuff, converting every '\\' to '/' on all platforms. */
-char *fslash(char *catbuff, size_t size, const char *a);
+/** Copy @p a into @p dst, converting every '\\' to '/' on all platforms. */
+char *fslash(hts_buf dst, const char *a);
 
 /** Set the process-global debug verbosity (0 is off); higher levels log more to
     stderr. Bit 0x80 redirects debug output to "hts-debug.txt". */
 void hts_debug(int level);
-
-#define fslash(A, B, C) (COMPILE_TIME_CHECK_SIZE(B), fslash(A, B, C))
 
 #define READ_ERROR (-1)
 #define READ_EOF (-2)
@@ -292,6 +290,8 @@ HTS_STATIC char *getHtsOptBuff_(httrackp *opt) {
 
 #define OPT_GET_BUFF(OPT)      ( getHtsOptBuff_(OPT) )
 #define OPT_GET_BUFF_SIZE(OPT) ( sizeof(opt->state.concat.buff[0]) )
+#define OPT_GET_HTS_BUF(OPT)                                                   \
+  hts_buf_at(OPT_GET_BUFF(OPT), OPT_GET_BUFF_SIZE(OPT))
 
 // cache pour le dns, pour éviter de faire des gethostbyname sans arrêt
 #ifndef HTS_DEF_FWSTRUCT_t_dnscache
