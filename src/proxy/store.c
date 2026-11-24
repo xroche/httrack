@@ -2535,9 +2535,9 @@ typedef struct PT_SaveCache__Arc_t {
   char md5[32 + 2];
 } PT_SaveCache__Arc_t;
 
-/* Append src to an .arc header block of capacity size, clipping what does not
-   fit: the values come from a cache entry, so shortening beats dropping it.
-   HTS_FALSE when it had to clip. */
+/* Append src to an .arc header block of capacity headers.size, clipping what
+   does not fit: the values come from a cache entry, so shortening beats
+   dropping it. HTS_FALSE when it had to clip. */
 static hts_boolean arc_headers_cat(hts_buf headers, const char *src) {
   const size_t used = strlen(headers.p);
   const size_t left = used < headers.size - 1 ? headers.size - used - 1 : 0;
