@@ -829,13 +829,9 @@ expected_skips=$ci_skip_list
 test "$lost" -eq 0 ||
     echo "::error::worker(s) vanished with no status, re-run this leg:$vanished"
 # Lowered only by the staged runs of tests 337 and 495, so they stage fewer stubs.
+# Any other value keeps 90, so a stray setting cannot pass a short run.
 min_pass=${HTTRACK_SUITE_MIN_PASS:-90}
-case "$min_pass" in
-*[!0-9]*)
-    echo "::warning::ignoring HTTRACK_SUITE_MIN_PASS=$min_pass"
-    min_pass=90
-    ;;
-esac
+case "$min_pass" in 0 | *[!0-9]*) min_pass=90 ;; esac
 [ "$pass" -ge "$min_pass" ] || {
     echo "::error::only $pass tests passed ($skip skipped)"
     # Vanished workers lower the count without anything having failed.

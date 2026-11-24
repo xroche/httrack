@@ -30,9 +30,9 @@ ci_stage_init() { # ci_stage_init
         sed -e 's/^expected_skips_msys="//' -e 's/"$//')
     nskip=$(count_matching_lines . <<<"$expected_skips")
     test "$nskip" -ge 1 || fail "read no expected skips out of the driver"
-    # The driver's pass floor for a staged run: far below its own 90, because macOS
-    # runs the stubs one at a time. npass-1 passing stubs clear it, and the lost
-    # one passes in the control leg.
+    # Staged runs lower the driver's pass floor of 90, because macOS runs the stubs
+    # one at a time. npass-1 passing stubs clear it, and the lost one passes in the
+    # control leg.
     stage_floor=10
     npass=$((stage_floor + 2))
     ran=$((npass + nskip))
