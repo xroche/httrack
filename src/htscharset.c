@@ -252,17 +252,17 @@ UINT hts_getCodepage(const char *name) {
   return 0;
 }
 
-LPWSTR hts_convertStringToUCS2(const char *s, int size, UINT cp, int *pwsize) {
+LPWSTR hts_convertStringToUCS2(hts_span s, UINT cp, int *pwsize) {
+  const int size = (int) s.len;
   /* Size in wide chars of the output */
-  const int wsize = MultiByteToWideChar(cp, 0, (LPCSTR) s, size, NULL, 0);
+  const int wsize = MultiByteToWideChar(cp, 0, (LPCSTR) s.p, size, NULL, 0);
 
   if (wsize > 0) {
     LPSTR uoutput = NULL;
     LPWSTR woutput = calloct((size_t) wsize + 1, sizeof(WCHAR));
 
-    if (woutput != NULL
-        && MultiByteToWideChar(cp, 0, (LPCSTR) s, size, woutput,
-                               wsize) == wsize) {
+    if (woutput != NULL && MultiByteToWideChar(cp, 0, (LPCSTR) s.p, size,
+                                               woutput, wsize) == wsize) {
       const int usize =
         WideCharToMultiByte(CP_UTF8, 0, woutput, wsize, NULL, 0, NULL, FALSE);
       if (usize > 0) {
@@ -277,8 +277,8 @@ LPWSTR hts_convertStringToUCS2(const char *s, int size, UINT cp, int *pwsize) {
   return NULL;
 }
 
-LPWSTR hts_convertUTF8StringToUCS2(const char *s, int size, int *pwsize) {
-  return hts_convertStringToUCS2(s, size, CP_UTF8, pwsize);
+LPWSTR hts_convertUTF8StringToUCS2(hts_span s, int *pwsize) {
+  return hts_convertStringToUCS2(s, CP_UTF8, pwsize);
 }
 
 /* WideCharToMultiByte rejects lpUsedDefaultChar and dwFlags on the Unicode,
@@ -343,20 +343,20 @@ char *hts_convertUCS2StringToUTF8(LPWSTR woutput, int wsize) {
   return hts_convertUCS2StringToCP(woutput, wsize, CP_UTF8);
 }
 
-char *hts_convertStringCPToUTF8(const char *s, size_t size, UINT cp) {
+char *hts_convertStringCPToUTF8(hts_span s, UINT cp) {
   /* Empty string ? */
-  if (size == 0) {
-    return hts_stringMemCopy(s, size);
+  if (s.len == 0) {
+    return hts_span_dup(s);
   }
   /* Already UTF-8 ? */
-  if (cp == CP_UTF8 || hts_isStringAscii(s, size)) {
-    return hts_stringMemCopy(s, size);
+  if (cp == CP_UTF8 || hts_isStringAscii(s.p, s.len)) {
+    return hts_span_dup(s);
   }
   /* Other (valid) charset */
   else if (cp != 0) {
     /* Size in wide chars of the output */
     int wsize;
-    LPWSTR woutput = hts_convertStringToUCS2(s, (int) size, cp, &wsize);
+    LPWSTR woutput = hts_convertStringToUCS2(s, cp, &wsize);
 
     if (woutput != NULL) {
       char *const uoutput = hts_convertUCS2StringToUTF8(woutput, wsize);
@@ -370,24 +370,24 @@ char *hts_convertStringCPToUTF8(const char *s, size_t size, UINT cp) {
   return NULL;
 }
 
-static char *hts_convertStringCPFromUTF8Ex(const char *s, size_t size, UINT cp,
+static char *hts_convertStringCPFromUTF8Ex(hts_span s, UINT cp,
                                            hts_boolean *plossy) {
   if (plossy != NULL) {
     *plossy = HTS_FALSE;
   }
   /* Empty string ? */
-  if (size == 0) {
-    return hts_stringMemCopy(s, size);
+  if (s.len == 0) {
+    return hts_span_dup(s);
   }
   /* Already UTF-8 ? */
-  if (cp == CP_UTF8 || hts_isStringAscii(s, size)) {
-    return hts_stringMemCopy(s, size);
+  if (cp == CP_UTF8 || hts_isStringAscii(s.p, s.len)) {
+    return hts_span_dup(s);
   }
   /* Other (valid) charset */
   else if (cp != 0) {
     /* Size in wide chars of the output */
     int wsize;
-    LPWSTR woutput = hts_convertStringToUCS2(s, (int) size, CP_UTF8, &wsize);
+    LPWSTR woutput = hts_convertStringToUCS2(s, CP_UTF8, &wsize);
 
     if (woutput != NULL) {
       char *const uoutput =
@@ -402,28 +402,27 @@ static char *hts_convertStringCPFromUTF8Ex(const char *s, size_t size, UINT cp,
   return NULL;
 }
 
-char *hts_convertStringCPFromUTF8(const char *s, size_t size, UINT cp) {
-  return hts_convertStringCPFromUTF8Ex(s, size, cp, NULL);
+char *hts_convertStringCPFromUTF8(hts_span s, UINT cp) {
+  return hts_convertStringCPFromUTF8Ex(s, cp, NULL);
 }
 
 HTSEXT_API char *hts_convertStringToUTF8(const char *s, size_t size,
                                          const char *charset) {
   const UINT cp = hts_getCodepage(charset);
 
-  return hts_convertStringCPToUTF8(s, size, cp);
+  return hts_convertStringCPToUTF8(hts_span_at(s, size), cp);
 }
 
-char *hts_convertStringFromUTF8(const char *s, size_t size, const char *charset) {
+char *hts_convertStringFromUTF8(hts_span s, const char *charset) {
   const UINT cp = hts_getCodepage(charset);
 
-  return hts_convertStringCPFromUTF8(s, size, cp);
+  return hts_convertStringCPFromUTF8(s, cp);
 }
 
-char *hts_convertStringFromUTF8Strict(const char *s, size_t size,
-                                      const char *charset) {
+char *hts_convertStringFromUTF8Strict(hts_span s, const char *charset) {
   hts_boolean lossy = HTS_FALSE;
   char *out =
-      hts_convertStringCPFromUTF8Ex(s, size, hts_getCodepage(charset), &lossy);
+      hts_convertStringCPFromUTF8Ex(s, hts_getCodepage(charset), &lossy);
 
   if (lossy) {
     freet(out);
@@ -433,11 +432,11 @@ char *hts_convertStringFromUTF8Strict(const char *s, size_t size,
 }
 
 HTSEXT_API char *hts_convertStringSystemToUTF8(const char *s, size_t size) {
-  return hts_convertStringCPToUTF8(s, size, GetACP());
+  return hts_convertStringCPToUTF8(hts_span_at(s, size), GetACP());
 }
 
 HTSEXT_API char *hts_convertStringUTF8ToSystem(const char *s, size_t size) {
-  return hts_convertStringCPFromUTF8(s, size, GetACP());
+  return hts_convertStringCPFromUTF8(hts_span_at(s, size), GetACP());
 }
 
 HTSEXT_API void hts_argv_utf8(int *pargc, char ***pargv) {
@@ -572,15 +571,15 @@ static char *hts_codepageToUTF8(const char *codepage, const char *s,
 }
 #endif
 
-static char *hts_convertStringCharset(const char *s, size_t size,
-                                      const char *to, const char *from) {
+static char *hts_convertStringCharset(hts_span s, const char *to,
+                                      const char *from) {
   /* Empty string ? */
-  if (size == 0) {
+  if (s.len == 0) {
     return strdupt("");
   }
   /* Already on correct charset ? */
   if (hts_equalsAlphanum(from, to)) {
-    return hts_stringMemCopy(s, size);
+    return hts_span_dup(s);
   }
 #ifndef DISABLE_ICONV
   /* Find codepage */
@@ -588,15 +587,16 @@ static char *hts_convertStringCharset(const char *s, size_t size,
     const iconv_t cp = iconv_open(to, from);
 
     if (cp != (iconv_t) - 1) {
-      char *inbuf = (char*) (uintptr_t) s; /* ugly iconv api, sheesh */
-      size_t inbytesleft = size;
+      char *inbuf = (char *) (uintptr_t) s.p; /* ugly iconv api, sheesh */
+      size_t inbytesleft = s.len;
       size_t outbufCapa = 0;
       char *outbuf = NULL;
       size_t outbytesleft = 0;
       size_t finalSize;
 
       /* Initial size to around the string size */
-      for(outbufCapa = 16; outbufCapa < size + 1; outbufCapa *= 2) ;
+      for (outbufCapa = 16; outbufCapa < s.len + 1; outbufCapa *= 2)
+        ;
       outbuf = malloct(outbufCapa);
       outbytesleft = outbufCapa;
 
@@ -656,7 +656,7 @@ static char *hts_convertStringCharset(const char *s, size_t size,
 #else
   /* Limited codepage decoding support only. */
   if (hts_isCharsetUTF8(to)) {
-    return hts_codepageToUTF8(from, s, size);
+    return hts_codepageToUTF8(from, s.p, s.len);
   }
 #endif
 
@@ -676,30 +676,29 @@ HTSEXT_API char *hts_convertStringToUTF8(const char *s, size_t size,
   }
   /* Find codepage */
   else {
-    return hts_convertStringCharset(s, size, "utf-8", charset);
+    return hts_convertStringCharset(hts_span_at(s, size), "utf-8", charset);
   }
 }
 
-char *hts_convertStringFromUTF8(const char *s, size_t size, const char *charset) {
+char *hts_convertStringFromUTF8(hts_span s, const char *charset) {
   /* Empty string ? */
-  if (size == 0) {
+  if (s.len == 0) {
     return strdupt("");
   }
   /* Already UTF-8 ? */
-  if (hts_isCharsetUTF8(charset) || hts_isStringAscii(s, size)) {
-    return hts_stringMemCopy(s, size);
+  if (hts_isCharsetUTF8(charset) || hts_isStringAscii(s.p, s.len)) {
+    return hts_span_dup(s);
   }
   /* Find codepage */
   else {
-    return hts_convertStringCharset(s, size, charset, "utf-8");
+    return hts_convertStringCharset(s, charset, "utf-8");
   }
 }
 
-char *hts_convertStringFromUTF8Strict(const char *s, size_t size,
-                                      const char *charset) {
+char *hts_convertStringFromUTF8Strict(hts_span s, const char *charset) {
   /* No transliteration is requested of iconv, so an unrepresentable code point
      already fails the conversion outright. */
-  return hts_convertStringFromUTF8(s, size, charset);
+  return hts_convertStringFromUTF8(s, charset);
 }
 
 #endif
@@ -731,29 +730,28 @@ size_t hts_stringLengthUTF8(const char *s) {
   return len;
 }
 
-size_t hts_copyStringUTF8(char *dest, const char *src, size_t size) {
+size_t hts_copyStringUTF8(hts_buf dest, const char *src) {
   const unsigned char *const bytes = (const unsigned char *) src;
   size_t i;
 
-  for (i = 0; i < size && bytes[i] != '\0'; i++)
+  assertf(dest.size != 0);
+  for (i = 0; i < dest.size - 1 && bytes[i] != '\0'; i++)
     ;
   // never end inside a UTF-8 sequence (a NUL counts as a leading byte)
   while (i > 0 && !HTS_IS_LEADING_UTF8(bytes[i]))
     i--;
-  memcpy(dest, src, i);
-  dest[i] = '\0';
+  memcpy(dest.p, src, i);
+  dest.p[i] = '\0';
 
   return i;
 }
 
-size_t hts_appendStringUTF8(char *dest, size_t dest_size, const char *src,
-                            size_t nBytes) {
-  const size_t used = strlen(dest);
-  size_t room;
+size_t hts_appendStringUTF8(hts_buf dest, const char *src, size_t nBytes) {
+  hts_buf tail = hts_buf_skip(dest, strlen(dest.p));
 
-  assertf(used < dest_size);
-  room = dest_size - 1 - used;
-  return hts_copyStringUTF8(dest + used, src, nBytes < room ? nBytes : room);
+  if (nBytes < tail.size - 1)
+    tail.size = nBytes + 1;
+  return hts_copyStringUTF8(tail, src);
 }
 
 int hts_isCharsetUTF8(const char *charset) {
@@ -762,7 +760,9 @@ int hts_isCharsetUTF8(const char *charset) {
 }
 
 /* Extract X from a "text/html; charset=X" content= attribute value. */
-static char *charset_from_content(const char *s, size_t len) {
+static char *charset_from_content(hts_span content) {
+  const char *const s = content.p;
+  const size_t len = content.len;
   size_t i;
 
   for (i = 0; i + 7 < len; i++) {
@@ -785,7 +785,9 @@ static char *charset_from_content(const char *s, size_t len) {
   return NULL;
 }
 
-char *hts_getCharsetFromMeta(const char *html, size_t size) {
+char *hts_getCharsetFromMeta(hts_span page) {
+  const char *const html = page.p;
+  const size_t size = page.len;
   size_t i;
 
   /* HTML5 <meta charset=X> or legacy
@@ -793,8 +795,7 @@ char *hts_getCharsetFromMeta(const char *html, size_t size) {
      attributes in any order; first resolvable tag wins. */
   for (i = 0; i + 6 < size; i++) {
     size_t j;
-    const char *equiv = NULL, *content = NULL;
-    size_t equiv_len = 0, content_len = 0;
+    hts_span equiv = {NULL, 0}, content = {NULL, 0};
 
     if (html[i] != '<' || hts_strncasecmp(&html[i + 1], "meta", 4) != 0 ||
         !is_html_space(html[i + 5])) {
@@ -843,20 +844,18 @@ char *hts_getCharsetFromMeta(const char *html, size_t size) {
       if (val_len != 0) {
         if (name_len == 7 && hts_strncasecmp(&html[name], "charset", 7) == 0) {
           return hts_stringMemCopy(&html[val], val_len);
-        } else if (equiv == NULL && name_len == 10 &&
+        } else if (equiv.len == 0 && name_len == 10 &&
                    hts_strncasecmp(&html[name], "http-equiv", 10) == 0) {
-          equiv = &html[val];
-          equiv_len = val_len;
-        } else if (content == NULL && name_len == 7 &&
+          equiv = hts_span_at(&html[val], val_len);
+        } else if (content.len == 0 && name_len == 7 &&
                    hts_strncasecmp(&html[name], "content", 7) == 0) {
-          content = &html[val];
-          content_len = val_len;
+          content = hts_span_at(&html[val], val_len);
         }
       }
     }
-    if (equiv_len == 12 && hts_strncasecmp(equiv, "content-type", 12) == 0 &&
-        content != NULL) {
-      char *const s = charset_from_content(content, content_len);
+    if (hts_span_eq_ci(equiv, hts_span_of("content-type")) &&
+        content.len != 0) {
+      char *const s = charset_from_content(content);
 
       if (s != NULL) {
         return s;
@@ -951,14 +950,14 @@ static size_t utf8_encode(hts_UCS4 uc, unsigned char *out) {
 } while(0)
 #define FREE_BUFFER() freet(dest)
 
-char *hts_convertStringUTF8ToIDNA(const char *s, size_t size) {
+char *hts_convertStringUTF8ToIDNA(hts_span s) {
   char *dest = NULL;
   size_t capa = 0, destSize = 0;
   size_t i, startSeg;
   int nonAsciiFound;
 
-  for(i = startSeg = 0, nonAsciiFound = 0 ; i <= size ; i++) {
-    const unsigned char c = i < size ? (unsigned char) s[i] : 0;
+  for (i = startSeg = 0, nonAsciiFound = 0; i <= s.len; i++) {
+    const unsigned char c = i < s.len ? (unsigned char) s.p[i] : 0;
     /* separator (ending, url segment, scheme, path segment, query string) */
     if (c == 0 || c == '.' || c == ':' || c == '/' || c == '?') {
       /* non-empty segment */
@@ -966,7 +965,7 @@ char *hts_convertStringUTF8ToIDNA(const char *s, size_t size) {
         /* IDNA ? */
         if (nonAsciiFound) {
           const size_t segSize = i - startSeg;
-          const unsigned char *segData = (const unsigned char*) &s[startSeg];
+          const unsigned char *segData = (const unsigned char *) &s.p[startSeg];
           punycode_uint *segInt = NULL;
           size_t j, utfSeq, segOutputSize;
 
@@ -1021,7 +1020,7 @@ char *hts_convertStringUTF8ToIDNA(const char *s, size_t size) {
         else {
           size_t j;
           for(j = startSeg ; j < i ; j++) {
-            const char c = s[j];
+            const char c = s.p[j];
             ADD_BYTE(c);
           }
         }
@@ -1051,7 +1050,7 @@ hts_boolean hts_host_to_ascii(char *dst, size_t size, const char *host,
   hts_boolean fits;
 
   if (!hts_isStringAscii(host, len)) {
-    idna = hts_convertStringUTF8ToIDNA(host, len);
+    idna = hts_convertStringUTF8ToIDNA(hts_span_at(host, len));
     if (idna == NULL)
       return HTS_FALSE;
     src = idna;
@@ -1084,16 +1083,16 @@ int hts_isStringIDNA(const char *s, size_t size) {
   return 0;
 }
 
-char *hts_convertStringIDNAToUTF8(const char *s, size_t size) {
+char *hts_convertStringIDNAToUTF8(hts_span s) {
   char *dest = NULL;
   size_t capa = 0, destSize = 0;
   size_t i, startSeg;
-  for(i = startSeg = 0 ; i <= size ; i++) {
-    const unsigned char c = i < size ? s[i] : 0;
+  for (i = startSeg = 0; i <= s.len; i++) {
+    const unsigned char c = i < s.len ? s.p[i] : 0;
     if (c == 0 || c == '.' || c == ':' || c == '/' || c == '?') {
       const size_t segSize = i - startSeg;
       /* IDNA segment ? */
-      if (segSize > 4 && hts_strncasecmp(&s[startSeg], "xn--", 4) == 0) {
+      if (segSize > 4 && hts_strncasecmp(&s.p[startSeg], "xn--", 4) == 0) {
         punycode_status status;
         punycode_uint output_capa;
         punycode_uint output_length;
@@ -1115,7 +1114,7 @@ char *hts_convertStringIDNAToUTF8(const char *s, size_t size) {
         }
         for (output_length = output_capa;
              (status = punycode_decode((punycode_uint) segSize - 4,
-                                       &s[startSeg + 4], &output_length,
+                                       &s.p[startSeg + 4], &output_length,
                                        output_dest)) == punycode_big_output;) {
           output_capa <<= 1;
           output_dest = (punycode_uint *) realloct(
@@ -1153,7 +1152,7 @@ char *hts_convertStringIDNAToUTF8(const char *s, size_t size) {
       } else {
         size_t j;
         for(j = startSeg ; j < i ; j++) {
-          const char c = s[j];
+          const char c = s.p[j];
           ADD_BYTE(c);
         }
       }
@@ -1167,8 +1166,8 @@ char *hts_convertStringIDNAToUTF8(const char *s, size_t size) {
   return dest;
 }
 
-hts_UCS4* hts_convertUTF8StringToUCS4(const char *s, size_t size, size_t *nChars) {
-  const unsigned char *const data = (const unsigned char*) s;
+hts_UCS4 *hts_convertUTF8StringToUCS4(hts_span s, size_t *nChars) {
+  const unsigned char *const data = (const unsigned char *) s.p;
   size_t i;
   hts_UCS4 *dest = NULL;
   size_t capa = 0, destSize = 0;
@@ -1176,9 +1175,9 @@ hts_UCS4* hts_convertUTF8StringToUCS4(const char *s, size_t size, size_t *nChars
   if (nChars != NULL) {
     *nChars = 0;
   }
-  for (i = 0; i < size;) {
+  for (i = 0; i < s.len;) {
     hts_UCS4 uc;
-    const size_t n = utf8_decode(&data[i], size - i, &uc);
+    const size_t n = utf8_decode(&data[i], s.len - i, &uc);
 
     /* each byte of a malformed sequence becomes one U+FFFD */
     if (n != 0) {

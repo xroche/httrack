@@ -32,7 +32,7 @@ Please visit our Website: http://www.httrack.com
 
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   char *html = fuzz_strdup(data, size);
-  char *charset = hts_getCharsetFromMeta(html, size);
+  char *charset = hts_getCharsetFromMeta(hts_span_at(html, size));
 
   freet(charset);
   freet(html);

@@ -1178,7 +1178,7 @@ static int st_ucs4_oom(httrackp *opt, int argc, char **argv) {
       freet(src);
       return 0;
     }
-    out = hts_convertUTF8StringToUCS4(src, units, NULL);
+    out = hts_convertUTF8StringToUCS4(hts_span_at(src, units), NULL);
     (void) setrlimit(RLIMIT_AS, &saved);
     freet(src);
     if (out == NULL) {
