@@ -498,7 +498,7 @@ NOT_STATUS = frozenset(
 
 
 def delegates(body):
-    """Names g in a bare `return g(...);`, not `return g(...) >= 0;`."""
+    """Yield each g that BODY returns bare, as `return g(...);`."""
     for m in DELEGATE.finditer(body):
         if re.match(r"\s*;", body[matching(body, m.end() - 1) :]):
             yield m.group(1)
