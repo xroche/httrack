@@ -36,6 +36,7 @@ Please visit our Website: http://www.httrack.com
 #define HTS_CATCHURL_DEFH
 
 #include "htsbasenet.h"
+#include "htsbuf.h"
 
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
@@ -68,9 +69,8 @@ typedef enum {
 /* Like catch_url(), but returns why the capture failed. A method or URL too
    long for its buffer is refused. data is left untouched on
    CATCH_URL_ERR_REQUEST, and emptied on CATCH_URL_ERR_BLOCK. */
-catch_url_status catch_url_capture(T_SOC soc, char *url, size_t url_size,
-                                   char *method, size_t method_size, char *data,
-                                   size_t data_size);
+catch_url_status catch_url_capture(T_SOC soc, hts_buf url, hts_buf method,
+                                   hts_buf data);
 
 /* Describes a catch_url_capture() status to the user. */
 const char *catch_url_strerror(catch_url_status status);
