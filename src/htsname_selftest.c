@@ -375,7 +375,7 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
   const char *bodyfile = "st-savename-body.tmp";
   const char *tmpbodyfile = "st-savename-tmpfile.tmp";
   int statuscode = HTTP_OK, status = 0;
-  int filpad = 0, adrpad = 0;
+  int filpad = 0, adrpad = 0, tplpad = 0;
   const char *padunit = "a"; /* the bytes filpad repeats */
   int nosback = 0;
   int rc = 0;
@@ -419,6 +419,8 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
       filpad = atoi(a + 7);
     else if (strncmp(a, "adrpad=", 7) == 0) /* as filpad, for adr= */
       adrpad = atoi(a + 7);
+    else if (strncmp(a, "tplpad=", 7) == 0) /* as filpad, for userdef= */
+      tplpad = atoi(a + 7);
     else if (strncmp(a, "padunit=", 8) == 0 && a[8] != '\0')
       padunit = a + 8;
     else if (strncmp(a, "delayed=", 8) == 0) /* -%N */
@@ -438,6 +440,16 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
   if (opt->savename_type == -1 && StringLength(opt->savename_userdef) == 0) {
     fprintf(stderr, "savename: type=-1 needs a userdef= template\n");
     return 1;
+  }
+  if (tplpad > 0) {
+    char BIGSTK tpl[HTS_URLMAXSIZE * 4];
+
+    if (!st_expand_pad(tpl, sizeof(tpl), StringBuff(opt->savename_userdef),
+                       tplpad, padunit)) {
+      fprintf(stderr, "savename: tplpad needs a '*' in userdef, and room\n");
+      return 1;
+    }
+    StringCopy(opt->savename_userdef, tpl);
   }
   memset(&probe, 0, sizeof(probe));
   memset(probe.canary, ST_POISON, sizeof(probe.canary));

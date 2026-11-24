@@ -290,6 +290,8 @@ HTS_STATIC char *getHtsOptBuff_(httrackp *opt) {
 
 #define OPT_GET_BUFF(OPT)      ( getHtsOptBuff_(OPT) )
 #define OPT_GET_BUFF_SIZE(OPT) ( sizeof(opt->state.concat.buff[0]) )
+#define OPT_GET_HTS_BUF(OPT)                                                   \
+  hts_buf_at(OPT_GET_BUFF(OPT), OPT_GET_BUFF_SIZE(OPT))
 
 // cache pour le dns, pour éviter de faire des gethostbyname sans arrêt
 #ifndef HTS_DEF_FWSTRUCT_t_dnscache

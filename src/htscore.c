@@ -1317,7 +1317,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
     // lien primaire
     if (!hts_record_link(
             opt, "primary", "/primary",
-            fslash(hts_buf_at(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt)),
+            fslash(OPT_GET_HTS_BUF(opt),
                    fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                            StringBuff(opt->path_html_utf8), "index.html")),
             "", "", NULL)) {

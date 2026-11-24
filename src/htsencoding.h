@@ -79,7 +79,7 @@ static HTS_INLINE HTS_UNUSED int hts_ehex(const char *s) {
  * Unescape HTML entities (as per HTML 4.0 Specification)
  * and replace them in-place by their UTF-8 equivalents.
  * Note: source and destination may be the same, and the destination only
- * needs to hold as space as the source.
+ * needs to hold as much space as the source.
  * Returns 0 upon success, -1 upon overflow or error.
  **/
 extern int hts_unescapeEntities(const char *src, hts_buf dest);
@@ -88,7 +88,7 @@ extern int hts_unescapeEntities(const char *src, hts_buf dest);
  * Unescape HTML entities (as per HTML 4.0 Specification)
  * and replace them in-place by their charset equivalents.
  * Note: source and destination may be the same, and the destination only
- * needs to hold as space as the source.
+ * needs to hold as much space as the source.
  * Returns 0 upon success, -1 upon overflow or error.
  **/
 extern int hts_unescapeEntitiesWithCharset(const char *src,

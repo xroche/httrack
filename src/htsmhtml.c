@@ -136,10 +136,8 @@ void mimehtml_add_file(httrackp *opt, const char *save, const char *adr,
 
       if (rsc_fil == NULL)
         rsc_fil = fil;
-      if (strncmp(fslash(hts_buf_at(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt)),
-                         save),
-                  fslash(hts_buf_at(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt)),
-                         StringBuff(opt->path_html_utf8)),
+      if (strncmp(fslash(OPT_GET_HTS_BUF(opt), save),
+                  fslash(OPT_GET_HTS_BUF(opt), StringBuff(opt->path_html_utf8)),
                   (n = (int) strlen(StringBuff(opt->path_html_utf8)))) == 0) {
         rsc_save += n;
       }
