@@ -88,17 +88,17 @@ static const char* value_sav_debug_print(void *arg, coucal_value_const a) {
 
 /* Return ADR's dedup-key host, aliased before urlhack drops a www. prefix. */
 static const char *key_host_alias(const hash_struct *hash, const char *adr,
-                                  char *buf, size_t bufsize) {
+                                  hts_buf buf) {
   const char *const canon =
-      hts_host_alias(hash->host_alias, adr, hash->norm_host, buf, bufsize);
+      hts_host_alias(hash->host_alias, adr, hash->norm_host, buf.p, buf.size);
 
   return canon != NULL ? canon : adr;
 }
 
 /* Run hash_url_key() with the host alias and strip keys resolved. */
 static const char *hash_url_key_(const hash_struct *hash, const char *adr_canon,
-                                 const char *fil, const char *keys, char *dst,
-                                 size_t dstsize) {
+                                 const char *fil, const char *keys,
+                                 hts_buf dst) {
   const char *const adr_norm = hash->norm_host
                                    ? jump_normalized_const(adr_canon)
                                    : jump_identification_const(adr_canon);
@@ -106,26 +106,24 @@ static const char *hash_url_key_(const hash_struct *hash, const char *adr_canon,
   // copy address
   assertf(adr_norm != NULL);
   /* Clip, because a wire URL feeds this, and a clipped key only collides. */
-  (void) strclipbuff(dst, dstsize, adr_norm);
+  (void) hts_buf_cpy_clip(dst, adr_norm);
 
   // copy link
   assertf(fil != NULL);
   {
-    const size_t used = strlen(dst);
-    char *const tail = &dst[used];
-    const size_t avail = dstsize - used;
+    const hts_buf tail = hts_buf_skip(dst, strlen(dst.p));
 
     /* normalizing never expands, and it takes a path of at most its own
        HTS_URLMAXSIZE * 2, so bound on both */
     if ((hash->norm_slash || hash->norm_query || keys != NULL) &&
-        strlen(fil) < avail && strlen(fil) < HTS_URLMAXSIZE * 2) {
-      fil_normalized_filtered_ex(fil, tail, keys, hash->norm_slash,
+        strlen(fil) < tail.size && strlen(fil) < HTS_URLMAXSIZE * 2) {
+      fil_normalized_filtered_ex(fil, tail.p, keys, hash->norm_slash,
                                  hash->norm_query);
     } else {
-      (void) strclipbuff(tail, avail, fil);
+      (void) hts_buf_cpy_clip(tail, fil);
     }
   }
-  return dst;
+  return dst.p;
 }
 
 /* Without rules, skip the buffers the hardened build zero-fills on each call */
@@ -135,20 +133,19 @@ static hts_boolean hash_has_rules(const hash_struct *hash) {
 
 /* see htshash.h */
 const char *hash_url_key(hash_struct *hash, const char *adr, const char *fil,
-                         char *dst, size_t dstsize) {
+                         hts_buf dst) {
   assertf(adr != NULL);
   if (!hash_has_rules(hash)) {
-    return hash_url_key_(hash, adr, fil, NULL, dst, dstsize);
+    return hash_url_key_(hash, adr, fil, NULL, dst);
   } else {
     char BIGSTK aliasbuf[HTS_URLMAXSIZE * 2];
     char BIGSTK keybuf[HTS_URLMAXSIZE];
-    const char *const adr_canon =
-        key_host_alias(hash, adr, HTS_SIZED(aliasbuf));
+    const char *const adr_canon = key_host_alias(hash, adr, HTS_BUF(aliasbuf));
     /* the per-URL strip keys apply even when urlhack is off */
     const char *const keys = hts_query_strip_keys(hash->strip_query, adr_canon,
                                                   fil, HTS_SIZED(keybuf));
 
-    return hash_url_key_(hash, adr_canon, fil, keys, dst, dstsize);
+    return hash_url_key_(hash, adr_canon, fil, keys, dst);
   }
 }
 
@@ -161,7 +158,7 @@ key_adrfil_hashes_generic(void *arg, coucal_key_const value, const int former) {
   const char *const fil = !former ? lien->fil : lien->former_fil;
 
   return coucal_hash_string(
-      hash_url_key(hash, adr, fil, HTS_SIZED(hash->normfil)));
+      hash_url_key(hash, adr, fil, HTS_BUF(hash->normfil)));
 }
 
 /* Compare as key_adrfil_equals_generic() with aliases and keys resolved. */
@@ -222,9 +219,9 @@ static int key_adrfil_equals_generic(void *arg,
     char BIGSTK a_aliasbuf[HTS_URLMAXSIZE * 2], b_aliasbuf[HTS_URLMAXSIZE * 2];
     char BIGSTK ka[HTS_URLMAXSIZE], kb[HTS_URLMAXSIZE];
     const char *const a_canon =
-        key_host_alias(hash, a_adr, HTS_SIZED(a_aliasbuf));
+        key_host_alias(hash, a_adr, HTS_BUF(a_aliasbuf));
     const char *const b_canon =
-        key_host_alias(hash, b_adr, HTS_SIZED(b_aliasbuf));
+        key_host_alias(hash, b_adr, HTS_BUF(b_aliasbuf));
     const char *const keysa =
         hts_query_strip_keys(hash->strip_query, a_canon, a_fil, HTS_SIZED(ka));
     const char *const keysb =
@@ -468,12 +465,11 @@ int hash_savename_owner(hash_struct *hash, const char *adr, const char *fil) {
 
 /* KEY is KIND followed by NAME lowercased, as the save-name table compares
    names. */
-static void savename_next_key(char *key, size_t size, char kind,
-                              const char *name) {
-  key[0] = kind;
-  key[1] = '\0';
-  strlncatbuff(key, name, size, size - 1);
-  hts_lowcase(key);
+static void savename_next_key(hts_buf key, char kind, const char *name) {
+  key.p[0] = kind;
+  key.p[1] = '\0';
+  hts_buf_catn(key, name, key.size - 1);
+  hts_lowcase(key.p);
 }
 
 /* see htshash.h */
@@ -481,7 +477,7 @@ int hash_savename_next(hash_struct *hash, char kind, const char *name) {
   char BIGSTK key[HTS_URLMAXSIZE * 2 + 2];
   intptr_t value;
 
-  savename_next_key(HTS_SIZED(key), kind, name);
+  savename_next_key(HTS_BUF(key), kind, name);
   return coucal_read(hash->savename_next, key, &value) ? (int) value : 0;
 }
 
@@ -490,7 +486,7 @@ void hash_savename_next_set(hash_struct *hash, char kind, const char *name,
                             int n) {
   char BIGSTK key[HTS_URLMAXSIZE * 2 + 2];
 
-  savename_next_key(HTS_SIZED(key), kind, name);
+  savename_next_key(HTS_BUF(key), kind, name);
   coucal_write(hash->savename_next, key, (intptr_t) n);
 }
 

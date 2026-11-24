@@ -1563,7 +1563,8 @@ static void hashdiff_setup(hashdiff_run *run, hash_struct *hash,
       memset(run->ko, '#', HTS_URLMAXSIZE * 4);
       memset(run->kn, '#', HTS_URLMAXSIZE * 4);
       legacy_hash_url_key(hash, run->adr[i], run->fil[i], run->ko, sizes[k]);
-      hash_url_key(hash, run->adr[i], run->fil[i], run->kn, sizes[k]);
+      hash_url_key(hash, run->adr[i], run->fil[i],
+                   hts_buf_at(run->kn, sizes[k]));
       run->cases++;
       if (memcmp(run->ko, run->kn, HTS_URLMAXSIZE * 4) != 0) {
         run->failures++;
@@ -1709,7 +1710,7 @@ static hts_boolean st_hashkey(httrackp *opt, const char *adr, const char *fil,
      untouched */
   memset(arena, '#', keysize + guard);
   hash_init(opt, &hash, opt->urlhack);
-  hash_url_key(&hash, adr, fil, arena, keysize);
+  hash_url_key(&hash, adr, fil, hts_buf_at(arena, keysize));
   hash_free(&hash);
   for (i = keysize; i < keysize + guard; i++) {
     if (arena[i] != '#')
@@ -1792,6 +1793,22 @@ static int st_hashkey_bounds(httrackp *opt, int argc, char **argv) {
     fil[5 + field + 64] = '\0';
     assertf(st_hashkey(opt, "h.com", fil, arena, keysize, guard));
     StringCopy(opt->strip_query, "");
+  }
+
+  /* a maximal save-name keys by kind and lowercase name */
+  {
+    hash_struct hash;
+
+    memset(adr, 'A', field);
+    adr[field] = '\0';
+    hash_init(opt, &hash, opt->urlhack);
+    hash_savename_next_set(&hash, 'k', adr, 7);
+    hts_lowcase(adr);
+    assertf(hash_savename_next(&hash, 'k', adr) == 7);
+    assertf(hash_savename_next(&hash, 'j', adr) == 0);
+    adr[field - 1] = '\0';
+    assertf(hash_savename_next(&hash, 'k', adr) == 0);
+    hash_free(&hash);
   }
 
   freet(adr);

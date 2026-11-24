@@ -37,6 +37,8 @@ Please visit our Website: http://www.httrack.com
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
 
+#include "htsbuf.h"
+
 /* Forward definitions */
 #ifndef HTS_DEF_FWSTRUCT_hash_struct
 #define HTS_DEF_FWSTRUCT_hash_struct
@@ -62,10 +64,10 @@ hts_boolean hash_url_equals_in(hash_struct *hash, const char *adra,
                                const char *fila, const char *adrb,
                                const char *filb);
 /* Build the dedup key of ADR/FIL, the canonical host then the path, into DST
-   (DSTSIZE bytes) and return it. Each half is clipped to fit, so DST is always
-   NUL-terminated; it only feeds the hash, never a comparison. */
+   and return it. Each half is clipped to fit, so DST is always NUL-terminated;
+   it only feeds the hash, never a comparison. */
 const char *hash_url_key(hash_struct *hash, const char *adr, const char *fil,
-                         char *dst, size_t dstsize);
+                         hts_buf dst);
 int hash_read(const hash_struct * hash, const char *nom1, const char *nom2,
               hash_struct_type type);
 void hash_write(hash_struct * hash, size_t lpos);
