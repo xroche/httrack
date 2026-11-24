@@ -148,7 +148,7 @@ static void cache_zip_write_failed(httrackp *opt, cache_back *cache,
       } else {
         hts_log_print(opt, LOG_ERROR,
                       "Mirror aborted: cache write failed (%s): %s", what,
-                      hts_get_zerror(zErr, HTS_SIZED(errbuf)));
+                      hts_get_zerror(zErr, HTS_BUF(errbuf)));
       }
     }
     /* fatal: stop the mirror, exit non-zero */
@@ -156,7 +156,7 @@ static void cache_zip_write_failed(httrackp *opt, cache_back *cache,
   } else {
     hts_log_print(opt, LOG_WARNING,
                   "cache write failed (%s: %s), entry not cached: %s%s", what,
-                  hts_get_zerror(zErr, HTS_SIZED(errbuf)),
+                  hts_get_zerror(zErr, HTS_BUF(errbuf)),
                   adr_nologin(opt, url_adr), url_fil);
   }
 }
@@ -1270,7 +1270,7 @@ void cache_init(cache_back * cache, httrackp * opt) {
 
           hts_log_print(opt, LOG_WARNING,
                         "Cache: error trying to read the cache: %s",
-                        hts_get_zerror(zErr, HTS_SIZED(errbuf)));
+                        hts_get_zerror(zErr, HTS_BUF(errbuf)));
         }
 
       } else {

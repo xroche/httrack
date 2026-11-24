@@ -204,7 +204,7 @@ int hts_zunpack_max(const char *filename, const char *newfile, LLint cap) {
   return ret;
 }
 
-size_t hts_zhead(const void *in, size_t in_len, void *out, size_t out_len) {
+size_t hts_zhead(hts_span in, hts_buf out) {
   z_stream zs;
   size_t n = 0;
   int err;
@@ -212,13 +212,13 @@ size_t hts_zhead(const void *in, size_t in_len, void *out, size_t out_len) {
   memset(&zs, 0, sizeof(zs));
   if (inflateInit2(&zs, 47) != Z_OK) /* 47: gzip or zlib, autodetected */
     return 0;
-  zs.next_in = (const Bytef *) in;
-  zs.avail_in = (uInt) in_len;
-  zs.next_out = (Bytef *) out;
-  zs.avail_out = (uInt) out_len;
+  zs.next_in = (const Bytef *) in.p;
+  zs.avail_in = (uInt) in.len;
+  zs.next_out = (Bytef *) out.p;
+  zs.avail_out = (uInt) out.size;
   err = inflate(&zs, Z_SYNC_FLUSH);
   if (err == Z_OK || err == Z_STREAM_END || err == Z_BUF_ERROR)
-    n = out_len - zs.avail_out;
+    n = out.size - zs.avail_out;
   inflateEnd(&zs);
   return n;
 }
@@ -280,7 +280,7 @@ int hts_extract_meta(const char *path) {
   return 0;
 }
 
-const char *hts_get_zerror(int err, char *buf, size_t size) {
+const char *hts_get_zerror(int err, hts_buf buf) {
   switch (err) {
   case UNZ_OK:
     return "no error";
@@ -289,7 +289,7 @@ const char *hts_get_zerror(int err, char *buf, size_t size) {
     return "end of list of file";
     break;
   case UNZ_ERRNO:
-    return hts_strerror(errno, buf, size);
+    return hts_strerror(errno, buf.p, buf.size);
     break;
   case UNZ_PARAMERROR:
     return "parameter error";

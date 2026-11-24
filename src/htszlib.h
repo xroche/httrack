@@ -41,6 +41,7 @@ Please visit our Website: http://www.httrack.com
 #include "minizip/zip.h"
 #include "minizip/unzip.h"
 #include "minizip/mztools.h"
+#include "htsbuf.h"
 
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
@@ -52,13 +53,12 @@ extern int hts_zunpack(const char *filename, const char *newfile);
    HTS_CODEC_TOOBIG when that cap was exceeded. */
 extern int hts_zunpack_max(const char *filename, const char *newfile,
                            LLint cap);
-/* Inflate the head of a gzip/zlib stream, out_len max; 0 if undecodable */
-extern size_t hts_zhead(const void *in, size_t in_len, void *out,
-                        size_t out_len);
+/* Inflate the head of a gzip/zlib stream into OUT; 0 if undecodable */
+extern size_t hts_zhead(hts_span in, hts_buf out);
 extern int hts_extract_meta(const char *path);
-/* The message for a minizip error code. buf (HTS_STRERROR_SIZE) backs the
+/* The message for a minizip error code. BUF (HTS_STRERROR_SIZE) backs the
    UNZ_ERRNO case, where the text comes from errno; the rest are literals. */
-extern const char *hts_get_zerror(int err, char *buf, size_t size);
+extern const char *hts_get_zerror(int err, hts_buf buf);
 /* Open a ZIP through the UTF-8 file wrappers, because minizip's fopen mangles
    a non-ASCII Windows path (#630). `append` takes APPEND_STATUS_* values. */
 extern unzFile hts_unzOpen_utf8(const char *path);

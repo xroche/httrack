@@ -35,6 +35,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsglobal.h"
 #include "htsurlport.h"
+#include "htsbuf.h"
 
 /* Content codings we may meet in a Content-Encoding header. */
 typedef enum {
@@ -78,10 +79,9 @@ extern LLint hts_codec_decode_cap(LLint user_cap);
 /* Does cap, rather than the built-in limit, set the budget for in_size? */
 extern hts_boolean hts_codec_cap_binds(LLint in_size, LLint cap);
 
-/* Decode up to out_len leading bytes of a coded body for the MIME sniffer;
+/* Decode the leading bytes of a coded body into OUT for the MIME sniffer;
    0 when nothing could be decoded. */
-extern size_t hts_codec_head(hts_codec codec, const void *in, size_t in_len,
-                             void *out, size_t out_len);
+extern size_t hts_codec_head(hts_codec codec, hts_span in, hts_buf out);
 
 /* Return the decoded-size ceiling for in_size coded bytes. */
 extern LLint hts_codec_maxout(LLint in_size);

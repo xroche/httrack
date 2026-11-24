@@ -189,7 +189,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   LLint cap;
   hts_boolean sniff, written;
   FILE *fp;
-  unsigned char head[64];
+  char head[64];
   unsigned char *expect_buf = NULL;
   size_t expect_len = 0;
   int ret, expect = FUZZ_CODEC_NO_ORACLE;
@@ -211,8 +211,9 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   }
 
   /* the MIME sniffer's prefix decoder reads the same body from memory */
-  if (sniff && hts_codec_head(codec, body, body_size, head, sizeof(head)) >
-                   sizeof(head)) {
+  if (sniff &&
+      hts_codec_head(codec, hts_span_at((const char *) body, body_size),
+                     HTS_BUF(head)) > sizeof(head)) {
     abort();
   }
   ret = hts_codec_unpack_max(codec, in_path, out_path, cap);
