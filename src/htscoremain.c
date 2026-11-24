@@ -479,20 +479,19 @@ static void cmdl_count_url(int *count) {
    the index of the word the option takes from *NEXT on (-qO <path>), or -1.
    PARAM, or NULL, marks the words taken as a value even when they begin with
    '-'. */
-static hts_boolean cmdl_cluster_step(const char *word, size_t *at, char *name,
-                                     size_t name_size, int argc,
-                                     char *const *argv,
+static hts_boolean cmdl_cluster_step(const char *word, size_t *at, hts_buf name,
+                                     int argc, char *const *argv,
                                      const hts_boolean *param, int *next,
                                      int *value) {
   int pos;
 
-  if (!optcluster_next(word, at, name, name_size))
+  if (!optcluster_next(word, at, name))
     return HTS_FALSE;
-  pos = optreal_find(name);
+  pos = optreal_find(name.p);
   *value = -1;
   /* only a lone -N reads the next word; a clustered one reads its digits */
   if (pos < 0 || optclass_of(pos) != HTS_OPT_PARAM1 ||
-      strcmp(name, "-N") == 0 || *next >= argc ||
+      strcmp(name.p, "-N") == 0 || *next >= argc ||
       (argv[*next][0] == '-' && (param == NULL || !param[*next])))
     return HTS_TRUE;
   *value = (*next)++;
@@ -509,7 +508,7 @@ static int cmdl_cluster_params(cmdl_argv *cmd, const char *word, int argc,
   int next = first;
   int value;
 
-  while (cmdl_cluster_step(word, &at, HTS_SIZED(name), argc, argv, NULL, &next,
+  while (cmdl_cluster_step(word, &at, HTS_BUF(name), argc, argv, NULL, &next,
                            &value)) {
     if (value < 0)
       continue;
@@ -838,7 +837,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
         /* Resolve an option alias, if any */
         result = optalias_check(argc, (const char *const *) argv, na, &tmp_argc,
                                 (char **) tmp_argv, sizeof(_tmp_argv[0]),
-                                HTS_SIZED(tmp_error));
+                                HTS_BUF(tmp_error));
         if (!result) {
           HTS_PANIC_PRINTF(tmp_error);
           return -1;
@@ -932,7 +931,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
           int value;
 
           /* the word the parse loop gives -O, past -P's in -PO */
-          while (cmdl_cluster_step(word, &at, HTS_SIZED(name), argc, argv,
+          while (cmdl_cluster_step(word, &at, HTS_BUF(name), argc, argv,
                                    x_cmd->param, &next, &value)) {
             if (strcmp(name, "-O") == 0) {
               if (value < 0) {
@@ -1580,7 +1579,9 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                 com++;
               if (ndigits > 0)
                 opt->savename_type =
-                    optalias_digits_fit(digits, ndigits) ? atoi(digits) : 0;
+                    optalias_digits_fit(hts_span_at(digits, ndigits))
+                        ? atoi(digits)
+                        : 0;
             }
             break;
           case 'L': {
@@ -1592,7 +1593,8 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
             for (ndigits = 0; hts_isdigit((unsigned char) *(com + 1));
                  ndigits++)
               com++;
-            if (ndigits > 0 && optalias_digits_fit(digits, ndigits))
+            if (ndigits > 0 &&
+                optalias_digits_fit(hts_span_at(digits, ndigits)))
               level = atoi(digits);
             switch (level) {
             case 0: // 8-3 (ISO9660 L1)
@@ -3240,7 +3242,7 @@ static hts_boolean cmdl_shortopt_named(const char *s, const char *opt) {
 
   if (s[0] != '-' || s[1] == '-')
     return HTS_FALSE;
-  while (optcluster_next(s, &at, HTS_SIZED(name)))
+  while (optcluster_next(s, &at, HTS_BUF(name)))
     if (strcmp(name, opt) == 0)
       return HTS_TRUE;
   return HTS_FALSE;

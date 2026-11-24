@@ -664,8 +664,8 @@ static const char *st_optalias_expand(char *dest, size_t dest_size,
   argv[0] = word;
   argv[1] = next;
   out[0][0] = out[1][0] = dest[0] = warn[0] = '\0';
-  *used = optalias_check(argc, argv, 0, &outc, outv, sizeof(out[0]), error,
-                         sizeof(error));
+  *used = optalias_check(argc, argv, 0, &outc, outv, sizeof(out[0]),
+                         HTS_BUF(error));
   if (*used == 0) {
     assertf(error[0] != '\0'); /* a refusal has to say why */
     return NULL;
@@ -902,6 +902,20 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
   EXPANDS("-N0000000001", "--structure=0000000001", NULL);
   EXPANDS("-N0000000001", "-N", "0000000001");
   assertf(used == 2);
+  /* a padded run glues while "-N" plus it fits the output, else stays apart */
+  {
+    char run[HTS_CDLMAXSIZE], want[HTS_CDLMAXSIZE + 4];
+    size_t len;
+
+    for (len = HTS_CDLMAXSIZE - 4; len < HTS_CDLMAXSIZE; len++) {
+      memset(run, '0', len - 1);
+      run[len - 1] = '7';
+      run[len] = '\0';
+      snprintf(want, sizeof(want), "-N%s%s",
+               len < HTS_CDLMAXSIZE - 2 ? "" : " ", run);
+      EXPANDS(want, "-N", run);
+    }
+  }
   /* a %-free value would map every URL onto one name, so it is a typo */
   REFUSES("--structure=OFF", NULL);
   REFUSES("--structure=flat", NULL);

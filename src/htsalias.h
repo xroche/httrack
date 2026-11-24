@@ -36,6 +36,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsglobal.h"
 #include "htsarena.h"
+#include "htsbuf.h"
 
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
@@ -43,15 +44,14 @@ Please visit our Website: http://www.httrack.com
    every int width and falls back to the option's default. */
 #define HTS_SAVENAME_PRESET_MAX_DIGITS 9
 
-/* Whether the LEN-digit run at DIGITS converts to an int rather than
-   overflowing: leading zeros cost nothing, so 0000000001 is the value 1. */
-hts_boolean optalias_digits_fit(const char *digits, size_t len);
+/* Does the digit run DIGITS convert to an int rather than overflow? Leading
+   zeros cost nothing, so 0000000001 is the value 1. */
+hts_boolean optalias_digits_fit(hts_span digits);
 
 extern const char *hts_optalias[][4];
 int optalias_check(int argc, const char *const *argv, int n_arg,
                    int *return_argc, char **return_argv,
-                   size_t return_argv_size, char *return_error,
-                   size_t return_error_size);
+                   size_t return_argv_size, hts_buf return_error);
 int optalias_find(const char *token);
 const char *optalias_help(const char *token);
 int optreal_find(const char *token);
@@ -59,8 +59,7 @@ int optreal_find(const char *token);
    as htscoremain.c's cluster loop splits it, copying each option's name (-O,
    -%P for -&P) to NAME, at least 5 bytes. A glued digit comes back as an
    option of its own (-1), which names none. Returns HTS_FALSE past the end. */
-hts_boolean optcluster_next(const char *token, size_t *at, char *name,
-                            size_t name_size);
+hts_boolean optcluster_next(const char *token, size_t *at, hts_buf name);
 /* Reads the -%c rate at VAL. Returns the bytes it spans: the number, or the
    rest of the word when no usable rate is there, in which case *RATE is -1. */
 size_t optrate_read(const char *val, double *rate);

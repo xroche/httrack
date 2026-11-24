@@ -94,7 +94,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
       int back_n = 0;
 
       (void) optalias_check(nargs, (const char *const *) args, i, &rac, ra,
-                            HTS_CDLMAXSIZE, HTS_SIZED(err));
+                            HTS_CDLMAXSIZE, HTS_BUF(err));
       (void) optalias_help(args[i]);
       (void) optrate_read(args[i], &rate);
 
