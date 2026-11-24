@@ -506,24 +506,18 @@ static hts_boolean ftp_decode_userinfo(hts_span src, hts_buf dst) {
   return hts_is_control_free_sized(dst.p, j);
 }
 
-/* Split a hostile-URL "user[:pass]@" prefix (see htsftp.h). */
-hts_boolean ftp_split_userpass(const char *src, const char *end, hts_buf user,
-                               hts_buf pass) {
-  size_t len = 0, user_len;
-  const char *colon;
+/* Split a hostile-URL "user[:pass]" userinfo (see htsftp.h). */
+hts_boolean ftp_split_userpass(hts_span info, hts_buf user, hts_buf pass) {
+  /* the raw colon, so %3A stays in the name */
+  const char *const colon = memchr(info.p, ':', info.len);
+  const size_t user_len = colon != NULL ? (size_t) (colon - info.p) : info.len;
 
   assertf(user.size > 0 && pass.size > 0); /* the size-1 math underflows on 0 */
-  assertf(end > src);                      /* end is one past the '@' */
-
   // fail safe for a caller that ignores the result
   user.p[0] = pass.p[0] = '\0';
-  while (len < (size_t) (end - src) - 1 && src[len] != '\0')
-    len++;
-  colon = memchr(src, ':', len); /* the raw colon, so %3A stays in the name */
-  user_len = colon != NULL ? (size_t) (colon - src) : len;
-  if (!ftp_decode_userinfo(hts_span_at(src, user_len), user) ||
+  if (!ftp_decode_userinfo(hts_span_at(info.p, user_len), user) ||
       (colon != NULL &&
-       !ftp_decode_userinfo(hts_span_at(colon + 1, len - user_len - 1),
+       !ftp_decode_userinfo(hts_span_at(colon + 1, info.len - user_len - 1),
                             pass))) {
     user.p[0] = pass.p[0] = '\0';
     return HTS_FALSE;
@@ -815,7 +809,8 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
 
   real_adr = ftp_jump_authority(back->url_adr);
   if ((adr = jump_identification(real_adr)) != real_adr) {      // user
-    if (!ftp_split_userpass_buf(real_adr, adr, user, pass)) {
+    if (!ftp_split_userpass_buf(hts_span_between(real_adr, adr - 1), user,
+                                pass)) {
       ftp_fail(&back->r, "FTP user name or password too long or invalid");
       goto done;
     }

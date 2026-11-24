@@ -75,7 +75,7 @@ static void ftp_split_url(char *url) {
   int port = 21;
 
   if ((adr = jump_identification(real_adr)) != real_adr &&
-      ftp_split_userpass_buf(real_adr, adr, user, pass) &&
+      ftp_split_userpass_buf(hts_span_between(real_adr, adr - 1), user, pass) &&
       (strlen(user) >= sizeof(user) || strlen(pass) >= sizeof(pass)))
     ftp_fail("userpass", real_adr);
   path = strchr(adr, '/');

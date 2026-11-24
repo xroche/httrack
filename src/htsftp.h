@@ -86,9 +86,9 @@ int ftp_scratch_selftests(httrackp *opt);
 
 int run_launch_ftp(FTPDownloadStruct * params);
 int send_line(T_SOC soc, const char *data);
-/* Read one control-channel reply into line, clipped; a size-0 line discards it.
-   Returns 0 on error. Optional back ends the wait on a stop, opt clips it to
-   --max-time. */
+/* Read one control-channel reply into line, clipped. A size-0 line discards
+   the reply. Returns 0 on error. Optional back ends the wait on a stop, opt
+   clips it to --max-time. */
 int get_ftp_line(lien_back *back, T_SOC soc, hts_buf line, int timeout,
                  const httrackp *opt);
 /* Start of the authority in a URL address: the scheme and its slashes skipped.
@@ -100,19 +100,18 @@ char *ftp_jump_authority(char *url_adr);
    port (#614). */
 hts_boolean ftp_split_hostport(const char *adr, hts_buf host, int *port,
                                hts_buf err);
-/* Split a "user[:pass]@" prefix (end = jump_identification result) on its
-   first raw colon and percent-decode each field into NUL-terminated user/pass
-   buffers. Returns HTS_FALSE and empties both when a decoded field does not
-   fit, as a clipped one would name another account, or holds a control byte.
-   Both sizes must be nonzero. */
-hts_boolean ftp_split_userpass(const char *src, const char *end, hts_buf user,
-                               hts_buf pass);
+/* Split a "user[:pass]" userinfo, without its '@', on its first raw colon and
+   percent-decode each field into NUL-terminated user/pass buffers. Returns
+   HTS_FALSE and empties both when a decoded field does not fit, as a clipped
+   one would name another account, or holds a control byte. Both sizes must be
+   nonzero. */
+hts_boolean ftp_split_userpass(hts_span info, hts_buf user, hts_buf pass);
 /* ftp_split_userpass() into the caller's fixed buffers; a buffer too wide for
    its "USER <user>" line would be clipped again when the command is built. */
-#define ftp_split_userpass_buf(src, end, user, pass)                           \
+#define ftp_split_userpass_buf(info, user, pass)                               \
   (HTS_COMPILE_ASSERT(sizeof(user) + sizeof("USER ") - 1 <= FTP_LINE_SIZE &&   \
                       sizeof(pass) + sizeof("PASS ") - 1 <= FTP_LINE_SIZE),    \
-   ftp_split_userpass((src), (end), HTS_BUF(user), HTS_BUF(pass)))
+   ftp_split_userpass((info), HTS_BUF(user), HTS_BUF(pass)))
 /* Build "<verb> <path>" into line. The path is quoted whenever a bare one
    would give the server a second token; it must already have been screened
    for control bytes. Returns HTS_FALSE and empties line when the command does
