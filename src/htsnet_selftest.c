@@ -1347,8 +1347,32 @@ static int st_catchurl_overlong(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* What one catch_url_init* listener must hold. Consumes srv. */
-static void st_catchurl_check_bind(T_SOC srv, int port, const char *adr) {
+/* The deprecated entry points are what these measure, so silence them here. */
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#elif defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4996)
+#endif
+static T_SOC st_catchurl_init_legacy(int *port, char *adr) {
+  return catch_url_init_std(port, adr);
+}
+
+static hts_boolean st_catchurl_legacy(T_SOC soc, char *url, char *method,
+                                      char *data) {
+  return catch_url(soc, url, method, data);
+}
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#elif defined(_MSC_VER)
+#pragma warning(pop)
+#endif
+
+/* What one catch_url_init* listener must hold, captured through the legacy or
+   the sized catch_url. Consumes srv. */
+static void st_catchurl_check_bind(T_SOC srv, int port, const char *adr,
+                                   hts_boolean legacy) {
   char BIGSTK url[HTS_URLMAXSIZE * 2];
   char method[32];
   char *data = malloct(CATCH_URL_DATA_SIZE);
@@ -1375,8 +1399,11 @@ static void st_catchurl_check_bind(T_SOC srv, int port, const char *adr) {
   arg.tail = 7;
   url[0] = method[0] = data[0] = '\0';
   assertf(hts_newthread(st_catchurl_client, &arg) == 0);
-  assertf(catch_url_capture(srv, url, sizeof(url), method, sizeof(method), data,
-                            CATCH_URL_DATA_SIZE) == CATCH_URL_OK);
+  if (legacy)
+    assertf(st_catchurl_legacy(srv, url, method, data));
+  else
+    assertf(catch_url_sized(srv, HTS_SIZED(url), HTS_SIZED(method), data,
+                            CATCH_URL_DATA_SIZE));
   htsthread_wait();
   deletesoc(srv);
   assertf(strcmp(method, "GET") == 0);
@@ -1384,7 +1411,7 @@ static void st_catchurl_check_bind(T_SOC srv, int port, const char *adr) {
   freet(data);
 }
 
-/* Both entry points, and the CLI's 8080 and ephemeral binds, use loopback. */
+/* Every entry point, and the CLI's 8080 and ephemeral binds, use loopback. */
 static int st_catchurl_bind(httrackp *opt, int argc, char **argv) {
   char adr[128];
   T_SOC srv;
@@ -1393,14 +1420,31 @@ static int st_catchurl_bind(httrackp *opt, int argc, char **argv) {
   /* poisoned, so a listener that wrote nothing is not read as "127.0.0.1" */
   memset(adr, 'x', sizeof(adr) - 1);
   adr[sizeof(adr) - 1] = '\0';
-  srv = catch_url_init(&port, adr);
-  st_catchurl_check_bind(srv, port, adr);
+  srv = catch_url_init(&port, HTS_SIZED(adr));
+  st_catchurl_check_bind(srv, port, adr, HTS_FALSE);
 
   memset(adr, 'x', sizeof(adr) - 1);
-  srv = catch_url_init_std(&port, adr);
-  st_catchurl_check_bind(srv, port, adr);
+  srv = catch_url_init_std_sized(&port, HTS_SIZED(adr));
+  st_catchurl_check_bind(srv, port, adr, HTS_FALSE);
 
-  printf("catchurl bind self-test OK (%s, both entry points)\n", adr);
+  memset(adr, 'x', sizeof(adr) - 1);
+  srv = st_catchurl_init_legacy(&port, adr);
+  st_catchurl_check_bind(srv, port, adr, HTS_TRUE);
+
+  /* one byte short of "127.0.0.1": the listener stands, the address is empty */
+  {
+    char *small = st_sized_alloc(sizeof("127.0.0.1") - 1);
+
+    small[0] = 'x';
+    srv = catch_url_init_std_sized(&port, small, sizeof("127.0.0.1") - 1);
+    assertf(srv != INVALID_SOCKET);
+    assertf(small[0] == '\0' &&
+            st_sized_guard_ok(small, sizeof("127.0.0.1") - 1));
+    deletesoc(srv);
+    freet(small);
+  }
+
+  printf("catchurl bind self-test OK (%s, every entry point)\n", adr);
   return 0;
 }
 
@@ -1830,6 +1874,27 @@ static int st_catchurl_sized(httrackp *opt, int argc, char **argv) {
     freet(url);
     freet(method);
     freet(data);
+  }
+  /* the exported form passes the URL size through: an exact fit, one short */
+  for (i = 0; i < 2; i++) {
+    char *url = st_sized_alloc(cases[i].url);
+    char method[4], data[sizeof(get_want)];
+    st_catchurl_sized_arg arg;
+    const T_SOC srv = st_catchurl_listen(&arg.port);
+    hts_boolean ok;
+
+    arg.req = get;
+    assertf(hts_newthread(st_catchurl_sized_client, &arg) == 0);
+    ok = catch_url_sized(srv, url, cases[i].url, HTS_SIZED(method),
+                         HTS_SIZED(data));
+    htsthread_wait();
+    deletesoc(srv);
+    if (ok != (cases[i].want == CATCH_URL_OK) ||
+        !st_sized_guard_ok(url, cases[i].url)) {
+      printf("catchurl-sized: catch_url_sized case %u\n", (unsigned) i);
+      fail = 1;
+    }
+    freet(url);
   }
   /* a token longer than the scan width is refused, not split */
   if (!st_catchurl_width_ok(CATCH_URL_METHOD_MAX, 19, CATCH_URL_OK) ||

@@ -39,8 +39,8 @@ Please visit our Website: http://www.httrack.com
 
 // Read a CRLF line from a non-blocking socket (waits up to timeout per recv).
 // Returns the line length (0 = empty), or -1 on timeout/EOF/error.
-static int proxy_getline(T_SOC soc, char *s, int max, int timeout) {
-  int j = 0;
+static int proxy_getline(T_SOC soc, hts_buf s, int timeout) {
+  size_t j = 0;
 
   for (;;) {
     unsigned char ch;
@@ -54,9 +54,9 @@ static int proxy_getline(T_SOC soc, char *s, int max, int timeout) {
         continue;
       if (ch == 10) // LF: end of line
         break;
-      if (j >= max - 1)
+      if (j >= s.size - 1)
         return -1; // line too long: bound the read against a hostile proxy
-      s[j++] = (char) ch;
+      s.p[j++] = (char) ch;
     } else if (n == 0) {
       return -1; // connection closed
     } else {
@@ -65,8 +65,8 @@ static int proxy_getline(T_SOC soc, char *s, int max, int timeout) {
       return -1;
     }
   }
-  s[j] = '\0';
-  return j;
+  s.p[j] = '\0';
+  return (int) j;
 }
 
 /* The ":port" of adr's authority, or NULL; never one before host. */
@@ -154,7 +154,7 @@ int http_proxy_tunnel(httrackp *opt, htsblk *retour, const char *adr,
   }
 
   // proxy status line: "HTTP/1.x <code> ..."
-  if (proxy_getline(soc, line, sizeof(line), timeout) < 0) {
+  if (proxy_getline(soc, HTS_BUF(line), timeout) < 0) {
     strcpybuff(retour->msg, "proxy CONNECT: no response");
     return 0;
   }
@@ -171,7 +171,7 @@ int http_proxy_tunnel(httrackp *opt, htsblk *retour, const char *adr,
     int headers = 0;
 
     for (;;) {
-      const int n = proxy_getline(soc, line, sizeof(line), timeout);
+      const int n = proxy_getline(soc, HTS_BUF(line), timeout);
 
       if (n < 0) {
         strcpybuff(retour->msg, "proxy CONNECT: truncated response");

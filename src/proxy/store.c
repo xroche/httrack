@@ -260,11 +260,11 @@ void PT_Delete(PT_Indexes index) {
   }
 }
 
-/* Reads one line into "s" (at most "max" chars plus its NUL) and returns the
-   advance. *cut, when asked for, says the line did not fit. */
-static int binput(char *buff, char *s, int max, hts_boolean *cut) {
+/* Reads one line into "s" and returns the advance. *cut, when asked for, says
+   the line did not fit. */
+static int binput(char *buff, hts_buf s, hts_boolean *cut) {
   int count = 0;
-  int destCount = 0;
+  size_t destCount = 0;
 
   if (cut != NULL) {
     *cut = HTS_FALSE;
@@ -272,15 +272,15 @@ static int binput(char *buff, char *s, int max, hts_boolean *cut) {
   /* Consume the whole line, or the next call reads a clipped tail as a field */
   while (buff[count] != '\0' && buff[count] != '\n') {
     if (buff[count] != '\r') {
-      if (destCount < max) {
-        s[destCount++] = buff[count];
+      if (destCount < s.size - 1) {
+        s.p[destCount++] = buff[count];
       } else if (cut != NULL) {
         *cut = HTS_TRUE;
       }
     }
     count++;
   }
-  s[destCount] = '\0';
+  s.p[destCount] = '\0';
 
   /* Step over a newline only, never the NUL or a truncated field's byte */
   return buff[count] == '\n' ? count + 1 : count;
@@ -1480,7 +1480,7 @@ static int cache_brstr(char *adr, char *s, size_t s_size) {
   const char *num = buff;
   LLint len;
 
-  off = binput(adr, buff, 256, NULL);
+  off = binput(adr, HTS_BUF_N(buff, 256 + 1), NULL);
   /* no length-prefixed value follows a field the terminating NUL stopped */
   if (adr[off] == '\0') {
     s[0] = '\0';
@@ -1681,18 +1681,10 @@ static int PT_LoadCache__Old(PT_Index index_, const char *filename) {
             if (a) {
               a++;
               /* read "host/file" */
-              a += binput(a, line, HTS_URLMAXSIZE, NULL);
-              {
-                /* binput writes its NUL at s[max], so the second field must be
-                   bounded by what is left of line[], not by the same constant
-                 */
-                const size_t used = strlen(line);
-
-                a += binput(a, line + used, (int) (sizeof(line) - used - 1),
-                            NULL);
-              }
+              a += binput(a, HTS_BUF_N(line, HTS_URLMAXSIZE + 1), NULL);
+              a += binput(a, hts_buf_skip(HTS_BUF(line), strlen(line)), NULL);
               /* read position */
-              a += binput(a, linepos, 200, NULL);
+              a += binput(a, HTS_BUF_N(linepos, 200 + 1), NULL);
               /* an unparseable field must not carry the previous entry's
                  offset over, nor read the stack on the first one */
               if (sscanf(linepos, "%d", &pos) != 1)
@@ -2543,16 +2535,15 @@ typedef struct PT_SaveCache__Arc_t {
   char md5[32 + 2];
 } PT_SaveCache__Arc_t;
 
-/* Append src to an .arc header block of capacity size, clipping what does not
-   fit: the values come from a cache entry, so shortening beats dropping it.
-   HTS_FALSE when it had to clip. */
-static hts_boolean arc_headers_cat(char *headers, size_t size,
-                                   const char *src) {
-  const size_t used = strlen(headers);
-  const size_t left = used < size - 1 ? size - used - 1 : 0;
+/* Append src to an .arc header block of capacity headers.size, clipping what
+   does not fit: the values come from a cache entry, so shortening beats
+   dropping it. HTS_FALSE when it had to clip. */
+static hts_boolean arc_headers_cat(hts_buf headers, const char *src) {
+  const size_t used = strlen(headers.p);
+  const size_t left = used < headers.size - 1 ? headers.size - used - 1 : 0;
 
   if (left != 0) {
-    strlncatbuff(headers, src, size, left);
+    strlncatbuff(headers.p, src, headers.size, left);
   }
   return strlen(src) <= left ? HTS_TRUE : HTS_FALSE;
 }
@@ -2564,7 +2555,7 @@ static int PT_SaveCache__Arc_Fun(void *arg, const char *url, PT_Element element)
   struct tm *tm = convert_time_rfc822(&st->buff, element->lastmodified);
   struct tm unknown_date;
   /* the two strcatbuff calls closing the block rely on these 4 bytes */
-  const size_t room = sizeof(st->headers) - 4;
+  const hts_buf room = HTS_BUF_N(st->headers, sizeof(st->headers) - 4);
   hts_boolean fit;
   int size_headers;
 
@@ -2582,31 +2573,30 @@ static int PT_SaveCache__Arc_Fun(void *arg, const char *url, PT_Element element)
     tm = &unknown_date;
   }
 
-  fit = slprintfbuff(st->headers, room,
-                     "HTTP/1.0 %d %s"
-                     "\r\n"
-                     "X-Server: ProxyTrack " PROXYTRACK_VERSION "\r\n"
-                     "Content-type: %s%s%s%s"
-                     "\r\n"
-                     "Last-modified: %s"
-                     "\r\n"
-                     "Content-length: %d"
-                     "\r\n",
-                     element->statuscode, element->msg,
-                     /**/ hts_effective_mime(element->contenttype),
-                     (element->charset[0] ? "; charset=\"" : ""),
-                     (element->charset[0] ? element->charset : ""),
-                     (element->charset[0] ? "\"" : ""),
-                     /**/ element->lastmodified, (int) body_size);
+  fit = hts_buf_printf(room,
+                       "HTTP/1.0 %d %s"
+                       "\r\n"
+                       "X-Server: ProxyTrack " PROXYTRACK_VERSION "\r\n"
+                       "Content-type: %s%s%s%s"
+                       "\r\n"
+                       "Last-modified: %s"
+                       "\r\n"
+                       "Content-length: %d"
+                       "\r\n",
+                       element->statuscode, element->msg,
+                       /**/ hts_effective_mime(element->contenttype),
+                       (element->charset[0] ? "; charset=\"" : ""),
+                       (element->charset[0] ? element->charset : ""),
+                       (element->charset[0] ? "\"" : ""),
+                       /**/ element->lastmodified, (int) body_size);
   if (element->location != NULL && element->location[0] != '\0') {
-    if (!arc_headers_cat(st->headers, room, "Location: ") ||
-        !arc_headers_cat(st->headers, room, element->location) ||
-        !arc_headers_cat(st->headers, room, "\r\n")) {
+    if (!arc_headers_cat(room, "Location: ") ||
+        !arc_headers_cat(room, element->location) ||
+        !arc_headers_cat(room, "\r\n")) {
       fit = HTS_FALSE;
     }
   }
-  if (element->headers != NULL &&
-      !arc_headers_cat(st->headers, room, element->headers)) {
+  if (element->headers != NULL && !arc_headers_cat(room, element->headers)) {
     fit = HTS_FALSE;
   }
   /* a clip landing mid-line must still end it, or the body reads as a header */

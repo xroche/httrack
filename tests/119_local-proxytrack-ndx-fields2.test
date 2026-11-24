@@ -91,6 +91,24 @@ convert "$dir/first.ndx" "first entry"
 test "$(mime_of "$dir/out.arc" example.com/a.html)" = audio/midi ||
     fail "an unparseable position on the first entry did not read as 0"
 
+# Length of the URL proxytrack builds from index fields of $1 and $2 bytes.
+url_len() {
+    record audio/midi ZERO ZEROBODY >"$dir/u.dat"
+    {
+        enc CACHE-1.4
+        enc "Wed, 01 Jan 2025 00:00:00 GMT"
+        printf 'X\nexample.com/%s\n%s\n0\n' "$(repeat_chars $(($1 - 12)) f)" \
+            "$(repeat_chars "$2" s)"
+    } >"$dir/u.ndx"
+    convert "$dir/u.ndx" "index fields of $1 and $2 bytes"
+    grep -a -m1 '^http://example.com/f' "$dir/out.arc" | awk '{ print length($1) - 7 }'
+}
+
+# The first field keeps 1024 bytes, and both share a 2048-byte line.
+test "$(url_len 1024 4)" = 1028 || fail "a 1024-byte first index field was cut"
+test "$(url_len 1025 4)" = 1028 || fail "a first index field kept more than 1024 bytes"
+test "$(url_len 1024 1100)" = 2047 || fail "the two index fields did not fill 2047 bytes"
+
 # The .ndx name reaches the copy before anything opens it, so no file needed.
 long=$(printf '%3000s' '' | tr ' ' 'x')
 convert "$dir/$long.ndx" "over-long .ndx name"

@@ -54,7 +54,7 @@ static int st_duration(httrackp *opt, int argc, char **argv) {
   if (argc < 1)
     return 1;
   sec2str(lng, sizeof(lng), (TStamp) strtoll(argv[0], NULL, 10));
-  qsec2str(shrt, (TStamp) strtoll(argv[0], NULL, 10));
+  qsec2str_sized(HTS_SIZED(shrt), (TStamp) strtoll(argv[0], NULL, 10));
   printf("%s|%s\n", lng, shrt);
   return 0;
 }
@@ -5489,7 +5489,26 @@ static hts_boolean st_sized_len_ok(const char *buf, size_t cap, size_t full) {
          st_sized_guard_ok(buf, cap);
 }
 
-/* The duration and date writers clip to the size they are given. */
+/* The deprecated forms are what these measure, so silence them here only. */
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#elif defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4996)
+#endif
+static void st_qsec2str_legacy(char *st, TStamp t) { qsec2str(st, t); }
+
+static void st_infostatuscode_legacy(char *msg, int code) {
+  infostatuscode(msg, code);
+}
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#elif defined(_MSC_VER)
+#pragma warning(pop)
+#endif
+
+/* The duration, date and status writers clip to the size they are given. */
 static int st_lib_sized(httrackp *opt, int argc, char **argv) {
   /* Each row exercises one branch of the duration formatter. */
   static const struct {
@@ -5502,6 +5521,17 @@ static int st_lib_sized(httrackp *opt, int argc, char **argv) {
               {5, "5 seconds"}};
 
   static const char qdur[] = "2147483647d,23h,59min59s";
+
+  /* clipped, one byte short, an exact fit, and the unknown-code fallback */
+  static const struct {
+    int code;
+    size_t cap;
+    const char *want;
+  } codes[] = {{404, 4, "Not Found"},
+               {404, 9, "Not Found"},
+               {404, 10, "Not Found"},
+               {799, 8, "Unknown error"},
+               {799, 14, "Unknown error"}};
   static const char date[] = "Sun, 06 Nov 1994 08:49:37 GMT";
   static const char mdate[] = "Tue, 29 Feb 2000 00:00:00 GMT";
   /* The caps are 8 bytes, one byte short, and an exact fit. */
@@ -5576,13 +5606,51 @@ static int st_lib_sized(httrackp *opt, int argc, char **argv) {
     }
     freet(buf);
   }
-  {
-    /* the longest short form fits the 32 bytes qsec2str() documents */
-    char *buf = st_sized_alloc(32);
+  for (k = 0; k < 4; k++) {
+    /* one byte short, an exact fit, and the 32 bytes qsec2str() assumes */
+    const size_t qcaps[] = {8, sizeof(qdur) - 1, sizeof(qdur), 32};
+    char *buf = st_sized_alloc(qcaps[k]);
+    const TStamp longest = (TStamp) 2147483647 * 86400 + 86399;
 
-    qsec2str(buf, (TStamp) 2147483647 * 86400 + 86399);
-    if (!st_sized_clip_ok(buf, 32, qdur)) {
-      printf("lib-sized: qsec2str wrote '%.32s'\n", buf);
+    if (k == 3)
+      st_qsec2str_legacy(buf, longest);
+    else
+      qsec2str_sized(buf, qcaps[k], longest);
+    if (!st_sized_clip_ok(buf, qcaps[k], qdur)) {
+      printf("lib-sized: qsec2str into %u bytes wrote '%.32s'\n",
+             (unsigned) qcaps[k], buf);
+      fail = 1;
+    }
+    freet(buf);
+  }
+  for (i = 0; i < sizeof(codes) / sizeof(codes[0]); i++) {
+    char *buf = st_sized_alloc(codes[i].cap);
+
+    infostatuscode_sized(buf, codes[i].cap, codes[i].code);
+    if (!st_sized_clip_ok(buf, codes[i].cap, codes[i].want)) {
+      printf("lib-sized: infostatuscode(%d) into %u bytes\n", codes[i].code,
+             (unsigned) codes[i].cap);
+      fail = 1;
+    }
+    freet(buf);
+  }
+  {
+    /* the longest reason phrase fits the 64 bytes infostatuscode() assumes */
+    const char *want = "";
+    int code = 0, c;
+    char *buf = st_sized_alloc(64);
+
+    for (c = 100; c < 600; c++) {
+      const char *const text = infostatuscode_const(c);
+
+      if (text != NULL && strlen(text) > strlen(want)) {
+        want = text;
+        code = c;
+      }
+    }
+    st_infostatuscode_legacy(buf, code);
+    if (strlen(want) < 30 || !st_sized_clip_ok(buf, 64, want)) {
+      printf("lib-sized: infostatuscode(%d) wrote '%.64s'\n", code, buf);
       fail = 1;
     }
     freet(buf);

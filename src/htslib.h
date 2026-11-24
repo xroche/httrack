@@ -136,9 +136,10 @@ char *hts_getcategory(const char *filename);
 /** Open a capture socket on 127.0.0.1, port *port (0 picks a free port). No
     other host can reach it, because the request it captures carries the
     browser's cookies for the target site. Writes the bound port back to *port
-    and its dotted address into @p adr (a caller buffer of at least 128 bytes),
-    and returns the listening socket. Returns INVALID_SOCKET on failure. */
-T_SOC catch_url_init(int *port, char *adr);
+    and its dotted address into @p adr of @p adr_size bytes (left empty if the
+    address does not fit), and returns the listening socket. Returns
+    INVALID_SOCKET on failure. */
+T_SOC catch_url_init(int *port, char *adr, size_t adr_size);
 
 /** Whether the directory containing @p path exists. The basename is stripped
     first, so passing a file path tests its parent directory. @return 1 if it is
@@ -730,6 +731,8 @@ hts_boolean binput_line(const char *buff, const char *end, char *s, int max,
 hts_boolean hts_header_is_read(const char *line);
 const char *strstrcase(const char *s, const char *o);
 int ident_url_absolute(const char *url, lien_adrfil *adrfil);
+/* Collapse "./" and "../" segments of @p f in place. An empty path becomes
+   "./", so @p f needs at least 3 bytes. */
 void fil_simplifie(char *f);
 void map_characters(unsigned char *buffer, unsigned int size,
                     unsigned int *map);

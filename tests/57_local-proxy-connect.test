@@ -151,6 +151,17 @@ grep -q "proxy CONNECT refused" "$wrap/out/hts-log.txt" ||
     fail_dump "the crawl did not report the refused CONNECT" "$wrap/out/hts-log.txt"
 echo "OK: a status code of 2^32+200 refuses the CONNECT tunnel"
 
+# A 1023-byte reply line fits the 1024-byte line buffer, one more is refused.
+for n in 1023 1024; do
+    start_server "$tmpdir/hdr$n" "hdr$n"
+    run_crawl "$tmpdir/hdr$n/out" "connect://127.0.0.1:${proxy_port}" "$origin_port" || true
+done
+grep -rq "ORIGIN-PAGE-564" "$tmpdir/hdr1023/out" ||
+    fail_dump "a 1023-byte CONNECT reply line was refused" "$tmpdir/hdr1023/out/hts-log.txt"
+grep -q "proxy CONNECT: truncated response" "$tmpdir/hdr1024/out/hts-log.txt" ||
+    fail_dump "a 1024-byte CONNECT reply line was accepted" "$tmpdir/hdr1024/out/hts-log.txt"
+echo "OK: a CONNECT reply line is bounded at 1023 bytes"
+
 # A proxy that answers 200 then streams headers forever must not hang the crawl.
 flood="$tmpdir/flood"
 start_server "$flood" flood

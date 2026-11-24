@@ -13,6 +13,7 @@ Proxy modes (argv[2], default "ok"):
   flood - answer 200 then stream headers forever with no blank line, to exercise
           the client's bound on the proxy response (must not hang the crawl)
   wrap  - tunnel, but answer the CONNECT with status 2^32+200
+  hdrN  - tunnel, with one N-byte header line in the CONNECT reply
 
 Usage: proxy-connect-server.py <logdir> [mode]
 Prints "ORIGIN <port>", "PROXY <port>", then "ready" (one per line) on stdout.
