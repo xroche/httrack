@@ -579,7 +579,7 @@ hts_boolean cookie_domain_match(const char *jar_dom, const char *host) {
   if (host[host_len - dom_len - 1] != '.')
     return HTS_FALSE;
   // an address has no parent domain, or "1.1" would reach 192.168.1.1
-  if (hts_host_is_address(host, host_len))
+  if (hts_host_is_address(hts_span_at(host, host_len)))
     return HTS_FALSE;
   return HTS_TRUE;
 }
@@ -595,7 +595,8 @@ static hts_boolean cookie_domain_is_suffix(const char *domain) {
   len = strlen(domain);
   if (len != 0 && domain[len - 1] == '.')
     len--;
-  if (len == 0 || !hts_psl_loaded() || hts_host_is_address(domain, len))
+  if (len == 0 || !hts_psl_loaded() ||
+      hts_host_is_address(hts_span_at(domain, len)))
     return HTS_FALSE;
   // no caller passes a longer one, and a clipped copy names another domain
   if (!hts_buf_put_span(HTS_BUF(dom), hts_span_at(domain, len)))
@@ -1058,7 +1059,7 @@ const char *cookie_flat_bind(const char *url, char *host, size_t host_size,
   if (!cookie_url_host(url, host, host_size))
     return NULL;
   // an address or a public suffix has no parent domain to share cookies with
-  domain = hts_host_is_address(host, strlen(host))
+  domain = hts_host_is_address(hts_span_of(host))
                ? NULL
                : hts_psl_registrable_domain(host);
   attr->host_only = domain == NULL;

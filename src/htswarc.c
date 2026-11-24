@@ -585,7 +585,7 @@ static int surt_canon(const char *url, wbuf *out) {
     return -1;
 
   url_len = strlen(url);
-  (void) hts_url_view_parse(url, url_len, &v);
+  (void) hts_url_view_parse(hts_span_at(url, url_len), &v);
   if (hts_span_eq_ci(v.scheme, hts_span_of("http")))
     def_port = 80;
   else if (hts_span_eq_ci(v.scheme, hts_span_of("https")))
@@ -601,7 +601,7 @@ static int surt_canon(const char *url, wbuf *out) {
   hostbuf[hlen] = '\0';
 
   if (!is_ipv6)
-    is_ip = hts_host_is_ipv4(hostbuf, hlen);
+    is_ip = hts_host_is_ipv4(hts_span_at(hostbuf, hlen));
 
   if (!is_ipv6 && !is_ip && hlen >= 4 && hostbuf[0] == 'w' &&
       hostbuf[1] == 'w' && hostbuf[2] == 'w') {

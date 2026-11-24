@@ -504,7 +504,7 @@ static hts_boolean ftp_decode_userinfo(const char *src, size_t len, char *dst,
     }
   }
   dst[j] = '\0';
-  return hts_is_control_free_sized(dst, j);
+  return hts_is_control_free_span(hts_span_at(dst, j));
 }
 
 /* Split a hostile-URL "user[:pass]@" prefix (see htsftp.h). */

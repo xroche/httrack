@@ -1691,8 +1691,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
             int i;
             unsigned int nspec = 0;
 
-            map_characters((unsigned char *) r.adr, (unsigned int) r.size,
-                           &map[0]);
+            map_characters(hts_span_at(r.adr, (size_t) r.size), &map[0]);
             for(i = 1; i < 32; i++) {   //  null chars ignored..
               if (!is_realspace(i)
                   && i != 27    /* Damn you ISO2022-xx! */

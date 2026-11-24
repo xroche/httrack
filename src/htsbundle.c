@@ -358,7 +358,7 @@ static const char *bundle_note_url(bundle *b, const char *url) {
   if (!cookie_url_host(url, HTS_SIZED(host)))
     return b->scope_given ? NULL : "cannot work out the bundle's scope";
   // a host with no registrable domain covers itself alone
-  reg = hts_host_is_address(host, strlen(host))
+  reg = hts_host_is_address(hts_span_of(host))
             ? NULL
             : hts_psl_registrable_domain(host);
   snprintf(entry, sizeof(entry), "%s%s", reg != NULL ? "" : "=",
@@ -392,7 +392,7 @@ static const char *bundle_scope_entry(const char *value,
     return "invalid scope";
   strcpybuff(dom, value);
   hts_lowcase(dom);
-  if (hts_host_is_address(dom, strlen(dom)))
+  if (hts_host_is_address(hts_span_of(dom)))
     snprintf(entry, SCOPE_ENTRY_SIZE, "=%s", dom);
   else if (hts_psl_registrable_domain(dom) != NULL)
     strlcpybuff(entry, dom, SCOPE_ENTRY_SIZE);
@@ -888,7 +888,7 @@ HTSEXT_API hts_boolean hts_registrable_domain(const char *host, char *out,
   if (len == 0 || !hts_buf_put_span(HTS_BUF(dom), hts_span_at(host, len)))
     return HTS_FALSE;
   hts_lowcase(dom);
-  if (hts_host_is_address(dom, len))
+  if (hts_host_is_address(hts_span_at(dom, len)))
     return HTS_FALSE;
   reg = hts_psl_registrable_domain(dom);
   if (reg == NULL || strlen(reg) >= size)
@@ -1470,7 +1470,7 @@ static hts_boolean paste_host_entry(const char *host, size_t len,
     return HTS_FALSE;
   if (!cookie_host(given, HTS_SIZED(folded)))
     return HTS_FALSE;
-  reg = hts_host_is_address(folded, strlen(folded))
+  reg = hts_host_is_address(hts_span_of(folded))
             ? folded
             : hts_psl_registrable_domain(folded);
   return reg != NULL && bundle_scope_entry(reg, entry) == NULL;
@@ -1697,7 +1697,7 @@ static const char *paste_name(const char *url, char name[HTS_BUNDLE_NAME_MAX]) {
     host[--len] = '\0';
   // www.github.io is a site of its own, so "www." stays here
   if (hts_registrable_domain(host, name, HTS_BUNDLE_NAME_MAX) &&
-      !hts_host_is_address(name, strlen(name)) &&
+      !hts_host_is_address(hts_span_of(name)) &&
       hts_bundle_name_refusal(name) == NULL)
     return name[0] == '_' && bundle_name_is_device(name + 1) ? taken : NULL;
   if (www)

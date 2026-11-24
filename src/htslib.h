@@ -527,18 +527,17 @@ int check_readinput(htsblk * r);
 int check_readinput_t(T_SOC soc, int timeout);
 int check_writeinput_t(T_SOC soc, int timeout);
 
-/* TRUE if str[0..len) holds no byte below ' '. A control byte in a value the
+/* TRUE if S holds no byte below ' '. A control byte in a value the
    client puts on a protocol line (an FTP command, a CONNECT authority, a
    SOCKS5 host) smuggles a line or a field of its own. */
-HTS_CHECK_RESULT hts_boolean hts_is_control_free_sized(const char *str,
-                                                       size_t len);
+HTS_CHECK_RESULT hts_boolean hts_is_control_free_span(hts_span s);
 
 /* Same over a NUL-terminated string. */
 HTS_CHECK_RESULT hts_boolean hts_is_control_free(const char *str);
 
-/* TRUE if host[0..len) is an IPv4 literal: digits and dots, at least one dot.
-   Such a host has no domain structure to reverse or to widen into. */
-hts_boolean hts_host_is_ipv4(const char *host, size_t len);
+/* TRUE if HOST is an IPv4 literal: digits and dots, at least one dot. Such a
+   host has no domain structure to reverse or to widen into. */
+hts_boolean hts_host_is_ipv4(hts_span host);
 
 /* Base-64 "user:pass" of the userinfo in a URL or proxy name, for a Basic
    Authorization header, into out[out_size] (at least 1100 bytes). Returns 1
@@ -560,8 +559,8 @@ HTS_CHECK_RESULT hts_boolean hts_sni_hostname(const char *url_adr, hts_buf out);
 HTS_CHECK_RESULT hts_boolean hts_ssl_check_cert(SSL *ssl, const char *url_adr);
 #endif
 
-/* TRUE if host[0..len) is an IPv4 or IPv6 address literal. */
-hts_boolean hts_host_is_address(const char *host, size_t len);
+/* TRUE if HOST is an IPv4 or IPv6 address literal. */
+hts_boolean hts_host_is_address(hts_span host);
 
 /* TRUE if this -P proxy name (which keeps its scheme) is a SOCKS5 proxy. */
 hts_boolean hts_proxy_is_socks(const char *name);
@@ -736,8 +735,8 @@ int ident_url_absolute(const char *url, lien_adrfil *adrfil);
 /* Collapse "./" and "../" segments of @p f in place. An empty path becomes
    "./", so @p f needs at least 3 bytes. */
 void fil_simplifie(char *f);
-void map_characters(unsigned char *buffer, unsigned int size,
-                    unsigned int *map);
+/* Count each byte value of S into map[256]. */
+void map_characters(hts_span s, unsigned int *map);
 int ishtml(httrackp * opt, const char *urlfil);
 /* Return 1 if EXT is an HTML extension such as "htm", else -1. */
 int ishtml_ext(hts_span ext);
@@ -768,13 +767,13 @@ typedef struct hts_url_view {
   hts_span fragment; /* without '#' */
 } hts_url_view;
 
-/* Split the LEN bytes at S, NULs included, into *V without copying. Input with
+/* Split URL, NULs included, into *V without copying. Input with
    no scheme starts at its authority, as an adr does. The scheme is an engine
    one ("//" optional) or any other before "://". The authority ends at '/',
    '?', '#' or '\'. Syntax only: return FALSE, *V still filled, on
    - an unclosed '[', or bytes after ']' that are not ":port" (no port then);
    - a port with a non-digit or above 65535. */
-hts_boolean hts_url_view_parse(const char *s, size_t len, hts_url_view *v);
+hts_boolean hts_url_view_parse(hts_span url, hts_url_view *v);
 
 char *jump_protocol(char *source);
 const char *jump_protocol_const(const char *source);
@@ -849,12 +848,11 @@ const char *login_end(const char *adr);
    and '\' before the last '@' preceding the first '/' written as %XX, so its
    login reads as it always has. Returns HTS_FALSE when dst was too small. */
 hts_boolean hts_escape_typed_login(const char *url, char *dst, size_t size);
-/* Copies the n bytes of src to dst of size bytes, writing each byte of set
-   that lies in [from, to) as %XX. An escape that does not fit is dropped
-   whole. Returns HTS_FALSE when dst was too small. */
-hts_boolean hts_escape_span(const char *src, size_t n, const char *from,
-                            const char *to, const char *set, char *dst,
-                            size_t size);
+/* Copies src to dst, writing each byte of set that lies inside escaped, a
+   part of src, as %XX. An escape that does not fit is dropped whole. Returns
+   HTS_FALSE when dst was too small. */
+hts_boolean hts_escape_span(hts_span src, hts_span escaped, const char *set,
+                            hts_buf dst);
 
 /* Is the name opening LINE one of the NULL-terminated NAMES, in any case? */
 hts_boolean header_name_in(const char *line, const char *const *names);

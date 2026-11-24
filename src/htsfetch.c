@@ -393,7 +393,7 @@ static const char *site_key(const fetch_origin *o, size_t *len) {
   size_t n = o->host_len, i, dots = 0;
 
   *len = o->host_len;
-  if (hts_host_is_address(o->host, o->host_len))
+  if (hts_host_is_address(hts_span_at(o->host, o->host_len)))
     return o->host;
   /* "a.example.com." keys on "example.com.", which the list cannot read. */
   if (n > 1 && o->host[n - 1] == '.')
@@ -477,7 +477,7 @@ hts_boolean hts_fetch_trustworthy(const char *adr) {
   if (host.len > 10 && hts_span_ends_with_ci(host, hts_span_of(".localhost")))
     return HTS_TRUE;
   return hts_span_starts_with(host, hts_span_of("127.")) &&
-         hts_host_is_ipv4(o.host, o.host_len);
+         hts_host_is_ipv4(host);
 }
 
 hts_boolean hts_fetch_is_navigation(int dest) {
