@@ -2169,9 +2169,11 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
     String got = STRING_EMPTY;
 
     sf_expand_fixture(opt, tail, sizeof(tail) - 1, &marked);
+    StringAddchar(marked, '9'); /* a digit past the span must not be read */
     StringClear(got);
     (void) singlefile_rewrite_html(
-        opt, root, page, hts_span_at(StringBuff(marked), StringLength(marked)),
+        opt, root, page,
+        hts_span_at(StringBuff(marked), StringLength(marked) - 1),
         SINGLEFILE_MAX_PAGE_SIZE, &got);
     sf_check(StringLength(got) == 11 &&
                  memcmp(StringBuff(got), "nothere.png", 11) == 0,

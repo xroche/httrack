@@ -511,7 +511,7 @@ static void sf_warn_oversize(sf_ctx *ctx, const char *path, LLint size,
 
 static void sf_expand(sf_ctx *ctx, const char *base_dir, int depth,
                       hts_span body, String *out);
-static size_t sf_strip_marks(hts_span intro, hts_buf body);
+static size_t sf_strip_marks(const char *intro, hts_buf body);
 
 /* Replace the reference ref, resolved against base_dir, with its
    data: URI appended to out. rebase_dir re-expresses an un-inlinable asset
@@ -590,8 +590,7 @@ static hts_boolean sf_inline(sf_ctx *ctx, const char *base_dir, hts_span ref,
         const char *const intro = singlefile_intro(ctx->opt);
 
         if (intro != NULL)
-          file_len =
-              sf_strip_marks(hts_span_of(intro), hts_buf_at(file, file_len));
+          file_len = sf_strip_marks(intro, hts_buf_at(file, file_len));
       }
       done = sf_append_base64(&payload, file, file_len);
     }
@@ -642,46 +641,43 @@ static void sf_warn_unresolved(sf_ctx *ctx, hts_span ref) {
 }
 
 /* Parse the mark at the start of s: "<intro>.<class>.<len>". Returns its
-   length, or 0 if it is not one. An intro with a NULL p matches any well-formed
-   secret of intro.len bytes, so a later run can delete marks an interrupted one
-   left behind without its secret. */
-static size_t sf_parse_mark(hts_span intro, hts_span s, char *cls,
+   length, or 0 if it is not one. intro is SINGLEFILE_INTRO_LEN bytes. A NULL
+   intro matches any well-formed secret, so a later run can delete marks an
+   interrupted one left behind without its secret. */
+static size_t sf_parse_mark(const char *intro, hts_span s, char *cls,
                             size_t *reflen) {
-  const char *const p = s.p;
-  const size_t avail = s.len;
-  const size_t introlen = intro.len;
-  size_t i = introlen;
+  size_t i = SINGLEFILE_INTRO_LEN;
   size_t n = 0;
   int digits = 0;
 
-  if (avail < introlen)
+  if (s.len < SINGLEFILE_INTRO_LEN)
     return 0;
-  if (intro.p != NULL) {
-    if (memcmp(p, intro.p, introlen) != 0)
+  if (intro != NULL) {
+    if (memcmp(s.p, intro, SINGLEFILE_INTRO_LEN) != 0)
       return 0;
   } else {
     size_t k;
 
-    if (memcmp(p, SINGLEFILE_MARK_INTRO, sizeof(SINGLEFILE_MARK_INTRO) - 1) !=
+    if (memcmp(s.p, SINGLEFILE_MARK_INTRO, sizeof(SINGLEFILE_MARK_INTRO) - 1) !=
         0)
       return 0;
-    for (k = sizeof(SINGLEFILE_MARK_INTRO) - 1; k < introlen; k++) {
-      if (!hts_isxdigit((unsigned char) p[k]))
+    for (k = sizeof(SINGLEFILE_MARK_INTRO) - 1; k < SINGLEFILE_INTRO_LEN; k++) {
+      if (!hts_isxdigit((unsigned char) s.p[k]))
         return 0;
     }
   }
-  if (i + 3 >= avail || p[i] != '.')
+  if (i + 3 >= s.len || s.p[i] != '.')
     return 0;
-  *cls = p[++i];
+  *cls = s.p[++i];
   if (*cls != SINGLEFILE_CLASS_ANY && *cls != SINGLEFILE_CLASS_CSS &&
       *cls != SINGLEFILE_CLASS_JS)
     return 0;
-  if (++i >= avail || p[i++] != '.')
+  if (++i >= s.len || s.p[i++] != '.')
     return 0;
-  while (i < avail && p[i] >= '0' && p[i] <= '9') {
+  while (i < s.len && s.p[i] >= '0' && s.p[i] <= '9') {
     if (n > SINGLEFILE_MAX_SPAN) /* saturated: no digit run can overflow n */
       return 0;
-    n = n * 10 + (size_t) (p[i++] - '0');
+    n = n * 10 + (size_t) (s.p[i++] - '0');
     digits++;
   }
   if (digits == 0 || n > SINGLEFILE_MAX_SPAN)
@@ -691,15 +687,15 @@ static size_t sf_parse_mark(hts_span intro, hts_span s, char *cls,
 }
 
 /* Drop every mark from body in place; returns the new length. */
-static size_t sf_strip_marks(hts_span intro, hts_buf body) {
+static size_t sf_strip_marks(const char *intro, hts_buf body) {
   const hts_span in = hts_span_at(body.p, body.size);
   size_t r, w = 0;
 
   for (r = 0; r < in.len;) {
     char cls;
     size_t reflen;
-    const hts_span rest = {in.p + r, in.len - r};
-    const size_t marklen = sf_parse_mark(intro, rest, &cls, &reflen);
+    const size_t marklen =
+        sf_parse_mark(intro, hts_span_skip(in, r), &cls, &reflen);
 
     if (marklen != 0)
       r += marklen;
@@ -716,25 +712,20 @@ static size_t sf_strip_marks(hts_span intro, hts_buf body) {
    which browsers accept but the HTML grammar forbids. */
 static void sf_expand(sf_ctx *ctx, const char *base_dir, int depth,
                       hts_span body, String *out) {
-  const char *const intro_str = singlefile_intro(ctx->opt);
-  hts_span intro;
+  const char *const intro = singlefile_intro(ctx->opt);
   size_t i = 0, flushed = 0;
 
-  if (intro_str == NULL) {
+  if (intro == NULL) {
     StringMemcat(*out, body.p, body.len);
     return;
   }
-  intro = hts_span_of(intro_str);
-  while (i + intro.len <= body.len) {
+  while (i + SINGLEFILE_INTRO_LEN <= body.len) {
     hts_boolean resolved = HTS_FALSE;
     size_t marklen, reflen = 0;
     char cls = SINGLEFILE_CLASS_ANY;
-    const hts_span rest = {body.p + i, body.len - i};
     hts_span ref;
 
-    /* Every mark opens with the intro, so skip the call on any other byte. */
-    marklen =
-        body.p[i] == intro.p[0] ? sf_parse_mark(intro, rest, &cls, &reflen) : 0;
+    marklen = sf_parse_mark(intro, hts_span_skip(body, i), &cls, &reflen);
     /* We wrote the length, but the file may have been truncated since; a
        reference reaching back before what we have is not one of ours. */
     if (marklen == 0 || reflen > i - flushed) {
@@ -856,8 +847,7 @@ static hts_boolean sf_strip_marks_file(httrackp *opt, const char *path) {
   body = sf_readfile(path, &len);
   if (body == NULL)
     return HTS_FALSE;
-  w = sf_strip_marks(hts_span_at(NULL, SINGLEFILE_INTRO_LEN),
-                     hts_buf_at(body, len));
+  w = sf_strip_marks(NULL, hts_buf_at(body, len));
   if (w == len) {
     freet(body);
     return HTS_FALSE;
