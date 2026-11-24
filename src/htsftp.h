@@ -111,8 +111,7 @@ hts_boolean ftp_split_userpass(const char *src, const char *end, char *user,
 #define ftp_split_userpass_buf(src, end, user, pass)                           \
   (HTS_COMPILE_ASSERT(sizeof(user) + sizeof("USER ") - 1 <= FTP_LINE_SIZE &&   \
                       sizeof(pass) + sizeof("PASS ") - 1 <= FTP_LINE_SIZE),    \
-   ftp_split_userpass((src), (end), (user), sizeof(user), (pass),              \
-                      sizeof(pass)))
+   ftp_split_userpass((src), (end), HTS_SIZED(user), HTS_SIZED(pass)))
 /* Build "<verb> <path>" into line. The path is quoted whenever a bare one
    would give the server a second token; it must already have been screened
    for control bytes. Returns HTS_FALSE and empties line when the command does
