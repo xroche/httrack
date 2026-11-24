@@ -1567,7 +1567,7 @@ static void paste_scope_text(const bundle *b, size_t own, const t_cookie *jar,
   if (used == NULL)
     return;
   while (*a != '\0') {
-    a += binput(a, line, (int) sizeof(line) - 1);
+    a += binput(a, HTS_BUF(line));
     if (!cookie_host(cookie_get(HTS_SIZED(buffer), line, 0), HTS_SIZED(host)))
       continue;
     for (i = 0; i < b->nscope; i++) {
@@ -1605,7 +1605,7 @@ static void paste_jar_summary(const t_cookie *jar, int *count,
     char listed[HTS_PASTE_HOSTS_SIZE + 2];
     const char *dom;
 
-    a += binput(a, line, (int) sizeof(line) - 1);
+    a += binput(a, HTS_BUF(line));
     dom = cookie_get(HTS_SIZED(buffer), line, 0);
     if (dom[0] == '.')
       dom++;

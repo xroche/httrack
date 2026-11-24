@@ -1528,7 +1528,9 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
         }
         if (cache->txt) {
 #undef ESC_URL
-#define ESC_URL(S) escape_check_url_addr(S, OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt))
+#define ESC_URL(S)                                                             \
+  escape_check_url_addr(S,                                                     \
+                        hts_buf_at(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt)))
           fprintf(cache->txt,
                   "%d\t" "%s ('%s')\t" "%s\t" "%s%s\t" "%s%s%s\t%s\t"
                   "(from %s%s%s)" LF, back[p].r.statuscode, state,
@@ -4691,14 +4693,14 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                     // ----------------------------------------
                     /* parse the header, status line first */
                     binput_line(back[i].r.adr + ptr,
-                                back[i].r.adr + back[i].r.size, rcvd, 2000,
-                                &adv);
+                                back[i].r.adr + back[i].r.size,
+                                HTS_BUF_N(rcvd, 2000), &adv);
                     ptr += adv;
                     if (strnotempty(rcvd) == 0) {
                       /* Bogus CRLF, OR recycled connection and trailing chunk CRLF */
                       binput_line(back[i].r.adr + ptr,
-                                  back[i].r.adr + back[i].r.size, rcvd, 2000,
-                                  &adv);
+                                  back[i].r.adr + back[i].r.size,
+                                  HTS_BUF_N(rcvd, 2000), &adv);
                       ptr += adv;
                     }
                     // traiter status-line
@@ -4721,7 +4723,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                     do {
                       const hts_boolean cut = binput_line(
                           back[i].r.adr + ptr, back[i].r.adr + back[i].r.size,
-                          rcvd, 2000, &adv);
+                          HTS_BUF_N(rcvd, 2000), &adv);
 
                       ptr += adv;
                       if (cut) {

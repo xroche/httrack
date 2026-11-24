@@ -1,0 +1,28 @@
+#!/bin/bash
+#
+# code64() against the RFC 4648 vectors, with and without its CRLF breaks.
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+times() { printf "$2%.0s" $(seq 1 "$1"); }
+
+selftest_queue "" base64 ""
+selftest_queue "Zg==" base64 f
+selftest_queue "Zm8=" base64 fo
+selftest_queue "Zm9v" base64 foo
+selftest_queue "Zm9vYg==" base64 foob
+selftest_queue "Zm9vYmE=" base64 fooba
+selftest_queue "Zm9vYmFy" base64 foobar
+selftest_queue "AA==" base64 hex:00
+selftest_queue "+/8=" base64 hex:fbff
+selftest_queue "////" base64 hex:ffffff
+# a CRLF follows every 60 input bytes, none before
+selftest_queue "$(times 20 YWJj)\\r\\n" base64 abc 20 1
+selftest_queue "$(times 20 YWJj)\\r\\nYWJj" base64 abc 21 1
+selftest_queue "$(times 20 YWJj)\\r\\n$(times 20 YWJj)\\r\\n" base64 abc 40 1
+selftest_queue "$(times 21 YWJj)" base64 abc 21 0
+selftest_queue "$(times 20 YWFh)\\r\\nYQ==" base64 a 61 1
+
+selftest_run_queued

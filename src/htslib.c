@@ -991,7 +991,7 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
                 !hts_proxy_is_connect(retour->req.proxy.name)) {
               /* only adr is raw here: the other three are %s-scanned */
               print_buffer(&bstr, "%s http://%s%s %s\r\n", method,
-                           escape_check_url_addr(adr, HTS_SIZED(esc)), url,
+                           escape_check_url_addr(adr, HTS_BUF(esc)), url,
                            protocol);
             } else {
               print_buffer(&bstr,
@@ -1029,10 +1029,10 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
       if (!link_has_authority(adr)) { // default http
         print_buffer(&bstr, "http://%s",
                      escape_check_url_addr(jump_identification_const(adr),
-                                           HTS_SIZED(esc)));
+                                           HTS_BUF(esc)));
       } else {                  // ftp:// en proxy http
         direct_url = 1;         // ne pas analyser user/pass
-        print_buffer(&bstr, "%s", escape_check_url_addr(adr, HTS_SIZED(esc)));
+        print_buffer(&bstr, "%s", escape_check_url_addr(adr, HTS_BUF(esc)));
       }
     }
     // NOM DU FICHIER
@@ -1103,12 +1103,11 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
 
         /* one escape per piece, so neither can outgrow its own source buffer */
         HDR_OPEN(HDR_REFERER);
-        print_buffer(
-            &hdr, "Referer: %s%s", scheme,
-            escape_check_url_addr(jump_identification_const(referer_adr),
-                                  HTS_SIZED(esc)));
+        print_buffer(&hdr, "Referer: %s%s", scheme,
+                     escape_check_url_addr(
+                         jump_identification_const(referer_adr), HTS_BUF(esc)));
         print_buffer(&hdr, "%s" H_CRLF,
-                     escape_check_url_addr(referer_fil, HTS_SIZED(esc)));
+                     escape_check_url_addr(referer_fil, HTS_BUF(esc)));
         HDR_CLOSE(HDR_REFERER);
       }
     }
@@ -1147,7 +1146,7 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
           !http_headers_have_field(custom, "Host")) { // not ftp:// for example
         HDR_OPEN(HDR_HOST);
         print_buffer(&hdr, "Host: %s" H_CRLF,
-                     escape_check_url_addr(real_adr, HTS_SIZED(esc)));
+                     escape_check_url_addr(real_adr, HTS_BUF(esc)));
         HDR_CLOSE(HDR_HOST);
       }
 
@@ -3041,8 +3040,8 @@ hts_boolean hts_timeout_elapsed(TStamp since_ms, TStamp now_ms, int timeout_s) {
 }
 
 /* Writes t seconds as days, hours, minutes and seconds, dropping the empty
-   leading units, clipped to size bytes. */
-static void duration_str(char *st, size_t size, TStamp t, hts_boolean quick) {
+   leading units, clipped to ST. */
+static void duration_str(hts_buf st, TStamp t, hts_boolean quick) {
   const int j = (int) (t / (3600 * 24));
   int h, m, s;
 
@@ -3054,29 +3053,29 @@ static void duration_str(char *st, size_t size, TStamp t, hts_boolean quick) {
   s = (int) t;
 
   if (j > 0)
-    snprintf(st, size,
+    snprintf(st.p, st.size,
              quick == HTS_TRUE ? "%dd,%02dh,%02dmin%02ds"
                                : "%d days, %d hours %d minutes %d seconds",
              j, h, m, s);
   else if (h > 0)
-    snprintf(st, size,
+    snprintf(st.p, st.size,
              quick == HTS_TRUE ? "%dh,%02dmin%02ds"
                                : "%d hours %d minutes %d seconds",
              h, m, s);
   else if (m > 0)
-    snprintf(st, size,
+    snprintf(st.p, st.size,
              quick == HTS_TRUE ? "%dmin%02ds" : "%d minutes %d seconds", m, s);
   else
-    snprintf(st, size, quick == HTS_TRUE ? "%ds" : "%d seconds", s);
+    snprintf(st.p, st.size, quick == HTS_TRUE ? "%ds" : "%d seconds", s);
 }
 
 void sec2str(char *st, size_t size, TStamp t) {
-  duration_str(st, size, t, HTS_FALSE);
+  duration_str(hts_buf_at(st, size), t, HTS_FALSE);
 }
 
 /* Contract in httrack-library.h. */
 HTSEXT_API void qsec2str_sized(char *st, size_t size, TStamp t) {
-  duration_str(st, size, t, HTS_TRUE);
+  duration_str(hts_buf_at(st, size), t, HTS_TRUE);
 }
 
 // the 32 bytes the deprecated contract documents
@@ -3438,18 +3437,19 @@ int sendc(htsblk * r, const char *s) {
 
 // Like linput, but in memory (optimized). A line too long for `s` is clipped
 // but consumed whole: resuming inside it reads its tail back as another line.
-int binput(const char *buff, char *s, int max) {
+int binput(const char *buff, hts_buf s) {
   int count = 0;
-  int destCount = 0;
+  size_t destCount = 0;
 
+  assertf(s.size != 0);
   // Note: \0 will return 1
   while (buff != NULL && buff[count] != '\0' && buff[count] != '\n') {
-    if (buff[count] != '\r' && destCount < max) {
-      s[destCount++] = buff[count];
+    if (buff[count] != '\r' && destCount < s.size - 1) {
+      s.p[destCount++] = buff[count];
     }
     count++;
   }
-  s[destCount] = '\0';
+  s.p[destCount] = '\0';
 
   // then return the supplemental jump offset
   return count + 1;
@@ -3479,25 +3479,26 @@ hts_boolean hts_header_is_read(const char *line) {
   return HTS_FALSE;
 }
 
-hts_boolean binput_line(const char *buff, const char *end, char *s, int max,
+hts_boolean binput_line(const char *buff, const char *end, hts_buf s,
                         int *offset) {
   hts_boolean cut = HTS_FALSE;
   const char *p;
-  int j = 0;
+  size_t j = 0;
 
+  assertf(s.size != 0);
   *offset = 0;
-  s[0] = '\0';
+  s.p[0] = '\0';
   if (buff == NULL || buff >= end)
     return HTS_FALSE;
   for (p = buff; p < end && *p != '\0' && *p != '\n'; p++) {
     if (*p == '\r')
       continue;
-    if (j < max - 1)
-      s[j++] = *p;
+    if (j < s.size - 1)
+      s.p[j++] = *p;
     else
       cut = HTS_TRUE; /* keep walking: the tail must not become more headers */
   }
-  s[j] = '\0';
+  s.p[j] = '\0';
   *offset = (int) (p - buff) + 1; /* binput's convention: step over the \n */
   return cut;
 }
@@ -3638,14 +3639,13 @@ static hts_boolean has_login(const char *adr) {
   return login_end(adr) > login_start(adr) ? HTS_TRUE : HTS_FALSE;
 }
 
-const char *adr_nologin_r(char *buf, size_t size, const char *adr) {
+const char *adr_nologin_r(hts_buf out, const char *adr) {
   const char *const scheme = login_start(adr);
   const char *const host = login_end(adr);
-  const hts_buf out = hts_buf_at(buf, size);
   const char *colon;
   size_t len = 0;
 
-  if (!has_login(adr) || size == 0)
+  if (!has_login(adr) || out.size == 0)
     return adr;
   colon = memchr(scheme, ':', (size_t) (host - scheme));
   if (colon != NULL) {
@@ -3656,11 +3656,12 @@ const char *adr_nologin_r(char *buf, size_t size, const char *adr) {
     append_clipped(out, &len, hts_span_of("***@"));
   }
   append_clipped(out, &len, hts_span_of(host));
-  return buf;
+  return out.p;
 }
 
 const char *url_nologin_r(char *buf, size_t size, const char *url) {
-  return login_start(url) != url ? adr_nologin_r(buf, size, url) : url;
+  return login_start(url) != url ? adr_nologin_r(hts_buf_at(buf, size), url)
+                                 : url;
 }
 
 const char *adr_nologin(httrackp *opt, const char *adr) {
@@ -3671,7 +3672,8 @@ const char *adr_nologin(httrackp *opt, const char *adr) {
   // no buffer to mask into: drop the whole login
   if (opt == NULL)
     return login_end(adr);
-  return adr_nologin_r(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), adr);
+  return adr_nologin_r(hts_buf_at(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt)),
+                       adr);
 }
 
 const char *url_nologin(httrackp *opt, const char *url) {
@@ -4256,8 +4258,7 @@ int hts_basic_auth_value(httrackp *opt, const char *url, char *out,
     return -1;
   strcpybuff(user_pass, unescape_http(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                                       user_pass));
-  code64((unsigned char *) user_pass, (int) strlen(user_pass),
-         (unsigned char *) out, 0);
+  code64(hts_span_of(user_pass), hts_buf_at(out, out_size), HTS_FALSE);
   hts_secret_add(opt, out, strlen(out), HTS_SECRET_HEADER);
   return 1;
 }
@@ -4585,61 +4586,31 @@ hts_boolean hts_escape_span(hts_span src, hts_span escaped, const char *set,
   return i == src.len ? HTS_TRUE : HTS_FALSE;
 }
 
-// codage base 64 a vers b
-void code64(unsigned char *a, int size_a, unsigned char *b, int crlf) {
-  int i1 = 0, i2 = 0, i3 = 0, i4 = 0;
-  int loop = 0;
-  unsigned long int store;
-  int n;
-  const char _hts_base64[] =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-  while(size_a-- > 0) {
-    // 24 bits
-    n = 1;
-    store = *a++;
-    if (size_a-- > 0) {
-      n = 2;
-      store <<= 8;
-      store |= *a++;
-    }
-    if (size_a-- > 0) {
-      n = 3;
-      store <<= 8;
-      store |= *a++;
-    }
-    if (n == 3) {
-      i4 = store & 63;
-      i3 = (store >> 6) & 63;
-      i2 = (store >> 12) & 63;
-      i1 = (store >> 18) & 63;
-    } else if (n == 2) {
-      store <<= 2;
-      i3 = store & 63;
-      i2 = (store >> 6) & 63;
-      i1 = (store >> 12) & 63;
-    } else {
-      store <<= 4;
-      i2 = store & 63;
-      i1 = (store >> 6) & 63;
-    }
+void code64(hts_span in, hts_buf out, hts_boolean crlf) {
+  static const char alphabet[] =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  const unsigned char *const a = (const unsigned char *) in.p;
+  const size_t groups = (in.len + 2) / 3;
+  size_t i, j = 0, line = 0;
 
-    *b++ = _hts_base64[i1];
-    *b++ = _hts_base64[i2];
-    if (n >= 2)
-      *b++ = _hts_base64[i3];
-    else
-      *b++ = '=';
-    if (n >= 3)
-      *b++ = _hts_base64[i4];
-    else
-      *b++ = '=';
+  assertf(groups * 4 + (crlf ? groups / 20 * 2 : 0) < out.size);
+  for (i = 0; i < in.len; i += 3) {
+    const size_t n = in.len - i < 3 ? in.len - i : 3;
+    const unsigned long store = (unsigned long) a[i] << 16 |
+                                (n > 1 ? (unsigned long) a[i + 1] << 8 : 0) |
+                                (n > 2 ? a[i + 2] : 0);
 
-    if (crlf && ((loop += 3) % 60) == 0) {
-      *b++ = '\r';
-      *b++ = '\n';
+    out.p[j++] = alphabet[store >> 18 & 63];
+    out.p[j++] = alphabet[store >> 12 & 63];
+    out.p[j++] = n > 1 ? alphabet[store >> 6 & 63] : '=';
+    out.p[j++] = n > 2 ? alphabet[store & 63] : '=';
+    if (crlf && ++line == 20) {
+      line = 0;
+      out.p[j++] = '\r';
+      out.p[j++] = '\n';
     }
   }
-  *b++ = '\0';
+  out.p[j] = '\0';
 }
 
 void unescape_amp(char *s) {
@@ -4733,16 +4704,14 @@ HTSEXT_API size_t escape_check_url(const char *const src, char *const dest,
   return x_escape_http(src, dest, size, 0);
 }
 
-size_t escape_control_url(const char *const src, char *const dest,
-                          const size_t size) {
-  return x_escape_http(src, dest, size, 4);
+size_t escape_control_url(const char *const src, hts_buf dest) {
+  return x_escape_http(src, dest.p, dest.size, 4);
 }
 
 // same as escape_check_url, but returns char*
-char *escape_check_url_addr(const char *const src, char *const dest,
-                            const size_t size) {
-  escape_check_url(src, dest, size);
-  return dest;
+char *escape_check_url_addr(const char *const src, hts_buf dest) {
+  escape_check_url(src, dest.p, dest.size);
+  return dest.p;
 }
 
 // Same as above, but appending to "dest"
@@ -4750,16 +4719,16 @@ char *escape_check_url_addr(const char *const src, char *const dest,
 /* clang-format off: an edit realigns all backslashes, churning the macro. */
 /* clang-format off */
 #define DECLARE_APPEND_ESCAPE_VERSION(NAME) \
-size_t append_ ##NAME(const char *const src, char *const dest, const size_t size) { \
-  const size_t len = strnlen(dest, size); \
-  assertf(len < size); \
-  RUNTIME_TIME_CHECK_SIZE(size); \
+size_t append_ ##NAME(const char *const src, hts_buf dest) { \
+  const size_t len = strnlen(dest.p, dest.size); \
+  assertf(len < dest.size); \
+  RUNTIME_TIME_CHECK_SIZE(dest.size); \
   /* A near-full buffer can leave the remainder the size heuristic rejects. \
      Report it as the overflow the caller already tests for. */ \
-  if (size - len == sizeof(void *)) { \
-    return size - len; \
+  if (dest.size - len == sizeof(void *)) { \
+    return dest.size - len; \
   } \
-  return NAME(src, dest + len, size - len); \
+  return NAME(src, dest.p + len, dest.size - len); \
 }
 /* clang-format on */
 
@@ -4810,7 +4779,7 @@ size_t make_content_id(const char *const adr, const char *const fil,
   size_t esc_size = escape_in_url(adr, dest, size);
   /* the append form takes a remainder the size check would misread */
   if (esc_size < size)
-    esc_size += append_escape_in_url(fil, dest, size);
+    esc_size += append_escape_in_url(fil, hts_buf_at(dest, size));
   RUNTIME_TIME_CHECK_SIZE(size);
   /* A '%' would be decoded again by whoever reads the cid: URL. The marker has
      to be a character escape_in_url() itself escapes, or two URLs can share one

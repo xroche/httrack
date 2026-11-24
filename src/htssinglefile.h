@@ -47,7 +47,7 @@ extern "C" {
 /* --single-file-max-size default: a bigger asset stays an ordinary link. */
 #define SINGLEFILE_DEFAULT_MAX_SIZE (10 * 1024 * 1024)
 
-/* Never base64 more than this, whatever the cap: code64() sizes in int. */
+/* Never base64 more than this, whatever the cap. */
 #define SINGLEFILE_HARD_MAX_SIZE (256 * 1024 * 1024)
 
 /* Total bytes one page may inline. Nested @import fans out multiplicatively,

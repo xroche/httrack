@@ -59,6 +59,33 @@ static int st_duration(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Base-64 of ARGV[0], repeated ARGV[1] times, with CRLF when ARGV[2] is 1. */
+static int st_base64(httrackp *opt, int argc, char **argv) {
+  char one[256], in[4096], out[8192];
+  const size_t n = argc < 1 ? 0 : st_decode_body(argv[0], one, sizeof(one));
+  const int repeat = argc < 2 ? 1 : atoi(argv[1]);
+  size_t len = 0, i;
+  int r;
+
+  (void) opt;
+  if (argc < 1 || repeat < 0 || (size_t) repeat > sizeof(in) / (n + 1))
+    return 1;
+  for (r = 0; r < repeat; r++, len += n)
+    memcpy(in + len, one, n);
+  code64(hts_span_at(in, len), HTS_BUF(out),
+         argc > 2 && atoi(argv[2]) != 0 ? HTS_TRUE : HTS_FALSE);
+  for (i = 0; out[i] != '\0'; i++) {
+    if (out[i] == '\r')
+      fputs("\\r", stdout);
+    else if (out[i] == '\n')
+      fputs("\\n", stdout);
+    else
+      putchar(out[i]);
+  }
+  putchar('\n');
+  return 0;
+}
+
 /* very minimalistic internal tests */
 static void basic_selftests(void) {
   // BUG 756328
@@ -1729,7 +1756,7 @@ static int nologin_rows(httrackp *opt) {
   size_t i;
 
   for (i = 0; i < sizeof(adrs) / sizeof(adrs[0]); i++) {
-    const char *got = adr_nologin_r(buf, sizeof(buf), adrs[i].in);
+    const char *got = adr_nologin_r(HTS_BUF(buf), adrs[i].in);
 
     if (strcmp(got, adrs[i].want) != 0) {
       fprintf(stderr, "adr_nologin: '%s' gave '%s'\n", adrs[i].in, got);
@@ -4472,7 +4499,7 @@ static int st_headerparse(httrackp *opt, int argc, char **argv) {
     jar.max_len = sizeof(jar.data);
     jar.data[0] = '\0';
     for (; p < end; p += offset) {
-      const hts_boolean cut = binput_line(p, end, rcvd, sizeof(rcvd), &offset);
+      const hts_boolean cut = binput_line(p, end, HTS_BUF(rcvd), &offset);
 
       if (strcmp(rcvd, "%%") == 0) {
         p += offset;
@@ -5706,6 +5733,8 @@ const struct selftest_entry selftests_lib[] = {
      "bounded string-op self-test", st_strsafe},
     {"duration", "<seconds>", "a duration as long and as short text",
      st_duration},
+    {"base64", "<hex:..|string> [repeat] [crlf]",
+     "base-64 of a repeated string, with a CRLF every 80 bytes", st_base64},
     {"strsprintf", "", "StringSprintf grows to fit at every capacity boundary",
      st_strsprintf},
     {"arena", "", "htsarena.h hands out addresses that never move", st_arena},
