@@ -42,11 +42,12 @@ Please visit our Website: http://www.httrack.com
 #include <sys/stat.h>
 #include <sys/types.h>
 
-int hts_shared_linput(FILE *fp, char *s, int max, int flags) {
-  int c;
-  int j = 0;
+int hts_shared_linput(FILE *fp, hts_buf s, int flags) {
+  int c = EOF;
+  size_t j = 0;
 
-  do {
+  assertf(s.size > 1);
+  while (j + 1 < s.size) {
     c = fgetc(fp);
     if (c != EOF) {
       switch (c) {
@@ -61,15 +62,17 @@ int hts_shared_linput(FILE *fp, char *s, int max, int flags) {
       case 0:
         if ((flags & HTS_LINPUT_SKIP_NUL) != 0)
           break;
-        s[j++] = (char) c;
+        s.p[j++] = (char) c;
         break;
       default:
-        s[j++] = (char) c;
+        s.p[j++] = (char) c;
         break;
       }
     }
-  } while ((c != -1) && (c != EOF) && (j < (max - 1)));
-  if (j == max - 1 && c != -1 && c != EOF) {
+    if (c == EOF) /* end of file, or the newline set it */
+      break;
+  }
+  if (j + 1 == s.size && c != EOF) {
     /* Stopped at the bound: consume the newline, or the next read returns "" */
     if ((flags & HTS_LINPUT_DROP_TAIL) != 0) {
       while ((c = fgetc(fp)) != 10 && c != EOF)
@@ -81,8 +84,8 @@ int hts_shared_linput(FILE *fp, char *s, int max, int flags) {
         ungetc(c, fp);
     }
   }
-  s[j] = '\0';
-  return j;
+  s.p[j] = '\0';
+  return (int) j;
 }
 
 hts_boolean hts_shared_fexist(const char *s) {
@@ -128,13 +131,13 @@ hts_boolean hts_shared_readable(T_SOC soc, time_t deadline) {
          FD_ISSET(soc, &fds);
 }
 
-int hts_shared_linputsoc(T_SOC soc, char *s, int max, time_t deadline,
+int hts_shared_linputsoc(T_SOC soc, hts_buf s, time_t deadline,
                          hts_boolean *cut) {
   int c;
-  int j = 0;
+  size_t j = 0;
 
   *cut = HTS_FALSE;
-  s[0] = '\0';
+  hts_buf_cpy(s, "");
   if (!hts_shared_readable(soc, deadline))
     return -1;
   do {
@@ -156,15 +159,15 @@ int hts_shared_linputsoc(T_SOC soc, char *s, int max, time_t deadline,
       c = -1;
       break;
     default:
-      if (j < max - 1)
-        s[j++] = (char) c;
+      if (j + 1 < s.size)
+        s.p[j++] = (char) c;
       else
         *cut = HTS_TRUE;
       break;
     }
   } while (c != -1 && c != EOF);
-  s[j] = '\0';
-  return j;
+  s.p[j] = '\0';
+  return (int) j;
 }
 
 hts_boolean hts_shared_gethost(const char *hostname, SOCaddr *server) {

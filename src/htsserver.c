@@ -1002,8 +1002,8 @@ static void load_ui_settings(void) {
   while (!feof(fp) && !ferror(fp)) {
     char line[256];
 
-    if (hts_shared_linput(fp, line, sizeof(line) - 2, HTS_LINPUT_SKIP_NUL) >
-            0 &&
+    if (hts_shared_linput(fp, HTS_BUF_N(line, sizeof(line) - 2),
+                          HTS_LINPUT_SKIP_NUL) > 0 &&
         strncmp(line, "uitheme=", 8) == 0 && theme_name_is_valid(line + 8)) {
       strcpybuff(ui_theme, line + 8);
     }
@@ -1575,8 +1575,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
     deadline = time(NULL) + timeout;
 
     /* A request line too long for line1 is served clipped. */
-    if (hts_shared_linputsoc(soc_c, line1, sizeof(line1) - 2, deadline, &cut) >
-        0) {
+    if (hts_shared_linputsoc(soc_c, HTS_BUF_N(line1, sizeof(line1) - 2),
+                             deadline, &cut) > 0) {
       int meth = 0;
       /* meth is rewritten later, so HEAD needs its own flag */
       hts_boolean is_head = HTS_FALSE;
@@ -1592,8 +1592,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
       if (meth) {
         /* Flush headers */
         length = -1;
-        while (hts_shared_linputsoc(soc_c, line, sizeof(line) - 2, deadline,
-                                    &cut) > 0) {
+        while (hts_shared_linputsoc(soc_c, HTS_BUF_N(line, sizeof(line) - 2),
+                                    deadline, &cut) > 0) {
           int p;
 
           if (cut) {
@@ -2176,7 +2176,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                 size_t prevlen = StringLength(output);
                 int nocr = 0;
 
-                if (!hts_shared_linput(fp, line, sizeof(line) - 2,
+                if (!hts_shared_linput(fp, HTS_BUF_N(line, sizeof(line) - 2),
                                        HTS_LINPUT_SKIP_NUL |
                                            HTS_LINPUT_DROP_TAIL)) {
                   *str = '\0';

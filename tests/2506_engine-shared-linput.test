@@ -1,0 +1,17 @@
+#!/bin/bash
+#
+# The htsserver and proxytrack socket line reader stops at its buffer's edge.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# sharedline CAP HEX: [line] per read into an exact CAP-byte heap buffer, "!"
+# before a cut one, then the last return. A cut line is drained to its newline.
+selftest_queue "[abc][z](0)" sharedline 4 hex:6162630a7a
+selftest_queue "![abc][z](0)" sharedline 4 hex:616263640a7a
+selftest_queue "[ab][z](0)" sharedline 4 hex:61090d620c0a7a
+selftest_queue "![a][z](0)" sharedline 2 hex:61620a7a
+selftest_run_queued
+
+ok "the socket line reader stops at the buffer's edge"

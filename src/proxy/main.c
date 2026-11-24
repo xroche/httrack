@@ -201,7 +201,8 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "error: could not process list %s\n", argv[i]);
             exit(1);
           }
-          while (hts_shared_linput(fp, line, 256, HTS_LINPUT_SKIP_NUL)) {
+          while (hts_shared_linput(fp, HTS_BUF_N(line, 256),
+                                   HTS_LINPUT_SKIP_NUL)) {
             int itemsAdded = PT_AddIndex(index, line);
 
             if (itemsAdded > 0) {
