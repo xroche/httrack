@@ -33,11 +33,11 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   char *s = fuzz_strdup(data, size);
 
   {
-    char *idna = hts_convertStringUTF8ToIDNA(s, size);
+    char *idna = hts_convertStringUTF8ToIDNA(hts_span_at(s, size));
     freet(idna);
   }
   {
-    char *utf8 = hts_convertStringIDNAToUTF8(s, size);
+    char *utf8 = hts_convertStringIDNAToUTF8(hts_span_at(s, size));
     freet(utf8);
   }
   (void) hts_isStringIDNA(s, size);

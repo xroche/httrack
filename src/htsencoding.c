@@ -133,10 +133,10 @@ int hts_unescapeEntitiesWithCharsetSpecial(const char *src, char *dest,
               /* Strict for a query only: a substituted '?' must not pass for
                  the code point the document wrote. */
               if (urlQuery) {
-                s = hts_convertStringFromUTF8Strict(buffer, strlen(buffer),
+                s = hts_convertStringFromUTF8Strict(hts_span_of(buffer),
                                                     charset);
               } else {
-                s = hts_convertStringFromUTF8(buffer, strlen(buffer), charset);
+                s = hts_convertStringFromUTF8(hts_span_of(buffer), charset);
               }
               if (s != NULL) {
                 const size_t sLen = strlen(s);

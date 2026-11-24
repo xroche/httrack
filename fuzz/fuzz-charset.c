@@ -52,12 +52,12 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     freet(utf8);
   }
   {
-    char *enc = hts_convertStringFromUTF8(s, size, charset);
+    char *enc = hts_convertStringFromUTF8(hts_span_at(s, size), charset);
     freet(enc);
   }
   {
     size_t nChars = 0;
-    hts_UCS4 *ucs = hts_convertUTF8StringToUCS4(s, size, &nChars);
+    hts_UCS4 *ucs = hts_convertUTF8StringToUCS4(hts_span_at(s, size), &nChars);
 
     if (ucs != NULL) {
       char *back = hts_convertUCS4StringToUTF8(ucs, nChars);

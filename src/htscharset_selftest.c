@@ -161,29 +161,29 @@ static int st_nobestfit(httrackp *opt, int argc, char **argv) {
                           NULL);
   assertf(n == 5); /* yen 1 + micro default 1 + hira 2 + 'A' 1 */
   /* control: banning best-fit must not break what the codepage does hold */
-  s = hts_convertStringFromUTF8Strict(hira, strlen(hira), cs);
+  s = hts_convertStringFromUTF8Strict(hts_span_of(hira), cs);
   assertf(s != NULL);
   assertf(strcmp(s, "\x82\xA0") == 0);
   freet(s);
-  s = hts_convertStringFromUTF8Strict(yen, strlen(yen), cs);
+  s = hts_convertStringFromUTF8Strict(hts_span_of(yen), cs);
   assertf(s == NULL);
   /* the non-strict caller substitutes the codepage's default character */
   gotCpInfo = GetCPInfo(cp, &cpi);
   assertf(gotCpInfo);
-  s = hts_convertStringFromUTF8(yen, strlen(yen), cs);
+  s = hts_convertStringFromUTF8(hts_span_of(yen), cs);
   assertf(s != NULL);
   assertf(s[0] == (char) cpi.DefaultChar[0] && s[1] == '\0');
   freet(s);
-  s = hts_convertStringFromUTF8Strict(micro, strlen(micro), cs);
+  s = hts_convertStringFromUTF8Strict(hts_span_of(micro), cs);
   assertf(s == NULL);
-  s = hts_convertStringFromUTF8(micro, strlen(micro), cs);
+  s = hts_convertStringFromUTF8(hts_span_of(micro), cs);
   assertf(s != NULL);
   assertf(s[0] == (char) cpi.DefaultChar[0] && s[1] == '\0');
   freet(s);
   /* A wrong size or flag gate changes the mixed string's bytes. */
-  s = hts_convertStringFromUTF8Strict(mixed, strlen(mixed), cs);
+  s = hts_convertStringFromUTF8Strict(hts_span_of(mixed), cs);
   assertf(s == NULL); /* yen and micro are both lossy */
-  s = hts_convertStringFromUTF8(mixed, strlen(mixed), cs);
+  s = hts_convertStringFromUTF8(hts_span_of(mixed), cs);
   assertf(s != NULL);
   assertf(s[0] == (char) cpi.DefaultChar[0]);
   assertf(s[1] == (char) cpi.DefaultChar[0]);
@@ -191,7 +191,7 @@ static int st_nobestfit(httrackp *opt, int argc, char **argv) {
   assertf(s[4] == 'A' && s[5] == '\0');
   freet(s);
   /* UTF-7 refuses a non-zero dwFlags but must still encode the yen */
-  s = hts_convertStringFromUTF8(yen, strlen(yen), "utf-7");
+  s = hts_convertStringFromUTF8(hts_span_of(yen), "utf-7");
   assertf(s != NULL && s[0] == '+');
   freet(s);
   printf("nobestfit: OK\n");
@@ -204,7 +204,7 @@ static int st_nobestfit(httrackp *opt, int argc, char **argv) {
 static int st_metacharset(httrackp *opt, int argc, char **argv) {
   char *s;
 
-  s = hts_getCharsetFromMeta(argv[0], strlen(argv[0]));
+  s = hts_getCharsetFromMeta(hts_span_of(argv[0]));
   printf("%s\n", s != NULL ? s : "(none)");
   freet(s);
   return 0;
@@ -225,7 +225,7 @@ static int st_idna_encode(httrackp *opt, int argc, char **argv) {
   char *s;
 
   len = st_decode_body(argv[0], buf, sizeof(buf));
-  s = hts_convertStringUTF8ToIDNA(buf, len);
+  s = hts_convertStringUTF8ToIDNA(hts_span_at(buf, len));
   if (s != NULL) {
     printf("%s\n", s);
     freet(s);
@@ -294,7 +294,7 @@ static int copy_utf8_case(const char *src, size_t size, const char *want) {
   assertf(heap != NULL && size < sizeof(dest) - 1);
   memcpy(heap, src, len + 1);
   memset(dest, 'Z', sizeof(dest));
-  n = hts_copyStringUTF8(dest, heap, size);
+  n = hts_copyStringUTF8(hts_buf_at(dest, size + 1), heap);
   fail = n != strlen(want) || strcmp(dest, want) != 0 || dest[n + 1] != 'Z';
   if (fail) {
     printf("copy-utf8: '%s' into %u gave '%s'\n", src, (unsigned) size, dest);
@@ -327,7 +327,7 @@ static int st_copy_utf8(httrackp *opt, int argc, char **argv) {
 static int st_idna_decode(httrackp *opt, int argc, char **argv) {
   char *s;
 
-  s = hts_convertStringIDNAToUTF8(argv[0], strlen(argv[0]));
+  s = hts_convertStringIDNAToUTF8(hts_span_of(argv[0]));
   if (s != NULL) {
     printf("%s\n", s);
     freet(s);
@@ -596,16 +596,17 @@ static int st_utf8_strict(httrackp *opt, int argc, char **argv) {
     fail |= utf8_strict_pin("entity", ents[i][0], buf, ents[i][1]);
   }
   for (i = 0; i < sizeof(hosts) / sizeof(hosts[0]); i++) {
-    char *idna = hts_convertStringUTF8ToIDNA(hosts[i][0], strlen(hosts[i][0]));
+    char *idna = hts_convertStringUTF8ToIDNA(hts_span_of(hosts[i][0]));
 
     fail |= utf8_strict_pin("idna", hosts[i][0], idna, hosts[i][1]);
     freet(idna);
   }
   /* one U+FFFD per refused byte, and the next character survives */
-  u = hts_convertUTF8StringToUCS4("\xc3"
-                                  "A\xe0\x80"
-                                  "B",
-                                  5, &n);
+  u = hts_convertUTF8StringToUCS4(hts_span_at("\xc3"
+                                              "A\xe0\x80"
+                                              "B",
+                                              5),
+                                  &n);
   if (u == NULL || n != 5 || u[0] != 0xfffd || u[1] != 'A' || u[2] != 0xfffd ||
       u[3] != 0xfffd || u[4] != 'B') {
     printf("utf8-strict: UCS4 of C3 41 E0 80 42 gave %u characters\n",
@@ -905,17 +906,26 @@ static int st_append_utf8_sized(httrackp *opt, int argc, char **argv) {
   /* "ab" then five two-byte u-umlauts */
   static const char src[] = "ab\xc3\xbc\xc3\xbc\xc3\xbc\xc3\xbc\xc3\xbc";
 
-  static const struct {
+  const size_t no_budget = (size_t) -1 / 2; /* a byte budget that never binds */
+
+  const struct {
     size_t cap;
+    size_t budget;
     const char *want;
   } cases[] = {
-      {8, "dirab\xc3\xbc"}, /* 4 bytes of room, one u-umlaut fits */
-      {9, "dirab\xc3\xbc"}, /* 5 bytes, the second one would not */
-      {4, "dir"},           /* no room at all */
-      {sizeof(src) + 3, "dirab\xc3\xbc\xc3\xbc\xc3\xbc\xc3\xbc\xc3\xbc"},
+      {8, no_budget, "dirab\xc3\xbc"}, /* 4 bytes of room, one u-umlaut fits */
+      {9, no_budget, "dirab\xc3\xbc"}, /* 5 bytes, the second one would not */
+      {4, no_budget, "dir"},           /* no room at all */
+      {sizeof(src) + 3, no_budget,
+       "dirab\xc3\xbc\xc3\xbc\xc3\xbc\xc3\xbc\xc3\xbc"},
+      /* the budget binds before the room does */
+      {32, 3, "dirab"},
+      {32, 4, "dirab\xc3\xbc"},
+      {32, 0, "dir"},
+      /* the budget equals the room left, 4 then 5 bytes */
+      {8, 4, "dirab\xc3\xbc"},
+      {9, 5, "dirab\xc3\xbc"},
   };
-
-  const size_t no_budget = (size_t) -1 / 2; /* a byte budget that never binds */
   size_t i;
   int fail = 0;
 
@@ -925,7 +935,7 @@ static int st_append_utf8_sized(httrackp *opt, int argc, char **argv) {
     size_t n;
 
     strlcpybuff(buf, "dir", cap);
-    n = hts_appendStringUTF8(buf, cap, src, no_budget);
+    n = hts_appendStringUTF8(hts_buf_at(buf, cap), src, cases[i].budget);
     if (n != strlen(cases[i].want) - 3 ||
         !st_sized_clip_ok(buf, cap, cases[i].want)) {
       printf("append-utf8-sized: into %u bytes gave '%.*s'\n", (unsigned) cap,

@@ -1663,7 +1663,7 @@ static const char *paste_host_idna(hts_buf url) {
 
   if (hts_isStringAscii(host, len))
     return NULL;
-  idna = hts_convertStringUTF8ToIDNA(host, len);
+  idna = hts_convertStringUTF8ToIDNA(hts_span_at(host, len));
   if (idna == NULL ||
       strlen(idna) >= url.size - (size_t) (host - url.p) - strlen(rest))
     why = "the address is too long once its host is in ASCII";

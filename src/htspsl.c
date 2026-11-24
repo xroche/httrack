@@ -231,7 +231,7 @@ const char *hts_psl_registrable_domain(const char *host) {
     return NULL;
   /* The rules are IDNA, and the conversion keeps every dot. */
   if (!hts_isStringAscii(host, strlen(host))) {
-    idna = hts_convertStringUTF8ToIDNA(host, strlen(host));
+    idna = hts_convertStringUTF8ToIDNA(hts_span_of(host));
     if (idna == NULL || psl_labels(idna, idna_labels, n) != n) {
       freet(idna);
       return NULL;

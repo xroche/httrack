@@ -37,6 +37,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsglobal.h"
 #include "httrack-library.h"
 #include "htsstrings.h"
+#include "htsbuf.h"
 #include <stdlib.h>
 #include <string.h>
 #include "htswin32.h"
@@ -51,8 +52,8 @@ typedef unsigned int hts_UCS4;
  * Convert the string "s" from UTF-8 to charset "charset".
  * Return NULL upon error.
  **/
-HTS_CHECK_RESULT extern char *
-hts_convertStringFromUTF8(const char *s, size_t size, const char *charset);
+HTS_CHECK_RESULT extern char *hts_convertStringFromUTF8(hts_span s,
+                                                        const char *charset);
 
 /**
  * Same, but refusing to lose a code point the charset can not represent:
@@ -61,14 +62,12 @@ hts_convertStringFromUTF8(const char *s, size_t size, const char *charset);
  * Return NULL upon error.
  **/
 HTS_CHECK_RESULT extern char *
-hts_convertStringFromUTF8Strict(const char *s, size_t size,
-                                const char *charset);
+hts_convertStringFromUTF8Strict(hts_span s, const char *charset);
 
 /**
  * Convert an UTF-8 string to an IDNA (RFC 3492) string.
  **/
-HTS_CHECK_RESULT extern char *hts_convertStringUTF8ToIDNA(const char *s,
-                                                          size_t size);
+HTS_CHECK_RESULT extern char *hts_convertStringUTF8ToIDNA(hts_span s);
 
 /**
  * Write the ASCII (IDNA) form of the len-byte host into dst, of size bytes;
@@ -80,8 +79,7 @@ extern hts_boolean hts_host_to_ascii(char *dst, size_t size, const char *host,
 /**
  * Convert an IDNA (RFC 3492) string to an UTF-8 string.
  **/
-HTS_CHECK_RESULT extern char *hts_convertStringIDNAToUTF8(const char *s,
-                                                          size_t size);
+HTS_CHECK_RESULT extern char *hts_convertStringIDNAToUTF8(hts_span s);
 
 /**
  * Has the given string any IDNA segments ?
@@ -89,11 +87,10 @@ HTS_CHECK_RESULT extern char *hts_convertStringIDNAToUTF8(const char *s,
 extern int hts_isStringIDNA(const char *s, size_t size);
 
 /**
- * Extract the <meta> charset from the HTML buffer "html" (HTML5 charset= or
- * legacy http-equiv form). Returns a malloc'ed string, or NULL if none.
+ * Extract the <meta> charset from the HTML in page (HTML5 charset= or legacy
+ * http-equiv form). Returns a malloc'ed string, or NULL if none.
  **/
-HTS_CHECK_RESULT extern char *hts_getCharsetFromMeta(const char *html,
-                                                     size_t size);
+HTS_CHECK_RESULT extern char *hts_getCharsetFromMeta(hts_span page);
 
 /**
  * Is the given string an ASCII string ?
@@ -117,27 +114,26 @@ extern int hts_isCharsetUTF8(const char *charset);
 extern size_t hts_stringLengthUTF8(const char *s);
 
 /**
- * Copy at most 'nBytes' bytes from src to dest, not truncating UTF-8
- * sequences. dest must hold nBytes + 1 bytes.
+ * Copy the string src into dest, clipping to what fits and not truncating
+ * UTF-8 sequences. dest.size must not be 0.
  * Returns the number of bytes copied, not including the terminating \0.
  **/
-extern size_t hts_copyStringUTF8(char *dest, const char *src, 
-                                 size_t nBytes);
+extern size_t hts_copyStringUTF8(hts_buf dest, const char *src);
 
 /**
- * Append at most 'nBytes' bytes from src to dest, a buffer of dest_size bytes,
+ * Append at most 'nBytes' bytes of the string src to the string in dest,
  * clipping to what fits and not truncating UTF-8 sequences.
  * Returns the number of bytes appended, not including the terminating \0.
  **/
-extern size_t hts_appendStringUTF8(char *dest, size_t dest_size,
-                                   const char *src, size_t nBytes);
+extern size_t hts_appendStringUTF8(hts_buf dest, const char *src,
+                                   size_t nBytes);
 
 /**
  * Convert an UTF-8 string into an Unicode string (0-terminated).
  * Each byte that hts_isStringUTF8() would refuse becomes one U+FFFD.
  **/
-HTS_CHECK_RESULT extern hts_UCS4 *
-hts_convertUTF8StringToUCS4(const char *s, size_t size, size_t *nChars);
+HTS_CHECK_RESULT extern hts_UCS4 *hts_convertUTF8StringToUCS4(hts_span s,
+                                                              size_t *nChars);
 
 /**
  * Convert an Unicode string into an UTF-8 string.
@@ -178,7 +174,7 @@ extern void hts_json_string(String *out, const char *s);
  * Convert UTF-8 to WCHAR.
  * This function is WIN32 specific.
  **/
-extern LPWSTR hts_convertUTF8StringToUCS2(const char *s, int size, int *pwsize);
+extern LPWSTR hts_convertUTF8StringToUCS2(hts_span s, int *pwsize);
 
 /**
  * Convert from WCHAR.
