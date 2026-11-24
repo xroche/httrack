@@ -96,22 +96,21 @@ static hts_boolean usercommand_push(shell_frame_t *stack, size_t *depth,
   return HTS_TRUE;
 }
 
-/* Appends len bytes of src at *pos in dest and keeps it NUL-terminated.
+/* Appends src at *pos in dest and keeps it NUL-terminated.
    Returns HTS_FALSE and parks *pos at dest.size when it does not fit. */
-static hts_boolean usercommand_append(hts_buf dest, size_t *pos,
-                                      const char *src, size_t len) {
-  if (*pos >= dest.size || len >= dest.size - *pos) {
+static hts_boolean usercommand_append(hts_buf dest, size_t *pos, hts_span src) {
+  if (*pos >= dest.size || src.len >= dest.size - *pos) {
     *pos = dest.size;
     return HTS_FALSE;
   }
-  memcpy(dest.p + *pos, src, len);
-  *pos += len;
+  memcpy(dest.p + *pos, src.p, src.len);
+  *pos += src.len;
   dest.p[*pos] = '\0';
   return HTS_TRUE;
 }
 
 static hts_boolean usercommand_append_char(hts_buf dest, size_t *pos, char c) {
-  return usercommand_append(dest, pos, &c, 1);
+  return usercommand_append(dest, pos, hts_span_at(&c, 1));
 }
 
 #ifndef _WIN32
@@ -223,7 +222,7 @@ int usercommand_expand(hts_buf dest, const char *cmd, const char *file,
         const char *const param = usercommand_param(ctx);
 
         if (param == NULL ||
-            !usercommand_append(dest, &pos, param, strlen(param)))
+            !usercommand_append(dest, &pos, hts_span_of(param)))
           return USERCOMMAND_EXPAND_TOOLONG;
       }
 #else
