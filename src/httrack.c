@@ -568,11 +568,11 @@ static int linput(FILE *fp, hts_buf s) {
     c = fgetc(fp);
     if (c != EOF) {
       switch (c) {
-      case 9:
-      case 12:
-      case 13:
-        break; /* TAB, FF and CR are dropped */
-      case 10:
+      case '\t':
+      case '\f':
+      case '\r':
+        break;
+      case '\n':
         c = -1;
         break;
       default:

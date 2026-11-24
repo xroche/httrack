@@ -207,13 +207,12 @@ static int codec_unpack_brotli(FILE *in, FILE *out, LLint maxout,
   return total > maxout ? HTS_CODEC_TOOBIG : -1;
 }
 
-static size_t codec_head_brotli(const void *in, size_t in_len, void *out,
-                                size_t out_len) {
+static size_t codec_head_brotli(hts_span in, hts_buf out) {
   BrotliDecoderState *const state =
       BrotliDecoderCreateInstance(NULL, NULL, NULL);
-  const uint8_t *next_in = (const uint8_t *) in;
-  uint8_t *next_out = (uint8_t *) out;
-  size_t avail_in = in_len, avail_out = out_len;
+  const uint8_t *next_in = (const uint8_t *) in.p;
+  uint8_t *next_out = (uint8_t *) out.p;
+  size_t avail_in = in.len, avail_out = out.size;
   BrotliDecoderResult res;
 
   if (state == NULL)
@@ -221,7 +220,7 @@ static size_t codec_head_brotli(const void *in, size_t in_len, void *out,
   res = BrotliDecoderDecompressStream(state, &avail_in, &next_in, &avail_out,
                                       &next_out, NULL);
   BrotliDecoderDestroyInstance(state);
-  return (res != BROTLI_DECODER_RESULT_ERROR) ? out_len - avail_out : 0;
+  return (res != BROTLI_DECODER_RESULT_ERROR) ? out.size - avail_out : 0;
 }
 #endif
 
@@ -276,8 +275,7 @@ static int codec_unpack_zstd(FILE *in, FILE *out, LLint maxout, int *io_errno) {
   return total > maxout ? HTS_CODEC_TOOBIG : -1;
 }
 
-static size_t codec_head_zstd(const void *in, size_t in_len, void *out,
-                              size_t out_len) {
+static size_t codec_head_zstd(hts_span in, hts_buf out) {
   ZSTD_DStream *const zds = ZSTD_createDStream();
   ZSTD_inBuffer input;
   ZSTD_outBuffer output;
@@ -290,11 +288,11 @@ static size_t codec_head_zstd(const void *in, size_t in_len, void *out,
     ZSTD_freeDStream(zds);
     return 0;
   }
-  input.src = in;
-  input.size = in_len;
+  input.src = in.p;
+  input.size = in.len;
   input.pos = 0;
-  output.dst = out;
-  output.size = out_len;
+  output.dst = out.p;
+  output.size = out.size;
   output.pos = 0;
   zret = ZSTD_decompressStream(zds, &output, &input);
   ZSTD_freeDStream(zds);
@@ -377,20 +375,19 @@ int hts_codec_unpack_max(hts_codec codec, const char *filename,
 #endif
 }
 
-size_t hts_codec_head(hts_codec codec, const void *in, size_t in_len, void *out,
-                      size_t out_len) {
-  if (in == NULL || in_len == 0 || out == NULL || out_len == 0)
+size_t hts_codec_head(hts_codec codec, hts_span in, hts_buf out) {
+  if (in.p == NULL || in.len == 0 || out.p == NULL || out.size == 0)
     return 0;
   switch (codec) {
   case HTS_CODEC_DEFLATE:
-    return hts_zhead(hts_span_at(in, in_len), hts_buf_at(out, out_len));
+    return hts_zhead(in, out);
 #if HTS_USEBROTLI
   case HTS_CODEC_BROTLI:
-    return codec_head_brotli(in, in_len, out, out_len);
+    return codec_head_brotli(in, out);
 #endif
 #if HTS_USEZSTD
   case HTS_CODEC_ZSTD:
-    return codec_head_zstd(in, in_len, out, out_len);
+    return codec_head_zstd(in, out);
 #endif
   default:
     return 0;

@@ -297,7 +297,7 @@ static size_t sniff_slot_head(const lien_back *slot, void *buf, size_t len) {
       n = hts_read_file_head(path, buf, len);
   }
   if (n > 0 && r->compressed) {
-    unsigned char raw[HTS_SNIFF_LEN];
+    char raw[HTS_SNIFF_LEN];
     const hts_codec codec = hts_codec_parse(r->contentencoding);
 
     if (n > sizeof(raw))
@@ -305,13 +305,14 @@ static size_t sniff_slot_head(const lien_back *slot, void *buf, size_t len) {
     memcpy(raw, buf, n);
     /* the transfer coding was applied last, so it comes off first */
     if (r->transfer_coding != HTS_TE_NONE) {
-      n = hts_codec_head(HTS_CODEC_DEFLATE, raw, n, buf, len);
+      n = hts_codec_head(HTS_CODEC_DEFLATE, hts_span_at(raw, n),
+                         hts_buf_at(buf, len));
       if (n > sizeof(raw))
         n = sizeof(raw);
       memcpy(raw, buf, n);
     }
     if (codec != HTS_CODEC_IDENTITY)
-      n = hts_codec_head(codec, raw, n, buf, len);
+      n = hts_codec_head(codec, hts_span_at(raw, n), hts_buf_at(buf, len));
   }
   return n;
 }
