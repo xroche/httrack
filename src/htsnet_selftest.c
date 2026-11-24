@@ -754,7 +754,7 @@ static int st_sigpipe(httrackp *opt, int argc, char **argv) {
 #endif
 
 /* get_ftp_line must bound a hostile, CRLF-less reply into its internal
-   1024-byte buffer; ASan turns the pre-fix overflow into an abort here. */
+   1024-byte buffer, then clip it into the caller's; ASan sees an overflow. */
 static int st_ftpline(httrackp *opt, int argc, char **argv) {
   T_SOC sv[2];
   char line[2048];
@@ -766,9 +766,15 @@ static int st_ftpline(httrackp *opt, int argc, char **argv) {
   assertf(send(sv[1], "220 ", 4, 0) == 4); // valid 3-digit code
   assertf(send(sv[1], flood, (int) sizeof(flood), 0) == (int) sizeof(flood));
   assertf(send(sv[1], "\r\n", 2, 0) == 2); // end the line so we return
+  assertf(send(sv[1], "220 short reply\r\n221 bye\r\n", 26, 0) == 26);
   deletesoc(sv[1]);
   line[0] = '\0';
-  get_ftp_line(NULL, sv[0], line, sizeof(line), 5, NULL);
+  assertf(get_ftp_line(NULL, sv[0], HTS_BUF(line), 5, NULL) != 0);
+  assertf(strlen(line) == 1023 && line[1022] == 'x');
+  memset(line, '#', sizeof(line)); // a zero canary would hide a stray NUL
+  assertf(get_ftp_line(NULL, sv[0], HTS_BUF_N(line, 8), 5, NULL) != 0);
+  assertf(strcmp(line, "220 sho") == 0 && line[8] == '#' && line[63] == '#');
+  assertf(get_ftp_line(NULL, sv[0], hts_buf_at(NULL, 0), 5, NULL) != 0);
   deletesoc(sv[0]);
   printf("ftp-line self-test OK (bounded %d-byte reply)\n",
          (int) sizeof(flood));
@@ -859,24 +865,24 @@ static int st_ftpuser(httrackp *opt, int argc, char **argv) {
   {
     const char ok[] = "bob:secret@host/f"; // '@' at index 10
 
-    assertf(ftp_split_userpass(ok, ok + 11, ubuf, sizeof(ubuf), pbuf,
-                               sizeof(pbuf)) == HTS_TRUE);
+    assertf(ftp_split_userpass(ok, ok + 11, HTS_BUF(ubuf), HTS_BUF(pbuf)) ==
+            HTS_TRUE);
     assertf(strcmp(ubuf, "bob") == 0);
     assertf(strcmp(pbuf, "secret") == 0);
   }
   {
     const char ok[] = "bob@host/f"; // no password: the '@' still ends the user
 
-    assertf(ftp_split_userpass(ok, ok + 4, ubuf, sizeof(ubuf), pbuf,
-                               sizeof(pbuf)) == HTS_TRUE);
+    assertf(ftp_split_userpass(ok, ok + 4, HTS_BUF(ubuf), HTS_BUF(pbuf)) ==
+            HTS_TRUE);
     assertf(strcmp(ubuf, "bob") == 0);
     assertf(pbuf[0] == '\0');
   }
   {
     const char ok[] = "u@relay:pw@gw/f"; // only the last '@' ends the userinfo
 
-    assertf(ftp_split_userpass(ok, ok + 11, ubuf, sizeof(ubuf), pbuf,
-                               sizeof(pbuf)) == HTS_TRUE);
+    assertf(ftp_split_userpass(ok, ok + 11, HTS_BUF(ubuf), HTS_BUF(pbuf)) ==
+            HTS_TRUE);
     assertf(strcmp(ubuf, "u@relay") == 0);
     assertf(strcmp(pbuf, "pw") == 0);
   }
@@ -901,8 +907,8 @@ static int st_ftpuser(httrackp *opt, int argc, char **argv) {
 
     for (r = 0; r < sizeof(rows) / sizeof(rows[0]); r++) {
       const char *const in = rows[r].in;
-      const hts_boolean ok = ftp_split_userpass(
-          in, in + strlen(in), ubuf, sizeof(ubuf), pbuf, sizeof(pbuf));
+      const hts_boolean ok =
+          ftp_split_userpass(in, in + strlen(in), HTS_BUF(ubuf), HTS_BUF(pbuf));
 
       assertf(ok == (rows[r].user != NULL ? HTS_TRUE : HTS_FALSE));
       if (ok) {
@@ -924,8 +930,8 @@ static int st_ftpuser(httrackp *opt, int argc, char **argv) {
         memcpy(in + 3 * i, "%75", 3);
       memcpy(in + 3 * n, ":p@", 4);
       memcpy(ubuf, poison, sizeof(ubuf));
-      assertf(ftp_split_userpass(in, in + 3 * n + 3, ubuf, 16, pbuf,
-                                 sizeof(pbuf)) ==
+      assertf(ftp_split_userpass(in, in + 3 * n + 3, HTS_BUF_N(ubuf, 16),
+                                 HTS_BUF(pbuf)) ==
               (n < 16 ? HTS_TRUE : HTS_FALSE));
       assertf(n == 16 || (strlen(ubuf) == n && ubuf[n - 1] == 'u'));
       assertf(memcmp(ubuf + 16, poison, sizeof(ubuf) - 16) == 0);
@@ -954,8 +960,8 @@ static int st_ftpuser(httrackp *opt, int argc, char **argv) {
         in[total] = '\0';
         memcpy(ubuf, poison, sizeof(ubuf)); /* a zero canary would hide a NUL */
         memcpy(pbuf, poison, sizeof(pbuf));
-        assertf(ftp_split_userpass(in, in + total, ubuf, ucap, pbuf, pcap) ==
-                fits);
+        assertf(ftp_split_userpass(in, in + total, hts_buf_at(ubuf, ucap),
+                                   hts_buf_at(pbuf, pcap)) == fits);
         if (fits) {
           assertf(strlen(ubuf) == user_len && strlen(pbuf) == pass_len);
           assertf(ubuf[user_len - 1] == 'u');

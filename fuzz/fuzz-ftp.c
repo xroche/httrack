@@ -125,7 +125,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     if (calls > size)
       ftp_fail("get_ftp_line read nothing", "");
     line[0] = '\0';
-    (void) get_ftp_line(NULL, sv[0], line, line_size, 1, NULL);
+    (void) get_ftp_line(NULL, sv[0], hts_buf_at(line, line_size), 1, NULL);
     if (strlen(line) >= line_size)
       ftp_fail("line overflows its buffer", "");
     ftp_parse_reply(line);
