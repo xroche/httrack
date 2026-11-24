@@ -210,8 +210,9 @@ typedef struct socks5_stream {
   socks5_test_io *io;
 } socks5_stream;
 
-// Unsigned frames keep 0xFF and length bytes positive. ARR must be an array.
-#define SOCKS5_BUF(ARR) hts_buf_at((char *) (ARR), sizeof(ARR))
+// Unsigned frames keep 0xFF and length bytes positive.
+#define SOCKS5_BUF(ARR)                                                        \
+  hts_buf_at((char *) (ARR), sizeof(ARR) + HTS_BUF_GUARD_(ARR))
 
 static int socks5_fail(hts_buf msg, const char *text) {
   hts_buf_cpy(msg, text);
@@ -251,26 +252,26 @@ static int socks5_read_n(socks5_stream *st, hts_buf buf) {
   return 1;
 }
 
-static int socks5_write_all(socks5_stream *st, const unsigned char *buf,
-                            size_t len) {
-  size_t remain = len;
+static int socks5_write_all(socks5_stream *st, hts_span buf) {
+  const char *p = buf.p;
+  size_t remain = buf.len;
   int stalls = 0;
 
   if (st->soc == INVALID_SOCKET) { /* scripted */
     socks5_test_io *const io = st->io;
 
-    if (len > sizeof(io->sent) - io->sent_len)
+    if (buf.len > sizeof(io->sent) - io->sent_len)
       return 0;
-    memcpy(io->sent + io->sent_len, buf, len);
-    io->sent_len += len;
+    memcpy(io->sent + io->sent_len, buf.p, buf.len);
+    io->sent_len += buf.len;
     return 1;
   }
   while (remain > 0) {
     // Not sendc(): the socket is still plain here, and that would route to TLS
-    const int n = hts_send_nosignal(st->soc, (const char *) buf, remain);
+    const int n = hts_send_nosignal(st->soc, p, remain);
 
     if (n > 0) {
-      buf += n;
+      p += n;
       remain -= (size_t) n;
       stalls = 0;
     } else {
@@ -360,7 +361,7 @@ static int socks5_negotiate(socks5_stream *st, hts_span host, int port,
   frame[1] = (unsigned char) (want_auth ? 2 : 1);
   frame[2] = SOCKS5_METHOD_NONE;
   frame[3] = SOCKS5_METHOD_USERPASS;
-  if (!socks5_write_all(st, frame, (size_t) 2 + frame[1]))
+  if (!socks5_write_all(st, hts_span_at((const char *) frame, 2 + frame[1])))
     return socks5_fail(msg, "SOCKS5: write error");
   if (!socks5_read_n(st, SOCKS5_BUF(rep)))
     return socks5_fail(msg, "SOCKS5: no method reply from proxy");
@@ -379,7 +380,8 @@ static int socks5_negotiate(socks5_stream *st, hts_span host, int port,
     memcpy(frame + 2, user.p, user.len);
     frame[2 + user.len] = (unsigned char) pass.len;
     memcpy(frame + 3 + user.len, pass.p, pass.len);
-    if (!socks5_write_all(st, frame, 3 + user.len + pass.len))
+    if (!socks5_write_all(
+            st, hts_span_at((const char *) frame, 3 + user.len + pass.len)))
       return socks5_fail(msg, "SOCKS5: write error");
     if (!socks5_read_n(st, SOCKS5_BUF(rep)))
       return socks5_fail(msg, "SOCKS5: no authentication reply");
@@ -402,7 +404,7 @@ static int socks5_negotiate(socks5_stream *st, hts_span host, int port,
   memcpy(frame + 5, host.p, host.len);
   frame[5 + host.len] = (unsigned char) (port >> 8);
   frame[6 + host.len] = (unsigned char) (port & 0xFF);
-  if (!socks5_write_all(st, frame, 7 + host.len))
+  if (!socks5_write_all(st, hts_span_at((const char *) frame, 7 + host.len)))
     return socks5_fail(msg, "SOCKS5: write error");
 
   return socks5_read_reply(st, msg);
@@ -439,21 +441,21 @@ static int socks5_credentials(httrackp *opt, const char *proxy_name,
 static int socks5_handshake_stream(httrackp *opt, socks5_stream *st,
                                    const char *adr, const char *proxy_name,
                                    int ssl, hts_buf msg) {
-  const char *const host = jump_identification_const(adr);
-  const char *const portsep = hts_host_port(adr, host);
-  const size_t hostlen =
-      portsep != NULL ? (size_t) (portsep - host) : strlen(host);
+  const char *const start = jump_identification_const(adr);
+  const char *const portsep = hts_host_port(adr, start);
+  const hts_span host =
+      portsep != NULL ? hts_span_between(start, portsep) : hts_span_of(start);
   // sized for the whole userinfo: decoding shrinks, so an over-long credential
   // lands intact and is rejected below rather than silently clipped
   char user[1024] = "";
   char pass[1024] = "";
   int port = ssl ? 443 : 80;
 
-  if (hostlen == 0 || hostlen > SOCKS5_MAXFIELD)
+  if (host.len == 0 || host.len > SOCKS5_MAXFIELD)
     return socks5_fail(msg, "SOCKS5: invalid origin host");
-  if (host[0] == '[') // ATYP=domain cannot carry an IPv6 literal
+  if (host.p[0] == '[') // ATYP=domain cannot carry an IPv6 literal
     return socks5_fail(msg, "SOCKS5: IPv6 literal origin is not supported");
-  if (!hts_is_control_free_sized(host, hostlen))
+  if (!hts_is_control_free_sized(host.p, host.len))
     return socks5_fail(msg, "SOCKS5: invalid origin host");
   // An empty "host:" is refused here, unlike on the direct path.
   if (portsep != NULL && !hts_parse_url_port(portsep + 1, &port))
@@ -462,8 +464,8 @@ static int socks5_handshake_stream(httrackp *opt, socks5_stream *st,
     if (!socks5_credentials(opt, proxy_name, HTS_BUF(user), HTS_BUF(pass), msg))
       return 0;
   }
-  return socks5_negotiate(st, hts_span_at(host, hostlen), port,
-                          hts_span_of(user), hts_span_of(pass), msg);
+  return socks5_negotiate(st, host, port, hts_span_of(user), hts_span_of(pass),
+                          msg);
 }
 
 int socks5_handshake(httrackp *opt, htsblk *retour, const char *adr,
