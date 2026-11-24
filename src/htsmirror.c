@@ -1022,7 +1022,7 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct *str,
           if (check_stdin()) {
             char com[256];
 
-            linput(stdin, com, 200);
+            linput(stdin, HTS_BUF_N(com, 200));
             if (opt->verbosedisplay == HTS_VERBOSE_FULL)
               opt->verbosedisplay = HTS_VERBOSE_SIMPLE;
             else
