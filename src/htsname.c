@@ -61,7 +61,7 @@ Please visit our Website: http://www.httrack.com
     if (len >= sizeof(afs->save))                                              \
       save_trim_dirs(buff, len, len - (sizeof(afs->save) - 1));                \
     afs->save[0] = '\0';                                                       \
-    url_savename_addstr(afs->save, sizeof(afs->save), buff);                   \
+    url_savename_addstr(HTS_SIZED(afs->save), buff);                           \
   }
 
 #define ADD_STANDARD_NAME(shortname)                                           \
@@ -69,7 +69,7 @@ Please visit our Website: http://www.httrack.com
     char BIGSTK buff[HTS_URLMAXSIZE * 2];                                      \
     char BIGSTK tail[HTS_URLMAXSIZE * 2];                                      \
     size_t len, need;                                                          \
-    standard_name(buff, sizeof(buff), dot_pos, nom_pos, fil_complete,          \
+    standard_name(HTS_SIZED(buff), dot_pos, nom_pos, fil_complete,             \
                   (shortname));                                                \
     strcpybuff(tail, buff + save_tail_offset(buff));                           \
     len = strlen(afs->save);                                                   \
@@ -82,8 +82,8 @@ Please visit our Website: http://www.httrack.com
     else /* sized: a long extension is dropped before the name */              \
       standard_name(buff, sizeof(afs->save) - strlen(afs->save), dot_pos,      \
                     nom_pos, fil_complete, (shortname));                       \
-    url_savename_addstr(afs->save, sizeof(afs->save), buff);                   \
-    save_append_tail(afs->save, sizeof(afs->save), tail);                      \
+    url_savename_addstr(HTS_SIZED(afs->save), buff);                           \
+    save_append_tail(HTS_SIZED(afs->save), tail);                              \
   }
 
 /* Avoid stupid DOS system folders/file such as 'nul' */
@@ -440,19 +440,18 @@ static void tmpl_catc(char *d, size_t dsize, char c) {
 #define TMPL_FLUSH()                                                           \
   do {                                                                         \
     if (tmpltail[0] != '\0') {                                                 \
-      save_append_tail(afs->save, sizeof(afs->save), tmpltail);                \
+      save_append_tail(HTS_SIZED(afs->save), tmpltail);                        \
       tmpltail[0] = '\0';                                                      \
     }                                                                          \
   } while (0)
 #define TMPL_CATN(S, N)                                                        \
   do {                                                                         \
     TMPL_FLUSH();                                                              \
-    if (!tmpl_catn(afs->save, sizeof(afs->save), (S), (size_t) (N)))           \
+    if (!tmpl_catn(HTS_SIZED(afs->save), (S), (size_t) (N)))                   \
       tmpl_clipped = HTS_TRUE;                                                 \
   } while (0)
 #define TMPL_CAT(S) TMPL_CATN((S), (size_t) -1)
-#define TMPL_TAILN(S, N)                                                       \
-  tmpl_catn(tmpltail, sizeof(tmpltail), (S), (size_t) (N))
+#define TMPL_TAILN(S, N) tmpl_catn(HTS_SIZED(tmpltail), (S), (size_t) (N))
 #define TMPL_TAIL(S) TMPL_TAILN((S), (size_t) -1)
 #define TMPL_TAILC(C) tmpl_catc(tmpltail, sizeof(tmpltail), (C))
 
