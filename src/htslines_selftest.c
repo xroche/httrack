@@ -148,7 +148,7 @@ static int st_readline(httrackp *opt, int argc, char **argv) {
           (strchr(argv[1], 'n') != NULL ? HTS_LINPUT_SKIP_NUL : 0) |
           (strchr(argv[1], 'd') != NULL ? HTS_LINPUT_DROP_TAIL : 0);
       const int len =
-          lin ? linput(fp, line, cap)
+          lin ? linput(fp, hts_buf_at(line, (size_t) cap))
               : hts_shared_linput(fp, hts_buf_at(line, (size_t) cap), sflags);
 
       assertf(len >= 0 && len < cap && line[len] == '\0');

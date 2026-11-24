@@ -144,14 +144,13 @@ hts_boolean hts_readline(FILE *fp, hts_buf s, int flags) {
   return readline_end(fp, s, flags, &len, &end);
 }
 
-int linput(FILE *fp, char *s, int max) {
+int linput(FILE *fp, hts_buf s) {
   size_t len;
   line_end end;
 
-  if (max < 1)
+  if (s.size < 1)
     return 0;
-  (void) readline_end(fp, hts_buf_at(s, (size_t) max),
-                      HTS_LINE_DROP_TAB | HTS_LINE_DROP_FF, &len, &end);
+  (void) readline_end(fp, s, HTS_LINE_DROP_TAB | HTS_LINE_DROP_FF, &len, &end);
   return (int) len;
 }
 

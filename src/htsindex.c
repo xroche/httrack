@@ -269,7 +269,7 @@ int index_keyword(const char *html_data, LLint size, const char *mime,
       while(!feof(tmpfp)) {
         char line[KEYW_LEN + 32];
 
-        linput(tmpfp, line, KEYW_LEN + 2);
+        linput(tmpfp, HTS_BUF_N(line, KEYW_LEN + 2));
         if (strnotempty(line)) {
           intptr_t e = 0;
 
