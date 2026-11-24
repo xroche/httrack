@@ -453,7 +453,7 @@ static void tmpl_catc(char *d, size_t dsize, char c) {
 #define TMPL_CAT(S) TMPL_CATN((S), (size_t) -1)
 #define TMPL_TAILN(S, N) tmpl_catn(HTS_SIZED(tmpltail), (S), (size_t) (N))
 #define TMPL_TAIL(S) TMPL_TAILN((S), (size_t) -1)
-#define TMPL_TAILC(C) tmpl_catc(tmpltail, sizeof(tmpltail), (C))
+#define TMPL_TAILC(C) tmpl_catc(HTS_SIZED(tmpltail), (C))
 
 hts_boolean url_query_value(const char *url, const char *name, hts_buf dst) {
   const char *const query = strchr(url, '?');

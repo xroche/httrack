@@ -3141,9 +3141,9 @@ int filecreateempty(filenote_strc * strc, const char *filename) {
 void hts_savename_listed(const char *root, const char *s, hts_buf dest) {
   char catbuff[CATBUFF_SIZE];
 
-  hts_buf_cpy(dest, fslash(catbuff, sizeof(catbuff), s));
-  if (strnotempty(root) && strncmp(fslash(catbuff, sizeof(catbuff), root),
-                                   dest.p, strlen(root)) == 0) {
+  hts_buf_cpy(dest, fslash(HTS_SIZED(catbuff), s));
+  if (strnotempty(root) &&
+      strncmp(fslash(HTS_SIZED(catbuff), root), dest.p, strlen(root)) == 0) {
     hts_buf_cpy(dest, s + strlen(root));
   }
 }

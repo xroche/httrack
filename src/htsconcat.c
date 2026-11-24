@@ -98,7 +98,6 @@ static char *__fslash(char *a) {
   return a;
 }
 
-#undef fslash
 char *fslash(char *catbuff, size_t size, const char *a) {
   RUNTIME_TIME_CHECK_SIZE(size);
   return __fslash(concat(catbuff, size, a, NULL));

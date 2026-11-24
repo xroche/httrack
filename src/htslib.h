@@ -275,8 +275,6 @@ char *fslash(char *catbuff, size_t size, const char *a);
     stderr. Bit 0x80 redirects debug output to "hts-debug.txt". */
 void hts_debug(int level);
 
-#define fslash(A, B, C) (COMPILE_TIME_CHECK_SIZE(B), fslash(A, B, C))
-
 #define READ_ERROR (-1)
 #define READ_EOF (-2)
 #define READ_TIMEOUT (-3)
