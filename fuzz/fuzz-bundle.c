@@ -98,7 +98,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   strcpybuff(url, "https://fuzz.example/other#httrack-bundle=fuzz2");
   (void) hts_bundle_take(opt, url);
 
-  (void) hts_bundle_load_all(opt, NULL, err, sizeof(err));
+  (void) hts_bundle_load_all(opt, NULL, HTS_SIZED(err));
 
   for (i = 0; hts_bundle_url(opt, i) != NULL; i++)
     continue;

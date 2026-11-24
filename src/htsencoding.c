@@ -39,6 +39,7 @@ Please visit our Website: http://www.httrack.com
 /* static int decode_entity(const uint64_t hash, const size_t len);
  */
 #include "htsentities.h"
+#include "htsbuf.h"
 
 /* 64-bit FNV-1a; must match htsentities.sh, which keys the entity table on it.
  */
@@ -124,7 +125,7 @@ int hts_unescapeEntitiesWithCharsetSpecial(const char *src, char *dest,
             size_t ulen;
             char buffer[32];
             len = 0;
-            if ( ( ulen = hts_writeUTF8(uc, buffer, sizeof(buffer)) ) != 0) {
+            if ((ulen = hts_writeUTF8(uc, HTS_SIZED(buffer))) != 0) {
               const hts_boolean urlQuery =
                   (flags & UNESCAPE_ENTITIES_URL_QUERY) != 0;
               char *s;

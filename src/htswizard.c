@@ -273,7 +273,7 @@ static void wizard_cat_scope(htsbuff *f, const char *sign, const char *adr,
   if (slot >= HTS_WIZARD_MAX_FILTERS)
     return;
   /* no domain lives below this host, so the host itself is the widest scope */
-  if (!wizard_answer_scope(adr, n, scope, sizeof(scope))) {
+  if (!wizard_answer_scope(adr, n, HTS_SIZED(scope))) {
     if (slot == 0) {
       wizard_cat_host(f, sign, adr);
       htsbuff_cat(f, "/*");
@@ -429,7 +429,7 @@ void hts_wizard_apply_verdict(httrackp *opt, int n, const char *adr,
     {
       char scope[HTS_URLMAXSIZE];
 
-      if (!wizard_answer_scope(adr, n, scope, sizeof(scope)))
+      if (!wizard_answer_scope(adr, n, HTS_SIZED(scope)))
         hts_log_print(opt, LOG_WARNING,
                       "(wizard) %s has no domain above it, answer %d applied "
                       "to the whole host",
@@ -931,7 +931,7 @@ static int hts_acceptlink_(httrackp *opt, int ptr, const char *adr,
       if ((ptr != 0) && (force_mirror == 0)) {
         char BIGSTK tempo[HTS_URLMAXSIZE * 2];
 
-        hts_wizard_prompt_url(tempo, sizeof(tempo), adr, fil);
+        hts_wizard_prompt_url(HTS_SIZED(tempo), adr, fil);
         s = RUN_CALLBACK1(opt, query3, tempo);
         n = hts_wizard_parse_reply(s);
         io_flush;

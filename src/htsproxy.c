@@ -114,7 +114,7 @@ int http_proxy_tunnel(httrackp *opt, htsblk *retour, const char *adr,
     char autorisation[1100];
 
     const int got = hts_basic_auth_value(opt, retour->req.proxy.name,
-                                         autorisation, sizeof(autorisation));
+                                         HTS_SIZED(autorisation));
 
     if (got < 0) {
       strcpybuff(retour->msg, "proxy CONNECT: credentials too long");
@@ -310,7 +310,7 @@ static int socks5_read_reply(socks5_stream *st, char *msg, size_t msgsize) {
   unsigned char addr[SOCKS5_MAXFIELD + 2];
   size_t addrlen;
 
-  if (!socks5_read_n(st, head, sizeof(head)))
+  if (!socks5_read_n(st, HTS_SIZED(head)))
     return socks5_fail(msg, msgsize, "SOCKS5: no reply from proxy");
   if (head[0] != SOCKS5_VERSION)
     return socks5_fail(msg, msgsize, "SOCKS5: bad version in reply");
@@ -358,7 +358,7 @@ static int socks5_negotiate(socks5_stream *st, const char *host, size_t hostlen,
   frame[3] = SOCKS5_METHOD_USERPASS;
   if (!socks5_write_all(st, frame, (size_t) 2 + frame[1]))
     return socks5_fail(msg, msgsize, "SOCKS5: write error");
-  if (!socks5_read_n(st, rep, sizeof(rep)))
+  if (!socks5_read_n(st, HTS_SIZED(rep)))
     return socks5_fail(msg, msgsize, "SOCKS5: no method reply from proxy");
   if (rep[0] != SOCKS5_VERSION)
     return socks5_fail(msg, msgsize, "SOCKS5: bad version in method reply");
@@ -377,7 +377,7 @@ static int socks5_negotiate(socks5_stream *st, const char *host, size_t hostlen,
     memcpy(frame + 3 + userlen, pass, passlen);
     if (!socks5_write_all(st, frame, 3 + userlen + passlen))
       return socks5_fail(msg, msgsize, "SOCKS5: write error");
-    if (!socks5_read_n(st, rep, sizeof(rep)))
+    if (!socks5_read_n(st, HTS_SIZED(rep)))
       return socks5_fail(msg, msgsize, "SOCKS5: no authentication reply");
     if (rep[1] != 0x00)
       return socks5_fail(msg, msgsize, "SOCKS5: authentication failed");
@@ -467,8 +467,8 @@ static int socks5_handshake_stream(httrackp *opt, socks5_stream *st,
   if (portsep != NULL && !hts_parse_url_port(portsep + 1, &port))
     return socks5_fail(msg, msgsize, "SOCKS5: invalid origin port");
   if (link_has_authorization(proxy_name)) {
-    if (!socks5_credentials(opt, proxy_name, user, sizeof(user), &userlen, pass,
-                            sizeof(pass), &passlen, msg, msgsize))
+    if (!socks5_credentials(opt, proxy_name, HTS_SIZED(user), &userlen,
+                            HTS_SIZED(pass), &passlen, msg, msgsize))
       return 0;
     want_auth = 1;
   }
@@ -491,7 +491,7 @@ int socks5_handshake(httrackp *opt, htsblk *retour, const char *adr,
   st.timeout = timeout;
   st.io = NULL;
   return socks5_handshake_stream(opt, &st, adr, retour->req.proxy.name, ssl,
-                                 retour->msg, sizeof(retour->msg));
+                                 HTS_SIZED(retour->msg));
 }
 
 int socks5_handshake_scripted(httrackp *opt, const char *adr,
@@ -504,6 +504,6 @@ int socks5_handshake_scripted(httrackp *opt, const char *adr,
   io->consumed = 0;
   io->sent_len = 0;
   io->msg[0] = '\0';
-  return socks5_handshake_stream(opt, &st, adr, proxy_name, 0, io->msg,
-                                 sizeof(io->msg));
+  return socks5_handshake_stream(opt, &st, adr, proxy_name, 0,
+                                 HTS_SIZED(io->msg));
 }

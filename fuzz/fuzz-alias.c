@@ -40,6 +40,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsalias.h"
 #include "htscmdline.h"
 #include "htsglobal.h"
+#include "htsbuf.h"
 
 static char alias_dir[256];
 static char alias_conf[sizeof(alias_dir) + sizeof("/fuzz-alias.conf")];
@@ -93,7 +94,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
       int back_n = 0;
 
       (void) optalias_check(nargs, (const char *const *) args, i, &rac, ra,
-                            HTS_CDLMAXSIZE, err, sizeof(err));
+                            HTS_CDLMAXSIZE, HTS_SIZED(err));
       (void) optalias_help(args[i]);
       (void) optrate_read(args[i], &rate);
 

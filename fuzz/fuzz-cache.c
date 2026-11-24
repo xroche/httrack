@@ -120,14 +120,13 @@ static void fuzz_cache_read_entry(httrackp *opt, cache_back *cache,
   char save[HTS_URLMAXSIZE * 2];
   htsblk r;
 
-  r = cache_read(opt, cache, key, "", NULL, location, sizeof(location));
+  r = cache_read(opt, cache, key, "", NULL, HTS_SIZED(location));
   freet(r.adr);
-  r = cache_readex(opt, cache, key, "", "", location, sizeof(location), NULL, 0,
-                   1);
+  r = cache_readex(opt, cache, key, "", "", HTS_SIZED(location), NULL, 0, 1);
   freet(r.adr);
   save[0] = '\0';
-  r = cache_read_including_broken(opt, cache, key, "", save, sizeof(save),
-                                  location, sizeof(location));
+  r = cache_read_including_broken(opt, cache, key, "", HTS_SIZED(save),
+                                  HTS_SIZED(location));
   freet(r.adr);
 }
 

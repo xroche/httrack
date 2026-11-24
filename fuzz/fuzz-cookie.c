@@ -131,7 +131,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     for (; rec != NULL && *rec != '\0'; rec = cookie_nextfield(rec)) {
       (void) cookie_sendable(rec, https ? HTS_TRUE : HTS_FALSE, now);
       for (i = 0; i < 6; i++) {
-        (void) cookie_get(field, sizeof(field), rec, i);
+        (void) cookie_get(HTS_SIZED(field), rec, i);
         cookie_sink += (unsigned long) strlen(field);
       }
     }
@@ -201,14 +201,14 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     strlncatbuff(s, lines[0], sizeof(s), sizeof(s) - 1);
     /* cookie_set checks the room before inserting, so the harness does too. */
     if (nlines > 1 && strlen(lines[1]) < sizeof(s) - strlen(s))
-      cookie_insert(s, sizeof(s), lines[1]);
+      cookie_insert(HTS_SIZED(s), lines[1]);
     if (nlines > 2) {
       /* Callers guarantee pos <= strlen(s) (both pass within-string
          offsets), so the harness clamps to the same contract. */
       size_t len = strlen(s);
       size_t pos = (size_t) atol(lines[2]);
 
-      cookie_delete(s, sizeof(s), pos > len ? len : pos);
+      cookie_delete(HTS_SIZED(s), pos > len ? len : pos);
     }
     cookie_sink += (unsigned long) strlen(s);
     break;
@@ -222,7 +222,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
     memset(&attr, 0, sizeof(attr));
     bind = cookie_flat_bind(nlines > 0 ? lines[0] : "https://a.fuzz.example/x",
-                            host, sizeof(host), &attr);
+                            HTS_SIZED(host), &attr);
     if (bind != NULL) {
       int ignored = 0;
 
@@ -243,12 +243,12 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     char field[8192];
     int i;
 
-    if (!cookie_url_host(nlines > 0 ? lines[0] : "https://[IPv6:::1]:80/", host,
-                         sizeof(host)))
+    if (!cookie_url_host(nlines > 0 ? lines[0] : "https://[IPv6:::1]:80/",
+                         HTS_SIZED(host)))
       host[0] = '\0'; // a refused URL leaves host unwritten
     cookie_sink += (unsigned long) strlen(host);
     for (i = 0; i < 8; i++) {
-      (void) cookie_get(field, sizeof(field), jar.data, i);
+      (void) cookie_get(HTS_SIZED(field), jar.data, i);
       cookie_sink += (unsigned long) strlen(field);
     }
     break;

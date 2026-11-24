@@ -490,7 +490,7 @@ static void warc_fill_random(warc_writer *w, unsigned char *b, size_t n) {
 static void warc_make_id(warc_writer *w, char out[64]) {
   unsigned char b[16];
   w->counter++;
-  warc_fill_random(w, b, sizeof(b));
+  warc_fill_random(w, HTS_SIZED(b));
   b[6] = (unsigned char) ((b[6] & 0x0F) | 0x40);
   b[8] = (unsigned char) ((b[8] & 0x3F) | 0x80);
   snprintf(out, 64,
@@ -1683,7 +1683,7 @@ int warc_write_transaction(warc_writer *w, const char *target_uri,
   /* CDXJ status/mime (from the caller's status and the response Content-Type).
    */
   snprintf(statusbuf, sizeof(statusbuf), "%d", statuscode);
-  warc_http_header_value(resp_hdr, "Content-Type", mimebuf, sizeof(mimebuf));
+  warc_http_header_value(resp_hdr, "Content-Type", HTS_SIZED(mimebuf));
   /* a 304 declares no type, so index the one only the caller knows */
   if (mimebuf[0] == '\0' && content_type != NULL)
     strclipbuff(mimebuf, sizeof(mimebuf), content_type);

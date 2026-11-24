@@ -658,7 +658,7 @@ int is_userknowntype(httrackp *opt, const char *fil) {
   if (!strnotempty(fil))
     return 0;
   mime[0] = '\0';
-  get_userhttptype(opt, mime, sizeof(mime), fil);
+  get_userhttptype(opt, HTS_SIZED(mime), fil);
   if (!strnotempty(mime))
     return 0;
   else if (is_html_mime_type(mime))

@@ -2175,12 +2175,12 @@ static hts_boolean ref_get_record(FILE *fp, lien_back *dst) {
     return HTS_FALSE; /* a pre-3.50.2 blit, or not a reference */
   if (!ref_get_u32(fp, &version) || version != HTS_REF_VERSION)
     return HTS_FALSE;
-  if (!ref_get_str(fp, dst->url_adr, sizeof(dst->url_adr)) ||
-      !ref_get_str(fp, dst->url_fil, sizeof(dst->url_fil)) ||
-      !ref_get_str(fp, dst->url_sav, sizeof(dst->url_sav)) ||
-      !ref_get_str(fp, dst->referer_adr, sizeof(dst->referer_adr)) ||
-      !ref_get_str(fp, dst->referer_fil, sizeof(dst->referer_fil)) ||
-      !ref_get_str(fp, dst->location_buffer, sizeof(dst->location_buffer)) ||
+  if (!ref_get_str(fp, HTS_SIZED(dst->url_adr)) ||
+      !ref_get_str(fp, HTS_SIZED(dst->url_fil)) ||
+      !ref_get_str(fp, HTS_SIZED(dst->url_sav)) ||
+      !ref_get_str(fp, HTS_SIZED(dst->referer_adr)) ||
+      !ref_get_str(fp, HTS_SIZED(dst->referer_fil)) ||
+      !ref_get_str(fp, HTS_SIZED(dst->location_buffer)) ||
       !ref_get_int(fp, &dst->r.statuscode) ||
       !ref_get_short(fp, &dst->r.notmodified) ||
       !ref_get_short(fp, &dst->r.compressed) ||
@@ -2189,14 +2189,13 @@ static hts_boolean ref_get_record(FILE *fp, lien_back *dst) {
       !ref_get_llint(fp, &dst->r.crange) ||
       !ref_get_llint(fp, &dst->r.crange_start) ||
       !ref_get_llint(fp, &dst->r.crange_end) ||
-      !ref_get_str(fp, dst->r.msg, sizeof(dst->r.msg)) ||
-      !ref_get_str(fp, dst->r.contenttype, sizeof(dst->r.contenttype)) ||
-      !ref_get_str(fp, dst->r.charset, sizeof(dst->r.charset)) ||
-      !ref_get_str(fp, dst->r.contentencoding,
-                   sizeof(dst->r.contentencoding)) ||
-      !ref_get_str(fp, dst->r.lastmodified, sizeof(dst->r.lastmodified)) ||
-      !ref_get_str(fp, dst->r.etag, sizeof(dst->r.etag)) ||
-      !ref_get_str(fp, dst->r.cdispo, sizeof(dst->r.cdispo)))
+      !ref_get_str(fp, HTS_SIZED(dst->r.msg)) ||
+      !ref_get_str(fp, HTS_SIZED(dst->r.contenttype)) ||
+      !ref_get_str(fp, HTS_SIZED(dst->r.charset)) ||
+      !ref_get_str(fp, HTS_SIZED(dst->r.contentencoding)) ||
+      !ref_get_str(fp, HTS_SIZED(dst->r.lastmodified)) ||
+      !ref_get_str(fp, HTS_SIZED(dst->r.etag)) ||
+      !ref_get_str(fp, HTS_SIZED(dst->r.cdispo)))
     return HTS_FALSE;
   /* A resume ref written before the engine refused these, or edited since */
   if (!hts_location_is_safe(dst->location_buffer))
@@ -3008,9 +3007,8 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
                 previous_save[0] = '\0';
                 r = cache_readex(opt, cache, adr, fil, /*head */ NULL,
                                  /*bound to back[p] (temporary) */
-                                 back[p].location_buffer,
-                                 sizeof(back[p].location_buffer), previous_save,
-                                 sizeof(previous_save), /*ro */ 1);
+                                 HTS_SIZED(back[p].location_buffer),
+                                 HTS_SIZED(previous_save), /*ro */ 1);
                 /* Is supposed to be on disk only */
                 if (r.is_write && previous_save[0] != '\0') {
                   /* rename a file saved under an older name */
@@ -3078,13 +3076,12 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
           // dans ce cas on peut également lire des réponses cachées comme 404,302...
           // lire dans le cache
           if (!test)
-            back[p].r =
-                cache_read(opt, cache, adr, fil, save, back[p].location_buffer,
-                           sizeof(back[p].location_buffer));
+            back[p].r = cache_read(opt, cache, adr, fil, save,
+                                   HTS_SIZED(back[p].location_buffer));
           else
             back[p].r =
-                cache_read(opt, cache, adr, fil, NULL, back[p].location_buffer,
-                           sizeof(back[p].location_buffer)); // headers only
+                cache_read(opt, cache, adr, fil, NULL,
+                           HTS_SIZED(back[p].location_buffer)); // headers only
 
           /* ensure correct location buffer set */
           back[p].r.location = back[p].location_buffer;
@@ -3240,7 +3237,7 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
           if (sz > 0) {         // Fichier non vide? (question bête, sinon on transfert tout!)
             char lastmodified[256];
 
-            get_filetime_rfc822(save, lastmodified, sizeof(lastmodified));
+            get_filetime_rfc822(save, HTS_SIZED(lastmodified));
             if (strnotempty(lastmodified)) { /* pas de If-.. possible */
               hts_log_print(opt, LOG_DEBUG,
                             "File partially present (" LLintP " bytes): %s%s",
@@ -5102,10 +5099,9 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                       /* the cache entry overwrites the whole struct, so drop
                          what the 304 response still owns first (#782) */
                       back_free_response(&back[i].r);
-                      back[i].r = cache_read(opt, cache, back[i].url_adr,
-                                             back[i].url_fil, back[i].url_sav,
-                                             back[i].location_buffer,
-                                             sizeof(back[i].location_buffer));
+                      back[i].r = cache_read(
+                          opt, cache, back[i].url_adr, back[i].url_fil,
+                          back[i].url_sav, HTS_SIZED(back[i].location_buffer));
                       back[i].r.location = back[i].location_buffer;
                       back_connxfr(&tmp, &back[i].r);
                       warc_move_request(&tmp, &back[i].r);

@@ -238,7 +238,7 @@ const char *hts_bundle_take(httrackp *opt, char *url) {
   if (why != NULL || name[0] == '\0')
     return why;
   // the scope reads the host the crawl will reach
-  if (!hts_escape_typed_login(url, typed, sizeof(typed)))
+  if (!hts_escape_typed_login(url, HTS_SIZED(typed)))
     return "invalid url";
   return bundle_add(opt, name, typed) ? NULL : "out of memory";
 }
@@ -355,7 +355,7 @@ static const char *bundle_note_url(bundle *b, const char *url) {
 
   if (strfield(url, "https:"))
     b->https_only = HTS_TRUE;
-  if (!cookie_url_host(url, host, sizeof(host)))
+  if (!cookie_url_host(url, HTS_SIZED(host)))
     return b->scope_given ? NULL : "cannot work out the bundle's scope";
   // a host with no registrable domain covers itself alone
   reg = hts_host_is_address(host, strlen(host))
@@ -475,10 +475,10 @@ static hts_boolean bundle_parse(httrackp *opt, bundle *b, text_src *src,
 
       // a typed login reads up to the last '@' before the first '/'
       if (strlen(value) >= HTS_URLMAXSIZE ||
-          !hts_escape_typed_login(value, typed, sizeof(typed)) ||
+          !hts_escape_typed_login(value, HTS_SIZED(typed)) ||
           strlen(typed) >= HTS_URLMAXSIZE ||
           strstr(typed, HTS_BUNDLE_SUFFIX) != NULL ||
-          !cookie_url_host(typed, host, sizeof(host)))
+          !cookie_url_host(typed, HTS_SIZED(host)))
         BUNDLE_FAIL("%s, line %d: invalid url", b->file, lineno);
       if (b->nurls >= BUNDLE_LIST_MAX)
         BUNDLE_FAIL("%s, line %d: more than %d url lines", b->file, lineno,
@@ -852,7 +852,7 @@ void hts_bundle_identity(httrackp *opt, const char *adr, htsrequest *req) {
   char host[COOKIE_MAX_DOMAIN];
   size_t i;
 
-  if (st == NULL || !cookie_host(adr, host, sizeof(host)))
+  if (st == NULL || !cookie_host(adr, HTS_SIZED(host)))
     return;
   for (i = 0; i < TypedArraySize(st->items); i++) {
     const bundle *const b = &TypedArrayNth(st->items, i);
@@ -1175,7 +1175,7 @@ static const char *curl_ansi_quote(const char **pp, char *dst, size_t *len) {
       return "an escape in $'...' is out of range";
     {
       char enc[5];
-      const size_t n = hts_writeUTF8((hts_UCS4) cp, enc, sizeof(enc));
+      const size_t n = hts_writeUTF8((hts_UCS4) cp, HTS_SIZED(enc));
 
       memcpy(dst + *len, enc, n);
       *len += n;
@@ -1397,7 +1397,7 @@ static const char *paste_curl_cookies(httrackp *opt, t_cookie *jar,
                                       const paste_curl *c, const char *url) {
   char host[COOKIE_MAX_DOMAIN];
   cookie_attr attr;
-  const char *const domain = cookie_flat_bind(url, host, sizeof(host), &attr);
+  const char *const domain = cookie_flat_bind(url, HTS_SIZED(host), &attr);
   const char *why = domain == NULL ? "the address has no host" : NULL;
   hts_span rest = hts_span_of(StringBuff(c->cookies)), name, value;
   String pair = STRING_EMPTY;
@@ -1468,7 +1468,7 @@ static hts_boolean paste_host_entry(const char *host, size_t len,
   }
   if (len == 0 || !hts_buf_put_span(HTS_BUF(given), hts_span_at(host, len)))
     return HTS_FALSE;
-  if (!cookie_host(given, folded, sizeof(folded)))
+  if (!cookie_host(given, HTS_SIZED(folded)))
     return HTS_FALSE;
   reg = hts_host_is_address(folded, strlen(folded))
             ? folded
@@ -1568,8 +1568,7 @@ static void paste_scope_text(const bundle *b, size_t own, const t_cookie *jar,
     return;
   while (*a != '\0') {
     a += binput(a, line, (int) sizeof(line) - 1);
-    if (!cookie_host(cookie_get(buffer, sizeof(buffer), line, 0), host,
-                     sizeof(host)))
+    if (!cookie_host(cookie_get(HTS_SIZED(buffer), line, 0), HTS_SIZED(host)))
       continue;
     for (i = 0; i < b->nscope; i++) {
       if (scope_covers(b->scope[i], host[0] == '.' ? host + 1 : host)) {
@@ -1607,7 +1606,7 @@ static void paste_jar_summary(const t_cookie *jar, int *count,
     const char *dom;
 
     a += binput(a, line, (int) sizeof(line) - 1);
-    dom = cookie_get(buffer, sizeof(buffer), line, 0);
+    dom = cookie_get(HTS_SIZED(buffer), line, 0);
     if (dom[0] == '.')
       dom++;
     if (*count < INT_MAX)
@@ -1689,7 +1688,7 @@ static const char *paste_name(const char *url, char name[HTS_BUNDLE_NAME_MAX]) {
   hts_boolean www;
   size_t len;
 
-  if (!cookie_url_host(url, host, sizeof(host)))
+  if (!cookie_url_host(url, HTS_SIZED(host)))
     return "the address has no host";
   if (host[0] == '[' || strchr(host, ':') != NULL)
     return "an IP address cannot name a login bundle";
@@ -1912,8 +1911,8 @@ HTSEXT_API hts_boolean hts_bundle_from_paste_hosts(
   memset(jar->data, 0, sizeof(jar->data));
   opt->cookie = jar;
   src = text_src_mem(StringBuff(text), StringLength(text));
-  if (!bundle_load_src(opt, &check, &src, NULL, all, NULL, NULL, err,
-                       sizeof(err)))
+  if (!bundle_load_src(opt, &check, &src, NULL, all, NULL, NULL,
+                       HTS_SIZED(err)))
     PASTE_FAIL("%s", err);
   paste_jar_summary(jar, &count, result->hosts);
   if (count == 0 && c.auth == NULL && !keep_empty)

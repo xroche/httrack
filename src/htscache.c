@@ -148,7 +148,7 @@ static void cache_zip_write_failed(httrackp *opt, cache_back *cache,
       } else {
         hts_log_print(opt, LOG_ERROR,
                       "Mirror aborted: cache write failed (%s): %s", what,
-                      hts_get_zerror(zErr, errbuf, sizeof(errbuf)));
+                      hts_get_zerror(zErr, HTS_SIZED(errbuf)));
       }
     }
     /* fatal: stop the mirror, exit non-zero */
@@ -156,7 +156,7 @@ static void cache_zip_write_failed(httrackp *opt, cache_back *cache,
   } else {
     hts_log_print(opt, LOG_WARNING,
                   "cache write failed (%s: %s), entry not cached: %s%s", what,
-                  hts_get_zerror(zErr, errbuf, sizeof(errbuf)),
+                  hts_get_zerror(zErr, HTS_SIZED(errbuf)),
                   adr_nologin(opt, url_adr), url_fil);
   }
 }
@@ -226,8 +226,8 @@ void cache_keep_previous(httrackp *opt, cache_back *cache, const char *url_adr,
   /* Headers only: a kept entry carries no body, so nothing is read from the
      previous cache or from disk, whatever the file's size. */
   previous_save[0] = '\0';
-  r = cache_readex_(opt, cache, url_adr, url_fil, NULL, NULL, 0, previous_save,
-                    sizeof(previous_save), 1, HTS_TRUE);
+  r = cache_readex_(opt, cache, url_adr, url_fil, NULL, NULL, 0,
+                    HTS_SIZED(previous_save), 1, HTS_TRUE);
   /* The entry must name this very file: fexist() upstream proves only that
      something occupies the name, which a collision flip fills with another
      URL's file. */
@@ -1270,7 +1270,7 @@ void cache_init(cache_back * cache, httrackp * opt) {
 
           hts_log_print(opt, LOG_WARNING,
                         "Cache: error trying to read the cache: %s",
-                        hts_get_zerror(zErr, errbuf, sizeof(errbuf)));
+                        hts_get_zerror(zErr, HTS_SIZED(errbuf)));
         }
 
       } else {

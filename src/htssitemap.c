@@ -230,8 +230,7 @@ int hts_sitemap_scan(const char *body, size_t size, int maxurls,
     /* hts_unescapeEntities decodes in place and tolerates src == dest; a
        reference to a control byte survives as one and sitemap_url_ok drops it.
      */
-    if (hts_unescapeEntities(url, url, sizeof(url)) != 0 ||
-        !sitemap_url_ok(url))
+    if (hts_unescapeEntities(url, HTS_SIZED(url)) != 0 || !sitemap_url_ok(url))
       continue;
     n++;
     if (!handler(arg, url))

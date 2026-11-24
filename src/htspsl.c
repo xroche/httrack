@@ -59,7 +59,7 @@ static void psl_add(coucal rules, const char *rule, size_t len) {
     rule++;
     len--;
   }
-  if (hts_host_to_ascii(key, sizeof(key), rule, len) && key[0] != '\0') {
+  if (hts_host_to_ascii(HTS_SIZED(key), rule, len) && key[0] != '\0') {
     hts_lowcase(key);
     (void) coucal_read(rules, key, &old);
     coucal_write(rules, key, old | kind);
@@ -70,8 +70,7 @@ static void psl_add(coucal rules, const char *rule, size_t len) {
 static void psl_install(coucal rules, const char *version, size_t vlen) {
   coucal_delete(&psl_rules);
   psl_rules = rules;
-  (void) hts_span_copy(hts_span_at(version, vlen), psl_version,
-                       sizeof(psl_version));
+  (void) hts_span_copy(hts_span_at(version, vlen), HTS_SIZED(psl_version));
 }
 
 /* Add the rule on one line of a list file, or note its VERSION stamp. */

@@ -536,7 +536,7 @@ static hts_boolean sf_inline(sf_ctx *ctx, const char *base_dir, const char *ref,
     StringFree(path);
     return HTS_FALSE;
   }
-  cls = sf_mime_class(ctx->opt, StringBuff(path), mime, sizeof(mime));
+  cls = sf_mime_class(ctx->opt, StringBuff(path), HTS_SIZED(mime));
   /* The referencing context decides when the name carries no usable type.
      A contradiction between the two is a bug and is not inlined. */
   if (want != SINGLEFILE_CLASS_ANY) {
