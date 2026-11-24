@@ -1837,15 +1837,14 @@ int back_serialize(FILE *fp, const lien_back *src) {
 
 /* Reads one string field into its fixed slot. A length with no room for the
    terminator is refused, not clipped. */
-static hts_boolean back_field_unserialize(back_source *s, char *dst,
-                                          size_t size) {
+static hts_boolean back_field_unserialize(back_source *s, hts_buf dst) {
   size_t len;
 
-  if (!back_source_get(s, &len, sizeof(len)) || len >= size)
+  if (!back_source_get(s, &len, sizeof(len)) || len >= dst.size)
     return HTS_FALSE;
-  if (len != 0 && !back_source_get(s, dst, len))
+  if (len != 0 && !back_source_get(s, dst.p, len))
     return HTS_FALSE;
-  dst[len] = '\0';
+  dst.p[len] = '\0';
   return HTS_TRUE;
 }
 
@@ -1858,7 +1857,8 @@ static hts_boolean back_record_unserialize(back_source *s, lien_back *dst) {
     const size_t off = back_spool_strings[i].offset;
 
     if ((off != at && !back_source_get(s, base + at, off - at)) ||
-        !back_field_unserialize(s, base + off, back_spool_strings[i].size))
+        !back_field_unserialize(
+            s, hts_buf_at(base + off, back_spool_strings[i].size)))
       return HTS_FALSE;
     at = off + back_spool_strings[i].size;
   }
@@ -2053,13 +2053,13 @@ static hts_boolean ref_put_str(FILE *fp, const char *str) {
 
 /* Clips into a fixed destination rather than aborting: the bytes come off a
    file another build, or another machine, wrote. */
-static hts_boolean ref_get_str(FILE *fp, char *dst, size_t size) {
+static hts_boolean ref_get_str(FILE *fp, hts_buf dst) {
   uint32_t len;
   size_t copied = 0;
   char chunk[1024];
 
-  assertf(size != 0);
-  dst[0] = '\0';
+  assertf(dst.size != 0);
+  dst.p[0] = '\0';
   if (!ref_get_u32(fp, &len) || len > HTS_REF_MAX_STR)
     return HTS_FALSE;
   while (len != 0) {
@@ -2069,15 +2069,15 @@ static hts_boolean ref_get_str(FILE *fp, char *dst, size_t size) {
     if (!hts_fread_exact(chunk, n, fp))
       return HTS_FALSE;
     len -= (uint32_t) n;
-    if (copied < size - 1) {
-      const size_t room = size - 1 - copied;
+    if (copied < dst.size - 1) {
+      const size_t room = dst.size - 1 - copied;
       const size_t take = n < room ? n : room;
 
-      memcpy(dst + copied, chunk, take);
+      memcpy(dst.p + copied, chunk, take);
       copied += take;
     }
   }
-  dst[copied] = '\0';
+  dst.p[copied] = '\0';
   return HTS_TRUE;
 }
 
@@ -2175,12 +2175,12 @@ static hts_boolean ref_get_record(FILE *fp, lien_back *dst) {
     return HTS_FALSE; /* a pre-3.50.2 blit, or not a reference */
   if (!ref_get_u32(fp, &version) || version != HTS_REF_VERSION)
     return HTS_FALSE;
-  if (!ref_get_str(fp, HTS_SIZED(dst->url_adr)) ||
-      !ref_get_str(fp, HTS_SIZED(dst->url_fil)) ||
-      !ref_get_str(fp, HTS_SIZED(dst->url_sav)) ||
-      !ref_get_str(fp, HTS_SIZED(dst->referer_adr)) ||
-      !ref_get_str(fp, HTS_SIZED(dst->referer_fil)) ||
-      !ref_get_str(fp, HTS_SIZED(dst->location_buffer)) ||
+  if (!ref_get_str(fp, HTS_BUF(dst->url_adr)) ||
+      !ref_get_str(fp, HTS_BUF(dst->url_fil)) ||
+      !ref_get_str(fp, HTS_BUF(dst->url_sav)) ||
+      !ref_get_str(fp, HTS_BUF(dst->referer_adr)) ||
+      !ref_get_str(fp, HTS_BUF(dst->referer_fil)) ||
+      !ref_get_str(fp, HTS_BUF(dst->location_buffer)) ||
       !ref_get_int(fp, &dst->r.statuscode) ||
       !ref_get_short(fp, &dst->r.notmodified) ||
       !ref_get_short(fp, &dst->r.compressed) ||
@@ -2189,13 +2189,13 @@ static hts_boolean ref_get_record(FILE *fp, lien_back *dst) {
       !ref_get_llint(fp, &dst->r.crange) ||
       !ref_get_llint(fp, &dst->r.crange_start) ||
       !ref_get_llint(fp, &dst->r.crange_end) ||
-      !ref_get_str(fp, HTS_SIZED(dst->r.msg)) ||
-      !ref_get_str(fp, HTS_SIZED(dst->r.contenttype)) ||
-      !ref_get_str(fp, HTS_SIZED(dst->r.charset)) ||
-      !ref_get_str(fp, HTS_SIZED(dst->r.contentencoding)) ||
-      !ref_get_str(fp, HTS_SIZED(dst->r.lastmodified)) ||
-      !ref_get_str(fp, HTS_SIZED(dst->r.etag)) ||
-      !ref_get_str(fp, HTS_SIZED(dst->r.cdispo)))
+      !ref_get_str(fp, HTS_BUF(dst->r.msg)) ||
+      !ref_get_str(fp, HTS_BUF(dst->r.contenttype)) ||
+      !ref_get_str(fp, HTS_BUF(dst->r.charset)) ||
+      !ref_get_str(fp, HTS_BUF(dst->r.contentencoding)) ||
+      !ref_get_str(fp, HTS_BUF(dst->r.lastmodified)) ||
+      !ref_get_str(fp, HTS_BUF(dst->r.etag)) ||
+      !ref_get_str(fp, HTS_BUF(dst->r.cdispo)))
     return HTS_FALSE;
   /* A resume ref written before the engine refused these, or edited since */
   if (!hts_location_is_safe(dst->location_buffer))
