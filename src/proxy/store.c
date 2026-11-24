@@ -2395,6 +2395,7 @@ static PT_Element PT_ReadCache__Arc(PT_Index index_, const char *url,
         /* a line reaching past this belongs to the record stored after it */
         const long int fposEnd = dataLength >= 0 ? fposMeta + dataLength : -1;
         const char *pos;
+        const hts_buf lb = HTS_BUF_N(index->line, sizeof(index->line) - 1);
         LLint declaredLength = 0;
         const hts_cache_field fields[] = {
             {"Content-Length", HTS_CACHE_FIELD_LLINT, &declaredLength, 0},
@@ -2411,9 +2412,7 @@ static PT_Element PT_ReadCache__Arc(PT_Index index_, const char *url,
 
         /* Read HTTP headers */
         /* HTTP/1.1 404 Not Found */
-        if (hts_shared_linput(index->file,
-                              HTS_BUF_N(index->line, sizeof(index->line) - 1),
-                              HTS_LINPUT_SKIP_NUL) &&
+        if (hts_shared_linput(index->file, lb, HTS_LINPUT_SKIP_NUL) &&
             !arcPastRecordEnd(index->file, fposEnd)) {
           if ((pos = getArcField(index->line, 1)) != NULL) {
             if (sscanf(pos, "%d", &r->statuscode) != 1) {
@@ -2424,11 +2423,8 @@ static PT_Element PT_ReadCache__Arc(PT_Index index_, const char *url,
             r->msg[0] = '\0';
             strncatbuff(r->msg, pos, sizeof(r->msg) - 1);
           }
-          while (
-              hts_shared_linput(index->file,
-                                HTS_BUF_N(index->line, sizeof(index->line) - 1),
-                                HTS_LINPUT_SKIP_NUL) &&
-              index->line[0] != '\0') {
+          while (hts_shared_linput(index->file, lb, HTS_LINPUT_SKIP_NUL) &&
+                 index->line[0] != '\0') {
             char *const line = index->line;
             char *value = strchr(line, ':');
 

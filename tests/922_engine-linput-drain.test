@@ -17,4 +17,16 @@ selftest_queue "[ab][x]" readline 5 - 'a\tb\f\nx' linput
 selftest_queue "[a\\x00b]" readline 5 - 'a\0b' linput
 selftest_queue "[a][][b]" readline 5 - 'a\n\nb' linput
 
+# hts_shared_linput(), htsserver and proxytrack's reader: n skips NUL and d
+# drops the tail of a cut line. Without d, the tail is read as the next line.
+selftest_queue "[abc][z]" readline 4 - 'abc\nz' shared
+selftest_queue "[abc][d][z]" readline 4 - 'abcd\nz' shared
+selftest_queue "[abc][d][z]" readline 4 n 'abcd\nz' shared
+selftest_queue "[abc][z]" readline 4 d 'abcd\nz' shared
+selftest_queue "[abc][z]" readline 4 - 'abc\r\nz' shared
+selftest_queue "[a][b][z]" readline 2 - 'ab\nz' shared
+selftest_queue "[a\\x00b][z]" readline 4 - 'a\0b\nz' shared
+selftest_queue "[ab][z]" readline 4 n 'a\0b\nz' shared
+selftest_queue "[ab][z]" readline 4 - 'a\t\rb\f\nz' shared
+
 selftest_run_queued

@@ -1,31 +1,17 @@
 #!/bin/bash
 #
-# The htsserver and proxytrack line readers stop at their buffer's edge.
+# The htsserver and proxytrack socket line reader stops at its buffer's edge.
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-# sharedline CAP MODE HEX: [line] per read into an exact CAP-byte heap buffer.
-# Lines of CAP-1, CAP and CAP+1 bytes, then "z".
-selftest_queue "[abc][z]" sharedline 4 file hex:6162630a7a
-selftest_queue "[abc][d][z]" sharedline 4 file hex:616263640a7a
-selftest_queue "[abc][de][z]" sharedline 4 file hex:61626364650a7a
-selftest_queue "[abc][z]" sharedline 4 tail hex:6162630a7a
-selftest_queue "[abc][z]" sharedline 4 tail hex:616263640a7a
-selftest_queue "[abc][z]" sharedline 4 tail hex:61626364650a7a
-# A line that fills the buffer has its CRLF consumed, so no empty read follows.
-selftest_queue "[abc][z]" sharedline 4 file hex:6162630d0a7a
-selftest_queue "[a][b][z]" sharedline 2 file hex:61620a7a
-selftest_queue '[a\x00b][z]' sharedline 4 file hex:6100620a7a
-selftest_queue "[ab][z]" sharedline 4 nul hex:6100620a7a
-selftest_queue "[ab][z]" sharedline 4 file hex:61090d620c0a7a
-# A socket line is drained to its newline and flagged "!" when cut.
-selftest_queue "[abc][z](0)" sharedline 4 soc hex:6162630a7a
-selftest_queue "![abc][z](0)" sharedline 4 soc hex:616263640a7a
-selftest_queue "![abc][z](0)" sharedline 4 soc hex:61626364650a7a
-selftest_queue "[ab][z](0)" sharedline 4 soc hex:61090d620c0a7a
-selftest_queue "![a][z](0)" sharedline 2 soc hex:61620a7a
+# sharedline CAP HEX: [line] per read into an exact CAP-byte heap buffer, "!"
+# before a cut one, then the last return. A cut line is drained to its newline.
+selftest_queue "[abc][z](0)" sharedline 4 hex:6162630a7a
+selftest_queue "![abc][z](0)" sharedline 4 hex:616263640a7a
+selftest_queue "[ab][z](0)" sharedline 4 hex:61090d620c0a7a
+selftest_queue "![a][z](0)" sharedline 2 hex:61620a7a
 selftest_run_queued
 
-ok "shared line readers stop at the buffer's edge"
+ok "the socket line reader stops at the buffer's edge"

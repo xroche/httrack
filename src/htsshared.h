@@ -64,10 +64,10 @@ hts_boolean hts_shared_link_has_authority(const char *lien);
    passes. */
 hts_boolean hts_shared_readable(T_SOC soc, time_t deadline);
 
-/* Read one line off soc into s, NUL included, and return its length, or -1
-   when no byte came before deadline (0: none). CR, TAB and form feed are
-   dropped. A line longer than s is drained to its newline and sets *cut, so
-   its tail is never read as a line of its own. */
+/* Read one line off soc into s (1 byte or more, NUL included) and return its
+   length, or -1 when no byte came before deadline (0: none). CR, TAB and form
+   feed are dropped. A line longer than s is drained to its newline and sets
+   *cut, so its tail is never read as a line of its own. */
 int hts_shared_linputsoc(T_SOC soc, hts_buf s, time_t deadline,
                          hts_boolean *cut);
 
