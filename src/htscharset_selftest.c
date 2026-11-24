@@ -633,9 +633,9 @@ static int st_utf8_strict(httrackp *opt, int argc, char **argv) {
 static int st_unescape_bounds(httrackp *opt, int argc, char **argv) {
   char dest[4];
 
-  assertf(hts_unescapeEntities("abcd", HTS_SIZED(dest)) == -1);
+  assertf(hts_unescapeEntities("abcd", HTS_BUF(dest)) == -1);
   assertf(hts_unescapeUrl("abcd", dest, sizeof(dest)) == -1);
-  assertf(hts_unescapeEntities("abc", HTS_SIZED(dest)) == 0);
+  assertf(hts_unescapeEntities("abc", HTS_BUF(dest)) == 0);
   assertf(strcmp(dest, "abc") == 0);
   /* raw multi-byte UTF-8 flush path (bypasses the per-byte guard) */
   assertf(hts_unescapeUrl("ab\xC3\xA9", dest, sizeof(dest)) == -1);

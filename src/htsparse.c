@@ -2649,7 +2649,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   }
 
                   // decode URI entities with UTF-8 charset
-                  if (hts_unescapeEntities(lien, HTS_SIZED(lien)) != 0) {
+                  if (hts_unescapeEntities(lien, HTS_BUF(lien)) != 0) {
                     hts_log_print(opt, LOG_WARNING,
                                   "could not decode URI '%s' as UTF-8",
                                   url_nologin(opt, lien));

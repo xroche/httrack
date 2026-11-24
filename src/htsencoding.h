@@ -34,6 +34,7 @@ Please visit our Website: http://www.httrack.com
 #define HTS_ENCODING_DEFH
 
 #include "htsglobal.h"
+#include "htsbuf.h"
 
 /** Standard includes. **/
 #include <stdlib.h>
@@ -81,8 +82,7 @@ static HTS_INLINE HTS_UNUSED int hts_ehex(const char *s) {
  * needs to hold as space as the source.
  * Returns 0 upon success, -1 upon overflow or error.
  **/
-extern int hts_unescapeEntities(const char *src,
-                                char *dest, const size_t max);
+extern int hts_unescapeEntities(const char *src, hts_buf dest);
 
 /**
  * Unescape HTML entities (as per HTML 4.0 Specification)

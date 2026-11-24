@@ -269,8 +269,8 @@ hts_boolean is_dyntype(hts_span ext);
    and a built-in keep-list of commonly mislabeled types), else 0. */
 hts_boolean may_unknown(httrackp *opt, const char *st);
 
-/** Copy @p a into @p catbuff, converting every '\\' to '/' on all platforms. */
-char *fslash(char *catbuff, size_t size, const char *a);
+/** Copy @p a into @p dst, converting every '\\' to '/' on all platforms. */
+char *fslash(hts_buf dst, const char *a);
 
 /** Set the process-global debug verbosity (0 is off); higher levels log more to
     stderr. Bit 0x80 redirects debug output to "hts-debug.txt". */

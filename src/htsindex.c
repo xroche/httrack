@@ -276,7 +276,7 @@ int index_keyword(const char *html_data, LLint size, const char *mime,
           if (coucal_read(WordIndexHash, line, &e)) {
             char BIGSTK savelst[HTS_URLMAXSIZE * 2];
 
-            if (strncmp(fslash(HTS_SIZED(catbuff), indexpath), filename,
+            if (strncmp(fslash(HTS_BUF(catbuff), indexpath), filename,
                         strlen(indexpath)) == 0)
               strcpybuff(savelst, filename + strlen(indexpath));
             else

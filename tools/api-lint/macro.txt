@@ -157,7 +157,6 @@ src/htslib.c: endwith: uses free name len
 src/htslib.h: GET_CALLBACK: uses free name default_callbacks
 src/htslib.h: HAS_CALLBACK: uses free name default_callbacks
 src/htslib.h: OPT_GET_BUFF_SIZE: uses free name opt
-src/htslib.h: fslash: evaluates B twice
 src/htslib.h: hts_effective_mime: evaluates m twice
 src/htslib.h: is_html_mime_type: evaluates a twice
 src/htslib.h: is_hypertext_mime__: evaluates a twice
