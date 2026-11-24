@@ -4329,11 +4329,13 @@ static size_t engine_scheme_len(hts_span s) {
 
   for (i = 0; i < sizeof(hts_engine_schemes) / sizeof(hts_engine_schemes[0]);
        i++) {
-    const hts_span name = hts_span_of(hts_engine_schemes[i]);
+    const char *const name = hts_engine_schemes[i];
+    size_t j;
 
-    if (s.len > name.len && hts_span_starts_with_ci(s, name) &&
-        s.p[name.len] == ':')
-      return name.len + 1;
+    for (j = 0; name[j] != '\0' && j < s.len && streql(s.p[j], name[j]); j++)
+      ;
+    if (name[j] == '\0' && j < s.len && s.p[j] == ':')
+      return j + 1;
   }
   return 0;
 }
