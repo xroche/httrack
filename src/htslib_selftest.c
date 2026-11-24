@@ -5661,6 +5661,18 @@ static int st_lib_sized(httrackp *opt, int argc, char **argv) {
     }
     freet(buf);
   }
+  for (k = 5; k <= 6; k++) {
+    /* fslash converts on every platform; one byte short leaves "" */
+    char *buf = st_sized_alloc(k);
+
+    if (!st_sized_clip_ok(fslash(hts_buf_at(buf, k), "a\\b\\c"), k,
+                          k == 6 ? "a/b/c" : "")) {
+      printf("lib-sized: fslash into %u bytes wrote '%.6s'\n", (unsigned) k,
+             buf);
+      fail = 1;
+    }
+    freet(buf);
+  }
   (void) UNLINK(path);
   return st_verdict("lib-sized", fail);
 }

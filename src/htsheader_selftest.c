@@ -1095,20 +1095,69 @@ static int st_contentcodings(httrackp *opt, int argc, char **argv) {
   assertf(hts_codec_decode_cap(100) == 100);
   assertf(hts_codec_decode_cap((LLint) 1 << 30) == (LLint) 1 << 30);
   assertf(hts_codec_cap_binds(1024 * 1024, hts_codec_decode_cap(-1)));
+  {
+    static const char ztext[] = "only the head of this stream is inflated";
+    const size_t tlen = sizeof(ztext) - 1;
+    Bytef z[128], want_head[64];
+    uLongf zlen = sizeof(z);
+    size_t want_len;
+    z_stream zs;
+    char *zc;
+    char head[8], full[64], errbuf[HTS_STRERROR_SIZE], want[HTS_STRERROR_SIZE];
+
+    assertf(compress2(z, &zlen, (const Bytef *) ztext, tlen, 9) == Z_OK);
+    /* an exact-size copy, so reading past in.len is an ASan over-read */
+    zc = malloct(zlen);
+    assertf(zc != NULL);
+    memcpy(zc, z, zlen);
+    assertf(hts_zhead(hts_span_at(zc, zlen), HTS_BUF(head)) == sizeof(head));
+    assertf(memcmp(head, ztext, sizeof(head)) == 0);
+    assertf(hts_zhead(hts_span_at(zc, zlen), HTS_BUF(full)) == tlen);
+    assertf(hts_zhead(hts_span_at(zc, zlen),
+                      HTS_BUF_N(full, sizeof(ztext) - 1)) == tlen);
+    assertf(memcmp(full, ztext, tlen) == 0);
+    /* a cut stream yields what zlib decodes from exactly those bytes */
+    memset(&zs, 0, sizeof(zs));
+    assertf(inflateInit(&zs) == Z_OK);
+    zs.next_in = z;
+    zs.avail_in = (uInt) (zlen / 2);
+    zs.next_out = want_head;
+    zs.avail_out = sizeof(want_head);
+    assertf(inflate(&zs, Z_NO_FLUSH) == Z_OK);
+    want_len = sizeof(want_head) - zs.avail_out;
+    (void) inflateEnd(&zs);
+    assertf(want_len < tlen);
+    assertf(hts_zhead(hts_span_at(zc, zlen / 2), HTS_BUF(full)) == want_len);
+    freet(zc);
+    assertf(hts_zhead(hts_span_of("not a zlib stream"), HTS_BUF(full)) == 0);
+    assertf(strcmp(hts_get_zerror(UNZ_BADZIPFILE, HTS_BUF(errbuf)),
+                   "bad zip file") == 0);
+    errno = ENOENT;
+    assertf(hts_get_zerror(UNZ_ERRNO, HTS_BUF(errbuf)) == errbuf);
+    assertf(strcmp(errbuf, hts_strerror(ENOENT, HTS_SIZED(want))) == 0);
+    /* clipped to the 8 bytes it was given, not HTS_STRERROR_SIZE */
+    memset(errbuf, 'X', sizeof(errbuf));
+    errno = ENOENT;
+    (void) hts_get_zerror(UNZ_ERRNO, HTS_BUF_N(errbuf, 8));
+    assertf(strlen(errbuf) == 7 && strncmp(errbuf, want, 7) == 0);
+    assertf(errbuf[8] == 'X');
+  }
 
   if (argc >= 1) {
     snprintf(inpath, sizeof(inpath), "%s/cc-in", argv[0]);
     snprintf(outpath, sizeof(outpath), "%s/cc-out", argv[0]);
 #if HTS_USEBROTLI
     {
-      unsigned char head[16];
+      char head[16];
 
       assertf(ae_write_raw(inpath, cc_br_text, sizeof(cc_br_text)) == 0);
       assertf(hts_codec_unpack(HTS_CODEC_BROTLI, inpath, outpath) ==
               (int) tlen);
       assertf(ae_check_decoded(outpath, cc_text, tlen) == 0);
-      assertf(hts_codec_head(HTS_CODEC_BROTLI, cc_br_text, sizeof(cc_br_text),
-                             head, sizeof(head)) == sizeof(head));
+      assertf(hts_codec_head(
+                  HTS_CODEC_BROTLI,
+                  hts_span_at((const char *) cc_br_text, sizeof(cc_br_text)),
+                  HTS_BUF(head)) == sizeof(head));
       assertf(memcmp(head, cc_text, sizeof(head)) == 0);
       /* truncated: must fail, not fall back to a verbatim copy */
       assertf(ae_write_raw(inpath, cc_br_text, sizeof(cc_br_text) - 4) == 0);
@@ -1128,7 +1177,7 @@ static int st_contentcodings(httrackp *opt, int argc, char **argv) {
       const size_t bound = ZSTD_compressBound(bomblen);
       unsigned char *bomb = malloct(bomblen);
       unsigned char *zbuf = malloct(bound);
-      unsigned char head[16];
+      char head[16];
       size_t zlen;
 
       assertf(bomb != NULL && zbuf != NULL);
@@ -1137,8 +1186,9 @@ static int st_contentcodings(httrackp *opt, int argc, char **argv) {
       assertf(ae_write_raw(inpath, zbuf, zlen) == 0);
       assertf(hts_codec_unpack(HTS_CODEC_ZSTD, inpath, outpath) == (int) tlen);
       assertf(ae_check_decoded(outpath, cc_text, tlen) == 0);
-      assertf(hts_codec_head(HTS_CODEC_ZSTD, zbuf, zlen, head, sizeof(head)) ==
-              sizeof(head));
+      assertf(hts_codec_head(HTS_CODEC_ZSTD,
+                             hts_span_at((const char *) zbuf, zlen),
+                             HTS_BUF(head)) == sizeof(head));
       assertf(memcmp(head, cc_text, sizeof(head)) == 0);
       assertf(ae_write_raw(inpath, zbuf, zlen - 4) == 0);
       assertf(hts_codec_unpack(HTS_CODEC_ZSTD, inpath, outpath) < 0);

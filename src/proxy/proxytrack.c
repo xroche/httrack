@@ -609,9 +609,9 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
   hts_boolean cut;
   int buffer_size = 32768;
   char *buffer = (char *) malloct(buffer_size);
-  int line1Size = 1024;
+  const size_t line1Size = 1024;
   char *line1 = (char *) malloct(line1Size);
-  int lineSize = 8192;
+  const size_t lineSize = 8192;
   char *line = (char *) malloct(lineSize);
   int length = 0;
   int keepAlive = 1;
@@ -672,12 +672,13 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
 
     /* line1: "GET http://www.example.com/ HTTP/1.0" */
     /* A request line too long for line1 is served clipped. */
-    if (hts_shared_linputsoc(soc_c, line1, line1Size - 2, deadline, &cut) > 0 &&
+    if (hts_shared_linputsoc(soc_c, hts_buf_at(line1, line1Size - 2), deadline,
+                             &cut) > 0 &&
         (surl = strchr(line1, ' ')) && !(*surl = '\0') && ++surl &&
         (proto = strchr(surl, ' ')) && !(*proto = '\0') && ++proto) {
       /* Flush headers */
-      while (hts_shared_linputsoc(soc_c, line, lineSize - 2, deadline, &cut) >
-                 0 &&
+      while (hts_shared_linputsoc(soc_c, hts_buf_at(line, lineSize - 2),
+                                  deadline, &cut) > 0 &&
              line[0] != 0) {
         int p;
 

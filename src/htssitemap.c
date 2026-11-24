@@ -154,7 +154,8 @@ static char *sitemap_gunzip(const char *body, size_t size, size_t *outsize) {
   out = malloct(cap + 1);
   if (out == NULL)
     return NULL;
-  n = hts_codec_head(HTS_CODEC_DEFLATE, body, size, out, cap);
+  n = hts_codec_head(HTS_CODEC_DEFLATE, hts_span_at(body, size),
+                     hts_buf_at(out, cap));
   if (n == 0) {
     freet(out);
     return NULL;
@@ -230,7 +231,7 @@ int hts_sitemap_scan(const char *body, size_t size, int maxurls,
     /* hts_unescapeEntities decodes in place and tolerates src == dest; a
        reference to a control byte survives as one and sitemap_url_ok drops it.
      */
-    if (hts_unescapeEntities(url, HTS_SIZED(url)) != 0 || !sitemap_url_ok(url))
+    if (hts_unescapeEntities(url, HTS_BUF(url)) != 0 || !sitemap_url_ok(url))
       continue;
     n++;
     if (!handler(arg, url))

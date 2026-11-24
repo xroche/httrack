@@ -2649,10 +2649,10 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   }
 
                   // decode URI entities with UTF-8 charset
-                  if (hts_unescapeEntities(lien, lien, strlen(lien) + 1) != 0) {
+                  if (hts_unescapeEntities(lien, HTS_BUF(lien)) != 0) {
                     hts_log_print(opt, LOG_WARNING,
-                                  "could not decode URI '%s' with charset '%s'",
-                                  url_nologin(opt, lien), charset);
+                                  "could not decode URI '%s' as UTF-8",
+                                  url_nologin(opt, lien));
                   }
 
                   // decode query entities with the page charset, out-of-place

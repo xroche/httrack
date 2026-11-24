@@ -33,6 +33,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsselftest_int.h"
 #include "htslines.h"
+#include "htsshared.h"
 
 /* The legacy readers write a byte past max at max == 1, hence the slack.
    ST_LINE_BIG holds any line of the corpus, joined or not. */
@@ -97,9 +98,10 @@ static void st_lines_print(const char *s, size_t len) {
   }
 }
 
-/* readline CAP FLAGS TEXT [cpp|alloc|linput]: every line a caller's feof() loop
-   gets, as [line], or "!" for a cut one. alloc keeps CAP bytes and shows them.
-   linput ignores FLAGS and checks its length return. */
+/* readline CAP FLAGS TEXT [cpp|alloc|linput|shared]: every line a caller's
+   feof() loop gets, as [line], or "!" for a cut one. alloc keeps CAP bytes and
+   shows them. linput ignores FLAGS, shared reads "n" as HTS_LINPUT_SKIP_NUL and
+   "d" as HTS_LINPUT_DROP_TAIL, and both check their length return. */
 static int st_readline(httrackp *opt, int argc, char **argv) {
   char data[4096];
   char line[ST_LINE_MAXCAP + ST_LINE_SLACK];
@@ -109,6 +111,8 @@ static int st_readline(httrackp *opt, int argc, char **argv) {
   const hts_boolean cpp = argc >= 4 && strcmp(argv[3], "cpp") == 0;
   const hts_boolean alloc = argc >= 4 && strcmp(argv[3], "alloc") == 0;
   const hts_boolean lin = argc >= 4 && strcmp(argv[3], "linput") == 0;
+  const hts_boolean shared = argc >= 4 && strcmp(argv[3], "shared") == 0;
+  int reads = 0;
   FILE *fp;
 
   if (cap < 1 || cap > ST_LINE_MAXCAP) {
@@ -121,6 +125,9 @@ static int st_readline(httrackp *opt, int argc, char **argv) {
     const int flags = st_lines_flags(argv[1]);
     hts_boolean cut;
     size_t n = (size_t) cap;
+
+    /* a reader that never advances would loop here forever */
+    assertf(++reads <= ST_LINE_MAXREADS);
 
     if (alloc) {
       String sline = STRING_EMPTY;
@@ -136,8 +143,13 @@ static int st_readline(httrackp *opt, int argc, char **argv) {
     if (cpp) {
       cut = hts_readline_cpp(fp, hts_buf_at(line, (size_t) cap), flags);
       n = strlen(line);
-    } else if (lin) {
-      const int len = linput(fp, line, cap);
+    } else if (lin || shared) {
+      const int sflags =
+          (strchr(argv[1], 'n') != NULL ? HTS_LINPUT_SKIP_NUL : 0) |
+          (strchr(argv[1], 'd') != NULL ? HTS_LINPUT_DROP_TAIL : 0);
+      const int len =
+          lin ? linput(fp, line, cap)
+              : hts_shared_linput(fp, hts_buf_at(line, (size_t) cap), sflags);
 
       assertf(len >= 0 && len < cap && line[len] == '\0');
       cut = HTS_FALSE;
@@ -515,7 +527,7 @@ static int st_fopen_private(httrackp *opt, int argc, char **argv) {
 /* ------------------------------------------------------------ */
 
 const struct selftest_entry selftests_lines[] = {
-    {"readline", "<cap> <t|n|tn|-> [text] [cpp|alloc|linput]",
+    {"readline", "<cap> <t|n|tn|-> [text] [cpp|alloc|linput|shared]",
      "config-file line reader: [line] per read, ! when cut", st_readline},
     {"linediff", "", "line readers against the legacy ones they replaced",
      st_linediff},

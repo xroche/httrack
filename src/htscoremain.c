@@ -158,7 +158,7 @@ static const char *dirname_of(hts_buf dst, const char *path) {
 
   if (path == NULL)
     return NULL;
-  slashed = fslash(catbuff, sizeof(catbuff), path);
+  slashed = fslash(HTS_BUF(catbuff), path);
   if ((sep = strrchr(slashed, '/')) == NULL)
     return NULL;
   len = (size_t) (sep - slashed) + 1;

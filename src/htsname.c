@@ -297,7 +297,7 @@ static size_t sniff_slot_head(const lien_back *slot, void *buf, size_t len) {
       n = hts_read_file_head(path, buf, len);
   }
   if (n > 0 && r->compressed) {
-    unsigned char raw[HTS_SNIFF_LEN];
+    char raw[HTS_SNIFF_LEN];
     const hts_codec codec = hts_codec_parse(r->contentencoding);
 
     if (n > sizeof(raw))
@@ -305,13 +305,14 @@ static size_t sniff_slot_head(const lien_back *slot, void *buf, size_t len) {
     memcpy(raw, buf, n);
     /* the transfer coding was applied last, so it comes off first */
     if (r->transfer_coding != HTS_TE_NONE) {
-      n = hts_codec_head(HTS_CODEC_DEFLATE, raw, n, buf, len);
+      n = hts_codec_head(HTS_CODEC_DEFLATE, hts_span_at(raw, n),
+                         hts_buf_at(buf, len));
       if (n > sizeof(raw))
         n = sizeof(raw);
       memcpy(raw, buf, n);
     }
     if (codec != HTS_CODEC_IDENTITY)
-      n = hts_codec_head(codec, raw, n, buf, len);
+      n = hts_codec_head(codec, hts_span_at(raw, n), hts_buf_at(buf, len));
   }
   return n;
 }
@@ -416,22 +417,22 @@ void url_savename_addtail(char *d, size_t dsize, const char *sep,
   strlcatbuff(d, s, dsize);
 }
 
-/* Append at most n characters of s, clipped to dsize. HTS_FALSE if clipped. */
-static hts_boolean tmpl_catn(char *d, size_t dsize, const char *s, size_t n) {
-  size_t i = strlen(d);
+/* Append at most n characters of s, clipped to d. HTS_FALSE if clipped. */
+static hts_boolean tmpl_catn(hts_buf d, const char *s, size_t n) {
+  size_t i = strlen(d.p);
 
-  for (; *s != '\0' && n != 0 && i + 1 < dsize; n--)
-    d[i++] = *s++;
-  d[i] = '\0';
+  for (; *s != '\0' && n != 0 && i + 1 < d.size; n--)
+    d.p[i++] = *s++;
+  d.p[i] = '\0';
   return *s == '\0' || n == 0 ? HTS_TRUE : HTS_FALSE;
 }
 
-static void tmpl_catc(char *d, size_t dsize, char c) {
+static void tmpl_catc(hts_buf d, char c) {
   char s[2];
 
   s[0] = c;
   s[1] = '\0';
-  tmpl_catn(d, dsize, s, 1);
+  tmpl_catn(d, s, 1);
 }
 
 /* These appends clip a savename_type -1 name, never abort (#1295). Template
@@ -447,13 +448,13 @@ static void tmpl_catc(char *d, size_t dsize, char c) {
 #define TMPL_CATN(S, N)                                                        \
   do {                                                                         \
     TMPL_FLUSH();                                                              \
-    if (!tmpl_catn(HTS_SIZED(afs->save), (S), (size_t) (N)))                   \
+    if (!tmpl_catn(HTS_BUF(afs->save), (S), (size_t) (N)))                     \
       tmpl_clipped = HTS_TRUE;                                                 \
   } while (0)
 #define TMPL_CAT(S) TMPL_CATN((S), (size_t) -1)
-#define TMPL_TAILN(S, N) tmpl_catn(HTS_SIZED(tmpltail), (S), (size_t) (N))
+#define TMPL_TAILN(S, N) tmpl_catn(HTS_BUF(tmpltail), (S), (size_t) (N))
 #define TMPL_TAIL(S) TMPL_TAILN((S), (size_t) -1)
-#define TMPL_TAILC(C) tmpl_catc(tmpltail, sizeof(tmpltail), (C))
+#define TMPL_TAILC(C) tmpl_catc(HTS_BUF(tmpltail), (C))
 
 hts_boolean url_query_value(const char *url, const char *name, hts_buf dst) {
   const char *const query = strchr(url, '?');
@@ -1577,8 +1578,8 @@ int url_savename(lien_adrfilsave *const afs,
           char BIGSTK buff[sizeof(afs->af.adr) + sizeof(afs->af.fil)];
 
           digest[0] = buff[0] = '\0';
-          tmpl_catn(HTS_SIZED(buff), adr, (size_t) -1);
-          tmpl_catn(HTS_SIZED(buff), fil_complete, (size_t) -1);
+          tmpl_catn(HTS_BUF(buff), adr, (size_t) -1);
+          tmpl_catn(HTS_BUF(buff), fil_complete, (size_t) -1);
           domd5mem(buff, strlen(buff), digest, 1);
           TMPL_TAIL(digest);
         } break;

@@ -32,6 +32,7 @@ Please visit our Website: http://www.httrack.com
 /* ------------------------------------------------------------ */
 
 #include "htsselftest_int.h"
+#include "htsshared.h"
 
 /* The MPTCP counters and option reach the stats but not another opt. */
 static int st_mptcpstats(httrackp *opt, int argc, char **argv) {
@@ -364,6 +365,45 @@ static int st_socks5(httrackp *opt, int argc, char **argv) {
     assertf(io.sent_len == 0);
   }
 
+  /* every field at its 255-byte limit fits the frames exactly (ASan) */
+  {
+    unsigned char big[300];
+    unsigned char maxdomain[1 + 255];
+    unsigned char auth[2 + 2 + 10];
+    char host[256];
+    char name[600];
+
+    memset(maxdomain, 'd', sizeof(maxdomain));
+    maxdomain[0] = 0xFF;
+    len = socks5_reply(big, 0x03, maxdomain, sizeof(maxdomain));
+    io.reply = big;
+    io.reply_len = len;
+    assertf(socks5_handshake_scripted(opt, "origin.test", proxy, &io) == 1);
+    assertf(SOCKS5_SENTINEL_LEFT(io, len));
+
+    memset(host, 'h', 255);
+    host[255] = '\0';
+    len = socks5_reply(script, 0x01, v4, sizeof(v4));
+    io.reply = script;
+    io.reply_len = len;
+    assertf(socks5_handshake_scripted(opt, host, proxy, &io) == 1);
+    assertf(io.sent_len == 3 + 7 + 255);
+
+    strcpybuff(name, "socks5://");
+    memset(name + 9, 'u', 255);
+    name[9 + 255] = ':';
+    memset(name + 9 + 256, 'p', 255);
+    name[9 + 511] = '\0';
+    strcatbuff(name, "@127.0.0.1");
+    memcpy(auth, "\x05\x02\x01\x00\x05\x00\x00\x01\x7f\x00\x00\x01\x1f\x90",
+           sizeof(auth));
+    io.reply = auth;
+    io.reply_len = sizeof(auth);
+    assertf(socks5_handshake_scripted(opt, "origin.test", name, &io) == 1);
+    assertf(io.consumed == sizeof(auth));
+    assertf(io.sent_len == 4 + 3 + 255 + 255 + 7 + 11);
+  }
+
   /* ATYP=domain cannot carry an IPv6 literal, so a bracketed origin fails. */
   io.reply = script;
   io.reply_len = len;
@@ -615,6 +655,37 @@ static int st_xfread_lines(httrackp *opt, int argc, char **argv) {
 static void socwait_delayed_send(void *arg) {
   Sleep(300);
   (void) send(*(T_SOC *) arg, "x", 1, 0);
+}
+
+/* sharedline CAP TEXT: each line hts_shared_linputsoc() gives into an exact
+   CAP-byte heap buffer, "!" before a cut one, then the last return. */
+static int st_sharedline(httrackp *opt, int argc, char **argv) {
+  char data[4096];
+  const int cap = argc >= 2 ? atoi(argv[0]) : 0;
+  const size_t len =
+      argc >= 2 ? st_decode_body(argv[1], data, sizeof(data)) : 0;
+  char *line;
+  T_SOC sv[2];
+  hts_boolean cut;
+  int n;
+
+  if (cap < 1 || cap > 1024) {
+    fprintf(stderr, "sharedline: needs CAP (1..1024) TEXT\n");
+    return 1;
+  }
+  line = malloct((size_t) cap);
+  assertf(line != NULL && st_socketpair(sv) == 0);
+  assertf(send(sv[0], data, (int) len, 0) == (int) len);
+  deletesoc(sv[0]);
+  while ((n = hts_shared_linputsoc(sv[1], hts_buf_at(line, (size_t) cap),
+                                   time(NULL) + 10, &cut)) > 0) {
+    assertf(line[n] == '\0');
+    printf("%s[%s]", cut ? "!" : "", line);
+  }
+  printf("(%d)\n", n);
+  deletesoc(sv[1]);
+  freet(line);
+  return 0;
 }
 
 /* Each wait watches its own direction: a fresh, empty socket is writable and
@@ -1934,6 +2005,9 @@ const struct selftest_entry selftests_net[] = {
      st_catchurl_bind},
     {"socwait", "", "the read and write waits each watch their own direction",
      st_socwait},
+    {"sharedline", "<cap> <text|hex:..>",
+     "the htsserver and proxytrack socket line reader at its buffer's edge",
+     st_sharedline},
     {"xfread-lines", "",
      "peeked line reads match the bytewise fallback on random streams",
      st_xfread_lines},

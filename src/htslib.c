@@ -4643,7 +4643,7 @@ void code64(unsigned char *a, int size_a, unsigned char *b, int crlf) {
 }
 
 void unescape_amp(char *s) {
-  if (hts_unescapeEntities(s, s, strlen(s) + 1) != 0) {
+  if (hts_unescapeEntities(s, hts_buf_at(s, strlen(s) + 1)) != 0) {
     assertf(! "error escaping html entities");
   }
 }
