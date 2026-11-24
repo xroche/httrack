@@ -1731,6 +1731,19 @@ static int st_hashkey_bounds(httrackp *opt, int argc, char **argv) {
   int hack;
 
   assertf(adr != NULL && fil != NULL && cat != NULL && arena != NULL);
+  /* one byte past the save-name key must abort, not write past its array */
+  for (hack = 0; hack < argc; hack++) {
+    if (strcmp(argv[hack], "overlong") == 0) {
+      hash_struct hash;
+
+      memset(adr, 'a', field + 1);
+      adr[field + 1] = '\0';
+      hash_init(opt, &hash, opt->urlhack);
+      (void) hash_savename_next(&hash, 'k', adr);
+      printf("hashkey-bounds: overlong save name was accepted\n");
+      return 1;
+    }
+  }
   opt->no_www_dedup = opt->no_slash_dedup = opt->no_query_dedup = HTS_FALSE;
   /* the crawler's own key buffer, or every maximal URL would collide */
   assertf(sizeof(((hash_struct *) NULL)->normfil) >= (size_t) keysize);
@@ -1795,14 +1808,14 @@ static int st_hashkey_bounds(httrackp *opt, int argc, char **argv) {
     StringCopy(opt->strip_query, "");
   }
 
-  /* a maximal save-name keys by kind and lowercase name */
+  /* a maximal save name is keyed by kind and lowercased name */
   {
     hash_struct hash;
 
     memset(adr, 'A', field);
     adr[field] = '\0';
     hash_init(opt, &hash, opt->urlhack);
-    hash_savename_next_set(&hash, 'k', adr, 7);
+    hash_savename_next_set(&hash, 'K', adr, 7);
     hts_lowcase(adr);
     assertf(hash_savename_next(&hash, 'k', adr) == 7);
     assertf(hash_savename_next(&hash, 'j', adr) == 0);

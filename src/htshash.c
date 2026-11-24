@@ -468,7 +468,7 @@ int hash_savename_owner(hash_struct *hash, const char *adr, const char *fil) {
 static void savename_next_key(hts_buf key, char kind, const char *name) {
   key.p[0] = kind;
   key.p[1] = '\0';
-  hts_buf_catn(key, name, key.size - 1);
+  hts_buf_cat(key, name);
   hts_lowcase(key.p);
 }
 

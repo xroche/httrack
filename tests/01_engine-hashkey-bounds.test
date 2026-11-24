@@ -7,3 +7,8 @@ set -euo pipefail
 # behind it (#1160).
 out=$(httrack -O /dev/null -#test=hashkey-bounds run)
 grep -q "hashkey-bounds self-test OK" <<<"$out"
+
+# A save name one byte past its key buffer aborts rather than overflowing it.
+rc=0
+httrack -O /dev/null -#test=hashkey-bounds overlong >/dev/null 2>&1 || rc=$?
+test "$(kill -l "$rc" 2>/dev/null)" = ABRT
