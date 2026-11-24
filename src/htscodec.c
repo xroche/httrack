@@ -383,7 +383,7 @@ size_t hts_codec_head(hts_codec codec, const void *in, size_t in_len, void *out,
     return 0;
   switch (codec) {
   case HTS_CODEC_DEFLATE:
-    return hts_zhead(in, in_len, out, out_len);
+    return hts_zhead(hts_span_at(in, in_len), hts_buf_at(out, out_len));
 #if HTS_USEBROTLI
   case HTS_CODEC_BROTLI:
     return codec_head_brotli(in, in_len, out, out_len);

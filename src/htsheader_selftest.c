@@ -1095,6 +1095,28 @@ static int st_contentcodings(httrackp *opt, int argc, char **argv) {
   assertf(hts_codec_decode_cap(100) == 100);
   assertf(hts_codec_decode_cap((LLint) 1 << 30) == (LLint) 1 << 30);
   assertf(hts_codec_cap_binds(1024 * 1024, hts_codec_decode_cap(-1)));
+  {
+    static const char ztext[] = "only the head of this stream is inflated";
+    Bytef z[128];
+    uLongf zlen = sizeof(z);
+    char head[8], full[64], errbuf[HTS_STRERROR_SIZE], want[HTS_STRERROR_SIZE];
+
+    assertf(compress2(z, &zlen, (const Bytef *) ztext, sizeof(ztext) - 1, 9) ==
+            Z_OK);
+    assertf(hts_zhead(hts_span_at((const char *) z, zlen), HTS_BUF(head)) ==
+            sizeof(head));
+    assertf(memcmp(head, ztext, sizeof(head)) == 0);
+    assertf(hts_zhead(hts_span_at((const char *) z, zlen), HTS_BUF(full)) ==
+            sizeof(ztext) - 1);
+    assertf(hts_zhead(hts_span_at((const char *) z, zlen / 2), HTS_BUF(full)) <
+            sizeof(ztext) - 1);
+    assertf(hts_zhead(hts_span_of("not a zlib stream"), HTS_BUF(full)) == 0);
+    assertf(strcmp(hts_get_zerror(UNZ_BADZIPFILE, HTS_BUF(errbuf)),
+                   "bad zip file") == 0);
+    errno = ENOENT;
+    assertf(hts_get_zerror(UNZ_ERRNO, HTS_BUF(errbuf)) == errbuf);
+    assertf(strcmp(errbuf, hts_strerror(ENOENT, HTS_SIZED(want))) == 0);
+  }
 
   if (argc >= 1) {
     snprintf(inpath, sizeof(inpath), "%s/cc-in", argv[0]);

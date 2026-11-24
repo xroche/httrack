@@ -44,7 +44,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsthread.h"
 
 /* Static definitions */
-static int linput(FILE * fp, char *s, int max);
+static int linput(FILE *fp, hts_buf s);
 
 // htswrap_add
 #include "htswrap.h"
@@ -505,7 +505,7 @@ static const char *__cdecl htsshow_query(t_hts_callbackarg * carg,
 
   printf("%s\nPress <Y><Enter> to confirm, <N><Enter> to abort\n", question);
   io_flush;
-  linput(stdin, s, 4);
+  linput(stdin, HTS_BUF_N(s, 4));
   return s;
 }
 static const char *__cdecl htsshow_query2(t_hts_callbackarg * carg,
@@ -515,7 +515,7 @@ static const char *__cdecl htsshow_query2(t_hts_callbackarg * carg,
 
   printf("%s\nPress <Y><Enter> to confirm, <N><Enter> to abort\n", question);
   io_flush;
-  linput(stdin, s, 4);
+  linput(stdin, HTS_BUF_N(s, 4));
   return s;
 }
 static const char *__cdecl htsshow_query3(t_hts_callbackarg * carg,
@@ -549,7 +549,7 @@ static const char *__cdecl htsshow_query3(t_hts_callbackarg * carg,
   do {
     printf(">> ");
     io_flush;
-    linput(stdin, line, 200);
+    linput(stdin, HTS_BUF_N(line, 200));
     /* linput() hides EOF, so check the stream or this prompt loops forever */
     if (!strnotempty(line) && (feof(stdin) || ferror(stdin)))
       strcpybuff(line, "*"); /* refuse this link and ask nothing more */
@@ -560,37 +560,36 @@ static const char *__cdecl htsshow_query3(t_hts_callbackarg * carg,
 
 /* *** Various functions *** */
 
-static int linput(FILE * fp, char *s, int max) {
+static int linput(FILE *fp, hts_buf s) {
   int c;
-  int j = 0;
+  size_t j = 0;
 
   do {
     c = fgetc(fp);
     if (c != EOF) {
       switch (c) {
+      case 9:
+      case 12:
       case 13:
-        break;                  // sauter CR
+        break; /* TAB, FF and CR are dropped */
       case 10:
         c = -1;
         break;
-      case 9:
-      case 12:
-        break;                  // sauter ces caractères
       default:
-        s[j++] = (char) c;
+        s.p[j++] = (char) c;
         break;
       }
     }
-  } while((c != -1) && (c != EOF) && (j < (max - 1)));
-  if (j == max - 1 && c != -1 && c != EOF) {
+  } while ((c != -1) && (c != EOF) && (j + 1 < s.size));
+  if (j + 1 == s.size && c != -1 && c != EOF) {
     /* Stopped at the bound: consume the newline, or the next read returns "" */
     while ((c = fgetc(fp)) == 13)
       ;
     if (c != 10 && c != EOF)
       ungetc(c, fp);
   }
-  s[j] = '\0';
-  return j;
+  s.p[j] = '\0';
+  return (int) j;
 }
 
 // Signal handlers (SIGHUP & co, Unix)
