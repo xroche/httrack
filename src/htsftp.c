@@ -483,48 +483,43 @@ hts_boolean ftp_split_hostport(const char *adr, hts_buf host, int *port,
   return HTS_TRUE;
 }
 
-/* Percent-decode src[0..len) into dst; HTS_FALSE if it does not fit or
-   decodes to a control byte, which would inject an FTP command. */
-static hts_boolean ftp_decode_userinfo(const char *src, size_t len, char *dst,
-                                       size_t dst_size) {
+/* Percent-decode src into dst; HTS_FALSE if it does not fit or decodes to
+   a control byte, which would inject an FTP command. */
+static hts_boolean ftp_decode_userinfo(hts_span src, hts_buf dst) {
   size_t i, j = 0;
 
-  for (i = 0; i < len; i++) {
+  for (i = 0; i < src.len; i++) {
     int h = -1;
 
-    if (j >= dst_size - 1)
-      return HTS_FALSE;               /* a clipped name is another account's */
-    if (src[i] == '%' && i + 2 < len) /* both hex digits in this field */
-      h = hts_ehex(&src[i + 1]);
+    if (j >= dst.size - 1)
+      return HTS_FALSE; /* a clipped name is another account's */
+    if (src.p[i] == '%' && i + 2 < src.len) /* both hex digits in this field */
+      h = hts_ehex(&src.p[i + 1]);
     if (h >= 0) {
-      dst[j++] = (char) h;
+      dst.p[j++] = (char) h;
       i += 2;
     } else {
-      dst[j++] = src[i];
+      dst.p[j++] = src.p[i];
     }
   }
-  dst[j] = '\0';
-  return hts_is_control_free_sized(dst, j);
+  dst.p[j] = '\0';
+  return hts_is_control_free_sized(dst.p, j);
 }
 
-/* Split a hostile-URL "user[:pass]@" prefix (see htsftp.h). */
-hts_boolean ftp_split_userpass(const char *src, const char *end, char *user,
-                               size_t user_size, char *pass, size_t pass_size) {
-  size_t len = 0, user_len;
-  const char *colon;
+/* Split a hostile-URL "user[:pass]" userinfo (see htsftp.h). */
+hts_boolean ftp_split_userpass(hts_span info, hts_buf user, hts_buf pass) {
+  /* the raw colon, so %3A stays in the name */
+  const char *const colon = memchr(info.p, ':', info.len);
+  const size_t user_len = colon != NULL ? (size_t) (colon - info.p) : info.len;
 
-  assertf(user_size > 0 && pass_size > 0); /* the size-1 math underflows on 0 */
-  assertf(end > src);                      /* end is one past the '@' */
-
-  user[0] = pass[0] = '\0'; // fail safe for a caller that ignores the result
-  while (len < (size_t) (end - src) - 1 && src[len] != '\0')
-    len++;
-  colon = memchr(src, ':', len); /* the raw colon, so %3A stays in the name */
-  user_len = colon != NULL ? (size_t) (colon - src) : len;
-  if (!ftp_decode_userinfo(src, user_len, user, user_size) ||
+  assertf(user.size > 0 && pass.size > 0); /* the size-1 math underflows on 0 */
+  // fail safe for a caller that ignores the result
+  user.p[0] = pass.p[0] = '\0';
+  if (!ftp_decode_userinfo(hts_span_at(info.p, user_len), user) ||
       (colon != NULL &&
-       !ftp_decode_userinfo(colon + 1, len - user_len - 1, pass, pass_size))) {
-    user[0] = pass[0] = '\0';
+       !ftp_decode_userinfo(hts_span_at(colon + 1, info.len - user_len - 1),
+                            pass))) {
+    user.p[0] = pass.p[0] = '\0';
     return HTS_FALSE;
   }
   return HTS_TRUE;
@@ -814,7 +809,8 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
 
   real_adr = ftp_jump_authority(back->url_adr);
   if ((adr = jump_identification(real_adr)) != real_adr) {      // user
-    if (!ftp_split_userpass_buf(real_adr, adr, user, pass)) {
+    if (!ftp_split_userpass_buf(hts_span_between(real_adr, adr - 1), user,
+                                pass)) {
       ftp_fail(&back->r, "FTP user name or password too long or invalid");
       goto done;
     }
@@ -919,7 +915,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
       // envoi du login
 
       // --USER--
-      get_ftp_line(back, soc_ctl, HTS_SIZED(line), timeout, opt); // en tête
+      get_ftp_line(back, soc_ctl, HTS_BUF(line), timeout, opt); // en tête
       if (stop_ftp(back))
         goto done;
 
@@ -927,7 +923,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
         strcpybuff(back->info, "login: user");
         snprintf(line, sizeof(line), "USER %s", user);
         send_line(soc_ctl, line);
-        get_ftp_line(back, soc_ctl, HTS_SIZED(line), timeout, opt);
+        get_ftp_line(back, soc_ctl, HTS_BUF(line), timeout, opt);
         if (stop_ftp(back))
           goto done;
         if ((line[0] == '3') || (line[0] == '2')) {
@@ -936,13 +932,13 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
             strcpybuff(back->info, "login: pass");
             snprintf(line, sizeof(line), "PASS %s", pass);
             send_line(soc_ctl, line);
-            get_ftp_line(back, soc_ctl, HTS_SIZED(line), timeout, opt);
+            get_ftp_line(back, soc_ctl, HTS_BUF(line), timeout, opt);
             if (stop_ftp(back))
               goto done;
           }
           if (line[0] == '2') { // ok
             send_line(soc_ctl, "TYPE I");
-            get_ftp_line(back, soc_ctl, HTS_SIZED(line), timeout, opt);
+            get_ftp_line(back, soc_ctl, HTS_BUF(line), timeout, opt);
             if (stop_ftp(back))
               goto done;
             if (line[0] == '2') {
@@ -972,7 +968,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
           strcpybuff(back->info, "pasv");
           snprintf(line, sizeof(line), "PASV");
           send_line(soc_ctl, line);
-          get_ftp_line(back, soc_ctl, HTS_SIZED(line), timeout, opt);
+          get_ftp_line(back, soc_ctl, HTS_BUF(line), timeout, opt);
         } else {                /* ipv6 */
           line[0] = '\0';
         }
@@ -992,7 +988,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
           strcpybuff(back->info, "pasv");
           snprintf(line, sizeof(line), "EPSV");
           send_line(soc_ctl, line);
-          get_ftp_line(back, soc_ctl, HTS_SIZED(line), timeout, opt);
+          get_ftp_line(back, soc_ctl, HTS_BUF(line), timeout, opt);
           if (stop_ftp(back))
             goto done;
           if (line[0] == '2') { /* got it */
@@ -1018,7 +1014,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
               // SIZE?
               strcpybuff(back->info, "size");
               send_line(soc_ctl, line);
-              get_ftp_line(back, soc_ctl, HTS_SIZED(line), timeout, opt);
+              get_ftp_line(back, soc_ctl, HTS_BUF(line), timeout, opt);
               if (stop_ftp(back))
                 goto done;
               if (line[0] == '2') {     // SIZE compris, ALORS tester REST (sinon pas tester: cf probleme des txt.gz decompresses a la volee)
@@ -1034,7 +1030,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                 if (ftp_command_line(line, "MDTM", ftp_path)) {
                   strcpybuff(back->info, "mdtm");
                   send_line(soc_ctl, line);
-                  get_ftp_line(back, soc_ctl, HTS_SIZED(line), timeout, opt);
+                  get_ftp_line(back, soc_ctl, HTS_BUF(line), timeout, opt);
                   if (stop_ftp(back))
                     goto done;
                   if (ftp_parse_mdtm(line, &remote_tm)) {
@@ -1062,7 +1058,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                   snprintf(line, sizeof(line), "REST " LLintP,
                            (LLint) back->range_req_size);
                   send_line(soc_ctl, line);
-                  get_ftp_line(back, soc_ctl, HTS_SIZED(line), timeout, opt);
+                  get_ftp_line(back, soc_ctl, HTS_BUF(line), timeout, opt);
                   if (stop_ftp(back))
                     goto done;
                   if ((line[0] == '3') || (line[0] == '2')) {   // ok
@@ -1105,7 +1101,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
               // clip, never abort: this line is built from a crawled URL
               strclipbuff(line, sizeof(line), line_retr);
               send_line(soc_ctl, line);
-              get_ftp_line(back, soc_ctl, HTS_SIZED(line), timeout, opt);
+              get_ftp_line(back, soc_ctl, HTS_BUF(line), timeout, opt);
               if (stop_ftp(back))
                 goto done;
               if (line[0] == '1') {
@@ -1138,7 +1134,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
           if (stop_ftp(back))
             goto done;
           send_line(soc_ctl, line);     // envoi du RETR
-          get_ftp_line(back, soc_ctl, HTS_SIZED(line), timeout, opt);
+          get_ftp_line(back, soc_ctl, HTS_BUF(line), timeout, opt);
           if (stop_ftp(back))
             goto done;
           if (line[0] == '2') { // ok
@@ -1146,7 +1142,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
             // clip, never abort: this line is built from a crawled URL
             strclipbuff(line, sizeof(line), line_retr);
             send_line(soc_ctl, line);
-            get_ftp_line(back, soc_ctl, HTS_SIZED(line), timeout, opt);
+            get_ftp_line(back, soc_ctl, HTS_BUF(line), timeout, opt);
             if (stop_ftp(back))
               goto done;
             if (line[0] == '1') {
@@ -1261,7 +1257,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
           if (back->r.statuscode != -1) {
             if (wait_socket_receive(back, soc_ctl, timeout_onfly, opt) > 0) {
               // récupérer 226 transfer complete
-              get_ftp_line(back, soc_ctl, HTS_SIZED(line), timeout, opt);
+              get_ftp_line(back, soc_ctl, HTS_BUF(line), timeout, opt);
               if (line[0] == '2') {     // OK
                 strcpybuff(back->r.msg, "OK");
                 back->r.statuscode = HTTP_OK;
@@ -1286,7 +1282,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
     /* A stopped mirror skips the second --timeout window this courtesy reply
        costs on a silent server; its text is discarded anyway (#1096). */
     if (!hts_load_acquire_int(&opt->state.stop))
-      get_ftp_line(back, soc_ctl, NULL, 0, timeout, opt);
+      get_ftp_line(back, soc_ctl, hts_buf_at(NULL, 0), timeout, opt);
   }
 
   if (back->r.statuscode != -1) {
@@ -1396,8 +1392,8 @@ int send_line(T_SOC soc, const char *data) {
 #endif
 }
 
-int get_ftp_line(lien_back *back, T_SOC soc, char *ptrline, size_t line_size,
-                 int timeout, const httrackp *opt) {
+int get_ftp_line(lien_back *back, T_SOC soc, hts_buf line, int timeout,
+                 const httrackp *opt) {
   char BIGSTK data[1024];
   int i, ok, multiline;
 
@@ -1411,8 +1407,8 @@ int get_ftp_line(lien_back *back, T_SOC soc, char *ptrline, size_t line_size,
   data[3] = '\0';
   // wait_socket_receive() refuses it too, but the analyzer does not follow it
   if (!hts_soc_selectable(soc)) {
-    if (ptrline)
-      snprintf(ptrline, line_size, "500 *read error");
+    if (line.size != 0)
+      hts_buf_printf_clip(line, "500 *read error");
     return 0;
   }
   do {
@@ -1421,13 +1417,13 @@ int get_ftp_line(lien_back *back, T_SOC soc, char *ptrline, size_t line_size,
     // vérifier données
     switch (wait_socket_receive(back, soc, timeout, opt)) {
     case -1:                   // erreur de lecture
-      if (ptrline)
-        snprintf(ptrline, line_size, "500 *read error");
+      if (line.size != 0)
+        hts_buf_printf_clip(line, "500 *read error");
       return 0;
       break;
     case 0:
-      if (ptrline)
-        snprintf(ptrline, line_size, "500 *read timeout (%d)", timeout);
+      if (line.size != 0)
+        hts_buf_printf_clip(line, "500 *read timeout (%d)", timeout);
       return 0;
       break;
     }
@@ -1439,8 +1435,8 @@ int get_ftp_line(lien_back *back, T_SOC soc, char *ptrline, size_t line_size,
         data[i++] = b; // truncate hostile over-long reply lines
       break;
     default:
-      if (ptrline)
-        snprintf(ptrline, line_size, "500 *read error");
+      if (line.size != 0)
+        hts_buf_printf_clip(line, "500 *read error");
       return 0;                 // error
       break;
     }
@@ -1467,8 +1463,8 @@ int get_ftp_line(lien_back *back, T_SOC soc, char *ptrline, size_t line_size,
   fflush(dd);
   printf("<--- %s\n", data);
 #endif
-  if (ptrline)
-    snprintf(ptrline, line_size, "%s", data);
+  if (line.size != 0)
+    hts_buf_printf_clip(line, "%s", data);
   return (strnotempty(data));
 }
 
