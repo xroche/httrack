@@ -46,4 +46,12 @@ dec 'xn--already-encoded.com' 'ǮalǭǮreaǭǫdy.com'
 # because a Windows command line turns invalid UTF-8 into U+FFFD.
 enc_bad 'hex:62c3bc636865762ee4be8be5ad62c3bc636865706c65'
 
+# an xn-- label is found wherever it sits, the last one included
+idna() { selftest_queue "$2" isidna "$1"; }
+idna 'xn--caf-dma.com' 1
+idna 'www.xn--caf-dma' 1
+idna 'www.XN--caf-dma/path' 1
+idna 'www.xn--.com' 0
+idna 'www.example.com' 0
+
 selftest_run_queued

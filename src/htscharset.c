@@ -992,8 +992,7 @@ char *hts_convertStringUTF8ToIDNA(hts_span s) {
               return NULL;
             }
             segInt[segOutputSize++] = uc;
-            seg.p += utfSeq;
-            seg.len -= utfSeq;
+            seg = hts_span_skip(seg, utfSeq);
           }
 
           /* encode */
@@ -1179,8 +1178,7 @@ hts_UCS4 *hts_convertUTF8StringToUCS4(hts_span s, size_t *nChars) {
       uc = 0xfffd;
       n = 1;
     }
-    s.p += n;
-    s.len -= n;
+    s = hts_span_skip(s, n);
 
     /* Emit char */
     ADD_BYTE(uc);
@@ -1202,8 +1200,7 @@ hts_boolean hts_isStringUTF8(hts_span s) {
     if (n == 0) {
       return HTS_FALSE;
     }
-    s.p += n;
-    s.len -= n;
+    s = hts_span_skip(s, n);
   }
 
   return HTS_TRUE;

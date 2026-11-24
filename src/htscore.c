@@ -543,6 +543,7 @@ char *hts_ucs2_to_utf8(const unsigned char *src, size_t size, hts_boolean swap,
   size_t i;
   size_t offs = 0;
   char *dest;
+  hts_buf out;
 
   /* Sized exactly, because one UTF-16 unit can take three UTF-8 bytes. */
   for (i = 0; i < size;) {
@@ -558,9 +559,10 @@ char *hts_ucs2_to_utf8(const unsigned char *src, size_t size, hts_boolean swap,
   if (dest == NULL) {
     return NULL;
   }
+  out = hts_buf_at(dest, (size_t) total + 1);
   for (i = 0; i < size;) {
     offs += hts_writeUTF8(utf16_next(src, size, &i, swap, &lone),
-                          hts_buf_at(&dest[offs], (size_t) total + 1 - offs));
+                          hts_buf_skip(out, offs));
   }
   assertf(offs == (size_t) total);
   dest[offs] = '\0';

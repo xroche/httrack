@@ -210,6 +210,11 @@ static int st_metacharset(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+static int st_isidna(httrackp *opt, int argc, char **argv) {
+  printf("%d\n", hts_isStringIDNA(hts_span_of(argv[0])) ? 1 : 0);
+  return 0;
+}
+
 static int st_isutf8(httrackp *opt, int argc, char **argv) {
   char buf[512];
   size_t len;
@@ -239,6 +244,7 @@ static int st_idna_encode(httrackp *opt, int argc, char **argv) {
 static int host_ascii_case(const char *host, size_t len, size_t size,
                            hts_boolean inplace, const char *want) {
   char buf[64], before[64];
+  const hts_buf dst = hts_buf_at(buf, size);
   const char *src = host;
   const size_t keep = want != NULL ? strlen(want) + 1 : 0;
 
@@ -250,8 +256,7 @@ static int host_ascii_case(const char *host, size_t len, size_t size,
   }
   memcpy(before, buf, sizeof(buf));
   // nothing past the NUL may change, and nothing at all on a refusal
-  if (hts_host_to_ascii(hts_buf_at(buf, size), hts_span_at(src, len)) !=
-          (want != NULL) ||
+  if (hts_host_to_ascii(dst, hts_span_at(src, len)) != (want != NULL) ||
       (want != NULL && strcmp(buf, want) != 0) ||
       memcmp(buf + keep, before + keep, sizeof(buf) - keep) != 0) {
     printf("host-ascii: '%s' (%u bytes into %u) gave '%s'\n", host,
@@ -965,6 +970,7 @@ const struct selftest_entry selftests_charset[] = {
     {"metacharset", "<html>", "extract the <meta> charset from an HTML page",
      st_metacharset},
     {"isutf8", "<hex:..|string>", "is the string valid UTF-8 (1/0)", st_isutf8},
+    {"isidna", "<host>", "has the host an xn-- label (1/0)", st_isidna},
     {"idna-encode", "<host>", "encode a hostname to IDNA/punycode",
      st_idna_encode},
     {"idna-decode", "<host>", "decode an IDNA/punycode hostname",

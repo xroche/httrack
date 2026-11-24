@@ -37,6 +37,8 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsglobal.h"
 
+#include <string.h>
+
 /* Read the unsigned decimal digits at s into *out if the value is in [min, max]
    and return TRUE, or return FALSE and leave *out alone. *end (if not NULL) is
    set past the digits, and overflow is refused before it can happen. */
@@ -68,19 +70,37 @@ typedef struct {
   size_t len;
 } hts_span;
 
+/* Return the span over the LEN bytes at P. */
+static HTS_INLINE HTS_UNUSED hts_span hts_span_at(const char *p, size_t len) {
+  hts_span r;
+
+  r.p = p;
+  r.len = len;
+  return r;
+}
+
 /* Return the span over the C string S, or an empty span when S is NULL. Pass a
    literal to a compare as hts_span_of("lit"). */
-hts_span hts_span_of(const char *s);
-
-/* Return the span over the LEN bytes at P. */
-hts_span hts_span_at(const char *p, size_t len);
+static HTS_INLINE HTS_UNUSED hts_span hts_span_of(const char *s) {
+  if (s == NULL)
+    s = "";
+  return hts_span_at(s, strlen(s));
+}
 
 /* Return the span over [FROM, TO), where TO must not precede FROM. */
 hts_span hts_span_between(const char *from, const char *to);
 
 /* Return S without its first N bytes, or the empty span at its end when N
    exceeds its length. */
-hts_span hts_span_skip(hts_span s, size_t n);
+static HTS_INLINE HTS_UNUSED hts_span hts_span_skip(hts_span s, size_t n) {
+  if (n > s.len)
+    n = s.len;
+  if (n != 0) {
+    s.p += n;
+    s.len -= n;
+  }
+  return s;
+}
 
 /* Is S present? An absent hts_url_view part is not, but an empty one is. */
 hts_boolean hts_span_present(hts_span s);
