@@ -147,7 +147,8 @@ const char *catch_url_strerror(catch_url_status status) {
 HTSEXT_API hts_boolean catch_url_sized(T_SOC soc, char *url, size_t url_size,
                                        char *method, size_t method_size,
                                        char *data, size_t data_size) {
-  return catch_url_capture(soc, hts_buf_at(url, url_size),
+  return url_size != 0 && method_size != 0 && data_size != 0 &&
+         catch_url_capture(soc, hts_buf_at(url, url_size),
                            hts_buf_at(method, method_size),
                            hts_buf_at(data, data_size)) == CATCH_URL_OK;
 }
