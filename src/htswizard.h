@@ -72,11 +72,9 @@ hts_boolean hts_robots_forbids(httrackp *opt, const char *adr, const char *fil,
 void hts_wizard_answer_filter(htsbuff *f, int slot, int n, const char *adr,
                               const char *fil, hts_boolean seeker_up);
 
-/* Writes into `dst` (capacity `dstsize`, NUL included) the "<host>/<path>" the
-   wizard prompt asks about, clipped to fit. The answer still applies to the
-   whole (adr,fil). */
-void hts_wizard_prompt_url(char *dst, size_t dstsize, const char *adr,
-                           const char *fil);
+/* Writes into `dst` the "<host>/<path>" the wizard prompt asks about, clipped
+   to fit. The answer still applies to the whole (adr,fil). */
+void hts_wizard_prompt_url(hts_buf dst, const char *adr, const char *fil);
 /* Returns the answer code in the front end's reply `s`: 0 for NULL or empty,
    the number for a leading digit run (trailing text is ignored), -1 for `*`,
    and -999 for `!`, any other first byte, or a number above INT_MAX. */
