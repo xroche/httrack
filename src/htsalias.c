@@ -803,9 +803,8 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
     if ((pos = optreal_find(argv[n_arg])) >= 0) {
       const hts_optclass cls = optclass_of(pos);
 
-      /* -N 1 is preset 1; anything else stays detached, since a template may
-         legitimately open with a digit (-N 2col/%n.%t) */
-      /* a run too long to glue stays detached and is refused there */
+      /* -N 1 is preset 1; anything else, or a run too long to glue, stays
+         detached for case 'N' (a template may open with a digit: -N 2col) */
       if (cls == HTS_OPT_PARAMN && n_arg + 1 < argc &&
           optalias_is_digits(argv[n_arg + 1]) &&
           strlen(argv[n_arg + 1]) < return_argv_size - strlen(argv[n_arg])) {
