@@ -30,9 +30,12 @@ ci_stage_init() { # ci_stage_init
         sed -e 's/^expected_skips_msys="//' -e 's/"$//')
     nskip=$(count_matching_lines . <<<"$expected_skips")
     test "$nskip" -ge 1 || fail "read no expected skips out of the driver"
-    # 91 passing stubs clear its floor of 90, and the lost one passes in the
+    # Staged runs lower the driver's pass floor of 90, because macOS runs the stubs
+    # one at a time. npass-1 passing stubs clear it, and the lost one passes in the
     # control leg.
-    ran=$((92 + nskip))
+    stage_floor=10
+    npass=$((stage_floor + 2))
+    ran=$((npass + nskip))
 }
 
 stub() { # stub <path> <exit status> [shell line]
@@ -49,13 +52,13 @@ stage() { # stage <dir> <lost stub body>
     chmod u+w "$d"/*.sh
     # Neutered, or it would kill a sibling's engine under "make check -j".
     printf 'reap_leftover_processes() { return 0; }\n' >>"$d/proclib.sh"
-    # One per glob the driver enumerates, plus enough passes to clear its floor of 90.
+    # One per glob the driver enumerates, plus enough passes to clear stage_floor.
     for t in 00_runnable 900_zlib-pass 901_watchdog-pass 902_crawllib-pass \
         903_crawl-harness-pass 904_crawl_proxy_https 905_crawl-log-salvage; do
         stub "$d/$t.test" 0
     done
     i=0
-    while test "$i" -lt 84; do
+    while test "$i" -lt "$((npass - 8))"; do
         stub "$d/9$((100 + i))_engine-pass.test" 0
         i=$((i + 1))
     done
@@ -82,7 +85,7 @@ run_suite() { # run_suite <dir>
     (
         cd "$1"
         RUNNER_TEMP="$1/rt" GITHUB_STEP_SUMMARY="$tmp/summary" HTTRACK_SUITE_JOBS=6 \
-            bash ./ci-windows-suite.sh "$bin"
+            HTTRACK_SUITE_MIN_PASS=$stage_floor bash ./ci-windows-suite.sh "$bin"
     ) >"$tmp/out" 2>&1 || rc=$?
     arm_took=$((SECONDS - began))
 }

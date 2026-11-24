@@ -105,7 +105,7 @@ n=0
 stage "$tmp/ok" ':'
 run_suite "$tmp/ok"
 test "$rc" -eq 0 || fail "a clean stub suite exited $rc: $(<"$tmp/out")"
-grep -q "^ran=$ran pass=92 fail=0 skip=$nskip lost=0$" "$tmp/out" ||
+grep -q "^ran=$ran pass=$npass fail=0 skip=$nskip lost=0$" "$tmp/out" ||
     fail "clean tally: $(grep '^ran=' "$tmp/out" || true)"
 # Keep a healthy console for the counter below, with no LOST line and lost=0.
 cp "$tmp/out" "$tmp/console-clean.log"
@@ -121,7 +121,7 @@ esac
 # LOST gets its own line, because the counter step reads these back.
 grep -q '^LOST 906_engine-lost.test (worker left no status; ' "$tmp/out" ||
     fail "the vanished worker was not reported: $(<"$tmp/out")"
-grep -q "^ran=$ran pass=91 fail=0 skip=$nskip lost=1$" "$tmp/out" ||
+grep -q "^ran=$ran pass=$((npass - 1)) fail=0 skip=$nskip lost=1$" "$tmp/out" ||
     fail "lost tally: $(grep '^ran=' "$tmp/out" || true)"
 grep -q '::error::worker(s) vanished with no status, re-run this leg: 906_engine-lost.test' "$tmp/out" ||
     fail "the suite did not name the vanished worker: $(<"$tmp/out")"
