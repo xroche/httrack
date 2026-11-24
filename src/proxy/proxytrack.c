@@ -676,6 +676,8 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
                              &cut) > 0 &&
         (surl = strchr(line1, ' ')) && !(*surl = '\0') && ++surl &&
         (proto = strchr(surl, ' ')) && !(*proto = '\0') && ++proto) {
+      /* Set first, so Connection: and the errors below can clear it. */
+      keepAlive = hts_strcasecmp(proto, "http/1.1") == 0;
       /* Flush headers */
       while (hts_shared_linputsoc(soc_c, hts_buf_at(line, lineSize - 2),
                                   deadline, &cut) > 0 &&
@@ -776,11 +778,9 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
         msgError = "Proxy Error (Unsupported or Unknown HTTP Command Request)";
         keepAlive = 0;
       }
-      if (hts_strcasecmp(proto, "http/1.1") == 0) {
-        keepAlive = 1;
-      } else if (hts_strcasecmp(proto, "http/1.0") == 0) {
+      if (hts_strcasecmp(proto, "http/1.0") == 0) {
         keepAlive = 0;
-      } else {
+      } else if (hts_strcasecmp(proto, "http/1.1") != 0) {
         msgCode = 505;
         msgError = "Proxy Error (Unknown HTTP Version)";
         keepAlive = 0;
