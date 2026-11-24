@@ -3,6 +3,9 @@
 
 set -euo pipefail
 
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
 # A maximal host plus a maximal path must fit the dedup key, not the field
 # behind it (#1160).
 out=$(httrack -O /dev/null -#test=hashkey-bounds run)
@@ -11,4 +14,9 @@ grep -q "hashkey-bounds self-test OK" <<<"$out"
 # A save name one byte past its key buffer aborts rather than overflowing it.
 rc=0
 httrack -O /dev/null -#test=hashkey-bounds overlong >/dev/null 2>&1 || rc=$?
-test "$(kill -l "$rc" 2>/dev/null)" = ABRT
+# MSVC's abort() exits with 3 rather than raising a signal
+if target_is_windows; then
+    test "$rc" -eq 3
+else
+    test "$(kill -l "$rc" 2>/dev/null)" = ABRT
+fi
