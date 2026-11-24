@@ -1989,6 +1989,7 @@ const char *infostatuscode_const(int statuscode) {
 HTSEXT_API void infostatuscode_sized(char *msg, size_t size, int statuscode) {
   const char *const text = infostatuscode_const(statuscode);
 
+  assertf(size != 0);
   if (text != NULL) {
     strclipbuff(msg, size, text);
   } else if (strnotempty(msg) == 0) {
@@ -3075,6 +3076,7 @@ void sec2str(char *st, size_t size, TStamp t) {
   duration_str(st, size, t, HTS_FALSE);
 }
 
+/* Contract in httrack-library.h. */
 HTSEXT_API void qsec2str_sized(char *st, size_t size, TStamp t) {
   duration_str(st, size, t, HTS_TRUE);
 }

@@ -5522,7 +5522,7 @@ static int st_lib_sized(httrackp *opt, int argc, char **argv) {
 
   static const char qdur[] = "2147483647d,23h,59min59s";
 
-  /* clipped, an exact fit with room to spare, and the unknown-code fallback */
+  /* clipped, one byte short, an exact fit, and the unknown-code fallback */
   static const struct {
     int code;
     size_t cap;

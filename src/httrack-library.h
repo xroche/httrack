@@ -298,7 +298,7 @@ HTSEXT_API char *hts_getcategories(char *path, int type);
     in turn and then any free port. Writes the port it bound to *port_prox and
     the bound address into @p adr_prox of @p adr_size bytes, which is left
     empty if the address does not fit, and returns the listening socket.
-    Returns INVALID_SOCKET if nothing bound. */
+    Returns INVALID_SOCKET if nothing bound. @p adr_size may not be 0. */
 HTSEXT_API T_SOC catch_url_init_std_sized(int *port_prox, char *adr_prox,
                                           size_t adr_size);
 
@@ -582,7 +582,7 @@ HTSEXT_API TStamp mtime_local(void);
 
 /** Format a duration @p t (in seconds) into a compact string in @p st of
     @p size bytes, for example "3d,02h,04min05s", clipped to fit. 32 bytes hold
-    the longest form. */
+    the longest form, and a @p size of 0 writes nothing. */
 HTSEXT_API void qsec2str_sized(char *st, size_t size, TStamp t);
 
 /** @deprecated Use qsec2str_sized(). Assumes @p st holds 32 bytes. */
