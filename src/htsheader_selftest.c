@@ -1099,8 +1099,9 @@ static int st_contentcodings(httrackp *opt, int argc, char **argv) {
     static const char ztext[] = "only the head of this stream is inflated";
     const size_t tlen = sizeof(ztext) - 1;
     Bytef z[128], want_head[64];
-    uLongf zlen = sizeof(z), want_len = sizeof(want_head);
-    uLong half;
+    uLongf zlen = sizeof(z);
+    size_t want_len;
+    z_stream zs;
     char *zc;
     char head[8], full[64], errbuf[HTS_STRERROR_SIZE], want[HTS_STRERROR_SIZE];
 
@@ -1116,8 +1117,15 @@ static int st_contentcodings(httrackp *opt, int argc, char **argv) {
                       HTS_BUF_N(full, sizeof(ztext) - 1)) == tlen);
     assertf(memcmp(full, ztext, tlen) == 0);
     /* a cut stream yields what zlib decodes from exactly those bytes */
-    half = zlen / 2;
-    assertf(uncompress2(want_head, &want_len, z, &half) != Z_OK);
+    memset(&zs, 0, sizeof(zs));
+    assertf(inflateInit(&zs) == Z_OK);
+    zs.next_in = z;
+    zs.avail_in = (uInt) (zlen / 2);
+    zs.next_out = want_head;
+    zs.avail_out = sizeof(want_head);
+    assertf(inflate(&zs, Z_NO_FLUSH) == Z_OK);
+    want_len = sizeof(want_head) - zs.avail_out;
+    (void) inflateEnd(&zs);
     assertf(want_len < tlen);
     assertf(hts_zhead(hts_span_at(zc, zlen / 2), HTS_BUF(full)) == want_len);
     freet(zc);
