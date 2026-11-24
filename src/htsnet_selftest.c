@@ -364,6 +364,45 @@ static int st_socks5(httrackp *opt, int argc, char **argv) {
     assertf(io.sent_len == 0);
   }
 
+  /* every field at its 255-byte limit fits the frames exactly (ASan) */
+  {
+    unsigned char big[300];
+    unsigned char maxdomain[1 + 255];
+    unsigned char auth[2 + 2 + 10];
+    char host[256];
+    char name[600];
+
+    memset(maxdomain, 'd', sizeof(maxdomain));
+    maxdomain[0] = 0xFF;
+    len = socks5_reply(big, 0x03, maxdomain, sizeof(maxdomain));
+    io.reply = big;
+    io.reply_len = len;
+    assertf(socks5_handshake_scripted(opt, "origin.test", proxy, &io) == 1);
+    assertf(SOCKS5_SENTINEL_LEFT(io, len));
+
+    memset(host, 'h', 255);
+    host[255] = '\0';
+    len = socks5_reply(script, 0x01, v4, sizeof(v4));
+    io.reply = script;
+    io.reply_len = len;
+    assertf(socks5_handshake_scripted(opt, host, proxy, &io) == 1);
+    assertf(io.sent_len == 3 + 7 + 255);
+
+    strcpybuff(name, "socks5://");
+    memset(name + 9, 'u', 255);
+    name[9 + 255] = ':';
+    memset(name + 9 + 256, 'p', 255);
+    name[9 + 511] = '\0';
+    strcatbuff(name, "@127.0.0.1");
+    memcpy(auth, "\x05\x02\x01\x00\x05\x00\x00\x01\x7f\x00\x00\x01\x1f\x90",
+           sizeof(auth));
+    io.reply = auth;
+    io.reply_len = sizeof(auth);
+    assertf(socks5_handshake_scripted(opt, "origin.test", name, &io) == 1);
+    assertf(io.consumed == sizeof(auth));
+    assertf(io.sent_len == 4 + 3 + 255 + 255 + 7 + 11);
+  }
+
   /* ATYP=domain cannot carry an IPv6 literal, so a bracketed origin fails. */
   io.reply = script;
   io.reply_len = len;
