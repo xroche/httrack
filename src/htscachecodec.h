@@ -38,6 +38,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsglobal.h"
 #include "htssafe.h"
 #include "htsbuf.h"
+#include "htsurlport.h"
 #include "htsdate.h"
 #include "minizip/zip.h"
 #include "minizip/unzip.h"
@@ -140,20 +141,20 @@ hts_cache_store_field(const hts_cache_field *fields, size_t count,
 typedef void (*hts_cache_field_other)(void *arg, const char *name,
                                       const char *value);
 
-/* Read the header block buff[0..size) of one ZIP cache entry into fields.
+/* Read the header block of one ZIP cache entry into fields.
    Returns HTS_FALSE on a NUL, which writers never store. */
 /* The longest stored line is "Location: " plus a full-capacity URL, and a
    shorter buffer truncates it into a valid-looking wrong target. */
 #define HTS_CACHE_LINE_SIZE (HTS_LOCATION_SIZE + 32)
 
-static HTS_UNUSED hts_boolean hts_cache_read_fields(
-    const char *buff, size_t size, const hts_cache_field *fields, size_t count,
-    hts_cache_field_other other, void *arg) {
-  const char *p = buff;
-  const char *const end = buff + size;
+static HTS_UNUSED hts_boolean
+hts_cache_read_fields(hts_span buff, const hts_cache_field *fields,
+                      size_t count, hts_cache_field_other other, void *arg) {
+  const char *p = buff.p;
+  const char *const end = buff.p + buff.len;
   char BIGSTK line[HTS_CACHE_LINE_SIZE];
 
-  if (memchr(buff, '\0', size) != NULL) {
+  if (memchr(buff.p, '\0', buff.len) != NULL) {
     return HTS_FALSE;
   }
   while (p < end) {
@@ -218,10 +219,9 @@ typedef void (*hts_cache_index_entry)(void *arg, const char *name, long pos);
 typedef void (*hts_cache_index_bad)(void *arg, const char *what, int entry);
 
 /* Is "X-In-Cache: 1" among the first two lines? A NUL ends the scan. */
-static HTS_UNUSED hts_boolean
-hts_cache_header_says_data_in_zip(const char *buff, size_t size) {
-  const char *p = buff;
-  const char *const end = buff + size;
+static HTS_UNUSED hts_boolean hts_cache_header_says_data_in_zip(hts_span buff) {
+  const char *p = buff.p;
+  const char *const end = buff.p + buff.len;
   int lines;
 
   for (lines = 0; lines < 2 && p < end && *p != '\0'; lines++) {
@@ -279,11 +279,11 @@ static HTS_UNUSED int hts_cache_walk_index(unzFile zFile,
         const char *const name =
             filename + (strfield(filename, "http://") ? 7 : 0);
 
-        entry(
-            arg, name,
-            hts_cache_header_says_data_in_zip(comment, (size_t) readSizeHeader)
-                ? pos
-                : -pos);
+        entry(arg, name,
+              hts_cache_header_says_data_in_zip(
+                  hts_span_at(comment, (size_t) readSizeHeader))
+                  ? pos
+                  : -pos);
       } else {
         bad(arg, "Corrupted cache meta entry", *entries);
       }

@@ -5073,10 +5073,46 @@ static size_t fields_etag_kept(size_t len, size_t crs) {
   for (i = strlen("Etag: "); i < len; i++)
     StringAddchar(block, 'e');
   StringCat(block, "\r\nX-Size: 1\r\n");
-  (void) hts_cache_read_fields(StringBuff(block), StringLength(block), fields,
-                               1, NULL, NULL);
+  (void) hts_cache_read_fields(
+      hts_span_at(StringBuff(block), StringLength(block)), fields, 1, NULL,
+      NULL);
   StringFree(block);
   return strlen(etag);
+}
+
+/* Bytes past the span, or a NUL inside it, must not be read as header. */
+static int fields_span_check(void) {
+  static const char block[] = "X-Size: 12\r\nX-In-Cache: 1\r\n";
+  static const char nul[] = "X-Size: 7\r\n\0X-Size: 8\r\n";
+  const size_t first = strlen("X-Size: 12\r\n");
+  LLint size = -1;
+  const hts_cache_field fields[] = {
+      {"X-Size", HTS_CACHE_FIELD_LLINT, &size, 0}};
+  int fail = 0;
+
+  if (hts_cache_header_says_data_in_zip(hts_span_at(block, first)) ||
+      !hts_cache_header_says_data_in_zip(
+          hts_span_at(block, sizeof(block) - 1))) {
+    fprintf(stderr, "cache-fields: X-In-Cache read past the span\n");
+    fail = 1;
+  }
+  if (!hts_cache_read_fields(hts_span_at(block, first - 3), fields, 1, NULL,
+                             NULL) ||
+      size != 1) {
+    fprintf(stderr, "cache-fields: a cut span read %d\n", (int) size);
+    fail = 1;
+  }
+  size = -1;
+  if (hts_cache_read_fields(hts_span_at(nul, sizeof(nul) - 1), fields, 1, NULL,
+                            NULL) ||
+      size != -1 ||
+      !hts_cache_read_fields(hts_span_at(nul, strlen(nul)), fields, 1, NULL,
+                             NULL) ||
+      size != 7) {
+    fprintf(stderr, "cache-fields: a NUL in the span read %d\n", (int) size);
+    fail = 1;
+  }
+  return fail;
 }
 
 /* Cache header lines read back off disk are kept up to the reader's line cap
@@ -5105,8 +5141,12 @@ static int st_cache_fields(httrackp *opt, int argc, char **argv) {
   /* a first line past the scan buffer is consumed whole */
   memset(first, 'M', sizeof(first));
   memcpy(first + sizeof(first) - 1 - strlen(marker), marker, strlen(marker));
-  if (!hts_cache_header_says_data_in_zip(first, sizeof(first) - 1)) {
+  if (!hts_cache_header_says_data_in_zip(
+          hts_span_at(first, sizeof(first) - 1))) {
     fprintf(stderr, "cache-fields: X-In-Cache after a long line missed\n");
+    fail = 1;
+  }
+  if (fields_span_check() != 0) {
     fail = 1;
   }
 
