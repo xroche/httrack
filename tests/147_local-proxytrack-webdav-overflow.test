@@ -107,7 +107,7 @@ for length in 5 +5; do
         fail "Content-length: $length answered '$status', wanted $want"
 done
 
-# A refused body is not read as the next request, and Connection: close closes.
+# A refused or unsized body is not read as the next request, and Connection: close closes.
 "$python" - "$proxyport" <<'PY' || fail_dump "proxytrack kept a connection it had to close" "$ptlog"
 import socket, sys
 
@@ -115,6 +115,7 @@ get = b"GET http://example.com/page.html HTTP/1.1\r\nHost: example.com\r\n"
 for name, req in (
     ("refused body", b"PROPFIND /webdav/x/ HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-length: 32768\r\n\r\n" + get + b"\r\n"),
     ("Connection: close", get + b"Connection: close\r\n\r\n"),
+    ("bad length", b"PROPFIND /webdav/x/ HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-length: x\r\nConnection: keep-alive\r\n\r\n" + get + b"\r\n"),
 ):
     sock = socket.create_connection(("127.0.0.1", int(sys.argv[1])), 30)
     sock.settimeout(10)

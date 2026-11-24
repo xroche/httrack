@@ -655,6 +655,7 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
     int listRequest = 0;
 
     int davDepth = 0;
+    hts_boolean closeAsked = HTS_FALSE;
 
     /* Clear context */
     length = 0;
@@ -700,8 +701,10 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
           }
         } else if (hts_strcasecmp(line, "Connection: close") == 0) {
           keepAlive = 0;
+          closeAsked = HTS_TRUE;
         } else if (hts_strcasecmp(line, "Connection: keep-alive") == 0) {
-          keepAlive = 1;
+          /* an earlier error or close stays final */
+          keepAlive = msgCode == 0 && !closeAsked;
         } else if ((p = strfield(line, "Host:"))) {
           char *chost = line + p;
 
