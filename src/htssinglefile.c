@@ -118,12 +118,12 @@ const char *singlefile_intro(httrackp *opt) {
   return st->intro;
 }
 
-hts_boolean singlefile_may_mark(httrackp *opt, const char *body, size_t len) {
+hts_boolean singlefile_may_mark(httrackp *opt, hts_span body) {
   const char *const intro = singlefile_intro(opt);
 
   if (intro == NULL)
     return HTS_FALSE;
-  if (hts_memstr(body, len, intro, strlen(intro)) != NULL) {
+  if (hts_memstr(body.p, body.len, intro, strlen(intro)) != NULL) {
     hts_log_print(opt, LOG_ERROR,
                   "single-file: document already carries this run's mark, "
                   "leaving it alone");
@@ -302,14 +302,14 @@ static void sf_relative_from(const char *from_dir, const char *to_path,
   StringCat(*out, to_path + common);
 }
 
-/* Resolve the mirrored reference [ref,ref+reflen) against base_dir into out, a
+/* Resolve the mirrored reference ref against base_dir into out, a
    '/'-separated path under ctx->root naming an existing regular file. Returns
    HTS_FALSE for a fragment, an absolute or scheme-bearing URL (data:
    included), a reference climbing out of the mirror, or a missing target.
    Containment is lexical, so a symlink planted in the output directory is
    followed. Fetched content cannot create one. */
 static hts_boolean sf_resolve(const sf_ctx *ctx, const char *base_dir,
-                              const char *ref, size_t reflen, String *out) {
+                              hts_span ref, String *out) {
   char raw[SF_MAX_REF];
   char decoded[SF_MAX_REF];
   size_t stack[SF_MAX_COMPONENTS];
@@ -317,8 +317,7 @@ static hts_boolean sf_resolve(const sf_ctx *ctx, const char *base_dir,
   hts_boolean ok = HTS_TRUE;
   size_t i, n;
   int sp = 0, part;
-  const hts_span r =
-      hts_span_trim(hts_span_at(ref, reflen), " \t\r\n\f", " \t\r\n\f");
+  const hts_span r = hts_span_trim(ref, " \t\r\n\f", " \t\r\n\f");
 
   /* A mirrored name carries no query or fragment. */
   for (n = 0; n < r.len; n++) {
@@ -457,16 +456,15 @@ static hts_boolean sf_append_base64(String *out, char *data, size_t len) {
   return HTS_TRUE;
 }
 
-/* Append [p,p+len), escaping what an unquoted CSS url(), an HTML attribute or
+/* Append s, escaping what an unquoted CSS url(), an HTML attribute or
    an appended fragment could choke on. preencoded text already carries the
    document's own '%' and '&' escapes, and encoding those again changes it. */
-static void sf_append_escaped(String *out, const char *p, size_t len,
-                              hts_boolean preencoded) {
+static void sf_append_escaped(String *out, hts_span s, hts_boolean preencoded) {
   static const char hex[] = "0123456789ABCDEF";
   size_t i;
 
-  for (i = 0; i < len; i++) {
-    const unsigned char c = (unsigned char) p[i];
+  for (i = 0; i < s.len; i++) {
+    const unsigned char c = (unsigned char) s.p[i];
 
     if (c <= 32 || c >= 127 || c == '"' || c == '\'' || c == '(' || c == ')' ||
         c == '\\' || c == '<' || c == '>' || c == '#' ||
@@ -512,17 +510,16 @@ static void sf_warn_oversize(sf_ctx *ctx, const char *path, LLint size,
 /* ------------------------------------------------------------ */
 
 static void sf_expand(sf_ctx *ctx, const char *base_dir, int depth,
-                      const char *body, size_t len, String *out);
-static size_t sf_strip_marks(const char *intro, size_t introlen, char *body,
-                             size_t len);
+                      hts_span body, String *out);
+static size_t sf_strip_marks(hts_span intro, hts_buf body);
 
-/* Replace the reference [ref,ref+reflen), resolved against base_dir, with its
+/* Replace the reference ref, resolved against base_dir, with its
    data: URI appended to out. rebase_dir re-expresses an un-inlinable asset
    relative to that directory, for a lenient resolver's base. Returns HTS_TRUE
    if out received a data: URI. */
-static hts_boolean sf_inline(sf_ctx *ctx, const char *base_dir, const char *ref,
-                             size_t reflen, const char *rebase_dir, int depth,
-                             char want, hts_boolean *resolved, String *out) {
+static hts_boolean sf_inline(sf_ctx *ctx, const char *base_dir, hts_span ref,
+                             const char *rebase_dir, int depth, char want,
+                             hts_boolean *resolved, String *out) {
   String path = STRING_EMPTY;
   char mime[HTS_MIMETYPE_SIZE];
   char *file;
@@ -531,7 +528,7 @@ static hts_boolean sf_inline(sf_ctx *ctx, const char *base_dir, const char *ref,
   int cls;
   hts_boolean done = HTS_FALSE;
 
-  *resolved = sf_resolve(ctx, base_dir, ref, reflen, &path);
+  *resolved = sf_resolve(ctx, base_dir, ref, &path);
   if (!*resolved) {
     StringFree(path);
     return HTS_FALSE;
@@ -580,8 +577,8 @@ static hts_boolean sf_inline(sf_ctx *ctx, const char *base_dir, const char *ref,
 
       sf_dirname(StringBuff(path), &nested_dir);
       StringClear(nested);
-      sf_expand(ctx, StringBuff(nested_dir), depth + 1, file, file_len,
-                &nested);
+      sf_expand(ctx, StringBuff(nested_dir), depth + 1,
+                hts_span_at(file, file_len), &nested);
       done = sf_append_base64(&payload, StringBuffRW(nested),
                               StringLength(nested));
       StringFree(nested);
@@ -593,7 +590,8 @@ static hts_boolean sf_inline(sf_ctx *ctx, const char *base_dir, const char *ref,
         const char *const intro = singlefile_intro(ctx->opt);
 
         if (intro != NULL)
-          file_len = sf_strip_marks(intro, strlen(intro), file, file_len);
+          file_len =
+              sf_strip_marks(hts_span_of(intro), hts_buf_at(file, file_len));
       }
       done = sf_append_base64(&payload, file, file_len);
     }
@@ -620,7 +618,8 @@ fallback:
     StringClear(rel);
     sf_relative_from(rebase_dir, StringBuff(path), &rel);
     if (StringLength(rel) > 0) {
-      sf_append_escaped(out, StringBuff(rel), StringLength(rel), HTS_FALSE);
+      sf_append_escaped(out, hts_span_at(StringBuff(rel), StringLength(rel)),
+                        HTS_FALSE);
       done = HTS_TRUE;
     }
     StringFree(rel);
@@ -631,7 +630,7 @@ fallback:
 
 /* A mark htsparse wrote always names a file it had just saved, so failing to
    resolve one means the mirror moved under us since the page was written. */
-static void sf_warn_unresolved(sf_ctx *ctx, const char *ref, size_t reflen) {
+static void sf_warn_unresolved(sf_ctx *ctx, hts_span ref) {
   if (*ctx->warn_budget <= 0)
     return;
   (*ctx->warn_budget)--;
@@ -639,22 +638,26 @@ static void sf_warn_unresolved(sf_ctx *ctx, const char *ref, size_t reflen) {
   hts_log_print(ctx->opt, LOG_WARNING,
                 "single-file: marked reference \"%.*s\" resolves to no "
                 "mirrored file, left as a link",
-                (int) (reflen > 256 ? 256 : reflen), ref);
+                (int) (ref.len > 256 ? 256 : ref.len), ref.p);
 }
 
-/* Parse the mark at [p,end): "<intro>.<class>.<len>". Returns its length, or 0
-   if it is not one. A NULL intro matches any well-formed secret, so a later
-   run can delete marks an interrupted one left behind without its secret. */
-static size_t sf_parse_mark(const char *intro, size_t introlen, const char *p,
-                            size_t avail, char *cls, size_t *reflen) {
+/* Parse the mark at the start of s: "<intro>.<class>.<len>". Returns its
+   length, or 0 if it is not one. An intro with a NULL p matches any well-formed
+   secret of intro.len bytes, so a later run can delete marks an interrupted one
+   left behind without its secret. */
+static size_t sf_parse_mark(hts_span intro, hts_span s, char *cls,
+                            size_t *reflen) {
+  const char *const p = s.p;
+  const size_t avail = s.len;
+  const size_t introlen = intro.len;
   size_t i = introlen;
   size_t n = 0;
   int digits = 0;
 
   if (avail < introlen)
     return 0;
-  if (intro != NULL) {
-    if (memcmp(p, intro, introlen) != 0)
+  if (intro.p != NULL) {
+    if (memcmp(p, intro.p, introlen) != 0)
       return 0;
   } else {
     size_t k;
@@ -687,65 +690,70 @@ static size_t sf_parse_mark(const char *intro, size_t introlen, const char *p,
   return i;
 }
 
-/* Drop every mark from [body,body+len) in place; returns the new length. */
-static size_t sf_strip_marks(const char *intro, size_t introlen, char *body,
-                             size_t len) {
+/* Drop every mark from body in place; returns the new length. */
+static size_t sf_strip_marks(hts_span intro, hts_buf body) {
+  const hts_span in = hts_span_at(body.p, body.size);
   size_t r, w = 0;
 
-  for (r = 0; r < len;) {
+  for (r = 0; r < in.len;) {
     char cls;
     size_t reflen;
-    const size_t marklen =
-        sf_parse_mark(intro, introlen, body + r, len - r, &cls, &reflen);
+    const hts_span rest = {in.p + r, in.len - r};
+    const size_t marklen = sf_parse_mark(intro, rest, &cls, &reflen);
 
     if (marklen != 0)
       r += marklen;
     else
-      body[w++] = body[r++];
+      body.p[w++] = body.p[r++];
   }
   return w;
 }
 
-/* Copy [body,body+len) to out, replacing each marked reference by its data:
+/* Copy body to out, replacing each marked reference by its data:
    URI, or by the bare reference when it cannot be inlined. Whatever follows
    the reference (a fragment, a kept query) stays after the data: URI. The
    substitution is in place, so an unquoted attribute gets base64 '=' padding,
    which browsers accept but the HTML grammar forbids. */
 static void sf_expand(sf_ctx *ctx, const char *base_dir, int depth,
-                      const char *body, size_t len, String *out) {
-  const char *const intro = singlefile_intro(ctx->opt);
-  size_t introlen, i = 0, flushed = 0;
+                      hts_span body, String *out) {
+  const char *const intro_str = singlefile_intro(ctx->opt);
+  hts_span intro;
+  size_t i = 0, flushed = 0;
 
-  if (intro == NULL) {
-    StringMemcat(*out, body, len);
+  if (intro_str == NULL) {
+    StringMemcat(*out, body.p, body.len);
     return;
   }
-  introlen = strlen(intro);
-  while (i + introlen <= len) {
+  intro = hts_span_of(intro_str);
+  while (i + intro.len <= body.len) {
     hts_boolean resolved = HTS_FALSE;
     size_t marklen, reflen = 0;
     char cls = SINGLEFILE_CLASS_ANY;
+    const hts_span rest = {body.p + i, body.len - i};
+    hts_span ref;
 
-    marklen = sf_parse_mark(intro, introlen, body + i, len - i, &cls, &reflen);
+    /* Every mark opens with the intro, so skip the call on any other byte. */
+    marklen =
+        body.p[i] == intro.p[0] ? sf_parse_mark(intro, rest, &cls, &reflen) : 0;
     /* We wrote the length, but the file may have been truncated since; a
        reference reaching back before what we have is not one of ours. */
     if (marklen == 0 || reflen > i - flushed) {
       i++;
       continue;
     }
-    StringMemcat(*out, body + flushed, i - reflen - flushed);
-    if (!sf_inline(ctx, base_dir, body + i - reflen, reflen,
-                   depth > 0 ? ctx->page_dir : NULL, depth, cls, &resolved,
-                   out)) {
+    ref = hts_span_at(body.p + i - reflen, reflen);
+    StringMemcat(*out, body.p + flushed, i - reflen - flushed);
+    if (!sf_inline(ctx, base_dir, ref, depth > 0 ? ctx->page_dir : NULL, depth,
+                   cls, &resolved, out)) {
       if (!resolved)
-        sf_warn_unresolved(ctx, body + i - reflen, reflen);
-      StringMemcat(*out, body + i - reflen, reflen);
+        sf_warn_unresolved(ctx, ref);
+      StringMemcat(*out, ref.p, ref.len);
     }
     ctx->marks++;
     i += marklen;
     flushed = i;
   }
-  StringMemcat(*out, body + flushed, len - flushed);
+  StringMemcat(*out, body.p + flushed, body.len - flushed);
 }
 
 /* ------------------------------------------------------------ */
@@ -753,9 +761,8 @@ static void sf_expand(sf_ctx *ctx, const char *base_dir, int depth,
 /* ------------------------------------------------------------ */
 
 hts_boolean singlefile_rewrite_html(httrackp *opt, const char *root,
-                                    const char *page_path, const char *html,
-                                    size_t html_len, LLint page_budget,
-                                    String *out) {
+                                    const char *page_path, hts_span html,
+                                    LLint page_budget, String *out) {
   String nroot = STRING_EMPTY;
   String npage = STRING_EMPTY;
   String dir = STRING_EMPTY;
@@ -773,7 +780,7 @@ hts_boolean singlefile_rewrite_html(httrackp *opt, const char *root,
   ctx.budget = page_budget;
   ctx.inlined = 0;
   ctx.marks = 0;
-  sf_expand(&ctx, StringBuff(dir), 0, html, html_len, out);
+  sf_expand(&ctx, StringBuff(dir), 0, html, out);
   StringFree(nroot);
   StringFree(npage);
   StringFree(dir);
@@ -785,7 +792,7 @@ hts_boolean singlefile_rewrite_html(httrackp *opt, const char *root,
 /* Overwrite path with body. Spools then renames: a half-written file would
    destroy a complete mirror file that nothing is going to re-fetch. */
 static hts_boolean sf_replace_file(httrackp *opt, const char *path,
-                                   const char *body, size_t len) {
+                                   hts_span body) {
   char catbuff[CATBUFF_SIZE];
   String tmp = STRING_EMPTY;
   hts_boolean ok = HTS_TRUE;
@@ -800,7 +807,7 @@ static hts_boolean sf_replace_file(httrackp *opt, const char *path,
     StringFree(tmp);
     return HTS_FALSE;
   }
-  if (len > 0 && !hts_fwrite_exact(body, len, fp))
+  if (body.len > 0 && !hts_fwrite_exact(body.p, body.len, fp))
     ok = HTS_FALSE;
 #ifndef _WIN32
   /* The spool bypassed filecreate(), so set the mode it would have. */
@@ -829,11 +836,12 @@ hts_boolean singlefile_rewrite_file(httrackp *opt, const char *root,
   if (html == NULL)
     return HTS_FALSE;
   StringClear(out);
-  ok = singlefile_rewrite_html(opt, root, page_path, html, len,
+  ok = singlefile_rewrite_html(opt, root, page_path, hts_span_at(html, len),
                                SINGLEFILE_MAX_PAGE_SIZE, &out);
   freet(html);
   if (ok)
-    ok = sf_replace_file(opt, page_path, StringBuff(out), StringLength(out));
+    ok = sf_replace_file(opt, page_path,
+                         hts_span_at(StringBuff(out), StringLength(out)));
   StringFree(out);
   return ok;
 }
@@ -848,12 +856,13 @@ static hts_boolean sf_strip_marks_file(httrackp *opt, const char *path) {
   body = sf_readfile(path, &len);
   if (body == NULL)
     return HTS_FALSE;
-  w = sf_strip_marks(NULL, SINGLEFILE_INTRO_LEN, body, len);
+  w = sf_strip_marks(hts_span_at(NULL, SINGLEFILE_INTRO_LEN),
+                     hts_buf_at(body, len));
   if (w == len) {
     freet(body);
     return HTS_FALSE;
   }
-  ok = sf_replace_file(opt, path, body, w);
+  ok = sf_replace_file(opt, path, hts_span_at(body, w));
   freet(body);
   return ok;
 }

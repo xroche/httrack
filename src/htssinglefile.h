@@ -39,6 +39,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscore.h" /* HTS_HTMLESCAPE_*_MAXEXP */
 #include "htsopt.h"
 #include "htsstrings.h"
+#include "htsurlport.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -92,7 +93,7 @@ const char *singlefile_intro(httrackp *opt);
 
 /* HTS_FALSE if [body,len) already holds this run's intro, so the document
    must not be marked. Only a 2^-64 coincidence trips this. */
-hts_boolean singlefile_may_mark(httrackp *opt, const char *body, size_t len);
+hts_boolean singlefile_may_mark(httrackp *opt, hts_span body);
 
 /* Write the mark for a reference of reflen bytes into buf; returns buf, left
    empty for a reflen the pass could not read back. */
@@ -119,9 +120,8 @@ void singlefile_process_mirror(httrackp *opt);
    multiplicatively; the mirror pass passes SINGLEFILE_MAX_PAGE_SIZE.
    Returns HTS_TRUE if at least one reference was replaced. */
 hts_boolean singlefile_rewrite_html(httrackp *opt, const char *root,
-                                    const char *page_path, const char *html,
-                                    size_t html_len, LLint page_budget,
-                                    String *out);
+                                    const char *page_path, hts_span html,
+                                    LLint page_budget, String *out);
 
 /* singlefile_rewrite_html() over the file at page_path, rewritten in place.
    Returns HTS_TRUE if the file changed. */
