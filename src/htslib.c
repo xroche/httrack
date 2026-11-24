@@ -4600,9 +4600,9 @@ void code64(hts_span in, hts_buf out, hts_boolean crlf) {
                                 (n > 1 ? (unsigned long) a[i + 1] << 8 : 0) |
                                 (n > 2 ? a[i + 2] : 0);
 
-    out.p[j++] = alphabet[store >> 18 & 63];
-    out.p[j++] = alphabet[store >> 12 & 63];
-    out.p[j++] = n > 1 ? alphabet[store >> 6 & 63] : '=';
+    out.p[j++] = alphabet[(store >> 18) & 63];
+    out.p[j++] = alphabet[(store >> 12) & 63];
+    out.p[j++] = n > 1 ? alphabet[(store >> 6) & 63] : '=';
     out.p[j++] = n > 2 ? alphabet[store & 63] : '=';
     if (crlf && ++line == 20) {
       line = 0;

@@ -59,20 +59,23 @@ static int st_duration(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* Base-64 of ARGV[0], repeated ARGV[1] times, with CRLF when ARGV[2] is 1. */
+/* Base-64 of ARGV[0], repeated ARGV[1] times, with CRLF when ARGV[2] is 1,
+   into an output of ARGV[3] bytes. */
 static int st_base64(httrackp *opt, int argc, char **argv) {
   char one[256], in[4096], out[8192];
   const size_t n = argc < 1 ? 0 : st_decode_body(argv[0], one, sizeof(one));
   const int repeat = argc < 2 ? 1 : atoi(argv[1]);
+  const size_t size = argc < 4 ? sizeof(out) : (size_t) atoi(argv[3]);
   size_t len = 0, i;
   int r;
 
   (void) opt;
-  if (argc < 1 || repeat < 0 || (size_t) repeat > sizeof(in) / (n + 1))
+  if (argc < 1 || repeat < 0 || (size_t) repeat > sizeof(in) / (n + 1) ||
+      size > sizeof(out))
     return 1;
   for (r = 0; r < repeat; r++, len += n)
     memcpy(in + len, one, n);
-  code64(hts_span_at(in, len), HTS_BUF(out),
+  code64(hts_span_at(in, len), hts_buf_at(out, size),
          argc > 2 && atoi(argv[2]) != 0 ? HTS_TRUE : HTS_FALSE);
   for (i = 0; out[i] != '\0'; i++) {
     if (out[i] == '\r')
@@ -5733,7 +5736,7 @@ const struct selftest_entry selftests_lib[] = {
      "bounded string-op self-test", st_strsafe},
     {"duration", "<seconds>", "a duration as long and as short text",
      st_duration},
-    {"base64", "<hex:..|string> [repeat] [crlf]",
+    {"base64", "<hex:..|string> [repeat] [crlf] [size]",
      "base-64 of a repeated string, with a CRLF every 80 bytes", st_base64},
     {"strsprintf", "", "StringSprintf grows to fit at every capacity boundary",
      st_strsprintf},

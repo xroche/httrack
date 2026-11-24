@@ -24,5 +24,20 @@ selftest_queue "$(times 20 YWJj)\\r\\nYWJj" base64 abc 21 1
 selftest_queue "$(times 20 YWJj)\\r\\n$(times 20 YWJj)\\r\\n" base64 abc 40 1
 selftest_queue "$(times 21 YWJj)" base64 abc 21 0
 selftest_queue "$(times 20 YWFh)\\r\\nYQ==" base64 a 61 1
+# an output of exactly the encoding plus its NUL is enough
+selftest_queue "Zg==" base64 f 1 0 5
+selftest_queue "$(times 20 YWJj)\\r\\n" base64 abc 20 1 83
 
 selftest_run_queued
+
+# one byte short must abort before writing
+short() {
+    local err
+    err=$(httrack -O /dev/null "-#test=base64" "$@" 2>&1) || true
+    case "$err" in
+    *"< out.size failed"*) ;;
+    *) fail "base64 $*: expected the code64 size abort, got: $err" ;;
+    esac
+}
+short f 1 0 4
+short abc 20 1 82
