@@ -1880,7 +1880,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
             }
             /* Attempt to find a meta charset */
             else if (is_html_mime_type(r.contenttype)) {
-              char *charset = hts_getCharsetFromMeta(r.adr, (size_t) r.size);
+              char *charset =
+                  hts_getCharsetFromMeta(hts_span_at(r.adr, (size_t) r.size));
 
               if (charset != NULL && strlen(charset) < sizeof(page_charset)) {
                 strcpy(page_charset, charset);

@@ -66,7 +66,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   /* the decoder is only reached for a non-ASCII string on a non-UTF-8 label */
   {
     char *utf8 = hts_convertStringToUTF8(s, size, charset);
-    char *enc = hts_convertStringFromUTF8(s, size, charset);
+    char *enc = hts_convertStringFromUTF8(hts_span_at(s, size), charset);
 
     freet(utf8);
     freet(enc);

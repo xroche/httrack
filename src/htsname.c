@@ -811,9 +811,9 @@ static void add_host_dir(lien_adrfilsave *const afs, const httrackp *opt,
     /* no crawled host is longer, and the type's directories still fit */
     strlncatbuff(afs->save, host, sizeof(afs->save), HTS_URLMAXSIZE);
   } else if (strlen(host) > 4 && strfield(host, "www.")) {
-    hts_appendStringUTF8(HTS_SIZED(afs->save), host + 4, max_char);
+    hts_appendStringUTF8(HTS_BUF(afs->save), host + 4, max_char);
   } else {
-    hts_appendStringUTF8(HTS_SIZED(afs->save), host, max_char);
+    hts_appendStringUTF8(HTS_BUF(afs->save), host, max_char);
   }
 }
 
@@ -946,7 +946,7 @@ int url_savename(lien_adrfilsave *const afs,
     )\
     /* and contains IDNA */\
     && hts_isStringIDNA(print_adr, strlen(print_adr))\
-    ? hts_convertStringIDNAToUTF8(print_adr, strlen(print_adr))\
+    ? hts_convertStringIDNAToUTF8(hts_span_of(print_adr))\
     : NULL;\
   /* Punycode can quadruple the host, and a clipped one names another host,\
      so an over-long decode keeps the ASCII form. The bound is the pre-IDNA\

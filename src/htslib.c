@@ -6282,7 +6282,7 @@ static void copyWchar(LPWSTR dest, const char *src) {
 #define HTS_WIN_LONGPATH_MIN 240 /* stay clear of MAX_PATH (260) */
 
 LPWSTR hts_pathToUCS2(const char *path) {
-  LPWSTR wpath = hts_convertUTF8StringToUCS2(path, (int) strlen(path), NULL);
+  LPWSTR wpath = hts_convertUTF8StringToUCS2(hts_span_of(path), NULL);
 
   if (wpath == NULL) {
     return NULL;
