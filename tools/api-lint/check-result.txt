@@ -14,7 +14,6 @@ src/htsback.h: back_add_if_not_exists
 src/htsback.h: back_busy_consistent
 src/htsback.h: back_clear_entry
 src/htsback.h: back_delayed_rename
-src/htsback.h: back_delete
 src/htsback.h: back_finalize
 src/htsback.h: back_maydelete
 src/htsback.h: back_new
@@ -66,7 +65,6 @@ src/htscore.h: back_fillmax
 src/htscore.h: check_fatal_io_errno
 src/htscore.h: check_stdin
 src/htscore.h: engine_stats
-src/htscore.h: engine_stats_tick
 src/htscore.h: filecreateempty
 src/htscore.h: filenote
 src/htscore.h: filesave
@@ -116,7 +114,6 @@ src/htslib.h: fsize_utf8
 src/htslib.h: getFunctionPtr
 src/htslib.h: get_filetime_rfc822
 src/htslib.h: get_userhttptype
-src/htslib.h: header_name_in
 src/htslib.h: hts_basic_auth_value
 src/htslib.h: hts_body_missing_unexpectedly
 src/htslib.h: hts_client_hints_of
@@ -127,7 +124,6 @@ src/htslib.h: hts_escape_typed_login
 src/htslib.h: hts_file_backdate
 src/htslib.h: hts_file_mtime
 src/htslib.h: hts_header_is_read
-src/htslib.h: hts_host_alias
 src/htslib.h: hts_host_alias_looping
 src/htslib.h: hts_host_alias_resolve
 src/htslib.h: hts_host_is_ipv4
@@ -145,10 +141,7 @@ src/htslib.h: http_bundle_header_refusal
 src/htslib.h: http_custom_header_warning
 src/htslib.h: http_sendhead
 src/htslib.h: ident_url_absolute
-src/htslib.h: infostatuscode_const
-src/htslib.h: is_dyntype
 src/htslib.h: ishtml
-src/htslib.h: ishtml_ext
 src/htslib.h: may_unknown
 src/htslib.h: openFunctionLib
 src/htslib.h: opendir
@@ -226,7 +219,6 @@ src/htswizard.h: hts_upper_links_note
 src/htswizard.h: hts_wizard_parse_reply
 src/htszlib.h: hts_extract_meta
 src/httrack-library.h: get_httptype_sized
-src/httrack-library.h: guess_httptype_sized
 src/httrack-library.h: hts_accept_preset
 src/httrack-library.h: hts_addfilter
 src/httrack-library.h: hts_addurl
