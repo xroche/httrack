@@ -1041,7 +1041,7 @@ static int st_warc_cdx_utf8(httrackp *opt, int argc, char **argv) {
 
     if (end != lp) {
       nlines++;
-      if (json == NULL || !hts_isStringUTF8(lp, (size_t) (end - lp))) {
+      if (json == NULL || !hts_isStringUTF8(hts_span_between(lp, end))) {
         fprintf(stderr, "warc-cdx-utf8: line %d is not UTF-8\n", nlines);
         err = 1;
       } else if (warc_memstr(json, "/caf\\ufffd\"", (size_t) (end - json),

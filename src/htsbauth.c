@@ -89,10 +89,10 @@ const char *cookie_host_refusal(const char *host, size_t len) {
   size_t i, n;
   hts_UCS4 uc;
 
-  if (!hts_isStringUTF8(host, len))
+  if (!hts_isStringUTF8(hts_span_at(host, len)))
     return "the host is not valid UTF-8";
   for (i = 0; i < len; i += n) {
-    n = hts_readUTF8(&host[i], len - i, &uc);
+    n = hts_readUTF8(hts_span_at(&host[i], len - i), &uc);
     if (n == 0) // a stalled reader would loop forever
       return "the host is not valid UTF-8";
     if (cookie_is_capital(uc))
@@ -128,10 +128,10 @@ hts_boolean cookie_host(const char *adr, char *dst, size_t dst_size) {
   // host names are case-insensitive, so one folded spelling reaches one entry
   hts_lowcase(dst);
   // a request names an international host in ASCII, so the jar keys on ASCII
-  if (!hts_isStringAscii(dst, strlen(dst)) &&
+  if (!hts_isStringAscii(hts_span_of(dst)) &&
       cookie_host_refusal(dst, strlen(dst)) != NULL)
     return HTS_FALSE;
-  if (!hts_host_to_ascii(dst, dst_size, dst, strlen(dst)))
+  if (!hts_host_to_ascii(hts_buf_at(dst, dst_size), hts_span_of(dst)))
     return HTS_FALSE;
   /* "%25" is RFC 6874's URI spelling of a zone id's '%'. Only a bracketed
      literal carries it, because a bare host's '%' is already literal. */

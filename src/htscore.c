@@ -549,7 +549,7 @@ char *hts_ucs2_to_utf8(const unsigned char *src, size_t size, hts_boolean swap,
     char seq[8];
 
     total += (LLint) hts_writeUTF8(utf16_next(src, size, &i, swap, &lone),
-                                   HTS_SIZED(seq));
+                                   HTS_BUF(seq));
   }
   if (!hts_inmem_size_fits(total + 1)) {
     return NULL;
@@ -559,8 +559,8 @@ char *hts_ucs2_to_utf8(const unsigned char *src, size_t size, hts_boolean swap,
     return NULL;
   }
   for (i = 0; i < size;) {
-    offs += hts_writeUTF8(utf16_next(src, size, &i, swap, &lone), &dest[offs],
-                          (size_t) total + 1 - offs);
+    offs += hts_writeUTF8(utf16_next(src, size, &i, swap, &lone),
+                          hts_buf_at(&dest[offs], (size_t) total + 1 - offs));
   }
   assertf(offs == (size_t) total);
   dest[offs] = '\0';

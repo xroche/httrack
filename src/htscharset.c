@@ -43,17 +43,17 @@ Please visit our Website: http://www.httrack.com
 #include <stdint.h>
 #include <stdarg.h>
 
-int hts_isStringAscii(const char *s, size_t size) {
+hts_boolean hts_isStringAscii(hts_span s) {
   size_t i;
 
-  for(i = 0; i < size; i++) {
-    const unsigned char c = (const unsigned char) s[i];
+  for (i = 0; i < s.len; i++) {
+    const unsigned char c = (const unsigned char) s.p[i];
 
     if (c >= 0x80) {
-      return 0;
+      return HTS_FALSE;
     }
   }
-  return 1;
+  return HTS_TRUE;
 }
 
 #define IS_ALNUM(C) ( ((C) >= 'A' && (C) <= 'Z') || ((C) >= 'a' && (C) <= 'z') || ((C) >= '0' && (C) <= '9') )
@@ -77,11 +77,6 @@ static int hts_equalsAlphanum(const char *a, const char *b) {
 }
 #undef IS_ALNUM
 #undef CHAR_LOWER
-
-/* Copy the memory region [s .. s + size - 1 ] as a \0-terminated string. */
-static char *hts_stringMemCopy(const char *s, size_t size) {
-  return hts_span_dup(hts_span_at(s, size));
-}
 
 #ifdef _WIN32
 
@@ -349,7 +344,7 @@ char *hts_convertStringCPToUTF8(hts_span s, UINT cp) {
     return hts_span_dup(s);
   }
   /* Already UTF-8 ? */
-  if (cp == CP_UTF8 || hts_isStringAscii(s.p, s.len)) {
+  if (cp == CP_UTF8 || hts_isStringAscii(s)) {
     return hts_span_dup(s);
   }
   /* Other (valid) charset */
@@ -380,7 +375,7 @@ static char *hts_convertStringCPFromUTF8Ex(hts_span s, UINT cp,
     return hts_span_dup(s);
   }
   /* Already UTF-8 ? */
-  if (cp == CP_UTF8 || hts_isStringAscii(s.p, s.len)) {
+  if (cp == CP_UTF8 || hts_isStringAscii(s)) {
     return hts_span_dup(s);
   }
   /* Other (valid) charset */
@@ -562,7 +557,7 @@ static char *hts_codepageToUTF8(const char *codepage, const char *s,
       dest = grown;
       capa = want;
     }
-    k += hts_writeUTF8(uc, &dest[k], MAX_UTF);
+    k += hts_writeUTF8(uc, hts_buf_at(&dest[k], MAX_UTF));
     assertf(k < capa);
   }
   dest[k] = '\0';
@@ -666,17 +661,19 @@ static char *hts_convertStringCharset(hts_span s, const char *to,
 
 HTSEXT_API char *hts_convertStringToUTF8(const char *s, size_t size,
                                          const char *charset) {
+  const hts_span in = hts_span_at(s, size);
+
   /* Empty string ? */
-  if (size == 0) {
+  if (in.len == 0) {
     return strdupt("");
   }
   /* Already UTF-8 ? */
-  if (hts_isCharsetUTF8(charset) || hts_isStringAscii(s, size)) {
-    return hts_stringMemCopy(s, size);
+  if (hts_isCharsetUTF8(charset) || hts_isStringAscii(in)) {
+    return hts_span_dup(in);
   }
   /* Find codepage */
   else {
-    return hts_convertStringCharset(hts_span_at(s, size), "utf-8", charset);
+    return hts_convertStringCharset(in, "utf-8", charset);
   }
 }
 
@@ -686,7 +683,7 @@ char *hts_convertStringFromUTF8(hts_span s, const char *charset) {
     return strdupt("");
   }
   /* Already UTF-8 ? */
-  if (hts_isCharsetUTF8(charset) || hts_isStringAscii(s.p, s.len)) {
+  if (hts_isCharsetUTF8(charset) || hts_isStringAscii(s)) {
     return hts_span_dup(s);
   }
   /* Find codepage */
@@ -778,7 +775,7 @@ static char *charset_from_content(hts_span content) {
            j++)
         ;
       if (j != val) {
-        return hts_stringMemCopy(&s[val], j - val);
+        return hts_span_dup(hts_span_at(&s[val], j - val));
       }
     }
   }
@@ -843,7 +840,7 @@ char *hts_getCharsetFromMeta(hts_span page) {
       /* first occurrence of each attribute wins, as in browsers */
       if (val_len != 0) {
         if (name_len == 7 && hts_strncasecmp(&html[name], "charset", 7) == 0) {
-          return hts_stringMemCopy(&html[val], val_len);
+          return hts_span_dup(hts_span_at(&html[val], val_len));
         } else if (equiv.len == 0 && name_len == 10 &&
                    hts_strncasecmp(&html[name], "http-equiv", 10) == 0) {
           equiv = hts_span_at(&html[val], val_len);
@@ -883,13 +880,14 @@ static size_t utf8_lead_length(unsigned char lead) {
 
 /* The one UTF-8 decoder: overlongs, surrogates, > U+10FFFF and truncated
    sequences give 0, else the sequence length. */
-static size_t utf8_decode(const unsigned char *s, size_t size, hts_UCS4 *puc) {
+static size_t utf8_decode(hts_span src, hts_UCS4 *puc) {
   static const hts_UCS4 min[5] = {0, 0, 0x80, 0x800, 0x10000};
-  const size_t len = size != 0 ? utf8_lead_length(s[0]) : 0;
+  const unsigned char *const s = (const unsigned char *) src.p;
+  const size_t len = src.len != 0 ? utf8_lead_length(s[0]) : 0;
   hts_UCS4 uc;
   size_t k;
 
-  if (len == 0 || size < len)
+  if (len == 0 || src.len < len)
     return 0;
   if (len == 1) {
     *puc = s[0];
@@ -965,9 +963,9 @@ char *hts_convertStringUTF8ToIDNA(hts_span s) {
         /* IDNA ? */
         if (nonAsciiFound) {
           const size_t segSize = i - startSeg;
-          const unsigned char *segData = (const unsigned char *) &s.p[startSeg];
+          hts_span seg = hts_span_at(&s.p[startSeg], segSize);
           punycode_uint *segInt = NULL;
-          size_t j, utfSeq, segOutputSize;
+          size_t segOutputSize;
 
           punycode_uint output_length;
           punycode_status status;
@@ -984,16 +982,18 @@ char *hts_convertStringUTF8ToIDNA(hts_span s) {
             FREE_BUFFER();
             return NULL;
           }
-          for (j = 0, segOutputSize = 0; j < segSize; j += utfSeq) {
+          for (segOutputSize = 0; seg.len != 0;) {
             hts_UCS4 uc;
+            const size_t utfSeq = utf8_decode(seg, &uc);
 
-            utfSeq = utf8_decode(&segData[j], segSize - j, &uc);
             if (utfSeq == 0) {
               freet(segInt);
               FREE_BUFFER();
               return NULL;
             }
             segInt[segOutputSize++] = uc;
+            seg.p += utfSeq;
+            seg.len -= utfSeq;
           }
 
           /* encode */
@@ -1042,45 +1042,42 @@ char *hts_convertStringUTF8ToIDNA(hts_span s) {
   return dest;
 }
 
-hts_boolean hts_host_to_ascii(char *dst, size_t size, const char *host,
-                              size_t len) {
+hts_boolean hts_host_to_ascii(hts_buf dst, hts_span host) {
   char *idna = NULL;
-  const char *src = host;
-  size_t n = len;
+  hts_span src = host;
   hts_boolean fits;
 
-  if (!hts_isStringAscii(host, len)) {
-    idna = hts_convertStringUTF8ToIDNA(hts_span_at(host, len));
+  if (!hts_isStringAscii(host)) {
+    idna = hts_convertStringUTF8ToIDNA(host);
     if (idna == NULL)
       return HTS_FALSE;
-    src = idna;
-    n = strlen(idna);
+    src = hts_span_of(idna);
   }
-  fits = n < size;
+  fits = src.len < dst.size;
   if (fits) {
     // dst may be host itself
-    memmove(dst, src, n);
-    dst[n] = '\0';
+    memmove(dst.p, src.p, src.len);
+    dst.p[src.len] = '\0';
   }
   freet(idna);
   return fits;
 }
 
-int hts_isStringIDNA(const char *s, size_t size) {
+hts_boolean hts_isStringIDNA(hts_span s) {
   size_t i, startSeg;
-  for(i = startSeg = 0 ; i <= size ; i++) {
-    const unsigned char c = i < size ? s[i] : 0;
+  for (i = startSeg = 0; i <= s.len; i++) {
+    const unsigned char c = i < s.len ? s.p[i] : 0;
     if (c == 0 || c == '.' || c == ':' || c == '/' || c == '?') {
       const size_t segSize = i - startSeg;
       /* IDNA segment ? */
-      if (segSize > 4 && hts_strncasecmp(&s[startSeg], "xn--", 4) == 0) {
-        return 1;
+      if (segSize > 4 && hts_strncasecmp(&s.p[startSeg], "xn--", 4) == 0) {
+        return HTS_TRUE;
       }
       /* next segment start */
       startSeg = i + 1;
     }
   }
-  return 0;
+  return HTS_FALSE;
 }
 
 char *hts_convertStringIDNAToUTF8(hts_span s) {
@@ -1167,25 +1164,23 @@ char *hts_convertStringIDNAToUTF8(hts_span s) {
 }
 
 hts_UCS4 *hts_convertUTF8StringToUCS4(hts_span s, size_t *nChars) {
-  const unsigned char *const data = (const unsigned char *) s.p;
-  size_t i;
   hts_UCS4 *dest = NULL;
   size_t capa = 0, destSize = 0;
 
   if (nChars != NULL) {
     *nChars = 0;
   }
-  for (i = 0; i < s.len;) {
+  while (s.len != 0) {
     hts_UCS4 uc;
-    const size_t n = utf8_decode(&data[i], s.len - i, &uc);
+    size_t n = utf8_decode(s, &uc);
 
     /* each byte of a malformed sequence becomes one U+FFFD */
-    if (n != 0) {
-      i += n;
-    } else {
+    if (n == 0) {
       uc = 0xfffd;
-      i++;
+      n = 1;
     }
+    s.p += n;
+    s.len -= n;
 
     /* Emit char */
     ADD_BYTE(uc);
@@ -1198,19 +1193,20 @@ hts_UCS4 *hts_convertUTF8StringToUCS4(hts_span s, size_t *nChars) {
   return dest;
 }
 
-int hts_isStringUTF8(const char *s, size_t size) {
-  const unsigned char *const data = (const unsigned char*) s;
-  size_t i, n;
+hts_boolean hts_isStringUTF8(hts_span s) {
   hts_UCS4 uc;
 
-  for (i = 0; i < size; i += n) {
-    n = utf8_decode(&data[i], size - i, &uc);
+  while (s.len != 0) {
+    const size_t n = utf8_decode(s, &uc);
+
     if (n == 0) {
-      return 0;
+      return HTS_FALSE;
     }
+    s.p += n;
+    s.len -= n;
   }
 
-  return 1;
+  return HTS_TRUE;
 }
 
 char *hts_convertUCS4StringToUTF8(const hts_UCS4 *s, size_t nChars) {
@@ -1233,21 +1229,21 @@ char *hts_convertUCS4StringToUTF8(const hts_UCS4 *s, size_t nChars) {
   return dest;
 }
 
-size_t hts_writeUTF8(hts_UCS4 uc, char *dest, size_t size) {
+size_t hts_writeUTF8(hts_UCS4 uc, hts_buf dest) {
   unsigned char seq[4];
   const size_t n = utf8_encode(uc, seq);
 
   /* keep room for a NUL the caller may add */
-  if (n == 0 || n >= size) {
+  if (n == 0 || n >= dest.size) {
     return 0;
   }
-  memcpy(dest, seq, n);
+  memcpy(dest.p, seq, n);
   return n;
 }
 
-size_t hts_readUTF8(const char *src, size_t size, hts_UCS4 *puc) {
+size_t hts_readUTF8(hts_span src, hts_UCS4 *puc) {
   hts_UCS4 uc;
-  const size_t n = utf8_decode((const unsigned char *) src, size, &uc);
+  const size_t n = utf8_decode(src, &uc);
 
   if (n != 0 && puc != NULL) {
     *puc = uc;
@@ -1282,7 +1278,8 @@ void hts_json_string(String *out, const char *s) {
     } else {
       /* Emit a sequence verbatim only if it is well-formed UTF-8. */
       hts_UCS4 uc;
-      const size_t len = utf8_decode(p, strnlen((const char *) p, 4), &uc);
+      const size_t len = utf8_decode(
+          hts_span_at((const char *) p, strnlen((const char *) p, 4)), &uc);
 
       if (len != 0) {
         StringMemcat(*out, (const char *) p, len);

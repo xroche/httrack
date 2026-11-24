@@ -70,11 +70,10 @@ hts_convertStringFromUTF8Strict(hts_span s, const char *charset);
 HTS_CHECK_RESULT extern char *hts_convertStringUTF8ToIDNA(hts_span s);
 
 /**
- * Write the ASCII (IDNA) form of the len-byte host into dst, of size bytes;
- * dst may be host. HTS_FALSE, dst untouched, if it has none or does not fit.
+ * Write the ASCII (IDNA) form of host into dst; dst may overlap host.
+ * HTS_FALSE, dst untouched, if it has none or does not fit.
  **/
-extern hts_boolean hts_host_to_ascii(char *dst, size_t size, const char *host,
-                                     size_t len);
+extern hts_boolean hts_host_to_ascii(hts_buf dst, hts_span host);
 
 /**
  * Convert an IDNA (RFC 3492) string to an UTF-8 string.
@@ -84,7 +83,7 @@ HTS_CHECK_RESULT extern char *hts_convertStringIDNAToUTF8(hts_span s);
 /**
  * Has the given string any IDNA segments ?
  **/
-extern int hts_isStringIDNA(const char *s, size_t size);
+extern hts_boolean hts_isStringIDNA(hts_span s);
 
 /**
  * Extract the <meta> charset from the HTML in page (HTML5 charset= or legacy
@@ -95,13 +94,13 @@ HTS_CHECK_RESULT extern char *hts_getCharsetFromMeta(hts_span page);
 /**
  * Is the given string an ASCII string ?
  **/
-extern int hts_isStringAscii(const char *s, size_t size);
+extern hts_boolean hts_isStringAscii(hts_span s);
 
 /**
  * Is the given string valid UTF-8 ? Strict RFC 3629: overlong forms,
  * surrogates, codepoints above U+10FFFF and 5/6-byte sequences are rejected.
  **/
-extern int hts_isStringUTF8(const char *s, size_t size);
+extern hts_boolean hts_isStringUTF8(hts_span s);
 
 /**
  * Is the given charset the UTF-8 charset ?
@@ -142,20 +141,20 @@ HTS_CHECK_RESULT extern char *hts_convertUCS4StringToUTF8(const hts_UCS4 *s,
                                                           size_t nChars);
 
 /**
- * Write the Unicode character 'uc' in 'dest' of maximum size 'size'.
+ * Write the Unicode character 'uc' in 'dest', keeping one byte free.
  * Return the number of bytes written, or 0 upon error, a surrogate or a
  * code point above U+10FFFF.
  * Note: does not \0-terminate the destination buffer.
  **/
-extern size_t hts_writeUTF8(hts_UCS4 uc, char *dest, size_t size);
+extern size_t hts_writeUTF8(hts_UCS4 uc, hts_buf dest);
 
 /**
- * Read the next Unicode character within 'src' of size 'size' and, upon
+ * Read the next Unicode character within 'src' and, upon
  * successful reading, return the number of bytes read and place the
  * character is 'puc'.
  * Return 0 for a sequence hts_isStringUTF8() refuses.
  **/
-extern size_t hts_readUTF8(const char *src, size_t size, hts_UCS4 *puc);
+extern size_t hts_readUTF8(hts_span src, hts_UCS4 *puc);
 
 /**
  * Given the first UTF-8 sequence character, get the total number of
