@@ -66,7 +66,7 @@ run_suite "$tmp/retried"
 test "$(<"$share/retried")" = 3 ||
     fail "the stub ran $(<"$share/retried") time(s), so nothing was retried"
 test "$rc" -eq 0 || fail "a retried outage exited $rc, want 0: $(<"$tmp/out")"
-grep -q "^ran=$ran pass=92 fail=0 skip=$nskip lost=0$" "$tmp/out" ||
+grep -q "^ran=$ran pass=$npass fail=0 skip=$nskip lost=0$" "$tmp/out" ||
     fail "the recovered test was not counted as a pass: $(grep '^ran=' "$tmp/out" || true)"
 grep -q '^retry: PASS 900_zlib-pass.test$' "$tmp/out" ||
     fail "the retry did not report its own verdict: $(<"$tmp/out")"
@@ -117,7 +117,7 @@ test -f "$tmp/collateral/900_zlib-pass.test.first.log" ||
 test "$(<"$share/collateral")" = 3 ||
     fail "the collateral test ran $(<"$share/collateral") time(s), so it was not retried"
 test "$rc" -eq 0 || fail "an outage hitting two tests exited $rc, want 0: $(<"$tmp/out")"
-grep -q "^ran=$ran pass=92 fail=0 skip=$nskip lost=0$" "$tmp/out" ||
+grep -q "^ran=$ran pass=$npass fail=0 skip=$nskip lost=0$" "$tmp/out" ||
     fail "both recovered tests were not counted: $(grep '^ran=' "$tmp/out" || true)"
 grep -q '^interop-retried: 900_zlib-pass.test 901_watchdog-pass.test$' "$tmp/out" ||
     fail "the retried tests were not both named: $(<"$tmp/out")"
