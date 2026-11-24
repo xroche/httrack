@@ -2931,15 +2931,12 @@ int smallserver_setkeyarr(const char *key, int id, const char *key2, const char 
   return coucal_write(NewLangList, tmp, (intptr_t) strdupt(value));
 }
 
-/* Read one key and value pair of a lang file into key and value, each of size
-   bytes. Returns HTS_FALSE when either line was cut, so the caller skips the
-   pair, and the next pair still lines up. */
-static hts_boolean lang_read_pair(FILE *fp, char *key, char *value,
-                                  size_t size) {
-  const hts_boolean key_cut =
-      hts_readline_cpp(fp, hts_buf_at(key, size), HTS_LINES_SERVER);
-  const hts_boolean value_cut =
-      hts_readline_cpp(fp, hts_buf_at(value, size), HTS_LINES_SERVER);
+/* Read one key and value pair of a lang file into key and value. Returns
+   HTS_FALSE when either line was cut, so the caller skips the pair, and the
+   next pair still lines up. */
+static hts_boolean lang_read_pair(FILE *fp, hts_buf key, hts_buf value) {
+  const hts_boolean key_cut = hts_readline_cpp(fp, key, HTS_LINES_SERVER);
+  const hts_boolean value_cut = hts_readline_cpp(fp, value, HTS_LINES_SERVER);
 
   if (key_cut || value_cut) {
     fprintf(stderr, "lang: line too long, ignored\n");
@@ -2965,8 +2962,9 @@ static void lang_load_catalog(FILE *fp, hts_boolean fallback,
   while (!feof(fp)) {
     const char *intkey;
 
-    if (!lang_read_pair(fp, extkey, value, 8000) || !strnotempty(extkey) ||
-        !strnotempty(value) || lang_is_symbol(extkey) != symbols)
+    if (!lang_read_pair(fp, HTS_BUF_N(extkey, 8000), HTS_BUF_N(value, 8000)) ||
+        !strnotempty(extkey) || !strnotempty(value) ||
+        lang_is_symbol(extkey) != symbols)
       continue;
     if (symbols) {
       if (strnotempty(LANGSEL(extkey)))
@@ -3047,7 +3045,7 @@ static int htslang_load(char *limit_to, size_t limit_size, const char *path) {
       char key[8192];
 
       while(!feof(fp)) {
-        if (!lang_read_pair(fp, intkey, key, 8000))
+        if (!lang_read_pair(fp, HTS_BUF_N(intkey, 8000), HTS_BUF_N(key, 8000)))
           continue;
         if (strnotempty(intkey) && strnotempty(key)) {
           const char *test = LANGINTKEY(key);
@@ -3113,7 +3111,8 @@ static int htslang_load(char *limit_to, size_t limit_size, const char *path) {
         hts_boolean found = HTS_FALSE;
 
         while (!found && !feof(fp)) {
-          if (lang_read_pair(fp, extkey, value, 8000) &&
+          if (lang_read_pair(fp, HTS_BUF_N(extkey, 8000),
+                             HTS_BUF_N(value, 8000)) &&
               strcmp(extkey, wanted) == 0 && value[0] != '\0') {
             strclipbuff(limit_to, limit_size, value);
             found = HTS_TRUE;

@@ -104,6 +104,16 @@ test "${got:-0}" = 1500 || fail "location kept ${got:-0} bytes, expected 1500"
 for n in $(seq $((HDRMAX - fixed - 32)) $((HDRMAX - fixed + 32))); do
     build_arc OK "" "$n"
     convert_check "passthrough of $n bytes"
+    # 4 bytes are held back, 1 of them for the NUL, and the closing CRLF adds 2
+    if [ "$((fixed + n))" -le "$((HDRMAX - 3))" ]; then
+        test "$((last_alen - ${#BODY}))" -eq "$((fixed + n))" ||
+            fail "a $((fixed + n))-byte header block was clipped"
+    else
+        grep -q 'clipped to' "$dir/log" ||
+            fail "a $((fixed + n))-byte header block was not reported clipped"
+        test "$((last_alen - ${#BODY}))" -ge "$((HDRMAX - 3))" ||
+            fail "a $((fixed + n))-byte header block was cut short of the cap"
+    fi
 done
 
 echo "OK: the .arc writer clips its header block instead of overflowing it"
