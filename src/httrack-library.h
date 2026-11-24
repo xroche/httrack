@@ -296,18 +296,34 @@ HTSEXT_API char *hts_getcategories(char *path, int type);
 /* Catch-URL */
 /** Open a loopback capture socket (a mini-proxy), trying the usual proxy ports
     in turn and then any free port. Writes the port it bound to *port_prox and
-    the bound address into adr_prox (a caller buffer of at least 128 bytes), and
-    returns the listening socket. Returns INVALID_SOCKET if nothing bound. */
+    the bound address into @p adr_prox of @p adr_size bytes, which is left
+    empty if the address does not fit, and returns the listening socket.
+    Returns INVALID_SOCKET if nothing bound. @p adr_size may not be 0. */
+HTSEXT_API T_SOC catch_url_init_std_sized(int *port_prox, char *adr_prox,
+                                          size_t adr_size);
+
+/** @deprecated Use catch_url_init_std_sized(). Assumes @p adr_prox holds 128
+    bytes. */
+HTS_DEPRECATED("use catch_url_init_std_sized(port_prox, adr_prox, adr_size)")
 HTSEXT_API T_SOC catch_url_init_std(int *port_prox, char *adr_prox);
 
 /** Block on capture socket @p soc, accept one browser connection, and capture
     the proxied HTTP request: write the absolute URL to @p url, the upper-cased
     method to @p method, and the rebuilt request (request line, headers, and any
-    POST body) to @p data, then send a canned response and close.
+    POST body) to @p data, then send a canned response and close. A URL, method
+    or header block too long for its buffer fails the capture, and a POST body
+    is cut to the room left. No size may be 0.
     @return 1 on success, 0 on error. On error @p data holds no usable request,
     and @p url holds the peer's "ip:port" unless the request line had already
-    parsed into it. The caller allocates all three: at least 32768 bytes for
-    @p data, HTS_URLMAXSIZE*2 for @p url and 32 for @p method. */
+    parsed into it. */
+HTSEXT_API hts_boolean catch_url_sized(T_SOC soc, char *url, size_t url_size,
+                                       char *method, size_t method_size,
+                                       char *data, size_t data_size);
+
+/** @deprecated Use catch_url_sized(). Assumes HTS_URLMAXSIZE*2 bytes for
+    @p url, 32 for @p method and 32768 for @p data. */
+HTS_DEPRECATED("use catch_url_sized(soc, url, url_size, method, method_size, "
+               "data, data_size)")
 HTSEXT_API hts_boolean catch_url(T_SOC soc, char *url, char *method,
                                  char *data);
 
@@ -549,17 +565,25 @@ HTSEXT_API int structcheck(const char *path);
  */
 HTSEXT_API int structcheck_utf8(const char *path);
 
-/** Write the HTTP reason phrase for @p statuscode into @p msg, a caller buffer
-   of at least 64 bytes. For an unknown code a non-empty @p msg is kept,
-   otherwise it is set to "Unknown error". */
+/** Write the HTTP reason phrase for @p statuscode into @p msg of @p size bytes
+    (not 0), clipped to fit. For an unknown code a non-empty @p msg is kept,
+    otherwise it is set to "Unknown error". */
+HTSEXT_API void infostatuscode_sized(char *msg, size_t size, int statuscode);
+
+/** @deprecated Use infostatuscode_sized(). Assumes @p msg holds 64 bytes. */
+HTS_DEPRECATED("use infostatuscode_sized(msg, size, statuscode)")
 HTSEXT_API void infostatuscode(char *msg, int statuscode);
 
 /** Current wall-clock time in milliseconds since the Unix epoch. */
 HTSEXT_API TStamp mtime_local(void);
 
-/** Format a duration @p t (in seconds) into a compact string in @p st, for
-    example "3d,02h,04min05s". @p st is caller-allocated and not bounds-checked,
-    and that example is not the worst case, so give it 32 bytes. */
+/** Format a duration @p t (in seconds) into a compact string in @p st of
+    @p size bytes, for example "3d,02h,04min05s", clipped to fit. 32 bytes hold
+    the longest form, and a @p size of 0 writes nothing. */
+HTSEXT_API void qsec2str_sized(char *st, size_t size, TStamp t);
+
+/** @deprecated Use qsec2str_sized(). Assumes @p st holds 32 bytes. */
+HTS_DEPRECATED("use qsec2str_sized(st, size, t)")
 HTSEXT_API void qsec2str(char *st, TStamp t);
 
 /* The int2* helpers below write into the caller-supplied strc and return
@@ -609,7 +633,6 @@ HTSEXT_API char *adr_normalized_sized(const char *source, char *dest,
    and assumes @p dest is the engine URL buffer of HTS_URLMAXSIZE*2 bytes; a
    smaller buffer can overflow. */
 HTS_DEPRECATED("use adr_normalized_sized(source, dest, destsize)")
-
 HTSEXT_API char *adr_normalized(const char *source, char *dest);
 
 /** Get or set the process executable root directory (with trailing '/'). The
@@ -670,7 +693,6 @@ HTSEXT_API hts_boolean get_httptype_sized(httrackp *opt, char *s, size_t ssize,
 /** @deprecated Use get_httptype_sized(). Assumes @p s has at least
     HTS_MIMETYPE_SIZE capacity. */
 HTS_DEPRECATED("use get_httptype_sized(opt, s, ssize, fil, flag)")
-
 HTSEXT_API void get_httptype(httrackp *opt, char *s, const char *fil, int flag);
 
 /** Guess the MIME type of local file @p fil into @p s (capacity @p ssize),
@@ -681,7 +703,6 @@ HTSEXT_API hts_boolean guess_httptype_sized(httrackp *opt, char *s,
 /** @deprecated Use guess_httptype_sized(). Assumes @p s has at least
     HTS_MIMETYPE_SIZE capacity. */
 HTS_DEPRECATED("use guess_httptype_sized(opt, s, ssize, fil)")
-
 HTSEXT_API void guess_httptype(httrackp *opt, char *s, const char *fil);
 
 /* Ugly string tools */

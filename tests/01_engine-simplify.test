@@ -35,6 +35,7 @@ simp '/a/../../b' '/b'
 simp '/../x' '/x'
 
 # collapses to nothing -> './' (relative) or '/' (absolute)
+simp '' './' # longer than its input, and not the last case, so a spill shows
 simp '..' './'
 simp 'a/..' './'
 simp '/' '/'

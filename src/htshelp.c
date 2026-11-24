@@ -403,7 +403,7 @@ static int help_query(const char *list, int def) {
 void help_catchurl(const char *dest_path) {
   char BIGSTK adr_prox[HTS_URLMAXSIZE * 2];
   int port_prox;
-  T_SOC soc = catch_url_init_std(&port_prox, adr_prox);
+  T_SOC soc = catch_url_init_std_sized(&port_prox, HTS_SIZED(adr_prox));
 
   if (soc != INVALID_SOCKET) {
     char BIGSTK url[HTS_URLMAXSIZE * 2];

@@ -671,7 +671,7 @@ static int __cdecl htsshow_loop(
     SInfo.stat_infos = stat_infos;
 
   st[0] = '\0';
-  qsec2str(st, stat_time);
+  qsec2str_sized(st, sizeof(st), stat_time);
 
   /* Set keys */
   smallserver_setkeyint("info.stat_bytes", SInfo.stat_bytes);

@@ -4,6 +4,8 @@ adr_normalized
 adr_normalized_sized
 catch_url
 catch_url_init_std
+catch_url_init_std_sized
+catch_url_sized
 concat
 copy_htsopt
 coucal_add
@@ -98,6 +100,7 @@ htsthread_wait
 htsthread_wait_n
 htswrap_add
 infostatuscode
+infostatuscode_sized
 inplace_escape_check_url
 int2bytes
 int2bytessec
@@ -105,6 +108,7 @@ jump_identification
 jump_identification_const
 mtime_local
 qsec2str
+qsec2str_sized
 structcheck
 structcheck_utf8
 unescape_amp

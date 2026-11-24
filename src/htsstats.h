@@ -138,7 +138,7 @@ HTS_STATIC int stats_collect_rows(httrackp *opt, const lien_back *back,
             char tempo[256];
 
             tempo[0] = '\0';
-            infostatuscode(tempo, b->r.statuscode);
+            infostatuscode_sized(tempo, sizeof(tempo), b->r.statuscode);
             strcpybuff(row->state, tempo);
           } else {
             strcpybuff(row->state, "error");

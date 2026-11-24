@@ -401,7 +401,7 @@ static int __cdecl htsshow_loop(t_hts_callbackarg * carg, httrackp * opt, lien_b
       vt_clear();
 
     st[0] = '\0';
-    qsec2str(st, stat_time);
+    qsec2str_sized(st, sizeof(st), stat_time);
     vt_home();
     printf(VT_GOTOXY("1", "1")
            VT_CLREOL STYLE_STATTEXT "Bytes saved:" STYLE_STATVALUES " \t%s" "\t"
