@@ -1100,8 +1100,7 @@ static size_t curl_join(const char *p) {
   return p[1] == '\r' && p[2] == '\n' ? 3 : 0;
 }
 
-/* The value of the hex digits of s, or -1. A NUL inside s is no digit, so s
-   may pass the end of a string. */
+/* The value of the hex digits of s, or -1. */
 static long curl_hex_run(hts_span s) {
   long v = 0;
   size_t i;
@@ -1114,6 +1113,13 @@ static long curl_hex_run(hts_span s) {
     v = v * 16 + d;
   }
   return v;
+}
+
+/* The value of the n hex digits at p, or -1 when fewer remain. */
+static long curl_hex_at(const char *p, size_t n) {
+  const hts_span s = hts_span_at(p, strnlen(p, n));
+
+  return s.len == n ? curl_hex_run(s) : -1;
 }
 
 /* Decode the $'...' body at *pp, past the opening quote, into dst at *len,
@@ -1146,7 +1152,7 @@ static const char *curl_ansi_quote(const char **pp, char *dst, size_t *len) {
       p++;
       break;
     case 'x':
-      if ((cp = curl_hex_run(hts_span_at(p + 1, 2))) < 0)
+      if ((cp = curl_hex_at(p + 1, 2)) < 0)
         return digits;
       p += 3;
       if (cp == 0)
@@ -1154,12 +1160,12 @@ static const char *curl_ansi_quote(const char **pp, char *dst, size_t *len) {
       dst[(*len)++] = (char) cp; // a raw byte, as bash gives it
       continue;
     case 'u':
-      if ((cp = curl_hex_run(hts_span_at(p + 1, 4))) < 0)
+      if ((cp = curl_hex_at(p + 1, 4)) < 0)
         return digits;
       p += 5;
       // Firefox writes a character past U+FFFF as two UTF-16 halves
       if (cp >= 0xd800 && cp <= 0xdbff && p[0] == '\\' && p[1] == 'u') {
-        const long low = curl_hex_run(hts_span_at(p + 2, 4));
+        const long low = curl_hex_at(p + 2, 4);
 
         if (low >= 0xdc00 && low <= 0xdfff) {
           cp = 0x10000 + ((cp - 0xd800) << 10) + (low - 0xdc00);
