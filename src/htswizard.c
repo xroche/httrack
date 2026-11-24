@@ -229,7 +229,7 @@ HTSEXT_API hts_boolean hts_wizard_host_scope(const char *question, int k,
     slash--;
   if (slash == host || *host == '[') /* no host, or an IPv6 literal */
     return HTS_FALSE;
-  if (hts_host_is_ipv4(host, (size_t) (slash - host)))
+  if (hts_host_is_ipv4(hts_span_between(host, slash)))
     return HTS_FALSE;
 
   /* widen by dropping one leading label per step, and never offer a bare TLD */

@@ -278,9 +278,9 @@ static int st_wizardscope(httrackp *opt, int argc, char **argv) {
   NOSCOPE("foo.com/a.b.c/d:e", 1);
 
   /* the shared predicate: a dotless run of digits is a hostname, not an IP */
-  assertf(hts_host_is_ipv4("1.2.3.4", 7));
-  assertf(!hts_host_is_ipv4("12345", 5));
-  assertf(!hts_host_is_ipv4("foo.com", 7));
+  assertf(hts_host_is_ipv4(hts_span_of("1.2.3.4")));
+  assertf(!hts_host_is_ipv4(hts_span_of("12345")));
+  assertf(!hts_host_is_ipv4(hts_span_of("foo.com")));
 
   /* an IP literal splits on dots without being a domain */
   NOSCOPE("192.168.1.1/x", 0);

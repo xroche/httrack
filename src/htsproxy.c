@@ -455,7 +455,7 @@ static int socks5_handshake_stream(httrackp *opt, socks5_stream *st,
     return socks5_fail(msg, "SOCKS5: invalid origin host");
   if (host.p[0] == '[') // ATYP=domain cannot carry an IPv6 literal
     return socks5_fail(msg, "SOCKS5: IPv6 literal origin is not supported");
-  if (!hts_is_control_free_sized(host.p, host.len))
+  if (!hts_span_is_control_free(host))
     return socks5_fail(msg, "SOCKS5: invalid origin host");
   // An empty "host:" is refused here, unlike on the direct path.
   if (portsep != NULL && !hts_parse_url_port(portsep + 1, &port))

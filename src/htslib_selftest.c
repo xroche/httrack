@@ -4387,6 +4387,12 @@ static int st_spanindex(httrackp *opt, int argc, char **argv) {
       failures++;
     }
   }
+  {
+    unsigned int map[256];
+
+    map_characters(hts_span_at("\0\xff\xff", 3), map);
+    assertf(map[0] == 1 && map[255] == 2);
+  }
   printf("spanindex: %d cases, %d failures\n",
          (int) (sizeof(cases) / sizeof(cases[0])), (int) failures);
   if (failures == 0)
@@ -5077,15 +5083,14 @@ static int st_urlview(httrackp *opt, int argc, char **argv) {
     int a;
 
     for (a = 0; a < argc; a++) {
-      const hts_boolean ok = hts_url_view_parse(argv[a], strlen(argv[a]), &v);
+      const hts_boolean ok = hts_url_view_parse(hts_span_of(argv[a]), &v);
 
       printf("%s\n", urlview_describe(out, sizeof(out), ok, &v));
     }
     return 0;
   }
   for (i = 0; i < sizeof(rows) / sizeof(rows[0]); i++) {
-    const hts_boolean ok =
-        hts_url_view_parse(rows[i].url, strlen(rows[i].url), &v);
+    const hts_boolean ok = hts_url_view_parse(hts_span_of(rows[i].url), &v);
 
     urlview_describe(out, sizeof(out), ok, &v);
     if (strcmp(out, rows[i].want) != 0) {
@@ -5095,7 +5100,8 @@ static int st_urlview(httrackp *opt, int argc, char **argv) {
   }
   /* LEN bounds the read, and a NUL is an ordinary byte */
   for (i = 0; i < sizeof(bounded) / sizeof(bounded[0]); i++) {
-    const hts_boolean ok = hts_url_view_parse(bounded[i].s, bounded[i].len, &v);
+    const hts_boolean ok =
+        hts_url_view_parse(hts_span_at(bounded[i].s, bounded[i].len), &v);
 
     if (strcmp(urlview_describe(out, sizeof(out), ok, &v), bounded[i].want) !=
         0) {
@@ -5117,7 +5123,7 @@ static int st_urlview(httrackp *opt, int argc, char **argv) {
     }
     buf = malloct(len != 0 ? len : 1);
     memcpy(buf, s, len);
-    (void) hts_url_view_parse(buf, len, &v);
+    (void) hts_url_view_parse(hts_span_at(buf, len), &v);
     if (!urlview_tiles(buf, len, &v)) {
       printf("FAIL tiles (%d bytes) %.*s\n", (int) len, (int) len, s);
       failures++;

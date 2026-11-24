@@ -641,19 +641,17 @@ static hts_boolean hts_request_is_secure(const htsblk *retour) {
 #endif
 }
 
-/* Is the product token at s, length n, named name ("Chrome" for "Chrome/141")?
-   On a match, *major is the version's first number, or -1 when the version is
+/* Is the product token TOK named name ("Chrome" for "Chrome/141")? On a
+   match, *major is the version's first number, or -1 when the version is
    malformed. */
-static hts_boolean ua_product_is(const char *s, size_t n, const char *name,
-                                 int *major) {
-  const size_t len = strlen(name);
-  hts_span version, head, tail;
+static hts_boolean ua_product_is(hts_span tok, const char *name, int *major) {
+  hts_span product, version, head, tail;
   LLint v;
 
-  if (n <= len || strncmp(s, name, len) != 0 || s[len] != '/')
+  if (!hts_span_split(tok, '/', &product, &version) ||
+      !hts_span_eq(product, hts_span_of(name)))
     return HTS_FALSE;
   *major = -1;
-  version = hts_span_at(s + len + 1, n - len - 1);
   if (!hts_span_split(version, '.', &head, &tail))
     head = version;
   if (hts_span_starts_with(version, hts_span_of("0")) ||
@@ -664,13 +662,12 @@ static hts_boolean ua_product_is(const char *s, size_t n, const char *name,
   return HTS_TRUE;
 }
 
-/* Does the UA comment s, length n, contain word? */
-static hts_boolean ua_comment_has(const char *s, size_t n, const char *word) {
-  const size_t len = strlen(word);
-  size_t i;
+/* Does the UA comment contain word? */
+static hts_boolean ua_comment_has(hts_span comment, const char *word) {
+  const hts_span w = hts_span_of(word);
 
-  for (i = 0; i + len <= n; i++) {
-    if (strncmp(s + i, word, len) == 0)
+  for (; comment.len >= w.len; comment = hts_span_skip(comment, 1)) {
+    if (hts_span_starts_with(comment, w))
       return HTS_TRUE;
   }
   return HTS_FALSE;
@@ -685,8 +682,7 @@ hts_boolean hts_client_hints_of(const char *user_agent, hts_client_hints *ch) {
   static const char *const grease_versions[] = {"8", "99", "24"};
   static const int orders[6][3] = {{0, 1, 2}, {0, 2, 1}, {1, 0, 2},
                                    {1, 2, 0}, {2, 0, 1}, {2, 1, 0}};
-  const char *comment = NULL;
-  size_t comment_len = 0;
+  hts_span comment = {NULL, 0};
   int chrome = -1;
   int edge = 0; /* 0: no Edg token */
   hts_boolean mobile = HTS_FALSE, mozilla = HTS_FALSE;
@@ -703,6 +699,7 @@ hts_boolean hts_client_hints_of(const char *user_agent, hts_client_hints *ch) {
   for (p = user_agent; *p != '\0';) {
     size_t n;
     int major;
+    hts_span tok;
 
     if (*p == ' ') {
       p++;
@@ -711,24 +708,23 @@ hts_boolean hts_client_hints_of(const char *user_agent, hts_client_hints *ch) {
 
       if (end == NULL)
         return HTS_FALSE;
-      if (comment == NULL) {
-        comment = p + 1;
-        comment_len = (size_t) (end - comment);
-      }
+      if (comment.p == NULL)
+        comment = hts_span_between(p + 1, end);
       p = end + 1;
     } else {
       for (n = 0; (unsigned char) p[n] > ' ' && p[n] != '('; n++)
         ;
-      if (ua_product_is(p, n, "Chrome", &major))
+      tok = hts_span_at(p, n);
+      if (ua_product_is(tok, "Chrome", &major))
         chrome = major;
-      else if (ua_product_is(p, n, "Edg", &major))
+      else if (ua_product_is(tok, "Edg", &major))
         edge = major;
-      else if (ua_product_is(p, n, "Mozilla", &major))
+      else if (ua_product_is(tok, "Mozilla", &major))
         mozilla = HTS_TRUE;
-      else if (n == 6 && strncmp(p, "Mobile", 6) == 0)
+      else if (hts_span_eq(tok, hts_span_of("Mobile")))
         mobile = HTS_TRUE;
-      else if (!ua_product_is(p, n, "AppleWebKit", &major) &&
-               !ua_product_is(p, n, "Safari", &major))
+      else if (!ua_product_is(tok, "AppleWebKit", &major) &&
+               !ua_product_is(tok, "Safari", &major))
         return HTS_FALSE;
       p += n;
     }
@@ -738,15 +734,15 @@ hts_boolean hts_client_hints_of(const char *user_agent, hts_client_hints *ch) {
     return HTS_FALSE;
 
   /* Android before Linux: an Android comment names both. */
-  if (ua_comment_has(comment, comment_len, "Android"))
+  if (ua_comment_has(comment, "Android"))
     strcpybuff(ch->platform, "\"Android\"");
-  else if (ua_comment_has(comment, comment_len, "CrOS"))
+  else if (ua_comment_has(comment, "CrOS"))
     strcpybuff(ch->platform, "\"Chrome OS\"");
-  else if (ua_comment_has(comment, comment_len, "Windows"))
+  else if (ua_comment_has(comment, "Windows"))
     strcpybuff(ch->platform, "\"Windows\"");
-  else if (ua_comment_has(comment, comment_len, "Macintosh"))
+  else if (ua_comment_has(comment, "Macintosh"))
     strcpybuff(ch->platform, "\"macOS\"");
-  else if (ua_comment_has(comment, comment_len, "Linux"))
+  else if (ua_comment_has(comment, "Linux"))
     strcpybuff(ch->platform, "\"Linux\"");
   else
     return HTS_FALSE;
@@ -780,6 +776,7 @@ static hts_boolean ua_is_firefox(const char *user_agent) {
   for (p = user_agent; *p != '\0';) {
     size_t n;
     int major;
+    hts_span tok;
 
     if (*p == ' ') {
       p++;
@@ -792,11 +789,12 @@ static hts_boolean ua_is_firefox(const char *user_agent) {
     } else {
       for (n = 0; (unsigned char) p[n] > ' ' && p[n] != '('; n++)
         ;
-      if (ua_product_is(p, n, "Firefox", &major))
+      tok = hts_span_at(p, n);
+      if (ua_product_is(tok, "Firefox", &major))
         firefox = major;
-      else if (ua_product_is(p, n, "Gecko", &major))
+      else if (ua_product_is(tok, "Gecko", &major))
         gecko = HTS_TRUE;
-      else if (ua_product_is(p, n, "Mozilla", &major))
+      else if (ua_product_is(tok, "Mozilla", &major))
         mozilla = HTS_TRUE;
       else
         return HTS_FALSE;
@@ -3513,13 +3511,12 @@ const char *strstrcase(const char *s, const char *o) {
   return s;
 }
 
-void map_characters(unsigned char *buffer, unsigned int size, unsigned int *map) {
-  unsigned int i;
+void map_characters(hts_span s, unsigned int *map) {
+  size_t i;
 
   memset(map, 0, sizeof(unsigned int) * 256);
-  for(i = 0; i < size; i++) {
-    map[buffer[i]]++;
-  }
+  for (i = 0; i < s.len; i++)
+    map[(unsigned char) s.p[i]]++;
 }
 
 // le fichier est-il un fichier html?
@@ -3587,14 +3584,15 @@ char *FUN(char *source) { \
   return ret != NULL ? source + ( ret - source ) : NULL; \
 }
 
-/* Appends n bytes of s at buf[*len], clipped to size - 1, NUL-terminated. */
-static void append_clipped(char *buf, size_t size, size_t *len, const char *s,
-                           size_t n) {
-  if (n > size - 1 - *len)
-    n = size - 1 - *len;
-  memcpy(buf + *len, s, n);
+/* Appends s at buf.p[*len], clipped to buf.size - 1, NUL-terminated. */
+static void append_clipped(hts_buf buf, size_t *len, hts_span s) {
+  size_t n = s.len;
+
+  if (n > buf.size - 1 - *len)
+    n = buf.size - 1 - *len;
+  memcpy(buf.p + *len, s.p, n);
   *len += n;
-  buf[*len] = '\0';
+  buf.p[*len] = '\0';
 }
 
 /* Returns adr past its blanks, scheme and "//", the engine's or any
@@ -3622,7 +3620,7 @@ const char *login_end(const char *adr) {
 
   while (hts_isspace((unsigned char) *s))
     s++;
-  (void) hts_url_view_parse(s, strlen(s), &v);
+  (void) hts_url_view_parse(hts_span_of(s), &v);
   return hts_span_present(v.userinfo) ? v.host.p : login_start(adr);
 }
 
@@ -3630,8 +3628,9 @@ hts_boolean hts_escape_typed_login(const char *url, char *dst, size_t size) {
   const char *const start = login_start(url);
   const char *const at = strrchr_limit(start, '@', strchr(start, '/'));
 
-  return hts_escape_span(url, strlen(url), start, at != NULL ? at - 1 : start,
-                         "?#\\", dst, size);
+  return hts_escape_span(hts_span_of(url),
+                         hts_span_between(start, at != NULL ? at - 1 : start),
+                         "?#\\", hts_buf_at(dst, size));
 }
 
 /* Returns HTS_TRUE when adr has a login, a user alone included. */
@@ -3642,21 +3641,21 @@ static hts_boolean has_login(const char *adr) {
 const char *adr_nologin_r(char *buf, size_t size, const char *adr) {
   const char *const scheme = login_start(adr);
   const char *const host = login_end(adr);
+  const hts_buf out = hts_buf_at(buf, size);
   const char *colon;
   size_t len = 0;
 
   if (!has_login(adr) || size == 0)
     return adr;
   colon = memchr(scheme, ':', (size_t) (host - scheme));
-  buf[0] = '\0';
   if (colon != NULL) {
-    append_clipped(buf, size, &len, adr, (size_t) (colon - adr));
-    append_clipped(buf, size, &len, ":***@", 5);
+    append_clipped(out, &len, hts_span_between(adr, colon));
+    append_clipped(out, &len, hts_span_of(":***@"));
   } else {
-    append_clipped(buf, size, &len, adr, (size_t) (scheme - adr));
-    append_clipped(buf, size, &len, "***@", 4);
+    append_clipped(out, &len, hts_span_between(adr, scheme));
+    append_clipped(out, &len, hts_span_of("***@"));
   }
-  append_clipped(buf, size, &len, host, strlen(host));
+  append_clipped(out, &len, hts_span_of(host));
   return buf;
 }
 
@@ -3685,7 +3684,7 @@ HTSEXT_API const char *jump_identification_const(const char *source) {
 
   if (strcmp(source, "file://") == 0)
     return source;
-  (void) hts_url_view_parse(source, strlen(source), &v);
+  (void) hts_url_view_parse(hts_span_of(source), &v);
   // a scheme the engine does not know is kept whole
   if (hts_span_present(v.scheme) && jump_protocol_const(source) == source)
     return source;
@@ -4245,7 +4244,7 @@ int hts_basic_auth_value(httrackp *opt, const char *url, char *out,
 
   assertf(out_size >= 1100); /* base-64 of 765 bytes is 1020 */
   out[0] = '\0';
-  (void) hts_url_view_parse(url, strlen(url), &v);
+  (void) hts_url_view_parse(hts_span_of(url), &v);
   // no login where jump_identification_const() keeps the URL whole
   idlen = jump_identification_const(url) == v.host.p ? v.userinfo.len : 0;
   if (idlen == 0)
@@ -4266,11 +4265,11 @@ int hts_basic_auth_value(httrackp *opt, const char *url, char *out,
 hts_boolean hts_sni_hostname(const char *url_adr, hts_buf out) {
   hts_url_view v;
 
-  (void) hts_url_view_parse(url_adr, strlen(url_adr), &v);
+  (void) hts_url_view_parse(hts_span_of(url_adr), &v);
   out.p[0] = '\0';
   if (hts_span_empty(v.host) ||
       hts_span_starts_with(v.host, hts_span_of("[")) ||
-      hts_host_is_ipv4(v.host.p, v.host.len))
+      hts_host_is_ipv4(v.host))
     return HTS_FALSE;
   return hts_buf_put_span(out, v.host);
 }
@@ -4317,26 +4316,29 @@ hts_boolean hts_ssl_check_cert(SSL *ssl, const char *url_adr) {
 
 const char *hts_authority_end(const char *s) { return s + strcspn(s, "/?#\\"); }
 
-/* jump_protocol_const() and the view both read these schemes. */
-static const char *const hts_engine_schemes[] = {
+/* jump_protocol_const() and the view both read these schemes. A scheme longer
+   than a row does not compile. */
+static const char hts_engine_schemes[][8] = {
     "http", "ftp", "https", "file", "socks5h", "socks5", "connect"};
 
-/* Return the length of the engine scheme and ':' that start the LEN bytes at
-   S, or 0. LEN may exceed the string, because jump_protocol_const() passes
-   (size_t) -1, and a NUL then ends the match. */
-static size_t engine_scheme_len(const char *s, size_t len) {
+/* The most bytes an engine scheme and its ':' span. */
+#define ENGINE_SCHEME_SPAN (sizeof(hts_engine_schemes[0]) + 1)
+
+/* Return the length of the engine scheme and ':' that start S, or 0. */
+static size_t engine_scheme_len(hts_span s) {
   size_t i;
 
   for (i = 0; i < sizeof(hts_engine_schemes) / sizeof(hts_engine_schemes[0]);
        i++) {
     const char *const name = hts_engine_schemes[i];
-    const size_t n = strlen(name);
+    const size_t n = sizeof(hts_engine_schemes[i]);
     size_t j;
 
-    for (j = 0; j < n && j < len && streql(s[j], name[j]); j++)
+    for (j = 0;
+         j < n && name[j] != '\0' && j < s.len && streql(s.p[j], name[j]); j++)
       ;
-    if (j == n && n < len && s[n] == ':')
-      return n + 1;
+    if (j < s.len && s.p[j] == ':' && (j == n || name[j] == '\0'))
+      return j + 1;
   }
   return 0;
 }
@@ -4349,8 +4351,9 @@ static hts_boolean port_is_valid(hts_span port) {
   return hts_span_empty(port) || hts_span_parse_llint(port, 0, 65535, &value);
 }
 
-hts_boolean hts_url_view_parse(const char *s, size_t len, hts_url_view *v) {
-  const char *const end = s + len;
+hts_boolean hts_url_view_parse(hts_span url, hts_url_view *v) {
+  const char *const s = url.p;
+  const char *const end = s + url.len;
   const char *p = s;
   const char *auth_end, *at, *q;
   hts_span auth;
@@ -4358,10 +4361,10 @@ hts_boolean hts_url_view_parse(const char *s, size_t len, hts_url_view *v) {
   size_t n;
 
   memset(v, 0, sizeof(*v));
-  if ((n = engine_scheme_len(s, len)) != 0) {
+  if ((n = engine_scheme_len(url)) != 0) {
     v->scheme = hts_span_at(s, n - 1);
     p = s + n;
-  } else if (len != 0 && hts_isalpha((unsigned char) s[0])) {
+  } else if (url.len != 0 && hts_isalpha((unsigned char) s[0])) {
     for (q = s + 1; q < end && (hts_isalnum((unsigned char) *q) || *q == '+' ||
                                 *q == '-' || *q == '.');
          q++)
@@ -4426,7 +4429,7 @@ hts_boolean hts_url_view_parse(const char *s, size_t len, hts_url_view *v) {
 const char *jump_toport_const(const char *source) {
   hts_url_view v;
 
-  (void) hts_url_view_parse(source, strlen(source), &v);
+  (void) hts_url_view_parse(hts_span_of(source), &v);
   // jump_identification_const() keeps these whole, so their ':' is the port
   if (hts_span_present(v.scheme) &&
       (strcmp(source, "file://") == 0 || jump_protocol_const(source) == source))
@@ -4457,7 +4460,8 @@ const char *strrchr_limit(const char *s, char c, const char *limit) {
 // Returns source past its engine scheme and "//", if any.
 const char *jump_protocol_const(const char *source) {
   // "Comparisons of scheme names MUST be case-insensitive" (RFC2616)
-  source += engine_scheme_len(source, (size_t) -1);
+  source += engine_scheme_len(
+      hts_span_at(source, strnlen(source, ENGINE_SCHEME_SPAN)));
   // net_path
   if (strncmp(source, "//", 2) == 0)
     source += 2;
@@ -4466,35 +4470,35 @@ const char *jump_protocol_const(const char *source) {
 
 DECLARE_NON_CONST_VERSION(jump_protocol)
 
-hts_boolean hts_is_control_free_sized(const char *str, size_t len) {
+hts_boolean hts_span_is_control_free(hts_span s) {
   size_t i;
 
-  for (i = 0; i < len; i++) {
-    if ((unsigned char) str[i] < ' ')
+  for (i = 0; i < s.len; i++) {
+    if ((unsigned char) s.p[i] < ' ')
       return HTS_FALSE;
   }
   return HTS_TRUE;
 }
 
 hts_boolean hts_is_control_free(const char *str) {
-  return hts_is_control_free_sized(str, strlen(str));
+  return hts_span_is_control_free(hts_span_of(str));
 }
 
-hts_boolean hts_host_is_ipv4(const char *host, size_t len) {
+hts_boolean hts_host_is_ipv4(hts_span host) {
   size_t i;
   int dots = 0;
 
-  for (i = 0; i < len; i++) {
-    if (host[i] == '.')
+  for (i = 0; i < host.len; i++) {
+    if (host.p[i] == '.')
       dots++;
-    else if (host[i] < '0' || host[i] > '9')
+    else if (host.p[i] < '0' || host.p[i] > '9')
       return HTS_FALSE;
   }
   return dots > 0 ? HTS_TRUE : HTS_FALSE;
 }
 
-hts_boolean hts_host_is_address(const char *host, size_t len) {
-  return memchr(host, ':', len) != NULL || hts_host_is_ipv4(host, len);
+hts_boolean hts_host_is_address(hts_span host) {
+  return memchr(host.p, ':', host.len) != NULL || hts_host_is_ipv4(host);
 }
 
 hts_boolean hts_proxy_is_socks(const char *name) {
@@ -4551,30 +4555,34 @@ void hts_parse_proxy(const char *arg, char *name, size_t name_size, int *port) {
     if (arg[i] == '@')
       at = arg + i;
   // escape what would end the authority early: the login is unescaped later
-  (void) hts_escape_span(arg, namelen, authority, at, "/?#\\", name, name_size);
+  (void) hts_escape_span(hts_span_at(arg, namelen),
+                         hts_span_between(authority, at), "/?#\\",
+                         hts_buf_at(name, name_size));
 }
 
-hts_boolean hts_escape_span(const char *src, size_t n, const char *from,
-                            const char *to, const char *set, char *dst,
-                            size_t size) {
+hts_boolean hts_escape_span(hts_span src, hts_span escaped, const char *set,
+                            hts_buf dst) {
   size_t i, len = 0;
 
-  if (size == 0)
+  if (dst.size == 0)
     return HTS_FALSE;
-  for (i = 0; i < n; i++) {
-    if (src + i >= from && src + i < to && strchr(set, src[i]) != NULL) {
-      if (size - len <= 3)
+  for (i = 0; i < src.len; i++) {
+    const char *const c = src.p + i;
+
+    if (c >= escaped.p && c < escaped.p + escaped.len &&
+        strchr(set, *c) != NULL) {
+      if (dst.size - len <= 3)
         break;
-      snprintf(dst + len, 4, "%%%02X", (unsigned char) src[i]);
+      snprintf(dst.p + len, 4, "%%%02X", (unsigned char) *c);
       len += 3;
     } else {
-      if (size - len <= 1)
+      if (dst.size - len <= 1)
         break;
-      dst[len++] = src[i];
+      dst.p[len++] = *c;
     }
   }
-  dst[len] = '\0';
-  return i == n ? HTS_TRUE : HTS_FALSE;
+  dst.p[len] = '\0';
+  return i == src.len ? HTS_TRUE : HTS_FALSE;
 }
 
 // codage base 64 a vers b
