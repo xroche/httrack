@@ -110,6 +110,7 @@ list=${work}/list.dat
     printf '\377\376.zz\n'
     printf 'zz\000junk\na.yy\n'
     printf 'crlf.test\r\n'
+    printf '\t tab.test\n'
     printf 'last.rule'
 } >"${list}"
 stamp=2000-01-01_00-00-00_UTC
@@ -121,6 +122,7 @@ selftest_queue_lines "www.ck"$'\n'"${stamp}" pslfile "${list}" a.www.ck
 selftest_queue_lines "x.xn--55qx5d.cn"$'\n'"${stamp}" pslfile "${list}" a.x.xn--55qx5d.cn
 selftest_queue_lines "r.a.yy"$'\n'"${stamp}" pslfile "${list}" q.r.a.yy
 selftest_queue_lines "b.crlf.test"$'\n'"${stamp}" pslfile "${list}" a.b.crlf.test
+selftest_queue_lines "b.tab.test"$'\n'"${stamp}" pslfile "${list}" a.b.tab.test
 selftest_queue_lines "y.last.rule"$'\n'"${stamp}" pslfile "${list}" x.y.last.rule
 selftest_queue unreadable pslfile "${work}/missing.dat" a.example.com
 selftest_queue unreadable pslfile /dev/null a.example.com

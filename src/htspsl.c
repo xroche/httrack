@@ -46,20 +46,18 @@ static coucal psl_rules = NULL;
 static char psl_version[64] = "";
 
 /* Add one rule as the list spells it, converting a Unicode name to IDNA. */
-static void psl_add(coucal rules, const char *rule, size_t len) {
+static void psl_add(coucal rules, hts_span rule) {
   intptr_t kind = PSL_EXACT, old = 0;
   char key[256];
 
-  if (len > 2 && rule[0] == '*' && rule[1] == '.') {
+  if (rule.len > 2 && hts_span_starts_with(rule, hts_span_of("*."))) {
     kind = PSL_WILDCARD;
-    rule += 2;
-    len -= 2;
-  } else if (len > 1 && rule[0] == '!') {
+    rule = hts_span_skip(rule, 2);
+  } else if (rule.len > 1 && rule.p[0] == '!') {
     kind = PSL_EXCEPTION;
-    rule++;
-    len--;
+    rule = hts_span_skip(rule, 1);
   }
-  if (hts_host_to_ascii(HTS_SIZED(key), rule, len) && key[0] != '\0') {
+  if (hts_host_to_ascii(HTS_SIZED(key), rule.p, rule.len) && key[0] != '\0') {
     hts_lowcase(key);
     (void) coucal_read(rules, key, &old);
     coucal_write(rules, key, old | kind);
@@ -67,46 +65,42 @@ static void psl_add(coucal rules, const char *rule, size_t len) {
 }
 
 /* Replace the list in use with rules, freeing the old one. */
-static void psl_install(coucal rules, const char *version, size_t vlen) {
+static void psl_install(coucal rules, hts_span version) {
   coucal_delete(&psl_rules);
   psl_rules = rules;
-  (void) hts_span_copy(hts_span_at(version, vlen), HTS_SIZED(psl_version));
+  (void) hts_span_copy(version, HTS_SIZED(psl_version));
+}
+
+/* Return the leading bytes of S up to its first blank or CR. */
+static hts_span psl_word(hts_span s) {
+  size_t n = 0;
+
+  while (n < s.len && s.p[n] != ' ' && s.p[n] != '\t' && s.p[n] != '\r')
+    n++;
+  return hts_span_at(s.p, n);
 }
 
 /* Add the rule on one line of a list file, or note its VERSION stamp. */
-static void psl_add_line(coucal rules, const char *line, size_t len,
-                         const char **version, size_t *vlen) {
+static void psl_add_line(coucal rules, hts_span line, hts_span *version) {
   static const char tag[] = "// VERSION: ";
-  size_t i = 0, n;
+  hts_span rule;
 
-  if (len >= sizeof(tag) - 1 && memcmp(line, tag, sizeof(tag) - 1) == 0) {
-    *version = line + sizeof(tag) - 1;
-    for (*vlen = 0; *vlen < len - (sizeof(tag) - 1); (*vlen)++) {
-      const char c = (*version)[*vlen];
-
-      if (c == ' ' || c == '\t' || c == '\r')
-        break;
-    }
+  if (hts_span_starts_with(line, hts_span_at(tag, sizeof(tag) - 1))) {
+    *version = psl_word(hts_span_skip(line, sizeof(tag) - 1));
     return;
   }
-  while (i < len && (line[i] == ' ' || line[i] == '\t'))
-    i++;
-  if (len - i >= 2 && line[i] == '/' && line[i + 1] == '/')
+  line = hts_span_trim(line, " \t", "");
+  if (hts_span_starts_with(line, hts_span_of("//")))
     return;
-  for (n = 0; i + n < len; n++) {
-    const char c = line[i + n];
-
-    if (c == ' ' || c == '\t' || c == '\r')
-      break;
-  }
-  if (n != 0)
-    psl_add(rules, line + i, n);
+  rule = psl_word(line);
+  if (rule.len != 0)
+    psl_add(rules, rule);
 }
 
 hts_boolean hts_psl_load_file(const char *path, size_t min_rules) {
   const LLint size = fsize(path);
-  const char *version = "", *p, *end;
-  size_t vlen = 0;
+  hts_span version = hts_span_of("");
+  const char *p, *end;
   char *text;
   coucal rules;
   FILE *fp;
@@ -130,7 +124,7 @@ hts_boolean hts_psl_load_file(const char *path, size_t min_rules) {
     const char *const eol = memchr(p, '\n', (size_t) (end - p));
     const size_t len = (size_t) ((eol != NULL ? eol : end) - p);
 
-    psl_add_line(rules, p, len, &version, &vlen);
+    psl_add_line(rules, hts_span_at(p, len), &version);
     p += len + 1;
   }
   if (coucal_nitems(rules) < min_rules || coucal_nitems(rules) == 0) {
@@ -138,7 +132,7 @@ hts_boolean hts_psl_load_file(const char *path, size_t min_rules) {
     freet(text);
     return HTS_FALSE;
   }
-  psl_install(rules, version, vlen);
+  psl_install(rules, version);
   freet(text);
   return HTS_TRUE;
 }
@@ -158,9 +152,9 @@ void hts_psl_init_from(const char *path) {
     const char *const end = p + hts_psl_builtin_size[i] - 1;
 
     for (; p < end; p += strlen(p) + 1)
-      psl_add(rules, p, strlen(p));
+      psl_add(rules, hts_span_of(p));
   }
-  psl_install(rules, hts_psl_builtin_version, strlen(hts_psl_builtin_version));
+  psl_install(rules, hts_span_of(hts_psl_builtin_version));
 }
 
 void hts_psl_init(void) {

@@ -184,9 +184,8 @@ static hts_boolean digest_file(const char *path,
   return HTS_TRUE;
 }
 
-static void digest_mem(const char *buffer, size_t len,
-                       unsigned char digest[DIGEST_SIZE]) {
-  domd5mem(buffer, len, (char *) digest, 0);
+static void digest_mem(hts_span data, unsigned char digest[DIGEST_SIZE]) {
+  domd5mem(data.p, data.len, (char *) digest, 0);
 }
 
 hts_change_bucket hts_changes_classify(hts_boolean rewritten,
@@ -314,10 +313,10 @@ void hts_changes_html(httrackp *opt, cache_back *cache, const htsblk *r,
     return;
 
   /* The page on disk has rewritten links, so compare against the cache. */
-  digest_mem(r->adr, (size_t) r->size, new_digest);
+  digest_mem(hts_span_at(r->adr, (size_t) r->size), new_digest);
   prev = cache_read_ro(opt, cache, adr, fil, "", HTS_SIZED(location));
   if (HTTP_IS_OK(prev.statuscode) && prev.adr != NULL && prev.size >= 0) {
-    digest_mem(prev.adr, (size_t) prev.size, prev_digest);
+    digest_mem(hts_span_at(prev.adr, (size_t) prev.size), prev_digest);
     has_prev = HTS_TRUE;
   }
   freet(prev.adr);
