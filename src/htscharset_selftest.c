@@ -922,6 +922,9 @@ static int st_append_utf8_sized(httrackp *opt, int argc, char **argv) {
       {32, 3, "dirab"},
       {32, 4, "dirab\xc3\xbc"},
       {32, 0, "dir"},
+      /* the budget equals the room left, 4 then 5 bytes */
+      {8, 4, "dirab\xc3\xbc"},
+      {9, 5, "dirab\xc3\xbc"},
   };
   size_t i;
   int fail = 0;

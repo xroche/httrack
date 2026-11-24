@@ -87,10 +87,10 @@ HTS_CHECK_RESULT extern char *hts_convertStringIDNAToUTF8(hts_span s);
 extern int hts_isStringIDNA(const char *s, size_t size);
 
 /**
- * Extract the <meta> charset from the HTML buffer "html" (HTML5 charset= or
- * legacy http-equiv form). Returns a malloc'ed string, or NULL if none.
+ * Extract the <meta> charset from the HTML in page (HTML5 charset= or legacy
+ * http-equiv form). Returns a malloc'ed string, or NULL if none.
  **/
-HTS_CHECK_RESULT extern char *hts_getCharsetFromMeta(hts_span html);
+HTS_CHECK_RESULT extern char *hts_getCharsetFromMeta(hts_span page);
 
 /**
  * Is the given string an ASCII string ?

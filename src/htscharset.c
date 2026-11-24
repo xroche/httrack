@@ -795,7 +795,7 @@ char *hts_getCharsetFromMeta(hts_span page) {
      attributes in any order; first resolvable tag wins. */
   for (i = 0; i + 6 < size; i++) {
     size_t j;
-    hts_span equiv = hts_span_at(NULL, 0), content = hts_span_at(NULL, 0);
+    hts_span equiv = {NULL, 0}, content = {NULL, 0};
 
     if (html[i] != '<' || hts_strncasecmp(&html[i + 1], "meta", 4) != 0 ||
         !is_html_space(html[i + 5])) {
@@ -844,17 +844,17 @@ char *hts_getCharsetFromMeta(hts_span page) {
       if (val_len != 0) {
         if (name_len == 7 && hts_strncasecmp(&html[name], "charset", 7) == 0) {
           return hts_stringMemCopy(&html[val], val_len);
-        } else if (equiv.p == NULL && name_len == 10 &&
+        } else if (equiv.len == 0 && name_len == 10 &&
                    hts_strncasecmp(&html[name], "http-equiv", 10) == 0) {
           equiv = hts_span_at(&html[val], val_len);
-        } else if (content.p == NULL && name_len == 7 &&
+        } else if (content.len == 0 && name_len == 7 &&
                    hts_strncasecmp(&html[name], "content", 7) == 0) {
           content = hts_span_at(&html[val], val_len);
         }
       }
     }
     if (hts_span_eq_ci(equiv, hts_span_of("content-type")) &&
-        content.p != NULL) {
+        content.len != 0) {
       char *const s = charset_from_content(content);
 
       if (s != NULL) {
