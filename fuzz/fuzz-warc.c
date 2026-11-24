@@ -257,21 +257,21 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   if ((w = warc_open(opt, wc_path)) != NULL) {
     (void) warc_write_transaction(
         w, uri, ip[0] != '\0' ? ip : NULL, reqhdr_len > 0 ? reqhdr : NULL,
-        resphdr_len > 0 ? resphdr : NULL, hts_span_at(body, (size_t) body_len),
-        NULL, ctype[0] != '\0' ? ctype : NULL, statuscode, WARC_UNCHANGED_NONE,
-        truncated != 0 ? truncated : 0);
+        resphdr_len > 0 ? resphdr : NULL,
+        warc_body_mem(body, (size_t) body_len), ctype[0] != '\0' ? ctype : NULL,
+        statuscode, WARC_UNCHANGED_NONE, truncated != 0 ? truncated : 0);
     if ((data[1] & 0x04) != 0) {
       statuscode2 = statuscode;
       (void) warc_write_transaction(
           w, uri, ip[0] != '\0' ? ip : NULL, reqhdr_len > 0 ? reqhdr : NULL,
           resphdr_len > 0 ? resphdr : NULL,
-          hts_span_at(body, (size_t) body_len), NULL,
+          warc_body_mem(body, (size_t) body_len),
           ctype[0] != '\0' ? ctype : NULL, statuscode2, unchanged, 0);
     }
     if ((data[1] & 0x08) != 0) {
       (void) warc_write_resource(
           w, uri, ip[0] != '\0' ? ip : NULL, ctype[0] != '\0' ? ctype : NULL,
-          hts_span_at(body, (size_t) body_len), NULL, truncated);
+          warc_body_mem(body, (size_t) body_len), truncated);
     }
     warc_close(w);
   }
