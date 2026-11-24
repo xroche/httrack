@@ -56,7 +56,7 @@ static int st_bundlecut(httrackp *opt, int argc, char **argv) {
   } else {
     /* the name shows in the file a load from a missing folder cannot open */
     StringCopy(opt->bundle_dir, nodir);
-    assertf(!hts_bundle_load_all(opt, NULL, err, sizeof(err)) &&
+    assertf(!hts_bundle_load_all(opt, NULL, HTS_BUF(err)) &&
             strncmp(err, nodir, sizeof(nodir) - 1) == 0 &&
             strstr(err, ".hts: ") != NULL);
     printf("%.*s %s\n",
@@ -127,7 +127,7 @@ static int st_bundle(httrackp *opt, int argc, char **argv) {
     }
   }
   for (i = 0; i < loads; i++) {
-    if (!hts_bundle_load_all(opt, jar_file, err, sizeof(err))) {
+    if (!hts_bundle_load_all(opt, jar_file, HTS_BUF(err))) {
       printf("refused: ");
       print_without_dir(err, argv[0]);
       goto done;

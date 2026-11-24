@@ -41,6 +41,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsglobal.h"
 #include "htsopt.h"
 #include "htsbauth.h"
+#include "htsbuf.h"
 #include "htsurlport.h"
 
 /* A start URL ending with this names the bundle file <name>.hts. */
@@ -58,8 +59,8 @@ const char *hts_bundle_take(httrackp *opt, char *url);
    The cookies go into opt->cookie. A jar_file newer than the bundle keeps its
    records. A NULL one never does. HTS_FALSE after writing why into err, naming
    the file, and then the run must stop. A second call reads the files again. */
-hts_boolean hts_bundle_load_all(httrackp *opt, const char *jar_file, char *err,
-                                size_t err_size);
+hts_boolean hts_bundle_load_all(httrackp *opt, const char *jar_file,
+                                hts_buf err);
 
 /* The i-th url line of the loaded bundles, or NULL past the last one. */
 const char *hts_bundle_url(httrackp *opt, size_t i);
@@ -72,8 +73,8 @@ void hts_bundle_identity(httrackp *opt, const char *adr, htsrequest *req);
 /* Forget the bundles named for opt. */
 void hts_bundle_free(httrackp *opt);
 
-/* Do the len bytes at s hold a control byte other than TAB? */
-hts_boolean hts_bundle_has_control(const char *s, size_t len);
+/* Does s hold a control byte other than TAB? */
+hts_boolean hts_bundle_has_control(hts_span s);
 
 /* The bundles share these htsbauth.c internals. */
 
