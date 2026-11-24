@@ -66,6 +66,14 @@ int lint_probe_branch(int a) {
   return 0;
 }
 int lint_probe_late(int x) { if (x) return -1; return 0; }
+int lint_probe_deleg(int x) { return lint_probe_int(x); }
+int lint_probe_deleg_ok(int x) { return lint_probe_int(x); }
+int lint_probe_deleg_plain(int x) { return abs(x); }
+int lint_probe_deleg_marked(int x) { return lint_probe_marked_int(x); }
+int lint_probe_deleg_cmp(int x) { return lint_probe_int(x) >= 0; }
+int lint_probe_deleg_clean(int x) { return lint_probe_clean(x); }
+int lint_probe_marked_int(int x) { if (x) return -1; return 0; }
+int lint_probe_clean(int x) { return x + 1; }
 size_t lint_probe_span(hts_span tok, const hts_span *out, const char *z) {
   hts_span a, b = hts_span_of(z);
   hts_url_view v;
@@ -111,6 +119,14 @@ int lint_probe_int(int x);
 hts_boolean lint_probe_bool(int x);
 char *lint_probe_twin(int x);
 int lint_probe_late(int x);
+int lint_probe_deleg(int x);
+HTS_CHECK_RESULT int lint_probe_deleg_ok(int x);
+int lint_probe_deleg_plain(int x);
+int lint_probe_deleg_marked(int x);
+int lint_probe_deleg_cmp(int x);
+int lint_probe_deleg_clean(int x);
+HTS_CHECK_RESULT int lint_probe_marked_int(int x);
+int lint_probe_clean(int x);
 #define lint_cmt(x) ((x) + /* a note \
    that wraps */ (x))
 static inline int lint_probe_after(int x) { if (x) return -1; return 0; }
@@ -151,6 +167,8 @@ for want in "src/htslib.c:$(at "${c}" "lint_probe_ctype("): ctype: new violation
     "src/htslib.h:$(at "${h}" "lint_after("): macro: new violation: macro lint_after: evaluates x twice" \
     "src/htslib.h:$(at "${h}" "lint_cmt("): macro: new violation: macro lint_cmt: evaluates x twice" \
     "src/htslib.h:$(at "${h}" "lint_probe_after("): check-result: new violation: lint_probe_after returns failure (int)" \
+    "src/htslib.h:$(at "${h}" "lint_probe_deleg("): check-result: new violation: lint_probe_deleg returns failure (int)" \
+    "src/htslib.h:$(at "${h}" "lint_probe_deleg_marked("): check-result: new violation: lint_probe_deleg_marked returns failure (int)" \
     "src/htslib.h:$(at "${h}" "lint_probe_ptr("): check-result: new violation: lint_probe_ptr returns failure (pointer)" \
     "src/htslib.h:$(at "${h}" "lint_probe_int("): check-result: new violation: lint_probe_int returns failure (int)" \
     "src/htslib.h:$(at "${h}" "lint_probe_bool("): check-result: new violation: lint_probe_bool returns failure (hts_boolean)" \
@@ -177,7 +195,7 @@ for want in "src/htslib.c:$(at "${c}" "lint_probe_ctype("): ctype: new violation
     "span: new violation: strnlen(b.p) reads a span up to a NUL"; do
     grep -qF "${want}" <<<"${out}" || fail "missed ${want}: ${out}"
 done
-test "$(wc -l <<<"${out}")" -eq 43 || fail "flagged a clean probe: ${out}"
+test "$(wc -l <<<"${out}")" -eq 45 || fail "flagged a clean probe: ${out}"
 
 # Removing a known violation, or listing one that never was, leaves a stale entry.
 rm -r "${work}/src/lintprobe"

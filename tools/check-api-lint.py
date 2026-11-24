@@ -3,11 +3,12 @@
 macros, header functions that can fail without HTS_CHECK_RESULT, and a span's
 .p handed to a function that reads up to a NUL or printed with %s.
 Known cases live in tools/api-lint/, and --update rewrites those baselines.
-Known limits: tail-call failures, free names inside _Generic, and a function
-defined only in a later branch of an unbalanced #if group go unreported. A span
-is seen only as a local, a parameter or a URL view field, never through a
-pointer copy, another struct or a macro, and only the NUL_READERS functions and
-printf-style %s count, so a span handed to any other function goes unreported.
+Known limits: a failure delegated through two calls, free names inside _Generic,
+and a function defined only in a later branch of an unbalanced #if group go
+unreported. A span is seen only as a local, a parameter or a URL view field,
+never through a pointer copy, another struct or a macro, and only the
+NUL_READERS functions and printf-style %s count, so a span handed to any other
+function goes unreported.
 """
 
 import argparse
@@ -486,6 +487,23 @@ def yes_no(body):
     return "0" in values and len(values) > 1 and all(boolean.search(v) for v in values)
 
 
+DELEGATE = re.compile(r"\breturn\s+([A-Za-z_]\w*)\s*\(")
+# Callees whose return is a value, not a status, so delegating to them is no failure.
+NOT_STATUS = frozenset(
+    """
+    engine_stats hts_status_reason hts_host_alias_resolve get_httptype_sized
+    back_clear_entry
+    """.split()
+)
+
+
+def delegates(body):
+    """Yield each g that BODY returns bare, as `return g(...);`."""
+    for m in DELEGATE.finditer(body):
+        if re.match(r"\s*;", body[matching(body, m.end() - 1) :]):
+            yield m.group(1)
+
+
 def check_result(files):
     """Yield (path, line, key, message) for header functions that can fail unmarked."""
     bodies = collections.defaultdict(list)
@@ -503,12 +521,28 @@ def check_result(files):
                 bodies[name].append(body)
             if path.endswith(".h"):
                 decls.append((path, start, head, name, ret, body))
+
+    def bodies_of(name, body):
+        return [body] if body is not None else bodies.get(name, [])
+
+    def literal(cls, found):
+        return any(
+            FAILURE[cls].search(b) or (cls == "int" and yes_no(b)) for b in found
+        )
+
+    # Functions whose failure shows in a literal return, or that are marked.
+    failing = set(marked)
     for path, start, head, name, ret, body in decls:
         cls = return_class(ret)
-        found = [body] if body is not None else bodies.get(name, [])
+        if cls and literal(cls, bodies_of(name, body)):
+            failing.add(name)
+    for path, start, head, name, ret, body in decls:
+        cls = return_class(ret)
         if cls is None or name in marked:
             continue
-        if any(FAILURE[cls].search(b) or (cls == "int" and yes_no(b)) for b in found):
+        # One level of `return g(...);` where g can fail.
+        calls = {g for b in bodies_of(name, body) for g in delegates(b)}
+        if name in failing or calls & (failing - NOT_STATUS):
             line = line_of(files[path], start + len(head) - len(head.lstrip()))
             msg = "%s returns failure (%s) without HTS_CHECK_RESULT" % (name, cls)
             yield path, line, name, msg
