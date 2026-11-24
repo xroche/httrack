@@ -311,24 +311,23 @@ static int stream_body_pad(warc_sink sink, void *ctx, size_t remaining) {
   return 0;
 }
 
-static int stream_block(int http_section, const char *http_hdr,
-                        size_t http_hdr_len, int has_body, const char *body,
-                        size_t body_len, const char *body_path, warc_sink sink,
+static int stream_block(int http_section, hts_span http_hdr, int has_body,
+                        hts_span body, const char *body_path, warc_sink sink,
                         void *ctx) {
   if (http_section) {
-    if (http_hdr != NULL && http_hdr_len > 0 &&
-        sink(ctx, 0, http_hdr, http_hdr_len) != 0)
+    if (!hts_span_empty(http_hdr) &&
+        sink(ctx, 0, http_hdr.p, http_hdr.len) != 0)
       return -1;
     if (sink(ctx, 0, "\r\n", 2) != 0)
       return -1;
   }
   if (has_body) {
-    if (body != NULL) {
-      if (body_len > 0 && sink(ctx, 1, body, body_len) != 0)
+    if (hts_span_present(body)) {
+      if (body.len > 0 && sink(ctx, 1, body.p, body.len) != 0)
         return -1;
     } else if (body_path != NULL) {
       char catbuff[CATBUFF_SIZE];
-      size_t remaining = body_len;
+      size_t remaining = body.len;
       FILE *fp = FOPEN(fconv(catbuff, sizeof(catbuff), body_path), "rb");
       if (fp == NULL)
         return -1;
@@ -373,8 +372,8 @@ static int write_sink(void *ctx, int region, const void *p, size_t n) {
 
 /* Base32 SHA-1 of a transaction payload (body only), for revisit dedup.
    Returns 1 and fills out[33] on success, 0 without OpenSSL or on error. */
-static int payload_digest_b32(const char *body, size_t body_len,
-                              const char *body_path, char out[33]) {
+static int payload_digest_b32(hts_span body, const char *body_path,
+                              char out[33]) {
 #if HTS_USEOPENSSL
   digester d;
   unsigned char md[EVP_MAX_MD_SIZE];
@@ -388,7 +387,7 @@ static int payload_digest_b32(const char *body, size_t body_len,
     EVP_MD_CTX_free(d.payload);
     return 0;
   }
-  ok = stream_block(0, NULL, 0, 1, body, body_len, body_path, digest_sink,
+  ok = stream_block(0, hts_span_at(NULL, 0), 1, body, body_path, digest_sink,
                     &d) == 0 &&
        EVP_DigestFinal_ex(d.payload, md, &mdlen) == 1 && mdlen == 20;
   EVP_MD_CTX_free(d.payload);
@@ -398,7 +397,6 @@ static int payload_digest_b32(const char *body, size_t body_len,
   return 1;
 #else
   (void) body;
-  (void) body_len;
   (void) body_path;
   (void) out;
   return 0;
@@ -418,8 +416,8 @@ static void md32_to_hex(const unsigned char md[32], char out[65]) {
   out[64] = '\0';
 }
 
-/* Lowercase-hex SHA-256 of n bytes at p into out[65]. Returns 1 on success. */
-static int sha256_hex_mem(const void *p, size_t n, char out[65]) {
+/* Lowercase-hex SHA-256 of s into out[65]. Returns 1 on success. */
+static int sha256_hex_mem(hts_span s, char out[65]) {
   EVP_MD_CTX *c = EVP_MD_CTX_new();
   unsigned char md[EVP_MAX_MD_SIZE];
   unsigned int mdlen = 0;
@@ -427,7 +425,7 @@ static int sha256_hex_mem(const void *p, size_t n, char out[65]) {
   if (c == NULL)
     return 0;
   ok = EVP_DigestInit_ex(c, EVP_sha256(), NULL) == 1 &&
-       (n == 0 || EVP_DigestUpdate(c, p, n) == 1) &&
+       (s.len == 0 || EVP_DigestUpdate(c, s.p, s.len) == 1) &&
        EVP_DigestFinal_ex(c, md, &mdlen) == 1 && mdlen == 32;
   EVP_MD_CTX_free(c);
   if (ok)
@@ -472,17 +470,18 @@ static int sha256_hex_file(const char *path, char out[65]) {
 
 /* ---- misc record helpers ---- */
 
-static void warc_fill_random(warc_writer *w, unsigned char *b, size_t n) {
+static void warc_fill_random(warc_writer *w, hts_buf b) {
+  unsigned char *const u = (unsigned char *) b.p;
   size_t i;
 #if HTS_USEOPENSSL
-  if (n <= (size_t) 0x7fffffff && RAND_bytes(b, (int) n) == 1)
+  if (b.size <= (size_t) 0x7fffffff && RAND_bytes(u, (int) b.size) == 1)
     return;
 #endif
-  for (i = 0; i < n; i++) {
+  for (i = 0; i < b.size; i++) {
     w->rng ^= w->rng << 13;
     w->rng ^= w->rng >> 7;
     w->rng ^= w->rng << 17;
-    b[i] = (unsigned char) (w->rng >> 24);
+    u[i] = (unsigned char) (w->rng >> 24);
   }
 }
 
@@ -490,7 +489,7 @@ static void warc_fill_random(warc_writer *w, unsigned char *b, size_t n) {
 static void warc_make_id(warc_writer *w, char out[64]) {
   unsigned char b[16];
   w->counter++;
-  warc_fill_random(w, HTS_SIZED(b));
+  warc_fill_random(w, hts_buf_at((char *) b, sizeof(b)));
   b[6] = (unsigned char) ((b[6] & 0x0F) | 0x40);
   b[8] = (unsigned char) ((b[8] & 0x3F) | 0x80);
   snprintf(out, 64,
@@ -543,15 +542,15 @@ static char *path_basename_dup(const char *path) {
   return strdupt(b);
 }
 
-/* Append n bytes of s, percent-encoding any byte that is not part of a
-   well-formed UTF-8 sequence, so the whole CDXJ line stays UTF-8. */
-static int surt_add_utf8(wbuf *out, const char *s, size_t n) {
+/* Append s, percent-encoding any byte that is not part of a well-formed UTF-8
+   sequence, so the whole CDXJ line stays UTF-8. */
+static int surt_add_utf8(wbuf *out, hts_span s) {
   size_t i = 0;
-  while (i < n) {
-    const unsigned char c = (unsigned char) s[i];
+  while (i < s.len) {
+    const unsigned char c = (unsigned char) s.p[i];
     size_t len = 1;
     if (c >= 0x80) {
-      len = hts_readUTF8(s + i, n - i, NULL);
+      len = hts_readUTF8(s.p + i, s.len - i, NULL);
       if (len == 0) {
         if (wbuf_printf(out, "%%%02X", (unsigned) c) != 0)
           return -1;
@@ -559,7 +558,7 @@ static int surt_add_utf8(wbuf *out, const char *s, size_t n) {
         continue;
       }
     }
-    if (wbuf_add(out, s + i, len) != 0)
+    if (wbuf_add(out, s.p + i, len) != 0)
       return -1;
     i += len;
   }
@@ -629,7 +628,7 @@ static int surt_canon(const char *url, wbuf *out) {
         if (llen > 0) {
           if (!first && wbuf_add(out, ",", 1) != 0)
             return -1;
-          if (surt_add_utf8(out, hostbuf + lstart, llen) != 0)
+          if (surt_add_utf8(out, hts_span_at(hostbuf + lstart, llen)) != 0)
             return -1;
           first = 0;
         }
@@ -655,7 +654,7 @@ static int surt_canon(const char *url, wbuf *out) {
   /* Copy the path and query verbatim, and stop before the fragment's '#'. */
   path_end = hts_span_present(v.fragment) ? v.fragment.p - 1 : url + url_len;
   path = hts_span_between(v.path.p, path_end);
-  if (surt_add_utf8(out, path.p, path.len) != 0)
+  if (surt_add_utf8(out, path) != 0)
     return -1;
   return 0;
 }
@@ -685,13 +684,12 @@ static int cdx_json_str(wbuf *b, const char *s) {
 }
 
 /* see htswarc.h */
-void warc_http_header_value(const char *hdr, const char *name, char *out,
-                            size_t outsz) {
+void warc_http_header_value(const char *hdr, const char *name, hts_buf out) {
   hts_span rest, n;
   hts_header_field f;
-  if (outsz == 0)
+  if (out.size == 0)
     return;
-  out[0] = '\0';
+  out.p[0] = '\0';
   if (hdr == NULL)
     return;
   rest = hts_span_of(hdr);
@@ -707,7 +705,7 @@ void warc_http_header_value(const char *hdr, const char *name, char *out,
           v.len = k;
           break;
         }
-      (void) hts_span_copy(v, out, outsz);
+      (void) hts_span_copy(v, out.p, out.size);
       return;
     }
   }
@@ -940,21 +938,21 @@ static int wacz_add_disk(zipFile zf, const char *zipname, const char *diskpath,
 }
 
 /* Store in-memory bytes as zipname; when res != NULL, hash and list them. */
-static int wacz_add_mem(zipFile zf, const char *zipname, const void *data,
-                        size_t n, const char *resname, wbuf *res, int first) {
+static int wacz_add_mem(zipFile zf, const char *zipname, hts_span data,
+                        const char *resname, wbuf *res, int first) {
   char hex[65];
-  if (res != NULL && !sha256_hex_mem(data, n, hex))
+  if (res != NULL && !sha256_hex_mem(data, hex))
     return -1;
   if (wacz_open_store(zf, zipname) != ZIP_OK)
     return -1;
-  if (wacz_write_bytes(zf, data, n) != 0) {
+  if (wacz_write_bytes(zf, data.p, data.len) != 0) {
     zipCloseFileInZip(zf);
     return -1;
   }
   if (zipCloseFileInZip(zf) != ZIP_OK)
     return -1;
   if (res != NULL)
-    return wacz_resource_add(res, first, resname, zipname, hex, n);
+    return wacz_resource_add(res, first, resname, zipname, hex, data.len);
   return 0;
 }
 
@@ -1036,8 +1034,9 @@ static void warc_wacz_package(warc_writer *w) {
     if (wbuf_puts(&pages, TypedArrayNth(w->page_lines, i)) != 0 ||
         wbuf_add(&pages, "\n", 1) != 0)
       err = 1;
-  if (!err && wacz_add_mem(zf, "pages/pages.jsonl", pages.data, pages.len,
-                           "pages.jsonl", &resources, first) != 0)
+  if (!err &&
+      wacz_add_mem(zf, "pages/pages.jsonl", hts_span_at(pages.data, pages.len),
+                   "pages.jsonl", &resources, first) != 0)
     err = 1;
   wbuf_free(&pages);
 
@@ -1061,18 +1060,18 @@ static void warc_wacz_package(warc_writer *w) {
                wbuf_add(&dp, resources.data, resources.len) != 0 ||
                wbuf_puts(&dp, "]}") != 0))
     err = 1;
-  if (!err &&
-      wacz_add_mem(zf, "datapackage.json", dp.data, dp.len, NULL, NULL, 0) != 0)
+  if (!err && wacz_add_mem(zf, "datapackage.json", hts_span_at(dp.data, dp.len),
+                           NULL, NULL, 0) != 0)
     err = 1;
 
   /* datapackage-digest.json chains the integrity of datapackage.json. */
   memset(&digest, 0, sizeof(digest));
-  if (!err && sha256_hex_mem(dp.data, dp.len, dp_hex)) {
+  if (!err && sha256_hex_mem(hts_span_at(dp.data, dp.len), dp_hex)) {
     if (wbuf_printf(&digest,
                     "{\"path\": \"datapackage.json\", \"hash\": \"sha256:%s\"}",
                     dp_hex) != 0 ||
-        wacz_add_mem(zf, "datapackage-digest.json", digest.data, digest.len,
-                     NULL, NULL, 0) != 0)
+        wacz_add_mem(zf, "datapackage-digest.json",
+                     hts_span_at(digest.data, digest.len), NULL, NULL, 0) != 0)
       err = 1;
   } else {
     err = 1;
@@ -1099,23 +1098,23 @@ static void warc_wacz_package(warc_writer *w) {
 static int warc_rotate(warc_writer *w);
 
 /* Emit one full WARC record. When http_section, the block holds http_hdr
-   (maybe empty) and a CRLF, then body when has_body. block_len is counted the
-   way stream_block emits. truncated is a WARC-Truncated reason or NULL, and
-   out_id (may be NULL) receives the record id. */
+   (maybe empty) and a CRLF, then body when has_body, read from body_path when
+   body is absent. block_len is counted the way stream_block emits. truncated is
+   a WARC-Truncated reason or NULL, and out_id (may be NULL) receives the record
+   id. */
 static int warc_emit(warc_writer *w, const char *type, const char *content_type,
                      const char *target_uri, const char *ip,
                      const char *concurrent_to, const char *refers_uri,
                      const char *refers_date, const char *profile,
                      const char *payload_digest, const char *truncated,
                      const char *cdx_status, const char *cdx_mime,
-                     int http_section, const char *http_hdr,
-                     size_t http_hdr_len, int has_body, const char *body,
-                     size_t body_len, const char *body_path, char out_id[64]) {
+                     int http_section, hts_span http_hdr, int has_body,
+                     hts_span body, const char *body_path, char out_id[64]) {
   wbuf hdr;
   member m;
   char id[64], date[32];
   size_t sep = http_section ? 2 : 0;
-  size_t payload = has_body ? body_len : 0;
+  size_t payload = has_body ? body.len : 0;
   size_t block_len;
   int rc = -1;
 #if HTS_USEOPENSSL
@@ -1136,12 +1135,12 @@ static int warc_emit(warc_writer *w, const char *type, const char *content_type,
     }
   }
 
-  /* F4: overflow-safe block length; http_hdr_len+sep is provably small. */
-  if (payload > (size_t) -1 - http_hdr_len - sep) {
+  /* F4: overflow-safe block length; http_hdr.len+sep is provably small. */
+  if (payload > (size_t) -1 - http_hdr.len - sep) {
     w->failed = HTS_TRUE;
     return -1;
   }
-  block_len = http_hdr_len + sep + payload;
+  block_len = http_hdr.len + sep + payload;
 
   memset(&hdr, 0, sizeof(hdr));
   warc_make_id(w, id);
@@ -1152,8 +1151,8 @@ static int warc_emit(warc_writer *w, const char *type, const char *content_type,
   d.block = EVP_MD_CTX_new();
   d.payload = NULL;
   if (d.block != NULL && EVP_DigestInit_ex(d.block, EVP_sha1(), NULL) == 1 &&
-      stream_block(http_section, http_hdr, http_hdr_len, has_body, body,
-                   body_len, body_path, digest_sink, &d) == 0 &&
+      stream_block(http_section, http_hdr, has_body, body, body_path,
+                   digest_sink, &d) == 0 &&
       EVP_DigestFinal_ex(d.block, md, &mdlen) == 1 && mdlen == 20) {
     base32_20(md, block_b32);
     have_block_digest = 1;
@@ -1214,8 +1213,8 @@ static int warc_emit(warc_writer *w, const char *type, const char *content_type,
   { /* member start (before writing): CDXJ offset for this record */
     uint64_t rec_offset = w->offset;
     if (member_write(&m, hdr.data, hdr.len) != 0 ||
-        stream_block(http_section, http_hdr, http_hdr_len, has_body, body,
-                     body_len, body_path, write_sink, &m) != 0 ||
+        stream_block(http_section, http_hdr, has_body, body, body_path,
+                     write_sink, &m) != 0 ||
         member_write(&m, "\r\n\r\n", 4) != 0) {
       member_end(&m);
       goto done;
@@ -1273,10 +1272,10 @@ static const char *warc_open_path(warc_writer *w, const char *final,
 /* Emit the warcinfo that heads a segment; sets w->info_id for its records. */
 static int warc_write_warcinfo_record(warc_writer *w) {
   w->info_id[0] = '\0'; /* warcinfo itself carries no WARC-Warcinfo-ID */
-  return warc_emit(
-      w, "warcinfo", "application/warc-fields", NULL, NULL, NULL, NULL, NULL,
-      NULL, NULL, NULL, NULL, NULL, 0, NULL, 0, 1, w->info_fields,
-      w->info_fields != NULL ? strlen(w->info_fields) : 0, NULL, w->info_id);
+  return warc_emit(w, "warcinfo", "application/warc-fields", NULL, NULL, NULL,
+                   NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0,
+                   hts_span_at(NULL, 0), 1, hts_span_of(w->info_fields), NULL,
+                   w->info_id);
 }
 
 static int warc_rotate(warc_writer *w) {
@@ -1658,10 +1657,9 @@ void warc_abort_opt(httrackp *opt) {
 
 int warc_write_transaction(warc_writer *w, const char *target_uri,
                            const char *ip, const char *req_hdr,
-                           const char *resp_hdr, const char *body,
-                           size_t body_len, const char *body_path,
-                           const char *content_type, int statuscode,
-                           int unchanged_kind, int truncated) {
+                           const char *resp_hdr, hts_span body,
+                           const char *body_path, const char *content_type,
+                           int statuscode, int unchanged_kind, int truncated) {
   wbuf http;
   char resp_id[64];
   char pdig[33];
@@ -1683,18 +1681,18 @@ int warc_write_transaction(warc_writer *w, const char *target_uri,
   /* CDXJ status/mime (from the caller's status and the response Content-Type).
    */
   snprintf(statusbuf, sizeof(statusbuf), "%d", statuscode);
-  warc_http_header_value(resp_hdr, "Content-Type", HTS_SIZED(mimebuf));
+  warc_http_header_value(resp_hdr, "Content-Type", HTS_BUF(mimebuf));
   /* a 304 declares no type, so index the one only the caller knows */
   if (mimebuf[0] == '\0' && content_type != NULL)
     strclipbuff(mimebuf, sizeof(mimebuf), content_type);
 
   /* A payload exists (for digesting) unless this is a bodyless 304. */
-  has_payload = (body_len > 0 && (body != NULL || body_path != NULL) &&
-                 unchanged_kind != WARC_UNCHANGED_SERVER_304);
+  has_payload =
+      (body.len > 0 && (hts_span_present(body) || body_path != NULL) &&
+       unchanged_kind != WARC_UNCHANGED_SERVER_304);
 
   /* Payload digest drives identical-payload-digest dedup (OpenSSL only). */
-  have_pdig =
-      has_payload ? payload_digest_b32(body, body_len, body_path, pdig) : 0;
+  have_pdig = has_payload ? payload_digest_b32(body, body_path, pdig) : 0;
 
   if (unchanged_kind == WARC_UNCHANGED_SERVER_304) {
     is_revisit = 1;
@@ -1708,8 +1706,9 @@ int warc_write_transaction(warc_writer *w, const char *target_uri,
   } else if (unchanged_kind == WARC_UNCHANGED_ENGINE_FORCED) {
     /* An empty body looks digest-less to has_payload, but sha1 of nothing is
        a valid digest, so compute it here. */
-    if (!have_pdig && body_len == 0 && (body != NULL || body_path != NULL))
-      have_pdig = payload_digest_b32(body, body_len, body_path, pdig);
+    if (!have_pdig && body.len == 0 &&
+        (hts_span_present(body) || body_path != NULL))
+      have_pdig = payload_digest_b32(body, body_path, pdig);
     /* Served from cache with no exchange either way: still unbacked. */
     w->unbacked_revisits++;
     /* Without OpenSSL there is no digest for a revisit to point at and no
@@ -1743,7 +1742,7 @@ int warc_write_transaction(warc_writer *w, const char *target_uri,
   /* Full response rewrites Content-Length and keeps Content-Encoding verbatim
      (see normalize_http_headers); a revisit keeps the original headers. */
   memset(&http, 0, sizeof(http));
-  if (normalize_http_headers(resp_hdr, emit_body ? (long long) body_len : -1,
+  if (normalize_http_headers(resp_hdr, emit_body ? (long long) body.len : -1,
                              &http) != 0) {
     wbuf_free(&http);
     return -1;
@@ -1756,20 +1755,18 @@ int warc_write_transaction(warc_writer *w, const char *target_uri,
                 "application/http;msgtype=response", target_uri, ip, NULL,
                 refers_uri, refers_date, profile, have_pdig ? pdig : NULL,
                 emit_body ? warc_truncated_reason(truncated) : NULL, statusbuf,
-                mimebuf, 1, http.data, http.len, emit_body, body, body_len,
+                mimebuf, 1, hts_span_at(http.data, http.len), emit_body, body,
                 body_path, resp_id) != 0) {
     wbuf_free(&http);
     return -1;
   }
   wbuf_free(&http);
 
-  if (req_hdr != NULL && req_hdr[0] != '\0') {
-    size_t rlen = strlen(req_hdr);
-    if (warc_emit(w, "request", "application/http;msgtype=request", target_uri,
-                  NULL, resp_id, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0,
-                  NULL, 0, 1, req_hdr, rlen, NULL, NULL) != 0)
-      return -1;
-  }
+  if (req_hdr != NULL && req_hdr[0] != '\0' &&
+      warc_emit(w, "request", "application/http;msgtype=request", target_uri,
+                NULL, resp_id, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0,
+                hts_span_at(NULL, 0), 1, hts_span_of(req_hdr), NULL, NULL) != 0)
+    return -1;
 
   /* Record this payload for later identical-payload-digest revisits. */
   if (!is_revisit && have_pdig && w->seen != NULL && target_uri != NULL) {
@@ -1795,12 +1792,12 @@ int warc_write_transaction(warc_writer *w, const char *target_uri,
 /* ---- one non-HTTP capture ---- */
 
 int warc_write_resource(warc_writer *w, const char *target_uri, const char *ip,
-                        const char *content_type, const char *body,
-                        size_t body_len, const char *body_path, int truncated) {
+                        const char *content_type, hts_span body,
+                        const char *body_path, int truncated) {
   char pdig[33];
-  int has_body = (body_len > 0 && (body != NULL || body_path != NULL));
-  int have_pdig =
-      has_body ? payload_digest_b32(body, body_len, body_path, pdig) : 0;
+  int has_body =
+      (body.len > 0 && (hts_span_present(body) || body_path != NULL));
+  int have_pdig = has_body ? payload_digest_b32(body, body_path, pdig) : 0;
   /* resource: the block is the raw payload, its own MIME is the record's
      Content-Type, and there is no HTTP request/response envelope. */
   return warc_emit(w, "resource",
@@ -1809,7 +1806,7 @@ int warc_write_resource(warc_writer *w, const char *target_uri, const char *ip,
                        : "application/octet-stream",
                    target_uri, ip, NULL, NULL, NULL, NULL,
                    have_pdig ? pdig : NULL, warc_truncated_reason(truncated),
-                   NULL, content_type, 0, NULL, 0, has_body, body, body_len,
+                   NULL, content_type, 0, hts_span_at(NULL, 0), has_body, body,
                    body_path, NULL);
 }
 
@@ -1871,8 +1868,9 @@ void warc_write_backtransaction(httrackp *opt, lien_back *back) {
 
   /* FTP has no HTTP envelope: one resource record carrying the payload. */
   if (is_ftp) {
-    warc_write_resource(w, uri, ip, back->r.contenttype, body, body_len,
-                        body_path, back->r.warc_truncated);
+    warc_write_resource(w, uri, ip, back->r.contenttype,
+                        hts_span_at(body, body_len), body_path,
+                        back->r.warc_truncated);
     return;
   }
 
@@ -1904,8 +1902,8 @@ void warc_write_backtransaction(httrackp *opt, lien_back *back) {
     resp_hdr = synth;
   }
 
-  warc_write_transaction(w, uri, ip, back->r.warc_reqhdr, resp_hdr, body,
-                         body_len, body_path, back->r.contenttype,
-                         back->r.statuscode, unchanged_kind,
-                         back->r.warc_truncated);
+  warc_write_transaction(w, uri, ip, back->r.warc_reqhdr, resp_hdr,
+                         hts_span_at(body, body_len), body_path,
+                         back->r.contenttype, back->r.statuscode,
+                         unchanged_kind, back->r.warc_truncated);
 }

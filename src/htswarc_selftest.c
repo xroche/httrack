@@ -115,14 +115,14 @@ static int st_warc(httrackp *opt, int argc, char **argv) {
       "GET /a.html HTTP/1.1\r\nHost: test.local\r\n\r\n",
       "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n"
       "Transfer-Encoding : chunked\r\nContent-Length: 999\r\n\r\n",
-      a_body, sizeof(a_body) - 1, NULL, NULL, 200, 0, 0);
+      hts_span_at(a_body, sizeof(a_body) - 1), NULL, NULL, 200, 0, 0);
 
   /* 302 redirect: header-only, no body. */
   warc_write_transaction(
       w, "http://test.local/r", "127.0.0.1",
       "GET /r HTTP/1.1\r\nHost: test.local\r\n\r\n",
-      "HTTP/1.1 302 Found\r\nLocation: http://test.local/a.html\r\n\r\n", NULL,
-      0, NULL, NULL, 302, 0, 0);
+      "HTTP/1.1 302 Found\r\nLocation: http://test.local/a.html\r\n\r\n",
+      hts_span_at(NULL, 0), NULL, NULL, 302, 0, 0);
 
   /* 200 binary, chunked coding on the wire (already de-chunked here). */
   warc_write_transaction(
@@ -130,7 +130,7 @@ static int st_warc(httrackp *opt, int argc, char **argv) {
       "GET /b.bin HTTP/1.1\r\nHost: test.local\r\n\r\n",
       "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\n"
       "Transfer-Encoding: chunked\r\n\r\n",
-      "\x00\x01\x02\x03\x04", 5, NULL, NULL, 200, 0, 0);
+      hts_span_at("\x00\x01\x02\x03\x04", 5), NULL, NULL, 200, 0, 0);
 
   /* 200 with a body shorter than the declared Content-Length (rewritten). */
   warc_write_transaction(
@@ -138,20 +138,21 @@ static int st_warc(httrackp *opt, int argc, char **argv) {
       "GET /trunc HTTP/1.1\r\nHost: test.local\r\n\r\n",
       "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: "
       "100\r\n\r\n",
-      "short", 5, NULL, NULL, 200, 0, 0);
+      hts_span_at("short", 5), NULL, NULL, 200, 0, 0);
 
   /* Same payload as a.html at a new URL: identical-payload-digest revisit
      (OpenSSL builds only; a plain build writes a second full response). */
   warc_write_transaction(w, "http://test.local/a2.html", "127.0.0.1",
                          "GET /a2.html HTTP/1.1\r\nHost: test.local\r\n\r\n",
                          "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n",
-                         a_body, sizeof(a_body) - 1, NULL, NULL, 200, 0, 0);
+                         hts_span_at(a_body, sizeof(a_body) - 1), NULL, NULL,
+                         200, 0, 0);
 
   /* 304 revisit with an EMPTY response-header block: the block is just the
      2-byte separator, so declared Content-Length must be exactly 2 (F3). */
   warc_write_transaction(w, "http://test.local/nm", "127.0.0.1",
                          "GET /nm HTTP/1.1\r\nHost: test.local\r\n\r\n", "",
-                         NULL, 0, NULL, NULL, 304, 1, 0);
+                         hts_span_at(NULL, 0), NULL, NULL, 304, 1, 0);
 
   warc_close(w);
 
@@ -310,14 +311,16 @@ static int st_warc_trunc(httrackp *opt, int argc, char **argv) {
   warc_write_transaction(
       w, "http://test.local/big.bin", "127.0.0.1",
       "GET /big.bin HTTP/1.1\r\nHost: test.local\r\n\r\n",
-      "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\n\r\n", body,
-      sizeof(body) - 1, NULL, NULL, 200, 0, WARC_TRUNC_LENGTH);
+      "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\n\r\n",
+      hts_span_at(body, sizeof(body) - 1), NULL, NULL, 200, 0,
+      WARC_TRUNC_LENGTH);
   warc_write_transaction(
       w, "http://test.local/big.gz", "127.0.0.1",
       "GET /big.gz HTTP/1.1\r\nHost: test.local\r\n\r\n",
       "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Encoding: "
       "gzip\r\n\r\n",
-      (const char *) gz, sizeof(gz), NULL, NULL, 200, 0, WARC_TRUNC_TIME);
+      hts_span_at((const char *) gz, sizeof(gz)), NULL, NULL, 200, 0,
+      WARC_TRUNC_TIME);
   warc_close(w);
 
   data = (unsigned char *) st_slurp(path, &data_len);
@@ -385,8 +388,8 @@ static int st_warc_ftp(httrackp *opt, int argc, char **argv) {
   w = warc_open(opt, path);
   assertf(w != NULL);
   warc_write_resource(w, "ftp://ftp.local/file.bin", "127.0.0.1",
-                      "application/octet-stream", body, sizeof(body) - 1, NULL,
-                      0);
+                      "application/octet-stream",
+                      hts_span_at(body, sizeof(body) - 1), NULL, 0);
   warc_close(w);
 
   data = (unsigned char *) st_slurp(path, &data_len);
@@ -457,7 +460,7 @@ static int st_warc_rotate(httrackp *opt, int argc, char **argv) {
     warc_write_transaction(
         w, uri, "127.0.0.1", "GET / HTTP/1.1\r\nHost: test.local\r\n\r\n",
         "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\n\r\n",
-        (const char *) body, sizeof(body), NULL, NULL, 200, 0, 0);
+        hts_span_at((const char *) body, sizeof(body)), NULL, NULL, 200, 0, 0);
   }
   warc_close(w);
   opt->warc_max_size = saved_max;
@@ -531,7 +534,7 @@ static int st_warc_verbatim(httrackp *opt, int argc, char **argv) {
       "GET /z.html HTTP/1.1\r\nHost: test.local\r\n\r\n",
       "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Encoding: "
       "gzip\r\nTransfer-Encoding: chunked\r\nContent-Length: 999\r\n\r\n",
-      (const char *) a_gz, sizeof(a_gz), NULL, NULL, 200, 0, 0);
+      hts_span_at((const char *) a_gz, sizeof(a_gz)), NULL, NULL, 200, 0, 0);
   warc_close(w);
 
   data = (unsigned char *) st_slurp(path, &data_len);
@@ -831,8 +834,9 @@ static int st_warc_longurl(httrackp *opt, int argc, char **argv) {
     uri[len] = '\0';
     /* Distinct payloads: identical ones dedupe into revisit records. */
     snprintf(body, sizeof(body), "<html><body>%04d</body></html>\n", (int) len);
-    if (warc_write_transaction(w, uri, NULL, NULL, resp_hdr, body, strlen(body),
-                               NULL, NULL, 200, 0, 0) != 0) {
+    if (warc_write_transaction(w, uri, NULL, NULL, resp_hdr,
+                               hts_span_at(body, strlen(body)), NULL, NULL, 200,
+                               0, 0) != 0) {
       fprintf(stderr, "warc-longurl: write failed at length %d\n", (int) len);
       err = 1;
     }
@@ -896,27 +900,27 @@ static int st_warc_cdx(httrackp *opt, int argc, char **argv) {
   warc_write_transaction(w, "http://www.example.com/one", "127.0.0.1",
                          "GET /one HTTP/1.1\r\nHost: www.example.com\r\n\r\n",
                          "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n",
-                         "one body\n", 9, NULL, NULL, 200, 0, 0);
+                         hts_span_at("one body\n", 9), NULL, NULL, 200, 0, 0);
   warc_write_resource(w, "ftp://files.example.com/data.bin", "127.0.0.1",
-                      "application/octet-stream", "\x00\x01\x02\x03", 4, NULL,
-                      0);
+                      "application/octet-stream",
+                      hts_span_at("\x00\x01\x02\x03", 4), NULL, 0);
   warc_write_transaction(w, "http://alpha.example.com/two", "127.0.0.1",
                          "GET /two HTTP/1.1\r\nHost: alpha.example.com\r\n\r\n",
                          "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n",
-                         "two body\n", 9, NULL, NULL, 200, 0, 0);
+                         hts_span_at("two body\n", 9), NULL, NULL, 200, 0, 0);
   /* Same payload as /one at a new URL: identical-payload-digest revisit under
      OpenSSL, a full response otherwise; either way one index line. */
   warc_write_transaction(w, "http://zeta.example.com/dup", "127.0.0.1",
                          "GET /dup HTTP/1.1\r\nHost: zeta.example.com\r\n\r\n",
                          "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n",
-                         "one body\n", 9, NULL, NULL, 200, 0, 0);
+                         hts_span_at("one body\n", 9), NULL, NULL, 200, 0, 0);
   /* A 304 declares no type, so the index line takes the caller's (#826). */
   warc_write_transaction(w, "http://nm.example.com/kept", "127.0.0.1",
                          "GET /kept HTTP/1.1\r\nHost: nm.example.com\r\n"
                          "If-Modified-Since: Mon, 01 Jan 2024 00:00:00 GMT\r\n"
                          "\r\n",
-                         "HTTP/1.1 304 Not Modified\r\n\r\n", NULL, 0, NULL,
-                         "text/html", 200, 1, 0);
+                         "HTTP/1.1 304 Not Modified\r\n\r\n",
+                         hts_span_at(NULL, 0), NULL, "text/html", 200, 1, 0);
   warc_close(w);
   opt->warc_cdx = saved_cdx;
 
@@ -1022,11 +1026,12 @@ static int st_warc_cdx_utf8(httrackp *opt, int argc, char **argv) {
   w = warc_open(opt, wpath);
   assertf(w != NULL);
   for (i = 0; i < sizeof(urls) / sizeof(urls[0]); i++)
-    warc_write_transaction(w, urls[i], "127.0.0.1",
-                           "GET /caf HTTP/1.1\r\nHost: www.example.com\r\n\r\n",
-                           "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n",
-                           i == 0 ? "first\n" : "second\n", i == 0 ? 6 : 7,
-                           NULL, NULL, 200, 0, 0);
+    warc_write_transaction(
+        w, urls[i], "127.0.0.1",
+        "GET /caf HTTP/1.1\r\nHost: www.example.com\r\n\r\n",
+        "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n",
+        hts_span_at(i == 0 ? "first\n" : "second\n", i == 0 ? 6 : 7), NULL,
+        NULL, 200, 0, 0);
   warc_close(w);
   opt->warc_cdx = saved_cdx;
 
@@ -1114,7 +1119,7 @@ static void st_cdx_fill(warc_writer *w, int n, size_t pad) {
              "GET / HTTP/1.1\r\nHost: e%d.example.com\r\n\r\n", i);
     warc_write_transaction(w, url, "127.0.0.1", req,
                            "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n",
-                           "body\n", 5, NULL, NULL, 200, 0, 0);
+                           hts_span_at("body\n", 5), NULL, NULL, 200, 0, 0);
   }
 }
 
@@ -1430,13 +1435,14 @@ static int st_warc_wacz(httrackp *opt, int argc, char **argv) {
   warc_write_transaction(w, "http://www.example.com/", "127.0.0.1",
                          "GET / HTTP/1.1\r\nHost: www.example.com\r\n\r\n",
                          "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n",
-                         "<html>home</html>\n", 18, NULL, NULL, 200, 0, 0);
+                         hts_span_at("<html>home</html>\n", 18), NULL, NULL,
+                         200, 0, 0);
   warc_write_transaction(
       w, "http://www.example.com/data.bin", "127.0.0.1",
       "GET /data.bin HTTP/1.1\r\nHost: www.example.com\r\n\r\n",
       "HTTP/1.1 200 OK\r\n"
       "Content-Type: application/octet-stream\r\n\r\n",
-      "\x00\x01\x02\x03\x04", 5, NULL, NULL, 200, 0, 0);
+      hts_span_at("\x00\x01\x02\x03\x04", 5), NULL, NULL, 200, 0, 0);
   warc_close(w);
 
   /* Unzip every member in-process. */
@@ -2421,7 +2427,7 @@ static void warcdiff_one(parsediff_stats *st, const char *hdr) {
       memset(n, 'O', sizeof(n));
       st->cases++;
       legacy_http_header_value(hdr, names[i], o, sizes[j]);
-      warc_http_header_value(hdr, names[i], n, sizes[j]);
+      warc_http_header_value(hdr, names[i], hts_buf_at(n, sizes[j]));
       if (memcmp(o, n, sizeof(o)) != 0)
         parsediff_fail(st, "http_header_value", hdr != NULL ? hdr : "(null)",
                        names[i], o, n);
@@ -2481,8 +2487,8 @@ static int st_warcspandiff(httrackp *opt, int argc, char **argv) {
     char z = 'Z';
 
     warc_http_header_value("HTTP/1.1 200 OK\r\nContent-Type: a\r\n",
-                           "Content-Type", &z, 0);
-    warc_http_header_value(NULL, "Content-Type", &z, 0);
+                           "Content-Type", hts_buf_at(&z, 0));
+    warc_http_header_value(NULL, "Content-Type", hts_buf_at(&z, 0));
     assertf(z == 'Z');
   }
   warcdiff_one(&st, NULL);

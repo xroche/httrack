@@ -226,7 +226,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
         *bar++ = '\0';
         (void) wc_hex(line, hdr, sizeof(hdr));
         memset(out, 0, sizeof(out));
-        warc_http_header_value(hdr, bar, HTS_SIZED(out));
+        warc_http_header_value(hdr, bar, HTS_BUF(out));
         for (k = 0; k < sizeof(out); k++)
           wc_sink += (size_t) out[k];
       }
@@ -257,20 +257,21 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   if ((w = warc_open(opt, wc_path)) != NULL) {
     (void) warc_write_transaction(
         w, uri, ip[0] != '\0' ? ip : NULL, reqhdr_len > 0 ? reqhdr : NULL,
-        resphdr_len > 0 ? resphdr : NULL, body, (size_t) body_len, NULL,
-        ctype[0] != '\0' ? ctype : NULL, statuscode, WARC_UNCHANGED_NONE,
+        resphdr_len > 0 ? resphdr : NULL, hts_span_at(body, (size_t) body_len),
+        NULL, ctype[0] != '\0' ? ctype : NULL, statuscode, WARC_UNCHANGED_NONE,
         truncated != 0 ? truncated : 0);
     if ((data[1] & 0x04) != 0) {
       statuscode2 = statuscode;
       (void) warc_write_transaction(
           w, uri, ip[0] != '\0' ? ip : NULL, reqhdr_len > 0 ? reqhdr : NULL,
-          resphdr_len > 0 ? resphdr : NULL, body, (size_t) body_len, NULL,
+          resphdr_len > 0 ? resphdr : NULL,
+          hts_span_at(body, (size_t) body_len), NULL,
           ctype[0] != '\0' ? ctype : NULL, statuscode2, unchanged, 0);
     }
     if ((data[1] & 0x08) != 0) {
-      (void) warc_write_resource(w, uri, ip[0] != '\0' ? ip : NULL,
-                                 ctype[0] != '\0' ? ctype : NULL, body,
-                                 (size_t) body_len, NULL, truncated);
+      (void) warc_write_resource(
+          w, uri, ip[0] != '\0' ? ip : NULL, ctype[0] != '\0' ? ctype : NULL,
+          hts_span_at(body, (size_t) body_len), NULL, truncated);
     }
     warc_close(w);
   }
@@ -323,7 +324,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     }
     memset(hv, 0, sizeof(hv));
     if (resphdr_len > 0) {
-      warc_http_header_value(resphdr, "Content-Type", HTS_SIZED(hv));
+      warc_http_header_value(resphdr, "Content-Type", HTS_BUF(hv));
       wc_sink += (size_t) hv[0];
     }
     memset(ext, 0, sizeof(ext));
