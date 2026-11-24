@@ -4337,7 +4337,7 @@ static size_t engine_scheme_len(hts_span s) {
     for (j = 0;
          j < n && name[j] != '\0' && j < s.len && streql(s.p[j], name[j]); j++)
       ;
-    if ((j == n || name[j] == '\0') && j < s.len && s.p[j] == ':')
+    if (j < s.len && s.p[j] == ':' && (j == n || name[j] == '\0'))
       return j + 1;
   }
   return 0;
