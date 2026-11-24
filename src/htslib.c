@@ -1486,7 +1486,7 @@ void treatfirstline(htsblk * retour, const char *rcvd) {
           if ((strlen(a) > 1) && (strlen(a) < 64) && hts_is_control_free(a))
             strcpybuff(retour->msg, a); // message retour
           else
-            infostatuscode(retour->msg, retour->statuscode);
+            infostatuscode_sized(HTS_SIZED(retour->msg), retour->statuscode);
           // type MIME par défaut2
           strcpybuff(retour->contenttype, HTS_UNKNOWN_MIME);
         } else { // pas de code!
@@ -1985,17 +1985,20 @@ const char *infostatuscode_const(int statuscode) {
   return hts_status_reason(statuscode);
 }
 
-// Write the status code's reason phrase into msg. For an unknown code, keep any
-// caller-provided message, otherwise fall back to a default. Callers provide a
-// buffer of at least 64 bytes (the longest reason phrase is 31).
-HTSEXT_API void infostatuscode(char *msg, int statuscode) {
+/* Contract in httrack-library.h. */
+HTSEXT_API void infostatuscode_sized(char *msg, size_t size, int statuscode) {
   const char *const text = infostatuscode_const(statuscode);
 
   if (text != NULL) {
-    strlcpybuff(msg, text, 64);
+    strclipbuff(msg, size, text);
   } else if (strnotempty(msg) == 0) {
-    strlcpybuff(msg, "Unknown error", 64);
+    strclipbuff(msg, size, "Unknown error");
   }
+}
+
+// the 64 bytes the deprecated contract documents
+HTSEXT_API void infostatuscode(char *msg, int statuscode) {
+  infostatuscode_sized(msg, 64, statuscode);
 }
 
 /* Wait up to timeout seconds for soc to be readable, or writable when for_write
@@ -2880,7 +2883,7 @@ int ident_url_absolute(const char *url, lien_adrfil *adrfil) {
   return 0;
 }
 
-/* simplify ../ and ./ */
+/* Contract in htslib.h. */
 void fil_simplifie(char *f) {
   char *a, *b;
   char lc = '/';
@@ -3072,10 +3075,12 @@ void sec2str(char *st, size_t size, TStamp t) {
   duration_str(st, size, t, HTS_FALSE);
 }
 
-// the 32 bytes httrack-library.h documents, which the longest form fits
-HTSEXT_API void qsec2str(char *st, TStamp t) {
-  duration_str(st, 32, t, HTS_TRUE);
+HTSEXT_API void qsec2str_sized(char *st, size_t size, TStamp t) {
+  duration_str(st, size, t, HTS_TRUE);
 }
+
+// the 32 bytes the deprecated contract documents
+HTSEXT_API void qsec2str(char *st, TStamp t) { qsec2str_sized(st, 32, t); }
 
 void time_gmt_rfc822(char *s, size_t size) {
   time_t tt;

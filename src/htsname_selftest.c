@@ -43,8 +43,12 @@ static int st_refname(httrackp *opt, int argc, char **argv) {
 }
 
 static int st_simplify(httrackp *opt, int argc, char **argv) {
-  fil_simplifie(argv[0]);
-  printf("simplified=%s\n", argv[0]);
+  char path[HTS_URLMAXSIZE * 2];
+
+  if (!strclipbuff(path, sizeof(path), argv[0]))
+    return 1;
+  fil_simplifie(path);
+  printf("simplified=%s\n", path);
   return 0;
 }
 

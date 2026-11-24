@@ -255,7 +255,7 @@ static int st_statsrows(httrackp *opt, int argc, char **argv) {
     char notfound[256];
 
     notfound[0] = '\0';
-    infostatuscode(notfound, 404);
+    infostatuscode_sized(HTS_SIZED(notfound), 404);
     ST_FAIL_IF(err, strcmp(rows[5].state, notfound) != 0 || rows[5].back != 3);
   }
   ST_FAIL_IF(err, strcmp(rows[6].state, "error") != 0 || rows[6].back != 4);

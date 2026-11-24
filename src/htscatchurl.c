@@ -60,29 +60,32 @@ static hts_boolean socinput(T_SOC soc, char *s, int max);
 
 // URL Link catcher
 
-// 0- Init the URL catcher with standard port
-
-// catch_url_init(&port,&return_host);
-HTSEXT_API T_SOC catch_url_init_std(int *port_prox, char *adr_prox) {
+/* Contract in httrack-library.h. */
+HTSEXT_API T_SOC catch_url_init_std_sized(int *port_prox, char *adr_prox,
+                                          size_t adr_size) {
   T_SOC soc;
   int try_to_listen_to[] = {8080, 3128, 80, 81, 82, 8081, 3129, 0, -1};
   int i = 0;
 
   do {
-    soc = catch_url_init(&try_to_listen_to[i], adr_prox);
+    soc = catch_url_init(&try_to_listen_to[i], adr_prox, adr_size);
     *port_prox = try_to_listen_to[i];
     i++;
   } while((soc == INVALID_SOCKET) && (try_to_listen_to[i] >= 0));
   return soc;
 }
 
-// 1- Init the URL catcher
+// the 128 bytes the deprecated contract documents
+HTSEXT_API T_SOC catch_url_init_std(int *port_prox, char *adr_prox) {
+  return catch_url_init_std_sized(port_prox, adr_prox, 128);
+}
 
-// catch_url_init(&port,&return_host);
-T_SOC catch_url_init(int *port, /* 128 bytes */ char *adr) {
+/* Contract in htslib.h. */
+T_SOC catch_url_init(int *port, char *adr, size_t adr_size) {
   SOCaddr server, bound;
   T_SOC soc;
 
+  assertf(adr_size != 0);
   /* Loopback only: the request this proxy captures carries the browser's
      cookies and credentials for the target site. */
   SOCaddr_initloopback(server);
@@ -91,7 +94,7 @@ T_SOC catch_url_init(int *port, /* 128 bytes */ char *adr) {
   if (soc != INVALID_SOCKET) {
     /* only the bound address carries an ephemeral port */
     *port = ntohs(SOCaddr_sinport(bound));
-    SOCaddr_inetntoa(adr, 128, bound);
+    SOCaddr_inetntoa(adr, adr_size, bound);
   }
   return soc;
 }
@@ -140,17 +143,19 @@ const char *catch_url_strerror(catch_url_status status) {
   return "the browser sent no usable request line";
 }
 
-// 2 - Wait for URL
+/* Contract in httrack-library.h. */
+HTSEXT_API hts_boolean catch_url_sized(T_SOC soc, char *url, size_t url_size,
+                                       char *method, size_t method_size,
+                                       char *data, size_t data_size) {
+  return catch_url_capture(soc, url, url_size, method, method_size, data,
+                           data_size) == CATCH_URL_OK;
+}
 
-// catch_url
-// returns 0 if error
-// url: buffer where URL must be stored - or ip:port in case of failure
-// data: 32Kb
+// the sizes the deprecated contract documents
 HTSEXT_API hts_boolean catch_url(T_SOC soc, char *url, char *method,
                                  char *data) {
-  return catch_url_capture(soc, url, HTS_URLMAXSIZE * 2, method,
-                           CATCH_URL_METHOD_SIZE, data,
-                           CATCH_URL_DATA_SIZE) == CATCH_URL_OK;
+  return catch_url_sized(soc, url, HTS_URLMAXSIZE * 2, method,
+                         CATCH_URL_METHOD_SIZE, data, CATCH_URL_DATA_SIZE);
 }
 
 /* Contract in htscatchurl.h. */

@@ -588,7 +588,7 @@ static void cmdl_print_cache_entry(httrackp *opt, cache_back *cache,
     return;
   }
 
-  infostatuscode(msg, r.statuscode);
+  infostatuscode_sized(HTS_SIZED(msg), r.statuscode);
   time_gmt_rfc822(HTS_SIZED(cdate));
 
   fprintf(stdout, "HTTP/1.1 %d %s\r\n", r.statuscode, r.msg[0] ? r.msg : msg);
