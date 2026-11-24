@@ -312,7 +312,7 @@ static hts_boolean optreal_glued(const char *token) {
 
   if (token[0] != '-' || token[1] == '-')
     return HTS_FALSE;
-  while (optcluster_next(token, &at, HTS_SIZED(name))) {
+  while (optcluster_next(token, &at, HTS_BUF(name))) {
     if (optreal_find(name) < 0)
       return HTS_FALSE;
     pieces++;
@@ -443,12 +443,12 @@ static const char *optalias_suffix(hts_optclass type, const char *value) {
   return NULL;
 }
 
-hts_boolean optalias_digits_fit(const char *digits, size_t len) {
+hts_boolean optalias_digits_fit(hts_span digits) {
   size_t i;
 
-  for (i = 0; i < len && digits[i] == '0'; i++) {
+  for (i = 0; i < digits.len && digits.p[i] == '0'; i++) {
   }
-  return len - i <= HTS_SAVENAME_PRESET_MAX_DIGITS ? HTS_TRUE : HTS_FALSE;
+  return digits.len - i <= HTS_SAVENAME_PRESET_MAX_DIGITS;
 }
 
 /* A bare digit run -N reads as a preset number. */
@@ -459,7 +459,7 @@ static hts_boolean optalias_is_digits(const char *value) {
     if (!hts_isdigit((unsigned char) value[i]))
       return HTS_FALSE;
   }
-  return i != 0 && optalias_digits_fit(value, i) ? HTS_TRUE : HTS_FALSE;
+  return i != 0 && optalias_digits_fit(hts_span_at(value, i));
 }
 
 /* Whether a "paramn" value glues onto the short form: a preset, or on/off. */
@@ -477,7 +477,7 @@ static hts_boolean optalias_paramn_cluster_tail(const char *value) {
 
   for (i = 0; hts_isdigit((unsigned char) value[i]); i++) {
   }
-  if (i == 0 || value[i] == '\0' || !optalias_digits_fit(value, i))
+  if (i == 0 || value[i] == '\0' || !optalias_digits_fit(hts_span_at(value, i)))
     return HTS_FALSE;
   return strchr(value + i, '/') == NULL && strchr(value + i, '.') == NULL
              ? HTS_TRUE
@@ -550,45 +550,47 @@ static const char *optalias_help_line(hts_buf dest, const char *name) {
    unrecognized. */
 static void optparam_error(optparam_state state, const char *spelling,
                            const char *real, const char *next,
-                           char *return_error, size_t return_error_size) {
+                           hts_buf return_error) {
   const int pos = optreal_find(real);
   char help[256];
 
   /* by long name: optalias_help() looks the short form up in vain */
   optalias_help_line(HTS_BUF(help), pos >= 0 ? hts_optalias[pos][0] : real);
   if (state == OPTPARAM_ABSENT)
-    slprintfbuff_clip(return_error, return_error_size,
-                      "Syntax error:\n\tOption %s needs to be followed by a "
-                      "parameter: %s <param>\n%s",
-                      spelling, spelling, help);
+    hts_buf_printf_clip(return_error,
+                        "Syntax error:\n\tOption %s needs to be followed by a "
+                        "parameter: %s <param>\n%s",
+                        spelling, spelling, help);
   else if (optparam_names_option(real, next))
-    slprintfbuff_clip(return_error, return_error_size,
-                      "Syntax error:\n\tOption %s takes a value, and the next "
-                      "word \"%s\" names an option\n%s",
-                      spelling, next, help);
+    hts_buf_printf_clip(
+        return_error,
+        "Syntax error:\n\tOption %s takes a value, and the next "
+        "word \"%s\" names an option\n%s",
+        spelling, next, help);
   else
-    slprintfbuff_clip(return_error, return_error_size,
-                      "Syntax error:\n\tOption %s takes a value, and the next "
-                      "word \"%s\" begins with '-', so it was read as the next "
-                      "option\n%s",
-                      spelling, next, help);
+    hts_buf_printf_clip(
+        return_error,
+        "Syntax error:\n\tOption %s takes a value, and the next "
+        "word \"%s\" begins with '-', so it was read as the next "
+        "option\n%s",
+        spelling, next, help);
 }
 
 /* Report that --name refuses param, and ask to remove its quotes if it has
    any. */
 static void optvalue_error(const char *name, const char *param,
-                           char *return_error, size_t return_error_size) {
+                           hts_buf return_error) {
   char help[256];
 
   optalias_help_line(HTS_BUF(help), name);
   if (hts_is_quoted(param, strlen(param)))
-    slprintfbuff_clip(return_error, return_error_size,
-                      "Syntax error:\n\tOption --%s: %s " HTS_QUOTED_HINT
-                      "\n%s",
-                      name, param, help);
+    hts_buf_printf_clip(return_error,
+                        "Syntax error:\n\tOption --%s: %s " HTS_QUOTED_HINT
+                        "\n%s",
+                        name, param, help);
   else
-    slprintfbuff_clip(
-        return_error, return_error_size,
+    hts_buf_printf_clip(
+        return_error,
         "Syntax error:\n\tOption --%s does not take the value %s\n%s", name,
         param, help);
 }
@@ -604,9 +606,8 @@ static void optvalue_error(const char *name, const char *param,
 */
 int optalias_check(int argc, const char *const *argv, int n_arg,
                    int *return_argc, char **return_argv,
-                   size_t return_argv_size, char *return_error,
-                   size_t return_error_size) {
-  return_error[0] = '\0';
+                   size_t return_argv_size, hts_buf return_error) {
+  return_error.p[0] = '\0';
   *return_argc = 1;
   if (argv[n_arg][0] == '-')
     if (argv[n_arg][1] == '-') {
@@ -669,19 +670,20 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
            drop the count in silence */
         if (addcommand[0] != '\0' && !optalias_clusters(cls, command)) {
 #if OPTALIAS_PREFIX_STRICT
-          slprintfbuff_clip(return_error, return_error_size,
-                            "Syntax error:\n\tThe %s- prefix does not apply to "
-                            "--%s: write --%s --%s instead\n",
-                            addname, hts_optalias[pos][0], addname,
-                            hts_optalias[pos][0]);
+          hts_buf_printf_clip(
+              return_error,
+              "Syntax error:\n\tThe %s- prefix does not apply to "
+              "--%s: write --%s --%s instead\n",
+              addname, hts_optalias[pos][0], addname, hts_optalias[pos][0]);
           return 0;
 #else
-          slprintfbuff_clip(return_error, return_error_size,
-                            "Warning: the %s- prefix cannot add its connection "
-                            "count to --%s, so --%s runs without it; write "
-                            "--%s --%s instead",
-                            addname, hts_optalias[pos][0], hts_optalias[pos][0],
-                            addname, hts_optalias[pos][0]);
+          hts_buf_printf_clip(
+              return_error,
+              "Warning: the %s- prefix cannot add its connection "
+              "count to --%s, so --%s runs without it; write "
+              "--%s --%s instead",
+              addname, hts_optalias[pos][0], hts_optalias[pos][0], addname,
+              hts_optalias[pos][0]);
           addcommand[0] = '\0';
 #endif
         }
@@ -695,7 +697,7 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
             if (state != OPTPARAM_PRESENT) {
               optparam_error(state, argv[n_arg], command,
                              state == OPTPARAM_ABSENT ? "" : argv[n_arg + 1],
-                             return_error, return_error_size);
+                             return_error);
               return 0;
             }
             strcpybuff(param, argv[n_arg + 1]);
@@ -716,8 +718,7 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
             !optalias_paramn_glues(param) &&
             (optalias_paramn_cluster_tail(param) ||
              strchr(param, '%') == NULL)) {
-          optvalue_error(hts_optalias[pos][0], param, return_error,
-                         return_error_size);
+          optvalue_error(hts_optalias[pos][0], param, return_error);
           return 0;
         }
 
@@ -730,8 +731,7 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
         /* Every other class glues the value onto the short form in one
            buffer, where strlcatbuff aborts rather than clips. */
         if (!detached && strlen(param) >= return_argv_size - strlen(command)) {
-          optvalue_error(hts_optalias[pos][0], param, return_error,
-                         return_error_size);
+          optvalue_error(hts_optalias[pos][0], param, return_error);
           return 0;
         }
 
@@ -757,8 +757,7 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
                own values out above */
             if (cls == HTS_OPT_PARAM && param[0] != '\0' &&
                 !optalias_param_takes(command, param)) {
-              optvalue_error(hts_optalias[pos][0], param, return_error,
-                             return_error_size);
+              optvalue_error(hts_optalias[pos][0], param, return_error);
               return 0;
             }
             /* --cache=off or --index=on */
@@ -778,11 +777,10 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
                enabling bare --index */
             if (suffix == NULL) {
               if (negated)
-                slprintfbuff_clip(return_error, return_error_size,
-                                  "Unknown option: %s\n", argv[n_arg] + 2);
+                hts_buf_printf_clip(return_error, "Unknown option: %s\n",
+                                    argv[n_arg] + 2);
               else
-                optvalue_error(hts_optalias[pos][0], param, return_error,
-                               return_error_size);
+                optvalue_error(hts_optalias[pos][0], param, return_error);
               return 0;
             }
             strlcatbuff(return_argv[0], suffix, return_argv_size);
@@ -792,8 +790,7 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
           *return_argc = 1;     /* 1 parameter returned */
         }
       } else {
-        slprintfbuff_clip(return_error, return_error_size,
-                          "Unknown option: %s\n", command);
+        hts_buf_printf_clip(return_error, "Unknown option: %s\n", command);
         return 0;
       }
       return need_param;
@@ -806,10 +803,11 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
     if ((pos = optreal_find(argv[n_arg])) >= 0) {
       const hts_optclass cls = optclass_of(pos);
 
-      /* -N 1 is preset 1; anything else stays detached, since a template may
-         legitimately open with a digit (-N 2col/%n.%t) */
+      /* -N 1 is preset 1; anything else, or a run too long to glue, stays
+         detached for case 'N' (a template may open with a digit: -N 2col) */
       if (cls == HTS_OPT_PARAMN && n_arg + 1 < argc &&
-          optalias_is_digits(argv[n_arg + 1])) {
+          optalias_is_digits(argv[n_arg + 1]) &&
+          strlen(argv[n_arg + 1]) < return_argv_size - strlen(argv[n_arg])) {
         strlcpybuff(return_argv[0], argv[n_arg], return_argv_size);
         strlcatbuff(return_argv[0], argv[n_arg + 1], return_argv_size);
         *return_argc = 1;
@@ -832,7 +830,7 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
         if (state != OPTPARAM_PRESENT) {
           optparam_error(state, argv[n_arg], argv[n_arg],
                          state == OPTPARAM_ABSENT ? "" : argv[n_arg + 1],
-                         return_error, return_error_size);
+                         return_error);
           return 0;
         }
         /* Copy parameters */
@@ -884,32 +882,31 @@ int optreal_find(const char *token) {
   return -1;
 }
 
-hts_boolean optcluster_next(const char *token, size_t *at, char *name,
-                            size_t name_size) {
+hts_boolean optcluster_next(const char *token, size_t *at, hts_buf name) {
   const size_t i = *at;
   size_t len;
 
-  if (name_size < 5 || token[i] == '\0')
+  if (name.size < 5 || token[i] == '\0')
     return HTS_FALSE;
   len = strchr("%&@#", token[i]) != NULL && token[i + 1] != '\0' ? 2 : 1;
-  name[0] = '-';
-  memcpy(name + 1, token + i, len);
-  name[len + 1] = '\0';
+  name.p[0] = '-';
+  memcpy(name.p + 1, token + i, len);
+  name.p[len + 1] = '\0';
   /* -&P is -%P */
-  if (name[1] == '&' && len == 2)
-    name[1] = '%';
+  if (name.p[1] == '&' && len == 2)
+    name.p[1] = '%';
   /* a sub-letter naming an option of its own: -%rf, -%Zs */
   if (len == 2 && hts_isalpha((unsigned char) token[i + 2])) {
-    name[3] = token[i + 2];
-    name[4] = '\0';
-    if (optreal_find(name) >= 0)
+    name.p[3] = token[i + 2];
+    name.p[4] = '\0';
+    if (optreal_find(name.p) >= 0)
       len = 3;
     else
-      name[3] = '\0';
+      name.p[3] = '\0';
   }
   *at = i + len;
   /* a -%c rate is one value, so a letter in it is not an option (-%cinf) */
-  if (strcmp(name, "-%c") == 0) {
+  if (strcmp(name.p, "-%c") == 0) {
     double rate;
 
     *at += optrate_read(token + *at, &rate);
@@ -1277,7 +1274,7 @@ cmdl_file_result optinclude_file(const char *name, cmdl_argv *cmd) {
 
             result = optalias_check(
                 2, (const char *const *) tmp_argv, 0, &return_argc,
-                (tmp_argv + 2), sizeof(_tmp_argv[0]), HTS_SIZED(return_error));
+                (tmp_argv + 2), sizeof(_tmp_argv[0]), HTS_BUF(return_error));
             /* strip a value's quote pair, but -O decodes its own quotes */
             if (result && return_argc > 1 && strncmp(tmp_argv[2], "-O", 2) != 0)
               quote_ok = hts_unquote_arg(tmp_argv[3]);

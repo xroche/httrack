@@ -651,9 +651,9 @@ static int st_crashannounce(httrackp *opt, int argc, char **argv) {
 #endif
 
 /* Returns the short form optalias_check() emits, or NULL on refusal. */
-static const char *st_optalias_expand(char *dest, size_t dest_size,
-                                      const char *word, const char *next,
-                                      int *used, char *warn, size_t warn_size) {
+static const char *st_optalias_expand(hts_buf dest, const char *word,
+                                      const char *next, int *used,
+                                      hts_buf warn) {
   char BIGSTK out[2][HTS_CDLMAXSIZE];
   char *outv[2] = {out[0], out[1]};
   const char *argv[2];
@@ -663,21 +663,21 @@ static const char *st_optalias_expand(char *dest, size_t dest_size,
 
   argv[0] = word;
   argv[1] = next;
-  out[0][0] = out[1][0] = dest[0] = warn[0] = '\0';
-  *used = optalias_check(argc, argv, 0, &outc, outv, sizeof(out[0]), error,
-                         sizeof(error));
+  out[0][0] = out[1][0] = dest.p[0] = warn.p[0] = '\0';
+  *used = optalias_check(argc, argv, 0, &outc, outv, sizeof(out[0]),
+                         HTS_BUF(error));
   if (*used == 0) {
     assertf(error[0] != '\0'); /* a refusal has to say why */
     return NULL;
   }
-  strlcpybuff(warn, error, warn_size);
+  hts_buf_cpy(warn, error);
   assertf(outc >= 1 && outc <= 2);
-  strlcpybuff(dest, out[0], dest_size);
+  hts_buf_cpy(dest, out[0]);
   if (outc == 2) {
-    strlcatbuff(dest, " ", dest_size);
-    strlcatbuff(dest, out[1], dest_size);
+    hts_buf_cat(dest, " ");
+    hts_buf_cat(dest, out[1]);
   }
-  return dest;
+  return dest.p;
 }
 
 /* --index=0 must not read back as a bare --index (#1195). */
@@ -693,31 +693,31 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
     return 0;
   }
   if (argc >= 1) {
-    const char *const out = st_optalias_expand(got, sizeof(got), argv[0],
-                                               argc >= 2 ? argv[1] : NULL,
-                                               &used, warn, sizeof(warn));
+    const char *const out =
+        st_optalias_expand(HTS_BUF(got), argv[0], argc >= 2 ? argv[1] : NULL,
+                           &used, HTS_BUF(warn));
 
     printf("%s\n", out != NULL ? out : "(refused)");
     return out != NULL ? 0 : 1;
   }
 #define EXPANDS(want, word, next)                                              \
   do {                                                                         \
-    const char *const out__ = st_optalias_expand(                              \
-        got, sizeof(got), (word), (next), &used, warn, sizeof(warn));          \
+    const char *const out__ = st_optalias_expand(HTS_BUF(got), (word), (next), \
+                                                 &used, HTS_BUF(warn));        \
     assertf(out__ != NULL && strcmp(out__, (want)) == 0);                      \
     assertf(warn[0] == '\0');                                                  \
   } while (0)
 /* WORD expands to WANT but draws a warning */
 #define WARNS(want, word, next)                                                \
   do {                                                                         \
-    const char *const out__ = st_optalias_expand(                              \
-        got, sizeof(got), (word), (next), &used, warn, sizeof(warn));          \
+    const char *const out__ = st_optalias_expand(HTS_BUF(got), (word), (next), \
+                                                 &used, HTS_BUF(warn));        \
     assertf(out__ != NULL && strcmp(out__, (want)) == 0);                      \
     assertf(warn[0] != '\0');                                                  \
   } while (0)
 #define REFUSES(word, next)                                                    \
-  assertf(st_optalias_expand(got, sizeof(got), (word), (next), &used, warn,    \
-                             sizeof(warn)) == NULL)
+  assertf(st_optalias_expand(HTS_BUF(got), (word), (next), &used,              \
+                             HTS_BUF(warn)) == NULL)
 
   /* the long form can disable the index like -I0 */
   EXPANDS("-I0", "--index=0", NULL);
@@ -902,6 +902,20 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
   EXPANDS("-N0000000001", "--structure=0000000001", NULL);
   EXPANDS("-N0000000001", "-N", "0000000001");
   assertf(used == 2);
+  /* a padded run glues while "-N" plus it fits the output, else stays apart */
+  {
+    char run[HTS_CDLMAXSIZE], want[HTS_CDLMAXSIZE + 4];
+    size_t len;
+
+    for (len = HTS_CDLMAXSIZE - 3; len <= HTS_CDLMAXSIZE - 2; len++) {
+      memset(run, '0', len - 1);
+      run[len - 1] = '7';
+      run[len] = '\0';
+      snprintf(want, sizeof(want), "-N%s%s",
+               len < HTS_CDLMAXSIZE - 2 ? "" : " ", run);
+      EXPANDS(want, "-N", run);
+    }
+  }
   /* a %-free value would map every URL onto one name, so it is a typo */
   REFUSES("--structure=OFF", NULL);
   REFUSES("--structure=flat", NULL);
