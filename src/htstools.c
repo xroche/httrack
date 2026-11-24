@@ -1143,7 +1143,7 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
             for(i = 0; i < chainSize; i++) {
               char BIGSTK hname[HTS_URLMAXSIZE * 2];
 
-              escape_uri_utf(sortedElts[i]->name, hname, sizeof(hname));
+              escape_uri_utf(sortedElts[i]->name, HTS_SIZED(hname));
 
               /* Changed category */
               if (strcmp(category, sortedElts[i]->category) != 0) {
@@ -1244,7 +1244,7 @@ char *hts_getcategory(const char *filename) {
 
   if (fp != NULL) {
     char BIGSTK line[1022];
-    const size_t off = profile_key_line(fp, "category=", line, sizeof(line));
+    const size_t off = profile_key_line(fp, "category=", HTS_SIZED(line));
 
     if (off != 0)
       hts_unescapehttp(line + off, &categ);
@@ -1259,7 +1259,7 @@ hts_boolean hts_profile_declares_utf8(const char *filename) {
 
   if (fp != NULL) {
     char BIGSTK line[1022];
-    const size_t off = profile_key_line(fp, "charset=", line, sizeof(line));
+    const size_t off = profile_key_line(fp, "charset=", HTS_SIZED(line));
 
     utf8 = off != 0 && hts_isCharsetUTF8(line + off);
     fclose(fp);
@@ -1298,7 +1298,7 @@ HTSEXT_API char *hts_getcategories(char *path, int type) {
 
             if (fp != NULL) {
               const size_t off =
-                  profile_key_line(fp, "category=", line2, sizeof(line2));
+                  profile_key_line(fp, "category=", HTS_SIZED(line2));
               const char *const value = line2 + off;
 
               if (off != 0 && *value != '\0' &&

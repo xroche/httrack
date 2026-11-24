@@ -312,7 +312,7 @@ static hts_boolean optreal_glued(const char *token) {
 
   if (token[0] != '-' || token[1] == '-')
     return HTS_FALSE;
-  while (optcluster_next(token, &at, name, sizeof(name))) {
+  while (optcluster_next(token, &at, HTS_SIZED(name))) {
     if (optreal_find(name) < 0)
       return HTS_FALSE;
     pieces++;
@@ -1275,10 +1275,9 @@ cmdl_file_result optinclude_file(const char *name, cmdl_argv *cmd) {
             strcatbuff(_tmp_argv[0], a);
             strcpybuff(_tmp_argv[1], b);
 
-            result = optalias_check(2, (const char *const *) tmp_argv, 0,
-                                    &return_argc, (tmp_argv + 2),
-                                    sizeof(_tmp_argv[0]), return_error,
-                                    sizeof(return_error));
+            result = optalias_check(
+                2, (const char *const *) tmp_argv, 0, &return_argc,
+                (tmp_argv + 2), sizeof(_tmp_argv[0]), HTS_SIZED(return_error));
             /* strip a value's quote pair, but -O decodes its own quotes */
             if (result && return_argc > 1 && strncmp(tmp_argv[2], "-O", 2) != 0)
               quote_ok = hts_unquote_arg(tmp_argv[3]);

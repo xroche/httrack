@@ -98,9 +98,8 @@ static hts_boolean hts_link_may_carry_links(httrackp *opt, cache_back *cache,
 
   /* a cache miss leaves both untouched */
   prev_save[0] = prev_location[0] = '\0';
-  prev = cache_read_including_broken(opt, cache, adr, fil, prev_save,
-                                     sizeof(prev_save), prev_location,
-                                     sizeof(prev_location));
+  prev = cache_read_including_broken(opt, cache, adr, fil, HTS_SIZED(prev_save),
+                                     HTS_SIZED(prev_location));
 
   if (HTTP_IS_REDIRECT(prev.statuscode))
     return HTS_TRUE;
@@ -284,10 +283,10 @@ int hts_mirror_check_moved(htsmoduleStruct *str,
                           adr_nologin(opt, urladr()), urlfil(),
                           url_nologin(opt, mov_url));
             if (!opt->mimehtml) {
-              inplace_escape_uri(mov_url, sizeof(mov_url));
+              inplace_escape_uri(HTS_SIZED(mov_url));
             } else {
               char BIGSTK cid[HTS_URLMAXSIZE * 3];
-              make_content_id(moved->adr, moved->fil, cid, sizeof(cid));
+              make_content_id(moved->adr, moved->fil, HTS_SIZED(cid));
               strcpybuff(mov_url, "cid:");
               strcatbuff(mov_url, cid);
             }
@@ -725,7 +724,7 @@ void hts_mirror_process_user_interaction(htsmoduleStruct *str,
       strcatbuff(add_url, *next);
       // a typed login reads up to the last '@' before the first '/'
       const hts_boolean escaped =
-          hts_escape_typed_login(add_url, typed, sizeof(typed));
+          hts_escape_typed_login(add_url, HTS_SIZED(typed));
 
       if (!escaped)
         hts_log_print(
@@ -1202,8 +1201,8 @@ int hts_wait_delayed(htsmoduleStruct *str, lien_adrfilsave *afs,
          self-redirect Set-Cookie trips the retry, not a concurrent slot's. */
       cookie_before[0] = '\0';
       if (opt->accept_cookie && opt->cookie != NULL)
-        http_cookie_header(opt->cookie, afs->af.adr, afs->af.fil, cookie_before,
-                           sizeof(cookie_before));
+        http_cookie_header(opt->cookie, afs->af.adr, afs->af.fil,
+                           HTS_SIZED(cookie_before));
 
       /* Wait for an available slot */
       if (!hts_wait_available_socket(sback, opt, cache, ptr))
@@ -1397,7 +1396,7 @@ int hts_wait_delayed(htsmoduleStruct *str, lien_adrfilsave *afs,
             cookie_after[0] = '\0';
             if (opt->accept_cookie && opt->cookie != NULL)
               http_cookie_header(opt->cookie, afs->af.adr, afs->af.fil,
-                                 cookie_after, sizeof(cookie_after));
+                                 HTS_SIZED(cookie_after));
             cookies_changed = strcmp(cookie_before, cookie_after) != 0;
 
             mov_url[0] = '\0';

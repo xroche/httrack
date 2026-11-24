@@ -42,8 +42,8 @@ static void fuzz_header_param(const char *value) {
   size_t i;
 
   for (i = 0; i < sizeof(params) / sizeof(params[0]); i++) {
-    const hts_boolean found = hts_header_param(
-        value, params[i].seps, params[i].name, out, sizeof(out));
+    const hts_boolean found =
+        hts_header_param(value, params[i].seps, params[i].name, HTS_SIZED(out));
 
     if (strlen(out) >= sizeof(out) || (!found && out[0] != '\0'))
       abort();

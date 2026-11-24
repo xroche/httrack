@@ -313,7 +313,7 @@ static void cmdl_panic_value(httrackp *opt, const char *msg,
 
   if (hts_is_quoted(value, strlen(value)))
     snprintf(s, sizeof(s), "%s: \"%s " HTS_QUOTED_HINT, msg,
-             adr_nologin_r(shown, sizeof(shown), value + 1));
+             adr_nologin_r(HTS_SIZED(shown), value + 1));
   else
     snprintf(s, sizeof(s), "%s", msg);
   HTS_PANIC_PRINTF(s);
@@ -330,7 +330,7 @@ static void print_rule_nologin(const char *rule) {
       n = sizeof(tok) - 1;
     memcpy(tok, rule, n);
     tok[n] = '\0';
-    fputs(adr_nologin_r(shown, sizeof(shown), tok), stdout);
+    fputs(adr_nologin_r(HTS_SIZED(shown), tok), stdout);
     rule += n;
     if (*rule == ',' || *rule == '=')
       putchar(*rule++);
@@ -509,8 +509,8 @@ static int cmdl_cluster_params(cmdl_argv *cmd, const char *word, int argc,
   int next = first;
   int value;
 
-  while (cmdl_cluster_step(word, &at, name, sizeof(name), argc, argv, NULL,
-                           &next, &value)) {
+  while (cmdl_cluster_step(word, &at, HTS_SIZED(name), argc, argv, NULL, &next,
+                           &value)) {
     if (value < 0)
       continue;
     if (!cmdl_add(cmd, argv[value]))
@@ -589,7 +589,7 @@ static void cmdl_print_cache_entry(httrackp *opt, cache_back *cache,
   }
 
   infostatuscode(msg, r.statuscode);
-  time_gmt_rfc822(cdate, sizeof(cdate));
+  time_gmt_rfc822(HTS_SIZED(cdate));
 
   fprintf(stdout, "HTTP/1.1 %d %s\r\n", r.statuscode, r.msg[0] ? r.msg : msg);
   fprintf(stdout, "X-Host: %s\r\n", afs.af.adr);
@@ -766,7 +766,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
   {
     char datadir[HTS_URLMAXSIZE * 2];
     char selfbuff[HTS_URLMAXSIZE * 2];
-    const char *self = hts_self_path(selfbuff, sizeof(selfbuff));
+    const char *self = hts_self_path(HTS_SIZED(selfbuff));
 
 #ifdef HTS_HTTRACKDIR
     const char *const builtin = HTS_HTTRACKDIR;
@@ -838,7 +838,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
         /* Resolve an option alias, if any */
         result = optalias_check(argc, (const char *const *) argv, na, &tmp_argc,
                                 (char **) tmp_argv, sizeof(_tmp_argv[0]),
-                                tmp_error, sizeof(tmp_error));
+                                HTS_SIZED(tmp_error));
         if (!result) {
           HTS_PANIC_PRINTF(tmp_error);
           return -1;
@@ -932,7 +932,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
           int value;
 
           /* the word the parse loop gives -O, past -P's in -PO */
-          while (cmdl_cluster_step(word, &at, name, sizeof(name), argc, argv,
+          while (cmdl_cluster_step(word, &at, HTS_SIZED(name), argc, argv,
                                    x_cmd->param, &next, &value)) {
             if (strcmp(name, "-O") == 0) {
               if (value < 0) {
@@ -1941,9 +1941,9 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                       char shown[HTS_URLMAXSIZE * 2];
 
                       /* one write, so a merged stdout cannot split it */
-                      fprintf(stderr, "warning: -%%X %s: %s\n", why,
-                              hts_header_shown(opt, argv[na], shown,
-                                               sizeof(shown)));
+                      fprintf(
+                          stderr, "warning: -%%X %s: %s\n", why,
+                          hts_header_shown(opt, argv[na], HTS_SIZED(shown)));
                     }
                   }
                   /* A refused line goes in, so the request drops its folds. */
@@ -2640,7 +2640,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
               char BIGSTK pname[HTS_URLMAXSIZE * 2];
 
               opt->proxy.active = 1;
-              hts_parse_proxy(argv[na], pname, sizeof(pname), &opt->proxy.port);
+              hts_parse_proxy(argv[na], HTS_SIZED(pname), &opt->proxy.port);
               StringCopy(opt->proxy.name, pname);
             }
             break;
@@ -2824,7 +2824,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
       char *masked_url;
       const char *shown_url;
 
-      time_local_rfc822(t, sizeof(t)); // stamps the generated file below
+      time_local_rfc822(HTS_SIZED(t)); // stamps the generated file below
 
       /* readme for information purpose */
       {
@@ -3240,7 +3240,7 @@ static hts_boolean cmdl_shortopt_named(const char *s, const char *opt) {
 
   if (s[0] != '-' || s[1] == '-')
     return HTS_FALSE;
-  while (optcluster_next(s, &at, name, sizeof(name)))
+  while (optcluster_next(s, &at, HTS_SIZED(name)))
     if (strcmp(name, opt) == 0)
       return HTS_TRUE;
   return HTS_FALSE;

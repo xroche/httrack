@@ -418,8 +418,8 @@ void help_catchurl(const char *dest_path) {
     printf("\tProxy's address: \t%s\n\tProxy's port: \t%d\n", adr_prox,
            port_prox);
     //
-    status = catch_url_capture(soc, url, sizeof(url), method, sizeof(method),
-                               data, sizeof(data));
+    status = catch_url_capture(soc, HTS_SIZED(url), HTS_SIZED(method),
+                               HTS_SIZED(data));
     if (status == CATCH_URL_OK) {
       char BIGSTK dest[HTS_URLMAXSIZE * 2];
       int i = 0;

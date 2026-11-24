@@ -284,7 +284,7 @@ int proxytrack_main(char *proxyAddr, int proxyPort, char *icpAddr, int icpPort,
               " on %s: %s (%d)\n",
               icpFailed ? "udp" : "tcp", icpFailed ? icpPort : proxyPort,
               icpFailed ? icpAddr : proxyAddr,
-              socket_error_string(err, errbuf, sizeof(errbuf)), err);
+              socket_error_string(err, HTS_SIZED(errbuf)), err);
     }
     returncode = 1;
   }

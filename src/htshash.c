@@ -143,10 +143,10 @@ const char *hash_url_key(hash_struct *hash, const char *adr, const char *fil,
     char BIGSTK aliasbuf[HTS_URLMAXSIZE * 2];
     char BIGSTK keybuf[HTS_URLMAXSIZE];
     const char *const adr_canon =
-        key_host_alias(hash, adr, aliasbuf, sizeof(aliasbuf));
+        key_host_alias(hash, adr, HTS_SIZED(aliasbuf));
     /* the per-URL strip keys apply even when urlhack is off */
     const char *const keys = hts_query_strip_keys(hash->strip_query, adr_canon,
-                                                  fil, keybuf, sizeof(keybuf));
+                                                  fil, HTS_SIZED(keybuf));
 
     return hash_url_key_(hash, adr_canon, fil, keys, dst, dstsize);
   }
@@ -161,7 +161,7 @@ key_adrfil_hashes_generic(void *arg, coucal_key_const value, const int former) {
   const char *const fil = !former ? lien->fil : lien->former_fil;
 
   return coucal_hash_string(
-      hash_url_key(hash, adr, fil, hash->normfil, sizeof(hash->normfil)));
+      hash_url_key(hash, adr, fil, HTS_SIZED(hash->normfil)));
 }
 
 /* Compare as key_adrfil_equals_generic() with aliases and keys resolved. */
@@ -222,13 +222,13 @@ static int key_adrfil_equals_generic(void *arg,
     char BIGSTK a_aliasbuf[HTS_URLMAXSIZE * 2], b_aliasbuf[HTS_URLMAXSIZE * 2];
     char BIGSTK ka[HTS_URLMAXSIZE], kb[HTS_URLMAXSIZE];
     const char *const a_canon =
-        key_host_alias(hash, a_adr, a_aliasbuf, sizeof(a_aliasbuf));
+        key_host_alias(hash, a_adr, HTS_SIZED(a_aliasbuf));
     const char *const b_canon =
-        key_host_alias(hash, b_adr, b_aliasbuf, sizeof(b_aliasbuf));
+        key_host_alias(hash, b_adr, HTS_SIZED(b_aliasbuf));
     const char *const keysa =
-        hts_query_strip_keys(hash->strip_query, a_canon, a_fil, ka, sizeof(ka));
+        hts_query_strip_keys(hash->strip_query, a_canon, a_fil, HTS_SIZED(ka));
     const char *const keysb =
-        hts_query_strip_keys(hash->strip_query, b_canon, b_fil, kb, sizeof(kb));
+        hts_query_strip_keys(hash->strip_query, b_canon, b_fil, HTS_SIZED(kb));
 
     return key_adrfil_equals_(hash, a_canon, a_fil, keysa, b_canon, b_fil,
                               keysb);
@@ -481,7 +481,7 @@ int hash_savename_next(hash_struct *hash, char kind, const char *name) {
   char BIGSTK key[HTS_URLMAXSIZE * 2 + 2];
   intptr_t value;
 
-  savename_next_key(key, sizeof(key), kind, name);
+  savename_next_key(HTS_SIZED(key), kind, name);
   return coucal_read(hash->savename_next, key, &value) ? (int) value : 0;
 }
 
@@ -490,7 +490,7 @@ void hash_savename_next_set(hash_struct *hash, char kind, const char *name,
                             int n) {
   char BIGSTK key[HTS_URLMAXSIZE * 2 + 2];
 
-  savename_next_key(key, sizeof(key), kind, name);
+  savename_next_key(HTS_SIZED(key), kind, name);
   coucal_write(hash->savename_next, key, (intptr_t) n);
 }
 

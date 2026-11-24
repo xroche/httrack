@@ -55,8 +55,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   memset(&robots, 0, sizeof(robots));
   info[0] = '\0';
   sitemaps[0] = '\0';
-  robots_parse(NULL, &robots, "fuzz.example", body, size, info, sizeof(info),
-               keep_root, sitemaps, sizeof(sitemaps));
+  robots_parse(NULL, &robots, "fuzz.example", body, size, HTS_SIZED(info),
+               keep_root, HTS_SIZED(sitemaps));
   robots_sink += (unsigned long) strlen(info);
   robots_sink += (unsigned long) strlen(sitemaps);
 

@@ -199,7 +199,7 @@ T_SOC http_xfopen(httrackp *opt, const char *adr, const char *fil,
       char errbuf[HTS_STRERROR_SIZE];
 
       htsblk_failf(retour, "Connect error: %s",
-                   hts_strerror(last_errno, errbuf, sizeof(errbuf)));
+                   hts_strerror(last_errno, HTS_SIZED(errbuf)));
     }
   }
   // a local file: LOCAL_SOCKET_ID is a pseudo-socket, and no proxy applies
@@ -323,7 +323,7 @@ static int append_cookie_header(buff_struct *bstr, t_cookie *cookie,
     *skipped = 0;
   if (cookie == NULL || bstr->overflow)
     return 0;
-  if (!cookie_host(adr, host, sizeof(host)))
+  if (!cookie_host(adr, HTS_SIZED(host)))
     return 0;
   domain = host;
 
@@ -993,7 +993,7 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
                 !hts_proxy_is_connect(retour->req.proxy.name)) {
               /* only adr is raw here: the other three are %s-scanned */
               print_buffer(&bstr, "%s http://%s%s %s\r\n", method,
-                           escape_check_url_addr(adr, esc, sizeof(esc)), url,
+                           escape_check_url_addr(adr, HTS_SIZED(esc)), url,
                            protocol);
             } else {
               print_buffer(&bstr,
@@ -1030,11 +1030,11 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
         (strncmp(adr, "https://", 8) != 0)) {
       if (!link_has_authority(adr)) { // default http
         print_buffer(&bstr, "http://%s",
-                     escape_check_url_addr(jump_identification_const(adr), esc,
-                                           sizeof(esc)));
+                     escape_check_url_addr(jump_identification_const(adr),
+                                           HTS_SIZED(esc)));
       } else {                  // ftp:// en proxy http
         direct_url = 1;         // ne pas analyser user/pass
-        print_buffer(&bstr, "%s", escape_check_url_addr(adr, esc, sizeof(esc)));
+        print_buffer(&bstr, "%s", escape_check_url_addr(adr, HTS_SIZED(esc)));
       }
     }
     // NOM DU FICHIER
@@ -1074,8 +1074,8 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
           !http_headers_have_field(custom, "Proxy-Authorization")) {
         char autorisation[1100];
 
-        const int got = hts_basic_auth_value(
-            opt, retour->req.proxy.name, autorisation, sizeof(autorisation));
+        const int got = hts_basic_auth_value(opt, retour->req.proxy.name,
+                                             HTS_SIZED(autorisation));
 
         if (got > 0)
           print_buffer(&bstr, "Proxy-Authorization: Basic %s" H_CRLF,
@@ -1107,10 +1107,10 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
         HDR_OPEN(HDR_REFERER);
         print_buffer(
             &hdr, "Referer: %s%s", scheme,
-            escape_check_url_addr(jump_identification_const(referer_adr), esc,
-                                  sizeof(esc)));
+            escape_check_url_addr(jump_identification_const(referer_adr),
+                                  HTS_SIZED(esc)));
         print_buffer(&hdr, "%s" H_CRLF,
-                     escape_check_url_addr(referer_fil, esc, sizeof(esc)));
+                     escape_check_url_addr(referer_fil, HTS_SIZED(esc)));
         HDR_CLOSE(HDR_REFERER);
       }
     }
@@ -1149,7 +1149,7 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
           !http_headers_have_field(custom, "Host")) { // not ftp:// for example
         HDR_OPEN(HDR_HOST);
         print_buffer(&hdr, "Host: %s" H_CRLF,
-                     escape_check_url_addr(real_adr, esc, sizeof(esc)));
+                     escape_check_url_addr(real_adr, HTS_SIZED(esc)));
         HDR_CLOSE(HDR_HOST);
       }
 
@@ -1215,7 +1215,7 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
                                    retour->req.accept, opt->accept_given,
                                    fetch != NULL ? fetch->dest
                                                  : HTS_FETCH_DEST_UNKNOWN,
-                                   family, accept_buf, sizeof(accept_buf));
+                                   family, HTS_SIZED(accept_buf));
         if (strnotempty(accept) && !http_headers_have_field(custom, "Accept")) {
           HDR_OPEN(HDR_ACCEPT);
           print_buffer(&hdr, "Accept: %s" H_CRLF, accept);
@@ -1326,8 +1326,8 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
           const char *a = jump_identification_const(adr);
 
           if (!direct_url) {    // pas ftp:// par exemple
-            const int got = hts_basic_auth_value(opt, adr, autorisation,
-                                                 sizeof(autorisation));
+            const int got =
+                hts_basic_auth_value(opt, adr, HTS_SIZED(autorisation));
 
             if (got > 0) {
               if (strcmp(fil, "/robots.txt")) /* pas robots.txt */
@@ -1606,7 +1606,7 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
   } else if (HEADER_IS(name, "Content-Disposition")) {
     char tmp[256];
 
-    if (hts_header_param(value, ";", "filename", tmp, sizeof(tmp))) {
+    if (hts_header_param(value, ";", "filename", HTS_SIZED(tmp))) {
       const char *a = tmp;
       const char *c;
 
@@ -1625,14 +1625,13 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
     const hts_span v = header_value(value);
 
     if (v.len < sizeof(retour->lastmodified))
-      (void) hts_span_copy(v, retour->lastmodified,
-                           sizeof(retour->lastmodified));
+      (void) hts_span_copy(v, HTS_SIZED(retour->lastmodified));
   } else if (HEADER_IS(name, "Etag")) {
     if (retour) {
       const hts_span v = header_value(value);
 
       if (v.len < 64)
-        (void) hts_span_copy(v, retour->etag, sizeof(retour->etag));
+        (void) hts_span_copy(v, HTS_SIZED(retour->etag));
       else
         retour->etag[0] = '\0';
     }
@@ -1670,7 +1669,7 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
       char chs[256];
       char *const semi = strchr(value, ';');
 
-      if (hts_header_param(value, ";", "charset", chs, sizeof(chs))) {
+      if (hts_header_param(value, ";", "charset", HTS_SIZED(chs))) {
         const char *const c = chs + strspn(chs, HTS_SPACES);
         const size_t n = strcspn(c, HTS_SPACES);
 
@@ -1768,9 +1767,9 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
       retour->keep_alive = 1;
       retour->keep_alive_max = 10;
       retour->keep_alive_t = 15;
-      if (hts_header_param(a, ",;", "timeout", v, sizeof(v)))
+      if (hts_header_param(a, ",;", "timeout", HTS_SIZED(v)))
         keep_alive_param(v, &retour->keep_alive_t);
-      if (hts_header_param(a, ",;", "max", v, sizeof(v)))
+      if (hts_header_param(a, ",;", "max", HTS_SIZED(v)))
         keep_alive_param(v, &retour->keep_alive_max);
       if (retour->keep_alive_max <= 1 || retour->keep_alive_t < 1) {
         retour->keep_alive = 0;
@@ -1844,8 +1843,8 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
 
     /* Refuse a host cookie_host() cannot scope, and one too long for the
        default-domain copy below (that would abort the mirror). */
-    if (adr != NULL && (strlen(adr) >= sizeof(domain) ||
-                        !cookie_host(adr, scoped, sizeof(scoped))))
+    if (adr != NULL &&
+        (strlen(adr) >= sizeof(domain) || !cookie_host(adr, HTS_SIZED(scoped))))
       return;
     {
       char name[256];
@@ -1890,8 +1889,8 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
         if (hts_span_present(v) && word == key.len) {
           /* RFC 6265 4.1.1 makes the quotes part of a quoted cookie-value. */
           if (key.len > 0 && key.len < 200 && v.len < 8000) {
-            hts_span_copy(key, name, sizeof(name));
-            hts_span_copy(v, value, sizeof(value));
+            hts_span_copy(key, HTS_SIZED(name));
+            hts_span_copy(v, HTS_SIZED(value));
             if (first) {
               // the first pair is the cookie, and "name=" may erase one
               strcpybuff(cook_name, name);
@@ -2584,7 +2583,7 @@ static T_SOC newhttp_open(httrackp *opt, htsblk *retour, SOCaddr *server,
         char errbuf[HTS_STRERROR_SIZE];
 
         htsblk_failf(retour, HTS_DNS_BIND_PREFIX "%s",
-                     hts_strerror(last_errno, errbuf, sizeof(errbuf)));
+                     hts_strerror(last_errno, HTS_SIZED(errbuf)));
         deletesoc(soc);
         soc = INVALID_SOCKET;
         local = NULL;
@@ -2606,7 +2605,7 @@ static T_SOC newhttp_open(httrackp *opt, htsblk *retour, SOCaddr *server,
     char errbuf[HTS_STRERROR_SIZE];
 
     htsblk_failf(retour, "Unable to create a socket: %s",
-                 hts_strerror(last_errno, errbuf, sizeof(errbuf)));
+                 hts_strerror(last_errno, HTS_SIZED(errbuf)));
     return INVALID_SOCKET;
   }
   SOCaddr_initport(*server, port);
@@ -2616,7 +2615,7 @@ static T_SOC newhttp_open(httrackp *opt, htsblk *retour, SOCaddr *server,
     char errbuf[HTS_STRERROR_SIZE];
 
     htsblk_failf(retour, "Non-blocking socket failed: %s",
-                 hts_strerror(last_errno, errbuf, sizeof(errbuf)));
+                 hts_strerror(last_errno, HTS_SIZED(errbuf)));
     deletesoc(soc);
     return INVALID_SOCKET;
   }
@@ -2629,7 +2628,7 @@ static T_SOC newhttp_open(httrackp *opt, htsblk *retour, SOCaddr *server,
     char errbuf[HTS_STRERROR_SIZE];
 
     htsblk_failf(retour, "Connect error: %s",
-                 hts_strerror(last_errno, errbuf, sizeof(errbuf)));
+                 hts_strerror(last_errno, HTS_SIZED(errbuf)));
     deletesoc(soc);
     *try_next = HTS_TRUE;
     return INVALID_SOCKET;
@@ -2979,7 +2978,7 @@ void deletesoc(T_SOC soc) {
       char errbuf[HTS_STRERROR_SIZE];
 
       fprintf(stderr, "* error closing socket " T_SOCP ": %s\n", soc,
-              hts_strerror(err, errbuf, sizeof(errbuf)));
+              hts_strerror(err, HTS_SIZED(errbuf)));
     }
   }
 }
@@ -3532,7 +3531,7 @@ int ishtml(httrackp * opt, const char *fil) {
   if ((a = strchr(fil_noquery, '?')) != NULL) {
     *a = '\0';
   }
-  if (get_userhttptype(opt, mime, sizeof(mime), fil_noquery)) {
+  if (get_userhttptype(opt, HTS_SIZED(mime), fil_noquery)) {
     if (is_html_mime_type(mime)) {
       return 1;
     } else {
@@ -3879,7 +3878,7 @@ static const char *hts_query_strip_keys_match(const char *rules,
       continue;
     if (hts_span_split(line, '=', &pattern, &keys)) {
       /* Clip a too-long pattern, never skip it. */
-      (void) hts_span_copy(pattern, pat, sizeof(pat));
+      (void) hts_span_copy(pattern, HTS_SIZED(pat));
     } else {
       strcpybuff(pat, "*");
       keys = line;
@@ -3941,7 +3940,7 @@ const char *hts_host_alias_match(const char *rules, const char *host,
 
       /* A trailing slash is not part of a path. */
       alias = hts_span_trim(alias, " \t", " \t/");
-      if (!hts_span_empty(alias) && hts_span_copy(alias, glob, sizeof(glob))) {
+      if (!hts_span_empty(alias) && hts_span_copy(alias, HTS_SIZED(glob))) {
         char *ghost;
 
         /* the collapse applies to the pattern too, so a rule may spell either
@@ -4016,7 +4015,7 @@ static const char *hts_host_alias_resolve_rules(const char *rules,
   /* Match the host as the dedup layer does, so with the www. collapse on, a
      rule naming example.com also covers www.example.com. */
   hostsubj = collapse_www ? jump_normalized_const(host) : host;
-  if (!hts_host_alias_subject(adr, hostsubj, fullsubj, sizeof(fullsubj)))
+  if (!hts_host_alias_subject(adr, hostsubj, HTS_SIZED(fullsubj)))
     return NULL;
   canon =
       hts_host_alias_match(rules, hostsubj, fullsubj, collapse_www, &canonlen);
@@ -4060,7 +4059,7 @@ static const char *hts_host_alias_resolve_rules(const char *rules,
     dhost = jump_identification_const(dest);
     if (collapse_www)
       dhost = jump_normalized_const(dhost);
-    if (!hts_host_alias_subject(dest, dhost, fullsubj, sizeof(fullsubj)))
+    if (!hts_host_alias_subject(dest, dhost, HTS_SIZED(fullsubj)))
       return NULL;
     next = hts_host_alias_match(rules, dhost, fullsubj, collapse_www, &nextlen);
     if (next == NULL)
@@ -4114,7 +4113,7 @@ const char *hts_host_alias_fold(httrackp *opt, lien_adrfil *af) {
   if (rules != NULL) {
     char BIGSTK canon[HTS_URLMAXSIZE * 2];
     const char *const alias = hts_host_alias(
-        rules, af->adr, hts_host_alias_collapse_www(opt), canon, sizeof(canon));
+        rules, af->adr, hts_host_alias_collapse_www(opt), HTS_SIZED(canon));
 
     if (alias != NULL)
       strcpybuff(af->adr, alias);
@@ -4130,8 +4129,8 @@ hts_boolean hts_host_same_alias(const char *rules, const char *adra,
 
   if (rules == NULL || *rules == '\0' || adra == NULL || adrb == NULL)
     return HTS_FALSE;
-  a = hts_host_alias(rules, adra, collapse_www, ca, sizeof(ca));
-  b = hts_host_alias(rules, adrb, collapse_www, cb, sizeof(cb));
+  a = hts_host_alias(rules, adra, collapse_www, HTS_SIZED(ca));
+  b = hts_host_alias(rules, adrb, collapse_www, HTS_SIZED(cb));
   if (a == NULL && b == NULL)
     return HTS_FALSE; /* neither is aliased: the caller's own test */
   return hts_strcasecmp(jump_identification_const(a != NULL ? a : adra),
@@ -4149,7 +4148,7 @@ static hts_boolean hts_host_alias_token_ok(hts_span token, hts_boolean glob) {
   size_t len;
 
   token = hts_span_trim(token, " \t", " \t");
-  if (hts_span_empty(token) || !hts_span_copy(token, buff, sizeof(buff)))
+  if (hts_span_empty(token) || !hts_span_copy(token, HTS_SIZED(buff)))
     return HTS_FALSE;
   len = token.len;
   while (len > 0 && buff[len - 1] == '/')
@@ -4201,9 +4200,9 @@ const char *hts_host_alias_looping(const char *rules, hts_boolean collapse_www,
     hts_boolean settled;
 
     if (!hts_span_split(line, '=', &aliases, &target) ||
-        hts_span_empty(target) || !hts_span_copy(target, canon, sizeof(canon)))
+        hts_span_empty(target) || !hts_span_copy(target, HTS_SIZED(canon)))
       continue;
-    (void) hts_host_alias_resolve(rules, canon, collapse_www, tmp, sizeof(tmp),
+    (void) hts_host_alias_resolve(rules, canon, collapse_www, HTS_SIZED(tmp),
                                   &settled);
     if (!settled) {
       if (strlen(canon) >= dest.size)
@@ -5486,8 +5485,7 @@ void hts_log_vprint(httrackp *opt, int type,
       if ((type & LOG_ERRNO) != 0) {
         char errbuf[HTS_STRERROR_SIZE];
 
-        fprintf(opt->log, ": %s",
-                hts_strerror(save_errno, errbuf, sizeof(errbuf)));
+        fprintf(opt->log, ": %s", hts_strerror(save_errno, HTS_SIZED(errbuf)));
       }
       fputs(LF, opt->log);
       if (opt->flush) {
@@ -5561,7 +5559,7 @@ int plug_wrapper(httrackp *opt, const char *moduleName, const char *argv) {
 
       hts_debug_log_print("* note: can't find entry point 'hts_plug' in %s: %s",
                           moduleName,
-                          hts_strerror(last_errno, errbuf, sizeof(errbuf)));
+                          hts_strerror(last_errno, HTS_SIZED(errbuf)));
     }
     closeFunctionLib(handle);
     return 0;
@@ -5570,7 +5568,7 @@ int plug_wrapper(httrackp *opt, const char *moduleName, const char *argv) {
     char errbuf[HTS_STRERROR_SIZE];
 
     hts_debug_log_print("* note: can't load %s: %s", moduleName,
-                        hts_strerror(last_errno, errbuf, sizeof(errbuf)));
+                        hts_strerror(last_errno, HTS_SIZED(errbuf)));
   }
   return -1;
 }

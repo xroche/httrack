@@ -87,8 +87,8 @@ static void fuzz_line(const char *line, httrackp *opt, cache_back *cache,
     char d[128];
 
     d[0] = '\0';
-    url_savename_addstr(d, sizeof(d), line);
-    url_savename_addtail(d, sizeof(d), "-", line);
+    url_savename_addstr(HTS_SIZED(d), line);
+    url_savename_addtail(HTS_SIZED(d), "-", line);
     savename_sink += (unsigned long) strlen(d);
   }
 
@@ -114,7 +114,7 @@ static void fuzz_line(const char *line, httrackp *opt, cache_back *cache,
     while (nom > fil && nom[-1] != '/' && nom[-1] != '\\')
       nom--;
     dot = strrchr(nom, '.');
-    standard_name(b, sizeof(b), dot, nom, fil, flags & 1);
+    standard_name(HTS_SIZED(b), dot, nom, fil, flags & 1);
     savename_sink += (unsigned long) strlen(b);
   }
 

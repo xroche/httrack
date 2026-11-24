@@ -385,7 +385,7 @@ void hts_finish_makeindex(httrackp *opt, int *makeindex_done,
       char BIGSTK tempo[HTS_URLMAXSIZE * 2 + 64];
       if (makeindex_links == 1) {
         char BIGSTK link_escaped[HTS_URLMAXSIZE * 2];
-        escape_uri_utf(makeindex_firstlink, link_escaped, sizeof(link_escaped));
+        escape_uri_utf(makeindex_firstlink, HTS_SIZED(link_escaped));
         /* no redirect beats one pointing at a clipped URL */
         if (!sprintfbuff(
                 tempo,
@@ -548,8 +548,8 @@ char *hts_ucs2_to_utf8(const unsigned char *src, size_t size, hts_boolean swap,
   for (i = 0; i < size;) {
     char seq[8];
 
-    total += (LLint) hts_writeUTF8(utf16_next(src, size, &i, swap, &lone), seq,
-                                   sizeof(seq));
+    total += (LLint) hts_writeUTF8(utf16_next(src, size, &i, swap, &lone),
+                                   HTS_SIZED(seq));
   }
   if (!hts_inmem_size_fits(total + 1)) {
     return NULL;
@@ -794,8 +794,8 @@ static hts_boolean bundle_start(httrackp *opt, char **primary,
   size_t room = 0;
   size_t i;
 
-  if (!hts_bundle_load_all(opt, bundle_jar_file(opt, jarbuff), err,
-                           sizeof(err))) {
+  if (!hts_bundle_load_all(opt, bundle_jar_file(opt, jarbuff),
+                           HTS_SIZED(err))) {
     hts_log_print(opt, LOG_ERROR, "Login bundle: %s", err);
     fprintf(stderr, "Login bundle: %s\n", err);
     return HTS_FALSE;
@@ -1182,7 +1182,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
       else
         snprintf(typed, sizeof(typed), "%s", StringBuff(opt->why_url));
       // a typed login reads up to the last '@' before the first '/'
-      if (!hts_escape_typed_login(typed, url, sizeof(url)))
+      if (!hts_escape_typed_login(typed, HTS_SIZED(url)))
         strcpybuff(url, typed);
       if (ident_url_absolute(url, &af) < 0) {
         printf("--why: unable to parse URL %s" LF,
@@ -1276,7 +1276,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
             char BIGSTK typed[HTS_URLLIST_LINE_SIZE * 3];
 
             // sized so the escape cannot clip
-            (void) hts_escape_typed_login(line, typed, sizeof(typed));
+            (void) hts_escape_typed_login(line, HTS_SIZED(typed));
             n++;
             seed_append(&primarybuff, typed);
           }
@@ -1942,8 +1942,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
 #endif
 
               robots_parse(opt, &robots, urladr(), r.adr, (size_t) r.size,
-                           infobuff, sizeof(infobuff), keep_root, sitemaps,
-                           sizeof(sitemaps));
+                           HTS_SIZED(infobuff), keep_root, HTS_SIZED(sitemaps));
               if (strnotempty(infobuff)) {
                 hts_log_print(opt, LOG_INFO,
                               "Note: robots.txt forbidden links for %s are: %s",
@@ -2194,8 +2193,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
           int purge = 0;
 
           for (pos = 0; pos < (size_t) old_sz;) {
-            if (!old_lst_entry(opt, old_lst, old_end, &pos, line, sizeof(line),
-                               file, sizeof(file)))
+            if (!old_lst_entry(opt, old_lst, old_end, &pos, HTS_SIZED(line),
+                               HTS_SIZED(file)))
               continue;
             hts_changes_previous(opt, file + root);
             if (!strstr(new_lst, line)) { // not found in the new list?
@@ -2219,8 +2218,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
             for (pos = 0; pos < (size_t) old_sz;) {
               size_t dir;
 
-              if (!old_lst_entry(opt, old_lst, old_end, &pos, line,
-                                 sizeof(line), file, sizeof(file)))
+              if (!old_lst_entry(opt, old_lst, old_end, &pos, HTS_SIZED(line),
+                                 HTS_SIZED(file)))
                 continue;
               dir = strlen(file);
               if (!chop_to_parent(file, root, &dir))
@@ -2271,7 +2270,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
     const LLint recv = hts_stat_recv_get();
     LLint n = (LLint) (recv / (max(1, time_local() - HTS_STAT.stat_timestart)));
 
-    sec2str(htstime, sizeof(htstime), time_local() - HTS_STAT.stat_timestart);
+    sec2str(HTS_SIZED(htstime), time_local() - HTS_STAT.stat_timestart);
     infoupdated[0] = '\0';
     if (opt->is_update) {
       if (HTS_STAT.stat_updated_files > 0) {

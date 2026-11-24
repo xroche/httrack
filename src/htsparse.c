@@ -1450,7 +1450,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         }
 
                         // Body
-                        inplace_escape_uri_utf(tempo, sizeof(tempo));
+                        inplace_escape_uri_utf(HTS_SIZED(tempo));
                         hts_template_format(makeindex_fp, template_body, tempo, s, /* EOF */ NULL);
                       }
                     }
@@ -1567,13 +1567,13 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   // prepends the scheme to them (credentials already stripped
                   // by jump_identification_const, and the scheme is a safe
                   // literal, so no re-escaping is needed).
-                  html_inline_safe(url_host, safe_adr, sizeof(safe_adr));
-                  html_inline_safe(urlfil(), safe_fil, sizeof(safe_fil));
+                  html_inline_safe(url_host, HTS_SIZED(safe_adr));
+                  html_inline_safe(urlfil(), HTS_SIZED(safe_fil));
                   snprintf(safe_url, sizeof(safe_url), "%s%s%s", url_scheme,
                            safe_adr, safe_fil);
                   snprintf(status_str, sizeof(status_str), "%d", r->statuscode);
                   snprintf(size_str, sizeof(size_str), LLintP, (LLint) r->size);
-                  time_gmt_rfc822(gmttime, sizeof(gmttime));
+                  time_gmt_rfc822(HTS_SIZED(gmttime));
 
                   {
                     // Network strings go through html_inline_safe(), because a
@@ -1585,12 +1585,12 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     values[HTS_FOOTER_URL] = safe_url;
                     values[HTS_FOOTER_DATE] = gmttime;
                     values[HTS_FOOTER_LASTMODIFIED] = html_inline_safe(
-                        r->lastmodified, safe_lastmod, sizeof(safe_lastmod));
+                        r->lastmodified, HTS_SIZED(safe_lastmod));
                     values[HTS_FOOTER_VERSION] = HTTRACK_VERSIONID;
-                    values[HTS_FOOTER_MIME] = html_inline_safe(
-                        r->contenttype, safe_ctype, sizeof(safe_ctype));
-                    values[HTS_FOOTER_CHARSET] = html_inline_safe(
-                        r->charset, safe_charset, sizeof(safe_charset));
+                    values[HTS_FOOTER_MIME] =
+                        html_inline_safe(r->contenttype, HTS_SIZED(safe_ctype));
+                    values[HTS_FOOTER_CHARSET] =
+                        html_inline_safe(r->charset, HTS_SIZED(safe_charset));
                     values[HTS_FOOTER_STATUS] = status_str;
                     values[HTS_FOOTER_SIZE] = size_str;
 
@@ -2608,7 +2608,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   {
                     char BIGSTK tempo[sizeof(lien)];
 
-                    if (escape_control_url(lien, tempo, sizeof(tempo)) <
+                    if (escape_control_url(lien, HTS_SIZED(tempo)) <
                         sizeof(tempo) - HTS_LINK_TAIL_ROOM) {
                       strcpybuff(lien, tempo);
                     } else {
@@ -2661,7 +2661,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     char BIGSTK decoded[sizeof(query)];
 
                     if (hts_unescapeEntitiesWithCharsetSpecial(
-                            query, decoded, sizeof(decoded), charset,
+                            query, HTS_SIZED(decoded), charset,
                             UNESCAPE_ENTITIES_URL_QUERY) == 0) {
                       strcpybuff(query, decoded);
                     } else {
@@ -2675,7 +2675,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   // Decode remaining %XX high characters with UTF-8 
                   // but only when this leads to valid UTF-8.
                   // Otherwise, leave them unescaped.
-                  if (hts_unescapeUrlSpecial(lien, catbuff, sizeof(catbuff),
+                  if (hts_unescapeUrlSpecial(lien, HTS_SIZED(catbuff),
                                              UNESCAPE_URL_NO_ASCII) == 0) {
                     strcpybuff(lien, catbuff);
                   } else {
@@ -2746,7 +2746,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   }
                 }
                 // drop a default :80 port from the authority
-                hts_strip_default_port(lien, sizeof(lien));
+                hts_strip_default_port(HTS_SIZED(lien));
                 // vérifier que l'on ne doit pas ajouter de .class
                 if (!error) {
                   if (add_class) {
@@ -3241,7 +3241,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                               /* Never escape high-chars (we don't know the
                                * encoding!!) */
                               inplace_escape_uri_utf(
-                                  tempo, sizeof(tempo)); // escape with %xx
+                                  HTS_SIZED(tempo));     // escape with %xx
                               HT_ADD_HTMLESCAPED(tempo); // page externe
                               HT_ADD("?link=");          // page externe
 
@@ -3342,7 +3342,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       char BIGSTK cid[HTS_URLMAXSIZE * 3];
 
                       HT_ADD("cid:");
-                      make_content_id(afs.af.adr, afs.af.fil, cid, sizeof(cid));
+                      make_content_id(afs.af.adr, afs.af.fil, HTS_SIZED(cid));
                       HT_ADD_HTMLESCAPED(cid);
                       lastsaved = eadr - 1;     // dernier écrit+1 (enfin euh apres on fait un ++ alors hein)
                     } else if (opt->urlmode == HTS_URLMODE_ABSOLUTE_URI) {
@@ -3407,11 +3407,11 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                       relativesavename()) == 0) {
                         if (!in_media) {        // In media (such as real audio): don't patch
                           /* Never escape high-chars (we don't know the encoding!!) */
-                          inplace_escape_uri_utf(tempo, sizeof(tempo));
+                          inplace_escape_uri_utf(HTS_SIZED(tempo));
 
                           // CSS url(): keep parens escaped
                           if (escape_parens)
-                            escape_url_parens(tempo, sizeof(tempo));
+                            escape_url_parens(HTS_SIZED(tempo));
                         }
                         hts_log_print(
                             opt, LOG_DEBUG,
@@ -3516,7 +3516,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                 sf_span_fits);
 
                             HT_ADD(singlefile_mark(
-                                opt, sf_mark, sizeof(sf_mark), sf_class,
+                                opt, HTS_SIZED(sf_mark), sf_class,
                                 TypedArraySize(sink.buf) - sf_start));
                           }
                         }

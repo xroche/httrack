@@ -29,6 +29,7 @@ Please visit our Website: http://www.httrack.com
    UTF-8/UCS4 primitives (htscharset.c). The first byte picks the charset. */
 #include "fuzz.h"
 #include "htscharset.h"
+#include "htsbuf.h"
 
 static const char *const charsets[] = {
     "utf-8",    "iso-8859-1", "iso-8859-2", "iso-8859-15", "windows-1252",
@@ -74,7 +75,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
       if (nr == 0)
         break;
-      hts_writeUTF8(uc, out, sizeof(out));
+      hts_writeUTF8(uc, HTS_SIZED(out));
       i += nr;
     }
   }

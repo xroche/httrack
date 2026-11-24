@@ -1364,7 +1364,7 @@ static void ini_rebase_lists(const char *ini, int delta, String *out) {
     if (hts_span_split(line, '=', &key, &value)) {
       /* Trim the CRs a textarea posts. */
       value = hts_span_trim(value, "", "\r");
-      if (hts_span_copy(key, name, sizeof(name)) && ini_key_is_list(name))
+      if (hts_span_copy(key, HTS_SIZED(name)) && ini_key_is_list(name))
         id = ini_list_shift(value.p, value.len, delta);
     }
     if (id >= 0) {
@@ -2797,14 +2797,14 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
             smallserver_head(
                 &headers, "200 Pong",
                 "Content-type: text/html\r\n" SMALLSERVER_NO_CACHE);
-            if (query_alnum_value(window, sizeof(window), query, "w")) {
+            if (query_alnum_value(HTS_SIZED(window), query, "w")) {
               char verb[SMALLSERVER_WINDOW_ID_MAX + 1];
 
               /* Ending a session is a command, so it carries the session id
                  like every other one. A heartbeat can only extend a life, and
                  any local peer or visited page can send one of those. */
               client_event(
-                  authed && query_alnum_value(verb, sizeof(verb), query, "e") &&
+                  authed && query_alnum_value(HTS_SIZED(verb), query, "e") &&
                           strcmp(verb, "bye") == 0
                       ? SMALLSERVER_CLIENT_LEAVING
                       : SMALLSERVER_CLIENT_PING,
@@ -3272,7 +3272,7 @@ static int LANG_SEARCH(const char *path, const char *iso) {
   do {
     QLANG_T(i);
     strcpybuff(lang_str, "LANGUAGE_ISO");
-    htslang_load(lang_str, sizeof(lang_str), path);
+    htslang_load(HTS_SIZED(lang_str), path);
     if (strfield(iso, lang_str)) {
       found = i;
     }
@@ -3291,7 +3291,7 @@ static int LANG_LIST(const char *path, hts_buf buffer) {
   do {
     QLANG_T(i);
     strlcpybuff(lang_str, "LANGUAGE_NAME", sizeof(lang_str));
-    htslang_load(lang_str, sizeof(lang_str), path);
+    htslang_load(HTS_SIZED(lang_str), path);
     if (strlen(lang_str) > 0) {
       if (buffer.p[0])
         hts_buf_cat(buffer, "\n");

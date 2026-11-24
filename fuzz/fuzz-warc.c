@@ -226,7 +226,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
         *bar++ = '\0';
         (void) wc_hex(line, hdr, sizeof(hdr));
         memset(out, 0, sizeof(out));
-        warc_http_header_value(hdr, bar, out, sizeof(out));
+        warc_http_header_value(hdr, bar, HTS_SIZED(out));
         for (k = 0; k < sizeof(out); k++)
           wc_sink += (size_t) out[k];
       }
@@ -323,7 +323,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     }
     memset(hv, 0, sizeof(hv));
     if (resphdr_len > 0) {
-      warc_http_header_value(resphdr, "Content-Type", hv, sizeof(hv));
+      warc_http_header_value(resphdr, "Content-Type", HTS_SIZED(hv));
       wc_sink += (size_t) hv[0];
     }
     memset(ext, 0, sizeof(ext));

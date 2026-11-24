@@ -565,13 +565,13 @@ const char *hts_header_shown(httrackp *opt, const char *line, char *dst,
                       (unsigned long) (len - keep)))
       (void) strclipbuff(dst + n, size - n, "<redacted>");
   } else if (keep < len) {
-    (void) hts_span_copy(hts_span_at(line + keep, len - keep), value,
-                         sizeof(value));
+    (void) hts_span_copy(hts_span_at(line + keep, len - keep),
+                         HTS_SIZED(value));
     if (header_name_in(line, url_fields)) {
       char masked[HTS_URLMAXSIZE * 2];
 
       (void) strclipbuff(dst + n, size - n,
-                         url_nologin_r(masked, sizeof(masked), value));
+                         url_nologin_r(HTS_SIZED(masked), value));
     } else {
       (void) strclipbuff(dst + n, size - n, value);
     }

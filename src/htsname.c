@@ -341,7 +341,7 @@ static int wire_patches_ext(httrackp *opt, const sniff_src *src,
                             const char *wiremime, const char *file) {
   char urlmime[256];
 
-  switch (wire_ext_verdict(opt, wiremime, file, urlmime, sizeof(urlmime))) {
+  switch (wire_ext_verdict(opt, wiremime, file, HTS_SIZED(urlmime))) {
   case WIRE_KEEPS_EXT:
     return 0;
   case WIRE_WINS:
@@ -376,7 +376,7 @@ int hts_ext_sniff_wanted(httrackp *opt, const char *wiremime,
   char urlmime[256];
 
   return wiremime != NULL && strnotempty(wiremime) &&
-         wire_ext_verdict(opt, wiremime, file, urlmime, sizeof(urlmime)) ==
+         wire_ext_verdict(opt, wiremime, file, HTS_SIZED(urlmime)) ==
              WIRE_CONTESTED &&
          hts_sniff_mime_known(urlmime);
 }
@@ -786,14 +786,13 @@ static hts_boolean savename_walk_skipped(const httrackp *opt, int max_char,
 
   /* the suffix NAME carries, if it is a collision name at all */
   strcpybuff(node, name);
-  k = savename_collision_next(node, sizeof(node), opt, max_char, 0, &regular) -
-      1;
+  k = savename_collision_next(HTS_SIZED(node), opt, max_char, 0, &regular) - 1;
   if (k < 1 || k >= last)
     return HTS_FALSE;
   /* the walk reaches suffix K unless it starts above it */
   strcpybuff(node, first);
-  return savename_collision_next(node, sizeof(node), opt, max_char, k,
-                                 &regular) == k &&
+  return savename_collision_next(HTS_SIZED(node), opt, max_char, k, &regular) ==
+             k &&
          hts_strcasecmp(node, name) == 0;
 }
 
@@ -802,7 +801,7 @@ static hts_boolean user_mime_ext(httrackp *opt, const char *fil, hts_buf ext) {
   char BIGSTK mime[1024];
 
   mime[0] = ext.p[0] = '\0';
-  get_userhttptype(opt, mime, sizeof(mime), fil);
+  get_userhttptype(opt, HTS_SIZED(mime), fil);
   return strnotempty(mime) && give_mimext(ext, mime) ? HTS_TRUE : HTS_FALSE;
 }
 
@@ -813,9 +812,9 @@ static void add_host_dir(lien_adrfilsave *const afs, const httrackp *opt,
     /* no crawled host is longer, and the type's directories still fit */
     strlncatbuff(afs->save, host, sizeof(afs->save), HTS_URLMAXSIZE);
   } else if (strlen(host) > 4 && strfield(host, "www.")) {
-    hts_appendStringUTF8(afs->save, sizeof(afs->save), host + 4, max_char);
+    hts_appendStringUTF8(HTS_SIZED(afs->save), host + 4, max_char);
   } else {
-    hts_appendStringUTF8(afs->save, sizeof(afs->save), host, max_char);
+    hts_appendStringUTF8(HTS_SIZED(afs->save), host, max_char);
   }
 }
 
@@ -855,7 +854,7 @@ int url_savename(lien_adrfilsave *const afs,
   const char *const strip_rules = hts_strip_query_rules(opt);
   const char *const strip =
       strip_rules != NULL ? hts_query_strip_keys(strip_rules, adr, fil_complete,
-                                                 stripkeys, sizeof(stripkeys))
+                                                 HTS_SIZED(stripkeys))
                           : NULL;
   const char *const print_adr = jump_protocol_const(adr);
   const char *start_pos = NULL, *nom_pos = NULL, *dot_pos = NULL;     // Position nom et point
@@ -1021,7 +1020,7 @@ int url_savename(lien_adrfilsave *const afs,
 
   // decode remaining % (normally not necessary; already done in htsparse.c)
   // this will NOT decode buggy %xx (ie. not UTF-8) ones
-  if (hts_unescapeUrl(fil, catbuff, sizeof(catbuff)) == 0) {
+  if (hts_unescapeUrl(fil, HTS_SIZED(catbuff)) == 0) {
     strcpybuff(fil, catbuff);
   } else {
     hts_log_print(opt, LOG_WARNING,
@@ -1070,8 +1069,8 @@ int url_savename(lien_adrfilsave *const afs,
           htsblk r;
 
           previous_save[0] = '\0';
-          r = cache_read_including_broken(opt, cache, adr, fil, previous_save,
-                                          sizeof(previous_save), NULL,
+          r = cache_read_including_broken(opt, cache, adr, fil,
+                                          HTS_SIZED(previous_save), NULL,
                                           0); // test only
 
           if (r.statuscode != -1) { // cache entry read OK
@@ -1363,12 +1362,12 @@ int url_savename(lien_adrfilsave *const afs,
   if (hts_lastchar(fil) == '/') {
     if (!strfield(adr_complete, "ftp://")
       ) {
-      save_append_tail(fil, sizeof(fil), DEFAULT_HTML);
+      save_append_tail(HTS_SIZED(fil), DEFAULT_HTML);
     } else {
       if (!opt->proxy.active)
-        save_append_tail(fil, sizeof(fil), DEFAULT_FTP);
+        save_append_tail(HTS_SIZED(fil), DEFAULT_FTP);
       else // through a proxy, assume html
-        save_append_tail(fil, sizeof(fil), DEFAULT_HTML);
+        save_append_tail(HTS_SIZED(fil), DEFAULT_HTML);
     }
   }
   // Change the extension? e.g. php3 saved as html, cgi as html or gif/xbm
@@ -1402,14 +1401,14 @@ int url_savename(lien_adrfilsave *const afs,
         fil[dot - fil] = '\0'; // cut
       dot_ext[0] = '.';
       strlcpybuff(dot_ext + 1, ext, sizeof(dot_ext) - 1);
-      save_append_tail(fil, sizeof(fil), dot_ext);
+      save_append_tail(HTS_SIZED(fil), dot_ext);
     } else {
       while((a > fil) && (*a != '/'))
         a--;
       if (*a == '/')
         a++;
       *a = '\0';
-      save_append_tail(fil, sizeof(fil), ext);
+      save_append_tail(HTS_SIZED(fil), ext);
     }
   }
   // find the last / and the last .
@@ -1514,7 +1513,7 @@ int url_savename(lien_adrfilsave *const afs,
               TMPL_CATN(nom_pos, 8);
           }
           if (tmpl_clipped)
-            save_keep_clipped_name(afs->save, sizeof(afs->save), nom_pos);
+            save_keep_clipped_name(HTS_SIZED(afs->save), nom_pos);
           if (tok == 'n')
             break;
           TMPL_TAILC('.');
@@ -1579,8 +1578,8 @@ int url_savename(lien_adrfilsave *const afs,
           char BIGSTK buff[sizeof(afs->af.adr) + sizeof(afs->af.fil)];
 
           digest[0] = buff[0] = '\0';
-          tmpl_catn(buff, sizeof(buff), adr, (size_t) -1);
-          tmpl_catn(buff, sizeof(buff), fil_complete, (size_t) -1);
+          tmpl_catn(HTS_SIZED(buff), adr, (size_t) -1);
+          tmpl_catn(HTS_SIZED(buff), fil_complete, (size_t) -1);
           domd5mem(buff, strlen(buff), digest, 1);
           TMPL_TAIL(digest);
         } break;
@@ -1619,7 +1618,7 @@ int url_savename(lien_adrfilsave *const afs,
       tmpl_clipped = HTS_FALSE;
       TMPL_CAT(nom_pos);
       if (tmpl_clipped)
-        save_keep_clipped_name(afs->save, sizeof(afs->save), nom_pos);
+        save_keep_clipped_name(HTS_SIZED(afs->save), nom_pos);
     }
     //
     // predefined types
@@ -1735,7 +1734,7 @@ int url_savename(lien_adrfilsave *const afs,
         // append the extension
         a = hts_path_ext_dot(fil, "/");
         if (a != NULL) {
-          save_append_tail(afs->save, sizeof(afs->save), a);
+          save_append_tail(HTS_SIZED(afs->save), a);
         }
       }
       break;
@@ -1750,7 +1749,7 @@ int url_savename(lien_adrfilsave *const afs,
     hts_lowcase(afs->save);
 
     if (hts_lastchar(afs->save) == '/')
-      save_append_tail(afs->save, sizeof(afs->save), DEFAULT_HTML);
+      save_append_tail(HTS_SIZED(afs->save), DEFAULT_HTML);
   }
 
   // Without an extension, force .html (not used for delayed types)
@@ -1758,7 +1757,7 @@ int url_savename(lien_adrfilsave *const afs,
   if (opt->savename_type != -1 &&
       opt->savename_delayed != HTS_SAVENAME_DELAYED_HARD) {
     if (hts_path_ext_dot(afs->save, "/") == NULL) {
-      save_append_tail(afs->save, sizeof(afs->save), ".html");
+      save_append_tail(HTS_SIZED(afs->save), ".html");
       hts_log_print(opt, LOG_DEBUG, "Default HTML type set for %s%s => %s",
                     adr_nologin(opt, adr_complete), fil_complete, afs->save);
     }
@@ -1800,7 +1799,7 @@ int url_savename(lien_adrfilsave *const afs,
 
   /* Before path_html is prepended, so the user's own output directory keeps
      its name. */
-  url_savename_escape_reserved(afs->save, sizeof(afs->save));
+  url_savename_escape_reserved(HTS_SIZED(afs->save));
 
   /* Strip ending . or ' ' forbidden on windoz */
   cleanEndingSpaceOrDot(afs->save);
@@ -1872,7 +1871,7 @@ int url_savename(lien_adrfilsave *const afs,
 
   /* Ensure that the MANDATORY "temporary" extension is set */
   if (ext_chg_delayed && !IS_DELAYED_EXT(afs->save))
-    save_append_tail(afs->save, sizeof(afs->save), "." DELAYED_EXT);
+    save_append_tail(HTS_SIZED(afs->save), "." DELAYED_EXT);
   // Cap the save path: the final parent+name is copied into a fixed buffer that
   // aborts() on overflow (htssafe.h), so clamp every ceiling to fit it.
 #define HTS_SAVE_BUFSIZE (HTS_URLMAXSIZE * 2) /* sizeof(afs->save) */
@@ -2046,7 +2045,7 @@ int url_savename(lien_adrfilsave *const afs,
   }
   // Before the collision search, so a name already taken this run still moves.
   if (ext_chg_delayed)
-    url_savename_undelay(opt, afs->save, sizeof(afs->save), ext);
+    url_savename_undelay(opt, HTS_SIZED(afs->save), ext);
 
   // rename on collision with another link's name
   if (opt->liens != NULL) {
@@ -2069,9 +2068,8 @@ int url_savename(lien_adrfilsave *const afs,
       int last = 0, steps, s;
 
       strcpybuff(first, afs->save);
-      steps =
-          savename_walk(afs->save, sizeof(afs->save), opt, hash, normadr,
-                        normfil, max_char, kind, jump, &last, &same, &regular);
+      steps = savename_walk(HTS_SIZED(afs->save), opt, hash, normadr, normfil,
+                            max_char, kind, jump, &last, &same, &regular);
       if (owner >= 0 && !same) {
         const char *const name = heap(owner)->sav;
         const int j = hash_read(hash, name, NULL, HASH_STRUCT_FILENAME);
@@ -2081,9 +2079,9 @@ int url_savename(lien_adrfilsave *const afs,
           strcpybuff(afs->save, first);
           jump = HTS_FALSE;
           regular = HTS_TRUE;
-          steps = savename_walk(afs->save, sizeof(afs->save), opt, hash,
-                                normadr, normfil, max_char, kind, jump, &last,
-                                &same, &regular);
+          steps =
+              savename_walk(HTS_SIZED(afs->save), opt, hash, normadr, normfil,
+                            max_char, kind, jump, &last, &same, &regular);
         } else if (j >= 0 && savename_same_link(opt, j, normadr, normfil) &&
                    savename_walk_skipped(opt, max_char, first, last, name)) {
           /* a walk name by name would have stopped there */
@@ -2099,8 +2097,8 @@ int url_savename(lien_adrfilsave *const afs,
           const int skip = jump ? hash_savename_next(hash, kind, node) : 0;
 
           hash_savename_next_set(hash, kind, node, last);
-          (void) savename_collision_next(node, sizeof(node), opt, max_char,
-                                         skip, &regular);
+          (void) savename_collision_next(HTS_SIZED(node), opt, max_char, skip,
+                                         &regular);
         }
       }
     }

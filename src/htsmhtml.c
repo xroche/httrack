@@ -46,7 +46,7 @@ Please visit our Website: http://www.httrack.com
 static void mimehtml_write_header(httrackp *opt, const char *startcid) {
   char BIGSTK currtime[256];
 
-  time_gmt_rfc822(currtime, sizeof(currtime));
+  time_gmt_rfc822(HTS_SIZED(currtime));
   fprintf(opt->state.mimefp,
           "From: HTTrack Website Copier <nobody@localhost>\r\n"
           "Subject: Local mirror\r\n"
@@ -147,7 +147,7 @@ void mimehtml_add_file(httrackp *opt, const char *save, const char *adr,
         const int isHtml = (ishtml(opt, save) == 1);
         char BIGSTK cid[HTS_URLMAXSIZE * 3];
 
-        make_content_id(adr, fil, cid, sizeof(cid));
+        make_content_id(adr, fil, HTS_SIZED(cid));
         if (opt->state.mimehtml_created == MIMEHTML_NONE) {
           srand((unsigned int) time(NULL));
           StringRoom(opt->state.mimemid, 256);

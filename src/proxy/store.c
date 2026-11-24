@@ -1093,7 +1093,7 @@ int PT_LoadCache__New(PT_Index index_, const char *filename) {
 
       walk.index = index;
       walk.firstSeen = HTS_FALSE;
-      index_base_path(index->path, sizeof(index->path), filename);
+      index_base_path(HTS_SIZED(index->path), filename);
 
       /* Ready directory entries */
       if (hts_cache_walk_index(zFile, index_entry_new, index_bad_new, &walk,
@@ -1235,9 +1235,9 @@ static PT_Element PT_ReadCache__New(PT_Index index_, const char *url,
             strcpybuff(r->msg, "Cache Read Error : NUL In Header");
           }
 
-          PT_resolve_previous_save(previous_save, sizeof(previous_save),
-                                   index->path, previous_save_, r, url,
-                                   &index->fixedPath, &index->safeCache);
+          PT_resolve_previous_save(HTS_SIZED(previous_save), index->path,
+                                   previous_save_, r, url, &index->fixedPath,
+                                   &index->safeCache);
 
           /* The 32-bit zip writer cannot store an in-cache body of INT_MAX
              or more. */
@@ -1275,7 +1275,8 @@ static PT_Element PT_ReadCache__New(PT_Index index_, const char *url,
                     r->statuscode = STATUSCODE_INVALID;
                     strcpybuff(r->msg, "Cache Read Error : Bad Size");
                   } else {
-                    FILE *fp = fopen(file_convert(catbuff, sizeof(catbuff), previous_save), "rb");
+                    FILE *fp = fopen(
+                        file_convert(HTS_SIZED(catbuff), previous_save), "rb");
 
                     if (fp != NULL &&
                         !cache_fits(fp, stream_size(fp), r->size)) {
@@ -1309,8 +1310,7 @@ static PT_Element PT_ReadCache__New(PT_Index index_, const char *url,
                       r->statuscode = STATUSCODE_INVALID;
                       PT_Element_failf(
                           r, "Read error (can't open '%s') from cache",
-                          file_convert(catbuff, sizeof(catbuff),
-                                       previous_save));
+                          file_convert(HTS_SIZED(catbuff), previous_save));
                     }
                   }
                 }
@@ -1611,7 +1611,7 @@ static int PT_LoadCache__Old(PT_Index index_, const char *filename) {
     /* Init before any early return, as readers and the destructor use it */
     MutexInit(&cache->fileLock);
 
-    index_base_path(cache->path, sizeof(cache->path), filename);
+    index_base_path(HTS_SIZED(cache->path), filename);
 
     /* Index/data filenames */
     if (pos != NULL) {
@@ -1645,12 +1645,12 @@ static int PT_LoadCache__Old(PT_Index index_, const char *filename) {
         char *a = use;
 
         use[ndxSize] = '\0';
-        a += cache_brstr(a, firstline, sizeof(firstline));
+        a += cache_brstr(a, HTS_SIZED(firstline));
         if (strncmp(firstline, "CACHE-", 6) == 0) {     // Nouvelle version du cache
           if (strncmp(firstline, "CACHE-1.", 8) == 0) { // Version 1.1x
             cache->version = (int) (firstline[8] - '0');        // cache 1.x
             if (cache->version <= 5) {
-              a += cache_brstr(a, firstline, sizeof(firstline));
+              a += cache_brstr(a, HTS_SIZED(firstline));
               strcpybuff(cache->lastmodified, firstline);
             } else {
               fclose(cache->dat);
@@ -1850,28 +1850,26 @@ static PT_Element PT_ReadCache__Old(PT_Index index_, const char *url,
            rather than serve fields decoded from the wrong bytes */
         if (cache_rint(cache->dat, datSize, &r->statuscode) &&
             cache_rLLint(cache->dat, datSize, &size_) &&
-            cache_rstr(cache->dat, r->msg, sizeof(r->msg), datSize) &&
-            cache_rstr(cache->dat, r->contenttype, sizeof(r->contenttype),
-                       datSize) &&
+            cache_rstr(cache->dat, HTS_SIZED(r->msg), datSize) &&
+            cache_rstr(cache->dat, HTS_SIZED(r->contenttype), datSize) &&
             (cache->version < 3 ||
-             cache_rstr(cache->dat, r->charset, sizeof(r->charset), datSize)) &&
-            cache_rstr(cache->dat, r->lastmodified, sizeof(r->lastmodified),
-                       datSize) &&
-            cache_rstr(cache->dat, r->etag, sizeof(r->etag), datSize) &&
+             cache_rstr(cache->dat, HTS_SIZED(r->charset), datSize)) &&
+            cache_rstr(cache->dat, HTS_SIZED(r->lastmodified), datSize) &&
+            cache_rstr(cache->dat, HTS_SIZED(r->etag), datSize) &&
             cache_rstr(cache->dat, r->location, sizeof(location_default),
                        datSize) &&
             (cache->version < 2 ||
-             cache_rstr(cache->dat, r->cdispo, sizeof(r->cdispo), datSize)) &&
+             cache_rstr(cache->dat, HTS_SIZED(r->cdispo), datSize)) &&
             (cache->version < 4 ||
-             (cache_rstr(cache->dat, previous_save_, sizeof(previous_save_),
+             (cache_rstr(cache->dat, HTS_SIZED(previous_save_),
                          datSize) && // adr
-              cache_rstr(cache->dat, previous_save_, sizeof(previous_save_),
+              cache_rstr(cache->dat, HTS_SIZED(previous_save_),
                          datSize) && // fil
-              cache_rstr(cache->dat, previous_save_, sizeof(previous_save_),
+              cache_rstr(cache->dat, HTS_SIZED(previous_save_),
                          datSize))) && // save
             (cache->version < 5 ||
              cache_rstr_addr(cache->dat, datSize, &r->headers)) &&
-            cache_rstr(cache->dat, check, sizeof(check), datSize) &&
+            cache_rstr(cache->dat, HTS_SIZED(check), datSize) &&
             strcmp(check, "HTS") == 0 && /* intégrité OK */
             cache_rLLint(cache->dat, datSize, &size_read)) {
           ok = 1;
@@ -1881,9 +1879,9 @@ static PT_Element PT_ReadCache__Old(PT_Index index_, const char *url,
         r->size = ok ? (size_t) size_read : 0;
       }
 
-      PT_resolve_previous_save(previous_save, sizeof(previous_save),
-                               cache->path, previous_save_, r, url,
-                               &cache->fixedPath, &cache->safeCache);
+      PT_resolve_previous_save(HTS_SIZED(previous_save), cache->path,
+                               previous_save_, r, url, &cache->fixedPath,
+                               &cache->safeCache);
 
       /* Read data */
       if (ok) {
