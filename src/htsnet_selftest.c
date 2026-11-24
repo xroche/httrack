@@ -32,6 +32,7 @@ Please visit our Website: http://www.httrack.com
 /* ------------------------------------------------------------ */
 
 #include "htsselftest_int.h"
+#include "htsshared.h"
 
 /* The MPTCP counters and option reach the stats but not another opt. */
 static int st_mptcpstats(httrackp *opt, int argc, char **argv) {
@@ -615,6 +616,74 @@ static int st_xfread_lines(httrackp *opt, int argc, char **argv) {
 static void socwait_delayed_send(void *arg) {
   Sleep(300);
   (void) send(*(T_SOC *) arg, "x", 1, 0);
+}
+
+/* Print len bytes of s as [s], control bytes escaped. */
+static void st_shared_print(const char *s, int len) {
+  int i;
+
+  putchar('[');
+  for (i = 0; i < len; i++) {
+    const unsigned char c = (unsigned char) s[i];
+
+    if (c < 0x20 || c >= 0x7f || c == '\\')
+      printf("\\x%02x", c);
+    else
+      putchar(c);
+  }
+  putchar(']');
+}
+
+/* sharedline CAP file|nul|tail|soc TEXT: each line the shared readers give
+   into an exact CAP-byte heap buffer, "!" before a cut socket line. */
+static int st_sharedline(httrackp *opt, int argc, char **argv) {
+  char data[4096];
+  const int cap = argc >= 3 ? atoi(argv[0]) : 0;
+  const char *const mode = argc >= 3 ? argv[1] : "";
+  const size_t len =
+      argc >= 3 ? st_decode_body(argv[2], data, sizeof(data)) : 0;
+  char *line;
+  int n;
+
+  if (cap < 1 || cap > 1024) {
+    fprintf(stderr, "sharedline: needs CAP (1..1024) MODE TEXT\n");
+    return 1;
+  }
+  line = malloct((size_t) cap);
+  assertf(line != NULL);
+  if (strcmp(mode, "soc") == 0) {
+    T_SOC sv[2];
+    hts_boolean cut;
+
+    assertf(st_socketpair(sv) == 0);
+    assertf(send(sv[0], data, (int) len, 0) == (int) len);
+    deletesoc(sv[0]);
+    while ((n = hts_shared_linputsoc(sv[1], hts_buf_at(line, (size_t) cap),
+                                     time(NULL) + 10, &cut)) > 0) {
+      assertf(line[n] == '\0');
+      printf("%s", cut ? "!" : "");
+      st_shared_print(line, n);
+    }
+    printf("(%d)", n);
+    deletesoc(sv[1]);
+  } else {
+    const int flags = strcmp(mode, "file") == 0  ? 0
+                      : strcmp(mode, "nul") == 0 ? HTS_LINPUT_SKIP_NUL
+                                                 : HTS_LINPUT_DROP_TAIL;
+    FILE *const fp = tmpfile();
+
+    assertf(fp != NULL && fwrite(data, 1, len, fp) == len);
+    rewind(fp);
+    while (!feof(fp)) {
+      n = hts_shared_linput(fp, hts_buf_at(line, (size_t) cap), flags);
+      assertf(n >= 0 && n < cap && line[n] == '\0');
+      st_shared_print(line, n);
+    }
+    fclose(fp);
+  }
+  printf("\n");
+  freet(line);
+  return 0;
 }
 
 /* Each wait watches its own direction: a fresh, empty socket is writable and
@@ -1934,6 +2003,9 @@ const struct selftest_entry selftests_net[] = {
      st_catchurl_bind},
     {"socwait", "", "the read and write waits each watch their own direction",
      st_socwait},
+    {"sharedline", "<cap> file|nul|tail|soc <text|hex:..>",
+     "proxytrack and htsserver line readers at their buffer's edge",
+     st_sharedline},
     {"xfread-lines", "",
      "peeked line reads match the bytewise fallback on random streams",
      st_xfread_lines},

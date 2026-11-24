@@ -36,17 +36,19 @@ Please visit our Website: http://www.httrack.com
 #include "htsglobal.h"
 #include "htsbasenet.h"
 #include "htsnet.h"
+#include "htsbuf.h"
 
 #include <stdio.h>
 #include <time.h>
 
 /* Not HTSEXT_API, because that breaks the MSVC proxytrack build. */
 
-/* Read one line of fp into s (max bytes, NUL included) and return its length.
-   CR, TAB and form feed are dropped, and NUL too with HTS_LINPUT_SKIP_NUL. A
-   line cut at the bound has its newline consumed, so the next read is not "",
-   and with HTS_LINPUT_DROP_TAIL the rest of the line is skipped. */
-int hts_shared_linput(FILE *fp, char *s, int max, int flags);
+/* Read one line of fp into s (2 bytes or more, NUL included) and return its
+   length. CR, TAB and form feed are dropped, and NUL too with
+   HTS_LINPUT_SKIP_NUL. A line cut at the bound has its newline consumed, so
+   the next read is not "", and with HTS_LINPUT_DROP_TAIL the rest of the line
+   is skipped. */
+int hts_shared_linput(FILE *fp, hts_buf s, int flags);
 
 /* hts_shared_linput() flags. */
 #define HTS_LINPUT_SKIP_NUL 1
@@ -62,11 +64,11 @@ hts_boolean hts_shared_link_has_authority(const char *lien);
    passes. */
 hts_boolean hts_shared_readable(T_SOC soc, time_t deadline);
 
-/* Read one line off soc into s (max bytes, NUL included) and return its
-   length, or -1 when no byte came before deadline (0: none). CR, TAB and form
-   feed are dropped. A line longer than s is drained to its newline and sets
-   *cut, so its tail is never read as a line of its own. */
-int hts_shared_linputsoc(T_SOC soc, char *s, int max, time_t deadline,
+/* Read one line off soc into s, NUL included, and return its length, or -1
+   when no byte came before deadline (0: none). CR, TAB and form feed are
+   dropped. A line longer than s is drained to its newline and sets *cut, so
+   its tail is never read as a line of its own. */
+int hts_shared_linputsoc(T_SOC soc, hts_buf s, time_t deadline,
                          hts_boolean *cut);
 
 /* Store the first address of hostname in *server. Return HTS_FALSE when
