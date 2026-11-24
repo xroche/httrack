@@ -124,6 +124,10 @@ def handle_client(conn, logdir, mode, default_port):
     if mode == "wrap":
         # 2^32 + 200, which a %d parse wraps to 200
         conn.sendall(b"HTTP/1.1 4294967496 Connection established\r\n\r\n")
+    elif mode.startswith("hdr"):
+        # one header line of exactly N bytes before its CRLF
+        pad = b"X: " + b"h" * (int(mode[3:]) - 3)
+        conn.sendall(b"HTTP/1.0 200 Connection established\r\n" + pad + b"\r\n\r\n")
     else:
         conn.sendall(b"HTTP/1.0 200 Connection established\r\n\r\n")
     threading.Thread(target=pipe, args=(conn, upstream), daemon=True).start()
