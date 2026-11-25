@@ -98,9 +98,8 @@ int url_savename(lien_adrfilsave *const afs,
                  httrackp * opt, struct_back * sback, cache_back * cache,
                  hash_struct * hash, int ptr, int numero_passe,
                  const lien_back * headers);
-void standard_name(char *b, size_t bsize, const char *dot_pos,
-                   const char *nom_pos, const char *fil_complete,
-                   int short_ver);
+void standard_name(hts_buf b, const char *dot_pos, const char *nom_pos,
+                   const char *fil_complete, int short_ver);
 /* Does url's query have a field with an '=' whose key is exactly name? Its
    value, clipped to fit, goes to dst, of size >= 1. */
 hts_boolean url_query_value(const char *url, const char *name, hts_buf dst);

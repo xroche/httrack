@@ -114,7 +114,7 @@ static void fuzz_line(const char *line, httrackp *opt, cache_back *cache,
     while (nom > fil && nom[-1] != '/' && nom[-1] != '\\')
       nom--;
     dot = strrchr(nom, '.');
-    standard_name(HTS_SIZED(b), dot, nom, fil, flags & 1);
+    standard_name(HTS_BUF(b), dot, nom, fil, flags & 1);
     savename_sink += (unsigned long) strlen(b);
   }
 

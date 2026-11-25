@@ -69,8 +69,7 @@ Please visit our Website: http://www.httrack.com
     char BIGSTK buff[HTS_URLMAXSIZE * 2];                                      \
     char BIGSTK tail[HTS_URLMAXSIZE * 2];                                      \
     size_t len, need;                                                          \
-    standard_name(HTS_SIZED(buff), dot_pos, nom_pos, fil_complete,             \
-                  (shortname));                                                \
+    standard_name(HTS_BUF(buff), dot_pos, nom_pos, fil_complete, (shortname)); \
     strcpybuff(tail, buff + save_tail_offset(buff));                           \
     len = strlen(afs->save);                                                   \
     need = save_name_keep(buff) + strlen(tail) + 1;                            \
@@ -80,10 +79,10 @@ Please visit our Website: http://www.httrack.com
     if (tail[0] != '\0')                                                       \
       buff[strlen(buff) - strlen(tail)] = '\0';                                \
     else /* sized: a long extension is dropped before the name */              \
-      standard_name(buff, sizeof(afs->save) - strlen(afs->save), dot_pos,      \
-                    nom_pos, fil_complete, (shortname));                       \
+      standard_name(hts_buf_at(buff, sizeof(afs->save) - strlen(afs->save)),   \
+                    dot_pos, nom_pos, fil_complete, (shortname));              \
     url_savename_addstr(HTS_SIZED(afs->save), buff);                           \
-    save_append_tail(HTS_SIZED(afs->save), tail);                              \
+    save_append_tail(HTS_BUF(afs->save), tail);                                \
   }
 
 /* Avoid stupid DOS system folders/file such as 'nul' */
@@ -144,21 +143,20 @@ static size_t reservedNameAt(const char *save, const char *c,
 
 /* Replace foo/<reserved>/bar by foo/<reserved>_/bar, matching a whole path
    component only (case-insensitively: the filesystem may be too). */
-static void escapeReservedNames(char *save, size_t size,
-                                const char *const *names) {
-  char *c = save;
+static void escapeReservedNames(hts_buf save, const char *const *names) {
+  char *c = save.p;
 
-  if (size == 0)
+  if (save.size == 0)
     return;
   for (;;) {
-    const size_t len = reservedNameAt(save, c, names);
+    const size_t len = reservedNameAt(save.p, c, names);
 
     if (len != 0) {
-      const size_t total = strlen(save);
+      const size_t total = strlen(save.p);
 
       /* a full buffer loses the name's last byte, never the path's tail */
-      if (total < size - 1) {
-        memmove(c + len + 1, c + len, total - (size_t) (c - save) - len + 1);
+      if (total < save.size - 1) {
+        memmove(c + len + 1, c + len, total - (size_t) (c - save.p) - len + 1);
         c[len] = '_';
       } else {
         c[len - 1] = '_';
@@ -172,8 +170,8 @@ static void escapeReservedNames(char *save, size_t size,
 }
 
 void url_savename_escape_reserved(char *save, size_t size) {
-  escapeReservedNames(save, size, hts_tbreserved);
-  escapeReservedNames(save, size, hts_tbdev);
+  escapeReservedNames(hts_buf_at(save, size), hts_tbreserved);
+  escapeReservedNames(hts_buf_at(save, size), hts_tbdev);
 }
 
 /* Strip all // */
@@ -441,7 +439,7 @@ static void tmpl_catc(hts_buf d, char c) {
 #define TMPL_FLUSH()                                                           \
   do {                                                                         \
     if (tmpltail[0] != '\0') {                                                 \
-      save_append_tail(HTS_SIZED(afs->save), tmpltail);                        \
+      save_append_tail(HTS_BUF(afs->save), tmpltail);                          \
       tmpltail[0] = '\0';                                                      \
     }                                                                          \
   } while (0)
@@ -513,45 +511,45 @@ static size_t save_name_keep(const char *name) {
   return n;
 }
 
-/* Append tail to save (capacity size), cutting the name down to its head. */
-static void save_append_tail(char *save, size_t size, const char *tail) {
-  const size_t len = strlen(save);
+/* Append tail to save, cutting the name down to its head. */
+static void save_append_tail(hts_buf save, const char *tail) {
+  const size_t len = strlen(save.p);
   size_t room;
 
-  assertf(strlen(tail) < size);
-  room = size - 1 - strlen(tail);
+  assertf(strlen(tail) < save.size);
+  room = save.size - 1 - strlen(tail);
   if (len > room) {
-    const char *const slash = strrchr(save, '/');
-    const size_t dir_len = slash != NULL ? (size_t) (slash - save) + 1 : 0;
-    const size_t keep = save_name_keep(save + dir_len);
+    const char *const slash = strrchr(save.p, '/');
+    const size_t dir_len = slash != NULL ? (size_t) (slash - save.p) + 1 : 0;
+    const size_t keep = save_name_keep(save.p + dir_len);
 
     if (dir_len + keep > room) {
       /* the directory alone fills save[]: shorten its longest segments */
-      save[dir_len + keep] = '\0';
-      save_trim_dirs(save, dir_len, dir_len + keep - room);
+      save.p[dir_len + keep] = '\0';
+      save_trim_dirs(save.p, dir_len, dir_len + keep - room);
     }
   }
-  url_savename_addtail(save, size, "", tail);
+  url_savename_addtail(save.p, save.size, "", tail);
 }
 
 /* Append the part of name a cut keeps, when a clip left no name byte. */
-static void save_append_name_head(char *save, size_t size, const char *name) {
+static void save_append_name_head(hts_buf save, const char *name) {
   char head[MAX_EXT_LEN + 8];
 
   head[0] = '\0';
   strncatbuff(head, name, save_name_keep(name));
-  save_append_tail(save, size, head);
+  save_append_tail(save, head);
 }
 
 /* Give save a file name when a clip left it none, or only a dotfile's dot. */
-static void save_keep_clipped_name(char *save, size_t size, const char *name) {
-  char *const slash = strrchr(save, '/');
-  char *const last = slash != NULL ? slash + 1 : save;
+static void save_keep_clipped_name(hts_buf save, const char *name) {
+  char *const slash = strrchr(save.p, '/');
+  char *const last = slash != NULL ? slash + 1 : save.p;
 
   if (strcmp(last, ".") == 0)
     *last = '\0';
   if (*last == '\0')
-    save_append_name_head(save, size, name);
+    save_append_name_head(save, name);
 }
 
 /* Return the byte offset of each character of s, then strlen(s), and store
@@ -668,16 +666,16 @@ static hts_boolean url_savename_undelay(httrackp *opt, char *save,
   return HTS_TRUE;
 }
 
-/* Replace SAVE (SIZE bytes), a name another link holds, by the next one to try:
+/* Replace SAVE, a name another link holds, by the next one to try:
    index.html -> index-2.html -> index-3.html. Jump to suffix SKIP when it is
    further. Clear *REGULAR when the new name breaks the rule that the walk
    from any of its names is the same suffix sequence. Return the suffix. */
-static int savename_collision_next(char *save, size_t size, const httrackp *opt,
+static int savename_collision_next(hts_buf save, const httrackp *opt,
                                    int max_char, int skip,
                                    hts_boolean *regular) {
   char BIGSTK tempo[HTS_URLMAXSIZE * 2];
   char suffix[16];
-  const char *const dot = hts_path_ext_dot(save, "/\\");
+  const char *const dot = hts_path_ext_dot(save.p, "/\\");
   size_t stem;
   int n = 2;
   const char collisionSeparator =
@@ -685,9 +683,9 @@ static int savename_collision_next(char *save, size_t size, const httrackp *opt,
 
   tempo[0] = '\0';
   if (dot != NULL)
-    strncatbuff(tempo, save, dot - save);
+    strncatbuff(tempo, save.p, dot - save.p);
   else
-    strcatbuff(tempo, save);
+    strcatbuff(tempo, save.p);
 
   // bump an existing -N suffix (index-2.html -> index-3.html)
   stem = hts_rtrimlen(tempo, "0123456789");
@@ -730,7 +728,7 @@ static int savename_collision_next(char *save, size_t size, const httrackp *opt,
   if (dot != NULL)
     strcatbuff(tempo, dot);
 
-  strlcpybuff(save, tempo, size);
+  strlcpybuff(save.p, tempo, save.size);
   return n;
 }
 
@@ -746,11 +744,10 @@ static hts_boolean savename_same_link(const httrackp *opt, int i,
    which then lands in SAVE. With JUMP, skip names an earlier walk found taken.
    Set *SAME when the walk ended on this link's name, *LAST to the last suffix
    tried. Return the number of steps. */
-static int savename_walk(char *save, size_t size, const httrackp *opt,
-                         hash_struct *hash, const char *normadr,
-                         const char *normfil, int max_char, char kind,
-                         hts_boolean jump, int *last, hts_boolean *same,
-                         hts_boolean *regular) {
+static int savename_walk(hts_buf save, const httrackp *opt, hash_struct *hash,
+                         const char *normadr, const char *normfil, int max_char,
+                         char kind, hts_boolean jump, int *last,
+                         hts_boolean *same, hts_boolean *regular) {
   int steps = 0;
 
   *same = HTS_FALSE;
@@ -758,19 +755,19 @@ static int savename_walk(char *save, size_t size, const httrackp *opt,
     int i;
 
     hash->savename_probes++;
-    i = hash_read(hash, save, NULL, HASH_STRUCT_FILENAME);
+    i = hash_read(hash, save.p, NULL, HASH_STRUCT_FILENAME);
     if (i < 0)
       break;
     if (savename_same_link(opt, i, normadr, normfil)) {
       /* keep its name, whatever its case */
-      if (strcmp(heap(i)->sav, save) != 0)
-        strlcpybuff(save, heap(i)->sav, size);
+      if (strcmp(heap(i)->sav, save.p) != 0)
+        strlcpybuff(save.p, heap(i)->sav, save.size);
       *same = HTS_TRUE;
       break;
     }
     *last = savename_collision_next(
-        save, size, opt, max_char,
-        jump ? hash_savename_next(hash, kind, save) : 0, regular);
+        save, opt, max_char, jump ? hash_savename_next(hash, kind, save.p) : 0,
+        regular);
     steps++;
   }
   return steps;
@@ -786,12 +783,12 @@ static hts_boolean savename_walk_skipped(const httrackp *opt, int max_char,
 
   /* the suffix NAME carries, if it is a collision name at all */
   strcpybuff(node, name);
-  k = savename_collision_next(HTS_SIZED(node), opt, max_char, 0, &regular) - 1;
+  k = savename_collision_next(HTS_BUF(node), opt, max_char, 0, &regular) - 1;
   if (k < 1 || k >= last)
     return HTS_FALSE;
   /* the walk reaches suffix K unless it starts above it */
   strcpybuff(node, first);
-  return savename_collision_next(HTS_SIZED(node), opt, max_char, k, &regular) ==
+  return savename_collision_next(HTS_BUF(node), opt, max_char, k, &regular) ==
              k &&
          hts_strcasecmp(node, name) == 0;
 }
@@ -1362,12 +1359,12 @@ int url_savename(lien_adrfilsave *const afs,
   if (hts_lastchar(fil) == '/') {
     if (!strfield(adr_complete, "ftp://")
       ) {
-      save_append_tail(HTS_SIZED(fil), DEFAULT_HTML);
+      save_append_tail(HTS_BUF(fil), DEFAULT_HTML);
     } else {
       if (!opt->proxy.active)
-        save_append_tail(HTS_SIZED(fil), DEFAULT_FTP);
+        save_append_tail(HTS_BUF(fil), DEFAULT_FTP);
       else // through a proxy, assume html
-        save_append_tail(HTS_SIZED(fil), DEFAULT_HTML);
+        save_append_tail(HTS_BUF(fil), DEFAULT_HTML);
     }
   }
   // Change the extension? e.g. php3 saved as html, cgi as html or gif/xbm
@@ -1401,14 +1398,14 @@ int url_savename(lien_adrfilsave *const afs,
         fil[dot - fil] = '\0'; // cut
       dot_ext[0] = '.';
       strlcpybuff(dot_ext + 1, ext, sizeof(dot_ext) - 1);
-      save_append_tail(HTS_SIZED(fil), dot_ext);
+      save_append_tail(HTS_BUF(fil), dot_ext);
     } else {
       while((a > fil) && (*a != '/'))
         a--;
       if (*a == '/')
         a++;
       *a = '\0';
-      save_append_tail(HTS_SIZED(fil), ext);
+      save_append_tail(HTS_BUF(fil), ext);
     }
   }
   // find the last / and the last .
@@ -1513,7 +1510,7 @@ int url_savename(lien_adrfilsave *const afs,
               TMPL_CATN(nom_pos, 8);
           }
           if (tmpl_clipped)
-            save_keep_clipped_name(HTS_SIZED(afs->save), nom_pos);
+            save_keep_clipped_name(HTS_BUF(afs->save), nom_pos);
           if (tok == 'n')
             break;
           TMPL_TAILC('.');
@@ -1618,7 +1615,7 @@ int url_savename(lien_adrfilsave *const afs,
       tmpl_clipped = HTS_FALSE;
       TMPL_CAT(nom_pos);
       if (tmpl_clipped)
-        save_keep_clipped_name(HTS_SIZED(afs->save), nom_pos);
+        save_keep_clipped_name(HTS_BUF(afs->save), nom_pos);
     }
     //
     // predefined types
@@ -1734,7 +1731,7 @@ int url_savename(lien_adrfilsave *const afs,
         // append the extension
         a = hts_path_ext_dot(fil, "/");
         if (a != NULL) {
-          save_append_tail(HTS_SIZED(afs->save), a);
+          save_append_tail(HTS_BUF(afs->save), a);
         }
       }
       break;
@@ -1749,7 +1746,7 @@ int url_savename(lien_adrfilsave *const afs,
     hts_lowcase(afs->save);
 
     if (hts_lastchar(afs->save) == '/')
-      save_append_tail(HTS_SIZED(afs->save), DEFAULT_HTML);
+      save_append_tail(HTS_BUF(afs->save), DEFAULT_HTML);
   }
 
   // Without an extension, force .html (not used for delayed types)
@@ -1757,7 +1754,7 @@ int url_savename(lien_adrfilsave *const afs,
   if (opt->savename_type != -1 &&
       opt->savename_delayed != HTS_SAVENAME_DELAYED_HARD) {
     if (hts_path_ext_dot(afs->save, "/") == NULL) {
-      save_append_tail(HTS_SIZED(afs->save), ".html");
+      save_append_tail(HTS_BUF(afs->save), ".html");
       hts_log_print(opt, LOG_DEBUG, "Default HTML type set for %s%s => %s",
                     adr_nologin(opt, adr_complete), fil_complete, afs->save);
     }
@@ -1871,7 +1868,7 @@ int url_savename(lien_adrfilsave *const afs,
 
   /* Ensure that the MANDATORY "temporary" extension is set */
   if (ext_chg_delayed && !IS_DELAYED_EXT(afs->save))
-    save_append_tail(HTS_SIZED(afs->save), "." DELAYED_EXT);
+    save_append_tail(HTS_BUF(afs->save), "." DELAYED_EXT);
   // Cap the save path: the final parent+name is copied into a fixed buffer that
   // aborts() on overflow (htssafe.h), so clamp every ceiling to fit it.
 #define HTS_SAVE_BUFSIZE (HTS_URLMAXSIZE * 2) /* sizeof(afs->save) */
@@ -2013,7 +2010,7 @@ int url_savename(lien_adrfilsave *const afs,
 
           strcpybuff(tail, afs->save + off);
           afs->save[off] = '\0';
-          save_append_tail(afs->save, budget + 1, tail);
+          save_append_tail(hts_buf_at(afs->save, budget + 1), tail);
         } else {
           afs->save[utf8_cut(afs->save, budget)] = '\0';
         }
@@ -2068,7 +2065,7 @@ int url_savename(lien_adrfilsave *const afs,
       int last = 0, steps, s;
 
       strcpybuff(first, afs->save);
-      steps = savename_walk(HTS_SIZED(afs->save), opt, hash, normadr, normfil,
+      steps = savename_walk(HTS_BUF(afs->save), opt, hash, normadr, normfil,
                             max_char, kind, jump, &last, &same, &regular);
       if (owner >= 0 && !same) {
         const char *const name = heap(owner)->sav;
@@ -2079,9 +2076,8 @@ int url_savename(lien_adrfilsave *const afs,
           strcpybuff(afs->save, first);
           jump = HTS_FALSE;
           regular = HTS_TRUE;
-          steps =
-              savename_walk(HTS_SIZED(afs->save), opt, hash, normadr, normfil,
-                            max_char, kind, jump, &last, &same, &regular);
+          steps = savename_walk(HTS_BUF(afs->save), opt, hash, normadr, normfil,
+                                max_char, kind, jump, &last, &same, &regular);
         } else if (j >= 0 && savename_same_link(opt, j, normadr, normfil) &&
                    savename_walk_skipped(opt, max_char, first, last, name)) {
           /* a walk name by name would have stopped there */
@@ -2097,7 +2093,7 @@ int url_savename(lien_adrfilsave *const afs,
           const int skip = jump ? hash_savename_next(hash, kind, node) : 0;
 
           hash_savename_next_set(hash, kind, node, last);
-          (void) savename_collision_next(HTS_SIZED(node), opt, max_char, skip,
+          (void) savename_collision_next(HTS_BUF(node), opt, max_char, skip,
                                          &regular);
         }
       }
@@ -2107,16 +2103,16 @@ int url_savename(lien_adrfilsave *const afs,
   return 0;
 }
 
-/* Build the md5-based name into b (capacity bsize). */
-void standard_name(char *b, size_t bsize, const char *dot_pos,
-                   const char *nom_pos, const char *fil, int short_ver) {
+/* Build the md5-based name into b. */
+void standard_name(hts_buf b, const char *dot_pos, const char *nom_pos,
+                   const char *fil, int short_ver) {
   char md5[32 + 2];
   htsbuff bb;
   size_t room, md5_len, ext_len, ext_tail, name_len;
 
-  assertf(bsize != 0);
-  bb = htsbuff_ptr(b, bsize);
-  room = bsize - 1;
+  assertf(b.size != 0);
+  bb = htsbuff_ptr(b.p, b.size);
+  room = b.size - 1;
   md5_len = strnlen(url_md5(HTS_BUF(md5), fil), 4);
   ext_len = dot_pos == NULL
                 ? 0
