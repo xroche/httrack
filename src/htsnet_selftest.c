@@ -1324,8 +1324,9 @@ static int st_catchurl(httrackp *opt, int argc, char **argv) {
   arg.tail = fits;
   url[0] = method[0] = data[0] = '\0';
   assertf(hts_newthread(st_catchurl_client, &arg) == 0);
-  assertf(catch_url_capture(srv, url, sizeof(url), method, sizeof(method), data,
-                            CATCH_URL_DATA_SIZE) == CATCH_URL_OK);
+  assertf(catch_url_capture(srv, HTS_BUF(url), HTS_BUF(method),
+                            hts_buf_at(data, CATCH_URL_DATA_SIZE)) ==
+          CATCH_URL_OK);
   htsthread_wait();
   assertf(strcmp(method, "GET") == 0);
   assertf(strcmp(url, "http://example.com/") == 0);
@@ -1336,8 +1337,9 @@ static int st_catchurl(httrackp *opt, int argc, char **argv) {
   arg.tail = fits + 1;
   url[0] = method[0] = data[0] = '\0';
   assertf(hts_newthread(st_catchurl_client, &arg) == 0);
-  assertf(catch_url_capture(srv, url, sizeof(url), method, sizeof(method), data,
-                            CATCH_URL_DATA_SIZE) == CATCH_URL_ERR_BLOCK);
+  assertf(catch_url_capture(srv, HTS_BUF(url), HTS_BUF(method),
+                            hts_buf_at(data, CATCH_URL_DATA_SIZE)) ==
+          CATCH_URL_ERR_BLOCK);
   htsthread_wait();
   deletesoc(srv);
   assertf(data[0] == '\0');
@@ -1407,16 +1409,18 @@ static int st_catchurl_overlong(httrackp *opt, int argc, char **argv) {
   /* one over-long line, far under any block bound: refused, nothing kept */
   url[0] = method[0] = data[0] = '\0';
   assertf(hts_newthread(st_catchurl_over_client, &arg) == 0);
-  assertf(catch_url_capture(srv, url, sizeof(url), method, sizeof(method), data,
-                            CATCH_URL_DATA_SIZE) == CATCH_URL_ERR_HEADER);
+  assertf(catch_url_capture(srv, HTS_BUF(url), HTS_BUF(method),
+                            hts_buf_at(data, CATCH_URL_DATA_SIZE)) ==
+          CATCH_URL_ERR_HEADER);
   htsthread_wait();
   assertf(data[0] == '\0');
 
   /* nothing but over-long lines: the capture ends on the first one */
   url[0] = method[0] = data[0] = '\0';
   assertf(hts_newthread(st_catchurl_flood_client, &arg) == 0);
-  assertf(catch_url_capture(srv, url, sizeof(url), method, sizeof(method), data,
-                            CATCH_URL_DATA_SIZE) == CATCH_URL_ERR_HEADER);
+  assertf(catch_url_capture(srv, HTS_BUF(url), HTS_BUF(method),
+                            hts_buf_at(data, CATCH_URL_DATA_SIZE)) ==
+          CATCH_URL_ERR_HEADER);
   htsthread_wait();
   deletesoc(srv);
   assertf(data[0] == '\0');
@@ -1843,8 +1847,9 @@ static catch_url_status st_catchurl_sized_run(const char *req, char *url,
 
   arg.req = req;
   assertf(hts_newthread(st_catchurl_sized_client, &arg) == 0);
-  status = catch_url_capture(srv, url, url_size, method, method_size, data,
-                             data_size);
+  status = catch_url_capture(srv, hts_buf_at(url, url_size),
+                             hts_buf_at(method, method_size),
+                             hts_buf_at(data, data_size));
   htsthread_wait();
   deletesoc(srv);
   return status;
@@ -1884,6 +1889,44 @@ static hts_boolean st_catchurl_width_ok(size_t method_len, size_t url_len,
   freet(method);
   freet(data);
   return ok;
+}
+
+/* Did a request line, or else a header line, of LEN bytes capture as WANT? */
+static hts_boolean st_catchurl_line_ok(hts_boolean header, size_t len,
+                                       catch_url_status want) {
+  static const char reqline[] = "GET http://example.com/ HTTP/1.0 ";
+  const char *const start = header ? "X-L: " : reqline;
+  const size_t head = header ? strlen(ST_CATCHURL_REQ) : 0;
+  char *req = malloct(head + len + 5);
+  char *url = st_sized_alloc(HTS_URLMAXSIZE * 2);
+  char *method = st_sized_alloc(CATCH_URL_METHOD_SIZE);
+  char *data = st_sized_alloc(CATCH_URL_DATA_SIZE);
+  catch_url_status got;
+
+  assertf(req != NULL && len >= strlen(start));
+  memcpy(req, ST_CATCHURL_REQ, head);
+  memset(req + head, 'h', len);
+  memcpy(req + head, start, strlen(start));
+  memcpy(req + head + len, "\r\n\r\n", 5);
+  got = st_catchurl_sized_run(req, url, HTS_URLMAXSIZE * 2, method,
+                              CATCH_URL_METHOD_SIZE, data, CATCH_URL_DATA_SIZE);
+  /* the request line, the header and its CRLF, then the empty line */
+  if (got == CATCH_URL_OK && header &&
+      strlen(data) != strlen(ST_CATCHURL_LINE) + len + 4) {
+    printf("catchurl-sized: header line of %u bytes: kept %u bytes\n",
+           (unsigned) len, (unsigned) strlen(data));
+    got = CATCH_URL_ERR_BLOCK;
+  }
+  if (got != want) {
+    printf("catchurl-sized: %s line of %u bytes: status %d, want %d\n",
+           header ? "header" : "request", (unsigned) len, (int) got,
+           (int) want);
+  }
+  freet(req);
+  freet(url);
+  freet(method);
+  freet(data);
+  return got == want;
 }
 
 /* Each catch_url_capture() output fits its capacity, or the capture fails. */
@@ -1975,12 +2018,38 @@ static int st_catchurl_sized(httrackp *opt, int argc, char **argv) {
     }
     freet(url);
   }
+  /* a 0 size is refused before the capture writes anything */
+  {
+    char data[1] = {'Q'};
+    char url[64], method[8];
+    int port;
+    const T_SOC srv = st_catchurl_listen(&port);
+    /* queued before the call, so a capture that ignores the size reads it */
+    const T_SOC cli = st_catchurl_connect(port);
+
+    assertf(send(cli, get, (int) strlen(get), 0) == (int) strlen(get));
+    if (catch_url_sized(srv, HTS_SIZED(url), HTS_SIZED(method), data, 0) ||
+        data[0] != 'Q') {
+      printf("catchurl-sized: catch_url_sized wrote a 0-size data\n");
+      fail = 1;
+    }
+    deletesoc(cli);
+    deletesoc(srv);
+  }
   /* a token longer than the scan width is refused, not split */
   if (!st_catchurl_width_ok(CATCH_URL_METHOD_MAX, 19, CATCH_URL_OK) ||
       !st_catchurl_width_ok(CATCH_URL_METHOD_MAX + 1, 19,
                             CATCH_URL_ERR_REQUEST) ||
       !st_catchurl_width_ok(3, HTS_URLMAXSIZE * 2 - 1, CATCH_URL_OK) ||
       !st_catchurl_width_ok(3, HTS_URLMAXSIZE * 2, CATCH_URL_ERR_REQUEST))
+    fail = 1;
+  /* a line one byte over CATCH_URL_LINE_MAX is refused, not clipped */
+  if (!st_catchurl_line_ok(HTS_FALSE, CATCH_URL_LINE_MAX, CATCH_URL_OK) ||
+      !st_catchurl_line_ok(HTS_FALSE, CATCH_URL_LINE_MAX + 1,
+                           CATCH_URL_ERR_REQUEST) ||
+      !st_catchurl_line_ok(HTS_TRUE, CATCH_URL_LINE_MAX, CATCH_URL_OK) ||
+      !st_catchurl_line_ok(HTS_TRUE, CATCH_URL_LINE_MAX + 1,
+                           CATCH_URL_ERR_HEADER))
     fail = 1;
   return st_verdict("catchurl-sized", fail);
 }
