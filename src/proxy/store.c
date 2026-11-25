@@ -910,10 +910,10 @@ PT_Element PT_ReadCache(PT_Index index, const char *url, int flags) {
 /* New HTTrack cache (new.zip) format                           */
 /* ------------------------------------------------------------ */
 
-/* Set path (capacity size) to filename's parent directory, separator included,
-   from an absolute filename. Empty when there is none, or when it would not
-   fit: a truncated prefix names a different directory. */
-static void index_base_path(char *path, size_t size, const char *filename) {
+/* Set path to filename's parent directory, separator included, from an
+   absolute filename. Empty when there is none, or when it would not fit: a
+   truncated prefix names a different directory. */
+static void index_base_path(hts_buf path, const char *filename) {
   const char *abpath;
   int slashes;
 
@@ -922,14 +922,14 @@ static void index_base_path(char *path, size_t size, const char *filename) {
        ((*abpath != '/' && *abpath != '\\') || --slashes > 0);
        abpath--)
     ;
-  path[0] = '\0';
-  if (slashes == 0 && *abpath != 0 && (size_t) (abpath - filename) < size - 1) {
-    int i;
+  path.p[0] = '\0';
+  if (slashes == 0 && *abpath != 0 &&
+      hts_buf_put_span(path, hts_span_between(filename, abpath + 1))) {
+    char *c;
 
-    strlncatbuff(path, filename, size, (size_t) (abpath - filename) + 1);
-    for (i = 0; path[i] != 0; i++) {
-      if (path[i] == '\\') {
-        path[i] = '/';
+    for (c = path.p; *c != '\0'; c++) {
+      if (*c == '\\') {
+        *c = '/';
       }
     }
   }
@@ -950,10 +950,10 @@ static const char *save_find_host(const char *save, const char *host) {
 
 /* The root can be empty, so an absolute name is refused, as is a clipped
    join. dst is empty after a refusal. */
-static HTS_CHECK_RESULT hts_boolean index_join_root(char *dst, size_t size,
+static HTS_CHECK_RESULT hts_boolean index_join_root(hts_buf dst,
                                                     const char *root,
                                                     const char *name) {
-  dst[0] = '\0';
+  dst.p[0] = '\0';
   if (!hts_path_is_relative_contained(name)) {
     proxytrack_print_log(WARNING,
                          "cache filename is not a contained relative name, "
@@ -961,7 +961,7 @@ static HTS_CHECK_RESULT hts_boolean index_join_root(char *dst, size_t size,
                          name);
     return HTS_FALSE;
   }
-  if (!slprintfbuff(dst, size, "%s%s", root, name)) {
+  if (!hts_buf_printf(dst, "%s%s", root, name)) {
     proxytrack_print_log(WARNING,
                          "cache filename does not fit under the store root, "
                          "not serving it: %s",
@@ -978,7 +978,7 @@ static void PT_Element_refuse_save(PT_Element r, const char *save) {
 }
 
 /* Resolve save under root into dst, refusing a name that leaves it. */
-static void PT_resolve_previous_save(char *dst, size_t size, const char *root,
+static void PT_resolve_previous_save(hts_buf dst, const char *root,
                                      const char *save, PT_Element r,
                                      const char *url, int *fixedPath,
                                      int *safeCache) {
@@ -998,14 +998,14 @@ static void PT_resolve_previous_save(char *dst, size_t size, const char *root,
   pathLen = (int) strlen(root);
   /* old (<3.40) buggy format */
   if (pathLen > 0 && strncmp(save, root, pathLen) == 0) {
-    strlcpybuff(dst, save, size);
+    hts_buf_cpy(dst, save);
   }
   // relative ? (hack)
   else if (*safeCache || (save[0] != '/' // /home/foo/bar.gif
                           && (!hts_isalpha((unsigned char) save[0]) ||
                               save[1] != ':')) // c:/home/foo/bar.gif
   ) {
-    if (!index_join_root(dst, size, root, save)) {
+    if (!index_join_root(dst, root, save)) {
       PT_Element_refuse_save(r, save);
     } else {
       *safeCache = 1;
@@ -1037,7 +1037,7 @@ static void PT_resolve_previous_save(char *dst, size_t size, const char *root,
         PT_Element_failf(r, "Bogus fixePath prefix for %s (prefixLen=%d)", save,
                          *fixedPath);
         r->statuscode = STATUSCODE_INVALID;
-      } else if (!index_join_root(dst, size, root, save + *fixedPath)) {
+      } else if (!index_join_root(dst, root, save + *fixedPath)) {
         PT_Element_refuse_save(r, save);
       }
     } else {
@@ -1093,7 +1093,7 @@ int PT_LoadCache__New(PT_Index index_, const char *filename) {
 
       walk.index = index;
       walk.firstSeen = HTS_FALSE;
-      index_base_path(HTS_SIZED(index->path), filename);
+      index_base_path(HTS_BUF(index->path), filename);
 
       /* Ready directory entries */
       if (hts_cache_walk_index(zFile, index_entry_new, index_bad_new, &walk,
@@ -1236,7 +1236,7 @@ static PT_Element PT_ReadCache__New(PT_Index index_, const char *url,
             strcpybuff(r->msg, "Cache Read Error : NUL In Header");
           }
 
-          PT_resolve_previous_save(HTS_SIZED(previous_save), index->path,
+          PT_resolve_previous_save(HTS_BUF(previous_save), index->path,
                                    previous_save_, r, url, &index->fixedPath,
                                    &index->safeCache);
 
@@ -1474,7 +1474,7 @@ static int PT_SaveCache__New(PT_Indexes indexes, const char *filename) {
    corruption */
 #define CACHE_FIELD_MAXSIZE 32768
 
-static int cache_brstr(char *adr, char *s, size_t s_size) {
+static int cache_brstr(char *adr, hts_buf s) {
   int i;
   int off;
   char buff[256 + 4];
@@ -1484,7 +1484,7 @@ static int cache_brstr(char *adr, char *s, size_t s_size) {
   off = binput(adr, HTS_BUF_N(buff, 256 + 1), NULL);
   /* no length-prefixed value follows a field the terminating NUL stopped */
   if (adr[off] == '\0') {
-    s[0] = '\0';
+    s.p[0] = '\0';
     return off;
   }
   /* An empty or non-numeric length reads as 0 */
@@ -1494,13 +1494,11 @@ static int cache_brstr(char *adr, char *s, size_t s_size) {
   if (i > 0) {
     /* A corrupt length may pass the buffer end, so bound by what is there */
     const size_t avail = strnlen(adr + off, (size_t) i);
-    const size_t store = avail < s_size ? avail : s_size - 1;
 
-    memcpy(s, adr + off, store);
-    s[store] = '\0';
+    (void) hts_span_copy(hts_span_at(adr + off, avail), s.p, s.size);
     off += (int) avail;
   } else {
-    s[0] = '\0';
+    s.p[0] = '\0';
   }
   return off;
 }
@@ -1523,23 +1521,22 @@ static hts_boolean cache_rlen(FILE *fp, long int datSize, size_t *len) {
 
 /** Read one length-prefixed field into s. HTS_FALSE leaves s empty and the
     stream at an unknown offset, so the caller must drop the whole record. **/
-static hts_boolean cache_rstr(FILE *fp, char *s, size_t s_size,
-                              long int datSize) {
+static hts_boolean cache_rstr(FILE *fp, hts_buf s, long int datSize) {
   size_t want;
 
-  s[0] = '\0';
+  s.p[0] = '\0';
   if (!cache_rlen(fp, datSize, &want))
     return HTS_FALSE;
   if (want != 0) {
-    /* store at most s_size-1 bytes, but consume all of them so the next field
+    /* store at most s.size-1 bytes, but consume all of them so the next field
        stays aligned when a cache declares more than the destination holds */
-    const size_t store = want < s_size ? want : s_size - 1;
+    const size_t store = want < s.size ? want : s.size - 1;
 
-    if (!hts_fread_exact(s, store, fp))
+    if (!hts_fread_exact(s.p, store, fp))
       return HTS_FALSE;
     if (want > store && fseek(fp, (long) (want - store), SEEK_CUR) != 0)
       return HTS_FALSE;
-    s[store] = '\0';
+    s.p[store] = '\0';
   }
   return HTS_TRUE;
 }
@@ -1580,7 +1577,7 @@ static hts_boolean cache_rint(FILE *fp, long int datSize, int *i) {
   char s[256];
 
   *i = 0;
-  if (!cache_rstr(fp, HTS_SIZED(s), datSize))
+  if (!cache_rstr(fp, HTS_BUF(s), datSize))
     return HTS_FALSE;
   return sscanf(s, "%d", i) == 1 ? HTS_TRUE : HTS_FALSE;
 }
@@ -1593,7 +1590,7 @@ static hts_boolean cache_rLLint(FILE *fp, long int datSize, unsigned long *i) {
   const char *num = s;
 
   *i = 0;
-  if (!cache_rstr(fp, HTS_SIZED(s), datSize))
+  if (!cache_rstr(fp, HTS_BUF(s), datSize))
     return HTS_FALSE;
   if (hts_scan_llint(&num, 0, INT_MAX, &l) != HTS_SCAN_OK)
     return HTS_FALSE;
@@ -1612,7 +1609,7 @@ static int PT_LoadCache__Old(PT_Index index_, const char *filename) {
     /* Init before any early return, as readers and the destructor use it */
     MutexInit(&cache->fileLock);
 
-    index_base_path(HTS_SIZED(cache->path), filename);
+    index_base_path(HTS_BUF(cache->path), filename);
 
     /* Index/data filenames */
     if (pos != NULL) {
@@ -1646,12 +1643,12 @@ static int PT_LoadCache__Old(PT_Index index_, const char *filename) {
         char *a = use;
 
         use[ndxSize] = '\0';
-        a += cache_brstr(a, HTS_SIZED(firstline));
+        a += cache_brstr(a, HTS_BUF(firstline));
         if (strncmp(firstline, "CACHE-", 6) == 0) {     // Nouvelle version du cache
           if (strncmp(firstline, "CACHE-1.", 8) == 0) { // Version 1.1x
             cache->version = (int) (firstline[8] - '0');        // cache 1.x
             if (cache->version <= 5) {
-              a += cache_brstr(a, HTS_SIZED(firstline));
+              a += cache_brstr(a, HTS_BUF(firstline));
               strcpybuff(cache->lastmodified, firstline);
             } else {
               fclose(cache->dat);
@@ -1843,26 +1840,27 @@ static PT_Element PT_ReadCache__Old(PT_Index index_, const char *url,
            rather than serve fields decoded from the wrong bytes */
         if (cache_rint(cache->dat, datSize, &r->statuscode) &&
             cache_rLLint(cache->dat, datSize, &size_) &&
-            cache_rstr(cache->dat, HTS_SIZED(r->msg), datSize) &&
-            cache_rstr(cache->dat, HTS_SIZED(r->contenttype), datSize) &&
+            cache_rstr(cache->dat, HTS_BUF(r->msg), datSize) &&
+            cache_rstr(cache->dat, HTS_BUF(r->contenttype), datSize) &&
             (cache->version < 3 ||
-             cache_rstr(cache->dat, HTS_SIZED(r->charset), datSize)) &&
-            cache_rstr(cache->dat, HTS_SIZED(r->lastmodified), datSize) &&
-            cache_rstr(cache->dat, HTS_SIZED(r->etag), datSize) &&
-            cache_rstr(cache->dat, r->location, sizeof(location_default),
+             cache_rstr(cache->dat, HTS_BUF(r->charset), datSize)) &&
+            cache_rstr(cache->dat, HTS_BUF(r->lastmodified), datSize) &&
+            cache_rstr(cache->dat, HTS_BUF(r->etag), datSize) &&
+            cache_rstr(cache->dat,
+                       hts_buf_at(r->location, sizeof(location_default)),
                        datSize) &&
             (cache->version < 2 ||
-             cache_rstr(cache->dat, HTS_SIZED(r->cdispo), datSize)) &&
+             cache_rstr(cache->dat, HTS_BUF(r->cdispo), datSize)) &&
             (cache->version < 4 ||
-             (cache_rstr(cache->dat, HTS_SIZED(previous_save_),
+             (cache_rstr(cache->dat, HTS_BUF(previous_save_),
                          datSize) && // adr
-              cache_rstr(cache->dat, HTS_SIZED(previous_save_),
+              cache_rstr(cache->dat, HTS_BUF(previous_save_),
                          datSize) && // fil
-              cache_rstr(cache->dat, HTS_SIZED(previous_save_),
+              cache_rstr(cache->dat, HTS_BUF(previous_save_),
                          datSize))) && // save
             (cache->version < 5 ||
              cache_rstr_addr(cache->dat, datSize, &r->headers)) &&
-            cache_rstr(cache->dat, HTS_SIZED(check), datSize) &&
+            cache_rstr(cache->dat, HTS_BUF(check), datSize) &&
             strcmp(check, "HTS") == 0 && /* intégrité OK */
             cache_rLLint(cache->dat, datSize, &size_read)) {
           ok = 1;
@@ -1872,7 +1870,7 @@ static PT_Element PT_ReadCache__Old(PT_Index index_, const char *url,
         r->size = ok ? (size_t) size_read : 0;
       }
 
-      PT_resolve_previous_save(HTS_SIZED(previous_save), cache->path,
+      PT_resolve_previous_save(HTS_BUF(previous_save), cache->path,
                                previous_save_, r, url, &cache->fixedPath,
                                &cache->safeCache);
 
@@ -1976,19 +1974,18 @@ static const char *getArcField(const char *line, int pos) {
   return NULL;
 }
 
-static char *copyArcField(const char *line, int npos, char *dest, int destMax) {
+static char *copyArcField(const char *line, int npos, hts_buf dest) {
   const char *pos;
 
   if ((pos = getArcField(line, npos)) != NULL) {
-    int i;
+    const char *end = pos;
 
-    for(i = 0; pos[i] != '\0' && pos[i] != ARC_SP && (--destMax) > 0; i++) {
-      dest[i] = pos[i];
-    }
-    dest[i] = 0;
-    return dest;
+    while (*end != '\0' && *end != ARC_SP)
+      end++;
+    (void) hts_span_copy(hts_span_between(pos, end), dest.p, dest.size);
+    return dest.p;
   }
-  dest[0] = 0;
+  dest.p[0] = '\0';
   return NULL;
 }
 
@@ -2168,36 +2165,36 @@ static hts_boolean arcIsRecordLine(const char *line) {
 /* Could this raw span open a record line? Every one names a scheme, so the
    first field has to reach a ':' through scheme characters alone, and that
    turns away almost every line of an archived page before it is copied. */
-static hts_boolean arcMayOpenRecord(const char *raw, size_t len) {
+static hts_boolean arcMayOpenRecord(hts_span raw) {
   size_t i;
 
-  for (i = 0; i < len && arcDroppedByte(raw[i]); i++)
+  for (i = 0; i < raw.len && arcDroppedByte(raw.p[i]); i++)
     ;
-  if (i == len || !hts_isalpha((unsigned char) raw[i]))
+  if (i == raw.len || !hts_isalpha((unsigned char) raw.p[i]))
     return HTS_FALSE;
-  for (; i < len; i++) {
-    if (raw[i] == ':')
+  for (; i < raw.len; i++) {
+    const char c = raw.p[i];
+
+    if (c == ':')
       return HTS_TRUE;
-    if (arcDroppedByte(raw[i]))
+    if (arcDroppedByte(c))
       continue;
-    if (!hts_isalnum((unsigned char) raw[i]) && raw[i] != '+' &&
-        raw[i] != '-' && raw[i] != '.')
+    if (!hts_isalnum((unsigned char) c) && c != '+' && c != '-' && c != '.')
       return HTS_FALSE;
   }
   return HTS_FALSE;
 }
 
-/* Append what hts_shared_linput() would have kept of a raw span, to the same
- * cap. */
-static size_t arcAppendLine(char *line, size_t len, const char *raw,
-                            size_t rawlen) {
+/* Append what hts_shared_linput() would have kept of raw to line's first len
+   bytes, clipped to line.size - 1; returns the new length. */
+static size_t arcAppendLine(hts_buf line, size_t len, hts_span raw) {
   size_t i;
 
-  for (i = 0; i < rawlen && len < (size_t) ARC_LINE_MAX; i++) {
-    if (!arcDroppedByte(raw[i]))
-      line[len++] = raw[i];
+  for (i = 0; i < raw.len && len < line.size - 1; i++) {
+    if (!arcDroppedByte(raw.p[i]))
+      line.p[len++] = raw.p[i];
   }
-  line[len] = '\0';
+  line.p[len] = '\0';
   return len;
 }
 
@@ -2223,14 +2220,17 @@ static hts_boolean arcDataHoldsARecord(PT_Index__Arc index, long int from,
 
       if (lineLen == 0 && nl != NULL) {
         /* the whole line is in the buffer, so weigh it before copying it out */
-        if (arcMayOpenRecord(&buffer[i], chunk)) {
-          (void) arcAppendLine(line, 0, &buffer[i], chunk);
+        const hts_span raw = hts_span_at(&buffer[i], chunk);
+
+        if (arcMayOpenRecord(raw)) {
+          (void) arcAppendLine(HTS_BUF(line), 0, raw);
           if (arcIsRecordLine(line))
             return HTS_TRUE;
         }
       } else {
-        lineLen = arcAppendLine(line, lineLen, &buffer[i], chunk);
-        if (nl != NULL && arcMayOpenRecord(line, lineLen) &&
+        lineLen = arcAppendLine(HTS_BUF(line), lineLen,
+                                hts_span_at(&buffer[i], chunk));
+        if (nl != NULL && arcMayOpenRecord(hts_span_at(line, lineLen)) &&
             arcIsRecordLine(line))
           return HTS_TRUE;
       }
@@ -2245,7 +2245,7 @@ static hts_boolean arcDataHoldsARecord(PT_Index__Arc index, long int from,
       break;
   }
   /* Check the data's last line, which ends at the separator */
-  if (lineLen != 0 && arcMayOpenRecord(line, lineLen))
+  if (lineLen != 0 && arcMayOpenRecord(hts_span_at(line, lineLen)))
     return arcIsRecordLine(line);
   return HTS_FALSE;
 }
@@ -2297,8 +2297,11 @@ int PT_LoadCache__Arc(PT_Index index_, const char *filename) {
             int length = getArcLength(index->line);
 
             if (length >= 0) {
-              const char *filenameIndex = copyArcField(index->line, 0,
-                                                       index->filenameIndexBuff, sizeof(index->filenameIndexBuff) - 1); /* can not be NULL */
+              const char *filenameIndex =
+                  copyArcField(index->line, 0,
+                               HTS_BUF_N(index->filenameIndexBuff,
+                                         sizeof(index->filenameIndexBuff) -
+                                             1)); /* can not be NULL */
 
               if (strncmp(filenameIndex, "http://", 7) == 0) {
                 filenameIndex += 7;
