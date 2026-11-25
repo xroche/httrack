@@ -152,19 +152,19 @@ static int st_wizardfilter(httrackp *opt, int argc, char **argv) {
     const size_t urlmax = HTS_URLMAXSIZE * 2 - 1; /* the engine's adr and fil */
     char *adr = malloct(urlmax + 1);
     char *fil = malloct(urlmax + 1);
+    const hts_buf adrb = hts_buf_at(adr, urlmax + 1);
+    const hts_buf filb = hts_buf_at(fil, urlmax + 1);
     char *expect = malloct(HTS_FILTER_SLOT_SIZE);
     size_t total;
 
     for (total = 2040; total <= 2048; total++) {
       const size_t adrlen = total / 2, fillen = total - 1 - adrlen;
 
-      wizardfilter_link(hts_buf_at(adr, urlmax + 1), adrlen,
-                        hts_buf_at(fil, urlmax + 1), fillen, HTS_TRUE);
+      wizardfilter_link(adrb, adrlen, filb, fillen, HTS_TRUE);
       wizardfilter_emits(&f, expect, adr, fil);
     }
     /* the maximum fills both buffers and the slot, NUL included */
-    wizardfilter_link(hts_buf_at(adr, urlmax + 1), urlmax,
-                      hts_buf_at(fil, urlmax + 1), urlmax, HTS_FALSE);
+    wizardfilter_link(adrb, urlmax, filb, urlmax, HTS_FALSE);
     assertf(wizardfilter_emits(&f, expect, adr, fil) ==
             HTS_FILTER_SLOT_SIZE - 1);
     freet(adr);

@@ -560,7 +560,7 @@ static int st_utf8_strict(httrackp *opt, int argc, char **argv) {
                                          {"h\xed\xa0\x80.com", "(null)"},
                                          {"h\xc3\xa9\xa9.com", "(null)"},
                                          {"h\xc3\xa9.com", "xn--h-bga.com"}};
-  unsigned char x[4];
+  char x[4];
   unsigned a, b, c, d, i;
   hts_UCS4 cp, *u;
   size_t n;
@@ -568,17 +568,17 @@ static int st_utf8_strict(httrackp *opt, int argc, char **argv) {
   char buf[64];
 
   for (a = 0; a < 256; a++) {
-    x[0] = (unsigned char) a;
-    fail |= utf8_strict_bytes(hts_span_at((const char *) x, 1));
+    x[0] = (char) a;
+    fail |= utf8_strict_bytes(hts_span_at(x, 1));
     for (b = 0; b < 256; b++) {
-      x[1] = (unsigned char) b;
-      fail |= utf8_strict_bytes(hts_span_at((const char *) x, 2));
+      x[1] = (char) b;
+      fail |= utf8_strict_bytes(hts_span_at(x, 2));
       for (c = 0; c < 256; c++) {
-        x[2] = (unsigned char) c;
-        fail |= utf8_strict_bytes(hts_span_at((const char *) x, 3));
+        x[2] = (char) c;
+        fail |= utf8_strict_bytes(hts_span_at(x, 3));
         for (d = 0; a >= 0xf0 && d < sizeof(tails); d++) {
-          x[3] = tails[d];
-          fail |= utf8_strict_bytes(hts_span_at((const char *) x, 4));
+          x[3] = (char) tails[d];
+          fail |= utf8_strict_bytes(hts_span_at(x, 4));
         }
       }
     }
