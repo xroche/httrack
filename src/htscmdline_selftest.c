@@ -429,9 +429,10 @@ static int st_quotediff(httrackp *opt, int argc, char **argv) {
     static const char s[] = "\"a\"b\\\"";
     String e = STRING_EMPTY;
 
-    st.cases += 2;
+    st.cases += 5;
     if (!hts_is_quoted(hts_span_at(s, 3)) || hts_is_quoted(hts_span_at(s, 2)) ||
-        hts_is_quoted(hts_span_at(s, 1)))
+        hts_is_quoted(hts_span_at(s, 1)) ||
+        hts_is_quoted(hts_span_at(s + 1, 2)))
       quote_fail(&st, "quoted span", s, "", "");
     hts_escape_arg(&e, hts_span_at(s, 5));
     if (strcmp(StringBuff(e), "\\\"a\\\"b\\\\") != 0)
