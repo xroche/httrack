@@ -64,6 +64,7 @@ cp "${work}/proj/hts-cache/winprofile.ini" "${work}/seeded.ini"
 mkdir -p "${work}/proj2/hts-cache"
 cat >"${work}/proj2/hts-cache/winprofile.ini" <<'EOF'
 CurrentUrl=http://example.org/
+Build=
 Near=0
 Test=1
 ParseAll=0
@@ -179,6 +180,9 @@ for pick, flag in [("4", "--priority=3"), ("5", "--priority=7")]:
 if "http://example.org/" not in load("proj2"):
     sys.exit("step2.html did not load the second project")
 only_flag(textarea(s.get("step4.html?sid=" + sid), "command"), "--test")
+# An empty id selects nothing, where a shifted 0 would pick the first entry.
+if selected(s.get("option2.html?sid=" + sid), "build") is not None:
+    sys.exit("an empty Build= renders as a selected entry")
 
 loaded = load("proj")
 if "http://example.com/" not in loaded:
