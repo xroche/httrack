@@ -110,7 +110,7 @@ static void dirtylink_case(httrackp *opt, selftest_sweep *sw, const char *str) {
     for (j = 0; j < 2; j++) {
       const hts_boolean inscript = j != 0 ? HTS_TRUE : HTS_FALSE;
       const hts_boolean got =
-          hts_dirty_link_is_url(opt, str, strlen(str), lastcs[i], inscript);
+          hts_dirty_link_is_url(opt, hts_span_of(str), lastcs[i], inscript);
 
       sw->cases++;
       if (got)
@@ -247,9 +247,8 @@ static int parse_selftest_dirtylink(httrackp *opt, hts_boolean dump) {
   sw.dump = dump;
 
   for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
-    const hts_boolean got =
-        hts_dirty_link_is_url(opt, cases[i].str, strlen(cases[i].str),
-                              cases[i].lastc, cases[i].inscript);
+    const hts_boolean got = hts_dirty_link_is_url(
+        opt, hts_span_of(cases[i].str), cases[i].lastc, cases[i].inscript);
 
     sw.cases++;
     if (got != cases[i].want) {
@@ -263,10 +262,17 @@ static int parse_selftest_dirtylink(httrackp *opt, hts_boolean dump) {
     }
   }
 
-  /* The parser passes a slice, so a read past "len" must fail here. */
-  if (!hts_dirty_link_is_url(opt, "a.gif*rest", 5, ')', HTS_TRUE) ||
-      hts_dirty_link_is_url(opt, "a.gif*rest", 10, ')', HTS_TRUE)) {
+  /* The parser passes a slice, so a read past its end must fail here. */
+  if (!hts_dirty_link_is_url(opt, hts_span_at("a.gif*rest", 5), ')',
+                             HTS_TRUE) ||
+      hts_dirty_link_is_url(opt, hts_span_at("a.gif*rest", 10), ')',
+                            HTS_TRUE)) {
     fprintf(stderr, "dirtylink: the verdict must read the first len bytes\n");
+    err = 1;
+  }
+  /* A NUL in the slice ends the string, so the '*' after it is never seen. */
+  if (!hts_dirty_link_is_url(opt, hts_span_at("a.gif\0*", 7), ')', HTS_TRUE)) {
+    fprintf(stderr, "dirtylink: a NUL must end the string\n");
     err = 1;
   }
   /* A string at the parser's cap gets no verdict, one byte under it does. */
@@ -276,9 +282,10 @@ static int parse_selftest_dirtylink(httrackp *opt, hts_boolean dump) {
     memset(big, 'a', sizeof(big) - 1);
     big[sizeof(big) - 1] = '\0';
     memcpy(big + sizeof(big) - 5, ".gif", 4);
-    if (hts_dirty_link_is_url(opt, big, HTS_URLMAXSIZE, ')', HTS_TRUE) ||
-        !hts_dirty_link_is_url(opt, big + 1, HTS_URLMAXSIZE - 1, ')',
-                               HTS_TRUE)) {
+    if (hts_dirty_link_is_url(opt, hts_span_at(big, HTS_URLMAXSIZE), ')',
+                              HTS_TRUE) ||
+        !hts_dirty_link_is_url(opt, hts_span_at(big + 1, HTS_URLMAXSIZE - 1),
+                               ')', HTS_TRUE)) {
       fprintf(stderr, "dirtylink: the length cap is off by one or absent\n");
       err = 1;
     }

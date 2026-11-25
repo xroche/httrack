@@ -210,7 +210,7 @@ static int st_stripport(httrackp *opt, int argc, char **argv) {
     char BIGSTK buff[HTS_URLMAXSIZE * 2];
 
     strcpybuff(buff, cases[k].in);
-    hts_strip_default_port(buff, sizeof(buff));
+    hts_strip_default_port(HTS_BUF(buff));
     assertf(strcmp(buff, cases[k].out) == 0);
   }
   printf("stripport self-test OK\n");
