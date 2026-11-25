@@ -509,10 +509,9 @@ static int hts_equalsCodepageName(const char *table_name, const char *label) {
   return 0;
 }
 
-/* Decode size bytes of a codepage to a NUL-terminated UTF-8 string, or NULL
-   when no table names that codepage. */
-static char *hts_codepageToUTF8(const char *codepage, const char *s,
-                                size_t size) {
+/* Decode s from a codepage to a NUL-terminated UTF-8 string, or NULL when no
+   table names that codepage. */
+static char *hts_codepageToUTF8(const char *codepage, hts_span s) {
   size_t i, j, k, capa;
   char *dest;
 
@@ -531,8 +530,8 @@ static char *hts_codepageToUTF8(const char *codepage, const char *s,
   if (dest == NULL) {
     return NULL;
   }
-  for (j = 0, k = 0; j < size; j++) {
-    const unsigned char c = (unsigned char) s[j];
+  for (j = 0, k = 0; j < s.len; j++) {
+    const unsigned char c = (unsigned char) s.p[j];
     const hts_UCS4 uc = table_mappings[i].table[c];
     const size_t max = k + MAX_UTF;
 
@@ -651,7 +650,7 @@ static char *hts_convertStringCharset(hts_span s, const char *to,
 #else
   /* Limited codepage decoding support only. */
   if (hts_isCharsetUTF8(to)) {
-    return hts_codepageToUTF8(from, s.p, s.len);
+    return hts_codepageToUTF8(from, s);
   }
 #endif
 

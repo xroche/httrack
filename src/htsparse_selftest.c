@@ -2019,8 +2019,8 @@ static int st_sitemap(httrackp *opt, int argc, char **argv) {
       zs.next_out = (Bytef *) out;
       zs.avail_out = sizeof(out) - 1;
       while (cut < (size_t) zlen &&
-             hts_memstr(out, sizeof(out) - 1 - zs.avail_out, "html<", 5) ==
-                 NULL) {
+             hts_memstr(hts_span_at(out, sizeof(out) - 1 - zs.avail_out),
+                        hts_span_of("html<")) == NULL) {
         zs.next_in = (const Bytef *) z + cut++;
         zs.avail_in = 1;
         (void) inflate(&zs, Z_SYNC_FLUSH);

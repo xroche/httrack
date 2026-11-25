@@ -143,8 +143,8 @@ typedef struct {
   const char *path;
 } warc_body;
 
-/* Return the in-memory body of LEN bytes at P. */
-warc_body warc_body_mem(const char *p, size_t len);
+/* Return the in-memory body over S. */
+warc_body warc_body_mem(hts_span s);
 
 /* unchanged_kind for warc_write_transaction. */
 #define WARC_UNCHANGED_NONE 0       /* a fresh exchange: a full response */

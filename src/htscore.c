@@ -417,7 +417,7 @@ void hts_finish_makeindex(httrackp *opt, int *makeindex_done,
 
 /* Write body to fp, then close it. On failure errno says why. */
 static hts_boolean hts_write_and_close(FILE *fp, hts_span body) {
-  hts_boolean written = body.len == 0 || hts_fwrite_exact(body.p, body.len, fp);
+  hts_boolean written = body.len == 0 || hts_fwrite_span(body, fp);
   int last_errno = written ? 0 : errno;
 
   /* a body small enough to sit in stdio's buffer only fails at fclose */

@@ -1424,11 +1424,11 @@ static const char *paste_curl_cookies(httrackp *opt, t_cookie *jar,
       why = "a cookie in the paste has no name";
     } else {
       // "g = h" is the cookie g, as a browser reads it
-      StringMemcpy(pair, name.p, name.len);
+      StringCopySpan(&pair, name);
       if (cookie_find_exact(jar->data, StringBuff(pair), domain, "/") != NULL)
         continue; // a browser lists the most specific path first, so it wins
       StringAddchar(pair, '=');
-      StringMemcat(pair, value.p, value.len);
+      StringCatSpan(&pair, value);
       if (!cookie_flat_pair(opt, jar, StringBuffRW(pair), domain, &attr,
                             "the paste", &ignored))
         why = "the cookies of the paste do not fit in a bundle";

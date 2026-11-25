@@ -235,15 +235,14 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
 
 /* Bounded substring search: bodies and archive records carry NUL bytes, so
    strstr() would stop at the first one. */
-const char *hts_memstr(const char *hay, size_t haylen, const char *needle,
-                       size_t nlen) {
+const char *hts_memstr(hts_span hay, hts_span needle) {
   size_t i;
 
-  if (nlen == 0 || haylen < nlen)
+  if (needle.len == 0 || hay.len < needle.len)
     return NULL;
-  for (i = 0; i + nlen <= haylen; i++) {
-    if (hay[i] == *needle && memcmp(hay + i, needle, nlen) == 0)
-      return hay + i;
+  for (i = 0; i + needle.len <= hay.len; i++) {
+    if (hay.p[i] == needle.p[0] && memcmp(hay.p + i, needle.p, needle.len) == 0)
+      return hay.p + i;
   }
   return NULL;
 }

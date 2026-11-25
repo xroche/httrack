@@ -265,7 +265,7 @@ hts_boolean cookie_write_replace(const char *file, hts_span data) {
   fp = hts_fopen_private_new(tmp, "wb");
   if (fp == NULL)
     return HTS_FALSE;
-  ok = hts_fwrite_exact(data.p, data.len, fp);
+  ok = hts_fwrite_span(data, fp);
   ok = cookie_close_synced(fp) && ok;
   ok = ok && cookie_replace(tmp, file);
   err = errno;

@@ -36,6 +36,7 @@ Please visit our Website: http://www.httrack.com
 #include <stdio.h>
 
 #include "htsglobal.h"
+#include "htsurlport.h"
 
 /** Cut an open file to sz bytes: 0 on success. **/
 #ifdef _WIN32
@@ -63,6 +64,11 @@ static HTS_INLINE HTS_UNUSED hts_boolean hts_fwrite_exact(const void *src,
                                                           size_t size,
                                                           FILE *fp) {
   return fwrite(src, 1, size, fp) == size ? HTS_TRUE : HTS_FALSE;
+}
+
+/** hts_fwrite_exact() over the bytes of s, which may be absent when empty. **/
+static HTS_INLINE HTS_UNUSED hts_boolean hts_fwrite_span(hts_span s, FILE *fp) {
+  return s.len == 0 || hts_fwrite_exact(s.p, s.len, fp);
 }
 
 #endif

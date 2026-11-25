@@ -60,8 +60,7 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
                       lien_adrfil* const adrfil);
 /* Bounded substring search over data that may hold NUL bytes; NULL if absent.
  */
-const char *hts_memstr(const char *hay, size_t haylen, const char *needle,
-                       size_t nlen);
+const char *hts_memstr(hts_span hay, hts_span needle);
 
 int lienrelatif(hts_buf s, const char *link, const char *curr);
 int link_has_authority(const char *lien);

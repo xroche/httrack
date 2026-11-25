@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Fail on new ctype calls without an (unsigned char) cast, unsafe function-like
-macros, header functions that can fail without HTS_CHECK_RESULT, and a span's
-.p handed to a function that reads up to a NUL or printed with %s.
+macros, header functions that can fail without HTS_CHECK_RESULT, a span's
+.p handed to a function that reads up to a NUL or printed with %s, and a call
+passing x.p, x.len as two arguments where the callee could take the span.
 Known cases live in tools/api-lint/, and --update rewrites those baselines.
 Known limits: a failure delegated through two calls, free names inside _Generic,
 and a function defined only in a later branch of an unbalanced #if group go
@@ -17,7 +18,7 @@ import os
 import re
 import sys
 
-RULES = ("ctype", "macro", "check-result", "span")
+RULES = ("ctype", "macro", "check-result", "span", "pair")
 HEADER = "# Known %s violations. Regenerate: tools/check-api-lint.py --update\n"
 
 # Vendored trees follow their upstream's conventions.
@@ -653,6 +654,59 @@ def check_span(path, raw, code):
                     yield line_of(code, start + m.start()), call, "%s %s" % (call, why)
 
 
+# Callees outside the tree, or in installed headers, that take (pointer, size).
+PAIR_TAKERS = frozenset(
+    """
+    memcpy memmove memcmp memchr memmem strnlen fwrite fread EVP_DigestUpdate
+    hts_span_at htsbuff_catn TypedArrayAppend
+    """.split()
+)
+SPAN_P = re.compile(r"^(.*?)(\.|->)p$", re.S)
+
+
+def byte_sinks(files):
+    """(name, index) of each parameter declared void *, which takes any bytes."""
+    sinks = set()
+    for code in files.values():
+        for _, head, _ in top_level(code):
+            fh = function_head(head)
+            if not fh:
+                continue
+            open_at = head.find("(", len(fh[1]))
+            params = head[open_at + 1 : matching(head, open_at) - 1]
+            for k, param in enumerate(split_top(params, ",")):
+                if re.search(r"\bvoid\s*\*", param):
+                    sinks.add((fh[0], k))
+    return sinks
+
+
+def check_pair(code, sinks):
+    """Yield (line, key, message) for a call passing x.p, x.len as two arguments."""
+    for start, head, body in top_level(code):
+        if body is None:
+            continue
+        text = head + body
+        for m in CALL.finditer(text, len(head)):
+            name = m.group(1)
+            if name in PAIR_TAKERS or name in KEYWORDS:
+                continue
+            open_at = m.end() - 1
+            args = [
+                re.sub(r"\s+", "", a)
+                for a in split_top(text[open_at + 1 : matching(text, open_at) - 1], ",")
+            ]
+            for k in range(len(args) - 1):
+                p = SPAN_P.match(args[k])
+                if (
+                    p
+                    and args[k + 1] == p.group(1) + p.group(2) + "len"
+                    and (name, k) not in sinks
+                ):
+                    call = "%s(%s, %s)" % (name, args[k], args[k + 1])
+                    msg = "%s splits a span, pass the hts_span" % call
+                    yield line_of(code, start + m.start()), call, msg
+
+
 def scan(root):
     """Map each rule to a list of (path, line, key, message)."""
     paths = []
@@ -683,6 +737,10 @@ def scan(root):
     for path, code in files.items():
         for line, key, msg in check_span(path, raws[path], code):
             found["span"].append((path, line, key, msg))
+    sinks = byte_sinks(files)
+    for path, code in files.items():
+        for line, key, msg in check_pair(code, sinks):
+            found["pair"].append((path, line, key, msg))
     return found
 
 

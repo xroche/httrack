@@ -3443,11 +3443,11 @@ static int st_querynext(httrackp *opt, int argc, char **argv) {
   }
   for (cur = argc == 1 ? argv[0] : ""; hts_query_next(&cur, &f);) {
     StringAddchar(out, '[');
-    StringMemcat(out, f.key.p, f.key.len);
+    StringCatSpan(&out, f.key);
     bad |= f.whole.p != f.key.p;
     if (hts_span_present(f.val)) {
       StringAddchar(out, '|');
-      StringMemcat(out, f.val.p, f.val.len);
+      StringCatSpan(&out, f.val);
       bad |= f.whole.len != f.key.len + 1 + f.val.len ||
              f.val.p != f.key.p + f.key.len + 1;
     } else {
@@ -4190,7 +4190,7 @@ static int st_span(httrackp *opt, int argc, char **argv) {
 
     while (hts_span_next_in(&s, argv[1][0], &a)) {
       StringAddchar(out, '[');
-      StringMemcat(out, a.p, a.len);
+      StringCatSpan(&out, a);
       StringAddchar(out, ']');
     }
     if (s.p != end)
@@ -4214,9 +4214,9 @@ static int st_span(httrackp *opt, int argc, char **argv) {
   } else if (strcmp(argv[0], "split") == 0) {
     if (hts_span_split(s, argv[1][0], &a, &b)) {
       StringAddchar(out, '[');
-      StringMemcat(out, a.p, a.len);
+      StringCatSpan(&out, a);
       StringAddchar(out, '|');
-      StringMemcat(out, b.p, b.len);
+      StringCatSpan(&out, b);
       StringAddchar(out, ']');
     } else {
       StringCat(out, "none");
@@ -4272,7 +4272,7 @@ static int st_span(httrackp *opt, int argc, char **argv) {
   } else if (strcmp(argv[0], "trim") == 0) {
     a = hts_span_trim(s, argv[1], argv[2]);
     StringAddchar(out, '[');
-    StringMemcat(out, a.p, a.len);
+    StringCatSpan(&out, a);
     StringAddchar(out, ']');
   } else if (strcmp(argv[0], "copy") == 0) {
     LLint size;

@@ -99,6 +99,16 @@ size_t lint_probe_readers(hts_span tok, hts_span a, hts_span b) {
   return hts_strcasecmp(a.p, "x") + strnlen(tok.p, tok.len) +
          strnlen(b.p, a.len) + stream_read(a.p);
 }
+void lint_probe_pair(hts_span a, struct { hts_span s; } *w, char *d) {
+  lint_take(a.p, a.len);
+  lint_take(w->s.p,
+            w->s.len);
+  lint_take(d, a.p, a.len, 0);
+  memcpy(d, a.p, a.len);
+  lint_sink(a.p, a.len);
+  lint_take(a.p, w->s.len);
+  lint_take(hts_span_at(a.p, a.len));
+}
 C
 cat >>"${h}" <<'H'
 #define lint_twice(x) ((x) + (x))
@@ -127,6 +137,7 @@ int lint_probe_deleg_cmp(int x);
 int lint_probe_deleg_clean(int x);
 HTS_CHECK_RESULT int lint_probe_marked_int(int x);
 int lint_probe_clean(int x);
+void lint_sink(const void *p, size_t n);
 #define lint_cmt(x) ((x) + /* a note \
    that wraps */ (x))
 static inline int lint_probe_after(int x) { if (x) return -1; return 0; }
@@ -192,10 +203,13 @@ for want in "src/htslib.c:$(at "${c}" "lint_probe_ctype("): ctype: new violation
     "span: new violation: hts_parse_url_port(b.p) reads a span up to a NUL" \
     "span: new violation: hts_header_param(tok.p) reads a span up to a NUL" \
     "span: new violation: hts_strcasecmp(a.p) reads a span up to a NUL" \
-    "span: new violation: strnlen(b.p) reads a span up to a NUL"; do
+    "span: new violation: strnlen(b.p) reads a span up to a NUL" \
+    "src/htslib.c:$(at "${c}" "lint_take(a.p, a.len);"): pair: new violation: lint_take(a.p, a.len) splits a span" \
+    "src/htslib.c:$(at "${c}" "lint_take(w->s.p,"): pair: new violation: lint_take(w->s.p, w->s.len) splits a span" \
+    "src/htslib.c:$(at "${c}" "lint_take(d, a.p"): pair: new violation: lint_take(a.p, a.len) splits a span"; do
     grep -qF "${want}" <<<"${out}" || fail "missed ${want}: ${out}"
 done
-test "$(wc -l <<<"${out}")" -eq 45 || fail "flagged a clean probe: ${out}"
+test "$(wc -l <<<"${out}")" -eq 48 || fail "flagged a clean probe: ${out}"
 
 # Removing a known violation, or listing one that never was, leaves a stale entry.
 rm -r "${work}/src/lintprobe"

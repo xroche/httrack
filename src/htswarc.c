@@ -164,8 +164,12 @@ static int wbuf_add(wbuf *b, const void *p, size_t n) {
   return 0;
 }
 
+static int wbuf_add_span(wbuf *b, hts_span s) {
+  return wbuf_add(b, s.p, s.len);
+}
+
 static int wbuf_puts(wbuf *b, const char *s) {
-  return wbuf_add(b, s, strlen(s));
+  return wbuf_add_span(b, hts_span_of(s));
 }
 
 static int wbuf_printf(wbuf *b, HTS_FORMAT_STRING const char *fmt, ...)
@@ -221,10 +225,11 @@ static int member_begin(member *m, warc_writer *w) {
   return 0;
 }
 
-static int member_write(member *m, const void *p, size_t n) {
+static int member_write(member *m, hts_span s) {
+  size_t n = s.len;
   if (!m->w->gz)
-    return (n == 0 || hts_fwrite_exact(p, n, m->w->f)) ? 0 : -1;
-  m->strm.next_in = (const Bytef *) p;
+    return (n == 0 || hts_fwrite_span(s, m->w->f)) ? 0 : -1;
+  m->strm.next_in = (const Bytef *) s.p;
   while (n > 0) {
     unsigned char out[8192];
     size_t got;
@@ -298,14 +303,14 @@ static void base32_20(const unsigned char in[20], char out[33]) {
    http_section, the header (maybe empty) and its CRLF go first. The body is
    capped or zero-padded to body_len, so Content-Length always matches.
    Returns 0 on success. */
-typedef int (*warc_sink)(void *ctx, int region, const void *p, size_t n);
+typedef int (*warc_sink)(void *ctx, int region, hts_span s);
 
 /* see htswarc.h */
-warc_body warc_body_mem(const char *p, size_t len) {
+warc_body warc_body_mem(hts_span s) {
   warc_body b;
 
-  b.p = p;
-  b.len = len;
+  b.p = s.p;
+  b.len = s.len;
   b.path = NULL;
   return b;
 }
@@ -319,7 +324,7 @@ static int stream_body_pad(warc_sink sink, void *ctx, size_t remaining) {
   static const char zeros[4096] = {0};
   while (remaining > 0) {
     size_t chunk = (remaining < sizeof(zeros)) ? remaining : sizeof(zeros);
-    if (sink(ctx, 1, zeros, chunk) != 0)
+    if (sink(ctx, 1, hts_span_at(zeros, chunk)) != 0)
       return -1;
     remaining -= chunk;
   }
@@ -329,15 +334,14 @@ static int stream_body_pad(warc_sink sink, void *ctx, size_t remaining) {
 static int stream_block(int http_section, hts_span http_hdr, int has_body,
                         warc_body body, warc_sink sink, void *ctx) {
   if (http_section) {
-    if (!hts_span_empty(http_hdr) &&
-        sink(ctx, 0, http_hdr.p, http_hdr.len) != 0)
+    if (!hts_span_empty(http_hdr) && sink(ctx, 0, http_hdr) != 0)
       return -1;
-    if (sink(ctx, 0, "\r\n", 2) != 0)
+    if (sink(ctx, 0, hts_span_of("\r\n")) != 0)
       return -1;
   }
   if (has_body) {
     if (body.p != NULL) {
-      if (body.len > 0 && sink(ctx, 1, body.p, body.len) != 0)
+      if (body.len > 0 && sink(ctx, 1, hts_span_at(body.p, body.len)) != 0)
         return -1;
     } else if (body.path != NULL) {
       char catbuff[CATBUFF_SIZE];
@@ -351,7 +355,7 @@ static int stream_block(int http_section, hts_span http_hdr, int has_body,
         size_t nl = fread(b, 1, want, fp);
         if (nl == 0)
           break; /* short file: pad below so written == declared */
-        if (sink(ctx, 1, b, nl) != 0) {
+        if (sink(ctx, 1, hts_span_at(b, nl)) != 0) {
           fclose(fp);
           return -1;
         }
@@ -368,20 +372,20 @@ static int stream_block(int http_section, hts_span http_hdr, int has_body,
 }
 
 #if HTS_USEOPENSSL
-static int digest_sink(void *ctx, int region, const void *p, size_t n) {
+static int digest_sink(void *ctx, int region, hts_span s) {
   digester *d = (digester *) ctx;
-  if (d->block != NULL && EVP_DigestUpdate(d->block, p, n) != 1)
+  if (d->block != NULL && EVP_DigestUpdate(d->block, s.p, s.len) != 1)
     return -1;
   if (region == 1 && d->payload != NULL &&
-      EVP_DigestUpdate(d->payload, p, n) != 1)
+      EVP_DigestUpdate(d->payload, s.p, s.len) != 1)
     return -1;
   return 0;
 }
 #endif
 
-static int write_sink(void *ctx, int region, const void *p, size_t n) {
+static int write_sink(void *ctx, int region, hts_span s) {
   (void) region;
-  return member_write((member *) ctx, p, n);
+  return member_write((member *) ctx, s);
 }
 
 /* Base32 SHA-1 of a transaction payload (body only), for revisit dedup.
@@ -534,8 +538,7 @@ static int normalize_http_headers(const char *resp_hdr, long long set_cl,
                hts_span_eq_ci(f.name, hts_span_of("Content-Length"))) {
       continue;
     }
-    if (wbuf_add(out, f.line.p, f.line.len) != 0 ||
-        wbuf_add(out, "\r\n", 2) != 0)
+    if (wbuf_add_span(out, f.line) != 0 || wbuf_add(out, "\r\n", 2) != 0)
       return -1;
   }
   if (set_cl >= 0 && wbuf_printf(out, "Content-Length: %lld\r\n", set_cl) != 0)
@@ -655,8 +658,7 @@ static int surt_canon(const char *url, wbuf *out) {
         hts_span_parse_llint(v.port, 0, 65535, &pv) && pv == def_port;
 
     if (!is_default && hts_span_is_digits(v.port) &&
-        (wbuf_add(out, ":", 1) != 0 ||
-         wbuf_add(out, v.port.p, v.port.len) != 0))
+        (wbuf_add(out, ":", 1) != 0 || wbuf_add_span(out, v.port) != 0))
       return -1;
   }
 
@@ -886,13 +888,12 @@ static int wacz_open_store(zipFile zf, const char *name) {
                              0 /*level*/);
 }
 
-static int wacz_write_bytes(zipFile zf, const void *p, size_t n) {
-  while (n > 0) {
-    unsigned chunk = (n > 0x40000000u) ? 0x40000000u : (unsigned) n;
-    if (zipWriteInFileInZip(zf, p, chunk) != ZIP_OK)
+static int wacz_write_bytes(zipFile zf, hts_span s) {
+  while (s.len > 0) {
+    unsigned chunk = (s.len > 0x40000000u) ? 0x40000000u : (unsigned) s.len;
+    if (zipWriteInFileInZip(zf, s.p, chunk) != ZIP_OK)
       return -1;
-    p = (const char *) p + chunk;
-    n -= chunk;
+    s = hts_span_skip(s, chunk);
   }
   return 0;
 }
@@ -929,7 +930,7 @@ static int wacz_add_disk(zipFile zf, const char *zipname, const char *diskpath,
     for (;;) {
       char b[32768];
       size_t nl = fread(b, 1, sizeof(b), fp);
-      if (nl > 0 && wacz_write_bytes(zf, b, nl) != 0) {
+      if (nl > 0 && wacz_write_bytes(zf, hts_span_at(b, nl)) != 0) {
         rc = -1;
         break;
       }
@@ -957,7 +958,7 @@ static int wacz_add_mem(zipFile zf, const char *zipname, hts_span data,
     return -1;
   if (wacz_open_store(zf, zipname) != ZIP_OK)
     return -1;
-  if (wacz_write_bytes(zf, data.p, data.len) != 0) {
+  if (wacz_write_bytes(zf, data) != 0) {
     zipCloseFileInZip(zf);
     return -1;
   }
@@ -1223,10 +1224,10 @@ static int warc_emit(warc_writer *w, const char *type, const char *content_type,
     goto done;
   { /* member start (before writing): CDXJ offset for this record */
     uint64_t rec_offset = w->offset;
-    if (member_write(&m, hdr.data, hdr.len) != 0 ||
+    if (member_write(&m, hts_span_at(hdr.data, hdr.len)) != 0 ||
         stream_block(http_section, http_hdr, has_body, body, write_sink, &m) !=
             0 ||
-        member_write(&m, "\r\n\r\n", 4) != 0) {
+        member_write(&m, hts_span_of("\r\n\r\n")) != 0) {
       member_end(&m);
       goto done;
     }
@@ -1286,8 +1287,8 @@ static int warc_write_warcinfo_record(warc_writer *w) {
   return warc_emit(
       w, "warcinfo", "application/warc-fields", NULL, NULL, NULL, NULL, NULL,
       NULL, NULL, NULL, NULL, NULL, 0, hts_span_at(NULL, 0), 1,
-      warc_body_mem(w->info_fields,
-                    w->info_fields != NULL ? strlen(w->info_fields) : 0),
+      warc_body_mem(hts_span_at(
+          w->info_fields, w->info_fields != NULL ? strlen(w->info_fields) : 0)),
       w->info_id);
 }
 
@@ -1776,8 +1777,8 @@ int warc_write_transaction(warc_writer *w, const char *target_uri,
   if (req_hdr != NULL && req_hdr[0] != '\0' &&
       warc_emit(w, "request", "application/http;msgtype=request", target_uri,
                 NULL, resp_id, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0,
-                hts_span_at(NULL, 0), 1,
-                warc_body_mem(req_hdr, strlen(req_hdr)), NULL) != 0)
+                hts_span_at(NULL, 0), 1, warc_body_mem(hts_span_of(req_hdr)),
+                NULL) != 0)
     return -1;
 
   /* Record this payload for later identical-payload-digest revisits. */
@@ -1859,9 +1860,7 @@ void warc_write_backtransaction(httrackp *opt, lien_back *back) {
   SOCaddr_inetntoa(ip, sizeof(ip), back->r.address);
 
   if (!back->r.is_write) {
-    const hts_span mem = hts_blk_body(&back->r);
-
-    body = warc_body_mem(mem.p, mem.len);
+    body = warc_body_mem(hts_blk_body(&back->r));
   } else {
     LLint fs;
     body.p = NULL;
