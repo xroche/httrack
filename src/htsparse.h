@@ -117,6 +117,11 @@ void hts_strip_default_port(hts_buf link);
 
 /* Self-test hook: 's' through each parser output writer, joined by '|', for a
    page saved as HTML or not and the given script state. The caller freet()s. */
+/* Self-test hook: 's' through escape_url_parens (in place) or html_inline_safe
+   into 'out'. Returns out.p. */
+const char *hts_parse_escape_selftest(const hts_boolean parens,
+                                      const char *const s, hts_buf out);
+
 char *hts_parse_sink_selftest(const hts_boolean enabled, const int inscript,
                               const int inscript_tag, const char *const s);
 

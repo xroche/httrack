@@ -1010,6 +1010,15 @@ static void sink_add_absolute_url(parse_sink *const sink, const char *const adr,
   sink_add_url_htmlescaped(sink, fil);
 }
 
+const char *hts_parse_escape_selftest(const hts_boolean parens,
+                                      const char *const s, hts_buf out) {
+  if (!parens)
+    return html_inline_safe(s, out);
+  hts_buf_cpy(out, s);
+  escape_url_parens(out);
+  return out.p;
+}
+
 char *hts_parse_sink_selftest(const hts_boolean enabled, const int inscript,
                               const int inscript_tag, const char *const s) {
   parse_sink sink = {EMPTY_TYPED_ARRAY, HTS_FALSE, enabled, &inscript,
@@ -2479,16 +2488,17 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                 ok = -1;        // No
               }
               // a lazy-load placeholder or template is no URL: leave it as is
-              if (ok == 0 && dataattr_p &&
-                  data_attr_is_not_url(
-                      hts_span_at(html, (size_t) (eadr - html - 1)))) {
-                const size_t len = (size_t) (eadr - html - 1);
-                char *shown = malloct(len + 8);
+              const hts_span value =
+                  hts_span_at(html, (size_t) (eadr - html - 1));
+
+              if (ok == 0 && dataattr_p && data_attr_is_not_url(value)) {
+                char *shown = malloct(value.len + 8);
 
                 if (shown != NULL)
                   hts_log_print(opt, LOG_DEBUG, "data attribute is no URL: %s",
-                                text_excerpt(opt, hts_buf_at(shown, len + 8),
-                                             hts_span_at(html, len), len + 7));
+                                text_excerpt(opt,
+                                             hts_buf_at(shown, value.len + 8),
+                                             value, value.len + 7));
                 freet(shown);
                 not_url = HTS_TRUE;
               }

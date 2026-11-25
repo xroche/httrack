@@ -649,6 +649,7 @@ static int parse_selftest_jsscan(httrackp *opt, hts_boolean dump) {
       {"x.SRC=\"pic.gif\";", 1, HTS_FALSE, HTS_FALSE, HTS_TRUE, 6, 7},
       /* .open's first argument can be a method or a type, and is neither */
       {"x.open(\"GET\",u)", 1, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
+      {"x.open(\"get\",u)", 1, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
       {"x.open(\"text/html\")", 1, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
       /* CSS lets url() drop the quotes, JavaScript's URL(x) does not */
       {"url(pic.png)", 0, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 7},
@@ -1315,6 +1316,32 @@ static int st_sink(httrackp *opt, int argc, char **argv) {
       err = 1;
     }
     freet(got);
+  }
+  /* The URL escapers stop at the last escape that fits a buffer of "size". */
+  {
+    static const struct {
+      hts_boolean parens;
+      size_t size;
+      const char *want;
+    } esc[] = {{HTS_TRUE, 7, "a%28"},
+               {HTS_TRUE, 8, "a%28b"},
+               {HTS_FALSE, 8, "a%3C"},
+               {HTS_FALSE, 9, "a%3Cb"}};
+
+    size_t k;
+
+    for (k = 0; k < sizeof(esc) / sizeof(esc[0]); k++) {
+      char buf[16];
+      const char *got = hts_parse_escape_selftest(esc[k].parens,
+                                                  esc[k].parens ? "a(b" : "a<b",
+                                                  hts_buf_at(buf, esc[k].size));
+
+      if (strcmp(got, esc[k].want) != 0) {
+        fprintf(stderr, "sink escape case %d: got \"%s\", wanted \"%s\"\n",
+                (int) k, got, esc[k].want);
+        err = 1;
+      }
+    }
   }
   if (err) {
     printf("sink self-test FAILED\n");
