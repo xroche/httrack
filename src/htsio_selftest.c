@@ -438,8 +438,7 @@ cleanup:
 }
 
 static void makeindex_run(httrackp *opt, const char *path, const char *footer,
-                          int links, const char *firstlink, char *buf,
-                          size_t size) {
+                          int links, const char *firstlink, hts_buf buf) {
   FILE *fp = fopen(path, "wb");
   int done = 0;
 
@@ -447,7 +446,7 @@ static void makeindex_run(httrackp *opt, const char *path, const char *footer,
   hts_finish_makeindex(opt, &done, &fp, links, firstlink, footer, "", "");
   assertf(fp == NULL); /* the function closed and cleared it */
   assertf(done != 0);
-  st_read_file(path, buf, size);
+  st_read_file(path, buf.p, buf.size);
 }
 
 // Read a whole file into a NUL-terminated heap string, NULL if unreadable.
@@ -550,8 +549,7 @@ static int st_makeindex(httrackp *opt, int argc, char **argv) {
     const char *const footer = footers[t];
 
     /* single first link: footer + a refresh meta carrying the escaped URL */
-    makeindex_run(opt, path, footer, 1, "http://example.com/a b", buf,
-                  sizeof(buf));
+    makeindex_run(opt, path, footer, 1, "http://example.com/a b", HTS_BUF(buf));
     {
       const char *const credit = strstr(buf, "<!-- Mirror and index made by");
       const char *const meta = strstr(buf, "<meta HTTP-EQUIV=\"Refresh\"");
@@ -578,13 +576,13 @@ static int st_makeindex(httrackp *opt, int argc, char **argv) {
       p += 1200;
       strcpy(p, "/end.html");
 
-      makeindex_run(opt, path, footer, 1, link, buf, sizeof(buf));
+      makeindex_run(opt, path, footer, 1, link, HTS_BUF(buf));
       /* the closing quote proves the URL was not clipped mid-way */
       assertf(strstr(buf, "/end.html\">") != NULL);
     }
 
     /* no single link: footer only, no refresh meta */
-    makeindex_run(opt, path, footer, 0, NULL, buf, sizeof(buf));
+    makeindex_run(opt, path, footer, 0, NULL, HTS_BUF(buf));
     assertf(strstr(buf, "Mirror and index made by HTTrack") != NULL);
     assertf(strstr(buf, "Refresh") == NULL);
   }
@@ -918,8 +916,7 @@ static size_t golden_drop_cr(char *buf, size_t len) {
 }
 
 /* Is the file at dir/name exactly these bytes? */
-static hts_boolean gif_is(const char *dir, const char *name, const char *data,
-                          size_t size) {
+static hts_boolean gif_is(const char *dir, const char *name, hts_span data) {
   char path[HTS_URLMAXSIZE + 64];
   size_t len = 0;
   char *got;
@@ -927,17 +924,17 @@ static hts_boolean gif_is(const char *dir, const char *name, const char *data,
 
   snprintf(path, sizeof(path), "%s/%s", dir, name);
   got = st_slurp_ansi(path, &len);
-  ok = got != NULL && len == size && memcmp(got, data, size) == 0 ? HTS_TRUE
-                                                                  : HTS_FALSE;
+  ok = got != NULL && len == data.len && memcmp(got, data.p, len) == 0;
   freet(got);
   return ok;
 }
 
 /* assertf would stringize the expanded gif literals, which MSVC rejects. */
 static hts_boolean gifs_are_current(const char *dir) {
-  return gif_is(dir, "backblue.gif", HTS_DATA_BACK_GIF,
-                HTS_DATA_BACK_GIF_LEN) &&
-         gif_is(dir, "fade.gif", HTS_DATA_FADE_GIF, HTS_DATA_FADE_GIF_LEN);
+  return gif_is(dir, "backblue.gif",
+                hts_span_at(HTS_DATA_BACK_GIF, HTS_DATA_BACK_GIF_LEN)) &&
+         gif_is(dir, "fade.gif",
+                hts_span_at(HTS_DATA_FADE_GIF, HTS_DATA_FADE_GIF_LEN));
 }
 
 /* The top index of a multi-project root, byte for byte against a golden file
@@ -1147,26 +1144,28 @@ static int st_filesave(httrackp *opt, int argc, char **argv) {
 
 /* Fill path with dir plus '/'-cut runs of 'a' to a string of want_len bytes,
    creating each directory, because structcheck() refuses a path this long. */
-static hts_boolean st_fill_path(char *path, size_t want_len, const char *dir) {
+static hts_boolean st_fill_path(hts_buf path, size_t want_len,
+                                const char *dir) {
   size_t n = strlen(dir);
   size_t i;
 
   assertf(n < want_len - 2);
-  memcpy(path, dir, n);
+  assertf(want_len < path.size);
+  memcpy(path.p, dir, n);
   /* 200-byte components stay under the 255-byte name limit */
   for (i = 0; n < want_len - 1; n++, i++) {
     if (i % 200 == 0) {
-      path[n] = '\0';
-      if (i != 0 && !st_mkdir_at(path, n, "fullpath")) {
+      path.p[n] = '\0';
+      if (i != 0 && !st_mkdir_at(path.p, n, "fullpath")) {
         return HTS_FALSE;
       }
-      path[n] = '/';
+      path.p[n] = '/';
     } else {
-      path[n] = 'a';
+      path.p[n] = 'a';
     }
   }
-  path[want_len - 1] = 'b';
-  path[want_len] = '\0';
+  path.p[want_len - 1] = 'b';
+  path.p[want_len] = '\0';
   return HTS_TRUE;
 }
 
@@ -1200,7 +1199,7 @@ static int st_fullpath(httrackp *opt, int argc, char **argv) {
                  "abcde") == 0);
   assertf(canary[sizeof(canary) - 1] == 'X');
 
-  if (!st_fill_path(path, HTS_URLMAXSIZE * 2 - 1, argv[0])) {
+  if (!st_fill_path(HTS_BUF(path), HTS_URLMAXSIZE * 2 - 1, argv[0])) {
 #ifdef __GNU__
     /* Hurd cuts a lookup at 1024 bytes, and the cut name does not exist */
     if (errno == ENOENT)
@@ -1230,7 +1229,7 @@ static int st_fullpath(httrackp *opt, int argc, char **argv) {
   assertf(UNLINK(path) == 0);
   printf("fullpath: kept a %u-byte save path", (unsigned) strlen(path));
 
-  if (!st_fill_path(path, HTS_URLMAXSIZE * 2, argv[0])) {
+  if (!st_fill_path(HTS_BUF(path), HTS_URLMAXSIZE * 2, argv[0])) {
     return 1;
   }
   assertf(filecreate(&opt->state.strc, path) == NULL);
