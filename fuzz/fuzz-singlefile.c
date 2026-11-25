@@ -174,7 +174,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   StringFree(in);
 
   StringClear(out);
-  (void) singlefile_rewrite_html(sf_opt, sf_root, sf_page, html, html_len,
+  (void) singlefile_rewrite_html(sf_opt, sf_root, sf_page,
+                                 hts_span_at(html, html_len),
                                  SINGLEFILE_MAX_PAGE_SIZE, &out);
 
   StringFree(out);

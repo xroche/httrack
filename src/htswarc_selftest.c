@@ -2202,9 +2202,9 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
     String marked = STRING_EMPTY;
 
     sf_expand_fixture(opt, sf_page, sizeof(sf_page) - 1, &marked);
-    (void) singlefile_rewrite_html(opt, root, page, StringBuff(marked),
-                                   StringLength(marked),
-                                   SINGLEFILE_MAX_PAGE_SIZE, &verbatim);
+    (void) singlefile_rewrite_html(
+        opt, root, page, hts_span_at(StringBuff(marked), StringLength(marked)),
+        SINGLEFILE_MAX_PAGE_SIZE, &verbatim);
     /* A reference that cannot inline loses its mark and nothing else. */
     sf_check(StringLength(verbatim) < StringLength(marked),
              "a page with nothing to inline kept its marks");
@@ -2212,6 +2212,25 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
              "an un-inlinable reference kept its mark");
     StringFree(marked);
     StringFree(verbatim);
+  }
+  /* A mark ending the body is read with no byte after it. */
+  {
+    static const char tail[] = "\001nothere.png\002";
+    String marked = STRING_EMPTY;
+    String got = STRING_EMPTY;
+
+    sf_expand_fixture(opt, tail, sizeof(tail) - 1, &marked);
+    StringAddchar(marked, '9'); /* a digit past the span must not be read */
+    StringClear(got);
+    (void) singlefile_rewrite_html(
+        opt, root, page,
+        hts_span_at(StringBuff(marked), StringLength(marked) - 1),
+        SINGLEFILE_MAX_PAGE_SIZE, &got);
+    sf_check(StringLength(got) == 11 &&
+                 memcmp(StringBuff(got), "nothere.png", 11) == 0,
+             "a mark ending the body was not read");
+    StringFree(marked);
+    StringFree(got);
   }
   (void) outlen;
 
@@ -2243,9 +2262,10 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
       StringCat(marked, mark);
       StringCat(marked, "\">\n");
       StringClear(got);
-      (void) singlefile_rewrite_html(opt, root, page, StringBuff(marked),
-                                     StringLength(marked),
-                                     SINGLEFILE_MAX_PAGE_SIZE, &got);
+      (void) singlefile_rewrite_html(
+          opt, root, page,
+          hts_span_at(StringBuff(marked), StringLength(marked)),
+          SINGLEFILE_MAX_PAGE_SIZE, &got);
       sf_check(strstr(StringBuff(got), singlefile_intro(opt)) == NULL,
                "a mark the emitter wrote stayed in the page as text");
       sf_check(hts_memstr(StringBuff(got), StringLength(got), pad, spans[k]) !=
@@ -2268,9 +2288,10 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
         StringCat(marked, tail);
         StringCat(marked, "\">\n");
         StringClear(got);
-        (void) singlefile_rewrite_html(opt, root, page, StringBuff(marked),
-                                       StringLength(marked),
-                                       SINGLEFILE_MAX_PAGE_SIZE, &got);
+        (void) singlefile_rewrite_html(
+            opt, root, page,
+            hts_span_at(StringBuff(marked), StringLength(marked)),
+            SINGLEFILE_MAX_PAGE_SIZE, &got);
         sf_check(strstr(StringBuff(got), singlefile_intro(opt)) != NULL,
                  "an over-cap length was read as a mark");
         /* 2^64 + 10: unsaturated, the digits wrap to 10 and the mark eats ten
@@ -2282,9 +2303,10 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
         StringCat(marked, ".-.18446744073709551626");
         StringCat(marked, "\">\n");
         StringClear(got);
-        (void) singlefile_rewrite_html(opt, root, page, StringBuff(marked),
-                                       StringLength(marked),
-                                       SINGLEFILE_MAX_PAGE_SIZE, &got);
+        (void) singlefile_rewrite_html(
+            opt, root, page,
+            hts_span_at(StringBuff(marked), StringLength(marked)),
+            SINGLEFILE_MAX_PAGE_SIZE, &got);
         sf_check(StringLength(got) == StringLength(marked),
                  "a wrapping digit run was read as a mark");
       }
@@ -2300,15 +2322,17 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
 
     sf_check(strlen(singlefile_intro(opt)) == SINGLEFILE_INTRO_LEN,
              "the intro is not the fixed-width string may_mark assumes");
-    sf_check(singlefile_may_mark(opt, "", 0), "an empty body was refused");
+    sf_check(singlefile_may_mark(opt, hts_span_of("")),
+             "an empty body was refused");
     StringClear(probe);
     StringMemcat(probe, "x\0", 2); /* bodies carry NULs; strstr would stop */
     StringCat(probe, singlefile_intro(opt));
-    sf_check(!singlefile_may_mark(opt, StringBuff(probe), StringLength(probe)),
+    sf_check(!singlefile_may_mark(
+                 opt, hts_span_at(StringBuff(probe), StringLength(probe))),
              "an intro ending the body, past a NUL, was missed");
-    sf_check(
-        singlefile_may_mark(opt, StringBuff(probe), StringLength(probe) - 1),
-        "a truncated intro was read as one");
+    sf_check(singlefile_may_mark(
+                 opt, hts_span_at(StringBuff(probe), StringLength(probe) - 1)),
+             "a truncated intro was read as one");
     StringFree(probe);
   }
 
@@ -2332,12 +2356,12 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
     StringClear(small);
     StringClear(large);
     sf_expand_fixture(opt, bomb_html, sizeof(bomb_html) - 1, &bomb);
-    (void) singlefile_rewrite_html(opt, root, page, StringBuff(bomb),
-                                   StringLength(bomb), (LLint) css_len * 3,
-                                   &small);
-    (void) singlefile_rewrite_html(opt, root, page, StringBuff(bomb),
-                                   StringLength(bomb), SINGLEFILE_MAX_PAGE_SIZE,
-                                   &large);
+    (void) singlefile_rewrite_html(
+        opt, root, page, hts_span_at(StringBuff(bomb), StringLength(bomb)),
+        (LLint) css_len * 3, &small);
+    (void) singlefile_rewrite_html(
+        opt, root, page, hts_span_at(StringBuff(bomb), StringLength(bomb)),
+        SINGLEFILE_MAX_PAGE_SIZE, &large);
     sf_check(StringLength(large) > 4096, "the @import bomb did not fan out");
     sf_check(StringLength(small) < StringLength(large) / 8,
              "the per-page budget did not cut the fan-out short");
