@@ -3873,9 +3873,10 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         adr_nologin(opt, urladr()), urlfil());
           error = 1;
         } else if (TypedArraySize(sink.buf) != 0) {
-          hts_finish_html_file(opt, cache, r, &fp, TypedArrayElts(sink.buf),
-                               TypedArraySize(sink.buf), urladr(), urlfil(),
-                               savename());
+          hts_finish_html_file(
+              opt, cache, r, &fp,
+              hts_span_at(TypedArrayElts(sink.buf), TypedArraySize(sink.buf)),
+              urladr(), urlfil(), savename());
         }
       }
       /* outside the write: mimehtml appends whatever the output mode is */

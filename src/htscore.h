@@ -388,7 +388,7 @@ typedef enum hts_urllist_status {
 /* Read the next -%L line of buff at *pos, and move *pos past it. Returns how
    the line ended. line holds the head of a LONG or NUL line, which the crawl
    drops. */
-hts_urllist_status hts_urllist_next(const char *buff, size_t size, size_t *pos,
+hts_urllist_status hts_urllist_next(hts_span buff, size_t *pos,
                                     char line[HTS_URLLIST_LINE_SIZE]);
 
 /* Run the mirror for the given start URL(s) under opt. Top-level engine entry.
@@ -404,11 +404,11 @@ void hts_mirror_clock_start(void);
 /* Return the time since hts_mirror_clock_start(), in monotonic ms. */
 TStamp hts_mirror_elapsed_ms(void);
 
-/* Write len bytes of adr to local path s. url_adr/url_fil (may be NULL) name
-   the source URL for logging/notification. */
-int filesave(httrackp * opt, const char *adr, int len, const char *s,
-             const char *url_adr /* = NULL */ ,
-             const char *url_fil /* = NULL */ );
+/* Write body to local path s. url_adr/url_fil (may be NULL) name the source
+   URL for logging/notification. */
+int filesave(httrackp *opt, hts_span body, const char *s,
+             const char *url_adr /* = NULL */,
+             const char *url_fil /* = NULL */);
 
 char *hts_cancel_file_pop(httrackp * opt);
 
@@ -483,23 +483,21 @@ void hts_finish_makeindex(httrackp *opt, int *makeindex_done,
                           const char *template_footer, const char *adr,
                           const char *fil);
 
-/* Re-encode 'size' bytes of UTF-16 as UTF-8, a surrogate outside a pair or a
+/* Re-encode the UTF-16 src as UTF-8, a surrogate outside a pair or a
    dangling last byte as U+FFFD. 'swap' selects little-endian input. Returns a
    NUL-terminated buffer to release with freet(), its length (NUL excluded) in
    *outsize, or NULL when the result does not fit memory. */
-char *hts_ucs2_to_utf8(const unsigned char *src, size_t size, hts_boolean swap,
-                       size_t *outsize);
+char *hts_ucs2_to_utf8(hts_span src, hts_boolean swap, size_t *outsize);
 
-/* Does 'size' bytes of UTF-16 read as text: some ASCII, and next to no lone
+/* Does the UTF-16 src read as text: some ASCII, and next to no lone
    surrogates, private-use, noncharacters or C0 controls? */
-hts_boolean hts_utf16_looks_like_text(const unsigned char *src, size_t size,
-                                      hts_boolean swap);
+hts_boolean hts_utf16_looks_like_text(hts_span src, hts_boolean swap);
 
-// Flush ht_buff[0..ht_len] to save on disk; *fp closed+NULLed on write.
-// Precondition: ht_len>0.
+// Flush html to save on disk; *fp closed+NULLed on write.
+// Precondition: html.len>0.
 void hts_finish_html_file(httrackp *opt, cache_back *cache, htsblk *r,
-                          FILE **fp, const char *ht_buff, size_t ht_len,
-                          const char *adr, const char *fil, const char *save);
+                          FILE **fp, hts_span html, const char *adr,
+                          const char *fil, const char *save);
 
 /* Longest suffix a rule builder appends after the path (the wizard's
    "*[file]"), NUL included; asserted against in htswizard.c. */
