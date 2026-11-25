@@ -1153,9 +1153,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
     // Indexing!
     if (opt->kindex) {
-      if (index_keyword
-          (r->adr, r->size, r->contenttype, savename(),
-           StringBuff(opt->path_html_utf8))) {
+      if (index_keyword(hts_span_at(r->adr, (size_t) r->size), r->contenttype,
+                        savename(), StringBuff(opt->path_html_utf8))) {
         hts_log_print(opt, LOG_DEBUG, "indexing file..done");
       } else {
         hts_log_print(opt, LOG_DEBUG, "indexing file..error!");

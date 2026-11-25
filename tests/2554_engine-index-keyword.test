@@ -1,0 +1,37 @@
+#!/bin/bash
+#
+# index_keyword reads only its span: scripts, comments and tags are skipped,
+# case-blind, up to the last byte and no further.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+require_httrack
+
+HTTRACK_PATH=$(httrack_path)
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_indexkw.XXXXXX")
+cleanup_push rm -rf "$tmp"
+cd "$tmp"
+
+nl=$'\n'
+ign=$'\n\tignored'
+
+selftest_queue_lines "indexkw 1${nl}alpha${ign} (500)${nl}delta${ign} (500)" \
+    indexkw text/html '<p>alpha</p><script>gamma</script>delta'
+selftest_queue_lines "indexkw 1${nl}one${ign} (500)${nl}two${ign} (500)" \
+    indexkw text/html 'one <!-- hidden --> two'
+selftest_queue_lines "indexkw 1${nl}delta${ign} (1000)" \
+    indexkw text/html '<SCRIPT>gamma</ScRiPt>delta'
+# The page ends inside "<script": nothing past it may be read.
+selftest_queue_lines "indexkw 1${nl}alpha${ign} (500)${nl}word9${ign} (500)" \
+    indexkw text/html 'word9 alpha<scr'
+# A UTF-8 lead byte as the last byte has no pair to fold.
+selftest_queue_lines "indexkw 1" indexkw text/html hex:636166c3
+selftest_queue_lines "indexkw 1${nl}cafe${ign} (500)${nl}naive${ign} (500)" \
+    indexkw text/html hex:636166c3a9206e61c3af7665
+selftest_queue_lines "indexkw 1" indexkw text/css 'body { color: red }'
+selftest_queue_lines "indexkw 0" indexkw image/png 'alpha beta'
+selftest_queue_lines "indexkw 0" indexkw text/html hex:
+selftest_run_queued

@@ -142,12 +142,12 @@ static void index_store_word(coucal WordIndexHash, FILE *tmpfp, char *keyword) {
    Tags and javascript handled (ignored)
 */
 /* Note: utf-8 */
-int index_keyword(const char *html_data, LLint size, const char *mime,
-                  const char *filename, const char *indexpath) {
+int index_keyword(hts_span html, const char *mime, const char *filename,
+                  const char *indexpath) {
   char catbuff[CATBUFF_SIZE];
   int intag = 0, inscript = 0, incomment = 0;
   char keyword[KEYW_LEN + 32];
-  int i = 0;
+  size_t i = 0;
 
   coucal WordIndexHash = NULL;
   FILE *tmpfp = NULL;
@@ -155,9 +155,7 @@ int index_keyword(const char *html_data, LLint size, const char *mime,
   //
 
   // Check parameters
-  if (!html_data)
-    return 0;
-  if (!size)
+  if (!html.p || !html.len)
     return 0;
   if (!mime)
     return 0;
@@ -199,38 +197,40 @@ int index_keyword(const char *html_data, LLint size, const char *mime,
 
   // Start indexing this page
   keyword[0] = '\0';
-  while(i < size) {
+  while (i < html.len) {
+    const hts_span rest = hts_span_skip(html, i);
+
     /* a tag ends the pending word */
-    if (html_data[i] == '<' && !inscript && !incomment && !intag)
+    if (html.p[i] == '<' && !inscript && !incomment && !intag)
       index_store_word(WordIndexHash, tmpfp, keyword);
-    if (strfield(html_data + i, "<script")) {
+    if (hts_span_starts_with_ci(rest, hts_span_of("<script"))) {
       inscript = 1;
-    } else if (strfield(html_data + i, "<!--")) {
+    } else if (hts_span_starts_with_ci(rest, hts_span_of("<!--"))) {
       incomment = 1;
-    } else if (strfield(html_data + i, "</script")) {
+    } else if (hts_span_starts_with_ci(rest, hts_span_of("</script"))) {
       if (!incomment) {
         inscript = 0;
         intag = 1;
       }
-    } else if (strfield(html_data + i, "-->")) {
+    } else if (hts_span_starts_with(rest, hts_span_of("-->"))) {
       incomment = 0;
-    } else if (html_data[i] == '<') {
+    } else if (html.p[i] == '<') {
       if (!inscript)
         intag = 1;
-    } else if (html_data[i] == '>') {
+    } else if (html.p[i] == '>') {
       intag = 0;
     } else {
       // Okay, parse keywords
       if ((!inscript) && (!incomment) && (!intag)) {
-        char cchar = html_data[i];
+        char cchar = html.p[i];
         int len = (int) strlen(keyword);
 
         // Replace (ignore case, and so on..)
         if (cchar >= 'A' && cchar <= 'Z') {
           cchar = (char) (cchar + ('a' - 'A'));
-        } else if ((unsigned char) cchar == 0xC3 && i + 1 < size &&
-                   ((unsigned char) html_data[i + 1] & 0xC0) == 0x80) {
-          cchar = KEYW_LATIN1_FOLD[(unsigned char) html_data[i + 1] & 0x3F];
+        } else if ((unsigned char) cchar == 0xC3 && i + 1 < html.len &&
+                   ((unsigned char) html.p[i + 1] & 0xC0) == 0x80) {
+          cchar = KEYW_LATIN1_FOLD[(unsigned char) html.p[i + 1] & 0x3F];
           i++; /* second byte of the UTF-8 pair */
         }
 
@@ -251,7 +251,6 @@ int index_keyword(const char *html_data, LLint size, const char *mime,
           keyword[(len = 0)] = '\0';
         }
       }
-
     }
 
     i++;

@@ -76,7 +76,39 @@ static int st_indexfd(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* -#test=indexkw <mime> <body>: index BODY (st_decode_body) as one page, held
+   with no end NUL, then print the 0/1 result and index.txt from the cwd. */
+static int st_indexkw(httrackp *opt, int argc, char **argv) {
+  char body[4096];
+  size_t n, len = 0;
+  char *page, *out;
+  int ok;
+
+  if (argc != 2) {
+    fprintf(stderr, "usage: indexkw <mime> <body>\n");
+    return 1;
+  }
+  n = st_decode_body(argv[1], body, sizeof(body));
+  page = malloct(n != 0 ? n : 1); /* exact, so ASan sees a read past it */
+  assertf(page != NULL);
+  memcpy(page, body, n);
+  UNLINK("index.txt"); /* a skipped page writes none */
+  index_init("");
+  ok = index_keyword(hts_span_at(page, n), argv[0], "page.html", "");
+  freet(page);
+  index_finish("", 1);
+  printf("indexkw %d\n", ok);
+  out = st_slurp("index.txt", &len);
+  if (out != NULL) {
+    fwrite(out, 1, len, stdout);
+    freet(out);
+  }
+  return 0;
+}
+
 const struct selftest_entry selftests_index[] = {
     {"indexfd", "", "keyword index temp file is closed", st_indexfd},
+    {"indexkw", "<mime> <body>", "index one page and print index.txt",
+     st_indexkw},
     {NULL, NULL, NULL, NULL},
 };
