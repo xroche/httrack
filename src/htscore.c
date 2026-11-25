@@ -1945,8 +1945,9 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
               hts_boolean keep_root = HTS_TRUE;
 #endif
 
-              robots_parse(opt, &robots, urladr(), r.adr, (size_t) r.size,
-                           HTS_SIZED(infobuff), keep_root, HTS_SIZED(sitemaps));
+              robots_parse(opt, &robots, urladr(),
+                           hts_span_at(r.adr, (size_t) r.size),
+                           HTS_BUF(infobuff), keep_root, HTS_BUF(sitemaps));
               if (strnotempty(infobuff)) {
                 hts_log_print(opt, LOG_INFO,
                               "Note: robots.txt forbidden links for %s are: %s",

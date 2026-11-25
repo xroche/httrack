@@ -60,6 +60,8 @@ struct robots_wizard {
 
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
+#include "htsbuf.h"
+
 /* -1 if `fil` disallowed for `adr` (RFC 9309); empty: -1 if rules exist. */
 int checkrobots(const robots_wizard *robots, const char *adr, const char *fil);
 /* Free every node's strings, plus every node below `robots` but not `robots`.
@@ -69,14 +71,13 @@ void checkrobots_free(robots_wizard * robots);
    success, 0 if the allocation failed. */
 int checkrobots_set(robots_wizard * robots, const char *adr, const char *data);
 /* Parse robots.txt `body` for `adr`, storing the HTTrack group's rules; `info`
-   gets a summary of the disallows actually kept, `keep_root_disallow` FALSE
-   drops "Disallow: /", and `sitemaps` (optional) collects the Sitemap: URLs,
-   one per line. Anything the parser has to leave out is logged through `opt`,
-   which may be NULL. */
+   (size 0: none) gets a summary of the disallows actually kept,
+   `keep_root_disallow` FALSE drops "Disallow: /", and `sitemaps` (size 0:
+   none) collects the Sitemap: URLs, one per line. Anything the parser has to
+   leave out is logged through `opt`, which may be NULL. */
 void robots_parse(httrackp *opt, robots_wizard *robots, const char *adr,
-                  const char *body, size_t bodysize, char *info,
-                  size_t infosize, hts_boolean keep_root_disallow,
-                  char *sitemaps, size_t sitemapsize);
+                  hts_span body, hts_buf info, hts_boolean keep_root_disallow,
+                  hts_buf sitemaps);
 #endif
 
 #endif

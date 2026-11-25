@@ -41,28 +41,28 @@ Please visit our Website: http://www.httrack.com
 
 // -- robots --
 
-/* Leftmost match of seg in hay by KMP, O(haylen + seglen); -1 if absent. */
-static long robots_find(const char *seg, size_t seglen, const char *hay,
-                        size_t haylen, unsigned int *fail) {
+/* Leftmost match of seg in hay by KMP, O(hay + seg); -1 if absent. `fail`
+   holds seg.len entries. */
+static long robots_find(hts_span seg, hts_span hay, unsigned int *fail) {
   size_t i, k = 0;
 
-  if (seglen == 0)
+  if (seg.len == 0)
     return 0;
   fail[0] = 0;
-  for (i = 1; i < seglen; i++) {
-    while (k > 0 && seg[i] != seg[k])
+  for (i = 1; i < seg.len; i++) {
+    while (k > 0 && seg.p[i] != seg.p[k])
       k = fail[k - 1];
-    if (seg[i] == seg[k])
+    if (seg.p[i] == seg.p[k])
       k++;
     fail[i] = (unsigned int) k;
   }
-  for (i = 0, k = 0; i < haylen; i++) {
-    while (k > 0 && hay[i] != seg[k])
+  for (i = 0, k = 0; i < hay.len; i++) {
+    while (k > 0 && hay.p[i] != seg.p[k])
       k = fail[k - 1];
-    if (hay[i] == seg[k])
+    if (hay.p[i] == seg.p[k])
       k++;
-    if (k == seglen)
-      return (long) (i + 1 - seglen);
+    if (k == seg.len)
+      return (long) (i + 1 - seg.len);
   }
   return -1;
 }
@@ -111,7 +111,8 @@ static hts_boolean robots_pattern_match(const char *pattern, const char *path) {
                  : HTS_FALSE;
     }
     if (seglen > 0) {
-      const long at = robots_find(p, seglen, path + pos, pathlen - pos, fail);
+      const long at = robots_find(hts_span_at(p, seglen),
+                                  hts_span_at(path + pos, pathlen - pos), fail);
 
       if (at < 0)
         return HTS_FALSE;
@@ -186,9 +187,8 @@ static hts_boolean robots_rule_add(String *blob, char marker, const char *pat) {
 }
 
 void robots_parse(httrackp *opt, robots_wizard *robots, const char *adr,
-                  const char *body, size_t bodysize, char *info,
-                  size_t infosize, hts_boolean keep_root_disallow,
-                  char *sitemaps, size_t sitemapsize) {
+                  hts_span body, hts_buf info, hts_boolean keep_root_disallow,
+                  hts_buf sitemaps) {
   size_t bptr = 0;
   int record = 0;
   hts_boolean in_agents = HTS_FALSE;     // inside the group's user-agent run
@@ -199,16 +199,16 @@ void robots_parse(httrackp *opt, robots_wizard *robots, const char *adr,
   String blob = STRING_EMPTY;
 
   dropped[0] = '\0';
-  if (info != NULL && infosize > 0)
-    info[0] = '\0';
-  if (sitemaps != NULL && sitemapsize > 0)
-    sitemaps[0] = '\0';
-  while (bptr < bodysize) {
+  if (info.size > 0)
+    info.p[0] = '\0';
+  if (sitemaps.size > 0)
+    sitemaps.p[0] = '\0';
+  while (bptr < body.len) {
     char *comm;
     int adv;
     hts_boolean cut;
 
-    cut = binput_line(body + bptr, body + bodysize,
+    cut = binput_line(body.p + bptr, body.p + body.len,
                       HTS_BUF_N(line, sizeof(line) - 1), &adv);
     bptr += (size_t) adv;
     comm = strchr(line, '#'); // strip comment
@@ -217,16 +217,16 @@ void robots_parse(httrackp *opt, robots_wizard *robots, const char *adr,
       cut = HTS_FALSE; // the comment ended the value inside the buffer
     }
     hts_rtrim(line, HTS_REALSPACES);
-    if (sitemaps != NULL && strfield(line, "sitemap:")) {
+    if (sitemaps.size > 0 && strfield(line, "sitemap:")) {
       // Sitemap belongs to no group (RFC 9309), so always collect it
       char *a = line + strfield(line, "sitemap:");
 
       a += strspn(a, HTS_REALSPACES);
       /* A line at the buffer limit was truncated: a half URL is not one. */
       if (strnotempty(a) && !cut &&
-          strlen(a) + 2 < sitemapsize - strlen(sitemaps)) {
-        strlcatbuff(sitemaps, a, sitemapsize);
-        strlcatbuff(sitemaps, "\n", sitemapsize);
+          strlen(a) + 2 < sitemaps.size - strlen(sitemaps.p)) {
+        hts_buf_cat(sitemaps, a);
+        hts_buf_cat(sitemaps, "\n");
       }
     } else if (strfield(line, "user-agent:")) {
       char *a = line + strfield(line, "user-agent:");
@@ -247,8 +247,8 @@ void robots_parse(httrackp *opt, robots_wizard *robots, const char *adr,
           StringClear(blob); // the generic rules read so far are not ours
           ndropped = 0;
           dropped[0] = '\0';
-          if (info != NULL && infosize > 0)
-            info[0] = '\0';
+          if (info.size > 0)
+            info.p[0] = '\0';
           have_specific = HTS_TRUE;
         }
         record = 2; // locked to the httrack groups
@@ -278,11 +278,11 @@ void robots_parse(httrackp *opt, robots_wizard *robots, const char *adr,
             }
           }
           /* info lists only the rules we honour. */
-          if (kept && is_disallow && info != NULL &&
-              strlen(a) + 2 < infosize - strlen(info)) {
-            if (strnotempty(info))
-              strlcatbuff(info, ", ", infosize);
-            strlcatbuff(info, a, infosize);
+          if (kept && is_disallow && info.size > 0 &&
+              strlen(a) + 2 < info.size - strlen(info.p)) {
+            if (strnotempty(info.p))
+              hts_buf_cat(info, ", ");
+            hts_buf_cat(info, a);
           }
         }
       }
