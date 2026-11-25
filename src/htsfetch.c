@@ -95,19 +95,19 @@ static hts_boolean tag_attr_find(const char *tag_name, const char *name,
   return tag_attr_find_end(tag_name, name, value, len, NULL);
 }
 
-/* Does the whitespace-separated list s, length len, hold token? */
-static hts_boolean has_token(const char *s, size_t len, const char *token) {
-  const size_t want = strlen(token);
+/* Does the whitespace-separated list hold token? */
+static hts_boolean has_token(hts_span list, const char *token) {
+  const hts_span want = hts_span_of(token);
   size_t i = 0;
 
-  while (i < len) {
+  while (i < list.len) {
     size_t start;
 
-    while (i < len && is_realspace(s[i]))
+    while (i < list.len && is_realspace(list.p[i]))
       i++;
-    for (start = i; i < len && !is_realspace(s[i]); i++)
+    for (start = i; i < list.len && !is_realspace(list.p[i]); i++)
       ;
-    if (i - start == want && hts_strncasecmp(s + start, token, want) == 0)
+    if (hts_span_eq_ci(hts_span_at(list.p + start, i - start), want))
       return HTS_TRUE;
   }
   return HTS_FALSE;
@@ -166,20 +166,22 @@ static hts_fetch_dest link_dest(const char *tag_name, hts_boolean *cors) {
                  {"image", HTS_FETCH_DEST_IMAGE},
                  {"font", HTS_FETCH_DEST_FONT}};
 
-  const char *rel;
+  const char *value;
   size_t len, i;
+  hts_span rel;
 
-  if (!tag_attr_find(tag_name, "rel", &rel, &len))
+  if (!tag_attr_find(tag_name, "rel", &value, &len))
     return HTS_FETCH_DEST_UNKNOWN;
-  if (has_token(rel, len, "stylesheet"))
+  rel = hts_span_at(value, len);
+  if (has_token(rel, "stylesheet"))
     return HTS_FETCH_DEST_STYLE;
-  if (has_token(rel, len, "icon"))
+  if (has_token(rel, "icon"))
     return HTS_FETCH_DEST_IMAGE;
-  if (has_token(rel, len, "modulepreload")) {
+  if (has_token(rel, "modulepreload")) {
     *cors = HTS_TRUE;
     return HTS_FETCH_DEST_SCRIPT;
   }
-  if (has_token(rel, len, "preload")) {
+  if (has_token(rel, "preload")) {
     for (i = 0; i < sizeof(preload) / sizeof(preload[0]); i++) {
       if (tag_attr_is(tag_name, "as", preload[i].as))
         return preload[i].dest;
@@ -568,28 +570,26 @@ static const char *const accept_presets[][ACCEPT_KINDS] = {
      "*/*;q=0.5",
      "*/*", "*/*"}};
 
-/* Return the accept_kinds index of the n bytes at name, or -1. */
-static int accept_kind_index(const char *name, size_t n) {
-  return hts_span_index(hts_span_at(name, n), accept_kinds);
+/* Return the accept_kinds index of name, or -1. */
+static int accept_kind_index(hts_span name) {
+  return hts_span_index(name, accept_kinds);
 }
 
 /* Return the accept_kinds index of dest, or -1 for an unknown one. */
 static int accept_kind_of_dest(int dest) {
-  const char *const name = hts_fetch_dest_name(dest);
-
-  return dest == HTS_FETCH_DEST_UNKNOWN ? -1
-                                        : accept_kind_index(name, strlen(name));
+  return dest == HTS_FETCH_DEST_UNKNOWN
+             ? -1
+             : accept_kind_index(hts_span_of(hts_fetch_dest_name(dest)));
 }
 
 int hts_accept_kind_of(const char *arg) {
   const char *const eq = strchr(arg, '=');
 
-  return eq != NULL ? accept_kind_index(arg, (size_t) (eq - arg)) : -1;
+  return eq != NULL ? accept_kind_index(hts_span_between(arg, eq)) : -1;
 }
 
-/* Copy the value of the last list line for kind into buf, or return NULL. */
-static const char *accept_list_find(const char *list, int kind, char *buf,
-                                    size_t size) {
+/* Copy the value of the last list line for kind into out, or return NULL. */
+static const char *accept_list_find(const char *list, int kind, hts_buf out) {
   const char *found = NULL;
   size_t found_len = 0;
   const char *line;
@@ -598,32 +598,29 @@ static const char *accept_list_find(const char *list, int kind, char *buf,
     const char *const end = line + strcspn(line, "\n");
     const char *const eq = memchr(line, '=', (size_t) (end - line));
 
-    if (eq != NULL && accept_kind_index(line, (size_t) (eq - line)) == kind) {
+    if (eq != NULL && accept_kind_index(hts_span_between(line, eq)) == kind) {
       found = eq + 1;
       found_len = (size_t) (end - found);
     }
     line = *end != '\0' ? end + 1 : end;
   }
-  return found != NULL && hts_buf_put_span(hts_buf_at(buf, size),
-                                           hts_span_at(found, found_len))
-             ? buf
+  return found != NULL && hts_buf_put_span(out, hts_span_at(found, found_len))
+             ? out.p
              : NULL;
 }
 
 const char *hts_accept_lookup(const char *list, const char *user_default,
                               hts_boolean user_given, int dest,
-                              hts_browser_family family, char *buf,
-                              size_t size) {
+                              hts_browser_family family, hts_buf out) {
   const int kind = accept_kind_of_dest(dest);
   const char *v;
 
   if (kind >= 0) {
-    if ((v = accept_list_find(list, kind, buf, size)) != NULL)
+    if ((v = accept_list_find(list, kind, out)) != NULL)
       return v;
     if ((dest == HTS_FETCH_DEST_IFRAME || dest == HTS_FETCH_DEST_FRAME) &&
-        (v = accept_list_find(list,
-                              accept_kind_of_dest(HTS_FETCH_DEST_DOCUMENT), buf,
-                              size)) != NULL)
+        (v = accept_list_find(
+             list, accept_kind_of_dest(HTS_FETCH_DEST_DOCUMENT), out)) != NULL)
       return v;
   }
   if (!user_given && kind >= 0 && family != HTS_BROWSER_NONE)
@@ -635,9 +632,8 @@ HTSEXT_API const char *const *hts_accept_kinds(void) { return accept_kinds; }
 
 HTSEXT_API const char *hts_accept_preset(const char *browser,
                                          const char *kind) {
-  const int k = kind != NULL && *kind != '\0'
-                    ? accept_kind_index(kind, strlen(kind))
-                    : -1;
+  const int k =
+      kind != NULL && *kind != '\0' ? accept_kind_index(hts_span_of(kind)) : -1;
 
   if (browser == NULL || (kind != NULL && *kind != '\0' && k < 0))
     return NULL;

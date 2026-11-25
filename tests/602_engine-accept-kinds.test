@@ -57,6 +57,11 @@ selftest_queue legacy accept object none - document=d/e
 # A request whose kind is unknown takes -%a or the built-in value.
 selftest_queue legacy accept empty chrome - image=a/b
 selftest_queue x/y accept empty firefox x/y
+# A kind's value too long for the buffer is skipped, not cut.
+v255=$(printf '%255s' '' | tr ' ' a)
+selftest_queue "$v255" accept image none - "image=$v255"
+selftest_queue legacy accept image none - "image=${v255}a"
+selftest_queue d/e accept iframe none - document=d/e "iframe=${v255}a"
 
 # An Origin drops the scheme's default port and refuses a host no header can
 # carry (hex: "http://a\x01test", "http://a\x7ftest", "http://a\xc3\xa9test").

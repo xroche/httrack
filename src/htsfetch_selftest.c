@@ -178,9 +178,9 @@ static int st_accept(httrackp *opt, int argc, char **argv) {
       strlcatbuff(list, "\n", sizeof(list));
     strlcatbuff(list, argv[i], sizeof(list));
   }
-  v = hts_accept_lookup(
-      list, strcmp(argv[2], "-") == 0 ? HTS_ACCEPT_LEGACY : argv[2],
-      strcmp(argv[2], "-") != 0, dest, family, buf, sizeof(buf));
+  v = hts_accept_lookup(list,
+                        strcmp(argv[2], "-") == 0 ? HTS_ACCEPT_LEGACY : argv[2],
+                        strcmp(argv[2], "-") != 0, dest, family, HTS_BUF(buf));
   printf("%s\n", v == NULL                           ? "(null)"
                  : *v == '\0'                        ? "(empty)"
                  : strcmp(v, HTS_ACCEPT_LEGACY) == 0 ? "legacy"
