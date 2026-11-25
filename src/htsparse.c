@@ -1572,7 +1572,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                            safe_adr, safe_fil);
                   snprintf(status_str, sizeof(status_str), "%d", r->statuscode);
                   snprintf(size_str, sizeof(size_str), LLintP, (LLint) r->size);
-                  time_gmt_rfc822(HTS_SIZED(gmttime));
+                  time_gmt_rfc822(HTS_BUF(gmttime));
 
                   {
                     // Network strings go through html_inline_safe(), because a
@@ -3347,7 +3347,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       char BIGSTK cid[HTS_URLMAXSIZE * 3];
 
                       HT_ADD("cid:");
-                      make_content_id(afs.af.adr, afs.af.fil, HTS_SIZED(cid));
+                      make_content_id(afs.af.adr, afs.af.fil, HTS_BUF(cid));
                       HT_ADD_HTMLESCAPED(cid);
                       lastsaved = eadr - 1;     // dernier écrit+1 (enfin euh apres on fait un ++ alors hein)
                     } else if (opt->urlmode == HTS_URLMODE_ABSOLUTE_URI) {
@@ -3873,9 +3873,10 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         adr_nologin(opt, urladr()), urlfil());
           error = 1;
         } else if (TypedArraySize(sink.buf) != 0) {
-          hts_finish_html_file(opt, cache, r, &fp, TypedArrayElts(sink.buf),
-                               TypedArraySize(sink.buf), urladr(), urlfil(),
-                               savename());
+          hts_finish_html_file(
+              opt, cache, r, &fp,
+              hts_span_at(TypedArrayElts(sink.buf), TypedArraySize(sink.buf)),
+              urladr(), urlfil(), savename());
         }
       }
       /* outside the write: mimehtml appends whatever the output mode is */

@@ -415,9 +415,9 @@ void hts_finish_makeindex(httrackp *opt, int *makeindex_done,
   *makeindex_done = 1;
 }
 
-/* Write len bytes of buf to fp, then close it. On failure errno says why. */
-static hts_boolean hts_write_and_close(FILE *fp, const char *buf, size_t len) {
-  hts_boolean written = len == 0 || hts_fwrite_exact(buf, len, fp);
+/* Write body to fp, then close it. On failure errno says why. */
+static hts_boolean hts_write_and_close(FILE *fp, hts_span body) {
+  hts_boolean written = body.len == 0 || hts_fwrite_exact(body.p, body.len, fp);
   int last_errno = written ? 0 : errno;
 
   /* a body small enough to sit in stdio's buffer only fails at fclose */
@@ -432,13 +432,13 @@ static hts_boolean hts_write_and_close(FILE *fp, const char *buf, size_t len) {
 
 /* Flush the parsed HTML output buffer to disk. */
 void hts_finish_html_file(httrackp *opt, cache_back *cache, htsblk *r,
-                          FILE **fp, const char *ht_buff, size_t ht_len,
-                          const char *adr, const char *fil, const char *save) {
+                          FILE **fp, hts_span html, const char *adr,
+                          const char *fil, const char *save) {
   file_notify(opt, adr, fil, save, 1, 1, r->notmodified);
   hts_changes_html(opt, cache, r, adr, fil, save);
   *fp = filecreate(&opt->state.strc, save);
   if (*fp) {
-    const hts_boolean written = hts_write_and_close(*fp, ht_buff, ht_len);
+    const hts_boolean written = hts_write_and_close(*fp, html);
 
     *fp = NULL;
     if (!written) {
@@ -489,20 +489,20 @@ static unsigned int ucs2_unit(const unsigned char *src, size_t i,
 /* Decode the code point at byte offset *i and step past it. A surrogate that
    is not half of a pair, or a dangling last byte, becomes U+FFFD and sets
    *lone when the former. */
-static hts_UCS4 utf16_next(const unsigned char *src, size_t size, size_t *i,
-                           hts_boolean swap, hts_boolean *lone) {
+static hts_UCS4 utf16_next(hts_span src, size_t *i, hts_boolean swap,
+                           hts_boolean *lone) {
   unsigned int hi;
 
-  if (size - *i < 2) {
-    *i = size;
+  if (src.len - *i < 2) {
+    *i = src.len;
     return 0xFFFD;
   }
-  hi = ucs2_unit(src, *i, swap);
+  hi = ucs2_unit((const unsigned char *) src.p, *i, swap);
   *i += 2;
   if (hi < 0xD800 || hi > 0xDFFF)
     return hi;
-  if (hi <= 0xDBFF && size - *i >= 2) {
-    const unsigned int lo = ucs2_unit(src, *i, swap);
+  if (hi <= 0xDBFF && src.len - *i >= 2) {
+    const unsigned int lo = ucs2_unit((const unsigned char *) src.p, *i, swap);
 
     if (lo >= 0xDC00 && lo <= 0xDFFF) {
       *i += 2;
@@ -513,15 +513,14 @@ static hts_UCS4 utf16_next(const unsigned char *src, size_t size, size_t *i,
   return 0xFFFD;
 }
 
-hts_boolean hts_utf16_looks_like_text(const unsigned char *src, size_t size,
-                                      hts_boolean swap) {
+hts_boolean hts_utf16_looks_like_text(hts_span src, hts_boolean swap) {
   size_t suspicious = 0;
   size_t ascii = 0;
   size_t i;
 
-  for (i = 0; i < size;) {
+  for (i = 0; i < src.len;) {
     hts_boolean lone = HTS_FALSE;
-    const hts_UCS4 cp = utf16_next(src, size, &i, swap, &lone);
+    const hts_UCS4 cp = utf16_next(src, &i, swap, &lone);
 
     /* Random units land here about 13% of the time, text almost never. */
     if (lone ||
@@ -532,11 +531,10 @@ hts_boolean hts_utf16_looks_like_text(const unsigned char *src, size_t size,
     else if (cp >= 0x20 && cp <= 0x7E)
       ascii++;
   }
-  return ascii >= 4 && suspicious <= size / 200 ? HTS_TRUE : HTS_FALSE;
+  return ascii >= 4 && suspicious <= src.len / 200 ? HTS_TRUE : HTS_FALSE;
 }
 
-char *hts_ucs2_to_utf8(const unsigned char *src, size_t size, hts_boolean swap,
-                       size_t *outsize) {
+char *hts_ucs2_to_utf8(hts_span src, hts_boolean swap, size_t *outsize) {
   /* Signed and wide, because three bytes per unit overflows a 32-bit size_t. */
   LLint total = 0;
   hts_boolean lone = HTS_FALSE;
@@ -546,11 +544,11 @@ char *hts_ucs2_to_utf8(const unsigned char *src, size_t size, hts_boolean swap,
   hts_buf out;
 
   /* Sized exactly, because one UTF-16 unit can take three UTF-8 bytes. */
-  for (i = 0; i < size;) {
+  for (i = 0; i < src.len;) {
     char seq[8];
 
-    total += (LLint) hts_writeUTF8(utf16_next(src, size, &i, swap, &lone),
-                                   HTS_BUF(seq));
+    total +=
+        (LLint) hts_writeUTF8(utf16_next(src, &i, swap, &lone), HTS_BUF(seq));
   }
   if (!hts_inmem_size_fits(total + 1)) {
     return NULL;
@@ -560,8 +558,8 @@ char *hts_ucs2_to_utf8(const unsigned char *src, size_t size, hts_boolean swap,
     return NULL;
   }
   out = hts_buf_at(dest, (size_t) total + 1);
-  for (i = 0; i < size;) {
-    offs += hts_writeUTF8(utf16_next(src, size, &i, swap, &lone),
+  for (i = 0; i < src.len;) {
+    offs += hts_writeUTF8(utf16_next(src, &i, swap, &lone),
                           hts_buf_skip(out, offs));
   }
   assertf(offs == (size_t) total);
@@ -664,22 +662,22 @@ const char *hts_urllist_load(const char *path, char **buff, size_t *size,
   return err;
 }
 
-hts_urllist_status hts_urllist_next(const char *buff, size_t size, size_t *pos,
+hts_urllist_status hts_urllist_next(hts_span buff, size_t *pos,
                                     char line[HTS_URLLIST_LINE_SIZE]) {
   int adv;
   hts_boolean cut;
   size_t term;
 
-  if (*pos >= size)
+  if (*pos >= buff.len)
     return HTS_URLLIST_END;
-  cut = binput_line(buff + *pos, buff + size,
+  cut = binput_line(buff.p + *pos, buff.p + buff.len,
                     hts_buf_at(line, HTS_URLMAXSIZE + 1), &adv);
   /* the byte it stopped on, past any CR it dropped */
   term = *pos + (size_t) adv - 1;
   *pos = term + 1;
   /* an embedded NUL ends the read too, and half a URL is not one */
-  if (term < size && buff[term] == '\0') {
-    while (*pos < size && buff[*pos] != '\n')
+  if (term < buff.len && buff.p[term] == '\0') {
+    while (*pos < buff.len && buff.p[*pos] != '\n')
       (*pos)++;
     (*pos)++;
     return HTS_URLLIST_NUL;
@@ -690,31 +688,30 @@ hts_urllist_status hts_urllist_next(const char *buff, size_t size, size_t *pos,
 
 /* Read old.lst's next "[path]" line. Return HTS_FALSE when it is cut,
    malformed, absolute, escaping or too long, which filenote() never writes. */
-static hts_boolean old_lst_entry(httrackp *opt, const char *lst,
-                                 const char *end, size_t *pos, char *line,
-                                 size_t linesize, char *file, size_t filesize) {
+static hts_boolean old_lst_entry(httrackp *opt, hts_span lst, size_t *pos,
+                                 hts_buf line, hts_buf file) {
   const size_t root = StringLength(opt->path_html);
   int adv;
   const hts_boolean cut =
-      binput_line(lst + *pos, end, hts_buf_at(line, linesize), &adv);
+      binput_line(lst.p + *pos, lst.p + lst.len, line, &adv);
   size_t len;
 
   if (adv <= 0) { // a line past INT_MAX bytes: stop walking
-    *pos = (size_t) (end - lst);
+    *pos = lst.len;
     return HTS_FALSE;
   }
   *pos += (size_t) adv;
-  len = strlen(line);
-  if (cut || len < 3 || line[0] != '[' || line[len - 1] != ']' ||
-      line[1] == '/' || line[1] == '\\')
+  len = strlen(line.p);
+  if (cut || len < 3 || line.p[0] != '[' || line.p[len - 1] != ']' ||
+      line.p[1] == '/' || line.p[1] == '\\')
     return HTS_FALSE;
-  if (root >= filesize || len - 2 >= filesize - root)
+  if (root >= file.size || len - 2 >= file.size - root)
     return HTS_FALSE;
-  memcpy(file, StringBuff(opt->path_html), root);
-  memcpy(file + root, line + 1, len - 2);
-  file[root + len - 2] = '\0';
+  memcpy(file.p, StringBuff(opt->path_html), root);
+  memcpy(file.p + root, line.p + 1, len - 2);
+  file.p[root + len - 2] = '\0';
   /* a ".." or drive prefix would walk the purge out of the mirror */
-  if (!hts_path_is_relative_contained(file + root))
+  if (!hts_path_is_relative_contained(file.p + root))
     return HTS_FALSE;
   return HTS_TRUE;
 }
@@ -737,9 +734,8 @@ static hts_boolean chop_to_parent(char *file, size_t root, size_t *len) {
 
 /* Decodes a rule into dest as the parser decodes a crawled link: the part
    before any '?', so "%41" and "%20" match the "A" and space a link holds.
-   Returns HTS_FALSE if it does not fit in size bytes. */
-static hts_boolean filter_rule_decode_(const char *rule, char *dest,
-                                       size_t size) {
+   Returns HTS_FALSE if it does not fit in dest. */
+static hts_boolean filter_rule_decode_(const char *rule, hts_buf dest) {
   char BIGSTK path[HTS_FILTER_MAXLEN * 3 + 1], dec[sizeof(path)];
   const char *const query = rule + strcspn(rule, "?");
   const size_t plen = (size_t) (query - rule);
@@ -748,10 +744,10 @@ static hts_boolean filter_rule_decode_(const char *rule, char *dest,
   if (!hts_buf_put_span(HTS_BUF(path), hts_span_at(rule, plen)))
     return HTS_FALSE;
   len = strlen(unescape_http_unharm(dec, sizeof(dec), path, 1 | 2));
-  if (strlen(query) >= size || len >= size - strlen(query))
+  if (strlen(query) >= dest.size || len >= dest.size - strlen(query))
     return HTS_FALSE;
-  memcpy(dest, dec, len);
-  memcpy(dest + len, query, strlen(query) + 1);
+  memcpy(dest.p, dec, len);
+  memcpy(dest.p + len, query, strlen(query) + 1);
   return HTS_TRUE;
 }
 
@@ -1117,10 +1113,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
 
         /* one under the cap: the sign is prepended into `rule` below, and the
            spare byte is the dead branch's trailing '*' */
-        const size_t room = sizeof(tempo) - 1;
-
         if (!hts_scan_token(&a, raw, sizeof(raw)) ||
-            !filter_rule_decode_(raw, tempo, room)) {
+            !filter_rule_decode_(raw, HTS_BUF_N(tempo, sizeof(tempo) - 1))) {
           /* on the console too: the user who typed it may have no log open */
           printf("Filter rule longer than %d bytes, ignored: %c%.64s...\n",
                  (int) HTS_FILTER_MAXLEN, type ? '+' : '-', raw);
@@ -1242,9 +1236,9 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
         char BIGSTK line[HTS_URLLIST_LINE_SIZE];
         const char *bundle_why;
         hts_urllist_status status;
+        const hts_span list = hts_span_at(filelist_buff, filelist_sz);
 
-        while ((status = hts_urllist_next(filelist_buff, filelist_sz,
-                                          &filelist_ptr, line)) !=
+        while ((status = hts_urllist_next(list, &filelist_ptr, line)) !=
                HTS_URLLIST_END) {
           lineno++;
           if (status == HTS_URLLIST_NUL) {
@@ -1717,12 +1711,11 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
              */
             if (ucs2_bom &&
                 (map[0] > r.size / 10 ||
-                 hts_utf16_looks_like_text((const unsigned char *) r.adr,
-                                           (size_t) r.size, ucs2_swap))) {
+                 hts_utf16_looks_like_text(hts_span_at(r.adr, (size_t) r.size),
+                                           ucs2_swap))) {
               size_t new_size = 0;
-              char *const new_adr =
-                  hts_ucs2_to_utf8((const unsigned char *) r.adr,
-                                   (size_t) r.size, ucs2_swap, &new_size);
+              char *const new_adr = hts_ucs2_to_utf8(
+                  hts_span_at(r.adr, (size_t) r.size), ucs2_swap, &new_size);
 
               if (new_adr == NULL) {
                 /* Fail only the page, as http_xfread1() does on this NULL. */
@@ -2015,8 +2008,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
           // read, which would destroy the copy being re-fetched (#748).
           if (r.statuscode > 0 && (r.adr != NULL || r.size == 0)) {
             file_notify(opt, urladr(), urlfil(), savename(), 1, 1, r.notmodified);
-            if (filesave(opt, r.adr, (int) r.size, savename(), urladr(), urlfil()) !=
-                0) {
+            if (r.size < 0 || filesave(opt, hts_span_at(r.adr, (size_t) r.size),
+                                       savename(), urladr(), urlfil()) != 0) {
               int fcheck;
 
               if ((fcheck = check_fatal_io_errno())) {
@@ -2190,7 +2183,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
         new_lst = readfile2_utf8(hts_logpath(opt, "hts-cache/new.lst"), NULL);
         if (new_lst != NULL) {
           const size_t root = StringLength(opt->path_html);
-          const char *const old_end = old_lst + (size_t) old_sz;
+          const hts_span old = hts_span_at(old_lst, (size_t) old_sz);
           /* This holds filenote()'s longest line, "[" + savelst + "]". */
           char BIGSTK line[HTS_URLMAXSIZE * 2 + 2];
           char BIGSTK file[HTS_URLMAXSIZE * 2];
@@ -2198,8 +2191,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
           int purge = 0;
 
           for (pos = 0; pos < (size_t) old_sz;) {
-            if (!old_lst_entry(opt, old_lst, old_end, &pos, HTS_SIZED(line),
-                               HTS_SIZED(file)))
+            if (!old_lst_entry(opt, old, &pos, HTS_BUF(line), HTS_BUF(file)))
               continue;
             hts_changes_previous(opt, file + root);
             if (!strstr(new_lst, line)) { // not found in the new list?
@@ -2223,8 +2215,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
             for (pos = 0; pos < (size_t) old_sz;) {
               size_t dir;
 
-              if (!old_lst_entry(opt, old_lst, old_end, &pos, HTS_SIZED(line),
-                                 HTS_SIZED(file)))
+              if (!old_lst_entry(opt, old, &pos, HTS_BUF(line), HTS_BUF(file)))
                 continue;
               dir = strlen(file);
               if (!chop_to_parent(file, root, &dir))
@@ -2275,7 +2266,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
     const LLint recv = hts_stat_recv_get();
     LLint n = (LLint) (recv / (max(1, time_local() - HTS_STAT.stat_timestart)));
 
-    sec2str(HTS_SIZED(htstime), time_local() - HTS_STAT.stat_timestart);
+    sec2str(HTS_BUF(htstime), time_local() - HTS_STAT.stat_timestart);
     infoupdated[0] = '\0';
     if (opt->is_update) {
       if (HTS_STAT.stat_updated_files > 0) {
@@ -3037,18 +3028,14 @@ HTSEXT_API int structcheck_utf8(const char *path) {
   return structcheck_impl(path, HTS_TRUE);
 }
 
-/* Save len bytes of adr as s: 0 on success, -1 with errno set on failure. */
-int filesave(httrackp * opt, const char *adr, int len, const char *s,
-             const char *url_adr, const char *url_fil) {
+/* Save body as s: 0 on success, -1 with errno set on failure. */
+int filesave(httrackp *opt, hts_span body, const char *s, const char *url_adr,
+             const char *url_fil) {
   FILE *const fp = filecreate(&opt->state.strc, s);
 
   if (fp == NULL)
     return -1;
-  if (len < 0) {
-    (void) fclose(fp);
-    return -1;
-  }
-  return hts_write_and_close(fp, adr, (size_t) len) ? 0 : -1;
+  return hts_write_and_close(fp, body) ? 0 : -1;
 }
 
 /* We should stop */
@@ -3816,7 +3803,7 @@ static hts_boolean filter_rule_normalize_(const char *rule, char *norm) {
     if ((unsigned char) rule[i] < ' ')
       return HTS_FALSE;
   }
-  return filter_rule_decode_(rule, norm, HTS_FILTER_MAXLEN + 1);
+  return filter_rule_decode_(rule, hts_buf_at(norm, HTS_FILTER_MAXLEN + 1));
 }
 
 /* Returns a normalized copy, or NULL if refused or out of memory. */

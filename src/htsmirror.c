@@ -286,7 +286,7 @@ int hts_mirror_check_moved(htsmoduleStruct *str,
               inplace_escape_uri(HTS_SIZED(mov_url));
             } else {
               char BIGSTK cid[HTS_URLMAXSIZE * 3];
-              make_content_id(moved->adr, moved->fil, HTS_SIZED(cid));
+              make_content_id(moved->adr, moved->fil, HTS_BUF(cid));
               strcpybuff(mov_url, "cid:");
               strcatbuff(mov_url, cid);
             }
@@ -1202,7 +1202,7 @@ int hts_wait_delayed(htsmoduleStruct *str, lien_adrfilsave *afs,
       cookie_before[0] = '\0';
       if (opt->accept_cookie && opt->cookie != NULL)
         http_cookie_header(opt->cookie, afs->af.adr, afs->af.fil,
-                           HTS_SIZED(cookie_before));
+                           HTS_BUF(cookie_before));
 
       /* Wait for an available slot */
       if (!hts_wait_available_socket(sback, opt, cache, ptr))
@@ -1396,7 +1396,7 @@ int hts_wait_delayed(htsmoduleStruct *str, lien_adrfilsave *afs,
             cookie_after[0] = '\0';
             if (opt->accept_cookie && opt->cookie != NULL)
               http_cookie_header(opt->cookie, afs->af.adr, afs->af.fil,
-                                 HTS_SIZED(cookie_after));
+                                 HTS_BUF(cookie_after));
             cookies_changed = strcmp(cookie_before, cookie_after) != 0;
 
             mov_url[0] = '\0';

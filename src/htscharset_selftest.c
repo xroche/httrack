@@ -819,7 +819,7 @@ static int st_inplace_escape(httrackp *opt, int argc, char **argv) {
   static size_t (*const plain[])(const char *, char *, size_t) = {
       escape_in_url, escape_spc_url, escape_uri_utf, escape_check_url,
       escape_uri};
-  size_t i, f;
+  size_t i, f, cap;
 
   memset(longstr, 'a', sizeof(longstr) - 1);
   for (f = 0; f < sizeof(inplace) / sizeof(inplace[0]); f++) {
@@ -831,6 +831,21 @@ static int st_inplace_escape(httrackp *opt, int argc, char **argv) {
       iret = inplace[f](work, sizeof(work));
       assertf(iret == rret);
       assertf(strcmp(work, ref) == 0);
+      // every capacity from the source's own size to the escaped one, clip
+      // included
+      for (cap = strlen(samples[i]) + 1; cap <= rret + 1; cap++) {
+        char *w, *r;
+
+        if (cap == sizeof(void *))
+          continue;
+        w = malloct(cap);
+        r = malloct(cap);
+        strlcpybuff(w, samples[i], cap);
+        assertf(inplace[f](w, cap) == plain[f](samples[i], r, cap));
+        assertf(strcmp(w, r) == 0);
+        freet(w);
+        freet(r);
+      }
     }
   }
   printf("inplace-escape self-test OK\n");

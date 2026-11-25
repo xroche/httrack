@@ -677,7 +677,7 @@ static int st_headerdedup(httrackp *opt, int argc, char **argv) {
   /* exact-size copy so a sanitizer traps an over-read of the block */
   headers = strdupt(tmp);
   freet(tmp);
-  http_append_custom_headers(req, capacity, headers);
+  http_append_custom_headers(hts_buf_at(req, capacity), headers);
   for (i = 0; appended[i] != '\0'; i++) {
     if (appended[i] == '\r')
       printf("\\r");
@@ -2605,7 +2605,7 @@ static void customdiff_one(parsediff_stats *st, const char *headers,
       memcpy(bo, reqs[i], strlen(reqs[i]) + 1);
       memcpy(bn, reqs[i], strlen(reqs[i]) + 1);
       legacy_http_append_custom_headers(bo, cap, headers);
-      http_append_custom_headers(bn, cap, headers);
+      http_append_custom_headers(hts_buf_at(bn, cap), headers);
       st->cases++;
       if (memcmp(bo, bn, cap) != 0)
         parsediff_fail(st, "append", headers, reqs[i], bo, bn);

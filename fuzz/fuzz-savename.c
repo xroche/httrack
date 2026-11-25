@@ -87,8 +87,8 @@ static void fuzz_line(const char *line, httrackp *opt, cache_back *cache,
     char d[128];
 
     d[0] = '\0';
-    url_savename_addstr(HTS_SIZED(d), line);
-    url_savename_addtail(HTS_SIZED(d), "-", line);
+    url_savename_addstr(HTS_BUF(d), line);
+    url_savename_addtail(HTS_BUF(d), "-", line);
     savename_sink += (unsigned long) strlen(d);
   }
 

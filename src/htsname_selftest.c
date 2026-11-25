@@ -875,7 +875,7 @@ static int st_savename_addstr(httrackp *opt, int argc, char **argv) {
              cases[k].add, (int) cases[k].dsize);
     memset(buf, ST_POISON, sizeof(buf));
     memcpy(buf, cases[k].seed, seedlen + 1);
-    url_savename_addstr(buf, cases[k].dsize, cases[k].add);
+    url_savename_addstr(hts_buf_at(buf, cases[k].dsize), cases[k].add);
     if (strcmp(buf, cases[k].want) != 0) {
       fprintf(stderr, "savename-addstr: '%s' + '%s' (%d) -> '%s' want '%s'\n",
               cases[k].seed, cases[k].add, (int) cases[k].dsize, buf,
@@ -900,7 +900,7 @@ static int st_savename_addstr(httrackp *opt, int argc, char **argv) {
     big[0] = '\0';
     memset(src, 'a', sizeof(src) - 1);
     src[sizeof(src) - 1] = '\0';
-    url_savename_addstr(big, dsize, src);
+    url_savename_addstr(hts_buf_at(big, dsize), src);
     if (strlen(big) != dsize - 1) {
       fprintf(stderr, "savename-addstr: dsize %d filled %d byte(s)\n",
               (int) dsize, (int) strlen(big));
@@ -956,7 +956,8 @@ static int st_savename_addtail(httrackp *opt, int argc, char **argv) {
              cases[k].sep, cases[k].add, (int) cases[k].dsize);
     memset(buf, ST_POISON, sizeof(buf));
     memcpy(buf, cases[k].seed, seedlen + 1);
-    url_savename_addtail(buf, cases[k].dsize, cases[k].sep, cases[k].add);
+    url_savename_addtail(hts_buf_at(buf, cases[k].dsize), cases[k].sep,
+                         cases[k].add);
     if (strcmp(buf, cases[k].want) != 0) {
       fprintf(stderr,
               "savename-addtail: '%s' + '%s%s' (%d) -> '%s' want '%s'\n",
@@ -976,7 +977,7 @@ static int st_savename_addtail(httrackp *opt, int argc, char **argv) {
     memset(big, ST_POISON, sizeof(big));
     memset(big, 'a', dsize - 1);
     big[dsize - 1] = '\0';
-    url_savename_addtail(big, dsize, ".", "html");
+    url_savename_addtail(hts_buf_at(big, dsize), ".", "html");
     if (strlen(big) != dsize - 1 ||
         strcmp(big + dsize - 1 - strlen(".html"), ".html") != 0) {
       fprintf(stderr,
@@ -2029,7 +2030,7 @@ static hts_boolean rs_check(const char *in, size_t size, const char *want) {
 
   memset(buf, '#', sizeof(buf));
   strlcpybuff(buf, in, sizeof(buf));
-  url_savename_escape_reserved(buf, size);
+  url_savename_escape_reserved(hts_buf_at(buf, size));
   ok = strcmp(buf, want) == 0 ? HTS_TRUE : HTS_FALSE;
   for (i = size > strlen(in) ? size : strlen(in) + 1; i < sizeof(buf); i++) {
     if (buf[i] != '#')

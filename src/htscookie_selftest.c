@@ -88,7 +88,7 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
     return 1;
   }
 
-  http_cookie_header(&cookie, dom, "/", hdr, sizeof(hdr));
+  http_cookie_header(&cookie, dom, "/", HTS_BUF(hdr));
   ST_FAIL_IF(err, strcmp(hdr, expected) != 0);
 
   /* A hostile over-long request host must not overflow domain[] in
@@ -170,7 +170,7 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
       snprintf(value, sizeof(value), "v%02d", i);
       ST_FAIL_IF(err, cookie_add(&many, name, value, dom, "/") != 0);
     }
-    sent = http_cookie_header(&many, dom, "/", many_hdr, sizeof(many_hdr));
+    sent = http_cookie_header(&many, dom, "/", HTS_BUF(many_hdr));
     ST_FAIL_IF(err, sent != n);
     ST_FAIL_IF(err, !cookie_line_is_whole(many_hdr, n));
     for (i = 0; i < n; i++) {
@@ -184,7 +184,7 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
        lands between a pair, on its separator or on the CRLF by the size. */
     for (i = 1; i <= (int) sizeof(tight); i++) {
       memset(tight, 'X', sizeof(tight)); /* a lost NUL must not read as empty */
-      sent = http_cookie_header(&many, dom, "/", tight, (size_t) i);
+      sent = http_cookie_header(&many, dom, "/", hts_buf_at(tight, (size_t) i));
       if (sent < 0 || sent > n)
         err = 1;
       else if (sent == 0) {
@@ -248,7 +248,7 @@ static hts_boolean cookie_roundtrip(const char *host, const char *header,
   cookie.data[0] = '\0';
   strcpybuff(line, header); // treathead NUL-cuts in place: never a literal
   treathead(&cookie, host, "/", &r, line);
-  http_cookie_header(&cookie, query, "/", hdr, sizeof(hdr));
+  http_cookie_header(&cookie, query, "/", HTS_BUF(hdr));
   return strstr(hdr, needle) != NULL ? HTS_TRUE : HTS_FALSE;
 }
 
@@ -425,7 +425,7 @@ static int st_cookieport(httrackp *opt, int argc, char **argv) {
     printf("cookie-port: FAIL (cookie_add setup)\n");
     return 1;
   }
-  http_cookie_header(&jar, "localhost:8080", "/", hdr, sizeof(hdr));
+  http_cookie_header(&jar, "localhost:8080", "/", HTS_BUF(hdr));
   err |= cookie_expect(strstr(hdr, "fromfile=F") != NULL, HTS_TRUE,
                        "a bare jar host is hidden by the port on the wire");
   err |= cookie_expect(strstr(hdr, "junk") != NULL, HTS_FALSE,
@@ -440,10 +440,10 @@ static int st_cookieport(httrackp *opt, int argc, char **argv) {
     printf("cookie-port: FAIL (cookie_add setup, port form)\n");
     return 1;
   }
-  http_cookie_header(&jar, "127.0.0.1", "/", hdr, sizeof(hdr));
+  http_cookie_header(&jar, "127.0.0.1", "/", HTS_BUF(hdr));
   err |= cookie_expect(strstr(hdr, "sess=PERSIST") != NULL, HTS_TRUE,
                        "a jar storing 127.0.0.1:8080 lost its session");
-  http_cookie_header(&jar, "::1", "/", hdr, sizeof(hdr));
+  http_cookie_header(&jar, "::1", "/", HTS_BUF(hdr));
   err |= cookie_expect(strstr(hdr, "sixjar=V") != NULL, HTS_TRUE,
                        "a jar storing [::1]:8080 lost its session");
   /* Only this case drives cookie_add with a zone id, which the host rows above
@@ -452,7 +452,7 @@ static int st_cookieport(httrackp *opt, int argc, char **argv) {
     printf("cookie-port: FAIL (cookie_add setup, zone id form)\n");
     return 1;
   }
-  http_cookie_header(&jar, "fe80::1%eth0", "/", hdr, sizeof(hdr));
+  http_cookie_header(&jar, "fe80::1%eth0", "/", HTS_BUF(hdr));
   err |= cookie_expect(strstr(hdr, "zonejar=Z") != NULL, HTS_TRUE,
                        "a jar storing [fe80::1%25eth0] lost its session");
   err |= cookie_expect(cookie_add(&jar, "pwn", "OWNED", "", "/") == 0,
@@ -566,7 +566,7 @@ static int st_cookiecase(httrackp *opt, int argc, char **argv) {
 
   for (i = 0; i < sizeof(jars) / sizeof(jars[0]); i++) {
     cookie_seed(&jar, jars[i].domain, jars[i].path);
-    http_cookie_header(&jar, jars[i].query, jars[i].qpath, hdr, sizeof(hdr));
+    http_cookie_header(&jar, jars[i].query, jars[i].qpath, HTS_BUF(hdr));
     err |= cookie_expect_at(LABEL, strstr(hdr, "id=A") != NULL, jars[i].want,
                             jars[i].what);
   }
@@ -702,7 +702,7 @@ static int st_cookiedomain(httrackp *opt, int argc, char **argv) {
 
   for (i = 0; i < sizeof(trips) / sizeof(trips[0]); i++) {
     cookie_seed(&jar, trips[i].jar_dom, "/");
-    http_cookie_header(&jar, trips[i].query, "/", hdr, sizeof(hdr));
+    http_cookie_header(&jar, trips[i].query, "/", HTS_BUF(hdr));
     err |= cookie_expect_at(LABEL, strstr(hdr, "id=A") != NULL, trips[i].want,
                             trips[i].what);
   }
@@ -1370,7 +1370,7 @@ static int st_cookiequote(httrackp *opt, int argc, char **argv) {
   for (i = 0; i < n; i++)
     putchar(cookie.data[i] == '\t' ? '|' : cookie.data[i]);
   printf("\n");
-  http_cookie_header(&cookie, "example.com", "/", hdr, sizeof(hdr));
+  http_cookie_header(&cookie, "example.com", "/", HTS_BUF(hdr));
   printf("sent=%s\n", hdr);
   return 0;
 }
@@ -1585,7 +1585,7 @@ static int st_cookiesetscope(httrackp *opt, int argc, char **argv) {
       strcpybuff(line, steps[i].header);
       treathead(&jar, steps[i].host, "/", &r, line);
     }
-    http_cookie_header(&jar, steps[i].query, "/", hdr, sizeof(hdr));
+    http_cookie_header(&jar, steps[i].query, "/", HTS_BUF(hdr));
     if (cookie_sent(hdr, steps[i].pair) != steps[i].want) {
       printf("%s: step %d: %s from %s, %s %s sent to %s\n", LABEL, (int) i,
              steps[i].header != NULL ? steps[i].header : "(query)",
@@ -1607,7 +1607,7 @@ static int st_cookiesetscope(httrackp *opt, int argc, char **argv) {
   }
   for (i = 0; i < sizeof(paths) / sizeof(paths[0]); i++) {
     cookie_seed(&jar, "path.test", paths[i].cpath);
-    http_cookie_header(&jar, "path.test", paths[i].qpath, hdr, sizeof(hdr));
+    http_cookie_header(&jar, "path.test", paths[i].qpath, HTS_BUF(hdr));
     if (cookie_sent(hdr, "id=A") != paths[i].want) {
       printf("%s: cookie path %s %s %s\n", LABEL, paths[i].cpath,
              paths[i].want ? "does not reach" : "wrongly reaches",
@@ -1631,7 +1631,7 @@ static int st_cookiesetscope(httrackp *opt, int argc, char **argv) {
       strcpybuff(line, hdrs[i]);
       treathead(&jar, origin[i], "/", &r, line);
     }
-    http_cookie_header(&jar, "https://deep.test", "/app/x", hdr, sizeof(hdr));
+    http_cookie_header(&jar, "https://deep.test", "/app/x", HTS_BUF(hdr));
     if (cookie_sent(hdr, "sid=EVIL") || !cookie_sent(hdr, "sid=GOOD")) {
       printf("%s: plain http shadowed a Secure cookie on a deeper path: %s\n",
              LABEL, hdr);
@@ -1667,7 +1667,7 @@ static int st_cookiesetscope(httrackp *opt, int argc, char **argv) {
       memset(&r, 0, sizeof(r));
       snprintf(line, sizeof(line), "Set-Cookie: dp=1%s", dp[i].attr);
       treathead(&jar, "dp.test", dp[i].fil, &r, line);
-      http_cookie_header(&jar, "dp.test", dp[i].qpath, hdr, sizeof(hdr));
+      http_cookie_header(&jar, "dp.test", dp[i].qpath, HTS_BUF(hdr));
       if (cookie_sent(hdr, "dp=1") != dp[i].want) {
         printf("%s: dp=1%s set by %s %s %s\n", LABEL, dp[i].attr, dp[i].fil,
                dp[i].want ? "does not reach" : "wrongly reaches", dp[i].qpath);
@@ -1701,7 +1701,7 @@ static int st_cookiesetscope(httrackp *opt, int argc, char **argv) {
         memset(&r, 0, sizeof(r));
         strcpybuff(line, "Set-Cookie: dp=1");
         treathead(&jar, "dp.test", longfil, &r, line);
-        http_cookie_header(&jar, "dp.test", q, hdr, sizeof(hdr));
+        http_cookie_header(&jar, "dp.test", q, HTS_BUF(hdr));
         if (cookie_sent(hdr, "dp=1") != fit[i].want) {
           printf("%s: dp=1 set under a %d-byte directory %s %s\n", LABEL,
                  fit[i].dirlen,
@@ -1772,7 +1772,7 @@ static int st_cookiehttponly(httrackp *opt, int argc, char **argv) {
       (void) UNLINK(file);
     }
   }
-  http_cookie_header(&ck, "www.example.com", "/", hdr, sizeof(hdr));
+  http_cookie_header(&ck, "www.example.com", "/", HTS_BUF(hdr));
   if (strstr(hdr, "sid=abc") == NULL || strstr(hdr, "plain=1") == NULL ||
       strstr(hdr, "sid2=def") == NULL || strstr(hdr, "dead") != NULL ||
       strchr(ck.data, '#') != NULL) {
@@ -1907,7 +1907,7 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
       strcpybuff(line, steps[i].header);
       treathead(&jar, steps[i].from, "/", &r, line);
     }
-    http_cookie_header(&jar, steps[i].to, steps[i].path, hdr, sizeof(hdr));
+    http_cookie_header(&jar, steps[i].to, steps[i].path, HTS_BUF(hdr));
     if (cookie_sent(hdr, steps[i].pair) != steps[i].want) {
       printf("%s: step %d: %s from %s, %s %s sent to %s%s\n", LABEL, (int) i,
              steps[i].header != NULL ? steps[i].header : "(query)",
@@ -2027,7 +2027,7 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
       assertf(cookie_set(&jar, "old", "1", "jar.test", "/", &attr) == 0);
       attr.expires = now + 3600;
       assertf(cookie_set(&jar, "young", "1", "jar.test", "/", &attr) == 0);
-      http_cookie_header(&jar, "jar.test", "/", hdr, sizeof(hdr));
+      http_cookie_header(&jar, "jar.test", "/", HTS_BUF(hdr));
       if (cookie_sent(hdr, "old=1") || !cookie_sent(hdr, "young=1")) {
         printf("%s: expired record at send: [%s]\n", LABEL, hdr);
         err = 1;
@@ -2071,7 +2071,7 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
       fclose(fp);
       jar.data[0] = '\0';
       assertf(cookie_load(NULL, &jar, fpath, "cookies.txt") == 0);
-      http_cookie_header(&jar, flags[i].to, "/", hdr, sizeof(hdr));
+      http_cookie_header(&jar, flags[i].to, "/", HTS_BUF(hdr));
       if (cookie_sent(hdr, flags[i].pair) != flags[i].want) {
         printf("%s: jar line %s %s sent to %s\n", LABEL, flags[i].line,
                flags[i].want ? "not" : "wrongly", flags[i].to);
@@ -2114,7 +2114,7 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
     jar.data[0] = '\0';
     assertf(cookie_load(NULL, &jar, fpath, "cookies.txt") == 0);
     for (i = 0; i < sizeof(sends) / sizeof(sends[0]); i++) {
-      http_cookie_header(&jar, sends[i].to, "/", hdr, sizeof(hdr));
+      http_cookie_header(&jar, sends[i].to, "/", HTS_BUF(hdr));
       if (cookie_sent(hdr, sends[i].pair) != sends[i].want) {
         printf("%s: loaded %s %s sent to %s\n", LABEL, sends[i].pair,
                sends[i].want ? "not" : "wrongly", sends[i].to);
@@ -2206,7 +2206,7 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
     cookie_log_stop(opt, &cap, logged, sizeof(logged));
     big[COOKIE_MAX_PAIR - 3] = '\0';
     assertf(sprintfbuff(pair, "fit=%s", big));
-    http_cookie_header(&jar, "big.test", "/", hdr, sizeof(hdr));
+    http_cookie_header(&jar, "big.test", "/", HTS_BUF(hdr));
     if (!cookie_sent(hdr, pair) || strstr(jar.data, "\tnot\t") != NULL ||
         strstr(logged, "did not store 'not'") == NULL) {
       printf("%s: a 4096-byte cookie: sent %d bytes, log [%s]\n", LABEL,
@@ -2280,7 +2280,7 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
         strcpybuff(line, legacy[i].header);
         treathead(&jar, "127.0.0.1", "/", &r, line);
       }
-      http_cookie_header(&jar, "127.0.0.1", "/", hdr, sizeof(hdr));
+      http_cookie_header(&jar, "127.0.0.1", "/", HTS_BUF(hdr));
       if (cookie_sent(hdr, legacy[i].pair) != legacy[i].want) {
         printf("%s: legacy jar row %d sent [%s]\n", LABEL, (int) i, hdr);
         err = 1;
@@ -2480,7 +2480,7 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
       fclose(fp);
       jar.data[0] = '\0';
       assertf(cookie_load(NULL, &jar, fpath, "cookies.txt") == 1);
-      http_cookie_header(&jar, "www.d.test", "/", hdr, sizeof(hdr));
+      http_cookie_header(&jar, "www.d.test", "/", HTS_BUF(hdr));
       if (!cookie_sent(hdr, "sid=last") || cookie_sent(hdr, "sid=first")) {
         printf("%s: a repeated cookie sent [%s]\n", LABEL, hdr);
         err = 1;
@@ -2537,13 +2537,13 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
         }
         jar.data[0] = '\0';
         skipped = cookie_load(NULL, &jar, fpath, "cookies.txt");
-        http_cookie_header(&jar, sfx[i].host, "/", hdr, sizeof(hdr));
+        http_cookie_header(&jar, sfx[i].host, "/", HTS_BUF(hdr));
         if (skipped != 0 || !cookie_sent(hdr, "sfx=1")) {
           printf("%s: suffix row %d: %d skipped, not sent to %s, jar [%s]\n",
                  LABEL, (int) i, skipped, sfx[i].host, jar.data);
           err = 1;
         }
-        http_cookie_header(&jar, sfx[i].sub, "/", hdr, sizeof(hdr));
+        http_cookie_header(&jar, sfx[i].sub, "/", HTS_BUF(hdr));
         if (cookie_sent(hdr, "sfx=1")) {
           printf("%s: suffix row %d: sent to %s\n", LABEL, (int) i, sfx[i].sub);
           err = 1;
@@ -3234,7 +3234,7 @@ static int st_cookieflat(httrackp *opt, int argc, char **argv) {
     (void) cookieflat_load(opt, &jar, "s=1", 3,
                            "https://www.example.com:8443/a?b");
     for (i = 0; i < sizeof(sends) / sizeof(sends[0]); i++) {
-      http_cookie_header(&jar, sends[i].to, "/any", hdr, sizeof(hdr));
+      http_cookie_header(&jar, sends[i].to, "/any", HTS_BUF(hdr));
       if (cookie_sent(hdr, "s=1") != sends[i].want) {
         printf("%s: s=1 %s sent to %s\n", LABEL,
                sends[i].want ? "not" : "wrongly", sends[i].to);

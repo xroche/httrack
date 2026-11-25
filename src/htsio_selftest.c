@@ -1131,17 +1131,17 @@ static int st_categories(httrackp *opt, int argc, char **argv) {
 /* filesave() reports a write failure only through its close, and its one crawl
    caller is unreachable: <doomed> is a save name that cannot take the bytes. */
 static int st_filesave(httrackp *opt, int argc, char **argv) {
-  static const char body[] = "DISKFULL-FILESAVE";
-  const int len = (int) sizeof(body) - 1;
+  static const char text[] = "DISKFULL-FILESAVE";
+  const hts_span body = hts_span_at(text, sizeof(text) - 1);
   int rc, err;
 
   errno = 0;
-  rc = filesave(opt, body, len, argv[0], "127.0.0.1", "/x.bin");
+  rc = filesave(opt, body, argv[0], "127.0.0.1", "/x.bin");
   err = errno;
   assertf(rc == -1);
   assertf(err == ENOSPC);
   /* control: the same call succeeds on a name that can take the bytes */
-  assertf(filesave(opt, body, len, argv[1], "127.0.0.1", "/x.bin") == 0);
+  assertf(filesave(opt, body, argv[1], "127.0.0.1", "/x.bin") == 0);
   printf("filesave: refused with ENOSPC, control saved\n");
   return 0;
 }
