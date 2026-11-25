@@ -35,6 +35,7 @@ Please visit our Website: http://www.httrack.com
 
 #include <stddef.h>
 #include "htsglobal.h"
+#include "htsurlport.h"
 
 /* Leading-body window read to arbitrate a wire/extension MIME conflict. */
 #define HTS_SNIFF_LEN 512
@@ -42,9 +43,8 @@ Please visit our Website: http://www.httrack.com
 /* Can a magic rule ever confirm this MIME? (whether sniffing is worth it) */
 hts_boolean hts_sniff_mime_known(const char *mime);
 
-/* TRUE when the leading body bytes are consistent with the claimed MIME;
+/* TRUE when the leading BODY bytes are consistent with the claimed MIME;
    FALSE on unknown MIME, unknown magic, or too-short data (fail-safe). */
-hts_boolean hts_sniff_mime_consistent(const void *data, size_t size,
-                                      const char *mime);
+hts_boolean hts_sniff_mime_consistent(hts_span body, const char *mime);
 
 #endif

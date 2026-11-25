@@ -182,7 +182,7 @@ static int st_sniff(httrackp *opt, int argc, char **argv) {
   n = st_decode_body(argv[1], body, sizeof(body));
   printf("sniff: known=%d consistent=%d\n",
          hts_sniff_mime_known(argv[0]) == HTS_TRUE,
-         hts_sniff_mime_consistent(body, n, argv[0]) == HTS_TRUE);
+         hts_sniff_mime_consistent(hts_span_at(body, n), argv[0]) == HTS_TRUE);
   return 0;
 }
 
