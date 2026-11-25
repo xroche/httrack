@@ -145,11 +145,10 @@ void text_src_readline(text_src *src, hts_buf s, size_t *len);
 void cookie_load_stream(httrackp *opt, t_cookie *cookie, text_src *src,
                         const char *given, cookie_filter *filter);
 
-/* Write the len bytes at data to a temporary beside file, owner-only, then
-   move it over file, so a symbolic link at file is replaced, never followed.
-   Did it succeed? On failure file is unchanged and errno says why. */
-hts_boolean cookie_write_replace(const char *file, const char *data,
-                                 size_t len);
+/* Write data to a temporary beside file, owner-only, then move it over file,
+   so a symbolic link at file is replaced, never followed. Did it succeed? On
+   failure file is unchanged and errno says why. */
+hts_boolean cookie_write_replace(const char *file, hts_span data);
 
 /* Why can host, past any ASCII lowercasing, not take an ASCII form? IDNA
    needs strict UTF-8, and it encodes a capital outside ASCII as another host.
