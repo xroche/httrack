@@ -795,8 +795,7 @@ static hts_boolean bundle_start(httrackp *opt, char **primary,
   size_t room = 0;
   size_t i;
 
-  if (!hts_bundle_load_all(opt, bundle_jar_file(opt, jarbuff),
-                           HTS_SIZED(err))) {
+  if (!hts_bundle_load_all(opt, bundle_jar_file(opt, jarbuff), HTS_BUF(err))) {
     hts_log_print(opt, LOG_ERROR, "Login bundle: %s", err);
     fprintf(stderr, "Login bundle: %s\n", err);
     return HTS_FALSE;

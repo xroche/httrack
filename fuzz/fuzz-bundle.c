@@ -98,7 +98,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   strcpybuff(url, "https://fuzz.example/other#httrack-bundle=fuzz2");
   (void) hts_bundle_take(opt, url);
 
-  (void) hts_bundle_load_all(opt, NULL, HTS_SIZED(err));
+  (void) hts_bundle_load_all(opt, NULL, HTS_BUF(err));
 
   for (i = 0; hts_bundle_url(opt, i) != NULL; i++)
     continue;
@@ -109,7 +109,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     hts_bundle_identity(opt, "https://fuzz.example/x", &req);
     hts_bundle_identity(opt, "http://other.example/x", &req);
   }
-  (void) hts_bundle_has_control((const char *) data, size);
+  (void) hts_bundle_has_control(hts_span_at((const char *) data, size));
 
   hts_bundle_free(opt);
   opt->cookie = NULL;

@@ -69,6 +69,15 @@ scope b.test
 scope c.test
 cookies" || fail_dump "listed records only" "$tmpdir/proj/a.test.hts"
 
+# One leading dot and any trailing dots are cut, but two leading dots name no host.
+paste_run "$(rec .a.test A)
+$(rec .b.test B)
+$(rec .c.test C)" url:https://a.test/ 'hosts:a.test.,.b.test,..c.test'
+test "$(command grep -v "$tab" <<<"$(bundle a.test)")" = "# HTTrack bundle 1
+scope a.test
+scope b.test
+cookies" || fail_dump "dotted hosts" "$tmpdir/proj/a.test.hts"
+
 # A listed record too long, or repeated, is left out without refusing the paste.
 paste_run "$(rec .a.test A)
 $(rec .b.test R)

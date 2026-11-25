@@ -1210,8 +1210,8 @@ static int cookie_load_records(httrackp *opt, t_cookie *cookie, text_src *src,
     first_line = HTS_FALSE;
     // a bundle is written for this run, so a damaged one stops it
     if (filter != NULL &&
-        hts_bundle_has_control(line,
-                               len < sizeof(line) ? len : sizeof(line) - 1)) {
+        hts_bundle_has_control(
+            hts_span_at(line, len < sizeof(line) ? len : sizeof(line) - 1))) {
       filter->why = "a cookie line holds a control byte";
     } else if (filter != NULL && len >= line_max) {
       filter->why = "a cookie line is too long";
