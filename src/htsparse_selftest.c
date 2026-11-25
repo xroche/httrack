@@ -1774,7 +1774,8 @@ static int st_sitemap(httrackp *opt, int argc, char **argv) {
                   "</sitemap></sitemapindex>",
                   100, &idx, &c) == 1);
   assertf(idx);
-  /* The root name may end the document, where a byte short is another name. */
+  /* A root name that ends the document still counts, but a truncated one does
+     not. */
   assertf(sm_scan("<sitemapindex", 100, &idx, &c) == 0 && idx);
   assertf(sm_scan("<sitemapinde", 100, &idx, &c) == 0 && !idx);
 
