@@ -2615,7 +2615,7 @@ static int PT_SaveCache__Arc_Fun(void *arg, const char *url, PT_Element element)
 
   /* Format: URL IP date mime result checksum location offset filename length */
   if (body_size != 0) {
-    domd5mem(element->adr, body_size, st->md5, 1);
+    domd5mem(hts_span_at(element->adr, body_size), HTS_BUF(st->md5), HTS_TRUE);
   } else {
     strcpybuff(st->md5, "-");
   }

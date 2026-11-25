@@ -41,7 +41,6 @@ Please visit our Website: http://www.httrack.com
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
 #include "htsmd5.h"
 #include "md5.h"
 #include "htssafe.h"
@@ -65,41 +64,43 @@ void hts_md5_hex(const unsigned char bindigest[16], char hex[33]) {
   hex[32] = '\0';
 }
 
-int domd5mem(const char *buf, size_t len, char *digest, int asAscii) {
+void domd5mem(hts_span data, hts_buf digest, hts_boolean asAscii) {
   unsigned char bindigest[16];
   struct MD5Context ctx;
 
+  assertf(digest.size >= (asAscii ? 33 : 16));
   hts_md5_init(&ctx);
-  MD5Update(&ctx, (const unsigned char *) buf, (unsigned int) len);
+  MD5Update(&ctx, (const unsigned char *) data.p, (unsigned int) data.len);
   MD5Final(bindigest, &ctx);
 
   if (!asAscii) {
-    memcpy(digest, bindigest, 16);
+    memcpy(digest.p, bindigest, 16);
   } else {
-    hts_md5_hex(bindigest, digest);
+    hts_md5_hex(bindigest, digest.p);
   }
+}
 
-  return 0;
+/* Checks both digest forms of 'data' against the hex 'md'. */
+static void md5check(hts_span data, const char *md) {
+  char digest[64];
+  unsigned char bin[16];
+
+  memset(digest, 0xCC, sizeof(digest));
+  domd5mem(data, HTS_BUF(digest), HTS_TRUE);
+  if (strcmp(digest, md) != 0) {
+    fprintf(stderr, "error: md5 selftest failed: '%.*s' => '%s' (!= '%s')\n",
+            (int) data.len, data.p, digest, md);
+    assertf(!"md5 selftest failed");
+  }
+  memset(bin, 0xCC, sizeof(bin));
+  domd5mem(data, hts_buf_at((char *) bin, sizeof(bin)), HTS_FALSE);
+  hts_md5_hex(bin, digest);
+  assertf(strcmp(digest, md) == 0);
 }
 
 void md5selftest(void) {
-  static const char str1[] = "The quick brown fox jumps over the lazy dog\n";
-  static const char str1m[] = "37c4b87edffc5d198ff5a185cee7ee09";
-  static const char str2[] = "Hello";
-  static const char str2m[] = "8b1a9953c4611296a827abf8c47804d7";
-  char digest[64];
-#define MDCHECK(VAR, VARMD) do { \
-  memset(digest, 0xCC, sizeof(digest)); \
-  domd5mem(VAR, sizeof(VAR) - 1, digest, 1); \
-  if (strcmp(digest, VARMD) != 0) { \
-    fprintf(stderr, \
-            "error: md5 selftest failed: '%s' => '%s' (!= '%s')\n", \
-            VAR, digest, VARMD); \
-    assert(! "md5 selftest failed"); \
-  } \
-} while(0)
-MDCHECK(str1, str1m);
-MDCHECK(str2, str2m);
-#undef MDCHECK
+  md5check(hts_span_of("The quick brown fox jumps over the lazy dog\n"),
+           "37c4b87edffc5d198ff5a185cee7ee09");
+  md5check(hts_span_of("Hello"), "8b1a9953c4611296a827abf8c47804d7");
   fprintf(stderr, "md5 selftest succeeded\n");
 }

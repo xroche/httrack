@@ -5322,7 +5322,8 @@ HTSEXT_API int hts_init(void) {
     const char *atest = "MD5 Checksum Autotest";
 
     digest[0] = '\0';
-    domd5mem(atest, strlen(atest), digest, 1);  /* a42ec44369da07ace5ec1d660ba4a69a */
+    domd5mem(hts_span_of(atest), HTS_BUF(digest),
+             HTS_TRUE); /* a42ec44369da07ace5ec1d660ba4a69a */
     if (strcmp(digest, "a42ec44369da07ace5ec1d660ba4a69a") != 0) {
       int fatal_broken_md5 = 0;
 
