@@ -1219,7 +1219,7 @@ int hts_wait_delayed(htsmoduleStruct *str, lien_adrfilsave *afs,
 
         memset(&back, 0, sizeof(back));
         back.r = cache_read(opt, cache, afs->af.adr, afs->af.fil, NULL,
-                            hts_buf_at(NULL, 0)); // test only
+                            hts_buf_none()); // test only
         if (back.r.statuscode == HTTP_OK &&
             strnotempty(back.r.contenttype)) { // cache found, and aswer is 'OK'
           hts_log_print(opt, LOG_DEBUG,

@@ -717,7 +717,7 @@ void warc_http_header_value(const char *hdr, const char *name, hts_buf out) {
           v.len = k;
           break;
         }
-      (void) hts_span_copy(v, out.p, out.size);
+      hts_buf_put_span_clip(out, v);
       return;
     }
   }

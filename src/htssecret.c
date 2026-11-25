@@ -566,8 +566,7 @@ const char *hts_header_shown(httrackp *opt, const char *line, char *dst,
                       (unsigned long) (len - keep)))
       (void) strclipbuff(dst + n, size - n, "<redacted>");
   } else if (keep < len) {
-    (void) hts_span_copy(hts_span_at(line + keep, len - keep),
-                         HTS_SIZED(value));
+    hts_buf_put_span_clip(HTS_BUF(value), hts_span_at(line + keep, len - keep));
     if (header_name_in(line, url_fields)) {
       char masked[HTS_URLMAXSIZE * 2];
 

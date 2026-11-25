@@ -464,7 +464,7 @@ hts_boolean url_query_value(const char *url, const char *name, hts_buf dst) {
     return HTS_FALSE;
   }
   /* crawled query text: clip it */
-  (void) hts_span_copy(f.val, dst.p, dst.size);
+  hts_buf_put_span_clip(dst, f.val);
   return HTS_TRUE;
 }
 
@@ -1068,7 +1068,7 @@ int url_savename(lien_adrfilsave *const afs,
           previous_save[0] = '\0';
           r = cache_read_including_broken(opt, cache, adr, fil,
                                           HTS_BUF(previous_save),
-                                          hts_buf_at(NULL, 0)); // test only
+                                          hts_buf_none()); // test only
 
           if (r.statuscode != -1) { // cache entry read OK
             hts_log_print(opt, LOG_DEBUG, "Testing link type (from cache) %s%s",

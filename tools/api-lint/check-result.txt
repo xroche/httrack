@@ -33,6 +33,7 @@ src/htsbauth.h: cookie_find
 src/htsbauth.h: cookie_is_secure_record
 src/htsbauth.h: cookie_max_age_time
 src/htsbauth.h: cookie_sendable
+src/htsbuf.h: hts_buf_put_span_clip
 src/htsbundle.h: cookie_find_exact
 src/htsbundle.h: cookie_flat_bind
 src/htsbundle.h: cookie_flat_pair

@@ -122,8 +122,8 @@ static void fuzz_cache_read_entry(httrackp *opt, cache_back *cache,
 
   r = cache_read(opt, cache, key, "", NULL, HTS_BUF(location));
   freet(r.adr);
-  r = cache_readex(opt, cache, key, "", "", HTS_BUF(location),
-                   hts_buf_at(NULL, 0), 1);
+  r = cache_readex(opt, cache, key, "", "", HTS_BUF(location), hts_buf_none(),
+                   1);
   freet(r.adr);
   save[0] = '\0';
   r = cache_read_including_broken(opt, cache, key, "", HTS_BUF(save),
