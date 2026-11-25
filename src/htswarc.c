@@ -1859,8 +1859,9 @@ void warc_write_backtransaction(httrackp *opt, lien_back *back) {
   SOCaddr_inetntoa(ip, sizeof(ip), back->r.address);
 
   if (!back->r.is_write) {
-    body = warc_body_mem(back->r.adr,
-                         back->r.size > 0 ? (size_t) back->r.size : 0);
+    const hts_span mem = hts_blk_body(&back->r);
+
+    body = warc_body_mem(mem.p, mem.len);
   } else {
     LLint fs;
     body.p = NULL;

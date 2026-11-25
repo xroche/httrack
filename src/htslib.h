@@ -462,6 +462,10 @@ hts_boolean http_headers_have_field(const char *headers,
    follow, or the 412/416 whose stale resume partial the parser re-gets. */
 hts_boolean hts_body_missing_unexpectedly(const htsblk *r);
 
+/* Return the body of R as a span, empty when it has none or a negative size.
+   Its pointer stays R->adr, so it may be NULL. */
+hts_span hts_blk_body(const htsblk *r);
+
 /* Returns the warning to print for a -%X line, or NULL when it goes out as
    typed. headers is the block so far. */
 const char *http_custom_header_warning(const char *headers, const char *line);

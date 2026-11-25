@@ -1688,7 +1688,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
             int i;
             unsigned int nspec = 0;
 
-            map_characters(hts_span_at(r.adr, (size_t) r.size), &map[0]);
+            map_characters(hts_blk_body(&r), &map[0]);
             for(i = 1; i < 32; i++) {   //  null chars ignored..
               if (!is_realspace(i)
                   && i != 27    /* Damn you ISO2022-xx! */
@@ -1711,11 +1711,10 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
              */
             if (ucs2_bom &&
                 (map[0] > r.size / 10 ||
-                 hts_utf16_looks_like_text(hts_span_at(r.adr, (size_t) r.size),
-                                           ucs2_swap))) {
+                 hts_utf16_looks_like_text(hts_blk_body(&r), ucs2_swap))) {
               size_t new_size = 0;
-              char *const new_adr = hts_ucs2_to_utf8(
-                  hts_span_at(r.adr, (size_t) r.size), ucs2_swap, &new_size);
+              char *const new_adr =
+                  hts_ucs2_to_utf8(hts_blk_body(&r), ucs2_swap, &new_size);
 
               if (new_adr == NULL) {
                 /* Fail only the page, as http_xfread1() does on this NULL. */
@@ -1815,9 +1814,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
         smstr.url_host = urladr();
         smstr.url_file = urlfil();
         smstr.mime = r.contenttype;
-        hts_sitemap_ingest(
-            opt, &smstr, urladr(), urlfil(),
-            hts_span_at(r.adr, r.size > 0 ? (size_t) r.size : 0));
+        hts_sitemap_ingest(opt, &smstr, urladr(), urlfil(), hts_blk_body(&r));
       }
 
       // ------------------------------------------------------
@@ -1876,8 +1873,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
             }
             /* Attempt to find a meta charset */
             else if (is_html_mime_type(r.contenttype)) {
-              char *charset =
-                  hts_getCharsetFromMeta(hts_span_at(r.adr, (size_t) r.size));
+              char *charset = hts_getCharsetFromMeta(hts_blk_body(&r));
 
               if (charset != NULL && strlen(charset) < sizeof(page_charset)) {
                 strcpy(page_charset, charset);
@@ -1938,8 +1934,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
               hts_boolean keep_root = HTS_TRUE;
 #endif
 
-              robots_parse(opt, &robots, urladr(),
-                           hts_span_at(r.adr, (size_t) r.size),
+              robots_parse(opt, &robots, urladr(), hts_blk_body(&r),
                            HTS_BUF(infobuff), keep_root, HTS_BUF(sitemaps));
               if (strnotempty(infobuff)) {
                 hts_log_print(opt, LOG_INFO,
@@ -2008,8 +2003,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
           // read, which would destroy the copy being re-fetched (#748).
           if (r.statuscode > 0 && (r.adr != NULL || r.size == 0)) {
             file_notify(opt, urladr(), urlfil(), savename(), 1, 1, r.notmodified);
-            if (r.size < 0 || filesave(opt, hts_span_at(r.adr, (size_t) r.size),
-                                       savename(), urladr(), urlfil()) != 0) {
+            if (r.size < 0 || filesave(opt, hts_blk_body(&r), savename(),
+                                       urladr(), urlfil()) != 0) {
               int fcheck;
 
               if ((fcheck = check_fatal_io_errno())) {

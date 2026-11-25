@@ -391,10 +391,11 @@ static void cache_add_ex(httrackp *opt, cache_back *cache, const htsblk *r,
   /* Write data in cache */
   if (dataincache) {
     if (r->is_write == 0) {
-      if (r->size > 0 && r->adr != NULL) {
-        if ((zErr =
-             zipWriteInFileInZip((zipFile) cache->zipOutput, r->adr,
-                                 (int) r->size)) != Z_OK) {
+      const hts_span body = hts_blk_body(r);
+
+      if (body.len > 0) {
+        if ((zErr = zipWriteInFileInZip((zipFile) cache->zipOutput, body.p,
+                                        (int) body.len)) != Z_OK) {
           cache_zip_write_failed(opt, cache, "writing to the cache", zErr,
                                  HTS_TRUE, url_adr, url_fil);
           return;

@@ -313,10 +313,10 @@ void hts_changes_html(httrackp *opt, cache_back *cache, const htsblk *r,
     return;
 
   /* The page on disk has rewritten links, so compare against the cache. */
-  digest_mem(hts_span_at(r->adr, (size_t) r->size), new_digest);
+  digest_mem(hts_blk_body(r), new_digest);
   prev = cache_read_ro(opt, cache, adr, fil, "", HTS_BUF(location));
   if (HTTP_IS_OK(prev.statuscode) && prev.adr != NULL && prev.size >= 0) {
-    digest_mem(hts_span_at(prev.adr, (size_t) prev.size), prev_digest);
+    digest_mem(hts_blk_body(&prev), prev_digest);
     has_prev = HTS_TRUE;
   }
   freet(prev.adr);

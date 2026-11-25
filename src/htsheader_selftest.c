@@ -816,6 +816,18 @@ static int st_nobody(httrackp *opt, int argc, char **argv) {
   r.is_write = 1;
   assertf(!hts_body_missing_unexpectedly(&r));
 
+  /* hts_blk_body: no buffer, a negative or zero size give an empty span */
+  memset(&r, 0, sizeof(r));
+  r.size = 4;
+  assertf(hts_blk_body(&r).p == NULL && hts_blk_body(&r).len == 0);
+  r.adr = body;
+  r.size = -1;
+  assertf(hts_blk_body(&r).p == body && hts_blk_body(&r).len == 0);
+  r.size = 0;
+  assertf(hts_blk_body(&r).p == body && hts_blk_body(&r).len == 0);
+  r.size = 3;
+  assertf(hts_blk_body(&r).p == body && hts_blk_body(&r).len == 3);
+
   printf("nobody self-test OK\n");
   return 0;
 }
@@ -2739,7 +2751,8 @@ const struct selftest_entry selftests_header[] = {
      "stream",
      st_codecerrno},
     {"status", "", "HTTP status code -> reason phrase self-test", st_status},
-    {"nobody", "", "which statuses excuse a response that stored no body",
+    {"nobody", "",
+     "which statuses excuse a response that stored no body, and the body span",
      st_nobody},
     {"acceptencoding", "[dir]",
      "Accept-Encoding advertises gzip+deflate, both decode", st_acceptencoding},
