@@ -1070,8 +1070,8 @@ int url_savename(lien_adrfilsave *const afs,
 
           previous_save[0] = '\0';
           r = cache_read_including_broken(opt, cache, adr, fil,
-                                          HTS_SIZED(previous_save), NULL,
-                                          0); // test only
+                                          HTS_BUF(previous_save),
+                                          hts_buf_at(NULL, 0)); // test only
 
           if (r.statuscode != -1) { // cache entry read OK
             hts_log_print(opt, LOG_DEBUG, "Testing link type (from cache) %s%s",
