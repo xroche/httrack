@@ -262,7 +262,7 @@ static const char *bundle_readline(text_src *src,
                                    char line[BUNDLE_LINE_MAX + 1]) {
   size_t len;
 
-  text_src_readline(src, line, BUNDLE_LINE_MAX + 1, &len);
+  text_src_readline(src, hts_buf_at(line, BUNDLE_LINE_MAX + 1), &len);
   if (len >= BUNDLE_LINE_MAX)
     return "too long";
   return hts_bundle_has_control(hts_span_at(line, len)) ? "holds a control byte"
@@ -356,7 +356,7 @@ static const char *bundle_note_url(bundle *b, const char *url) {
 
   if (strfield(url, "https:"))
     b->https_only = HTS_TRUE;
-  if (!cookie_url_host(url, HTS_SIZED(host)))
+  if (!cookie_url_host(url, HTS_BUF(host)))
     return b->scope_given ? NULL : "cannot work out the bundle's scope";
   // a host with no registrable domain covers itself alone
   reg = hts_host_is_address(hts_span_of(host))
@@ -478,7 +478,7 @@ static hts_boolean bundle_parse(httrackp *opt, bundle *b, text_src *src,
           !hts_escape_typed_login(value, HTS_SIZED(typed)) ||
           strlen(typed) >= HTS_URLMAXSIZE ||
           strstr(typed, HTS_BUNDLE_SUFFIX) != NULL ||
-          !cookie_url_host(typed, HTS_SIZED(host)))
+          !cookie_url_host(typed, HTS_BUF(host)))
         BUNDLE_FAIL("%s, line %d: invalid url", b->file, lineno);
       if (b->nurls >= BUNDLE_LIST_MAX)
         BUNDLE_FAIL("%s, line %d: more than %d url lines", b->file, lineno,
@@ -1405,7 +1405,7 @@ static const char *paste_curl_cookies(httrackp *opt, t_cookie *jar,
                                       const paste_curl *c, const char *url) {
   char host[COOKIE_MAX_DOMAIN];
   cookie_attr attr;
-  const char *const domain = cookie_flat_bind(url, HTS_SIZED(host), &attr);
+  const char *const domain = cookie_flat_bind(url, HTS_BUF(host), &attr);
   const char *why = domain == NULL ? "the address has no host" : NULL;
   hts_span rest = hts_span_of(StringBuff(c->cookies)), name, value;
   String pair = STRING_EMPTY;
@@ -1500,7 +1500,8 @@ static void paste_scope_hosts(bundle *b, const char *hosts) {
 static const char *paste_load_pass(httrackp *opt, cookie_filter *filter,
                                    const String *text, t_cookie *jar,
                                    int *stored, int *line) {
-  text_src src = text_src_mem(StringBuff(*text), StringLength(*text));
+  text_src src =
+      text_src_mem(hts_span_at(StringBuff(*text), StringLength(*text)));
   const int before = paste_jar_count(jar);
 
   cookie_load_stream(opt, jar, &src, "the paste", filter);
@@ -1693,7 +1694,7 @@ static const char *paste_name(const char *url, char name[HTS_BUNDLE_NAME_MAX]) {
   hts_boolean www;
   size_t len;
 
-  if (!cookie_url_host(url, HTS_SIZED(host)))
+  if (!cookie_url_host(url, HTS_BUF(host)))
     return "the address has no host";
   if (host[0] == '[' || strchr(host, ':') != NULL)
     return "an IP address cannot name a login bundle";
@@ -1852,7 +1853,7 @@ HTSEXT_API hts_boolean hts_bundle_from_paste_hosts(
     // typed URL's login runs up to the first '/'
     if (memchr(auth, '@', strcspn(auth, "/")) != NULL)
       PASTE_FAIL("the address holds a user name or password");
-    why = cookie_host_refusal(auth, strcspn(auth, ":/?\\"));
+    why = cookie_host_refusal(hts_span_at(auth, strcspn(auth, ":/?\\")));
     if (why != NULL)
       PASTE_FAIL("%s", why);
   }
@@ -1915,7 +1916,7 @@ HTSEXT_API hts_boolean hts_bundle_from_paste_hosts(
   // read it back through the engine's own loader, which also gives the count
   memset(jar->data, 0, sizeof(jar->data));
   opt->cookie = jar;
-  src = text_src_mem(StringBuff(text), StringLength(text));
+  src = text_src_mem(hts_span_at(StringBuff(text), StringLength(text)));
   if (!bundle_load_src(opt, &check, &src, NULL, all, NULL, NULL, HTS_BUF(err)))
     PASTE_FAIL("%s", err);
   paste_jar_summary(jar, &count, result->hosts);
