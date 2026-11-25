@@ -724,7 +724,7 @@ void hts_mirror_process_user_interaction(htsmoduleStruct *str,
       strcatbuff(add_url, *next);
       // a typed login reads up to the last '@' before the first '/'
       const hts_boolean escaped =
-          hts_escape_typed_login(add_url, HTS_SIZED(typed));
+          hts_escape_typed_login(add_url, HTS_BUF(typed));
 
       if (!escaped)
         hts_log_print(

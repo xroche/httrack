@@ -535,11 +535,10 @@ HTS_CHECK_RESULT hts_boolean hts_is_control_free(const char *str);
 hts_boolean hts_host_is_ipv4(hts_span host);
 
 /* Base-64 "user:pass" of the userinfo in a URL or proxy name, for a Basic
-   Authorization header, into out[out_size] (at least 1100 bytes). Returns 1
+   Authorization header, into OUT (at least 1100 bytes). Returns 1
    when filled, 0 when there is no userinfo, -1 when it is too long (765 bytes
    max, as a clipped credential would authenticate as somebody else). */
-int hts_basic_auth_value(httrackp *opt, const char *url, char *out,
-                         size_t out_size);
+int hts_basic_auth_value(httrackp *opt, const char *url, hts_buf out);
 
 /* Copy the bare host name of a URL address into out for the TLS SNI
    extension: no scheme, userinfo or port. FALSE with out emptied when there is
@@ -708,8 +707,8 @@ void hts_now_iso8601(char out[32]);
 int set_filetime_rfc822(const char *file, const char *date);
 /* File mtime as a UTC time_t, or (time_t) -1 if it can not be read. */
 time_t get_filetime(const char *file);
-/* Writes file mtime as an RFC 822 GMT date in size bytes, or returns 0. */
-int get_filetime_rfc822(const char *file, char *date, size_t size);
+/* Writes file mtime as an RFC 822 GMT date into DATE, or returns 0. */
+int get_filetime_rfc822(const char *file, hts_buf date);
 /* Writes A as an RFC 822 GMT date, clipped to size bytes. */
 HTS_INLINE void time_rfc822(char *s, size_t size, struct tm *A);
 
@@ -774,9 +773,9 @@ const char *jump_protocol_const(const char *source);
 
 /* Split a -P proxy argument "[scheme://][user:pass@]host[:port]" into the proxy
    host string (scheme and any user:pass kept, for later stripping and auth),
-   written NUL-terminated into name[name_size] (truncated to fit), and the port
+   written NUL-terminated into NAME (truncated to fit), and the port
    in *port. The port defaults by scheme: 1080 for socks5/socks5h, else 8080. */
-void hts_parse_proxy(const char *arg, char *name, size_t name_size, int *port);
+void hts_parse_proxy(const char *arg, hts_buf name, int *port);
 /* Base-64 IN into OUT, with a CRLF every 80 output bytes when CRLF is set. */
 void code64(hts_span in, hts_buf out, hts_boolean crlf);
 
@@ -839,10 +838,10 @@ void secret_vfprintf(httrackp *opt, FILE *fp,
 /* Skip adr's blanks and scheme, then its login. */
 const char *login_start(const char *adr);
 const char *login_end(const char *adr);
-/* Copies url, a URL a user typed, to dst of size bytes with each '?', '#'
+/* Copies url, a URL a user typed, to dst with each '?', '#'
    and '\' before the last '@' preceding the first '/' written as %XX, so its
    login reads as it always has. Returns HTS_FALSE when dst was too small. */
-hts_boolean hts_escape_typed_login(const char *url, char *dst, size_t size);
+hts_boolean hts_escape_typed_login(const char *url, hts_buf dst);
 /* Copies src to dst, writing each byte of set that lies inside escaped, a
    part of src, as %XX. An escape that does not fit is dropped whole. Returns
    HTS_FALSE when dst was too small. */
@@ -1318,7 +1317,7 @@ char *fil_normalized_filtered_ex(const char *source, char *dest,
    '\n'-separated "[pattern=]keys" RULES (patterns matched on host/path via
    strjoker, last wins); NULL if none match. Feeds fil_normalized_filtered(). */
 const char *hts_query_strip_keys(const char *rules, const char *adr,
-                                 const char *fil, char *dest, size_t destsize);
+                                 const char *fil, hts_buf dest);
 
 /* Is KEY in the comma list STRIP? Tokens are space-trimmed and
    case-sensitive, and "*" matches any key. */
@@ -1345,15 +1344,14 @@ const char *hts_strip_query_rules(httrackp *opt);
    credentials are kept. NULL when no rule applies, the mapping is a no-op, the
    rules loop, or the result would not fit DEST. */
 const char *hts_host_alias(const char *rules, const char *adr,
-                           hts_boolean collapse_www, char *dest,
-                           size_t destsize);
+                           hts_boolean collapse_www, hts_buf dest);
 
 /* Resolve like hts_host_alias, and set *SETTLED, when SETTLED is not NULL, to
    whether the chain ended within the hop limit. Exposed for the -#test=spandiff
    test. */
 const char *hts_host_alias_resolve(const char *rules, const char *adr,
-                                   hts_boolean collapse_www, char *dest,
-                                   size_t destsize, hts_boolean *settled);
+                                   hts_boolean collapse_www, hts_buf dest,
+                                   hts_boolean *settled);
 
 /* HTS_TRUE when OPT's url hacks collapse www.host onto host. */
 hts_boolean hts_host_alias_collapse_www(httrackp *opt);

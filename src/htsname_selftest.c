@@ -972,16 +972,13 @@ static int st_stripquery(httrackp *opt, int argc, char **argv) {
   const char *k;
 
   /* empty rules == plain fil_normalized */
-  assertf(hts_query_strip_keys(NULL, "h.com", "/p?a=1", keys, sizeof(keys)) ==
-          NULL);
-  assertf(hts_query_strip_keys("", "h.com", "/p?a=1", keys, sizeof(keys)) ==
-          NULL);
+  assertf(hts_query_strip_keys(NULL, "h.com", "/p?a=1", HTS_BUF(keys)) == NULL);
+  assertf(hts_query_strip_keys("", "h.com", "/p?a=1", HTS_BUF(keys)) == NULL);
   assertf(strcmp(fil_normalized_filtered("/p?b=2&a=1", dest, NULL),
                  fil_normalized("/p?b=2&a=1", ref)) == 0);
 
   /* bare form (*=keys): strip the key everywhere, keep+sort the rest */
-  k = hts_query_strip_keys("sid", "any.com", "/p?b=2&sid=x&a=1", keys,
-                           sizeof(keys));
+  k = hts_query_strip_keys("sid", "any.com", "/p?b=2&sid=x&a=1", HTS_BUF(keys));
   assertf(k != NULL && strcmp(k, "sid") == 0);
   assertf(strcmp(fil_normalized_filtered("/p?b=2&sid=x&a=1", dest, k),
                  "/p?a=1&b=2") == 0);
@@ -991,23 +988,23 @@ static int st_stripquery(httrackp *opt, int argc, char **argv) {
                  fil_normalized("/p?a=1&b=2", ref)) == 0);
 
   /* host pattern matches only that host, incl. its www-normalized forms */
-  assertf(hts_query_strip_keys("ex.com/*=utm", "other.com", "/p?utm=1", keys,
-                               sizeof(keys)) == NULL);
-  assertf(hts_query_strip_keys("ex.com/*=utm", "ex.com", "/p?utm=1", keys,
-                               sizeof(keys)) != NULL);
-  assertf(hts_query_strip_keys("ex.com/*=utm", "www.ex.com", "/p?utm=1", keys,
-                               sizeof(keys)) != NULL);
+  assertf(hts_query_strip_keys("ex.com/*=utm", "other.com", "/p?utm=1",
+                               HTS_BUF(keys)) == NULL);
+  assertf(hts_query_strip_keys("ex.com/*=utm", "ex.com", "/p?utm=1",
+                               HTS_BUF(keys)) != NULL);
+  assertf(hts_query_strip_keys("ex.com/*=utm", "www.ex.com", "/p?utm=1",
+                               HTS_BUF(keys)) != NULL);
   assertf(hts_query_strip_keys("ex.com/*=utm", "http://www-3.ex.com",
-                               "/p?utm=1", keys, sizeof(keys)) != NULL);
+                               "/p?utm=1", HTS_BUF(keys)) != NULL);
 
   /* last match wins, wholesale: host rule overrides global, no union */
   k = hts_query_strip_keys("*=sid\nex.com/*=utm", "ex.com",
-                           "/p?sid=1&utm=2&a=3", keys, sizeof(keys));
+                           "/p?sid=1&utm=2&a=3", HTS_BUF(keys));
   assertf(k != NULL && strcmp(k, "utm") == 0);
   assertf(strcmp(fil_normalized_filtered("/p?sid=1&utm=2&a=3", dest, k),
                  "/p?a=3&sid=1") == 0);
-  k = hts_query_strip_keys("*=sid\nex.com/*=utm", "z.com", "/p?sid=1&a=3", keys,
-                           sizeof(keys));
+  k = hts_query_strip_keys("*=sid\nex.com/*=utm", "z.com", "/p?sid=1&a=3",
+                           HTS_BUF(keys));
   assertf(k != NULL && strcmp(k, "sid") == 0);
 
   /* whole-key match, not prefix: "utm" must not strip utm_source */
@@ -1143,126 +1140,119 @@ static int st_hostalias(httrackp *opt, int argc, char **argv) {
   static const char *const rules = "b.com=a.com\nc.com,d.com=a.com";
 
   /* nothing declared, or nothing matching: the host is left alone */
-  assertf(hts_host_alias(NULL, "b.com", HTS_TRUE, dest, sizeof(dest)) == NULL);
-  assertf(hts_host_alias("", "b.com", HTS_TRUE, dest, sizeof(dest)) == NULL);
-  assertf(hts_host_alias(rules, "other.com", HTS_TRUE, dest, sizeof(dest)) ==
-          NULL);
+  assertf(hts_host_alias(NULL, "b.com", HTS_TRUE, HTS_BUF(dest)) == NULL);
+  assertf(hts_host_alias("", "b.com", HTS_TRUE, HTS_BUF(dest)) == NULL);
+  assertf(hts_host_alias(rules, "other.com", HTS_TRUE, HTS_BUF(dest)) == NULL);
   /* a rule mapping a host to itself is a no-op, not a rewrite */
-  assertf(hts_host_alias("a.com=a.com", "a.com", HTS_TRUE, dest,
-                         sizeof(dest)) == NULL);
+  assertf(hts_host_alias("a.com=a.com", "a.com", HTS_TRUE, HTS_BUF(dest)) ==
+          NULL);
 
   /* exact, comma-list and glob aliases */
-  assertf(strcmp(hts_host_alias(rules, "b.com", HTS_TRUE, dest, sizeof(dest)),
+  assertf(strcmp(hts_host_alias(rules, "b.com", HTS_TRUE, HTS_BUF(dest)),
                  "a.com") == 0);
-  assertf(strcmp(hts_host_alias(rules, "d.com", HTS_TRUE, dest, sizeof(dest)),
+  assertf(strcmp(hts_host_alias(rules, "d.com", HTS_TRUE, HTS_BUF(dest)),
                  "a.com") == 0);
   assertf(strcmp(hts_host_alias("*.cdn.b.com=a.com", "img.cdn.b.com", HTS_TRUE,
-                                dest, sizeof(dest)),
+                                HTS_BUF(dest)),
                  "a.com") == 0);
   /* hosts compare case-insensitively, like the filters */
-  assertf(strcmp(hts_host_alias(rules, "B.CoM", HTS_TRUE, dest, sizeof(dest)),
+  assertf(strcmp(hts_host_alias(rules, "B.CoM", HTS_TRUE, HTS_BUF(dest)),
                  "a.com") == 0);
   /* the port is part of the matched host */
   assertf(strcmp(hts_host_alias("b.com:8080=a.com:80", "b.com:8080", HTS_TRUE,
-                                dest, sizeof(dest)),
+                                HTS_BUF(dest)),
                  "a.com:80") == 0);
-  assertf(hts_host_alias("b.com:8080=a.com", "b.com", HTS_TRUE, dest,
-                         sizeof(dest)) == NULL);
+  assertf(hts_host_alias("b.com:8080=a.com", "b.com", HTS_TRUE,
+                         HTS_BUF(dest)) == NULL);
   /* last match wins */
   assertf(strcmp(hts_host_alias("b.com=a.com\nb.com=z.com", "b.com", HTS_TRUE,
-                                dest, sizeof(dest)),
+                                HTS_BUF(dest)),
                  "z.com") == 0);
   /* A bare-host rule covers its www. forms unless --no-www-dedup is set. */
-  assertf(
-      strcmp(hts_host_alias(rules, "www.b.com", HTS_TRUE, dest, sizeof(dest)),
-             "a.com") == 0);
-  assertf(strcmp(hts_host_alias(rules, "www-42.b.com", HTS_TRUE, dest,
-                                sizeof(dest)),
+  assertf(strcmp(hts_host_alias(rules, "www.b.com", HTS_TRUE, HTS_BUF(dest)),
                  "a.com") == 0);
-  assertf(hts_host_alias(rules, "www.b.com", HTS_FALSE, dest, sizeof(dest)) ==
-          NULL);
-  assertf(strcmp(hts_host_alias(rules, "b.com", HTS_FALSE, dest, sizeof(dest)),
+  assertf(strcmp(hts_host_alias(rules, "www-42.b.com", HTS_TRUE, HTS_BUF(dest)),
+                 "a.com") == 0);
+  assertf(hts_host_alias(rules, "www.b.com", HTS_FALSE, HTS_BUF(dest)) == NULL);
+  assertf(strcmp(hts_host_alias(rules, "b.com", HTS_FALSE, HTS_BUF(dest)),
                  "a.com") == 0);
   /* Under the collapse a rule may spell either form of its alias and both names
      fold, so naming www.b.com cannot split the pair -%u had merged. */
-  assertf(strcmp(hts_host_alias("www.b.com=a.com", "www.b.com", HTS_TRUE, dest,
-                                sizeof(dest)),
+  assertf(strcmp(hts_host_alias("www.b.com=a.com", "www.b.com", HTS_TRUE,
+                                HTS_BUF(dest)),
                  "a.com") == 0);
-  assertf(strcmp(hts_host_alias("www.b.com=a.com", "b.com", HTS_TRUE, dest,
-                                sizeof(dest)),
+  assertf(strcmp(hts_host_alias("www.b.com=a.com", "b.com", HTS_TRUE,
+                                HTS_BUF(dest)),
                  "a.com") == 0);
   /* with the collapse off the two names are distinct, and so are the rules */
-  assertf(strcmp(hts_host_alias("www.b.com=a.com", "www.b.com", HTS_FALSE, dest,
-                                sizeof(dest)),
+  assertf(strcmp(hts_host_alias("www.b.com=a.com", "www.b.com", HTS_FALSE,
+                                HTS_BUF(dest)),
                  "a.com") == 0);
-  assertf(hts_host_alias("www.b.com=a.com", "b.com", HTS_FALSE, dest,
-                         sizeof(dest)) == NULL);
+  assertf(hts_host_alias("www.b.com=a.com", "b.com", HTS_FALSE,
+                         HTS_BUF(dest)) == NULL);
 
   /* scheme and credentials survive, only the host is replaced */
-  assertf(strcmp(hts_host_alias(rules, "https://b.com", HTS_TRUE, dest,
-                                sizeof(dest)),
-                 "https://a.com") == 0);
-  assertf(strcmp(hts_host_alias(rules, "http://user:pw@b.com", HTS_TRUE, dest,
-                                sizeof(dest)),
+  assertf(
+      strcmp(hts_host_alias(rules, "https://b.com", HTS_TRUE, HTS_BUF(dest)),
+             "https://a.com") == 0);
+  assertf(strcmp(hts_host_alias(rules, "http://user:pw@b.com", HTS_TRUE,
+                                HTS_BUF(dest)),
                  "http://user:pw@a.com") == 0);
 
-  assertf(
-      strcmp(hts_host_alias(rules, "ftp://b.com", HTS_TRUE, dest, sizeof(dest)),
-             "ftp://a.com") == 0);
+  assertf(strcmp(hts_host_alias(rules, "ftp://b.com", HTS_TRUE, HTS_BUF(dest)),
+                 "ftp://a.com") == 0);
   assertf(
       strcmp(hts_host_alias("b.com:8080=a.com:80", "https://user:pw@b.com:8080",
-                            HTS_TRUE, dest, sizeof(dest)),
+                            HTS_TRUE, HTS_BUF(dest)),
              "https://user:pw@a.com:80") == 0);
   /* An alias-side scheme narrows the match to it; a canonical-side scheme
      replaces the link's, for a host that speaks one scheme only. */
   assertf(strcmp(hts_host_alias("b.com=https://a.com", "http://b.com", HTS_TRUE,
-                                dest, sizeof(dest)),
+                                HTS_BUF(dest)),
                  "https://a.com") == 0);
   assertf(strcmp(hts_host_alias("https://www.foo.com=ftp://ftp.foo.com",
-                                "https://www.foo.com", HTS_TRUE, dest,
-                                sizeof(dest)),
+                                "https://www.foo.com", HTS_TRUE, HTS_BUF(dest)),
                  "ftp://ftp.foo.com") == 0);
   assertf(hts_host_alias("https://www.foo.com=ftp://ftp.foo.com",
-                         "http://www.foo.com", HTS_TRUE, dest,
-                         sizeof(dest)) == NULL);
+                         "http://www.foo.com", HTS_TRUE,
+                         HTS_BUF(dest)) == NULL);
   /* a rule without a scheme still matches whichever scheme the link uses */
-  assertf(
-      strcmp(hts_host_alias(rules, "ftp://b.com", HTS_TRUE, dest, sizeof(dest)),
-             "ftp://a.com") == 0);
+  assertf(strcmp(hts_host_alias(rules, "ftp://b.com", HTS_TRUE, HTS_BUF(dest)),
+                 "ftp://a.com") == 0);
   /* credentials are the link's, whichever side names the scheme */
   assertf(strcmp(hts_host_alias("b.com=ftp://a.com", "http://user:pw@b.com",
-                                HTS_TRUE, dest, sizeof(dest)),
+                                HTS_TRUE, HTS_BUF(dest)),
                  "ftp://user:pw@a.com") == 0);
   /* A plain-http address carries no scheme, so http:// has to be spelled out
      for the rule to reach it: naming the default scheme must not be dead. */
-  assertf(strcmp(hts_host_alias("http://b.com=a.com", "b.com", HTS_TRUE, dest,
-                                sizeof(dest)),
+  assertf(strcmp(hts_host_alias("http://b.com=a.com", "b.com", HTS_TRUE,
+                                HTS_BUF(dest)),
                  "a.com") == 0);
-  assertf(hts_host_alias("http://b.com=a.com", "https://b.com", HTS_TRUE, dest,
-                         sizeof(dest)) == NULL);
+  assertf(hts_host_alias("http://b.com=a.com", "https://b.com", HTS_TRUE,
+                         HTS_BUF(dest)) == NULL);
   /* a scheme named mid-chain stays in effect: the hop after it names none, and
      dropping back to the link's would undo the reachability the rule bought */
   assertf(strcmp(hts_host_alias("a.com=https://b.com\nb.com=c.com",
-                                "http://a.com", HTS_TRUE, dest, sizeof(dest)),
+                                "http://a.com", HTS_TRUE, HTS_BUF(dest)),
                  "https://c.com") == 0);
   /* the spaces a user leaves around a token are not part of the host */
   assertf(hts_host_alias_rule_ok("b.com = a.com"));
-  assertf(strcmp(hts_host_alias("b.com = a.com", "http://b.com", HTS_TRUE, dest,
-                                sizeof(dest)),
+  assertf(strcmp(hts_host_alias("b.com = a.com", "http://b.com", HTS_TRUE,
+                                HTS_BUF(dest)),
                  "http://a.com") == 0);
   assertf(strcmp(hts_host_alias("b.com\t=\ta.com", "http://b.com", HTS_TRUE,
-                                dest, sizeof(dest)),
+                                HTS_BUF(dest)),
                  "http://a.com") == 0);
   /* a pattern naming no scheme is matched against the bare host, not the URL */
-  assertf(hts_host_alias("http*=x.com", "http://b.com", HTS_TRUE, dest,
-                         sizeof(dest)) == NULL);
+  assertf(hts_host_alias("http*=x.com", "http://b.com", HTS_TRUE,
+                         HTS_BUF(dest)) == NULL);
   /* the "//host" form names a host, and a glob may stand where a scheme goes */
-  assertf(strcmp(hts_host_alias("//b.com=a.com", "http://b.com", HTS_TRUE, dest,
-                                sizeof(dest)),
+  assertf(strcmp(hts_host_alias("//b.com=a.com", "http://b.com", HTS_TRUE,
+                                HTS_BUF(dest)),
                  "http://a.com") == 0);
   assertf(hts_host_alias_rule_ok("*://b.com=a.com"));
   assertf(strcmp(hts_host_alias("*://b.com=a.com", "ftp://b.com", HTS_TRUE,
-                                dest, sizeof(dest)),
+                                HTS_BUF(dest)),
                  "ftp://a.com") == 0);
   /* an IPv6 literal is a host; a scheme with none behind it is not, nor is the
      engine's own pseudo-host */
@@ -1271,42 +1261,41 @@ static int st_hostalias(httrackp *opt, int argc, char **argv) {
   assertf(!hts_host_alias_rule_ok("b.com=https://"));
   assertf(!hts_host_alias_rule_ok("b.com=///"));
   assertf(!hts_host_alias_rule_ok("b.com=primary"));
-  assertf(hts_host_alias("b.com=///", "http://b.com", HTS_TRUE, dest,
-                         sizeof(dest)) == NULL);
+  assertf(hts_host_alias("b.com=///", "http://b.com", HTS_TRUE,
+                         HTS_BUF(dest)) == NULL);
   /* a run of trailing slashes is stripped by both the check and the fold */
   assertf(hts_host_alias_rule_ok("b.com//=a.com//"));
   /* a canonical with a trailing slash must still end the chain */
-  assertf(strcmp(hts_host_alias("*=a.com/", "http://b.com", HTS_TRUE, dest,
-                                sizeof(dest)),
+  assertf(strcmp(hts_host_alias("*=a.com/", "http://b.com", HTS_TRUE,
+                                HTS_BUF(dest)),
                  "http://a.com") == 0);
   /* Rule credentials are refused or dropped, because each re-fold would
      prepend them to the link's again. */
   assertf(!hts_host_alias_rule_ok("a.com=user:pw@a.com"));
-  assertf(strcmp(hts_host_alias("*=u:p@b.com", "z.com", HTS_TRUE, dest,
-                                sizeof(dest)),
-                 "b.com") == 0);
-  assertf(hts_host_alias("*=u:p@b.com", "b.com", HTS_TRUE, dest,
-                         sizeof(dest)) == NULL);
+  assertf(
+      strcmp(hts_host_alias("*=u:p@b.com", "z.com", HTS_TRUE, HTS_BUF(dest)),
+             "b.com") == 0);
+  assertf(hts_host_alias("*=u:p@b.com", "b.com", HTS_TRUE, HTS_BUF(dest)) ==
+          NULL);
   assertf(strcmp(hts_host_alias("*=u:p@b.com", "http://user:pw@z.com", HTS_TRUE,
-                                dest, sizeof(dest)),
+                                HTS_BUF(dest)),
                  "http://user:pw@b.com") == 0);
   /* a trailing slash is not a path */
   assertf(strcmp(hts_host_alias("b.com/=https://a.com/", "http://b.com",
-                                HTS_TRUE, dest, sizeof(dest)),
+                                HTS_TRUE, HTS_BUF(dest)),
                  "https://a.com") == 0);
   /* every scheme of one host is one site to the scope test */
   assertf(hts_host_same_alias(rules, "ftp://b.com", "https://a.com", HTS_TRUE));
 
   /* engine pseudo-hosts survive a catch-all rule */
-  assertf(hts_host_alias("*=a.com", "primary", HTS_TRUE, dest, sizeof(dest)) ==
+  assertf(hts_host_alias("*=a.com", "primary", HTS_TRUE, HTS_BUF(dest)) ==
           NULL);
-  assertf(hts_host_alias("*=a.com", "file://", HTS_TRUE, dest, sizeof(dest)) ==
+  assertf(hts_host_alias("*=a.com", "file://", HTS_TRUE, HTS_BUF(dest)) ==
           NULL);
-  assertf(hts_host_alias("*=a.com", "", HTS_TRUE, dest, sizeof(dest)) == NULL);
+  assertf(hts_host_alias("*=a.com", "", HTS_TRUE, HTS_BUF(dest)) == NULL);
   /* control: the catch-all does rewrite a real host */
-  assertf(
-      strcmp(hts_host_alias("*=a.com", "b.com", HTS_TRUE, dest, sizeof(dest)),
-             "a.com") == 0);
+  assertf(strcmp(hts_host_alias("*=a.com", "b.com", HTS_TRUE, HTS_BUF(dest)),
+                 "a.com") == 0);
 
   /* A chain resolves to its end, because url_savename re-keys from there. */
   {
@@ -1315,15 +1304,12 @@ static int st_hostalias(httrackp *opt, int argc, char **argv) {
     static const char *const wwwchain = "b.com=www.c.com\nc.com=d.com";
     char again[HTS_URLMAXSIZE * 2], looping[HTS_URLMAXSIZE * 2];
 
-    assertf(strcmp(hts_host_alias(chain, "a.com", HTS_TRUE, dest, sizeof(dest)),
+    assertf(strcmp(hts_host_alias(chain, "a.com", HTS_TRUE, HTS_BUF(dest)),
                    "c.com") == 0);
-    assertf(hts_host_alias(chain, dest, HTS_TRUE, again, sizeof(again)) ==
-            NULL);
-    assertf(
-        strcmp(hts_host_alias(wwwchain, "b.com", HTS_TRUE, dest, sizeof(dest)),
-               "d.com") == 0);
-    assertf(hts_host_alias(wwwchain, dest, HTS_TRUE, again, sizeof(again)) ==
-            NULL);
+    assertf(hts_host_alias(chain, dest, HTS_TRUE, HTS_BUF(again)) == NULL);
+    assertf(strcmp(hts_host_alias(wwwchain, "b.com", HTS_TRUE, HTS_BUF(dest)),
+                   "d.com") == 0);
+    assertf(hts_host_alias(wwwchain, dest, HTS_TRUE, HTS_BUF(again)) == NULL);
     assertf(hts_host_alias_looping(chain, HTS_TRUE, HTS_BUF(looping)) == NULL);
     assertf(hts_host_alias_looping(rules, HTS_TRUE, HTS_BUF(looping)) == NULL);
 
@@ -1331,18 +1317,16 @@ static int st_hostalias(httrackp *opt, int argc, char **argv) {
     {
       static const char *const loop = "a.com=b.com\nb.com=a.com";
 
-      assertf(hts_host_alias(loop, "a.com", HTS_TRUE, dest, sizeof(dest)) ==
-              NULL);
-      assertf(hts_host_alias(loop, "b.com", HTS_TRUE, dest, sizeof(dest)) ==
-              NULL);
+      assertf(hts_host_alias(loop, "a.com", HTS_TRUE, HTS_BUF(dest)) == NULL);
+      assertf(hts_host_alias(loop, "b.com", HTS_TRUE, HTS_BUF(dest)) == NULL);
       assertf(strcmp(hts_host_alias_looping(loop, HTS_TRUE, HTS_BUF(looping)),
                      "b.com") == 0);
     }
   }
 
   /* alias lists tolerate the spaces a user writes after the commas */
-  assertf(strcmp(hts_host_alias("b.com, c.com =a.com", "c.com", HTS_TRUE, dest,
-                                sizeof(dest)),
+  assertf(strcmp(hts_host_alias("b.com, c.com =a.com", "c.com", HTS_TRUE,
+                                HTS_BUF(dest)),
                  "a.com") == 0);
 
   /* a canonical host that would not fit leaves the URL alone: never a
@@ -1350,22 +1334,18 @@ static int st_hostalias(httrackp *opt, int argc, char **argv) {
   {
     char small[5]; /* "a.com" needs 6 with its terminator */
 
-    assertf(hts_host_alias(rules, "b.com", HTS_TRUE, small, sizeof(small)) ==
+    assertf(hts_host_alias(rules, "b.com", HTS_TRUE, HTS_BUF(small)) == NULL);
+    assertf(hts_host_alias(rules, "https://b.com", HTS_TRUE, HTS_BUF(small)) ==
             NULL);
-    assertf(hts_host_alias(rules, "https://b.com", HTS_TRUE, small,
-                           sizeof(small)) == NULL);
     /* control: one more byte and it fits */
-    assertf(strcmp(hts_host_alias(rules, "b.com", HTS_TRUE, dest, 6),
+    assertf(strcmp(hts_host_alias(rules, "b.com", HTS_TRUE, HTS_BUF_N(dest, 6)),
                    "a.com") == 0);
   }
 
   /* malformed rules are ignored... */
-  assertf(hts_host_alias("b.com", "b.com", HTS_TRUE, dest, sizeof(dest)) ==
-          NULL);
-  assertf(hts_host_alias("=a.com", "b.com", HTS_TRUE, dest, sizeof(dest)) ==
-          NULL);
-  assertf(hts_host_alias("b.com=", "b.com", HTS_TRUE, dest, sizeof(dest)) ==
-          NULL);
+  assertf(hts_host_alias("b.com", "b.com", HTS_TRUE, HTS_BUF(dest)) == NULL);
+  assertf(hts_host_alias("=a.com", "b.com", HTS_TRUE, HTS_BUF(dest)) == NULL);
+  assertf(hts_host_alias("b.com=", "b.com", HTS_TRUE, HTS_BUF(dest)) == NULL);
   /* ...and the command line refuses them up front */
   assertf(hts_host_alias_rule_ok("b.com,c.com=a.com"));
   assertf(hts_host_alias_rule_ok("*.b.com=a.com:8080"));
@@ -1467,8 +1447,8 @@ static const char *legacy_hash_url_key(hash_struct *hash, const char *adr,
                                        const char *fil, char *dst,
                                        size_t dstsize) {
   char BIGSTK aliasbuf[HTS_URLMAXSIZE * 2];
-  const char *const alias = hts_host_alias(
-      hash->host_alias, adr, hash->norm_host, aliasbuf, sizeof(aliasbuf));
+  const char *const alias =
+      hts_host_alias(hash->host_alias, adr, hash->norm_host, HTS_BUF(aliasbuf));
   const char *const adr_canon = alias != NULL ? alias : adr;
   const char *const adr_norm = hash->norm_host
                                    ? jump_normalized_const(adr_canon)
@@ -1480,7 +1460,7 @@ static const char *legacy_hash_url_key(hash_struct *hash, const char *adr,
   {
     char BIGSTK keybuf[HTS_URLMAXSIZE];
     const char *const keys = hts_query_strip_keys(hash->strip_query, adr_canon,
-                                                  fil, keybuf, sizeof(keybuf));
+                                                  fil, HTS_BUF(keybuf));
     const size_t used = strlen(dst);
     char *const tail = &dst[used];
     const size_t avail = dstsize - used;
@@ -1504,10 +1484,10 @@ static int legacy_key_adrfil_equals(hash_struct *hash, const char *a_adr,
   const char *ja;
   const char *jb;
 
-  a_canon = hts_host_alias(hash->host_alias, a_adr, hash->norm_host, a_aliasbuf,
-                           sizeof(a_aliasbuf));
-  b_canon = hts_host_alias(hash->host_alias, b_adr, hash->norm_host, b_aliasbuf,
-                           sizeof(b_aliasbuf));
+  a_canon = hts_host_alias(hash->host_alias, a_adr, hash->norm_host,
+                           HTS_BUF(a_aliasbuf));
+  b_canon = hts_host_alias(hash->host_alias, b_adr, hash->norm_host,
+                           HTS_BUF(b_aliasbuf));
   if (a_canon == NULL)
     a_canon = a_adr;
   if (b_canon == NULL)
@@ -1522,9 +1502,9 @@ static int legacy_key_adrfil_equals(hash_struct *hash, const char *a_adr,
   {
     char BIGSTK ka[HTS_URLMAXSIZE], kb[HTS_URLMAXSIZE];
     const char *const keysa =
-        hts_query_strip_keys(hash->strip_query, a_canon, a_fil, ka, sizeof(ka));
+        hts_query_strip_keys(hash->strip_query, a_canon, a_fil, HTS_BUF(ka));
     const char *const keysb =
-        hts_query_strip_keys(hash->strip_query, b_canon, b_fil, kb, sizeof(kb));
+        hts_query_strip_keys(hash->strip_query, b_canon, b_fil, HTS_BUF(kb));
 
     if (hash->norm_slash || hash->norm_query || keysa != NULL ||
         keysb != NULL) {
@@ -1787,7 +1767,7 @@ static int st_hashkey_bounds(httrackp *opt, int argc, char **argv) {
     const char *k;
 
     /* control: the rules do match a short URL */
-    k = hts_query_strip_keys(rules, "h.com", "/bbz", keys, sizeof(keys));
+    k = hts_query_strip_keys(rules, "h.com", "/bbz", HTS_BUF(keys));
     assertf(k != NULL && strcmp(k, "sid") == 0);
     memset(adr, 'a', field - 1);
     adr[field - 1] = '\0';
@@ -1795,7 +1775,7 @@ static int st_hashkey_bounds(httrackp *opt, int argc, char **argv) {
     memset(fil + 1, 'b', field - 3);
     fil[field - 2] = 'z';
     fil[field - 1] = '\0';
-    assertf(hts_query_strip_keys(rules, adr, fil, keys, sizeof(keys)) == NULL);
+    assertf(hts_query_strip_keys(rules, adr, fil, HTS_BUF(keys)) == NULL);
     opt->urlhack = HTS_TRUE; /* and the key builder survives the same pair */
     StringCopy(opt->strip_query, rules);
     assertf(st_hashkey(opt, adr, fil, arena, keysize, guard));

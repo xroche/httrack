@@ -2218,7 +2218,7 @@ static int st_localtime(httrackp *opt, int argc, char **argv) {
     if (set_filetime_rfc822(path, "Tue, 29 Feb 2000 00:00:00 GMT") != 0) {
       fprintf(stderr, "localtime: cannot set %s's mtime\n", path);
       err = 1;
-    } else if (!get_filetime_rfc822(path, date, sizeof(date))) {
+    } else if (!get_filetime_rfc822(path, HTS_BUF(date))) {
       fprintf(stderr, "localtime: get_filetime_rfc822 failed on %s\n", path);
       err = 1;
     } else if (convert_time_rfc822(&parsed, date) == NULL ||
@@ -3621,8 +3621,8 @@ static const char *legacy_hts_host_alias_looping(const char *rules,
         continue;
       memcpy(canon, eq + 1, len);
       canon[len] = '\0';
-      (void) hts_host_alias_resolve(rules, canon, collapse_www, tmp,
-                                    sizeof(tmp), &settled);
+      (void) hts_host_alias_resolve(rules, canon, collapse_www, HTS_BUF(tmp),
+                                    &settled);
       if (!settled) {
         if (strlen(canon) >= destsize)
           continue;
@@ -3672,7 +3672,7 @@ static void spandiff_one(parsediff_stats *st, const char *rules,
       memset(n, 'O', sizeof(n));
       st->cases++;
       ro = legacy_hts_query_strip_keys(rules, adr, fil, o, sizes[j]);
-      rn = hts_query_strip_keys(rules, adr, fil, n, sizes[j]);
+      rn = hts_query_strip_keys(rules, adr, fil, hts_buf_at(n, sizes[j]));
       if ((ro == NULL) != (rn == NULL) ||
           (ro != NULL && (rn != n || strcmp(o, n) != 0)))
         parsediff_fail(st, "hts_query_strip_keys", rules, adr,
@@ -3877,7 +3877,7 @@ static int st_spandiff(httrackp *opt, int argc, char **argv) {
                                         StringBuff(longfil), o,
                                         sizeof(o)) == NULL ||
             hts_query_strip_keys(StringBuff(rules), "a.com",
-                                 StringBuff(longfil), n, sizeof(n)) == NULL)
+                                 StringBuff(longfil), HTS_BUF(n)) == NULL)
           parsediff_fail(&st, "clipped pattern matches", StringBuff(rules),
                          "a.com", "", "");
       }
@@ -4936,20 +4936,20 @@ static int st_typedlogin(httrackp *opt, int argc, char **argv) {
   int failures = 0;
 
   for (i = 0; i < sizeof(rows) / sizeof(rows[0]); i++) {
-    const hts_boolean ok =
-        hts_escape_typed_login(rows[i].url, out, sizeof(out));
+    const hts_boolean ok = hts_escape_typed_login(rows[i].url, HTS_BUF(out));
 
     if (!ok || strcmp(out, rows[i].want) != 0) {
       printf("FAIL %s: %s\n", rows[i].url, out);
       failures++;
-    } else if (!hts_escape_typed_login(rows[i].want, out, sizeof(out)) ||
+    } else if (!hts_escape_typed_login(rows[i].want, HTS_BUF(out)) ||
                strcmp(out, rows[i].want) != 0) {
       printf("FAIL twice %s: %s\n", rows[i].want, out);
       failures++;
     }
   }
   // an escape that does not fit is dropped whole
-  if (hts_escape_typed_login("u:ab?@h", out, 6) || strcmp(out, "u:ab") != 0) {
+  if (hts_escape_typed_login("u:ab?@h", HTS_BUF_N(out, 6)) ||
+      strcmp(out, "u:ab") != 0) {
     printf("FAIL short: %s\n", out);
     failures++;
   }
@@ -5625,7 +5625,7 @@ static int st_lib_sized(httrackp *opt, int argc, char **argv) {
       printf("lib-sized: time_rfc822 into %u bytes\n", (unsigned) rcap);
       fail = 1;
     }
-    if (!get_filetime_rfc822(path, buf, rcap) ||
+    if (!get_filetime_rfc822(path, hts_buf_at(buf, rcap)) ||
         !st_sized_clip_ok(buf, rcap, mdate)) {
       printf("lib-sized: get_filetime_rfc822 into %u bytes\n", (unsigned) rcap);
       fail = 1;

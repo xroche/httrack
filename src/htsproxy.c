@@ -114,7 +114,7 @@ int http_proxy_tunnel(httrackp *opt, htsblk *retour, const char *adr,
     char autorisation[1100];
 
     const int got = hts_basic_auth_value(opt, retour->req.proxy.name,
-                                         HTS_SIZED(autorisation));
+                                         HTS_BUF(autorisation));
 
     if (got < 0) {
       strcpybuff(retour->msg, "proxy CONNECT: credentials too long");

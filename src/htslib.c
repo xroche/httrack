@@ -1073,7 +1073,7 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
         char autorisation[1100];
 
         const int got = hts_basic_auth_value(opt, retour->req.proxy.name,
-                                             HTS_SIZED(autorisation));
+                                             HTS_BUF(autorisation));
 
         if (got > 0)
           print_buffer(&bstr, "Proxy-Authorization: Basic %s" H_CRLF,
@@ -1324,7 +1324,7 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
 
           if (!direct_url) {    // pas ftp:// par exemple
             const int got =
-                hts_basic_auth_value(opt, adr, HTS_SIZED(autorisation));
+                hts_basic_auth_value(opt, adr, HTS_BUF(autorisation));
 
             if (got > 0) {
               if (strcmp(fil, "/robots.txt")) /* pas robots.txt */
@@ -2075,7 +2075,7 @@ int hts_xfread_bytewise_count(void) { return hts_xfread_bytewise_calls; }
 /* Copy up to size buffered bytes without consuming them. Returns the count, 0
    when TLS has nothing decrypted yet, READ_EOF, READ_ERROR or PEEK_UNSUPPORTED.
    Only call it when the transport has data, as for hts_read(). */
-static int hts_peek(htsblk *r, char *buff, int size) {
+static int hts_peek(htsblk *r, hts_buf buff) {
   int ret;
 
   if (r->is_file || hts_load_acquire_int(&hts_peek_unsafe) ||
@@ -2086,7 +2086,7 @@ static int hts_peek(htsblk *r, char *buff, int size) {
     sigpipe_mask m;
 
     sigpipe_hold(&m);
-    ret = SSL_peek(r->ssl_con, buff, size);
+    ret = SSL_peek(r->ssl_con, buff.p, (int) buff.size);
     sigpipe_release(&m);
     if (ret <= 0) {
       const int err_code = SSL_get_error(r->ssl_con, ret);
@@ -2098,7 +2098,7 @@ static int hts_peek(htsblk *r, char *buff, int size) {
     return ret;
   }
 #endif
-  ret = recv(r->soc, buff, size, MSG_PEEK);
+  ret = recv(r->soc, buff.p, (int) buff.size, MSG_PEEK);
   if (ret == 0)
     return READ_EOF;
   return ret < 0 ? READ_ERROR : ret;
@@ -2172,7 +2172,7 @@ static int xfread_lines(htsblk *r, int bufl) {
   }
   if (r->size >= HTS_LINE_BLOCK_SIZE - 2)
     return READ_INTERNAL_ERROR;
-  avail = hts_peek(r, buff, sizeof(buff));
+  avail = hts_peek(r, HTS_BUF(buff));
   if (avail == PEEK_UNSUPPORTED) {
     hts_xfread_bytewise_calls++;
     return xfread_lines_bytewise(r, bufl);
@@ -3308,11 +3308,11 @@ hts_boolean hts_file_backdate(const char *file, int seconds) {
 }
 
 /* Note: utf-8 */
-int get_filetime_rfc822(const char *file, char *date, size_t size) {
+int get_filetime_rfc822(const char *file, hts_buf date) {
   STRUCT_STAT buf;
 
-  assertf(size != 0);
-  date[0] = '\0';
+  assertf(date.size != 0);
+  date.p[0] = '\0';
   if (STAT(file, &buf) == 0) {
     struct tm tmv;
     time_t tt = buf.st_mtime;
@@ -3320,7 +3320,7 @@ int get_filetime_rfc822(const char *file, char *date, size_t size) {
     /* no local-time fallback: it would format local time and still label it GMT
      * (#806) */
     if (hts_gmtime(tt, &tmv)) {
-      time_rfc822(date, size, &tmv);
+      time_rfc822(date.p, date.size, &tmv);
       return 1;
     }
   }
@@ -3625,13 +3625,13 @@ const char *login_end(const char *adr) {
   return hts_span_present(v.userinfo) ? v.host.p : login_start(adr);
 }
 
-hts_boolean hts_escape_typed_login(const char *url, char *dst, size_t size) {
+hts_boolean hts_escape_typed_login(const char *url, hts_buf dst) {
   const char *const start = login_start(url);
   const char *const at = strrchr_limit(start, '@', strchr(start, '/'));
 
   return hts_escape_span(hts_span_of(url),
                          hts_span_between(start, at != NULL ? at - 1 : start),
-                         "?#\\", hts_buf_at(dst, size));
+                         "?#\\", dst);
 }
 
 /* Returns HTS_TRUE when adr has a login, a user alone included. */
@@ -3854,7 +3854,7 @@ char *fil_normalized_filtered(const char *source, char *dest,
 /* hts_query_strip_keys() once some strip rules are known to exist */
 static const char *hts_query_strip_keys_match(const char *rules,
                                               const char *adr, const char *fil,
-                                              char *dest, size_t destsize) {
+                                              hts_buf dest) {
   const char *q;
   const char *result = NULL;
   hts_span rest, line;
@@ -3892,8 +3892,8 @@ static const char *hts_query_strip_keys_match(const char *rules,
       keys = line;
     }
     if (strjoker(url, pat, NULL, NULL) != NULL) {
-      (void) hts_span_copy(keys, dest, destsize);
-      result = dest;
+      (void) hts_span_copy(keys, dest.p, dest.size);
+      result = dest.p;
     }
   }
   return result;
@@ -3901,10 +3901,10 @@ static const char *hts_query_strip_keys_match(const char *rules,
 
 /* see htscore.h */
 const char *hts_query_strip_keys(const char *rules, const char *adr,
-                                 const char *fil, char *dest, size_t destsize) {
-  if (rules == NULL || *rules == '\0' || destsize == 0)
+                                 const char *fil, hts_buf dest) {
+  if (rules == NULL || *rules == '\0' || dest.size == 0)
     return NULL;
-  return hts_query_strip_keys_match(rules, adr, fil, dest, destsize);
+  return hts_query_strip_keys_match(rules, adr, fil, dest);
 }
 
 /* see htscore.h */
@@ -3980,7 +3980,7 @@ const char *hts_host_alias_match(const char *rules, const char *host,
 /* Build "scheme://host" from URL's scheme and HOST, for the rules that name a
    scheme. HTS_FALSE if it does not fit DEST. */
 static hts_boolean hts_host_alias_subject(const char *url, const char *host,
-                                          char *dest, size_t destsize) {
+                                          hts_buf dest) {
   /* An address with no scheme is the engine's plain-http form. Spell that one
      out, or a rule naming http:// could never match anything. */
   const hts_boolean bare =
@@ -3990,11 +3990,11 @@ static hts_boolean hts_host_alias_subject(const char *url, const char *host,
       bare ? strlen("http://") : (size_t) (jump_protocol_const(url) - url);
   const size_t hostlen = strlen(host);
 
-  if (schemelen >= destsize || hostlen >= destsize - schemelen)
+  if (schemelen >= dest.size || hostlen >= dest.size - schemelen)
     return HTS_FALSE;
-  memcpy(dest, scheme, schemelen);
-  memcpy(dest + schemelen, host, hostlen);
-  dest[schemelen + hostlen] = '\0';
+  memcpy(dest.p, scheme, schemelen);
+  memcpy(dest.p + schemelen, host, hostlen);
+  dest.p[schemelen + hostlen] = '\0';
   return HTS_TRUE;
 }
 
@@ -4007,7 +4007,7 @@ enum { HTS_HOST_ALIAS_MAXHOPS = 8 };
 static const char *hts_host_alias_resolve_rules(const char *rules,
                                                 const char *adr,
                                                 hts_boolean collapse_www,
-                                                char *dest, size_t destsize,
+                                                hts_buf dest,
                                                 hts_boolean *settled) {
   const char *proto, *host, *hostsubj, *canon;
   char BIGSTK fullsubj[HTS_URLMAXSIZE * 2];
@@ -4023,7 +4023,7 @@ static const char *hts_host_alias_resolve_rules(const char *rules,
   /* Match the host as the dedup layer does, so with the www. collapse on, a
      rule naming example.com also covers www.example.com. */
   hostsubj = collapse_www ? jump_normalized_const(host) : host;
-  if (!hts_host_alias_subject(adr, hostsubj, HTS_SIZED(fullsubj)))
+  if (!hts_host_alias_subject(adr, hostsubj, HTS_BUF(fullsubj)))
     return NULL;
   canon =
       hts_host_alias_match(rules, hostsubj, fullsubj, collapse_www, &canonlen);
@@ -4056,18 +4056,18 @@ static const char *hts_host_alias_resolve_rules(const char *rules,
 
     if (hostlen == 0)
       return NULL; /* a rule naming no host: leave the URL alone */
-    if (schemelen >= destsize || credlen >= destsize - schemelen ||
-        hostlen >= destsize - schemelen - credlen)
+    if (schemelen >= dest.size || credlen >= dest.size - schemelen ||
+        hostlen >= dest.size - schemelen - credlen)
       return NULL; /* would not fit: leave the URL alone */
-    memcpy(dest, schemebuf, schemelen);
-    memcpy(dest + schemelen, proto, credlen);
-    memcpy(dest + schemelen + credlen, chost, hostlen);
-    dest[schemelen + credlen + hostlen] = '\0';
+    memcpy(dest.p, schemebuf, schemelen);
+    memcpy(dest.p + schemelen, proto, credlen);
+    memcpy(dest.p + schemelen + credlen, chost, hostlen);
+    dest.p[schemelen + credlen + hostlen] = '\0';
 
-    dhost = jump_identification_const(dest);
+    dhost = jump_identification_const(dest.p);
     if (collapse_www)
       dhost = jump_normalized_const(dhost);
-    if (!hts_host_alias_subject(dest, dhost, HTS_SIZED(fullsubj)))
+    if (!hts_host_alias_subject(dest.p, dhost, HTS_BUF(fullsubj)))
       return NULL;
     next = hts_host_alias_match(rules, dhost, fullsubj, collapse_www, &nextlen);
     if (next == NULL)
@@ -4083,30 +4083,28 @@ static const char *hts_host_alias_resolve_rules(const char *rules,
     canonlen = nextlen;
   }
   /* a host that maps to itself: keep the callers' fast path */
-  return hts_strcasecmp(dest, adr) != 0 ? dest : NULL;
+  return hts_strcasecmp(dest.p, adr) != 0 ? dest.p : NULL;
 }
 
 /* see htscore.h */
 const char *hts_host_alias_resolve(const char *rules, const char *adr,
-                                   hts_boolean collapse_www, char *dest,
-                                   size_t destsize, hts_boolean *settled) {
+                                   hts_boolean collapse_www, hts_buf dest,
+                                   hts_boolean *settled) {
   if (settled != NULL)
     *settled = HTS_TRUE;
-  if (rules == NULL || *rules == '\0' || adr == NULL || destsize == 0)
+  if (rules == NULL || *rules == '\0' || adr == NULL || dest.size == 0)
     return NULL;
   /* engine pseudo-hosts: a "*=host" rule must not swallow them */
   if (adr[0] == '\0' || strcmp(adr, "primary") == 0 ||
       strcmp(adr, "file://") == 0)
     return NULL;
-  return hts_host_alias_resolve_rules(rules, adr, collapse_www, dest, destsize,
-                                      settled);
+  return hts_host_alias_resolve_rules(rules, adr, collapse_www, dest, settled);
 }
 
 /* see htscore.h */
 const char *hts_host_alias(const char *rules, const char *adr,
-                           hts_boolean collapse_www, char *dest,
-                           size_t destsize) {
-  return hts_host_alias_resolve(rules, adr, collapse_www, dest, destsize, NULL);
+                           hts_boolean collapse_www, hts_buf dest) {
+  return hts_host_alias_resolve(rules, adr, collapse_www, dest, NULL);
 }
 
 /* see htscore.h */
@@ -4121,7 +4119,7 @@ const char *hts_host_alias_fold(httrackp *opt, lien_adrfil *af) {
   if (rules != NULL) {
     char BIGSTK canon[HTS_URLMAXSIZE * 2];
     const char *const alias = hts_host_alias(
-        rules, af->adr, hts_host_alias_collapse_www(opt), HTS_SIZED(canon));
+        rules, af->adr, hts_host_alias_collapse_www(opt), HTS_BUF(canon));
 
     if (alias != NULL)
       strcpybuff(af->adr, alias);
@@ -4137,8 +4135,8 @@ hts_boolean hts_host_same_alias(const char *rules, const char *adra,
 
   if (rules == NULL || *rules == '\0' || adra == NULL || adrb == NULL)
     return HTS_FALSE;
-  a = hts_host_alias(rules, adra, collapse_www, HTS_SIZED(ca));
-  b = hts_host_alias(rules, adrb, collapse_www, HTS_SIZED(cb));
+  a = hts_host_alias(rules, adra, collapse_www, HTS_BUF(ca));
+  b = hts_host_alias(rules, adrb, collapse_www, HTS_BUF(cb));
   if (a == NULL && b == NULL)
     return HTS_FALSE; /* neither is aliased: the caller's own test */
   return hts_strcasecmp(jump_identification_const(a != NULL ? a : adra),
@@ -4210,7 +4208,7 @@ const char *hts_host_alias_looping(const char *rules, hts_boolean collapse_www,
     if (!hts_span_split(line, '=', &aliases, &target) ||
         hts_span_empty(target) || !hts_span_copy(target, HTS_SIZED(canon)))
       continue;
-    (void) hts_host_alias_resolve(rules, canon, collapse_www, HTS_SIZED(tmp),
+    (void) hts_host_alias_resolve(rules, canon, collapse_www, HTS_BUF(tmp),
                                   &settled);
     if (!settled) {
       if (strlen(canon) >= dest.size)
@@ -4238,14 +4236,13 @@ HTSEXT_API char *adr_normalized(const char *source, char *dest) {
 
 #undef endwith
 
-int hts_basic_auth_value(httrackp *opt, const char *url, char *out,
-                         size_t out_size) {
+int hts_basic_auth_value(httrackp *opt, const char *url, hts_buf out) {
   hts_url_view v;
   size_t idlen;
   char user_pass[768];
 
-  assertf(out_size >= 1100); /* base-64 of 765 bytes is 1020 */
-  out[0] = '\0';
+  assertf(out.size >= 1100); /* base-64 of 765 bytes is 1020 */
+  out.p[0] = '\0';
   (void) hts_url_view_parse(hts_span_of(url), &v);
   // no login where jump_identification_const() keeps the URL whole
   idlen = jump_identification_const(url) == v.host.p ? v.userinfo.len : 0;
@@ -4258,8 +4255,8 @@ int hts_basic_auth_value(httrackp *opt, const char *url, char *out,
     return -1;
   strcpybuff(user_pass, unescape_http(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                                       user_pass));
-  code64(hts_span_of(user_pass), hts_buf_at(out, out_size), HTS_FALSE);
-  hts_secret_add(opt, out, strlen(out), HTS_SECRET_HEADER);
+  code64(hts_span_of(user_pass), out, HTS_FALSE);
+  hts_secret_add(opt, out.p, strlen(out.p), HTS_SECRET_HEADER);
   return 1;
 }
 
@@ -4530,12 +4527,12 @@ static int parse_proxy_port(const char *a, const char *arg) {
   return port;
 }
 
-void hts_parse_proxy(const char *arg, char *name, size_t name_size, int *port) {
+void hts_parse_proxy(const char *arg, hts_buf name, int *port) {
   const char *authority = strstr(arg, "://");
   const char *a, *at;
   size_t namelen, i;
 
-  if (name_size == 0)
+  if (name.size == 0)
     return;
   // scan back to the port ':' (or userinfo '@'), never past the authority (a
   // scheme's own colon is not a port separator) nor into an IPv6 literal (']'
@@ -4557,8 +4554,7 @@ void hts_parse_proxy(const char *arg, char *name, size_t name_size, int *port) {
       at = arg + i;
   // escape what would end the authority early: the login is unescaped later
   (void) hts_escape_span(hts_span_at(arg, namelen),
-                         hts_span_between(authority, at), "/?#\\",
-                         hts_buf_at(name, name_size));
+                         hts_span_between(authority, at), "/?#\\", name);
 }
 
 hts_boolean hts_escape_span(hts_span src, hts_span escaped, const char *set,

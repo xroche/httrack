@@ -1184,7 +1184,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
       else
         snprintf(typed, sizeof(typed), "%s", StringBuff(opt->why_url));
       // a typed login reads up to the last '@' before the first '/'
-      if (!hts_escape_typed_login(typed, HTS_SIZED(url)))
+      if (!hts_escape_typed_login(typed, HTS_BUF(url)))
         strcpybuff(url, typed);
       if (ident_url_absolute(url, &af) < 0) {
         printf("--why: unable to parse URL %s" LF,
@@ -1278,7 +1278,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
             char BIGSTK typed[HTS_URLLIST_LINE_SIZE * 3];
 
             // sized so the escape cannot clip
-            (void) hts_escape_typed_login(line, HTS_SIZED(typed));
+            (void) hts_escape_typed_login(line, HTS_BUF(typed));
             n++;
             seed_append(&primarybuff, typed);
           }

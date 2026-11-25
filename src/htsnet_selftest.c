@@ -143,8 +143,7 @@ static int st_proxyauth(httrackp *opt, int argc, char **argv) {
     return 1;
   }
   for (i = 0; i < argc; i++) {
-    const int got =
-        hts_basic_auth_value(opt, argv[i], autorisation, sizeof(autorisation));
+    const int got = hts_basic_auth_value(opt, argv[i], HTS_BUF(autorisation));
 
     if (got > 0 && strlen(autorisation) > 64) /* long: print the length only */
       printf("auth=len%d\n", (int) strlen(autorisation));
@@ -191,7 +190,7 @@ static int st_proxyurl(httrackp *opt, int argc, char **argv) {
     }
     size = (size_t) n;
   }
-  hts_parse_proxy(argv[0], name, size, &port);
+  hts_parse_proxy(argv[0], hts_buf_at(name, size), &port);
   // host= is the resolved host (scheme/userinfo stripped); kind= the transport
   printf("name=%s port=%d host=%s kind=%s\n", name, port,
          jump_identification_const(name),
