@@ -640,9 +640,9 @@ static htsblk cache_readex_new(httrackp *opt, cache_back *cache,
           };
 
           headerBuff[readSizeHeader] = '\0';
-          if (!hts_cache_read_fields(headerBuff, (size_t) readSizeHeader,
-                                     fields, sizeof(fields) / sizeof(fields[0]),
-                                     NULL, NULL)) {
+          if (!hts_cache_read_fields(
+                  hts_span_at(headerBuff, (size_t) readSizeHeader), fields,
+                  sizeof(fields) / sizeof(fields[0]), NULL, NULL)) {
             hts_log_print(opt, LOG_WARNING,
                           "cached headers hold a NUL byte, "
                           "not using the cache entry: %s%s",

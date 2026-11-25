@@ -1228,9 +1228,10 @@ static PT_Element PT_ReadCache__New(PT_Index index_, const char *url,
           sink.len = &headersLen;
           sink.cap = &headersCap;
           headerBuff[readSizeHeader] = '\0';
-          if (!hts_cache_read_fields(headerBuff, (size_t) readSizeHeader,
-                                     fields, sizeof(fields) / sizeof(fields[0]),
-                                     PT_AppendHeaderSink, &sink)) {
+          if (!hts_cache_read_fields(
+                  hts_span_at(headerBuff, (size_t) readSizeHeader), fields,
+                  sizeof(fields) / sizeof(fields[0]), PT_AppendHeaderSink,
+                  &sink)) {
             r->statuscode = STATUSCODE_INVALID;
             strcpybuff(r->msg, "Cache Read Error : NUL In Header");
           }
