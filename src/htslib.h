@@ -470,17 +470,17 @@ const char *http_custom_header_warning(const char *headers, const char *line);
    block so far. */
 const char *http_bundle_header_refusal(const char *headers, const char *line);
 
-/* Append the custom header block to dst, dropping any line
-   whose field dst carries, a malformed or framing line, an earlier copy of
-   Host, Cookie or Authorization, and a leading folded line. Field names ignore
-   case and blanks before the colon. A line that does not fit is left out. */
+/* Append the custom header block to dst, dropping any line whose field dst
+   carries, a malformed or framing line, an earlier copy of Host, Cookie or
+   Authorization, and a leading folded line. Field names ignore case and blanks
+   before the colon. A line that does not fit is left out. */
 void http_append_custom_headers(hts_buf dst, const char *headers);
 
 /* Append the raw remainder of a >postfile: body into buffer at write position
-   pos, and return the new position. Clips to
-   the room left, and always leaves a NUL at the position returned: the request
-   block is read back with strlen() by the WARC stash, the sendhead callback
-   and sendc(). A NUL inside the file ends the request there. */
+   pos, and return the new position. Clips to the room left, and always leaves
+   a NUL at the position returned: the request block is read back with strlen()
+   by the WARC stash, the sendhead callback and sendc(). A NUL inside the file
+   ends the request there. */
 size_t http_postfile_body(hts_buf buffer, size_t pos, FILE *fp);
 
 /* Switch soc between blocking and non-blocking mode; false on failure, with
@@ -692,10 +692,11 @@ void hts_dns_test_move_clock(httrackp *opt, const char *host, TStamp ms);
 // outils divers
 HTS_INLINE TStamp time_local(void);
 
-/* Writes duration t in seconds as long text, clipped to S. */
+/* Writes duration t in seconds as long text, clipped to the buffer size. */
 void sec2str(hts_buf s, TStamp t);
 
-/* The current time as an RFC 822 date, GMT or local, clipped to S. */
+/* The current time as an RFC 822 date, GMT or local, clipped to the buffer
+   size. */
 void time_gmt_rfc822(hts_buf s);
 void time_local_rfc822(hts_buf s);
 

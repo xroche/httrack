@@ -1,0 +1,17 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# A >postfile: body that outgrows the request block is clipped one byte short
+# of it, for the NUL, on the wire http_sendhead() writes.
+skip_on_windows "windows: the self-test reads the request back through a socketpair"
+
+dir=$(mktemp -d)
+cleanup_push rm -rf "$dir"
+
+assert_selftest "postfilewire self-test: OK" postfilewire "$dir"
+
+exit 0

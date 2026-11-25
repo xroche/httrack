@@ -2233,10 +2233,9 @@ LLint http_xfread1(htsblk * r, int bufl) {
              this negative, and as a size_t it would drive a read past adr. */
           const LLint remaining = r->totalsize - r->size;
           const size_t req_size = remaining > 0 ? (size_t) remaining : 0;
+          const hts_buf rb = hts_buf_at(r->adr + (int) r->size, req_size);
 
-          nl = req_size > 0
-                   ? hts_read(r, hts_buf_at(r->adr + ((int) r->size), req_size))
-                   : 0; /* NO 32 bit overlow possible here (no 4GB html!) */
+          nl = req_size > 0 ? hts_read(r, rb) : 0;
           // nouvelle taille
           if (nl >= 0)
             r->size += nl;

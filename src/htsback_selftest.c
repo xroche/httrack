@@ -3515,6 +3515,61 @@ static int st_reqstrings(httrackp *opt, int argc, char **argv) {
   return err ? 1 : 0;
 }
 
+/* -#test=postfilewire <dir>: a >postfile: request clips at the request block,
+   one byte short of its capacity for the NUL. */
+static int st_postfilewire(httrackp *opt, int argc, char **argv) {
+#ifndef _WIN32
+  static const struct {
+    size_t body, wire;
+  } cases[] = {{16364, 16382}, {16365, 16383}, {16366, 16383}};
+
+  static char wire[65536];
+  size_t k, i;
+  int err = 0;
+
+  assertf(argc >= 1);
+  for (k = 0; k < sizeof(cases) / sizeof(cases[0]); k++) {
+    char path[HTS_URLMAXSIZE], fil[HTS_URLMAXSIZE * 2];
+    const int sz = 1 << 20;
+    htsblk r;
+    int sv[2];
+    ssize_t n;
+    FILE *fp;
+
+    snprintf(path, sizeof(path), "%s/body%u", argv[0], (unsigned) k);
+    fp = FOPEN(path, "wb");
+    assertf(fp != NULL);
+    fputs("POST /x HTTP/1.0\n", fp);
+    for (i = 0; i < cases[k].body; i++)
+      fputc('a' + (int) (i % 26), fp);
+    (void) fclose(fp);
+    snprintf(fil, sizeof(fil), "/p?>postfile:%s", path);
+    assertf(socketpair(AF_UNIX, SOCK_STREAM, 0, sv) == 0);
+    (void) setsockopt(sv[0], SOL_SOCKET, SO_SNDBUF, &sz, sizeof(sz));
+    (void) setsockopt(sv[1], SOL_SOCKET, SO_RCVBUF, &sz, sizeof(sz));
+    memset(&r, 0, sizeof(r));
+    r.soc = sv[0];
+    (void) http_sendhead(opt, NULL, 0, NULL, "example.com", fil, NULL, NULL,
+                         NULL, &r);
+    n = recv(sv[1], wire, sizeof(wire), MSG_DONTWAIT);
+    if (n != (ssize_t) cases[k].wire) {
+      printf("postfilewire: body %u put %d bytes on the wire, want %u\n",
+             (unsigned) cases[k].body, (int) n, (unsigned) cases[k].wire);
+      err = 1;
+    }
+    close(sv[0]);
+    close(sv[1]);
+  }
+  printf("postfilewire self-test: %s\n", err ? "FAILED" : "OK");
+  return err;
+#else
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  return 77;
+#endif
+}
+
 const struct selftest_entry selftests_back[] = {
     {"iofatal", "<logfile>",
      "a disk-full abort logs its line and stops the mirror", st_iofatal},
@@ -3563,6 +3618,8 @@ const struct selftest_entry selftests_back[] = {
     {"reqstrings", "",
      "requests and the hash keep the option strings copy_htsopt() rewrites",
      st_reqstrings},
+    {"postfilewire", "<dir>",
+     "a >postfile: request clips one byte short of its block", st_postfilewire},
     {"busyscans", "<dir>",
      "each slot-table scan reaches every slot in use, up to the last one",
      st_busyscans},
