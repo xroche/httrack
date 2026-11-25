@@ -199,7 +199,7 @@ T_SOC http_xfopen(httrackp *opt, const char *adr, const char *fil,
       char errbuf[HTS_STRERROR_SIZE];
 
       htsblk_failf(retour, "Connect error: %s",
-                   hts_strerror(last_errno, HTS_SIZED(errbuf)));
+                   hts_strerror(last_errno, HTS_BUF(errbuf)));
     }
   }
   // a local file: LOCAL_SOCKET_ID is a pseudo-socket, and no proxy applies
@@ -2583,7 +2583,7 @@ static T_SOC newhttp_open(httrackp *opt, htsblk *retour, SOCaddr *server,
         char errbuf[HTS_STRERROR_SIZE];
 
         htsblk_failf(retour, HTS_DNS_BIND_PREFIX "%s",
-                     hts_strerror(last_errno, HTS_SIZED(errbuf)));
+                     hts_strerror(last_errno, HTS_BUF(errbuf)));
         deletesoc(soc);
         soc = INVALID_SOCKET;
         local = NULL;
@@ -2605,7 +2605,7 @@ static T_SOC newhttp_open(httrackp *opt, htsblk *retour, SOCaddr *server,
     char errbuf[HTS_STRERROR_SIZE];
 
     htsblk_failf(retour, "Unable to create a socket: %s",
-                 hts_strerror(last_errno, HTS_SIZED(errbuf)));
+                 hts_strerror(last_errno, HTS_BUF(errbuf)));
     return INVALID_SOCKET;
   }
   SOCaddr_initport(*server, port);
@@ -2615,7 +2615,7 @@ static T_SOC newhttp_open(httrackp *opt, htsblk *retour, SOCaddr *server,
     char errbuf[HTS_STRERROR_SIZE];
 
     htsblk_failf(retour, "Non-blocking socket failed: %s",
-                 hts_strerror(last_errno, HTS_SIZED(errbuf)));
+                 hts_strerror(last_errno, HTS_BUF(errbuf)));
     deletesoc(soc);
     return INVALID_SOCKET;
   }
@@ -2628,7 +2628,7 @@ static T_SOC newhttp_open(httrackp *opt, htsblk *retour, SOCaddr *server,
     char errbuf[HTS_STRERROR_SIZE];
 
     htsblk_failf(retour, "Connect error: %s",
-                 hts_strerror(last_errno, HTS_SIZED(errbuf)));
+                 hts_strerror(last_errno, HTS_BUF(errbuf)));
     deletesoc(soc);
     *try_next = HTS_TRUE;
     return INVALID_SOCKET;
@@ -2978,7 +2978,7 @@ void deletesoc(T_SOC soc) {
       char errbuf[HTS_STRERROR_SIZE];
 
       fprintf(stderr, "* error closing socket " T_SOCP ": %s\n", soc,
-              hts_strerror(err, HTS_SIZED(errbuf)));
+              hts_strerror(err, HTS_BUF(errbuf)));
     }
   }
 }
@@ -5463,7 +5463,7 @@ void hts_log_vprint(httrackp *opt, int type,
       if ((type & LOG_ERRNO) != 0) {
         char errbuf[HTS_STRERROR_SIZE];
 
-        fprintf(opt->log, ": %s", hts_strerror(save_errno, HTS_SIZED(errbuf)));
+        fprintf(opt->log, ": %s", hts_strerror(save_errno, HTS_BUF(errbuf)));
       }
       fputs(LF, opt->log);
       if (opt->flush) {
@@ -5537,7 +5537,7 @@ int plug_wrapper(httrackp *opt, const char *moduleName, const char *argv) {
 
       hts_debug_log_print("* note: can't find entry point 'hts_plug' in %s: %s",
                           moduleName,
-                          hts_strerror(last_errno, HTS_SIZED(errbuf)));
+                          hts_strerror(last_errno, HTS_BUF(errbuf)));
     }
     closeFunctionLib(handle);
     return 0;
@@ -5546,7 +5546,7 @@ int plug_wrapper(httrackp *opt, const char *moduleName, const char *argv) {
     char errbuf[HTS_STRERROR_SIZE];
 
     hts_debug_log_print("* note: can't load %s: %s", moduleName,
-                        hts_strerror(last_errno, HTS_SIZED(errbuf)));
+                        hts_strerror(last_errno, HTS_BUF(errbuf)));
   }
   return -1;
 }

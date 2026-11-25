@@ -2420,7 +2420,7 @@ static void strerror_thread(void *arg) {
   for (round = 0; round < STRERROR_ROUNDS; round++) {
     char buf[HTS_STRERROR_SIZE];
 
-    if (strcmp(hts_strerror(strerror_codes[i], buf, sizeof(buf)),
+    if (strcmp(hts_strerror(strerror_codes[i], HTS_BUF(buf)),
                strerror_expected[i]) != 0)
       bad++;
   }
@@ -2436,8 +2436,8 @@ static int st_strerror(httrackp *opt, int argc, char **argv) {
   int err = 0, i;
 
   for (i = 0; i < STRERROR_THREADS; i++) {
-    const char *const msg = hts_strerror(
-        strerror_codes[i], strerror_expected[i], sizeof(strerror_expected[i]));
+    const char *const msg =
+        hts_strerror(strerror_codes[i], HTS_BUF(strerror_expected[i]));
 
     if (msg != strerror_expected[i] || *msg == '\0') {
       fprintf(stderr, "strerror: code %d gave no message of its own\n",
@@ -2448,8 +2448,8 @@ static int st_strerror(httrackp *opt, int argc, char **argv) {
 
   /* Two messages must coexist. Use the named codes at index 0 and 1, because
      musl prints every unknown code alike. */
-  kept = hts_strerror(strerror_codes[0], first, sizeof(first));
-  (void) hts_strerror(strerror_codes[1], second, sizeof(second));
+  kept = hts_strerror(strerror_codes[0], HTS_BUF(first));
+  (void) hts_strerror(strerror_codes[1], HTS_BUF(second));
   if (strcmp(kept, strerror_expected[0]) != 0) {
     fprintf(stderr,
             "strerror: the next call changed an earlier message to \"%s\"\n",
@@ -2480,7 +2480,7 @@ static int st_strerror(httrackp *opt, int argc, char **argv) {
       const size_t cap = sizes[k];
 
       memset(&s, '#', sizeof(s));
-      if (hts_strerror(EACCES, s.dst, cap) != s.dst ||
+      if (hts_strerror(EACCES, hts_buf_at(s.dst, cap)) != s.dst ||
           memchr(s.dst, '\0', cap) == NULL || (cap > 1 && s.dst[0] == '\0')) {
         fprintf(stderr, "strerror: capacity %d was not filled and terminated\n",
                 (int) cap);

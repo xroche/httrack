@@ -635,15 +635,16 @@ const char *hts_urllist_load(const char *path, char **buff, size_t *size,
   if (fs < 0) {
     /* fsize() hides the cause; redo stat() for a precise errno (#49) */
     STRUCT_STAT st;
-    err = STAT(path, &st) != 0 ? hts_strerror(errno, errbuf, HTS_STRERROR_SIZE)
-                               : "not a regular file";
+    err = STAT(path, &st) != 0
+              ? hts_strerror(errno, hts_buf_at(errbuf, HTS_STRERROR_SIZE))
+              : "not a regular file";
   } else if ((*size = llint_to_size_t(fs)) == (size_t) -1) {
     err = "file too large";
   } else {
     FILE *fp = FOPEN(path, "rb");
 
     if (fp == NULL) {
-      err = hts_strerror(errno, errbuf, HTS_STRERROR_SIZE);
+      err = hts_strerror(errno, hts_buf_at(errbuf, HTS_STRERROR_SIZE));
     } else {
       *buff = malloct(*size + 1);
       if (*buff == NULL) {

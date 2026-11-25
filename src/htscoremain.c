@@ -2033,8 +2033,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                           tmp, sizeof(tmp),
                           "option %%W : unable to load the module %s: %s "
                           "(check the library path ?)",
-                          argv[na],
-                          hts_strerror(last_errno, HTS_SIZED(errbuf)));
+                          argv[na], hts_strerror(last_errno, HTS_BUF(errbuf)));
                       HTS_PANIC_PRINTF(tmp);
                       return -1;
                     }
