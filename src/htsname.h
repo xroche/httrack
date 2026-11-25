@@ -104,8 +104,7 @@ void standard_name(hts_buf b, const char *dot_pos, const char *nom_pos,
    value, clipped to fit, goes to dst, of size >= 1. */
 hts_boolean url_query_value(const char *url, const char *name, hts_buf dst);
 /* Append s to d (mapping '\' to '/'), clipped to d.size bytes including the
-   NUL. Clips rather than aborts: s is a crawled link, hostile by construction.
- */
+   NUL. Clips rather than aborts, because s comes from a crawled page. */
 void url_savename_addstr(hts_buf d, const char *s);
 /* Escape in place each path component of save that is a DOS device or engine
    directory name, ignoring case and any extension: con.txt becomes con_.txt.
