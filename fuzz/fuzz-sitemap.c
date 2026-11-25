@@ -53,7 +53,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   body = malloct(size != 0 ? size : 1);
   memcpy(body, data, size);
 
-  (void) hts_sitemap_scan(body, size, cap, &is_index, sm_count, &n);
+  (void) hts_sitemap_scan(hts_span_at(body, size), cap, &is_index, sm_count,
+                          &n);
 
   freet(body);
   return 0;

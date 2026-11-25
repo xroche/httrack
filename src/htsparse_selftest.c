@@ -1750,7 +1750,7 @@ static int sm_scan(const char *doc, int maxurls, hts_boolean *is_index,
   memset(out, 0, sizeof(*out));
   assertf(raw != NULL);
   memcpy(raw, doc, len);
-  n = hts_sitemap_scan(raw, len, maxurls, is_index, sm_take, out);
+  n = hts_sitemap_scan(hts_span_at(raw, len), maxurls, is_index, sm_take, out);
   freet(raw);
   return n;
 }
@@ -1774,6 +1774,9 @@ static int st_sitemap(httrackp *opt, int argc, char **argv) {
                   "</sitemap></sitemapindex>",
                   100, &idx, &c) == 1);
   assertf(idx);
+  /* The root name may end the document, where a byte short is another name. */
+  assertf(sm_scan("<sitemapindex", 100, &idx, &c) == 0 && idx);
+  assertf(sm_scan("<sitemapinde", 100, &idx, &c) == 0 && !idx);
 
   /* Root element decides even when the other name appears later as text. */
   assertf(sm_scan("<urlset><url><loc>http://h.test/a</loc></url>"
@@ -1859,8 +1862,8 @@ static int st_sitemap(httrackp *opt, int argc, char **argv) {
       off += (size_t) len;
     }
     memset(&c, 0, sizeof(c));
-    assertf(hts_sitemap_scan(big, off, HTS_SITEMAP_MAX_URLS_DOC, &idx, sm_take,
-                             &c) == HTS_SITEMAP_MAX_URLS_DOC);
+    assertf(hts_sitemap_scan(hts_span_at(big, off), HTS_SITEMAP_MAX_URLS_DOC,
+                             &idx, sm_take, &c) == HTS_SITEMAP_MAX_URLS_DOC);
     /* The handler count, not just the return: a call site hardcoding a smaller
        cap would still return its own argument. */
     assertf(c.n == HTS_SITEMAP_MAX_URLS_DOC);
@@ -1910,7 +1913,8 @@ static int st_sitemap(httrackp *opt, int argc, char **argv) {
     /* it passes the 4096:1 budget's 1 MiB floor and stays under 64 MiB */
     assertf(xlen > 1024 * 1024 && (size_t) zlen < xlen / 100);
     memset(&c, 0, sizeof(c));
-    assertf(hts_sitemap_scan(z, (size_t) zlen, 10, &idx, sm_take, &c) == 10);
+    assertf(hts_sitemap_scan(hts_span_at(z, (size_t) zlen), 10, &idx, sm_take,
+                             &c) == 10);
     assertf(strcmp(c.url[0], "http://h.test/bomb") == 0);
     freet(z);
     freet(x);
@@ -1941,12 +1945,13 @@ static int st_sitemap(httrackp *opt, int argc, char **argv) {
     deflateEnd(&zs);
 
     memset(&c, 0, sizeof(c));
-    assertf(hts_sitemap_scan(z, (size_t) zlen, 100, &idx, sm_take, &c) == 1);
+    assertf(hts_sitemap_scan(hts_span_at(z, (size_t) zlen), 100, &idx, sm_take,
+                             &c) == 1);
     assertf(strcmp(c.url[0], "http://h.test/gz.html") == 0);
 
     /* Truncated gzip: refused, not scanned as plain text. */
     memset(&c, 0, sizeof(c));
-    assertf(hts_sitemap_scan(z, 4, 100, &idx, sm_take, &c) == -1);
+    assertf(hts_sitemap_scan(hts_span_at(z, 4), 100, &idx, sm_take, &c) == -1);
     freet(z);
   }
 

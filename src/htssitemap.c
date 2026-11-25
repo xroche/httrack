@@ -96,8 +96,9 @@ static const char *sitemap_tag_end(const char *p, const char *end) {
 /* HTS_TRUE when the document's root element is `name`. Skips the XML
    declaration, comments and processing instructions first, so a comment
    mentioning the other root element cannot decide the document type. */
-static hts_boolean sitemap_root_is(const char *doc, size_t size,
-                                   const char *name) {
+static hts_boolean sitemap_root_is(hts_span s, const char *name) {
+  const char *const doc = s.p;
+  const size_t size = s.len;
   const size_t nlen = strlen(name);
   size_t i = 0;
 
@@ -141,8 +142,8 @@ static hts_boolean sitemap_root_is(const char *doc, size_t size,
 }
 
 /* Decompress a gzip-framed body into a fresh buffer, capped at 64 MiB. */
-static char *sitemap_gunzip(const char *body, size_t size, size_t *outsize) {
-  const LLint budget = hts_codec_maxout((LLint) size);
+static char *sitemap_gunzip(hts_span body, size_t *outsize) {
+  const LLint budget = hts_codec_maxout((LLint) body.len);
   size_t cap = budget < (LLint) HTS_SITEMAP_MAX_BYTES
                    ? (size_t) budget
                    : (size_t) HTS_SITEMAP_MAX_BYTES;
@@ -154,8 +155,7 @@ static char *sitemap_gunzip(const char *body, size_t size, size_t *outsize) {
   out = malloct(cap + 1);
   if (out == NULL)
     return NULL;
-  n = hts_codec_head(HTS_CODEC_DEFLATE, hts_span_at(body, size),
-                     hts_buf_at(out, cap));
+  n = hts_codec_head(HTS_CODEC_DEFLATE, body, hts_buf_at(out, cap));
   if (n == 0) {
     freet(out);
     return NULL;
@@ -165,10 +165,10 @@ static char *sitemap_gunzip(const char *body, size_t size, size_t *outsize) {
   return out;
 }
 
-int hts_sitemap_scan(const char *body, size_t size, int maxurls,
-                     hts_boolean *is_index, hts_sitemap_handler handler,
-                     void *arg) {
+int hts_sitemap_scan(hts_span body, int maxurls, hts_boolean *is_index,
+                     hts_sitemap_handler handler, void *arg) {
   char *unpacked = NULL;
+  size_t size = body.len;
   const char *doc;
   const char *end;
   const char *p;
@@ -176,25 +176,25 @@ int hts_sitemap_scan(const char *body, size_t size, int maxurls,
 
   if (is_index != NULL)
     *is_index = HTS_FALSE;
-  if (body == NULL || size < 2 || handler == NULL)
+  if (body.p == NULL || size < 2 || handler == NULL)
     return 0;
 
   /* Content-Encoding gzip is undone upstream; only the container is left. */
-  if ((unsigned char) body[0] == 0x1f && (unsigned char) body[1] == 0x8b) {
-    unpacked = sitemap_gunzip(body, size, &size);
+  if ((unsigned char) body.p[0] == 0x1f && (unsigned char) body.p[1] == 0x8b) {
+    unpacked = sitemap_gunzip(body, &size);
     if (unpacked == NULL)
       return -1;
     doc = unpacked;
   } else {
     if (size > (size_t) HTS_SITEMAP_MAX_BYTES)
       size = (size_t) HTS_SITEMAP_MAX_BYTES;
-    doc = body;
+    doc = body.p;
   }
   end = doc + size;
 
   /* Set before the first callback: the handler reads the verdict. */
   if (is_index != NULL)
-    *is_index = sitemap_root_is(doc, size, "sitemapindex");
+    *is_index = sitemap_root_is(hts_span_at(doc, size), "sitemapindex");
 
   for (p = doc; n < maxurls;) {
     const char *loc = hts_memstr(p, (size_t) (end - p), "<loc", 4);
@@ -520,7 +520,7 @@ static hts_boolean sitemap_seed_any(void *arg, const char *url) {
 }
 
 void hts_sitemap_ingest(httrackp *opt, htsmoduleStruct *str, const char *adr,
-                        const char *fil, const char *body, size_t size) {
+                        const char *fil, hts_span body) {
   sitemap_doc *const d = sitemap_find(opt, adr, fil);
   hts_sitemap_state *const st = (hts_sitemap_state *) opt->sitemap_state;
   sitemap_ingest_ctx ctx;
@@ -549,7 +549,7 @@ void hts_sitemap_ingest(httrackp *opt, htsmoduleStruct *str, const char *adr,
   ctx.is_index = HTS_FALSE;
   ctx.accepted = 0;
 
-  n = hts_sitemap_scan(body, size, HTS_SITEMAP_MAX_URLS_DOC, &ctx.is_index,
+  n = hts_sitemap_scan(body, HTS_SITEMAP_MAX_URLS_DOC, &ctx.is_index,
                        sitemap_seed_any, &ctx);
   heap(anchor)->depth = saved_depth;
   if (n < 0) {
