@@ -301,6 +301,21 @@ static void basic_selftests(void) {
     assertf(get_httptype_sized(opt, r.contenttype, sizeof(r.contenttype),
                                "noextfile", 1) == 1);
     assertf(strcmp(r.contenttype, "application/octet-stream") == 0);
+    // a 0 return still clears a stale buffer, unmatched rule loaded or not
+    {
+      static const char *const fils[] = {"noextfile", "", "/x.zzz"};
+      size_t k;
+
+      for (k = 0; k < sizeof(fils) / sizeof(fils[0]); k++) {
+        StringCopy(opt->mimedefs, k == 2 ? "\ncgi=text/html\n" : "\n");
+        memset(r.contenttype, 'X', sizeof(r.contenttype) - 1);
+        r.contenttype[sizeof(r.contenttype) - 1] = '\0';
+        assertf(get_httptype_sized(opt, r.contenttype, sizeof(r.contenttype),
+                                   fils[k], 0) == 0);
+        assertf(r.contenttype[0] == '\0');
+      }
+      StringCopy(opt->mimedefs, "\n");
+    }
     // empty fil: no extension to scan; must not over-read before the string.
     // flag==0 -> 0 (nothing written), flag==1 -> octet-stream.
     assertf(get_httptype_sized(opt, r.contenttype, sizeof(r.contenttype), "",
