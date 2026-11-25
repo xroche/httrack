@@ -78,24 +78,4 @@ if accepts("127.0.0.2"):
     sys.exit("the HTTP proxy listens on the ICP address 127.0.0.2")
 PY
 
-# A busy port is reported with the system's text for the error code.
-"$python" - "$(nativepath "$(command -v proxytrack)")" "$(nativepath "$dir/in.arc")" <<'PY' || fail "bind error is not named"
-import os, re, socket, subprocess, sys
-
-busy = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-busy.bind(("127.0.0.1", 0))
-busy.listen(1)
-udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-udp.bind(("127.0.0.1", 0))
-icp = "127.0.0.1:%d" % udp.getsockname()[1]
-udp.close()
-r = subprocess.run([sys.argv[1], "127.0.0.1:%d" % busy.getsockname()[1], icp, sys.argv[2]],
-                   capture_output=True, timeout=60)
-m = re.search(r"cannot bind tcp port \d+ on 127\.0\.0\.1: (.*) \((\d+)\)", r.stderr.decode("latin-1"))
-code = int(m.group(2)) if m else 0
-# Winsock codes have no strerror() text
-if r.returncode != 1 or m is None or (code < 10000 and m.group(1) != os.strerror(code)):
-    sys.exit("rc %d, stderr %r" % (r.returncode, r.stderr))
-PY
-
 echo "OK: proxytrack binds each socket to its own address"

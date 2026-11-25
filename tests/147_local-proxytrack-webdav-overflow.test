@@ -108,7 +108,7 @@ for case in 5 +5 split 40 32768; do
     5) want=207 ;;
     split) args=(5 hell "o$get") want="207 200" ;;
     esac
-    status=$(status_with_length "${args[@]}") ||
+    status=$(status_with_length "${args[@]}" | tr -d '\r') ||
         fail_dump "proxytrack died on Content-length case $case" "$ptlog"
     # a kept-alive connection answers the closing EOF too, so match a prefix
     [[ "$status " == "$want "* ]] ||
