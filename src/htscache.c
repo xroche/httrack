@@ -190,19 +190,17 @@ static void cache_add_ex(httrackp *opt, cache_back *cache, const htsblk *r,
                          const char *url_save, int all_in_cache,
                          const char *path_prefix, hts_boolean kept);
 static htsblk cache_readex_(httrackp *opt, cache_back *cache, const char *adr,
-                            const char *fil, const char *save, char *location,
-                            size_t location_size, char *return_save,
-                            size_t return_save_size, int readonly,
+                            const char *fil, const char *save, hts_buf location,
+                            hts_buf return_save, int readonly,
                             hts_boolean include_kept);
 
 /* Is save copied whole into return_save? A clipped name would point at a file
  * we never stored, so a long one is refused. */
-static hts_boolean cache_return_save(htsblk *r, char *return_save,
-                                     size_t return_save_size,
+static hts_boolean cache_return_save(htsblk *r, hts_buf return_save,
                                      const char *save) {
-  if (strclipbuff(return_save, return_save_size, save))
+  if (hts_buf_cpy_clip(return_save, save))
     return HTS_TRUE;
-  return_save[0] = '\0';
+  return_save.p[0] = '\0';
   strcpybuff(r->msg, "Cache Read Error : Filename Too Long");
   return HTS_FALSE;
 }
@@ -226,8 +224,8 @@ void cache_keep_previous(httrackp *opt, cache_back *cache, const char *url_adr,
   /* Headers only: a kept entry carries no body, so nothing is read from the
      previous cache or from disk, whatever the file's size. */
   previous_save[0] = '\0';
-  r = cache_readex_(opt, cache, url_adr, url_fil, NULL, NULL, 0,
-                    HTS_SIZED(previous_save), 1, HTS_TRUE);
+  r = cache_readex_(opt, cache, url_adr, url_fil, NULL, hts_buf_at(NULL, 0),
+                    HTS_BUF(previous_save), 1, HTS_TRUE);
   /* The entry must name this very file: fexist() upstream proves only that
      something occupies the name, which a collision flip fills with another
      URL's file. */
@@ -456,45 +454,40 @@ void cache_add(httrackp *opt, cache_back *cache, const htsblk *r,
 }
 
 htsblk cache_read(httrackp *opt, cache_back *cache, const char *adr,
-                  const char *fil, const char *save, char *location,
-                  size_t location_size) {
-  return cache_readex(opt, cache, adr, fil, save, location, location_size, NULL,
-                      0, 0);
+                  const char *fil, const char *save, hts_buf location) {
+  return cache_readex(opt, cache, adr, fil, save, location, hts_buf_at(NULL, 0),
+                      0);
 }
 
 htsblk cache_read_ro(httrackp *opt, cache_back *cache, const char *adr,
-                     const char *fil, const char *save, char *location,
-                     size_t location_size) {
-  return cache_readex(opt, cache, adr, fil, save, location, location_size, NULL,
-                      0, 1);
+                     const char *fil, const char *save, hts_buf location) {
+  return cache_readex(opt, cache, adr, fil, save, location, hts_buf_at(NULL, 0),
+                      1);
 }
 
 htsblk cache_read_including_broken(httrackp *opt, cache_back *cache,
                                    const char *adr, const char *fil,
-                                   char *return_save, size_t return_save_size,
-                                   char *return_location,
-                                   size_t return_location_size) {
+                                   hts_buf return_save,
+                                   hts_buf return_location) {
   htsblk r = cache_readex_(opt, cache, adr, fil, NULL, return_location,
-                           return_location_size, return_save, return_save_size,
-                           0, HTS_TRUE);
+                           return_save, 0, HTS_TRUE);
 
   if (r.statuscode == -1) {
     lien_back *itemback = NULL;
 
     if (back_unserialize_ref(opt, adr, fil, &itemback) == 0) {
-      if (return_location != NULL)
-        (void) strclipbuff(return_location, return_location_size,
-                           itemback->r.location != NULL ? itemback->r.location
-                                                        : "");
+      if (return_location.p != NULL)
+        (void) hts_buf_cpy_clip(return_location, itemback->r.location != NULL
+                                                     ? itemback->r.location
+                                                     : "");
       r = itemback->r;
       /* header fields only, like cache_readex(): the entry torn down below
          owns these (#826) */
       r.adr = NULL;
       r.headers = NULL;
       r.location = NULL;
-      if (return_save != NULL &&
-          !cache_return_save(&r, return_save, return_save_size,
-                             itemback->url_sav)) {
+      if (return_save.p != NULL &&
+          !cache_return_save(&r, return_save, itemback->url_sav)) {
         r.statuscode = STATUSCODE_INVALID;
       }
       /* cleanup */
@@ -509,29 +502,26 @@ htsblk cache_read_including_broken(httrackp *opt, cache_back *cache,
 
 static htsblk cache_readex_new(httrackp *opt, cache_back *cache,
                                const char *adr, const char *fil,
-                               const char *save, char *location,
-                               size_t location_size, char *return_save,
-                               size_t return_save_size, int readonly,
+                               const char *save, hts_buf location,
+                               hts_buf return_save, int readonly,
                                hts_boolean include_kept);
 
 // lecture d'un fichier dans le cache
 // si save==null alors test unqiquement
 static htsblk cache_readex_(httrackp *opt, cache_back *cache, const char *adr,
-                            const char *fil, const char *save, char *location,
-                            size_t location_size, char *return_save,
-                            size_t return_save_size, int readonly,
+                            const char *fil, const char *save, hts_buf location,
+                            hts_buf return_save, int readonly,
                             hts_boolean include_kept) {
   if (cache->zipInput != NULL) {
-    return cache_readex_new(opt, cache, adr, fil, save, location, location_size,
-                            return_save, return_save_size, readonly,
-                            include_kept);
+    return cache_readex_new(opt, cache, adr, fil, save, location, return_save,
+                            readonly, include_kept);
   } else { /* no cache loaded */
     htsblk r;
 
     hts_init_htsblk(&r);
     strcpybuff(r.msg, "File Cache Entry Not Found");
-    if (location != NULL) {
-      r.location = location;
+    if (location.p != NULL) {
+      r.location = location.p;
       r.location[0] = '\0';
     }
     return r;
@@ -541,18 +531,16 @@ static htsblk cache_readex_(httrackp *opt, cache_back *cache, const char *adr,
 // lecture d'un fichier dans le cache
 // si save==null alors test unqiquement
 htsblk cache_readex(httrackp *opt, cache_back *cache, const char *adr,
-                    const char *fil, const char *save, char *location,
-                    size_t location_size, char *return_save,
-                    size_t return_save_size, int readonly) {
-  return cache_readex_(opt, cache, adr, fil, save, location, location_size,
-                       return_save, return_save_size, readonly, HTS_FALSE);
+                    const char *fil, const char *save, hts_buf location,
+                    hts_buf return_save, int readonly) {
+  return cache_readex_(opt, cache, adr, fil, save, location, return_save,
+                       readonly, HTS_FALSE);
 }
 
 static htsblk cache_readex_new(httrackp *opt, cache_back *cache,
                                const char *adr, const char *fil,
-                               const char *target_save, char *location,
-                               size_t location_size, char *return_save,
-                               size_t return_save_size, int readonly,
+                               const char *target_save, hts_buf location,
+                               hts_buf return_save, int readonly,
                                hts_boolean include_kept) {
   char BIGSTK location_default[HTS_LOCATION_SIZE];
   char BIGSTK buff[CACHE_KEY_SIZE];
@@ -569,12 +557,9 @@ static htsblk cache_readex_new(httrackp *opt, cache_back *cache,
   location_default[0] = '\0';
   previous_save[0] = previous_save_[0] = '\0';
 
-  if (location) {
-    r.location = location;
-  } else {
-    r.location = location_default;
-    location_size = sizeof(location_default);
-  }
+  if (location.p == NULL)
+    location = HTS_BUF(location_default);
+  r.location = location.p;
   r.location[0] = '\0';
   {
     size_t used = 0;
@@ -632,7 +617,7 @@ static htsblk cache_readex_new(httrackp *opt, cache_back *cache,
               {"Last-Modified", HTS_CACHE_FIELD_STRING, r.lastmodified,
                sizeof(r.lastmodified)},
               {"Etag", HTS_CACHE_FIELD_STRING, r.etag, sizeof(r.etag)},
-              {"Location", HTS_CACHE_FIELD_STRING, r.location, location_size},
+              {"Location", HTS_CACHE_FIELD_STRING, r.location, location.size},
               {"Content-Disposition", HTS_CACHE_FIELD_STRING, r.cdispo,
                sizeof(r.cdispo)},
               {"X-Save", HTS_CACHE_FIELD_STRING, previous_save_,
@@ -693,9 +678,8 @@ static htsblk cache_readex_new(httrackp *opt, cache_back *cache,
               strcpybuff(r.msg, "Cache Read Error : Filename Too Long");
             }
           }
-          if (return_save != NULL &&
-              !cache_return_save(&r, return_save, return_save_size,
-                                 previous_save)) {
+          if (return_save.p != NULL &&
+              !cache_return_save(&r, return_save, previous_save)) {
             r.statuscode = STATUSCODE_INVALID;
           }
 
@@ -983,7 +967,7 @@ static htsblk cache_readex_new(httrackp *opt, cache_back *cache,
     r.statuscode = STATUSCODE_INVALID;
     strcpybuff(r.msg, "File Cache Entry Not Found");
   }
-  if (!location) {              /* don't export internal buffer */
+  if (r.location == location_default) { /* don't export internal buffer */
     r.location = NULL;
   }
   return r;
@@ -1079,7 +1063,7 @@ void hts_cache_reconcile(httrackp *opt, hts_cache_reconcile_mode mode) {
 // return NULL upon error, and set -1 to r.statuscode
 htsblk *cache_header(httrackp * opt, cache_back * cache, const char *adr,
                      const char *fil, htsblk * r) {
-  *r = cache_read(opt, cache, adr, fil, NULL, NULL, 0); // test only
+  *r = cache_read(opt, cache, adr, fil, NULL, hts_buf_at(NULL, 0)); // test only
   if (r->statuscode != -1)
     return r;
   else

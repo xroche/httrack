@@ -98,8 +98,8 @@ static hts_boolean hts_link_may_carry_links(httrackp *opt, cache_back *cache,
 
   /* a cache miss leaves both untouched */
   prev_save[0] = prev_location[0] = '\0';
-  prev = cache_read_including_broken(opt, cache, adr, fil, HTS_SIZED(prev_save),
-                                     HTS_SIZED(prev_location));
+  prev = cache_read_including_broken(opt, cache, adr, fil, HTS_BUF(prev_save),
+                                     HTS_BUF(prev_location));
 
   if (HTTP_IS_REDIRECT(prev.statuscode))
     return HTS_TRUE;
@@ -1218,8 +1218,8 @@ int hts_wait_delayed(htsmoduleStruct *str, lien_adrfilsave *afs,
         lien_back back;
 
         memset(&back, 0, sizeof(back));
-        back.r = cache_read(opt, cache, afs->af.adr, afs->af.fil, NULL, NULL,
-                            0); // test only
+        back.r = cache_read(opt, cache, afs->af.adr, afs->af.fil, NULL,
+                            hts_buf_at(NULL, 0)); // test only
         if (back.r.statuscode == HTTP_OK &&
             strnotempty(back.r.contenttype)) { // cache found, and aswer is 'OK'
           hts_log_print(opt, LOG_DEBUG,

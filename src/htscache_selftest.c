@@ -139,7 +139,8 @@ static int check_entry(httrackp *opt, cache_back *cache, const char *adr,
 
   locbuf[0] = '\0';
   /* readonly=1: pure read, no rename/disk-write decision logic */
-  r = cache_read_ro(opt, cache, adr, fil, "", locbuf, HTS_LOCATION_SIZE);
+  r = cache_read_ro(opt, cache, adr, fil, "",
+                    hts_buf_at(locbuf, HTS_LOCATION_SIZE));
 
 #define CHECK_STR(field, want)                                                 \
   do {                                                                         \
@@ -271,7 +272,8 @@ static int disk_fallback_selftest(httrackp *opt) {
   selftest_open_for_read(&cache, opt);
   locbuf = malloct(HTS_LOCATION_SIZE);
   locbuf[0] = '\0';
-  r = cache_read_ro(opt, &cache, adr, fil, "", locbuf, HTS_LOCATION_SIZE);
+  r = cache_read_ro(opt, &cache, adr, fil, "",
+                    hts_buf_at(locbuf, HTS_LOCATION_SIZE));
   if (r.statuscode != 200) {
     fprintf(stderr,
             "cache-selftest: disk-fallback: statuscode %d, expected 200"
@@ -340,8 +342,8 @@ static int broken_ref_selftest(httrackp *opt) {
 
   selftest_open_for_read(&cache, opt);
   save[0] = '\0';
-  r = cache_read_including_broken(opt, &cache, adr, fil, save, sizeof(save),
-                                  NULL, 0);
+  r = cache_read_including_broken(opt, &cache, adr, fil, HTS_BUF(save),
+                                  hts_buf_at(NULL, 0));
   selftest_close(&cache);
 
   if (r.statuscode != 200 || strcmp(r.contenttype, "text/html") != 0) {
@@ -1904,7 +1906,7 @@ static int corrupt_expect_victim_fil(httrackp *opt, const char *fil,
 
   selftest_open_for_read(&cache, opt);
   lv[0] = lc[0] = '\0';
-  v = cache_read_ro(opt, &cache, CORRUPT_ADR, fil, "", lv, sizeof(lv));
+  v = cache_read_ro(opt, &cache, CORRUPT_ADR, fil, "", HTS_BUF(lv));
   if (v.statuscode != STATUSCODE_INVALID) {
     fprintf(stderr, "%s: %s: victim: statuscode is %d, expected %d\n",
             selftest_tag, what, v.statuscode, STATUSCODE_INVALID);
@@ -1915,8 +1917,7 @@ static int corrupt_expect_victim_fil(httrackp *opt, const char *fil,
             selftest_tag, what, v.msg, wantmsg);
     fail++;
   }
-  c = cache_read_ro(opt, &cache, CORRUPT_ADR, "/canary.html", "", lc,
-                    sizeof(lc));
+  c = cache_read_ro(opt, &cache, CORRUPT_ADR, "/canary.html", "", HTS_BUF(lc));
   if (c.statuscode != 200 || c.adr == NULL ||
       c.size != (LLint) strlen(corrupt_body_a) ||
       memcmp(c.adr, corrupt_body_a, strlen(corrupt_body_a)) != 0) {
@@ -1947,8 +1948,7 @@ static int corrupt_expect_disk_header(httrackp *opt, LLint wantsize,
 
   selftest_open_for_read(&cache, opt);
   lv[0] = '\0';
-  v = cache_read_ro(opt, &cache, CORRUPT_ADR, "/victim.bin", NULL, lv,
-                    sizeof(lv));
+  v = cache_read_ro(opt, &cache, CORRUPT_ADR, "/victim.bin", NULL, HTS_BUF(lv));
   if (v.statuscode != 200 || v.size != wantsize) {
     fprintf(stderr,
             "%s: %s: statuscode %d size " LLintP ", expected 200/" LLintP "\n",
@@ -1973,8 +1973,7 @@ static int corrupt_expect_victim_clipped(httrackp *opt, size_t wantmsg,
 
   selftest_open_for_read(&cache, opt);
   lv[0] = lc[0] = '\0';
-  v = cache_read_ro(opt, &cache, CORRUPT_ADR, "/victim.html", "", lv,
-                    sizeof(lv));
+  v = cache_read_ro(opt, &cache, CORRUPT_ADR, "/victim.html", "", HTS_BUF(lv));
   if (v.statuscode != 200) {
     fprintf(stderr, "%s: %s: status %d, expected 200\n", selftest_tag, what,
             v.statuscode);
@@ -1990,8 +1989,7 @@ static int corrupt_expect_victim_clipped(httrackp *opt, size_t wantmsg,
             what, (unsigned) strlen(v.lastmodified), (unsigned) wantlastmod);
     fail++;
   }
-  c = cache_read_ro(opt, &cache, CORRUPT_ADR, "/canary.html", "", lc,
-                    sizeof(lc));
+  c = cache_read_ro(opt, &cache, CORRUPT_ADR, "/canary.html", "", HTS_BUF(lc));
   if (c.statuscode != 200 || c.adr == NULL ||
       c.size != (LLint) strlen(corrupt_body_a) ||
       memcmp(c.adr, corrupt_body_a, strlen(corrupt_body_a)) != 0) {
@@ -2278,8 +2276,8 @@ static int cache_header_bounds_selftest(httrackp *opt, const char *dir) {
     htsblk r;
 
     locbuf[0] = '\0';
-    r = cache_read_ro(opt, &cache, ok_adr, ok_fil, "", locbuf,
-                      HTS_LOCATION_SIZE);
+    r = cache_read_ro(opt, &cache, ok_adr, ok_fil, "",
+                      hts_buf_at(locbuf, HTS_LOCATION_SIZE));
     if (r.statuscode != 200) {
       fprintf(stderr,
               "cache-hdrbounds: entry after the overflowing one reads "
@@ -2315,7 +2313,7 @@ static int cache_header_bounds_selftest(httrackp *opt, const char *dir) {
 /* A URL the cache cannot hold must read as a miss, never abort. */
 static int expect_miss(httrackp *opt, cache_back *cache, const char *adr,
                        const char *fil) {
-  htsblk r = cache_read_ro(opt, cache, adr, fil, "", NULL, 0);
+  htsblk r = cache_read_ro(opt, cache, adr, fil, "", hts_buf_at(NULL, 0));
   int failures = 0;
 
   if (r.statuscode != STATUSCODE_INVALID) {
@@ -2323,6 +2321,12 @@ static int expect_miss(httrackp *opt, cache_back *cache, const char *adr,
             "%s: an unstorable URL reads statuscode %d, expected a "
             "miss\n",
             selftest_tag, r.statuscode);
+    failures++;
+  }
+  /* no caller buffer, so no pointer into the reader's stack */
+  if (r.location != NULL) {
+    fprintf(stderr, "%s: a read with no location buffer returned one\n",
+            selftest_tag);
     failures++;
   }
   if (r.adr != NULL) {
@@ -2491,7 +2495,8 @@ static int savebounds_expect(httrackp *opt, const char *path, const char *adr,
 
   StringCopy(opt->path_html_utf8, path);
   selftest_open_for_read(&cache, opt);
-  r = cache_readex(opt, &cache, adr, fil, "", NULL, 0, got, SAVEBOUNDS_CAP, 1);
+  r = cache_readex(opt, &cache, adr, fil, "", hts_buf_at(NULL, 0),
+                   hts_buf_at(got, SAVEBOUNDS_CAP), 1);
   selftest_close(&cache);
 
   if (want != NULL) {
@@ -2901,8 +2906,9 @@ static int cache_readfail_selftest(httrackp *opt, const char *dir) {
     selftest_open_for_read(&cache, opt);
     locbuf[0] = '\0';
     /* readonly=0: the direct-disk branch, which writes the body out again */
-    r = cache_readex(opt, &cache, "example.com", "/trunc.bin", save, locbuf,
-                     HTS_LOCATION_SIZE, NULL, 0, 0);
+    r = cache_readex(opt, &cache, "example.com", "/trunc.bin", save,
+                     hts_buf_at(locbuf, HTS_LOCATION_SIZE), hts_buf_at(NULL, 0),
+                     0);
     if (r.statuscode != STATUSCODE_INVALID) {
       fprintf(stderr,
               "cache-readfail: truncated entry read back as %d ('%s')\n",
@@ -2912,8 +2918,9 @@ static int cache_readfail_selftest(httrackp *opt, const char *dir) {
     freet(r.adr);
     /* control: the same read on a whole entry succeeds */
     locbuf[0] = '\0';
-    r = cache_readex(opt, &cache, "example.com", "/whole.bin", save, locbuf,
-                     HTS_LOCATION_SIZE, NULL, 0, 0);
+    r = cache_readex(opt, &cache, "example.com", "/whole.bin", save,
+                     hts_buf_at(locbuf, HTS_LOCATION_SIZE), hts_buf_at(NULL, 0),
+                     0);
     if (r.statuscode != HTTP_OK) {
       fprintf(stderr, "cache-readfail: whole entry read back as %d ('%s')\n",
               r.statuscode, r.msg);
@@ -3594,14 +3601,16 @@ static int st_cache_nul(httrackp *opt, int argc, char **argv) {
     return 1;
   }
   selftest_open_for_read(&cache, opt);
-  r = cache_read_ro(opt, &cache, "example.com", "/nul.html", "", NULL, 0);
+  r = cache_read_ro(opt, &cache, "example.com", "/nul.html", "",
+                    hts_buf_at(NULL, 0));
   if (r.statuscode != STATUSCODE_INVALID) {
     fprintf(stderr, "cache-nul: NUL entry read as %d (%s)\n", r.statuscode,
             r.msg);
     fail = 1;
   }
   freet(r.adr);
-  r = cache_read_ro(opt, &cache, "example.com", "/clean.html", "", NULL, 0);
+  r = cache_read_ro(opt, &cache, "example.com", "/clean.html", "",
+                    hts_buf_at(NULL, 0));
   if (r.statuscode != 200 || r.adr == NULL || r.size != 4 ||
       memcmp(r.adr, "okay", 4) != 0) {
     fprintf(stderr, "cache-nul: control entry read as %d (%s)\n", r.statuscode,
@@ -3609,7 +3618,8 @@ static int st_cache_nul(httrackp *opt, int argc, char **argv) {
     fail = 1;
   }
   freet(r.adr);
-  r = cache_read_ro(opt, &cache, "example.com", "/blank.html", "", NULL, 0);
+  r = cache_read_ro(opt, &cache, "example.com", "/blank.html", "",
+                    hts_buf_at(NULL, 0));
   if (r.statuscode != 200 || r.adr == NULL || r.size != 4) {
     fprintf(stderr, "cache-nul: a field past the blank line read as %d (%s)\n",
             r.statuscode, r.msg);
@@ -5013,24 +5023,26 @@ static int st_cache_sized(httrackp *opt, int argc, char **argv) {
     char *loc = st_sized_alloc(cap);
     char *sav = st_sized_alloc(cap);
 
-    r = cache_read_ro(opt, &cache, adr, fil, NULL, loc, cap);
+    r = cache_read_ro(opt, &cache, adr, fil, NULL, hts_buf_at(loc, cap));
     fail |= r.statuscode != 301 || sized_location_bad("read_ro", loc, cap);
     freet(r.adr);
     loc[0] = 'Q';
-    r = cache_read(opt, &cache, adr, fil, NULL, loc, cap);
+    r = cache_read(opt, &cache, adr, fil, NULL, hts_buf_at(loc, cap));
     fail |= sized_location_bad("read", loc, cap);
     freet(r.adr);
     sav[0] = 'Q';
-    r = cache_readex(opt, &cache, adr, fil, NULL, NULL, 0, sav, cap, 1);
+    r = cache_readex(opt, &cache, adr, fil, NULL, hts_buf_at(NULL, 0),
+                     hts_buf_at(sav, cap), 1);
     fail |= sized_save_bad("readex", &r, sav, cap, save, 301);
     freet(r.adr);
     sav[0] = 'Q';
-    r = cache_read_including_broken(opt, &cache, adr, fil, sav, cap, loc, cap);
+    r = cache_read_including_broken(opt, &cache, adr, fil, hts_buf_at(sav, cap),
+                                    hts_buf_at(loc, cap));
     fail |= sized_save_bad("including_broken", &r, sav, cap, save, 301) ||
             sized_location_bad("including_broken", loc, cap);
     sav[0] = 'Q';
-    r = cache_read_including_broken(opt, &cache, adr, broken_fil, sav, cap, loc,
-                                    cap);
+    r = cache_read_including_broken(opt, &cache, adr, broken_fil,
+                                    hts_buf_at(sav, cap), hts_buf_at(loc, cap));
     fail |= sized_save_bad("broken ref", &r, sav, cap, save, 200) ||
             sized_location_bad("broken ref", loc, cap);
     freet(loc);
@@ -5041,12 +5053,13 @@ static int st_cache_sized(httrackp *opt, int argc, char **argv) {
     char *sav = st_sized_alloc(i);
 
     sav[0] = 'Q';
-    r = cache_readex(opt, &cache, adr, fil, NULL, NULL, 0, sav, i, 1);
+    r = cache_readex(opt, &cache, adr, fil, NULL, hts_buf_at(NULL, 0),
+                     hts_buf_at(sav, i), 1);
     fail |= sized_save_bad("readex edge", &r, sav, i, save, 301);
     freet(r.adr);
     sav[0] = 'Q';
-    r = cache_read_including_broken(opt, &cache, adr, broken_fil, sav, i, NULL,
-                                    0);
+    r = cache_read_including_broken(opt, &cache, adr, broken_fil,
+                                    hts_buf_at(sav, i), hts_buf_at(NULL, 0));
     fail |= sized_save_bad("broken ref edge", &r, sav, i, save, 200);
     freet(sav);
   }
