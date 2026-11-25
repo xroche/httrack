@@ -24,9 +24,13 @@ selftest_queue_lines "indexkw 1${nl}one${ign} (500)${nl}two${ign} (500)" \
     indexkw text/html 'one <!-- hidden --> two'
 selftest_queue_lines "indexkw 1${nl}delta${ign} (1000)" \
     indexkw text/html '<SCRIPT>gamma</ScRiPt>delta'
-# The page ends inside "<script": nothing past it may be read.
+# Each page ends inside a marker, before an unreadable page.
 selftest_queue_lines "indexkw 1${nl}alpha${ign} (500)${nl}word9${ign} (500)" \
     indexkw text/html 'word9 alpha<scr'
+selftest_queue_lines "indexkw 1${nl}alpha${ign} (1000)" \
+    indexkw text/html 'alpha<script>x</SCRIP'
+selftest_queue_lines "indexkw 1${nl}alpha${ign} (1000)" \
+    indexkw text/html 'alpha <!-'
 # A UTF-8 lead byte as the last byte has no pair to fold.
 selftest_queue_lines "indexkw 1" indexkw text/html hex:636166c3
 selftest_queue_lines "indexkw 1${nl}cafe${ign} (500)${nl}naive${ign} (500)" \
