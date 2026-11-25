@@ -802,7 +802,7 @@ static hts_boolean sf_replace_file(httrackp *opt, const char *path,
     StringFree(tmp);
     return HTS_FALSE;
   }
-  if (body.len > 0 && !hts_fwrite_span(body, fp))
+  if (!hts_fwrite_span(body, fp))
     ok = HTS_FALSE;
 #ifndef _WIN32
   /* The spool bypassed filecreate(), so set the mode it would have. */

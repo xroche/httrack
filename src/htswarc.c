@@ -228,7 +228,7 @@ static int member_begin(member *m, warc_writer *w) {
 static int member_write(member *m, hts_span s) {
   size_t n = s.len;
   if (!m->w->gz)
-    return (n == 0 || hts_fwrite_span(s, m->w->f)) ? 0 : -1;
+    return hts_fwrite_span(s, m->w->f) ? 0 : -1;
   m->strm.next_in = (const Bytef *) s.p;
   while (n > 0) {
     unsigned char out[8192];

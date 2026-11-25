@@ -1672,7 +1672,7 @@ static hts_boolean sf_try_put(const char *dir, const char *rel, hts_span data) {
   fp = FOPEN(fconv(catbuff, sizeof(catbuff), path), "wb");
   if (fp == NULL)
     return HTS_FALSE;
-  assertf(data.len == 0 || hts_fwrite_span(data, fp));
+  assertf(hts_fwrite_span(data, fp));
   fclose(fp);
   return HTS_TRUE;
 }

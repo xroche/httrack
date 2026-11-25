@@ -2,7 +2,8 @@
 """Fail on new ctype calls without an (unsigned char) cast, unsafe function-like
 macros, header functions that can fail without HTS_CHECK_RESULT, a span's
 .p handed to a function that reads up to a NUL or printed with %s, and a call
-passing x.p, x.len as two arguments where the callee could take the span.
+passing x.p, x.len (or x.p + n, x.len - n) as two arguments where the callee
+could take the span.
 Known cases live in tools/api-lint/, and --update rewrites those baselines.
 Known limits: a failure delegated through two calls, free names inside _Generic,
 and a function defined only in a later branch of an unbalanced #if group go
@@ -661,7 +662,7 @@ PAIR_TAKERS = frozenset(
     hts_span_at htsbuff_catn TypedArrayAppend
     """.split()
 )
-SPAN_P = re.compile(r"^(.*?)(\.|->)p$", re.S)
+SPAN_P = re.compile(r"^(.*?)(\.|->)p(?:\+(.+))?$", re.S)
 
 
 def byte_sinks(files):
@@ -697,9 +698,10 @@ def check_pair(code, sinks):
             ]
             for k in range(len(args) - 1):
                 p = SPAN_P.match(args[k])
+                tail = "-" + p.group(3) if p and p.group(3) else ""
                 if (
                     p
-                    and args[k + 1] == p.group(1) + p.group(2) + "len"
+                    and args[k + 1] == p.group(1) + p.group(2) + "len" + tail
                     and (name, k) not in sinks
                 ):
                     call = "%s(%s, %s)" % (name, args[k], args[k + 1])
