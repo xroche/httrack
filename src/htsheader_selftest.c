@@ -160,6 +160,21 @@ static int st_rfc822format(httrackp *opt, int argc, char **argv) {
     printf("rfc822-format: FAIL range \"%s\"\n", out);
     err = 1;
   }
+  // Each bound alone, so a dropped half of either guard shows.
+  tm.tm_wday = -1;
+  tm.tm_mon = 10;
+  hts_format_rfc822(HTS_BUF(out), &tm, "");
+  if (strcmp(out, "???, 06 Nov 1994 08:49:37") != 0) {
+    printf("rfc822-format: FAIL wday \"%s\"\n", out);
+    err = 1;
+  }
+  tm.tm_wday = 0;
+  tm.tm_mon = 12;
+  hts_format_rfc822(HTS_BUF(out), &tm, "");
+  if (strcmp(out, "Sun, 06 ??? 1994 08:49:37") != 0) {
+    printf("rfc822-format: FAIL mon \"%s\"\n", out);
+    err = 1;
+  }
   // The canary past the 10-byte view must survive the clip untouched.
   tm.tm_wday = 0;
   tm.tm_mon = 10;
