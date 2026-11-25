@@ -166,11 +166,11 @@ no_leak "$dir/reply" "the proxy reply"
 mkdir -p "$dir/n/hts-cache"
 printf '%s' "$BODY" >"$dir/n/body.html"
 
-craft_ndx() { # craft_ndx SIZE
-    "$python" - "$(nativepath "$dir/n/hts-cache")" "$1" <<'EOF'
+craft_ndx() { # craft_ndx SIZE [ETAG]
+    "$python" - "$(nativepath "$dir/n/hts-cache")" "$1" "${2-}" <<'EOF'
 import os, sys
 
-d, declared = sys.argv[1], sys.argv[2]
+d, declared, etag = sys.argv[1], sys.argv[2], sys.argv[3]
 
 def field(s):  # every .dat field is its byte length, a newline, then the bytes
     b = s.encode()
@@ -180,7 +180,7 @@ record = b"".join(
     field(v)
     for v in (
         "200", declared, "OK", "text/html", "",  # status, size, msg, type, charset
-        "Wed, 01 Jan 2025 00:00:00 GMT", "", "", "",  # date, etag, location, cdispo
+        "Wed, 01 Jan 2025 00:00:00 GMT", etag, "", "",  # date, etag, location, cdispo
         "", "", "body.html", "HTS", declared,  # addr, uri, save, integrity, size
     )
 )
@@ -208,5 +208,21 @@ record "$dir/ndx.arc" "$short_url"
 test "$(announced "$dir/ndx.arc")" -le "${#BODY}" ||
     fail "the .ndx reader kept more than the ${#BODY} bytes the file held"
 no_leak "$dir/ndx.arc" "the .ndx reader"
+
+# An etag past its 64-byte field is clipped, and the fields after it still align.
+etag=$(printf 'e%.0s' $(seq 1 200))
+craft_ndx "${#BODY}" "$etag"
+proxytrack --convert "$dir/ndx-etag.arc" "$dir/n/hts-cache/c.ndx" >/dev/null 2>&1 ||
+    fail "proxytrack died converting an .ndx cache with a long etag"
+record "$dir/ndx-etag.arc" "$short_url"
+grep -qaF "$BODY" "$dir/ndx-etag.arc" || fail "a long etag lost the body"
+# the ARC writer drops the etag, so read it back from a new.zip
+proxytrack --convert "$dir/ndx-etag.zip" "$dir/n/hts-cache/c.ndx" >/dev/null 2>&1 ||
+    fail "proxytrack died converting a long etag to new.zip"
+grep -qaF "Etag: ${etag:0:63}"$'\r' "$dir/ndx-etag.zip" ||
+    fail "the etag was not kept to its first 63 bytes"
+if grep -qaF "${etag:0:64}" "$dir/ndx-etag.zip"; then
+    fail "the etag overran its 63 bytes"
+fi
 
 echo "OK: neither consumer emitted a byte the cache body did not hold"

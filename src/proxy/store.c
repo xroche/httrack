@@ -2185,8 +2185,8 @@ static hts_boolean arcMayOpenRecord(hts_span raw) {
   return HTS_FALSE;
 }
 
-/* Append what hts_shared_linput() would have kept of raw to line's first len
-   bytes, clipped to line.size - 1; returns the new length. */
+/* Append what hts_shared_linput() would have kept of raw, clipped to
+   line.size - 1, which must be hts_shared_linput's cap. */
 static size_t arcAppendLine(hts_buf line, size_t len, hts_span raw) {
   size_t i;
 
@@ -2297,11 +2297,10 @@ int PT_LoadCache__Arc(PT_Index index_, const char *filename) {
             int length = getArcLength(index->line);
 
             if (length >= 0) {
-              const char *filenameIndex =
-                  copyArcField(index->line, 0,
-                               HTS_BUF_N(index->filenameIndexBuff,
-                                         sizeof(index->filenameIndexBuff) -
-                                             1)); /* can not be NULL */
+              const hts_buf fn =
+                  HTS_BUF_N(index->filenameIndexBuff,
+                            sizeof(index->filenameIndexBuff) - 1);
+              const char *filenameIndex = copyArcField(index->line, 0, fn);
 
               if (strncmp(filenameIndex, "http://", 7) == 0) {
                 filenameIndex += 7;
