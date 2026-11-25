@@ -725,7 +725,10 @@ static void sf_expand(sf_ctx *ctx, const char *base_dir, int depth,
     char cls = SINGLEFILE_CLASS_ANY;
     hts_span ref;
 
-    marklen = sf_parse_mark(intro, hts_span_skip(body, i), &cls, &reflen);
+    /* Every mark opens with the intro, so skip the call on any other byte. */
+    marklen = body.p[i] == intro[0]
+                  ? sf_parse_mark(intro, hts_span_skip(body, i), &cls, &reflen)
+                  : 0;
     /* We wrote the length, but the file may have been truncated since; a
        reference reaching back before what we have is not one of ours. */
     if (marklen == 0 || reflen > i - flushed) {
