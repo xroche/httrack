@@ -243,11 +243,11 @@ const char *hts_bundle_take(httrackp *opt, char *url) {
   return bundle_add(opt, name, typed) ? NULL : "out of memory";
 }
 
-hts_boolean hts_bundle_has_control(const char *s, size_t len) {
+hts_boolean hts_bundle_has_control(hts_span s) {
   size_t i;
 
-  for (i = 0; i < len; i++) {
-    const unsigned char c = (unsigned char) s[i];
+  for (i = 0; i < s.len; i++) {
+    const unsigned char c = (unsigned char) s.p[i];
 
     if ((c < 0x20 && c != '\t') || c == 0x7f)
       return HTS_TRUE;
@@ -265,7 +265,8 @@ static const char *bundle_readline(text_src *src,
   text_src_readline(src, line, BUNDLE_LINE_MAX + 1, &len);
   if (len >= BUNDLE_LINE_MAX)
     return "too long";
-  return hts_bundle_has_control(line, len) ? "holds a control byte" : NULL;
+  return hts_bundle_has_control(hts_span_at(line, len)) ? "holds a control byte"
+                                                        : NULL;
 }
 
 /* The major version a "# HTTrack bundle N[.M]" line gives, or -1 when line is
@@ -370,11 +371,10 @@ static const char *bundle_note_url(bundle *b, const char *url) {
   return bundle_scope_add(b, entry);
 }
 
-/* Write the reason into err and return HTS_FALSE. The caller needs err and
-   err_size. */
+/* Write the reason into err and return HTS_FALSE. The caller needs err. */
 #define BUNDLE_FAIL(...)                                                       \
   do {                                                                         \
-    snprintf(err, err_size, __VA_ARGS__);                                      \
+    hts_buf_printf_clip(err, __VA_ARGS__);                                     \
     return HTS_FALSE;                                                          \
   } while (0)
 
@@ -403,7 +403,7 @@ static const char *bundle_scope_entry(const char *value,
 
 /* Add a scope line's domain to b's scope. */
 static hts_boolean bundle_scope_line(bundle *b, const char *value, int lineno,
-                                     char *err, size_t err_size) {
+                                     hts_buf err) {
   char entry[SCOPE_ENTRY_SIZE];
   const char *why = bundle_scope_entry(value, entry);
 
@@ -417,7 +417,7 @@ static hts_boolean bundle_scope_line(bundle *b, const char *value, int lineno,
 /* Read b's lines up to "cookies", leaving fp at its jar. *cookies_line gets
    the number of that line, or 0 when b has no cookies. */
 static hts_boolean bundle_parse(httrackp *opt, bundle *b, text_src *src,
-                                int *cookies_line, char *err, size_t err_size) {
+                                int *cookies_line, hts_buf err) {
   static const char bom[] = "\xEF\xBB\xBF";
   static const char *const keys[] = {
       HTS_SPAN_WORDS("url", "ua", "header", "scope")};
@@ -502,7 +502,7 @@ static hts_boolean bundle_parse(httrackp *opt, bundle *b, text_src *src,
       StringCat(b->headers, "\r\n");
     } else {
       b->scope_given = HTS_TRUE;
-      if (!bundle_scope_line(b, value, lineno, err, err_size))
+      if (!bundle_scope_line(b, value, lineno, err))
         return HTS_FALSE;
     }
   }
@@ -616,7 +616,7 @@ static hts_boolean bundle_admit(cookie_filter *filter, t_cookie *cookie,
 static hts_boolean bundle_load_src(httrackp *opt, bundle *b, text_src *src,
                                    const char *jar_file, t_cookie *all_bundles,
                                    bundle_clashes *clashes, t_cookie *alone,
-                                   char *err, size_t err_size) {
+                                   hts_buf err) {
   int cookies_line;
   t_cookie *scratch = NULL;
   bundle_jar ctx;
@@ -625,7 +625,7 @@ static hts_boolean bundle_load_src(httrackp *opt, bundle *b, text_src *src,
   size_t i;
 
   bundle_clear(b);
-  if (!bundle_parse(opt, b, src, &cookies_line, err, err_size))
+  if (!bundle_parse(opt, b, src, &cookies_line, err))
     return HTS_FALSE;
   for (i = 0; i < b->nstart && why == NULL; i++)
     why = bundle_note_url(b, b->start_urls[i]);
@@ -689,7 +689,7 @@ static hts_boolean bundle_load_src(httrackp *opt, bundle *b, text_src *src,
    all_bundles. */
 static hts_boolean bundle_load(httrackp *opt, bundle *b, const char *jar_file,
                                t_cookie *all_bundles, bundle_clashes *clashes,
-                               t_cookie *alone, char *err, size_t err_size) {
+                               t_cookie *alone, hts_buf err) {
   const char *const dir = StringNotEmpty(opt->bundle_dir)
                               ? StringBuff(opt->bundle_dir)
                               : StringBuff(opt->path_log);
@@ -704,8 +704,8 @@ static hts_boolean bundle_load(httrackp *opt, bundle *b, const char *jar_file,
     BUNDLE_FAIL("%s: cannot read the login bundle: %s", b->file,
                 strerror(errno));
   src = text_src_file(fp);
-  ok = bundle_load_src(opt, b, &src, jar_file, all_bundles, clashes, alone, err,
-                       err_size);
+  ok =
+      bundle_load_src(opt, b, &src, jar_file, all_bundles, clashes, alone, err);
   fclose(fp);
   return ok;
 }
@@ -748,8 +748,8 @@ static size_t bundle_group(size_t *group, size_t i) {
   return i;
 }
 
-hts_boolean hts_bundle_load_all(httrackp *opt, const char *jar_file, char *err,
-                                size_t err_size) {
+hts_boolean hts_bundle_load_all(httrackp *opt, const char *jar_file,
+                                hts_buf err) {
   hts_bundle_state *const st = (hts_bundle_state *) opt->bundle_state;
   t_cookie *all_bundles;
   t_cookie *alone = NULL;
@@ -783,14 +783,14 @@ hts_boolean hts_bundle_load_all(httrackp *opt, const char *jar_file, char *err,
     group[i] = i;
   for (i = 0; i < n && ok; i++)
     ok = bundle_load(opt, &items[i], jar_file, all_bundles, &clashes, alone,
-                     err, err_size);
+                     err);
   // refuse a skipped clash on a site that is a bundle's home
   for (i = 0; i < clashes.count && ok; i++) {
     for (j = 0; j < n && ok; j++) {
       if (scope_list_covers(items[j].home, items[j].nhome, clashes.hosts[i])) {
-        snprintf(err, err_size,
-                 "%s: a cookie for %s has another value in another bundle",
-                 items[j].file, clashes.hosts[i]);
+        hts_buf_printf_clip(
+            err, "%s: a cookie for %s has another value in another bundle",
+            items[j].file, clashes.hosts[i]);
         ok = HTS_FALSE;
       }
     }
@@ -809,10 +809,10 @@ hts_boolean hts_bundle_load_all(httrackp *opt, const char *jar_file, char *err,
       if (!bundle_scopes_overlap(a, b))
         continue;
       if (!bundle_same_identity(a, b) && bundle_homes_overlap(a, b)) {
-        snprintf(err, err_size,
-                 "%s and %s cover the same site with a different user agent "
-                 "or headers",
-                 a->file, b->file);
+        hts_buf_printf_clip(err,
+                            "%s and %s cover the same site with a different "
+                            "user agent or headers",
+                            a->file, b->file);
         ok = HTS_FALSE;
       } else {
         group[bundle_group(group, j)] = bundle_group(group, i);
@@ -1100,19 +1100,26 @@ static size_t curl_join(const char *p) {
   return p[1] == '\r' && p[2] == '\n' ? 3 : 0;
 }
 
-/* The value of the n hex digits at p, or -1. */
-static long curl_hex_run(const char *p, int n) {
+/* The value of the hex digits of s, or -1. */
+static long curl_hex_run(hts_span s) {
   long v = 0;
-  int i;
+  size_t i;
 
-  for (i = 0; i < n; i++) {
-    const int d = hts_ehexh(p[i]);
+  for (i = 0; i < s.len; i++) {
+    const int d = hts_ehexh(s.p[i]);
 
     if (d < 0)
       return -1;
     v = v * 16 + d;
   }
   return v;
+}
+
+/* The value of the n hex digits at p, or -1 when fewer remain. */
+static long curl_hex_at(const char *p, size_t n) {
+  const hts_span s = hts_span_at(p, strnlen(p, n));
+
+  return s.len == n ? curl_hex_run(s) : -1;
 }
 
 /* Decode the $'...' body at *pp, past the opening quote, into dst at *len,
@@ -1145,7 +1152,7 @@ static const char *curl_ansi_quote(const char **pp, char *dst, size_t *len) {
       p++;
       break;
     case 'x':
-      if ((cp = curl_hex_run(p + 1, 2)) < 0)
+      if ((cp = curl_hex_at(p + 1, 2)) < 0)
         return digits;
       p += 3;
       if (cp == 0)
@@ -1153,12 +1160,12 @@ static const char *curl_ansi_quote(const char **pp, char *dst, size_t *len) {
       dst[(*len)++] = (char) cp; // a raw byte, as bash gives it
       continue;
     case 'u':
-      if ((cp = curl_hex_run(p + 1, 4)) < 0)
+      if ((cp = curl_hex_at(p + 1, 4)) < 0)
         return digits;
       p += 5;
       // Firefox writes a character past U+FFFF as two UTF-16 halves
       if (cp >= 0xd800 && cp <= 0xdbff && p[0] == '\\' && p[1] == 'u') {
-        const long low = curl_hex_run(p + 2, 4);
+        const long low = curl_hex_at(p + 2, 4);
 
         if (low >= 0xdc00 && low <= 0xdfff) {
           cp = 0x10000 + ((cp - 0xd800) << 10) + (low - 0xdc00);
@@ -1233,7 +1240,7 @@ static const char *curl_split(const char *s, paste_curl *c) {
     if (why != NULL)
       break;
     word[len] = '\0';
-    if (hts_bundle_has_control(word, len))
+    if (hts_bundle_has_control(hts_span_at(word, len)))
       why = "the text holds a control byte";
     else if (c->nwords >= PASTE_WORDS_MAX)
       why = "the command has too many words";
@@ -1359,14 +1366,15 @@ static void paste_records(const char *s, String *out) {
   }
 }
 
-/* Do the len bytes at s hold a bidi control, U+202A to U+202E or U+2066 to
-   U+2069, which could make the preview show another text? */
-static hts_boolean paste_has_bidi(const char *s, size_t len) {
+/* Does s hold a bidi control, U+202A to U+202E or U+2066 to U+2069, which
+   could make the preview show another text? */
+static hts_boolean paste_has_bidi(hts_span s) {
   size_t i;
 
-  for (i = 0; i + 2 < len; i++) {
-    const unsigned char a = (unsigned char) s[i], b = (unsigned char) s[i + 1],
-                        c = (unsigned char) s[i + 2];
+  for (i = 0; i + 2 < s.len; i++) {
+    const unsigned char a = (unsigned char) s.p[i],
+                        b = (unsigned char) s.p[i + 1],
+                        c = (unsigned char) s.p[i + 2];
 
     if (a == 0xe2 && ((b == 0x80 && c >= 0xaa && c <= 0xae) ||
                       (b == 0x81 && c >= 0xa6 && c <= 0xa9)))
@@ -1452,21 +1460,18 @@ static hts_boolean paste_scope_round_trips(const bundle *b) {
   return HTS_TRUE;
 }
 
-/* Copy into entry the scope entry of the len bytes at host: its registrable
-   domain, or the address itself. HTS_FALSE when no scope line can name it. */
-static hts_boolean paste_host_entry(const char *host, size_t len,
+/* Copy into entry the scope entry of host: its registrable domain, or the
+   address itself. HTS_FALSE when no scope line can name it. */
+static hts_boolean paste_host_entry(hts_span host,
                                     char entry[SCOPE_ENTRY_SIZE]) {
   char given[HTS_URLMAXSIZE];
   char folded[COOKIE_MAX_DOMAIN];
   const char *reg;
 
-  while (len > 0 && host[len - 1] == '.')
-    len--;
-  if (len > 0 && host[0] == '.') {
-    host++;
-    len--;
-  }
-  if (len == 0 || !hts_buf_put_span(HTS_BUF(given), hts_span_at(host, len)))
+  host = hts_span_trim(host, "", ".");
+  if (host.len > 0 && host.p[0] == '.')
+    host = hts_span_skip(host, 1);
+  if (host.len == 0 || !hts_buf_put_span(HTS_BUF(given), host))
     return HTS_FALSE;
   if (!cookie_host(given, HTS_SIZED(folded)))
     return HTS_FALSE;
@@ -1483,7 +1488,7 @@ static void paste_scope_hosts(bundle *b, const char *hosts) {
     const size_t len = strcspn(hosts, ",");
     char entry[SCOPE_ENTRY_SIZE];
 
-    if (paste_host_entry(hosts, len, entry) &&
+    if (paste_host_entry(hts_span_at(hosts, len), entry) &&
         bundle_scope_add(b, entry) != NULL)
       return; // the list is full
     hosts += len + (hosts[len] == ',');
@@ -1567,7 +1572,7 @@ static void paste_scope_text(const bundle *b, size_t own, const t_cookie *jar,
   if (used == NULL)
     return;
   while (*a != '\0') {
-    a += binput(a, line, (int) sizeof(line) - 1);
+    a += binput(a, HTS_BUF(line));
     if (!cookie_host(cookie_get(HTS_SIZED(buffer), line, 0), HTS_SIZED(host)))
       continue;
     for (i = 0; i < b->nscope; i++) {
@@ -1605,7 +1610,7 @@ static void paste_jar_summary(const t_cookie *jar, int *count,
     char listed[HTS_PASTE_HOSTS_SIZE + 2];
     const char *dom;
 
-    a += binput(a, line, (int) sizeof(line) - 1);
+    a += binput(a, HTS_BUF(line));
     dom = cookie_get(HTS_SIZED(buffer), line, 0);
     if (dom[0] == '.')
       dom++;
@@ -1732,9 +1737,9 @@ static const char *paste_agent(const char **ua,
     return "the user agent is blank";
   if (!hts_buf_put_span(hts_buf_at(buf, HTS_PASTE_AGENT_SIZE),
                         hts_span_at(s, len)) ||
-      hts_bundle_has_control(s, len))
+      hts_bundle_has_control(hts_span_at(s, len)))
     return "the user agent cannot be used";
-  if (paste_has_bidi(s, len))
+  if (paste_has_bidi(hts_span_at(s, len)))
     return "the user agent holds a text direction control";
   *ua = buf;
   return NULL;
@@ -1836,9 +1841,9 @@ HTSEXT_API hts_boolean hts_bundle_from_paste_hosts(
   if (!strfield(url, "http://") && !strfield(url, "https://"))
     PASTE_FAIL("the address is not an http or https URL");
   if (!hts_buf_put_span(HTS_BUF(base), hts_span_at(url, len)) ||
-      hts_bundle_has_control(url, len))
+      hts_bundle_has_control(hts_span_at(url, len)))
     PASTE_FAIL("the address cannot be used");
-  if (paste_has_bidi(url, len))
+  if (paste_has_bidi(hts_span_at(url, len)))
     PASTE_FAIL("the address holds a text direction control");
   {
     const char *const auth = strstr(base, "://") + 3;
@@ -1911,8 +1916,7 @@ HTSEXT_API hts_boolean hts_bundle_from_paste_hosts(
   memset(jar->data, 0, sizeof(jar->data));
   opt->cookie = jar;
   src = text_src_mem(StringBuff(text), StringLength(text));
-  if (!bundle_load_src(opt, &check, &src, NULL, all, NULL, NULL,
-                       HTS_SIZED(err)))
+  if (!bundle_load_src(opt, &check, &src, NULL, all, NULL, NULL, HTS_BUF(err)))
     PASTE_FAIL("%s", err);
   paste_jar_summary(jar, &count, result->hosts);
   if (count == 0 && c.auth == NULL && !keep_empty)

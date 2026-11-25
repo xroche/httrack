@@ -38,7 +38,6 @@ src/htsbase.h: max: evaluates b twice
 src/htsbase.h: min: evaluates a twice
 src/htsbase.h: min: evaluates b twice
 src/htsbundle.c: BUNDLE_FAIL: uses free name err
-src/htsbundle.c: BUNDLE_FAIL: uses free name err_size
 src/htsbundle.c: PASTE_FAIL: uses free name done
 src/htsbundle.c: PASTE_FAIL: uses free name ok
 src/htsbundle.c: PASTE_FAIL: uses free name result

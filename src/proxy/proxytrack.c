@@ -177,13 +177,13 @@ static void set_recv_timeout(T_SOC soc, int seconds) {
 
 /* recv() that gives up at `deadline`, so a client trickling bytes cannot hold
    the thread past it. */
-static int recv_until(T_SOC soc, char *buf, int len, time_t deadline) {
+static int recv_until(T_SOC soc, hts_buf buf, time_t deadline) {
   const time_t left = deadline - time(NULL);
 
   if (left <= 0)
     return -1;
   set_recv_timeout(soc, (int) left);
-  return (int) recv(soc, buf, len, 0);
+  return (int) recv(soc, buf.p, (int) buf.size, 0);
 }
 
 static String getip(SOCaddr * server) {
@@ -200,23 +200,23 @@ static String getip(SOCaddr * server) {
 }
 
 /* Winsock codes are not in strerror(); read the system message table. */
-static const char *socket_error_string(int err, char *buf, size_t size) {
+static const char *socket_error_string(int err, hts_buf buf) {
 #ifdef _WIN32
   DWORD len =
       FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-                     NULL, (DWORD) err, 0, buf, (DWORD) size, NULL);
+                     NULL, (DWORD) err, 0, buf.p, (DWORD) buf.size, NULL);
 
   /* the table punctuates its strings with a trailing ".\r\n" */
-  while (len != 0 && (unsigned char) buf[len - 1] <= ' ') {
-    buf[--len] = '\0';
+  while (len != 0 && (unsigned char) buf.p[len - 1] <= ' ') {
+    buf.p[--len] = '\0';
   }
   if (len == 0) {
-    strclipbuff(buf, size, "unknown error");
+    hts_buf_cpy_clip(buf, "unknown error");
   }
 #else
-  strclipbuff(buf, size, strerror(err));
+  hts_buf_cpy_clip(buf, strerror(err));
 #endif
-  return buf;
+  return buf.p;
 }
 
 /* hts_shared_gethost() uses getaddrinfo(), which never sets errno. */
@@ -284,7 +284,7 @@ int proxytrack_main(char *proxyAddr, int proxyPort, char *icpAddr, int icpPort,
               " on %s: %s (%d)\n",
               icpFailed ? "udp" : "tcp", icpFailed ? icpPort : proxyPort,
               icpFailed ? icpAddr : proxyAddr,
-              socket_error_string(err, HTS_SIZED(errbuf)), err);
+              socket_error_string(err, HTS_BUF(errbuf)), err);
     }
     returncode = 1;
   }
@@ -589,16 +589,16 @@ static size_t element_body_size(const PT_Element element) {
   return (element != NULL && element->adr != NULL) ? element->size : 0;
 }
 
-/* Read exactly len bytes: a slow client may split them over several recv(). */
-static hts_boolean recv_exact(T_SOC soc, char *buf, int len, time_t deadline) {
-  int got = 0;
+/* Fill all of buf: a slow client may split it over several recv(). */
+static hts_boolean recv_exact(T_SOC soc, hts_buf buf, time_t deadline) {
+  size_t got = 0;
 
-  while (got < len) {
-    const int n = recv_until(soc, buf + got, len - got, deadline);
+  while (got < buf.size) {
+    const int n = recv_until(soc, hts_buf_skip(buf, got), deadline);
 
     if (n <= 0)
       return HTS_FALSE;
-    got += n;
+    got += (size_t) n;
   }
   return HTS_TRUE;
 }
@@ -726,7 +726,8 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
       if (length > 0) {
         if (length < 32768) {
           StringRoom(davRequest, length + 1);
-          if (recv_exact(soc_c, StringBuffRW(davRequest), length, deadline)) {
+          if (recv_exact(soc_c, hts_buf_at(StringBuffRW(davRequest), length),
+                         deadline)) {
             StringBuffRW(davRequest)[length] = 0;
           } else {
             msgCode = 500;
@@ -1055,7 +1056,7 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
 
     /* Shutdown (FIN) and wait until confirmed */
     if (!keepAlive) {
-      char c;
+      char c[1];
 
 #ifdef _WIN32
       shutdown(soc_c, SD_SEND);
@@ -1063,7 +1064,7 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
       shutdown(soc_c, 1);
 #endif
       deadline = time(NULL) + timeout;
-      while (recv_until(soc_c, &c, 1, deadline) > 0)
+      while (recv_until(soc_c, HTS_BUF(c), deadline) > 0)
         ;
     }
   } while(keepAlive);

@@ -670,7 +670,8 @@ hts_urllist_status hts_urllist_next(const char *buff, size_t size, size_t *pos,
 
   if (*pos >= size)
     return HTS_URLLIST_END;
-  cut = binput_line(buff + *pos, buff + size, line, HTS_URLMAXSIZE + 1, &adv);
+  cut = binput_line(buff + *pos, buff + size,
+                    hts_buf_at(line, HTS_URLMAXSIZE + 1), &adv);
   /* the byte it stopped on, past any CR it dropped */
   term = *pos + (size_t) adv - 1;
   *pos = term + 1;
@@ -693,7 +694,7 @@ static hts_boolean old_lst_entry(httrackp *opt, const char *lst,
   const size_t root = StringLength(opt->path_html);
   int adv;
   const hts_boolean cut =
-      binput_line(lst + *pos, end, line, (int) linesize, &adv);
+      binput_line(lst + *pos, end, hts_buf_at(line, linesize), &adv);
   size_t len;
 
   if (adv <= 0) { // a line past INT_MAX bytes: stop walking
@@ -794,8 +795,7 @@ static hts_boolean bundle_start(httrackp *opt, char **primary,
   size_t room = 0;
   size_t i;
 
-  if (!hts_bundle_load_all(opt, bundle_jar_file(opt, jarbuff),
-                           HTS_SIZED(err))) {
+  if (!hts_bundle_load_all(opt, bundle_jar_file(opt, jarbuff), HTS_BUF(err))) {
     hts_log_print(opt, LOG_ERROR, "Login bundle: %s", err);
     fprintf(stderr, "Login bundle: %s\n", err);
     return HTS_FALSE;

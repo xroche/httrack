@@ -182,24 +182,23 @@ int hts_wizard_parse_reply(const char *s) {
   return *s == '*' ? -1 : -999;
 }
 
-/* "<sign><host>/" then the first len characters of fil ((size_t) -1: all). */
+/* "<sign><host>/" then fil. */
 static void wizard_cat_path(htsbuff *f, const char *sign, const char *adr,
-                            const char *fil, size_t len) {
+                            hts_span fil) {
   wizard_cat_host(f, sign, adr);
-  if (*fil != '/')
+  if (fil.len == 0 || fil.p[0] != '/')
     htsbuff_cat(f, "/");
-  htsbuff_catn(f, fil, len);
+  htsbuff_catn(f, fil.p, fil.len);
 }
 
-void hts_wizard_prompt_url(char *dst, size_t dstsize, const char *adr,
-                           const char *fil) {
-  if (dst == NULL || dstsize == 0)
+void hts_wizard_prompt_url(hts_buf dst, const char *adr, const char *fil) {
+  if (dst.p == NULL || dst.size == 0)
     return;
   /* clip, because a crawled adr and fil can outgrow any prompt buffer */
-  strclipbuff(dst, dstsize, adr);
+  (void) hts_buf_cpy_clip(dst, adr);
   if (*fil != '/')
-    strlncatbuff(dst, "/", dstsize, dstsize - 1 - strlen(dst));
-  strlncatbuff(dst, fil, dstsize, dstsize - 1 - strlen(dst));
+    hts_buf_catn(dst, "/", dst.size - 1 - strlen(dst.p));
+  hts_buf_catn(dst, fil, dst.size - 1 - strlen(dst.p));
 }
 
 HTSEXT_API hts_boolean hts_wizard_host_scope(const char *question, int k,
@@ -256,13 +255,12 @@ hts_tristate hts_wizard_scope_answer(int n) {
 }
 
 /* The domain a scope answer names, or HTS_FALSE for a host that has none. */
-static hts_boolean wizard_answer_scope(const char *adr, int n, char *dst,
-                                       size_t dstsize) {
+static hts_boolean wizard_answer_scope(const char *adr, int n, hts_buf dst) {
   const int k =
       n - (hts_wizard_scope_answer(n) == HTS_TRUE ? HTS_WIZARD_SCOPE_EXCLUDE
                                                   : HTS_WIZARD_SCOPE_INCLUDE);
 
-  return hts_wizard_host_scope(adr, k, dst, dstsize);
+  return hts_wizard_host_scope(adr, k, dst.p, dst.size);
 }
 
 /* Slot 0 gets the subdomain form, slot 1 the apex it does not match. */
@@ -273,7 +271,7 @@ static void wizard_cat_scope(htsbuff *f, const char *sign, const char *adr,
   if (slot >= HTS_WIZARD_MAX_FILTERS)
     return;
   /* no domain lives below this host, so the host itself is the widest scope */
-  if (!wizard_answer_scope(adr, n, HTS_SIZED(scope))) {
+  if (!wizard_answer_scope(adr, n, HTS_BUF(scope))) {
     if (slot == 0) {
       wizard_cat_host(f, sign, adr);
       htsbuff_cat(f, "/*");
@@ -307,13 +305,13 @@ void hts_wizard_answer_filter(htsbuff *f, int slot, int n, const char *adr,
   switch (n) {
   case 0:    /* this link only */
   case -999: /* an unreadable answer falls back to that same default */
-    wizard_cat_path(f, "-", adr, fil, (size_t) -1);
+    wizard_cat_path(f, "-", adr, hts_span_of(fil));
     break;
 
   case 1: /* this directory and below */
     if (fil[dir] == '/') {
       /* stops before the last slash, so a doubled one collapses */
-      wizard_cat_path(f, "-", adr, fil, dir);
+      wizard_cat_path(f, "-", adr, hts_span_at(fil, dir));
       if (f->buf[f->len - 1] != '/')
         htsbuff_cat(f, "/");
       htsbuff_cat(f, "*");
@@ -328,7 +326,7 @@ void hts_wizard_answer_filter(htsbuff *f, int slot, int n, const char *adr,
   case 5: /* this directory and below, or the whole host */
     if (!seeker_up) {
       if (fil[dir] == '/') {
-        wizard_cat_path(f, "+", adr, fil, dir + 1);
+        wizard_cat_path(f, "+", adr, hts_span_at(fil, dir + 1));
         htsbuff_cat(f, "*");
       }
     } else {
@@ -344,7 +342,7 @@ void hts_wizard_answer_filter(htsbuff *f, int slot, int n, const char *adr,
 
   case 7: /* this directory, files only */
     if (fil[dir] == '/') {
-      wizard_cat_path(f, "+", adr, fil, dir + 1);
+      wizard_cat_path(f, "+", adr, hts_span_at(fil, dir + 1));
       htsbuff_cat(f, HTS_WIZARD_FILTER_SUFFIX);
     }
     break;
@@ -429,7 +427,7 @@ void hts_wizard_apply_verdict(httrackp *opt, int n, const char *adr,
     {
       char scope[HTS_URLMAXSIZE];
 
-      if (!wizard_answer_scope(adr, n, HTS_SIZED(scope)))
+      if (!wizard_answer_scope(adr, n, HTS_BUF(scope)))
         hts_log_print(opt, LOG_WARNING,
                       "(wizard) %s has no domain above it, answer %d applied "
                       "to the whole host",
@@ -931,7 +929,7 @@ static int hts_acceptlink_(httrackp *opt, int ptr, const char *adr,
       if ((ptr != 0) && (force_mirror == 0)) {
         char BIGSTK tempo[HTS_URLMAXSIZE * 2];
 
-        hts_wizard_prompt_url(HTS_SIZED(tempo), adr, fil);
+        hts_wizard_prompt_url(HTS_BUF(tempo), adr, fil);
         s = RUN_CALLBACK1(opt, query3, tempo);
         n = hts_wizard_parse_reply(s);
         io_flush;

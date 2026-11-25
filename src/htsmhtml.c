@@ -195,8 +195,7 @@ void mimehtml_add_file(httrackp *opt, const char *save, const char *adr,
             if (!isHtml) {
               char base64buff[60 * 100 * 2];
 
-              code64((unsigned char *) buff, (int) len,
-                     (unsigned char *) base64buff, 1);
+              code64(hts_span_at(buff, len), HTS_BUF(base64buff), HTS_TRUE);
               fprintf(opt->state.mimefp, "%s", base64buff);
             } else {
               fwrite(buff, 1, len, opt->state.mimefp);

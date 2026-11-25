@@ -38,16 +38,17 @@ Please visit our Website: http://www.httrack.com
 #include <sys/stat.h>
 #include "htsbase.h"
 #include "htsnet.h"
+#include "htsbuf.h"
 
 /* String */
 #include "htsstrings.h"
 #include "htsescape.h"
 
-/* Listen on bindAddr, or the loopback interface if NULL/empty; adr (capacity
-   adr_size) gets the address to advertise, clipped if it does not fit.
-   INVALID_SOCKET on error. */
-T_SOC smallserver_init_std(int *port_prox, char *adr_prox, size_t adr_size,
-                           int defaultPort, const char *bindAddr);
+/* Listen on bindAddr, or the loopback interface if NULL/empty; adr_prox gets
+   the address to advertise, clipped if it does not fit. INVALID_SOCKET on
+   error. */
+T_SOC smallserver_init_std(int *port_prox, hts_buf adr_prox, int defaultPort,
+                           const char *bindAddr);
 int smallserver(T_SOC soc, char *url, char *method, char *data, char *path);
 
 #define CATCH_RESPONSE \

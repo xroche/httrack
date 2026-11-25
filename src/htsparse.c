@@ -2608,7 +2608,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   {
                     char BIGSTK tempo[sizeof(lien)];
 
-                    if (escape_control_url(lien, HTS_SIZED(tempo)) <
+                    if (escape_control_url(lien, HTS_BUF(tempo)) <
                         sizeof(tempo) - HTS_LINK_TAIL_ROOM) {
                       strcpybuff(lien, tempo);
                     } else {
@@ -2693,8 +2693,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
                     // the append grows the query too, and clips silently on
                     // overflow: drop, or we fetch a query nobody wrote (#982)
-                    if (used >= cap || append_escape_check_url(
-                                           query, lien, cap) >= cap - used) {
+                    if (used >= cap ||
+                        append_escape_check_url(query, hts_buf_at(lien, cap)) >=
+                            cap - used) {
                       error = 1;
                       hts_log_print(opt, LOG_DEBUG,
                                     "link rejected (query does not fit) %s",

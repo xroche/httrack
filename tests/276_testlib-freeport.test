@@ -186,6 +186,16 @@ assert_match "^.*cannot bind udp port $udpheld on 127\.0\.0\.1: .+ \([1-9][0-9]*
 case $out in
 *"No error"* | *": Success "* | *"unknown error"*) fail "no cause named: $out" ;;
 esac
+# The cause is strerror()'s whole text; Winsock codes have none to compare.
+code=${out##*\(}
+code=${code%\)}
+if test "$code" -lt 10000; then
+    want=$("$real_python" -c 'import os, sys; print(os.strerror(int(sys.argv[1])))' "$code" | tr -d '\r')
+    case $out in
+    *": $want ($code)") ;;
+    *) fail "the cause is not strerror($code) '$want': $out" ;;
+    esac
+fi
 ok "proxytrack names the protocol, the port and the cause of a lost bind"
 
 ## a name that does not resolve is not a bind failure

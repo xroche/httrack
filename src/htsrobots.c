@@ -140,8 +140,8 @@ int checkrobots(const robots_wizard *robots, const char *adr, const char *fil) {
         while (ptr < (int) toklen) {
           int adv;
 
-          (void) binput_line(robots->token + ptr, robots->token + toklen, line,
-                             sizeof(line), &adv);
+          (void) binput_line(robots->token + ptr, robots->token + toklen,
+                             HTS_BUF(line), &adv);
           ptr += adv;
           if (line[0] != 'A' && line[0] != 'D')
             continue;
@@ -208,8 +208,8 @@ void robots_parse(httrackp *opt, robots_wizard *robots, const char *adr,
     int adv;
     hts_boolean cut;
 
-    cut =
-        binput_line(body + bptr, body + bodysize, line, sizeof(line) - 1, &adv);
+    cut = binput_line(body + bptr, body + bodysize,
+                      HTS_BUF_N(line, sizeof(line) - 1), &adv);
     bptr += (size_t) adv;
     comm = strchr(line, '#'); // strip comment
     if (comm != NULL) {

@@ -451,7 +451,7 @@ static hts_boolean sf_append_base64(String *out, char *data, size_t len) {
   buf = (char *) malloct(b64len + 1);
   if (buf == NULL)
     return HTS_FALSE;
-  code64((unsigned char *) data, (int) len, (unsigned char *) buf, 0);
+  code64(hts_span_at(data, len), hts_buf_at(buf, b64len + 1), HTS_FALSE);
   StringMemcat(*out, buf, b64len);
   freet(buf);
   return HTS_TRUE;

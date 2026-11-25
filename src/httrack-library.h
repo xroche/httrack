@@ -312,7 +312,7 @@ HTSEXT_API T_SOC catch_url_init_std(int *port_prox, char *adr_prox);
     method to @p method, and the rebuilt request (request line, headers, and any
     POST body) to @p data, then send a canned response and close. A URL, method
     or header block too long for its buffer fails the capture, and a POST body
-    is cut to the room left. No size may be 0.
+    is cut to the room left. A size of 0 fails without writing anything.
     @return 1 on success, 0 on error. On error @p data holds no usable request,
     and @p url holds the peer's "ip:port" unless the request line had already
     parsed into it. */

@@ -1210,8 +1210,8 @@ static int cookie_load_records(httrackp *opt, t_cookie *cookie, text_src *src,
     first_line = HTS_FALSE;
     // a bundle is written for this run, so a damaged one stops it
     if (filter != NULL &&
-        hts_bundle_has_control(line,
-                               len < sizeof(line) ? len : sizeof(line) - 1)) {
+        hts_bundle_has_control(
+            hts_span_at(line, len < sizeof(line) ? len : sizeof(line) - 1))) {
       filter->why = "a cookie line holds a control byte";
     } else if (filter != NULL && len >= line_max) {
       filter->why = "a cookie line is too long";
@@ -1444,16 +1444,16 @@ int cookie_load_from(httrackp *opt, t_cookie *cookie, const char *fpath,
               while(!feof(fp)) {
                 cook_name[0] = cook_value[0] = domainpathpath[0]
                 = dummy[0] = af.adr[0] = af.fil[0] = '\0';
-                linput(fp, cook_name, 250);
+                linput(fp, HTS_BUF_N(cook_name, 250));
                 if (!feof(fp)) {
-                  linput(fp, cook_value, 250);
+                  linput(fp, HTS_BUF_N(cook_value, 250));
                   if (!feof(fp)) {
                     int i;
 
-                    linput(fp, domainpathpath, 500);
+                    linput(fp, HTS_BUF_N(domainpathpath, 500));
                     /* Read 6 other useless values */
                     for(i = 0; !feof(fp) && i < 6; i++) {
-                      linput(fp, dummy, 500);
+                      linput(fp, HTS_BUF_N(dummy, 500));
                     }
                     if (strnotempty(cook_name)
                         && strnotempty(cook_value)
