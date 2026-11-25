@@ -321,6 +321,7 @@ ci_suite_heartbeat() {
 # syscall-trim traces the engine with strace, which only a Linux engine has.
 # connect-sync-fallback needs addresses that fail a connect at once, and nobody
 # has measured which ones Winsock fails that way.
+# postfile-wire reads its request back through a socketpair, which Winsock lacks.
 expected_skips_msys="01_engine-usercommand.test
 01_engine-footer-overflow.test
 253_local-ftp-close-once.test
@@ -371,7 +372,8 @@ expected_skips_msys="01_engine-usercommand.test
 01_engine-mptcp.test
 658_local-private-run-files.test
 718_local-fd-setsize.test
-2371_local-syscall-trim.test"
+2371_local-syscall-trim.test
+2542_engine-postfile-wire.test"
 
 # This list comes from windows-build run 33927128153 and is written out, so a
 # name leaving the msys list must be a visible edit here too.
@@ -396,6 +398,7 @@ expected_skips_msys="01_engine-usercommand.test
 # syscall-trim traces the engine with strace, which only a Linux engine has.
 # connect-sync-fallback needs addresses that fail a connect at once, and nobody
 # has measured which ones Winsock fails that way.
+# postfile-wire reads its request back through a socketpair, which Winsock lacks.
 expected_skips_wsl2="01_engine-usercommand.test
 01_engine-footer-overflow.test
 253_local-ftp-close-once.test
@@ -447,7 +450,8 @@ expected_skips_wsl2="01_engine-usercommand.test
 01_engine-mptcp.test
 658_local-private-run-files.test
 718_local-fd-setsize.test
-2371_local-syscall-trim.test"
+2371_local-syscall-trim.test
+2542_engine-postfile-wire.test"
 
 # Sets ci_skip_list to the pinned skip set for backend $1, failing loudly if
 # there is none: an unknown backend must never fall back to an empty list,

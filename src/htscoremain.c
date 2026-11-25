@@ -589,7 +589,7 @@ static void cmdl_print_cache_entry(httrackp *opt, cache_back *cache,
   }
 
   infostatuscode_sized(HTS_SIZED(msg), r.statuscode);
-  time_gmt_rfc822(HTS_SIZED(cdate));
+  time_gmt_rfc822(HTS_BUF(cdate));
 
   fprintf(stdout, "HTTP/1.1 %d %s\r\n", r.statuscode, r.msg[0] ? r.msg : msg);
   fprintf(stdout, "X-Host: %s\r\n", afs.af.adr);
@@ -2827,7 +2827,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
       char *masked_url;
       const char *shown_url;
 
-      time_local_rfc822(HTS_SIZED(t)); // stamps the generated file below
+      time_local_rfc822(HTS_BUF(t)); // stamps the generated file below
 
       /* readme for information purpose */
       {

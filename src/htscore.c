@@ -2275,7 +2275,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
     const LLint recv = hts_stat_recv_get();
     LLint n = (LLint) (recv / (max(1, time_local() - HTS_STAT.stat_timestart)));
 
-    sec2str(HTS_SIZED(htstime), time_local() - HTS_STAT.stat_timestart);
+    sec2str(HTS_BUF(htstime), time_local() - HTS_STAT.stat_timestart);
     infoupdated[0] = '\0';
     if (opt->is_update) {
       if (HTS_STAT.stat_updated_files > 0) {
