@@ -2000,7 +2000,7 @@ int url_savename(lien_adrfilsave *const afs,
   // boundary (#133).
   {
     const size_t parentBytes = strlen(StringBuff(opt->path_html_utf8));
-    const size_t cap = HTS_SAVE_BUFSIZE - HTS_PATH_TAIL_RESERVE;
+    const size_t cap = HTS_SAVENAME_CAP;
     // Shrink only the name, because an empty name would collide across URLs.
     if (parentBytes < cap) {
       const size_t budget = cap - parentBytes;

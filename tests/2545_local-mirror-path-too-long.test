@@ -1,0 +1,64 @@
+#!/bin/bash
+# A mirror path too long for the names built under it is refused at startup,
+# where it used to abort the crawl on its first long name.
+
+# SC2088: the literal '~' is what httrack expands.
+# shellcheck disable=SC2088
+
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+# The limit is exact to the byte, and Windows rewrites $HOME into a native path.
+skip_on_windows "MSYS and WSL rewrite the path into one of another length"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_2545.XXXXXX") || exit 1
+cleanup() {
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+# A name longer than the 64 bytes left past the limit; the tree is never made,
+# because every path is over structcheck's 1024 bytes.
+page=$(repeat_chars 150 n).html
+mkdir -p "${tmpdir}/root"
+echo '<p>long</p>' >"${tmpdir}/root/${page}"
+
+require_httrack
+local_server_start --root "${tmpdir}/root" --log "${tmpdir}/server.log"
+
+# An -O argument stops at 1023 bytes, so $HOME carries the rest of the path.
+home="${tmpdir}/$(repeat_chars 1350 h)"
+limit=1982
+
+# crawl LEN: mirror under a path of LEN bytes, logging to a short one.
+crawl() {
+    local pad=$(($1 - ${#home} - 1)) rc=0
+    rm -rf "${tmpdir}/log"
+    HOME=$home local_crawl --log "${tmpdir}/crawl-$1.log" \
+        "http://127.0.0.1:${SRV_PORT}/${page}" \
+        -O "~/$(repeat_chars "$pad" p),${tmpdir}/log" \
+        --quiet --max-time=60 --timeout=30 --robots=0 || rc=$?
+    test "$rc" -ne 134 || fail_dump "httrack aborted at $1 bytes" "${tmpdir}/crawl-$1.log"
+    return "$rc"
+}
+
+crawl "$limit" || fail_dump "a ${limit}-byte path failed" "${tmpdir}/crawl-${limit}.log"
+log=$(<"${tmpdir}/crawl-${limit}.log")
+command grep -q 'too long' <<<"$log" && fail "a ${limit}-byte path was refused"
+# The name was built under the path, then dropped as a link too long to save.
+command grep -q 'Link is too long' "${tmpdir}/log/hts-log.txt" ||
+    fail_dump "no name was built under the path" "${tmpdir}/log/hts-log.txt"
+
+# One byte over aborted the crawl before; it is refused before the crawl now.
+for len in $((limit + 1)) 2040; do
+    rc=0
+    crawl "$len" || rc=$?
+    test "$rc" -ne 0 || fail "a ${len}-byte path was accepted"
+    log=$(<"${tmpdir}/crawl-${len}.log")
+    want="Error, the mirror path is too long (${len} bytes, at most ${limit})"
+    command grep -qF "$want" <<<"$log" ||
+        fail_dump "no refusal for ${len} bytes" "${tmpdir}/crawl-${len}.log"
+    test ! -e "${tmpdir}/log" || fail "the refused ${len}-byte run created its log directory"
+done

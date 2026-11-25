@@ -53,6 +53,10 @@ HTS_STATIC int strendwith_(const char *a, const char *b) {
 
 #define CACHE_REFNAME "hts-cache/ref"
 
+/* url_savename() keeps output path plus name under this many bytes, so an
+   output path this long leaves it no room and is refused at startup. */
+#define HTS_SAVENAME_CAP (HTS_URLMAXSIZE * 2 - 64)
+
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
 

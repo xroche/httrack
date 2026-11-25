@@ -982,6 +982,18 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
       // hts_argv_utf8), so no re-encoding.
       StringCopyN(opt->path_html_utf8, StringBuff(opt->path_html),
                   StringLength(opt->path_html));
+      /* url_savename() would abort on the first long name under it */
+      if (StringLength(opt->path_html_utf8) >= HTS_SAVENAME_CAP) {
+        char msg[256];
+
+        snprintf(msg, sizeof(msg),
+                 "Error, the mirror path is too long (%d bytes, at most %d)",
+                 /* not counting the slash check_path() appended */
+                 (int) StringLength(opt->path_html_utf8) - 1,
+                 HTS_SAVENAME_CAP - 2);
+        HTS_PANIC_PRINTF(msg);
+        return -1;
+      }
 
       /* if doit.log exists, or if new URL(s) defined, 
          then DO NOT load standard config files */
