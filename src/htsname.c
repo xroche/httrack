@@ -464,7 +464,7 @@ hts_boolean url_query_value(const char *url, const char *name, hts_buf dst) {
     return HTS_FALSE;
   }
   /* crawled query text: clip it */
-  (void) hts_span_copy(f.val, dst.p, dst.size);
+  hts_buf_put_span_clip(dst, f.val);
   return HTS_TRUE;
 }
 
@@ -1017,7 +1017,7 @@ int url_savename(lien_adrfilsave *const afs,
 
   // decode remaining % (normally not necessary; already done in htsparse.c)
   // this will NOT decode buggy %xx (ie. not UTF-8) ones
-  if (hts_unescapeUrl(fil, HTS_SIZED(catbuff)) == 0) {
+  if (hts_unescapeUrl(fil, HTS_BUF(catbuff)) == 0) {
     strcpybuff(fil, catbuff);
   } else {
     hts_log_print(opt, LOG_WARNING,
@@ -1068,7 +1068,7 @@ int url_savename(lien_adrfilsave *const afs,
           previous_save[0] = '\0';
           r = cache_read_including_broken(opt, cache, adr, fil,
                                           HTS_BUF(previous_save),
-                                          hts_buf_at(NULL, 0)); // test only
+                                          hts_buf_none()); // test only
 
           if (r.statuscode != -1) { // cache entry read OK
             hts_log_print(opt, LOG_DEBUG, "Testing link type (from cache) %s%s",
@@ -1577,7 +1577,7 @@ int url_savename(lien_adrfilsave *const afs,
           digest[0] = buff[0] = '\0';
           tmpl_catn(HTS_BUF(buff), adr, (size_t) -1);
           tmpl_catn(HTS_BUF(buff), fil_complete, (size_t) -1);
-          domd5mem(buff, strlen(buff), digest, 1);
+          domd5mem(hts_span_of(buff), HTS_BUF(digest), HTS_TRUE);
           TMPL_TAIL(digest);
         } break;
         case 'Q':
@@ -2156,7 +2156,7 @@ char *url_md5(hts_buf digest, const char *fil) {
   assertf(digest.size != 0);
   digest.p[0] = '\0';
   if (query != NULL) {
-    domd5mem(query + 1, strlen(query + 1), hex, 1);
+    domd5mem(hts_span_of(query + 1), HTS_BUF(hex), HTS_TRUE);
     hts_buf_cpy_clip(digest, hex);
   }
   return digest.p;

@@ -1281,7 +1281,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
     /* A stopped mirror skips the second --timeout window this courtesy reply
        costs on a silent server; its text is discarded anyway (#1096). */
     if (!hts_load_acquire_int(&opt->state.stop))
-      get_ftp_line(back, soc_ctl, hts_buf_at(NULL, 0), timeout, opt);
+      get_ftp_line(back, soc_ctl, hts_buf_none(), timeout, opt);
   }
 
   if (back->r.statuscode != -1) {

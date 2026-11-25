@@ -1495,7 +1495,7 @@ static int cache_brstr(char *adr, hts_buf s) {
     /* A corrupt length may pass the buffer end, so bound by what is there */
     const size_t avail = strnlen(adr + off, (size_t) i);
 
-    (void) hts_span_copy(hts_span_at(adr + off, avail), s.p, s.size);
+    hts_buf_put_span_clip(s, hts_span_at(adr + off, avail));
     off += (int) avail;
   } else {
     s.p[0] = '\0';
@@ -1982,7 +1982,7 @@ static char *copyArcField(const char *line, int npos, hts_buf dest) {
 
     while (*end != '\0' && *end != ARC_SP)
       end++;
-    (void) hts_span_copy(hts_span_between(pos, end), dest.p, dest.size);
+    hts_buf_put_span_clip(dest, hts_span_between(pos, end));
     return dest.p;
   }
   dest.p[0] = '\0';
@@ -2615,7 +2615,7 @@ static int PT_SaveCache__Arc_Fun(void *arg, const char *url, PT_Element element)
 
   /* Format: URL IP date mime result checksum location offset filename length */
   if (body_size != 0) {
-    domd5mem(element->adr, body_size, st->md5, 1);
+    domd5mem(hts_span_at(element->adr, body_size), HTS_BUF(st->md5), HTS_TRUE);
   } else {
     strcpybuff(st->md5, "-");
   }

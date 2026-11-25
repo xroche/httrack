@@ -396,6 +396,11 @@ hts_boolean hts_body_missing_unexpectedly(const htsblk *r) {
   return HTS_TRUE;
 }
 
+hts_span hts_blk_body(const htsblk *r) {
+  return hts_span_at(r->adr,
+                     r->adr != NULL && r->size > 0 ? (size_t) r->size : 0);
+}
+
 /* Read the next line of the custom block *REST, ended by CRLF, CR or LF.
    Unlike hts_header_next, a blank line does not end the block. */
 static hts_boolean custom_line_next(hts_span *rest, hts_span *line) {
@@ -1620,13 +1625,13 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
     const hts_span v = header_value(value);
 
     if (v.len < sizeof(retour->lastmodified))
-      (void) hts_span_copy(v, HTS_SIZED(retour->lastmodified));
+      hts_buf_put_span_clip(HTS_BUF(retour->lastmodified), v);
   } else if (HEADER_IS(name, "Etag")) {
     if (retour) {
       const hts_span v = header_value(value);
 
       if (v.len < 64)
-        (void) hts_span_copy(v, HTS_SIZED(retour->etag));
+        hts_buf_put_span_clip(HTS_BUF(retour->etag), v);
       else
         retour->etag[0] = '\0';
     }
@@ -1884,8 +1889,8 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
         if (hts_span_present(v) && word == key.len) {
           /* RFC 6265 4.1.1 makes the quotes part of a quoted cookie-value. */
           if (key.len > 0 && key.len < 200 && v.len < 8000) {
-            hts_span_copy(key, HTS_SIZED(name));
-            hts_span_copy(v, HTS_SIZED(value));
+            hts_buf_put_span_clip(HTS_BUF(name), key);
+            hts_buf_put_span_clip(HTS_BUF(value), v);
             if (first) {
               // the first pair is the cookie, and "name=" may erase one
               strcpybuff(cook_name, name);
@@ -3882,13 +3887,13 @@ static const char *hts_query_strip_keys_match(const char *rules,
       continue;
     if (hts_span_split(line, '=', &pattern, &keys)) {
       /* Clip a too-long pattern, never skip it. */
-      (void) hts_span_copy(pattern, HTS_SIZED(pat));
+      hts_buf_put_span_clip(HTS_BUF(pat), pattern);
     } else {
       strcpybuff(pat, "*");
       keys = line;
     }
     if (strjoker(url, pat, NULL, NULL) != NULL) {
-      (void) hts_span_copy(keys, dest.p, dest.size);
+      hts_buf_put_span_clip(dest, keys);
       result = dest.p;
     }
   }
@@ -5322,7 +5327,8 @@ HTSEXT_API int hts_init(void) {
     const char *atest = "MD5 Checksum Autotest";
 
     digest[0] = '\0';
-    domd5mem(atest, strlen(atest), digest, 1);  /* a42ec44369da07ace5ec1d660ba4a69a */
+    domd5mem(hts_span_of(atest), HTS_BUF(digest),
+             HTS_TRUE); /* a42ec44369da07ace5ec1d660ba4a69a */
     if (strcmp(digest, "a42ec44369da07ace5ec1d660ba4a69a") != 0) {
       int fatal_broken_md5 = 0;
 

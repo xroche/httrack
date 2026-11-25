@@ -91,8 +91,7 @@ extern int hts_unescapeEntities(const char *src, hts_buf dest);
  * needs to hold as much space as the source.
  * Returns 0 upon success, -1 upon overflow or error.
  **/
-extern int hts_unescapeEntitiesWithCharset(const char *src,
-                                           char *dest, const size_t max,
+extern int hts_unescapeEntitiesWithCharset(const char *src, hts_buf dest,
                                            const char *charset);
 
 /**
@@ -113,8 +112,7 @@ typedef enum unescapeEntitiesFlags {
  * the string (UNESCAPE_ENTITIES_URL_QUERY).
  * Returns 0 upon success, -1 upon overflow or error.
  **/
-extern int hts_unescapeEntitiesWithCharsetSpecial(const char *src, char *dest,
-                                                  const size_t max,
+extern int hts_unescapeEntitiesWithCharsetSpecial(const char *src, hts_buf dest,
                                                   const char *charset,
                                                   const int flags);
 
@@ -125,7 +123,7 @@ extern int hts_unescapeEntitiesWithCharsetSpecial(const char *src, char *dest,
  * Note: source and destination MUST NOT be the same.
  * Returns 0 upon success, -1 upon overflow or error.
  **/
-extern int hts_unescapeUrl(const char *src, char *dest, const size_t max);
+extern int hts_unescapeUrl(const char *src, hts_buf dest);
 
 /**
  * Unescape an URL-encoded string. The implicit charset is UTF-8.
@@ -135,7 +133,7 @@ extern int hts_unescapeUrl(const char *src, char *dest, const size_t max);
  * Note: source and destination MUST NOT be the same.
  * Returns 0 upon success, -1 upon overflow or error.
  **/
-extern int hts_unescapeUrlSpecial(const char *src, char *dest, const size_t max,
+extern int hts_unescapeUrlSpecial(const char *src, hts_buf dest,
                                   const int flags);
 
 #endif

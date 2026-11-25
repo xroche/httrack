@@ -717,7 +717,7 @@ void warc_http_header_value(const char *hdr, const char *name, hts_buf out) {
           v.len = k;
           break;
         }
-      (void) hts_span_copy(v, out.p, out.size);
+      hts_buf_put_span_clip(out, v);
       return;
     }
   }
@@ -1859,8 +1859,9 @@ void warc_write_backtransaction(httrackp *opt, lien_back *back) {
   SOCaddr_inetntoa(ip, sizeof(ip), back->r.address);
 
   if (!back->r.is_write) {
-    body = warc_body_mem(back->r.adr,
-                         back->r.size > 0 ? (size_t) back->r.size : 0);
+    const hts_span mem = hts_blk_body(&back->r);
+
+    body = warc_body_mem(mem.p, mem.len);
   } else {
     LLint fs;
     body.p = NULL;

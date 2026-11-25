@@ -38,6 +38,8 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTSMD5_DEFH
 #define HTSMD5_DEFH
 
+#include "htsbuf.h"
+
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
 struct MD5Context;
@@ -48,7 +50,8 @@ void hts_md5_init(struct MD5Context *ctx);
 /* Writes the 32 lowercase hex digits of 'bindigest' and a NUL into 'hex'. */
 void hts_md5_hex(const unsigned char bindigest[16], char hex[33]);
 
-int domd5mem(const char *buf, size_t len, char *digest, int asAscii);
+/* Writes the MD5 of 'data' as 16 raw bytes, or as 32 hex digits and a NUL. */
+void domd5mem(hts_span data, hts_buf digest, hts_boolean asAscii);
 void md5selftest(void);
 #endif
 

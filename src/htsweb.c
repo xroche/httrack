@@ -360,7 +360,8 @@ int main(int argc, char *argv[]) {
               "** CRITICAL: no system entropy source to build a session id\n");
       return -1;
     }
-    domd5mem((const char *) seed, sizeof(seed), digest, 1);
+    domd5mem(hts_span_at((const char *) seed, sizeof(seed)), HTS_BUF(digest),
+             HTS_TRUE);
     smallserver_setkey("sid", digest);
     smallserver_setkey("_sid", digest);
   }

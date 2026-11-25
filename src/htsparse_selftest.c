@@ -1421,8 +1421,8 @@ static int rb_decide(robots_wizard *r, const char *txt, const char *path) {
   char host[64];
 
   snprintf(host, sizeof(host), "h%d.example", n++);
-  robots_parse(NULL, r, host, hts_span_of(txt), hts_buf_at(NULL, 0), HTS_TRUE,
-               hts_buf_at(NULL, 0));
+  robots_parse(NULL, r, host, hts_span_of(txt), hts_buf_none(), HTS_TRUE,
+               hts_buf_none());
   return checkrobots(r, host, path);
 }
 
@@ -1692,8 +1692,8 @@ static int st_robots(httrackp *opt, int argc, char **argv) {
     robots_wizard rb;
 
     memset(&rb, 0, sizeof(rb));
-    robots_parse(NULL, &rb, "h.test", hts_span_of(txt), hts_buf_at(NULL, 0),
-                 HTS_TRUE, hts_buf_at(NULL, 0));
+    robots_parse(NULL, &rb, "h.test", hts_span_of(txt), hts_buf_none(),
+                 HTS_TRUE, hts_buf_none());
     assertf(rb.next != NULL && rb.next->token != NULL);
     assertf(strlen(rb.next->token) == strlen("/pad00000/") + 2);
     checkrobots_free(&rb);
@@ -1763,7 +1763,7 @@ static int st_robots(httrackp *opt, int argc, char **argv) {
 
     memset(&rb, 0, sizeof(rb));
     robots_parse(NULL, &rb, "h.test", hts_span_at(txt, strlen(txt) - 1),
-                 HTS_BUF(info), HTS_TRUE, hts_buf_at(NULL, 0));
+                 HTS_BUF(info), HTS_TRUE, hts_buf_none());
     assertf(strcmp(info, "/ab, /cd, /x") == 0);
     assertf(checkrobots(&rb, "h.test", "/xz") == -1);
     assertf(checkrobots(&rb, "h.test", "/pzq") == -1);
@@ -2041,7 +2041,7 @@ static int st_sitemap(httrackp *opt, int argc, char **argv) {
     robots_wizard rb;
 
     memset(&rb, 0, sizeof(rb));
-    robots_parse(NULL, &rb, "h.test", hts_span_of(txt), hts_buf_at(NULL, 0),
+    robots_parse(NULL, &rb, "h.test", hts_span_of(txt), hts_buf_none(),
                  HTS_TRUE, HTS_BUF(maps));
     assertf(strcmp(maps, "http://h.test/s1.xml\nhttps://h.test/s2.xml\n") == 0);
     assertf(checkrobots(&rb, "h.test", "/x") == -1);
