@@ -341,18 +341,16 @@ static void basic_selftests(void) {
     size_t len;
 
     // no query -> no md5: "index" + ".html"
-    standard_name(b, sizeof(b), dot, nom, "http://example.com/index.html", 0);
+    standard_name(HTS_BUF(b), dot, nom, "http://example.com/index.html", 0);
     assertf(strcmp(b, "index.html") == 0);
     // query -> 4 md5 chars between name and ext: "index" + md5(4) + ".html"
-    standard_name(b, sizeof(b), dot, nom, "http://example.com/index.html?v=1",
-                  0);
+    standard_name(HTS_BUF(b), dot, nom, "http://example.com/index.html?v=1", 0);
     len = strlen(b);
     assertf(len == 5 + 4 + 5);
     assertf(strncmp(b, "index", 5) == 0);
     assertf(strcmp(b + len - 5, ".html") == 0);
     // short names: name kept (<=8), the extension is clamped to 3 -> ".htm"
-    standard_name(b, sizeof(b), dot, nom, "http://example.com/index.html?v=1",
-                  1);
+    standard_name(HTS_BUF(b), dot, nom, "http://example.com/index.html?v=1", 1);
     len = strlen(b);
     assertf(len == 5 + 4 + 4);
     assertf(strcmp(b + len - 4, ".htm") == 0);
@@ -361,7 +359,7 @@ static void basic_selftests(void) {
       const char *lnom = "indexpage.html";
       const char *ldot = lnom + 9; // points at ".html"
 
-      standard_name(b, sizeof(b), ldot, lnom,
+      standard_name(HTS_BUF(b), ldot, lnom,
                     "http://example.com/indexpage.html?v=1", 1);
       len = strlen(b);
       assertf(len == 8 + 4 + 4);
@@ -376,23 +374,23 @@ static void basic_selftests(void) {
       const char *const dotf = ".htaccess";
       char sml[16];
 
-      standard_name(sml, 1, dot, nom, q, 0);
+      standard_name(HTS_BUF_N(sml, 1), dot, nom, q, 0);
       assertf(strcmp(sml, "") == 0);
-      standard_name(sml, 2, dot, nom, q, 0);
+      standard_name(HTS_BUF_N(sml, 2), dot, nom, q, 0);
       assertf(strcmp(sml, "i") == 0);
-      standard_name(sml, 6, dot, nom, q, 0);
+      standard_name(HTS_BUF_N(sml, 6), dot, nom, q, 0);
       assertf(strcmp(sml, "i3860") == 0); // md5("v=1") starts 3860
-      standard_name(sml, 6, dot, nom, nq, 0);
+      standard_name(HTS_BUF_N(sml, 6), dot, nom, nq, 0);
       assertf(strcmp(sml, "index") == 0);
-      standard_name(sml, 7, dot, nom, nq, 0);
+      standard_name(HTS_BUF_N(sml, 7), dot, nom, nq, 0);
       assertf(strcmp(sml, "i.html") == 0);
-      standard_name(sml, 5, dot, nom, nq, 1);
+      standard_name(HTS_BUF_N(sml, 5), dot, nom, nq, 1);
       assertf(strcmp(sml, "inde") == 0);
-      standard_name(sml, 6, dot, nom, nq, 1);
+      standard_name(HTS_BUF_N(sml, 6), dot, nom, nq, 1);
       assertf(strcmp(sml, "i.htm") == 0);
-      standard_name(sml, 4, dotf, dotf, dotf, 0);
+      standard_name(HTS_BUF_N(sml, 4), dotf, dotf, dotf, 0);
       assertf(strcmp(sml, "hta") == 0);
-      standard_name(sml, sizeof(sml), dotf, dotf, dotf, 0);
+      standard_name(HTS_BUF(sml), dotf, dotf, dotf, 0);
       assertf(strcmp(sml, ".htaccess") == 0);
     }
   }
