@@ -1574,7 +1574,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                            safe_adr, safe_fil);
                   snprintf(status_str, sizeof(status_str), "%d", r->statuscode);
                   snprintf(size_str, sizeof(size_str), LLintP, (LLint) r->size);
-                  time_gmt_rfc822(HTS_SIZED(gmttime));
+                  time_gmt_rfc822(HTS_BUF(gmttime));
 
                   {
                     // Network strings go through html_inline_safe(), because a
@@ -3344,7 +3344,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       char BIGSTK cid[HTS_URLMAXSIZE * 3];
 
                       HT_ADD("cid:");
-                      make_content_id(afs.af.adr, afs.af.fil, HTS_SIZED(cid));
+                      make_content_id(afs.af.adr, afs.af.fil, HTS_BUF(cid));
                       HT_ADD_HTMLESCAPED(cid);
                       lastsaved = eadr - 1;     // dernier écrit+1 (enfin euh apres on fait un ++ alors hein)
                     } else if (opt->urlmode == HTS_URLMODE_ABSOLUTE_URI) {

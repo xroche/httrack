@@ -1079,7 +1079,7 @@ static int st_postfile_case(const char *path, size_t start, size_t expect,
   memset(arena, 'R', start);          /* what the request line already wrote */
   arena[start] = '\0';
 
-  pos = http_postfile_body(arena, capacity, start, fp);
+  pos = http_postfile_body(hts_buf_at(arena, capacity), start, fp);
   fclose(fp);
 
   if (pos != expect) {

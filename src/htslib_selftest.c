@@ -53,7 +53,7 @@ static int st_duration(httrackp *opt, int argc, char **argv) {
   (void) opt;
   if (argc < 1)
     return 1;
-  sec2str(lng, sizeof(lng), (TStamp) strtoll(argv[0], NULL, 10));
+  sec2str(HTS_BUF(lng), (TStamp) strtoll(argv[0], NULL, 10));
   qsec2str_sized(HTS_SIZED(shrt), (TStamp) strtoll(argv[0], NULL, 10));
   printf("%s|%s\n", lng, shrt);
   return 0;
@@ -4842,7 +4842,7 @@ static int st_contentid(httrackp *opt, int argc, char **argv) {
   int i, c;
 
   for (i = 0; fils[i] != NULL; i++) {
-    make_content_id("www.example.com", fils[i], cid, sizeof(cid));
+    make_content_id("www.example.com", fils[i], HTS_BUF(cid));
     snprintf(url, sizeof(url), "www.example.com%s", fils[i]);
     if (!cid_unescape(cid, back, sizeof(back)) || strcmp(back, url) != 0) {
       printf("contentid: '%s' -> '%s' -> '%s'\n", url, cid, back);
@@ -4854,7 +4854,7 @@ static int st_contentid(httrackp *opt, int argc, char **argv) {
   for (c = 1; c <= 255; c++) {
     snprintf(fil, sizeof(fil), "/a%cb", c);
     snprintf(url, sizeof(url), "h%s", fil);
-    make_content_id("h", fil, cid, sizeof(cid));
+    make_content_id("h", fil, HTS_BUF(cid));
     if (!cid_unescape(cid, back, sizeof(back)) || strcmp(back, url) != 0) {
       printf("contentid: byte %d -> '%s' -> '%s'\n", c, cid, back);
       failures++;
@@ -4872,7 +4872,7 @@ static int st_contentid_tail(httrackp *opt, int argc, char **argv) {
   static const char fil[] = "/abcdefghijklmnop";
   char full[256];
   char cid[256];
-  const size_t full_len = make_content_id(host, fil, full, sizeof(full));
+  const size_t full_len = make_content_id(host, fil, HTS_BUF(full));
   int failures = 0;
   size_t size;
 
@@ -4882,7 +4882,7 @@ static int st_contentid_tail(httrackp *opt, int argc, char **argv) {
     if (size == sizeof(void *))
       continue; /* a caller passing that is the mistake the check is for */
     memset(cid, 'X', sizeof(cid));
-    ret = make_content_id(host, fil, cid, size);
+    ret = make_content_id(host, fil, hts_buf_at(cid, size));
     len = strnlen(cid, size);
     if (len == size || ret > size || cid[size] != 'X' ||
         strncmp(cid, full, len) != 0) {
@@ -5598,7 +5598,7 @@ static int st_lib_sized(httrackp *opt, int argc, char **argv) {
     for (k = 0; k < 3; k++) {
       char *buf = st_sized_alloc(dcaps[k]);
 
-      sec2str(buf, dcaps[k], durs[i].t);
+      sec2str(hts_buf_at(buf, dcaps[k]), durs[i].t);
       if (!st_sized_clip_ok(buf, dcaps[k], durs[i].want)) {
         printf("lib-sized: sec2str(%d) into %u bytes\n", (int) durs[i].t,
                (unsigned) dcaps[k]);
@@ -5608,8 +5608,8 @@ static int st_lib_sized(httrackp *opt, int argc, char **argv) {
     }
   }
   /* the clock may tick between calls, so later rows compare only lengths */
-  time_gmt_rfc822(gmt, sizeof(gmt));
-  time_local_rfc822(local, sizeof(local));
+  time_gmt_rfc822(HTS_BUF(gmt));
+  time_local_rfc822(HTS_BUF(local));
   if (strlen(gmt) < 4 || strcmp(gmt + strlen(gmt) - 4, " GMT") != 0 ||
       strstr(local, "GMT") != NULL) {
     printf("lib-sized: GMT is '%s' and local is '%s'\n", gmt, local);
@@ -5630,12 +5630,12 @@ static int st_lib_sized(httrackp *opt, int argc, char **argv) {
       printf("lib-sized: get_filetime_rfc822 into %u bytes\n", (unsigned) rcap);
       fail = 1;
     }
-    time_gmt_rfc822(buf, rcap);
+    time_gmt_rfc822(hts_buf_at(buf, rcap));
     if (!st_sized_len_ok(buf, rcap, strlen(gmt))) {
       printf("lib-sized: time_gmt_rfc822 into %u bytes\n", (unsigned) rcap);
       fail = 1;
     }
-    time_local_rfc822(buf, rcap);
+    time_local_rfc822(hts_buf_at(buf, rcap));
     if (!st_sized_len_ok(buf, rcap, strlen(local))) {
       printf("lib-sized: time_local_rfc822 into %u bytes\n", (unsigned) rcap);
       fail = 1;

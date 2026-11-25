@@ -378,11 +378,11 @@ static int append_cookie_header(buff_struct *bstr, t_cookie *cookie,
 /* Build the request Cookie line for adr/path into dst (always
    NUL-terminated). Returns the number of cookies emitted. */
 int http_cookie_header(t_cookie *cookie, const char *adr, const char *path,
-                       char *dst, size_t dst_size) {
-  buff_struct bstr = {dst, dst_size, 0};
+                       hts_buf dst) {
+  buff_struct bstr = {dst.p, dst.size, 0};
 
-  assertf(dst != NULL && dst_size > 0);
-  dst[0] = '\0';
+  assertf(dst.p != NULL && dst.size > 0);
+  dst.p[0] = '\0';
   return append_cookie_header(&bstr, cookie, adr, path, 0, NULL);
 }
 
@@ -605,26 +605,24 @@ static void append_custom_headers(buff_struct *bstr, const char *headers) {
   }
 }
 
-void http_append_custom_headers(char *dst, size_t dst_size,
-                                const char *headers) {
-  buff_struct bstr = {dst, dst_size, 0};
+void http_append_custom_headers(hts_buf dst, const char *headers) {
+  buff_struct bstr = {dst.p, dst.size, 0};
 
-  assertf(dst != NULL && dst_size > 0);
-  bstr.pos = strlen(dst);
+  assertf(dst.p != NULL && dst.size > 0);
+  bstr.pos = strlen(dst.p);
   append_custom_headers(&bstr, headers);
 }
 
 /* See htslib.h. Clip an oversized body, because aborting loses the mirror. */
-size_t http_postfile_body(char *buffer, size_t buffer_size, size_t pos,
-                          FILE *fp) {
+size_t http_postfile_body(hts_buf buffer, size_t pos, FILE *fp) {
   size_t room;
   size_t got;
 
-  assertf(pos < buffer_size);
-  room = buffer_size - pos - 1; /* the NUL every consumer strlen()s up to */
-  got = fread(&buffer[pos], 1, room, fp);
-  buffer[pos + got] = '\0';
-  return pos + strlen(&buffer[pos]);
+  assertf(pos < buffer.size);
+  room = buffer.size - pos - 1; /* the NUL every consumer strlen()s up to */
+  got = fread(&buffer.p[pos], 1, room, fp);
+  buffer.p[pos + got] = '\0';
+  return pos + strlen(&buffer.p[pos]);
 }
 
 hts_boolean hts_location_is_safe(const char *location) {
@@ -998,8 +996,8 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
                        "%s %s %s\r\n", method, url, protocol);
             }
             // the rest of the file goes out raw
-            bstr.pos =
-                http_postfile_body(bstr.buffer, bstr.capacity, bstr.pos, fp);
+            bstr.pos = http_postfile_body(
+                hts_buf_at(bstr.buffer, bstr.capacity), bstr.pos, fp);
           }
           fclose(fp);
         }
@@ -2146,7 +2144,7 @@ static int xfread_lines_bytewise(htsblk *r, int bufl) {
 
     if (r->size >= HTS_LINE_BLOCK_SIZE - 2)
       return READ_INTERNAL_ERROR;
-    nl = hts_read(r, &c, 1);
+    nl = hts_read(r, hts_buf_at(&c, 1));
     if (nl < 0)
       return nl;
     if (nl > 0 && xfread_line_step(&st, r->adr, &r->size, c, bufl))
@@ -2193,7 +2191,7 @@ static int xfread_lines(htsblk *r, int bufl) {
         break;
     }
   }
-  got = hts_read(r, buff, want);
+  got = hts_read(r, hts_buf_at(buff, want));
   if (got <= 0) /* peeked, so the read cannot fail */
     return got;
   for (i = 0; i < got; i++) {
@@ -2236,7 +2234,9 @@ LLint http_xfread1(htsblk * r, int bufl) {
           const LLint remaining = r->totalsize - r->size;
           const size_t req_size = remaining > 0 ? (size_t) remaining : 0;
 
-          nl = req_size > 0 ? hts_read(r, r->adr + ((int) r->size), (int) req_size) : 0;        /* NO 32 bit overlow possible here (no 4GB html!) */
+          nl = req_size > 0
+                   ? hts_read(r, hts_buf_at(r->adr + ((int) r->size), req_size))
+                   : 0; /* NO 32 bit overlow possible here (no 4GB html!) */
           // nouvelle taille
           if (nl >= 0)
             r->size += nl;
@@ -2269,7 +2269,7 @@ LLint http_xfread1(htsblk * r, int bufl) {
         }
 
         if (r->adr != NULL) {
-          nl = hts_read(r, r->adr + (int) r->size, bufl);
+          nl = hts_read(r, hts_buf_at(r->adr + (int) r->size, bufl));
           if (nl > 0) {
             // A failed shrink leaves the larger block, which still fits.
             char *const fit =
@@ -2293,7 +2293,7 @@ LLint http_xfread1(htsblk * r, int bufl) {
       buff = (char *) malloct(bufl);
       if (buff != NULL) {
         // lecture
-        nl = hts_read(r, buff, bufl);
+        nl = hts_read(r, hts_buf_at(buff, bufl));
         // nouvelle taille
         if (nl > 0) {
           r->size += nl;
@@ -3069,9 +3069,7 @@ static void duration_str(hts_buf st, TStamp t, hts_boolean quick) {
     snprintf(st.p, st.size, quick == HTS_TRUE ? "%ds" : "%d seconds", s);
 }
 
-void sec2str(char *st, size_t size, TStamp t) {
-  duration_str(hts_buf_at(st, size), t, HTS_FALSE);
-}
+void sec2str(hts_buf st, TStamp t) { duration_str(st, t, HTS_FALSE); }
 
 /* Contract in httrack-library.h. */
 HTSEXT_API void qsec2str_sized(char *st, size_t size, TStamp t) {
@@ -3081,18 +3079,18 @@ HTSEXT_API void qsec2str_sized(char *st, size_t size, TStamp t) {
 // the 32 bytes the deprecated contract documents
 HTSEXT_API void qsec2str(char *st, TStamp t) { qsec2str_sized(st, 32, t); }
 
-void time_gmt_rfc822(char *s, size_t size) {
+void time_gmt_rfc822(hts_buf s) {
   time_t tt;
   struct tm tmv;
 
-  assertf(size != 0);
+  assertf(s.size != 0);
   tt = time(NULL);
   /* no local-time fallback: it would format local time and still label it GMT
    * (#806) */
   if (hts_gmtime(tt, &tmv))
-    time_rfc822(s, size, &tmv);
+    time_rfc822(s.p, s.size, &tmv);
   else
-    s[0] = '\0';
+    s.p[0] = '\0';
 }
 
 void hts_now_iso8601(char out[32]) {
@@ -3104,16 +3102,16 @@ void hts_now_iso8601(char out[32]) {
   strftime(out, 32, "%Y-%m-%dT%H:%M:%SZ", &tmv);
 }
 
-void time_local_rfc822(char *s, size_t size) {
+void time_local_rfc822(hts_buf s) {
   time_t tt;
   struct tm tmv;
 
-  assertf(size != 0);
+  assertf(s.size != 0);
   tt = time(NULL);
   if (hts_localtime(tt, &tmv))
-    time_rfc822_local(s, size, &tmv);
+    time_rfc822_local(s.p, s.size, &tmv);
   else
-    s[0] = '\0';
+    s.p[0] = '\0';
 }
 
 /* sets file time. -1 if error */
@@ -4737,17 +4735,16 @@ DECLARE_APPEND_ESCAPE_VERSION(escape_check_url)
 // In-place escaping: copy dest aside, then escape that copy back into dest.
 typedef size_t (*escape_fn_t)(const char *src, char *dest, size_t size);
 
-static size_t inplace_escape(char *const dest, const size_t size,
-                             escape_fn_t escape) {
+static size_t inplace_escape(hts_buf dest, escape_fn_t escape) {
   char buffer[256];
-  const size_t len = strnlen(dest, size);
+  const size_t len = strnlen(dest.p, dest.size);
   const int in_buffer = len + 1 < sizeof(buffer);
   char *src = in_buffer ? buffer : malloct(len + 1);
   size_t ret;
   assertf(src != NULL);
-  assertf(len < size);
-  memcpy(src, dest, len + 1);
-  ret = escape(src, dest, size);
+  assertf(len < dest.size);
+  memcpy(src, dest.p, len + 1);
+  ret = escape(src, dest.p, dest.size);
   if (!in_buffer) {
     freet(src);
   }
@@ -4758,7 +4755,7 @@ static size_t inplace_escape(char *const dest, const size_t size,
 #undef DECLARE_INPLACE_ESCAPE_VERSION
 #define DECLARE_INPLACE_ESCAPE_VERSION(NAME)                                   \
   size_t inplace_##NAME(char *const dest, const size_t size) {                 \
-    return inplace_escape(dest, size, NAME);                                   \
+    return inplace_escape(hts_buf_at(dest, size), NAME);                       \
   }
 
 DECLARE_INPLACE_ESCAPE_VERSION(escape_in_url)
@@ -4770,17 +4767,17 @@ DECLARE_INPLACE_ESCAPE_VERSION(escape_uri)
 #undef DECLARE_INPLACE_ESCAPE_VERSION
 
 size_t make_content_id(const char *const adr, const char *const fil,
-                       char *const dest, const size_t size) {
+                       hts_buf dest) {
   char *a;
-  size_t esc_size = escape_in_url(adr, dest, size);
+  size_t esc_size = escape_in_url(adr, dest.p, dest.size);
   /* the append form takes a remainder the size check would misread */
-  if (esc_size < size)
-    esc_size += append_escape_in_url(fil, hts_buf_at(dest, size));
-  RUNTIME_TIME_CHECK_SIZE(size);
+  if (esc_size < dest.size)
+    esc_size += append_escape_in_url(fil, dest);
+  RUNTIME_TIME_CHECK_SIZE(dest.size);
   /* A '%' would be decoded again by whoever reads the cid: URL. The marker has
      to be a character escape_in_url() itself escapes, or two URLs can share one
      Content-ID and one part then serves both (#1925). */
-  for(a = dest ; (a = strchr(a, '%')) != NULL ; a++) {
+  for (a = dest.p; (a = strchr(a, '%')) != NULL; a++) {
     *a = '-';
   }
   return esc_size;
@@ -5100,12 +5097,13 @@ LLint check_downloadable_bytes(int rate) {
 // >0 : data received
 // == 0 : not yet data
 // <0: error or no data: READ_ERROR, READ_EOF or READ_TIMEOUT
-int hts_read(htsblk * r, char *buff, int size) {
+int hts_read(htsblk *r, hts_buf buff) {
+  const int size = (int) buff.size;
   int retour;
 
   if (r->is_file) {
     if (r->fp) {
-      retour = (int) fread(buff, 1, size, r->fp);
+      retour = (int) fread(buff.p, 1, size, r->fp);
       if (retour == 0)  // can happen with directories (!)
         retour = READ_ERROR;
     } else
@@ -5117,7 +5115,7 @@ int hts_read(htsblk * r, char *buff, int size) {
       sigpipe_mask m;
 
       sigpipe_hold(&m);
-      retour = SSL_read(r->ssl_con, buff, size);
+      retour = SSL_read(r->ssl_con, buff.p, size);
       sigpipe_release(&m);
       if (retour <= 0) {
         int err_code = SSL_get_error(r->ssl_con, retour);
@@ -5134,7 +5132,7 @@ int hts_read(htsblk * r, char *buff, int size) {
       }
     } else {
 #endif
-      retour = recv(r->soc, buff, size, 0);
+      retour = recv(r->soc, buff.p, size, 0);
       if (retour == 0) {
         retour = READ_EOF;
       } else if (retour < 0) {

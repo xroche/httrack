@@ -225,7 +225,7 @@ char *escape_check_url_addr(const char *const src, hts_buf dest);
     @p fil: escape_in_url() escaping with '-' for '%', so two URLs never share
     a token. */
 size_t make_content_id(const char *const adr, const char *const fil,
-                       char *const dest, const size_t size);
+                       hts_buf dest);
 
 /** Low-level percent-escaper backing the escape_* family. @p mode selects the
     character class to escape: 0 check_url, 1 in_url, 2 spc_url, 3 uri,
@@ -398,7 +398,7 @@ int64_t hts_parse_date(const char *s, int pivot);
 void hts_set_hash_handler(coucal hashtable, httrackp *opt);
 
 // fonctions unix/winsock
-int hts_read(htsblk * r, char *buff, int size);
+int hts_read(htsblk *r, hts_buf buff);
 
 /* Add to, read and reset the received-byte total, which FTP workers update
    from their thread. A lock guards it, as a 64-bit atomic needs libatomic.
@@ -449,7 +449,7 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
    uses. adr may carry its scheme, and only "https://" gets Secure cookies. A
    port in adr is ignored (see cookie_host). Returns cookies emitted. */
 int http_cookie_header(t_cookie *cookie, const char *adr, const char *path,
-                       char *dst, size_t dst_size);
+                       hts_buf dst);
 
 /* True if the raw CRLF-separated header block, a request one we build or a
    response one we received, starts a line with `field_name`, given without the
@@ -470,20 +470,18 @@ const char *http_custom_header_warning(const char *headers, const char *line);
    block so far. */
 const char *http_bundle_header_refusal(const char *headers, const char *line);
 
-/* Append the custom header block to dst (capacity dst_size), dropping any line
+/* Append the custom header block to dst, dropping any line
    whose field dst carries, a malformed or framing line, an earlier copy of
    Host, Cookie or Authorization, and a leading folded line. Field names ignore
    case and blanks before the colon. A line that does not fit is left out. */
-void http_append_custom_headers(char *dst, size_t dst_size,
-                                const char *headers);
+void http_append_custom_headers(hts_buf dst, const char *headers);
 
-/* Append the raw remainder of a >postfile: body into buffer (capacity
-   buffer_size) at write position pos, and return the new position. Clips to
+/* Append the raw remainder of a >postfile: body into buffer at write position
+   pos, and return the new position. Clips to
    the room left, and always leaves a NUL at the position returned: the request
    block is read back with strlen() by the WARC stash, the sendhead callback
    and sendc(). A NUL inside the file ends the request there. */
-size_t http_postfile_body(char *buffer, size_t buffer_size, size_t pos,
-                          FILE *fp);
+size_t http_postfile_body(hts_buf buffer, size_t pos, FILE *fp);
 
 /* Switch soc between blocking and non-blocking mode; false on failure, with
    errno (WSAGetLastError() on Windows) set. */
@@ -694,12 +692,12 @@ void hts_dns_test_move_clock(httrackp *opt, const char *host, TStamp ms);
 // outils divers
 HTS_INLINE TStamp time_local(void);
 
-/* Writes duration t in seconds as long text, clipped to size bytes. */
-void sec2str(char *s, size_t size, TStamp t);
+/* Writes duration t in seconds as long text, clipped to S. */
+void sec2str(hts_buf s, TStamp t);
 
-/* The current time as an RFC 822 date, GMT or local, clipped to size bytes. */
-void time_gmt_rfc822(char *s, size_t size);
-void time_local_rfc822(char *s, size_t size);
+/* The current time as an RFC 822 date, GMT or local, clipped to S. */
+void time_gmt_rfc822(hts_buf s);
+void time_local_rfc822(hts_buf s);
 
 /* Current UTC time as "YYYY-MM-DDThh:mm:ssZ". */
 void hts_now_iso8601(char out[32]);
