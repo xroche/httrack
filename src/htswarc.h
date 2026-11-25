@@ -37,6 +37,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsopt.h"
 #include "htsbuf.h"
+#include "htsurlport.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -61,10 +62,9 @@ const char *warc_truncated_reason(int code);
 
 /* Copy the media type of header NAME, up to a ';' or a space, from the raw
    block HDR into OUT, which is "" when the header is absent. OUT is clipped to
-   OUTSZ bytes and left alone when OUTSZ is 0. Exposed for the
+   its size and left alone when its size is 0. Exposed for the
    -#test=warcspandiff test. */
-void warc_http_header_value(const char *hdr, const char *name, char *out,
-                            size_t outsz);
+void warc_http_header_value(const char *hdr, const char *name, hts_buf out);
 
 /* Return the header block a response record stores for RESP_HDR, as a string
    the caller frees with freet. A SET_CL of 0 or more replaces Content-Length
@@ -136,6 +136,16 @@ uint64_t warc_stream_offset(FILE *f, uint64_t current);
 HTS_CHECK_RESULT hts_boolean warc_cdx_extent(hts_buf out, uint64_t length,
                                              uint64_t offset);
 
+/* LEN bytes at P, or in file PATH when P is NULL. */
+typedef struct {
+  const char *p;
+  size_t len;
+  const char *path;
+} warc_body;
+
+/* Return the in-memory body of LEN bytes at P. */
+warc_body warc_body_mem(const char *p, size_t len);
+
 /* unchanged_kind for warc_write_transaction. */
 #define WARC_UNCHANGED_NONE 0       /* a fresh exchange: a full response */
 #define WARC_UNCHANGED_SERVER_304 1 /* the server itself answered 304 */
@@ -147,8 +157,7 @@ HTS_CHECK_RESULT hts_boolean warc_cdx_extent(hts_buf out, uint64_t length,
    ip:          numeric peer IP, or NULL/"" to omit.
    req_hdr:     exact request header block sent, or NULL to skip the request.
    resp_hdr:    raw received response header block (status line + headers).
-   body/body_len: decoded in-memory body, or NULL when on disk.
-   body_path:   file re-read for the body when body==NULL (may be NULL).
+   body:        the as-received body, in memory or on disk.
    content_type: CDXJ mime when resp_hdr declares none, as a 304 does; NULL
                 to leave the index line without one.
    unchanged_kind: WARC_UNCHANGED_*; SERVER_304 writes a server-not-modified
@@ -156,12 +165,11 @@ HTS_CHECK_RESULT hts_boolean warc_cdx_extent(hts_buf out, uint64_t length,
                 digest one (no 304 to claim), both unbacked (#839).
    truncated: a WARC_TRUNC_* reason to tag a cap-truncated body, else 0.
    The body is stored verbatim: Content-Encoding is kept and Content-Length set
-   to body_len, so body/body_len must be the as-received (coded) bytes.
+   to body.len, so body must be the as-received (coded) bytes.
    Returns 0 on success, -1 on error. */
 int warc_write_transaction(warc_writer *w, const char *target_uri,
                            const char *ip, const char *req_hdr,
-                           const char *resp_hdr, const char *body,
-                           size_t body_len, const char *body_path,
+                           const char *resp_hdr, warc_body body,
                            const char *content_type, int statuscode,
                            int unchanged_kind, int truncated);
 
@@ -170,8 +178,8 @@ int warc_write_transaction(warc_writer *w, const char *target_uri,
    Used for ftp:// transfers. truncated is a WARC_TRUNC_* reason or 0.
    Returns 0 on success, -1 on error. */
 int warc_write_resource(warc_writer *w, const char *target_uri, const char *ip,
-                        const char *content_type, const char *body,
-                        size_t body_len, const char *body_path, int truncated);
+                        const char *content_type, warc_body body,
+                        int truncated);
 
 #ifdef __cplusplus
 }
