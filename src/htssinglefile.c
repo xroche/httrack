@@ -132,16 +132,16 @@ hts_boolean singlefile_may_mark(httrackp *opt, hts_span body) {
   return HTS_TRUE;
 }
 
-const char *singlefile_mark(httrackp *opt, char *buf, size_t bufsize, char cls,
+const char *singlefile_mark(httrackp *opt, hts_buf buf, char cls,
                             size_t reflen) {
   const char *const intro = singlefile_intro(opt);
 
-  buf[0] = '\0';
+  buf.p[0] = '\0';
   /* Nothing sf_parse_mark would refuse: an unread mark stays in the page as
      text and takes its reference with it. */
   if (intro != NULL && reflen <= SINGLEFILE_MAX_SPAN)
-    snprintf(buf, bufsize, "%s.%c.%d", intro, cls, (int) reflen);
-  return buf;
+    snprintf(buf.p, buf.size, "%s.%c.%d", intro, cls, (int) reflen);
+  return buf.p;
 }
 
 /* These (tag, attribute) pairs name a page or media stream, never an asset.
@@ -403,12 +403,13 @@ static hts_boolean sf_resolve(const sf_ctx *ctx, const char *base_dir,
 /* MIME, reading, encoding                                       */
 /* ------------------------------------------------------------ */
 
-/* Inlinable class of the file at path, or 0; mime receives the type to
+/* Inlinable class of the file at path, or 0; out receives the type to
    advertise in the data: URI. */
-static int sf_mime_class(httrackp *opt, const char *path, char *mime,
-                         size_t mimesize) {
-  mime[0] = '\0';
-  if (!guess_httptype_sized(opt, mime, mimesize, path) || mime[0] == '\0')
+static int sf_mime_class(httrackp *opt, const char *path, hts_buf out) {
+  const char *const mime = out.p;
+
+  out.p[0] = '\0';
+  if (!guess_httptype_sized(opt, out.p, out.size, path) || mime[0] == '\0')
     return 0;
   if (strfield(mime, "image/") != 0)
     return SF_C_IMAGE;
@@ -440,17 +441,17 @@ static char *sf_readfile(const char *path, size_t *size) {
   return adr;
 }
 
-static hts_boolean sf_append_base64(String *out, char *data, size_t len) {
+static hts_boolean sf_append_base64(String *out, hts_span data) {
   /* code64() emits exactly one padded 4-byte group per 3 input bytes. */
-  const size_t b64len = ((len + 2) / 3) * 4;
+  const size_t b64len = ((data.len + 2) / 3) * 4;
   char *buf;
 
-  if (len > SINGLEFILE_HARD_MAX_SIZE)
+  if (data.len > SINGLEFILE_HARD_MAX_SIZE)
     return HTS_FALSE;
   buf = (char *) malloct(b64len + 1);
   if (buf == NULL)
     return HTS_FALSE;
-  code64(hts_span_at(data, len), hts_buf_at(buf, b64len + 1), HTS_FALSE);
+  code64(data, hts_buf_at(buf, b64len + 1), HTS_FALSE);
   StringMemcat(*out, buf, b64len);
   freet(buf);
   return HTS_TRUE;
@@ -533,7 +534,7 @@ static hts_boolean sf_inline(sf_ctx *ctx, const char *base_dir, hts_span ref,
     StringFree(path);
     return HTS_FALSE;
   }
-  cls = sf_mime_class(ctx->opt, StringBuff(path), HTS_SIZED(mime));
+  cls = sf_mime_class(ctx->opt, StringBuff(path), HTS_BUF(mime));
   /* The referencing context decides when the name carries no usable type.
      A contradiction between the two is a bug and is not inlined. */
   if (want != SINGLEFILE_CLASS_ANY) {
@@ -579,8 +580,8 @@ static hts_boolean sf_inline(sf_ctx *ctx, const char *base_dir, hts_span ref,
       StringClear(nested);
       sf_expand(ctx, StringBuff(nested_dir), depth + 1,
                 hts_span_at(file, file_len), &nested);
-      done = sf_append_base64(&payload, StringBuffRW(nested),
-                              StringLength(nested));
+      done = sf_append_base64(
+          &payload, hts_span_at(StringBuff(nested), StringLength(nested)));
       StringFree(nested);
       StringFree(nested_dir);
     } else {
@@ -592,7 +593,7 @@ static hts_boolean sf_inline(sf_ctx *ctx, const char *base_dir, hts_span ref,
         if (intro != NULL)
           file_len = sf_strip_marks(intro, hts_buf_at(file, file_len));
       }
-      done = sf_append_base64(&payload, file, file_len);
+      done = sf_append_base64(&payload, hts_span_at(file, file_len));
     }
     if (done) {
       StringCat(*out, "data:");

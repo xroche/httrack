@@ -3521,7 +3521,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                 sf_span_fits);
 
                             HT_ADD(singlefile_mark(
-                                opt, HTS_SIZED(sf_mark), sf_class,
+                                opt, HTS_BUF(sf_mark), sf_class,
                                 TypedArraySize(sink.buf) - sf_start));
                           }
                         }
