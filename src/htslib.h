@@ -787,7 +787,7 @@ int multipleStringMatch(const char *s, const char *match);
    field that carries a login replaced by the fprint_redacted() marker, and
    each secret opt knows as ***. opt may be NULL. */
 void fprintfio(FILE *fp, const char *buff, const char *prefix, httrackp *opt);
-/* The first line of buff as fprintfio() shows it, written into dst, clipped:
+/* line up to its CR or LF as fprintfio() shows it, written into dst, clipped:
    for one write, which keeps the line whole on a merged stdout and stderr.
    Returns dst.p. */
 const char *hts_header_shown(httrackp *opt, const char *line, hts_buf dst);
