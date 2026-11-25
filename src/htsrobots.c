@@ -225,8 +225,8 @@ void robots_parse(httrackp *opt, robots_wizard *robots, const char *adr,
       /* A line at the buffer limit was truncated: a half URL is not one. */
       if (strnotempty(a) && !cut &&
           strlen(a) + 2 < sitemaps.size - strlen(sitemaps.p)) {
-        strlcatbuff(sitemaps.p, a, sitemaps.size);
-        strlcatbuff(sitemaps.p, "\n", sitemaps.size);
+        hts_buf_cat(sitemaps, a);
+        hts_buf_cat(sitemaps, "\n");
       }
     } else if (strfield(line, "user-agent:")) {
       char *a = line + strfield(line, "user-agent:");
@@ -281,8 +281,8 @@ void robots_parse(httrackp *opt, robots_wizard *robots, const char *adr,
           if (kept && is_disallow && info.size > 0 &&
               strlen(a) + 2 < info.size - strlen(info.p)) {
             if (strnotempty(info.p))
-              strlcatbuff(info.p, ", ", info.size);
-            strlcatbuff(info.p, a, info.size);
+              hts_buf_cat(info, ", ");
+            hts_buf_cat(info, a);
           }
         }
       }

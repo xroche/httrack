@@ -1724,13 +1724,13 @@ static int st_robots(httrackp *opt, int argc, char **argv) {
     /* the body stops at its span length and info at its buffer size */
     const char *const txt = "User-agent: *\nDisallow: /ab\nDisallow: /cd\n"
                             "Disallow: /p*q\nDisallow: /xy";
-    char info[12];
+    char info[13];
     robots_wizard rb;
 
     memset(&rb, 0, sizeof(rb));
     robots_parse(NULL, &rb, "h.test", hts_span_at(txt, strlen(txt) - 1),
                  HTS_BUF(info), HTS_TRUE, hts_buf_at(NULL, 0));
-    assertf(strcmp(info, "/ab, /cd") == 0);
+    assertf(strcmp(info, "/ab, /cd, /x") == 0);
     assertf(checkrobots(&rb, "h.test", "/xz") == -1);
     assertf(checkrobots(&rb, "h.test", "/pzq") == -1);
     checkrobots_free(&rb);
@@ -1973,7 +1973,7 @@ static int st_sitemap(httrackp *opt, int argc, char **argv) {
                             "SITEMAP:  http://h.test/s1.xml  # first\n"
                             "Sitemapper: http://h.test/no.xml\n"
                             "Sitemap:\thttps://h.test/s2.xml\n";
-    char BIGSTK maps[1024];
+    char maps[45]; /* the smallest size that keeps both URLs */
     robots_wizard rb;
 
     memset(&rb, 0, sizeof(rb));
