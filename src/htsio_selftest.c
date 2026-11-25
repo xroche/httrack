@@ -628,7 +628,7 @@ static int st_datadir(httrackp *opt, int argc, char **argv) {
   assertf(argc >= 1);
 
   /* argv[0] is a fallback: what the engine actually resolves from is this. */
-  assertf(hts_self_path(path, sizeof(path)) != NULL);
+  assertf(hts_self_path(HTS_BUF(path)) != NULL);
   assertf(fexist(path));
   /* A buffer the path does not fit in must refuse rather than clip. A refusal
      empties the buffer and writes nothing past the size it was given. */
@@ -637,11 +637,11 @@ static int st_datadir(httrackp *opt, int argc, char **argv) {
   memset(untouched, 'X', sizeof(untouched));
   /* A zero size has nothing to empty, so it refuses without writing at all. */
   memset(probe, 'X', sizeof(probe));
-  assertf(hts_self_path(probe, 0) == NULL);
+  assertf(hts_self_path(hts_buf_at(probe, 0)) == NULL);
   assertf(memcmp(probe, untouched, sizeof(probe)) == 0);
   for (i = 1; i <= selflen; i++) {
     memset(probe, 'X', sizeof(probe));
-    assertf(hts_self_path(probe, i) == NULL);
+    assertf(hts_self_path(hts_buf_at(probe, i)) == NULL);
     assertf(memcmp(probe + i, untouched, sizeof(probe) - i) == 0);
     assertf(probe[0] == '\0');
   }

@@ -54,8 +54,8 @@ hts_scan_result cmdl_glued_llint(char **com, LLint min, LLint max, LLint *out);
 hts_scan_result cmdl_glued_int(char **com, int min, int max, int *out);
 
 /* Absolute path of the running executable, or NULL where the OS will not say
-   and argv[0] is the only clue left. Fills dst (dstsize bytes). */
-const char *hts_self_path(char *dst, size_t dstsize);
+   and argv[0] is the only clue left. Fills dst. */
+const char *hts_self_path(hts_buf dst);
 
 /* Write the data directory holding the HTML templates into dst (clipped,
    trailing '/' included): builtin when it is there, else a layout under

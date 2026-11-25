@@ -103,22 +103,22 @@ static int datadir_has_templates(const char *dir) {
 
 /* htsbacktrace.c copies the Linux branch: it is program-side and cannot reach
    this hidden symbol, so a fix here belongs there too (#997). */
-const char *hts_self_path(char *dst, size_t dstsize) {
+const char *hts_self_path(hts_buf dst) {
   /* An empty dst holds no terminator, and readlink() would get SIZE_MAX. */
-  if (dstsize == 0)
+  if (dst.size == 0)
     return NULL;
 #if defined(_WIN32)
-  const DWORD n = GetModuleFileNameA(NULL, dst, (DWORD) dstsize);
+  const DWORD n = GetModuleFileNameA(NULL, dst.p, (DWORD) dst.size);
 
   /* Pre-Win8 returns nSize on truncation without terminating: a full buffer
      is a failure, not a path. */
-  if (n > 0 && (size_t) n < dstsize)
-    return dst;
+  if (n > 0 && (size_t) n < dst.size)
+    return dst.p;
 #elif defined(__APPLE__)
-  uint32_t n = (uint32_t) dstsize;
+  uint32_t n = (uint32_t) dst.size;
 
-  if (_NSGetExecutablePath(dst, &n) == 0)
-    return dst;
+  if (_NSGetExecutablePath(dst.p, &n) == 0)
+    return dst.p;
 #elif defined(HTS_SELF_PATH_SYSCTL)
   /* FreeBSD and DragonFly put the pid last, NetBSD puts it third, and 9 is the
      pathname on DragonFly but KERN_PROC_SV_NAME on FreeBSD (#1506). */
@@ -127,25 +127,25 @@ const char *hts_self_path(char *dst, size_t dstsize) {
 #else
   int mib[4] = {CTL_KERN, KERN_PROC, KERN_PROC_PATHNAME, -1};
 #endif
-  size_t n = dstsize;
+  size_t n = dst.size;
 
-  /* All three report strlen + 1, so 1 is the empty path and dst[n - 1] is the
+  /* All three report strlen + 1, so 1 is the empty path and dst.p[n - 1] is the
      kernel's own terminator. */
-  if (sysctl(mib, 4, dst, &n, NULL, 0) == 0 && n > 1 && n <= dstsize &&
-      dst[n - 1] == '\0')
-    return dst;
+  if (sysctl(mib, 4, dst.p, &n, NULL, 0) == 0 && n > 1 && n <= dst.size &&
+      dst.p[n - 1] == '\0')
+    return dst.p;
 #else
   /* Linux; anywhere else this is simply absent and argv[0] has to do. */
-  const ssize_t n = readlink("/proc/self/exe", dst, dstsize - 1);
+  const ssize_t n = readlink("/proc/self/exe", dst.p, dst.size - 1);
 
-  if (n > 0 && (size_t) n < dstsize - 1) {
-    dst[n] = '\0';
-    return dst;
+  if (n > 0 && (size_t) n < dst.size - 1) {
+    dst.p[n] = '\0';
+    return dst.p;
   }
 #endif
   /* GetModuleFileNameA() and sysctl() leave a clipped path on failure, so
      empty dst. */
-  dst[0] = '\0';
+  dst.p[0] = '\0';
   return NULL;
 }
 
@@ -766,7 +766,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
   {
     char datadir[HTS_URLMAXSIZE * 2];
     char selfbuff[HTS_URLMAXSIZE * 2];
-    const char *self = hts_self_path(HTS_SIZED(selfbuff));
+    const char *self = hts_self_path(HTS_BUF(selfbuff));
 
 #ifdef HTS_HTTRACKDIR
     const char *const builtin = HTS_HTTRACKDIR;
