@@ -18,15 +18,16 @@ selftest_queue "Zm9vYmFy" base64 foobar
 selftest_queue "AA==" base64 hex:00
 selftest_queue "+/8=" base64 hex:fbff
 selftest_queue "////" base64 hex:ffffff
-# a CRLF follows every 60 input bytes, none before
-selftest_queue "$(times 20 YWJj)\\r\\n" base64 abc 20 1
-selftest_queue "$(times 20 YWJj)\\r\\nYWJj" base64 abc 21 1
-selftest_queue "$(times 20 YWJj)\\r\\n$(times 20 YWJj)\\r\\n" base64 abc 40 1
+# RFC 2045: a CRLF after every 76 characters (57 input bytes), none before
+selftest_queue "$(times 18 YWJj)" base64 abc 18 1
+selftest_queue "$(times 19 YWJj)\\r\\n" base64 abc 19 1
+selftest_queue "$(times 19 YWJj)\\r\\nYWJj" base64 abc 20 1
+selftest_queue "$(times 19 YWJj)\\r\\n$(times 19 YWJj)\\r\\n" base64 abc 38 1
 selftest_queue "$(times 21 YWJj)" base64 abc 21 0
-selftest_queue "$(times 20 YWFh)\\r\\nYQ==" base64 a 61 1
+selftest_queue "$(times 19 YWFh)\\r\\nYQ==" base64 a 58 1
 # an output of exactly the encoding plus its NUL is enough
 selftest_queue "Zg==" base64 f 1 0 5
-selftest_queue "$(times 20 YWJj)\\r\\n" base64 abc 20 1 83
+selftest_queue "$(times 19 YWJj)\\r\\n" base64 abc 19 1 79
 
 selftest_run_queued
 
@@ -40,4 +41,4 @@ short() {
     esac
 }
 short f 1 0 4
-short abc 20 1 82
+short abc 19 1 78
