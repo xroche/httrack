@@ -289,7 +289,7 @@ const char *hts_get_zerror(int err, hts_buf buf) {
     return "end of list of file";
     break;
   case UNZ_ERRNO:
-    return hts_strerror(errno, buf.p, buf.size);
+    return hts_strerror(errno, buf);
     break;
   case UNZ_PARAMERROR:
     return "parameter error";

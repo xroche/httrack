@@ -997,7 +997,7 @@ static const char *names_note_words(char ***names, size_t *n,
 /* Add to *names the bundles the lines of the -%L file path name. Returns NULL,
    or why the file cannot be read or the crawl refuses a line. */
 static const char *names_note_file(char ***names, size_t *n, const char *path,
-                                   char errbuf[HTS_STRERROR_SIZE]) {
+                                   hts_buf errbuf) {
   char *buff;
   size_t size;
   size_t pos = 0;
@@ -1035,7 +1035,7 @@ HTSEXT_API int hts_bundle_names_in_use(const char *urls, const char *list_file,
   if (why == NULL && urls != NULL)
     why = names_note_words(&list, &n, urls);
   if (why == NULL && list_file != NULL)
-    why = names_note_file(&list, &n, list_file, errbuf);
+    why = names_note_file(&list, &n, list_file, HTS_BUF(errbuf));
   if (why == NULL) {
     char **const grown = realloct(list, (n + 1) * sizeof(char *));
 
