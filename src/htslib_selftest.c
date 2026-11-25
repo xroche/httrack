@@ -1941,7 +1941,7 @@ static int st_secretheaders(httrackp *opt, int argc, char **argv) {
           printf("[%.*s]", (int) (j - i), text + i);
       }
     printf(" shown=");
-    secretheaders_print(hts_header_shown(o, text, got, sizeof(got)));
+    secretheaders_print(hts_header_shown(o, text, HTS_BUF(got)));
     fprintfio(fp, text, "> ", o);
     secrets_read(fp, 0, got, sizeof(got));
     printf(" log=");
@@ -1951,6 +1951,54 @@ static int st_secretheaders(httrackp *opt, int argc, char **argv) {
     hts_free_opt(o);
   }
   return 0;
+}
+
+/* Prints the slices of TEXT the log masks, its -%H log, and its shown form. */
+static int st_secretslices(httrackp *opt, int argc, char **argv) {
+  httrackp *const o = hts_create_opt();
+  FILE *const fp = tmpfile();
+  char headers[128], text[128], probe[128], got[1024];
+  const size_t size = argc > 3 ? (size_t) atoi(argv[3]) : 0;
+  size_t n, i, j;
+  int err = 0;
+
+  (void) opt;
+  if (argc < 3 || o == NULL || fp == NULL || size > sizeof(got) ||
+      st_decode_body(argv[1], headers, sizeof(headers)) + 1 >=
+          sizeof(headers) ||
+      st_decode_body(argv[2], text, sizeof(text)) + 1 >= sizeof(text)) {
+    fprintf(stderr, "secretslices: bad arguments\n");
+    err = 1;
+  } else {
+    hts_secret_add_login(o, argv[0]);
+    hts_secret_add_headers(o, headers);
+    n = strlen(text);
+    for (i = 0; i < n; i++)
+      for (j = i + 1; j <= n; j++) {
+        memcpy(probe, text + i, j - i);
+        probe[j - i] = '\0';
+        hts_hide_secrets(o, probe, sizeof(probe));
+        if (strncmp(probe, text + i, j - i) != 0 || probe[j - i] != '\0') {
+          printf("[%u,%u=", (unsigned) i, (unsigned) j);
+          secretheaders_print(probe);
+          printf("]");
+        }
+      }
+    fprintfio(fp, text, "> ", o);
+    secrets_read(fp, 0, got, sizeof(got));
+    printf(" log=");
+    secretheaders_print(got);
+    if (size != 0) {
+      printf(" shown=");
+      secretheaders_print(hts_header_shown(o, text, hts_buf_at(got, size)));
+    }
+    printf("\n");
+  }
+  if (fp != NULL)
+    fclose(fp);
+  if (o != NULL)
+    hts_free_opt(o);
+  return err;
 }
 
 static int st_secrets(httrackp *opt, int argc, char **argv) {
@@ -2044,8 +2092,9 @@ static int st_secrets(httrackp *opt, int argc, char **argv) {
   memset(big, 'Z', sizeof(big) - 1);
   big[sizeof(big) - 1] = '\0';
   at = ftell(fp);
-  hts_secret_add(o, big, HTS_SECRET_MAXLEN + 1, HTS_SECRET_HEADER);
-  hts_secret_add(o, big + 1, HTS_SECRET_MAXLEN + 1, HTS_SECRET_LOGIN);
+  hts_secret_add(o, hts_span_at(big, HTS_SECRET_MAXLEN + 1), HTS_SECRET_HEADER);
+  hts_secret_add(o, hts_span_at(big + 1, HTS_SECRET_MAXLEN + 1),
+                 HTS_SECRET_LOGIN);
   secrets_read(fp, at, got, sizeof(got));
   w = strstr(got, "over 1024 bytes");
   if (w == NULL || strstr(w + 1, "over 1024 bytes") != NULL) {
@@ -5837,6 +5886,9 @@ const struct selftest_entry selftests_lib[] = {
     {"secretheaders", "<text|hex:..>...",
      "the header tokens the log learns from each block, and how it shows it",
      st_secretheaders},
+    {"secretslices", "<url> <headers> <text> [size]",
+     "each slice of a text the log masks, after learning a login and tokens",
+     st_secretslices},
     {"secrets", "",
      "the log hides a password it has seen in a login, and a header token "
      "anywhere",

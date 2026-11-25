@@ -1955,9 +1955,8 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                       char shown[HTS_URLMAXSIZE * 2];
 
                       /* one write, so a merged stdout cannot split it */
-                      fprintf(
-                          stderr, "warning: -%%X %s: %s\n", why,
-                          hts_header_shown(opt, argv[na], HTS_SIZED(shown)));
+                      fprintf(stderr, "warning: -%%X %s: %s\n", why,
+                              hts_header_shown(opt, argv[na], HTS_BUF(shown)));
                     }
                   }
                   /* A refused line goes in, so the request drops its folds. */
