@@ -1005,7 +1005,8 @@ static const char *names_note_file(char ***names, size_t *n, const char *path,
 
   while (why == NULL) {
     char line[HTS_URLLIST_LINE_SIZE];
-    const hts_urllist_status status = hts_urllist_next(buff, size, &pos, line);
+    const hts_urllist_status status =
+        hts_urllist_next(hts_span_at(buff, size), &pos, line);
 
     if (status == HTS_URLLIST_END)
       break;

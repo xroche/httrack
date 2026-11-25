@@ -1172,7 +1172,8 @@ static int ucs2_check(const unsigned short *units, size_t count,
     src[i * 2 + (swap ? 0 : 1)] = (unsigned char) (units[i] & 0xff);
     src[i * 2 + (swap ? 1 : 0)] = (unsigned char) (units[i] >> 8);
   }
-  got = hts_ucs2_to_utf8(src, count * 2, swap, &got_size);
+  got = hts_ucs2_to_utf8(hts_span_at((const char *) src, count * 2), swap,
+                         &got_size);
   ST_FAIL_IF(err, got == NULL || got_size != want ||
                       memcmp(got, expect, want) != 0 || got[got_size] != '\0');
   freet(got);
@@ -1224,6 +1225,9 @@ static int st_ucs4_oom(httrackp *opt, int argc, char **argv) {
   return 0;
 #endif
 }
+
+/* The bytes of array A, which may be unsigned char, as a span. */
+#define BYTES_SPAN(A) hts_span_at((const char *) (A), sizeof(A))
 
 static int st_ucs2(httrackp *opt, int argc, char **argv) {
   /* A BOM, ASCII, a two-byte and a three-byte code point, a surrogate pair
@@ -1291,7 +1295,8 @@ static int st_ucs2(httrackp *opt, int argc, char **argv) {
       freet(src);
       return 0;
     }
-    out = hts_ucs2_to_utf8(src, units * 2, HTS_FALSE, &out_size);
+    out = hts_ucs2_to_utf8(hts_span_at((const char *) src, units * 2),
+                           HTS_FALSE, &out_size);
     (void) setrlimit(RLIMIT_AS, &saved);
     freet(src);
     if (out != NULL) {
@@ -1317,7 +1322,7 @@ static int st_ucs2(httrackp *opt, int argc, char **argv) {
                                pairs_utf8, HTS_TRUE));
     {
       size_t n = 0;
-      char *got = hts_ucs2_to_utf8(odd, sizeof(odd), HTS_TRUE, &n);
+      char *got = hts_ucs2_to_utf8(BYTES_SPAN(odd), HTS_TRUE, &n);
 
       ST_FAIL_IF(err, got == NULL || n != 7 ||
                           memcmp(got,
@@ -1335,9 +1340,8 @@ static int st_ucs2(httrackp *opt, int argc, char **argv) {
       unsigned char bad[sizeof(text)];
       size_t k;
 
-      ST_FAIL_IF(err,
-                 !hts_utf16_looks_like_text(text, sizeof(text), HTS_TRUE) ||
-                     hts_utf16_looks_like_text(few, sizeof(few), HTS_TRUE));
+      ST_FAIL_IF(err, !hts_utf16_looks_like_text(BYTES_SPAN(text), HTS_TRUE) ||
+                          hts_utf16_looks_like_text(BYTES_SPAN(few), HTS_TRUE));
       /* One unit each: lone high and low halves, private use, noncharacters
          and a C0 control; a dangling byte is not one of them. */
       for (k = 0; k < 6; k++) {
@@ -1347,14 +1351,16 @@ static int st_ucs2(httrackp *opt, int argc, char **argv) {
         memcpy(bad, text, sizeof(text));
         bad[6] = (unsigned char) (units[k] & 0xff);
         bad[7] = (unsigned char) (units[k] >> 8);
-        ST_FAIL_IF(err, hts_utf16_looks_like_text(bad, sizeof(bad), HTS_TRUE));
+        ST_FAIL_IF(err, hts_utf16_looks_like_text(BYTES_SPAN(bad), HTS_TRUE));
       }
       memcpy(bad, text, sizeof(text));
       bad[6] = 0x01;
       bad[7] = 0;
-      ST_FAIL_IF(err, hts_utf16_looks_like_text(bad, sizeof(bad), HTS_TRUE) ||
-                          !hts_utf16_looks_like_text(text, sizeof(text) - 1,
-                                                     HTS_TRUE));
+      ST_FAIL_IF(err,
+                 hts_utf16_looks_like_text(BYTES_SPAN(bad), HTS_TRUE) ||
+                     !hts_utf16_looks_like_text(
+                         hts_span_at((const char *) text, sizeof(text) - 1),
+                         HTS_TRUE));
     }
     /* Every code unit alone, to pin the encoder against its ranges. */
     {
