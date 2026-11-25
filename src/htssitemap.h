@@ -36,6 +36,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsdefines.h"
 #include "htsopt.h"
+#include "htsurlport.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -66,9 +67,8 @@ typedef hts_boolean (*hts_sitemap_handler)(void *arg, const char *url);
    the handler refuses. `is_index` (optional) reports a <sitemapindex>, whose
    URLs are child sitemaps rather than pages. Returns the number of URLs handed
    out, or -1 when the document could not be decompressed within the caps. */
-int hts_sitemap_scan(const char *body, size_t size, int maxurls,
-                     hts_boolean *is_index, hts_sitemap_handler handler,
-                     void *arg);
+int hts_sitemap_scan(hts_span body, int maxurls, hts_boolean *is_index,
+                     hts_sitemap_handler handler, void *arg);
 
 /* --- Engine glue (needs a live httrackp). --- */
 
@@ -95,7 +95,7 @@ hts_boolean hts_sitemap_pending(httrackp *opt, const char *adr,
    through the wizard via htsAddLink, and queue nested sitemaps. `str` supplies
    the parser context of the document being processed. */
 void hts_sitemap_ingest(httrackp *opt, htsmoduleStruct *str, const char *adr,
-                        const char *fil, const char *body, size_t size);
+                        const char *fil, hts_span body);
 
 /* Release the ingestion state held in opt (NULL-safe, idempotent). */
 void hts_sitemap_free(httrackp *opt);

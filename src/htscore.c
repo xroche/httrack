@@ -1822,8 +1822,9 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
         smstr.url_host = urladr();
         smstr.url_file = urlfil();
         smstr.mime = r.contenttype;
-        hts_sitemap_ingest(opt, &smstr, urladr(), urlfil(), r.adr,
-                           r.adr != NULL && r.size > 0 ? (size_t) r.size : 0);
+        hts_sitemap_ingest(
+            opt, &smstr, urladr(), urlfil(),
+            hts_span_at(r.adr, r.size > 0 ? (size_t) r.size : 0));
       }
 
       // ------------------------------------------------------
