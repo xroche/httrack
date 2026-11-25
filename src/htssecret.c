@@ -164,7 +164,8 @@ static hts_boolean login_at(hts_span s, size_t i, size_t n) {
     while (u != 0 && strchr("/ \t\r\n", s.p[u - 1]) == NULL)
       u--;
     for (k = 0; k < sizeof(opaque) / sizeof(opaque[0]); k++)
-      if (strlen(opaque[k]) == i - 1 - u && strfield(s.p + u, opaque[k]))
+      if (hts_span_eq_ci(hts_span_at(s.p + u, i - 1 - u),
+                         hts_span_of(opaque[k])))
         return HTS_FALSE;
   }
   return word_start(s.p, u);
