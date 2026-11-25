@@ -588,11 +588,11 @@ static char *st_spool_record(const lien_back *back, long *len) {
   return buf;
 }
 
-static lien_back *st_spool_read(const char *buf, size_t len) {
+static lien_back *st_spool_read(hts_span rec) {
   FILE *const fp = tmpfile();
   lien_back *copy = NULL;
 
-  if (fp != NULL && fwrite(buf, 1, len, fp) == len &&
+  if (fp != NULL && fwrite(rec.p, 1, rec.len, fp) == rec.len &&
       fseek(fp, 0, SEEK_SET) == 0 && back_unserialize(fp, &copy) != 0 &&
       copy != NULL) {
     fprintf(stderr, "spoolrecord: a refused record kept a slot\n");
@@ -720,7 +720,7 @@ static int st_spoolrecord(httrackp *opt, int argc, char **argv) {
   back->early_add = 1;
   back->r.headers = strdupt(hdrs);
   rec = st_spool_record(back, &len);
-  copy = rec != NULL ? st_spool_read(rec, (size_t) len) : NULL;
+  copy = rec != NULL ? st_spool_read(hts_span_at(rec, (size_t) len)) : NULL;
   if (copy == NULL) {
     fprintf(stderr, "spoolrecord: a full slot did not round-trip\n");
     err = 1;
@@ -795,7 +795,7 @@ static int st_spoolrecord(httrackp *opt, int argc, char **argv) {
       memcpy(forged + sizeof(size_t), &bad[c], sizeof(size_t));
       memset(forged + head, 'a', claim);
       memcpy(forged + head + claim, rec + head + (room - 1), rest);
-      copy = st_spool_read(forged, size);
+      copy = st_spool_read(hts_span_at(forged, size));
       if (copy != NULL) {
         fprintf(stderr, "spoolrecord: a %lu-byte field length was read\n",
                 (unsigned long) bad[c]);
@@ -811,7 +811,7 @@ static int st_spoolrecord(httrackp *opt, int argc, char **argv) {
       const size_t ours = sizeof(lien_back);
 
       memcpy(rec, &other, sizeof(other));
-      copy = st_spool_read(rec, (size_t) len);
+      copy = st_spool_read(hts_span_at(rec, (size_t) len));
       if (copy != NULL) {
         fprintf(stderr, "spoolrecord: a foreign struct size was read\n");
         err = 1;
@@ -822,7 +822,7 @@ static int st_spoolrecord(httrackp *opt, int argc, char **argv) {
     }
     /* the control: the record as written, at the longest legal length */
     if (rec != NULL) {
-      copy = st_spool_read(rec, (size_t) len);
+      copy = st_spool_read(hts_span_at(rec, (size_t) len));
       if (copy == NULL) {
         fprintf(stderr, "spoolrecord: the unforged record was refused\n");
         err = 1;

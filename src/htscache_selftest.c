@@ -96,14 +96,14 @@ static void store_entry(httrackp *opt, cache_back *cache, const char *adr,
                         const char *msg, const char *contenttype,
                         const char *charset, const char *lastmodified,
                         const char *etag, const char *location,
-                        const char *cdispo, const char *body, size_t body_len) {
+                        const char *cdispo, hts_span body) {
   htsblk r;
   char locbuf[HTS_LOCATION_SIZE];
   char *bodycopy = NULL;
 
   hts_init_htsblk(&r);
   r.statuscode = statuscode;
-  r.size = (LLint) body_len;
+  r.size = (LLint) body.len;
   strcpybuff(r.msg, msg);
   strcpybuff(r.contenttype, contenttype);
   strcpybuff(r.charset, charset);
@@ -114,9 +114,9 @@ static void store_entry(httrackp *opt, cache_back *cache, const char *adr,
   r.location = locbuf;
   r.is_write = 0;
   /* an empty body must be NULL: cache_add rejects non-NULL with size 0 */
-  if (body_len != 0) {
-    bodycopy = malloct(body_len);
-    memcpy(bodycopy, body, body_len);
+  if (body.len != 0) {
+    bodycopy = malloct(body.len);
+    memcpy(bodycopy, body.p, body.len);
     r.adr = bodycopy;
   }
   /* all_in_cache=1: body stays in the ZIP, so reads never need a disk file */
@@ -132,7 +132,7 @@ static int check_entry(httrackp *opt, cache_back *cache, const char *adr,
                        const char *contenttype, const char *charset,
                        const char *lastmodified, const char *etag,
                        const char *location, const char *cdispo,
-                       const char *body, size_t body_len) {
+                       hts_span body) {
   int fail = 0;
   char *locbuf = malloct(HTS_LOCATION_SIZE);
   htsblk r;
@@ -164,12 +164,12 @@ static int check_entry(httrackp *opt, cache_back *cache, const char *adr,
   CHECK_STR(locbuf, location);
   CHECK_STR(r.cdispo, cdispo);
 
-  if (r.size != (LLint) body_len) {
+  if (r.size != (LLint) body.len) {
     fprintf(stderr, "%s: %s%s: size is " LLintP ", expected %d\n", selftest_tag,
-            adr, fil, (LLint) r.size, (int) body_len);
+            adr, fil, (LLint) r.size, (int) body.len);
     fail++;
-  } else if (body_len != 0 &&
-             (r.adr == NULL || memcmp(r.adr, body, body_len) != 0)) {
+  } else if (body.len != 0 &&
+             (r.adr == NULL || memcmp(r.adr, body.p, body.len) != 0)) {
     fprintf(stderr, "%s: %s%s: body mismatch\n", selftest_tag, adr, fil);
     fail++;
   }
@@ -194,16 +194,16 @@ static int check_entry(httrackp *opt, cache_back *cache, const char *adr,
 /* Fill a body of the requested size. kind 0 is highly compressible (a short
    repeating pattern), kind 1 is incompressible (a deterministic PRNG), kind 2
    alternates the two -- together they exercise both deflate outcomes. */
-static void gen_body(char *buf, size_t len, int kind) {
-  unsigned int seed = 0x9e3779b1u ^ (unsigned int) len;
+static void gen_body(hts_buf buf, int kind) {
+  unsigned int seed = 0x9e3779b1u ^ (unsigned int) buf.size;
   size_t j;
 
-  for (j = 0; j < len; j++) {
+  for (j = 0; j < buf.size; j++) {
     if (kind == 0 || (kind == 2 && (j & 1) == 0)) {
-      buf[j] = (char) ('A' + (j % 26));
+      buf.p[j] = (char) ('A' + (j % 26));
     } else {
       seed = seed * 1103515245u + 12345u;
-      buf[j] = (char) (seed >> 16);
+      buf.p[j] = (char) (seed >> 16);
     }
   }
 }
@@ -425,20 +425,20 @@ static zipFile selftest_open_failing_zip(const char *path,
 
 /* Store one octet-stream body into `cache` (all-in-cache, body in the ZIP). */
 static void writefail_store(httrackp *opt, cache_back *cache, const char *fil,
-                            const char *body, size_t body_len) {
+                            hts_span body) {
   htsblk r;
   char locbuf[4];
-  char *bodycopy = malloct(body_len);
+  char *bodycopy = malloct(body.len);
 
   hts_init_htsblk(&r);
   r.statuscode = 200;
-  r.size = (LLint) body_len;
+  r.size = (LLint) body.len;
   strcpybuff(r.msg, "OK");
   strcpybuff(r.contenttype, "application/octet-stream");
   locbuf[0] = '\0';
   r.location = locbuf;
   r.is_write = 0;
-  memcpy(bodycopy, body, body_len);
+  memcpy(bodycopy, body.p, body.len);
   r.adr = bodycopy;
   cache_add(opt, cache, &r, "example.com", fil, "example.com/blob.bin", 1,
             NULL);
@@ -465,8 +465,7 @@ static void writefail_store_oversized(httrackp *opt, cache_back *cache,
 /* Read back `entryname`: extra field (cached headers) and body. Returns the
    body length, or -1 if the entry is absent or unreadable. */
 static int writefail_read_entry(const char *path, const char *entryname,
-                                char *extra, size_t extralen, char *body,
-                                size_t bodylen) {
+                                hts_buf extra, hts_buf body) {
   unzFile z = unzOpen(path);
   int n = -1;
 
@@ -474,11 +473,12 @@ static int writefail_read_entry(const char *path, const char *entryname,
     return -1;
   if (unzLocateFile(z, entryname, 1) == UNZ_OK &&
       unzOpenCurrentFile(z) == UNZ_OK) {
-    const int elen = unzGetLocalExtrafield(z, extra, (unsigned) (extralen - 1));
+    const int elen =
+        unzGetLocalExtrafield(z, extra.p, (unsigned) (extra.size - 1));
 
     if (elen >= 0) {
-      extra[elen] = '\0';
-      n = unzReadCurrentFile(z, body, (unsigned) bodylen);
+      extra.p[elen] = '\0';
+      n = unzReadCurrentFile(z, body.p, (unsigned) body.size);
     }
     unzCloseCurrentFile(z);
   }
@@ -497,7 +497,7 @@ static int cache_write_failure_selftest(httrackp *opt, const char *dir) {
   char *body = malloct(body_len);
   int phase;
 
-  gen_body(body, body_len, 1 /* incompressible */);
+  gen_body(hts_buf_at(body, body_len), 1 /* incompressible */);
   fconcat(path, sizeof(path), dir, "/wfail.zip");
 
   /* phase 0: fatal errno (ENOSPC) aborts at once; phase 1: persistent EIO
@@ -526,7 +526,7 @@ static int cache_write_failure_selftest(httrackp *opt, const char *dir) {
 
     opt->state.exit_xh = 0; /* clear; the failing write must set it to -1 */
     if (phase == 0) {
-      writefail_store(opt, &cache, "/blob.bin", body, body_len);
+      writefail_store(opt, &cache, "/blob.bin", hts_span_at(body, body_len));
     } else {
       /* the abort must land on the 8th consecutive failure */
       int i;
@@ -535,14 +535,14 @@ static int cache_write_failure_selftest(httrackp *opt, const char *dir) {
         char fil[32];
 
         snprintf(fil, sizeof(fil), "/b%d.bin", i);
-        writefail_store(opt, &cache, fil, body, 16);
+        writefail_store(opt, &cache, fil, hts_span_at(body, 16));
       }
       if (cache.zipWriteFailed) {
         fprintf(stderr, "cache-writefail: phase 1: aborted before the "
                         "8th consecutive failure\n");
         fail++;
       }
-      writefail_store(opt, &cache, "/b7.bin", body, 16);
+      writefail_store(opt, &cache, "/b7.bin", hts_span_at(body, 16));
     }
     if (!cache.zipWriteFailed) {
       fprintf(stderr, "cache-writefail: phase %d: write error not caught\n",
@@ -558,7 +558,7 @@ static int cache_write_failure_selftest(httrackp *opt, const char *dir) {
 
     /* a flagged cache must no-op a sibling write: no further backend write */
     writes_after_fail = inj.writes;
-    writefail_store(opt, &cache, "/blob2.bin", body, 16);
+    writefail_store(opt, &cache, "/blob2.bin", hts_span_at(body, 16));
     if (inj.writes != writes_after_fail) {
       fprintf(stderr,
               "cache-writefail: phase %d: sibling write re-entered the broken "
@@ -599,10 +599,10 @@ static int cache_write_failure_selftest(httrackp *opt, const char *dir) {
 
       inj.budget = 0; /* this store fails */
       snprintf(fil, sizeof(fil), "/s%d.bin", i);
-      writefail_store(opt, &cache, fil, body, 16);
+      writefail_store(opt, &cache, fil, hts_span_at(body, 16));
       inj.budget = (size_t) -1; /* this one succeeds and resets the streak */
       snprintf(fil, sizeof(fil), "/ok%d.bin", i);
-      writefail_store(opt, &cache, fil, body, 16);
+      writefail_store(opt, &cache, fil, hts_span_at(body, 16));
     }
     if (cache.zipWriteFailed || opt->state.exit_xh != 0) {
       fprintf(stderr,
@@ -637,7 +637,7 @@ static int cache_write_failure_selftest(httrackp *opt, const char *dir) {
     cache.zipOutput = selftest_open_failing_zip(path, &inj, HTS_TRUE);
     opt->state.exit_xh = 0;
 
-    writefail_store(opt, &cache, "/blob.bin", body, body_len);
+    writefail_store(opt, &cache, "/blob.bin", hts_span_at(body, body_len));
     if (cache.zipWriteFailed || opt->state.exit_xh != 0) {
       fprintf(stderr,
               "cache-writefail: skip: isolated failure aborted the mirror "
@@ -657,11 +657,11 @@ static int cache_write_failure_selftest(httrackp *opt, const char *dir) {
               inj.truncates);
       fail++;
     }
-    writefail_store(opt, &cache, "/blob2.bin", body, 16);
+    writefail_store(opt, &cache, "/blob2.bin", hts_span_at(body, 16));
     zipClose(cache.zipOutput, NULL);
     cache.zipOutput = NULL;
-    n = writefail_read_entry(path, "http://example.com/blob2.bin", extra,
-                             sizeof(extra), rbody, sizeof(rbody));
+    n = writefail_read_entry(path, "http://example.com/blob2.bin",
+                             HTS_BUF(extra), HTS_BUF(rbody));
     if (n != 16 || memcmp(rbody, body, 16) != 0) {
       fprintf(stderr,
               "cache-writefail: skip: sibling entry lost after a skipped "
@@ -694,7 +694,7 @@ static int cache_write_failure_selftest(httrackp *opt, const char *dir) {
     cache.zipOutput = selftest_open_failing_zip(path, &inj, HTS_FALSE);
     opt->state.exit_xh = 0;
 
-    writefail_store(opt, &cache, "/blob.bin", body, body_len);
+    writefail_store(opt, &cache, "/blob.bin", hts_span_at(body, body_len));
     if (cache.zipWriteFailed || opt->state.exit_xh != 0) {
       fprintf(stderr,
               "cache-writefail: notrunc: a rewind-only rollback aborted the "
@@ -709,11 +709,11 @@ static int cache_write_failure_selftest(httrackp *opt, const char *dir) {
               inj.truncates);
       fail++;
     }
-    writefail_store(opt, &cache, "/blob2.bin", body, 16);
+    writefail_store(opt, &cache, "/blob2.bin", hts_span_at(body, 16));
     zipClose(cache.zipOutput, NULL);
     cache.zipOutput = NULL;
-    n = writefail_read_entry(path, "http://example.com/blob2.bin", extra,
-                             sizeof(extra), rbody, sizeof(rbody));
+    n = writefail_read_entry(path, "http://example.com/blob2.bin",
+                             HTS_BUF(extra), HTS_BUF(rbody));
     if (n != 16 || memcmp(rbody, body, 16) != 0) {
       fprintf(stderr,
               "cache-writefail: notrunc: sibling entry lost after a rewind "
@@ -757,14 +757,14 @@ static int cache_write_failure_selftest(httrackp *opt, const char *dir) {
               (int) cache.zipWriteFailed, opt->state.exit_xh);
       fail++;
     }
-    if (writefail_read_entry(path, "http://example.com/bigmem.bin", extra,
-                             sizeof(extra), rbody, sizeof(rbody)) >= 0) {
+    if (writefail_read_entry(path, "http://example.com/bigmem.bin",
+                             HTS_BUF(extra), HTS_BUF(rbody)) >= 0) {
       fprintf(stderr,
               "cache-writefail: oversize: in-memory entry was stored\n");
       fail++;
     }
-    n = writefail_read_entry(path, "http://example.com/bigdisk.bin", extra,
-                             sizeof(extra), rbody, sizeof(rbody));
+    n = writefail_read_entry(path, "http://example.com/bigdisk.bin",
+                             HTS_BUF(extra), HTS_BUF(rbody));
     if (n != 0 || strstr(extra, "X-In-Cache: 0") == NULL) {
       fprintf(stderr,
               "cache-writefail: oversize: on-disk entry not stored "
@@ -864,7 +864,7 @@ static int cache_selftests(httrackp *opt, const char *dir) {
 
   for (i = 0; i < large_count; i++) {
     large_body[i] = malloct(large_size[i]);
-    gen_body(large_body[i], large_size[i], i);
+    gen_body(hts_buf_at(large_body[i], large_size[i]), i);
   }
 
   /* set up an isolated cache directory */
@@ -888,26 +888,25 @@ static int cache_selftests(httrackp *opt, const char *dir) {
   /* edge cases (cdispo "" except where noted): normal HTML page */
   store_entry(opt, &cache, "example.com", "/", "example.com/index.html", 200,
               "OK", "text/html", "utf-8", "Mon, 01 Jan 2024 00:00:00 GMT",
-              "etag-normal", "", "", body_index, strlen(body_index));
+              "etag-normal", "", "", hts_span_of(body_index));
   /* redirect: empty body, empty optional fields, near-limit location */
   store_entry(opt, &cache, "example.com", "/moved", "example.com/moved.html",
               301, "Moved Permanently", "text/html", "", "", "", location_long,
-              "", NULL, 0);
+              "", hts_span_at(NULL, 0));
   /* non-HTML content-type, near-limit etag */
   store_entry(opt, &cache, "example.com", "/api", "example.com/api.json", 200,
               "OK", "application/json", "utf-8",
-              "Tue, 02 Jan 2024 12:00:00 GMT", etag_long, "", "", body_api,
-              strlen(body_api));
+              "Tue, 02 Jan 2024 12:00:00 GMT", etag_long, "", "",
+              hts_span_of(body_api));
   /* binary body, with a Content-Disposition */
   store_entry(opt, &cache, "example.com", "/logo", "example.com/logo.png", 200,
               "OK", "image/png", "", "", "etag-bin", "",
-              "attachment; filename=\"logo.png\"", binary_body,
-              sizeof(binary_body));
+              "attachment; filename=\"logo.png\"",
+              hts_span_at(binary_body, sizeof(binary_body)));
   /* error status with a body and a location */
   store_entry(opt, &cache, "example.com", "/gone", "example.com/gone.html", 404,
               "Not Found", "text/html", "utf-8", "", "etag-404",
-              "https://example.com/where-it-went", "", body_404,
-              strlen(body_404));
+              "https://example.com/where-it-went", "", hts_span_of(body_404));
 
   /* scale: a few thousand small entries */
   for (i = 0; i < SELFTEST_VOLUME; i++) {
@@ -917,7 +916,7 @@ static int cache_selftests(httrackp *opt, const char *dir) {
     sprintf(save, "example.com/v/%05d.html", i);
     sprintf(body, "<html>volume entry %d</html>", i);
     store_entry(opt, &cache, "example.com", fil, save, 200, "OK", "text/html",
-                "utf-8", "", "", "", "", body, strlen(body));
+                "utf-8", "", "", "", "", hts_span_of(body));
   }
 
   /* compression: a few large bodies */
@@ -927,8 +926,8 @@ static int cache_selftests(httrackp *opt, const char *dir) {
     sprintf(fil, "/big/%d.bin", i);
     sprintf(save, "example.com/big/%d.bin", i);
     store_entry(opt, &cache, "example.com", fil, save, 200, "OK",
-                "application/octet-stream", "", "", "", "", "", large_body[i],
-                large_size[i]);
+                "application/octet-stream", "", "", "", "", "",
+                hts_span_at(large_body[i], large_size[i]));
   }
 
   selftest_close(&cache);
@@ -936,25 +935,24 @@ static int cache_selftests(httrackp *opt, const char *dir) {
   /* pass 2: read back and verify everything round-tripped */
   selftest_open_for_read(&cache, opt);
 
-  failures +=
-      check_entry(opt, &cache, "example.com", "/", 200, "OK", "text/html",
-                  "utf-8", "Mon, 01 Jan 2024 00:00:00 GMT", "etag-normal", "",
-                  "", body_index, strlen(body_index));
+  failures += check_entry(opt, &cache, "example.com", "/", 200, "OK",
+                          "text/html", "utf-8", "Mon, 01 Jan 2024 00:00:00 GMT",
+                          "etag-normal", "", "", hts_span_of(body_index));
   failures += check_entry(opt, &cache, "example.com", "/moved", 301,
                           "Moved Permanently", "text/html", "", "", "",
-                          location_long, "", NULL, 0);
+                          location_long, "", hts_span_at(NULL, 0));
   failures +=
       check_entry(opt, &cache, "example.com", "/api", 200, "OK",
                   "application/json", "utf-8", "Tue, 02 Jan 2024 12:00:00 GMT",
-                  etag_long, "", "", body_api, strlen(body_api));
+                  etag_long, "", "", hts_span_of(body_api));
   failures +=
       check_entry(opt, &cache, "example.com", "/logo", 200, "OK", "image/png",
                   "", "", "etag-bin", "", "attachment; filename=\"logo.png\"",
-                  binary_body, sizeof(binary_body));
+                  hts_span_at(binary_body, sizeof(binary_body)));
   failures += check_entry(opt, &cache, "example.com", "/gone", 404, "Not Found",
                           "text/html", "utf-8", "", "etag-404",
-                          "https://example.com/where-it-went", "", body_404,
-                          strlen(body_404));
+                          "https://example.com/where-it-went", "",
+                          hts_span_of(body_404));
 
   for (i = 0; i < SELFTEST_VOLUME; i++) {
     char fil[64], body[64];
@@ -963,7 +961,7 @@ static int cache_selftests(httrackp *opt, const char *dir) {
     sprintf(body, "<html>volume entry %d</html>", i);
     failures +=
         check_entry(opt, &cache, "example.com", fil, 200, "OK", "text/html",
-                    "utf-8", "", "", "", "", body, strlen(body));
+                    "utf-8", "", "", "", "", hts_span_of(body));
   }
 
   for (i = 0; i < large_count; i++) {
@@ -972,7 +970,7 @@ static int cache_selftests(httrackp *opt, const char *dir) {
     sprintf(fil, "/big/%d.bin", i);
     failures += check_entry(opt, &cache, "example.com", fil, 200, "OK",
                             "application/octet-stream", "", "", "", "", "",
-                            large_body[i], large_size[i]);
+                            hts_span_at(large_body[i], large_size[i]));
   }
 
   selftest_close(&cache);
@@ -981,7 +979,7 @@ static int cache_selftests(httrackp *opt, const char *dir) {
   selftest_open_for_write(&cache, opt);
   store_entry(opt, &cache, "example.com", "/", "example.com/index.html", 200,
               "OK", "text/html", "iso-8859-1", "Wed, 03 Jan 2024 09:30:00 GMT",
-              "etag-updated", "", "", body_updated, strlen(body_updated));
+              "etag-updated", "", "", hts_span_of(body_updated));
   selftest_close(&cache);
 
   /* pass 4: re-read and confirm the updated value, not the old one */
@@ -989,7 +987,7 @@ static int cache_selftests(httrackp *opt, const char *dir) {
   failures +=
       check_entry(opt, &cache, "example.com", "/", 200, "OK", "text/html",
                   "iso-8859-1", "Wed, 03 Jan 2024 09:30:00 GMT", "etag-updated",
-                  "", "", body_updated, strlen(body_updated));
+                  "", "", hts_span_of(body_updated));
   selftest_close(&cache);
 
   /* pass 5: the disk-fallback read path (X-In-Cache: 0, body on disk) */
@@ -1083,7 +1081,7 @@ static int cache_golden_selftest(httrackp *opt, const char *dir, int regen) {
 
       store_entry(opt, &cache, e->adr, e->fil, e->save, e->statuscode, e->msg,
                   e->contenttype, e->charset, e->lastmodified, e->etag,
-                  e->location, e->cdispo, e->body, e->body_len);
+                  e->location, e->cdispo, hts_span_at(e->body, e->body_len));
     }
     selftest_close(&cache);
   }
@@ -1095,7 +1093,7 @@ static int cache_golden_selftest(httrackp *opt, const char *dir, int regen) {
     failures +=
         check_entry(opt, &cache, e->adr, e->fil, e->statuscode, e->msg,
                     e->contenttype, e->charset, e->lastmodified, e->etag,
-                    e->location, e->cdispo, e->body, e->body_len);
+                    e->location, e->cdispo, hts_span_at(e->body, e->body_len));
   }
   selftest_close(&cache);
 
@@ -1684,7 +1682,7 @@ static int cache_legacy_refused_selftest(httrackp *opt, const char *dir) {
     reconcile_wipe(opt);
     selftest_open_for_write(&cache, opt);
     store_entry(opt, &cache, "example.com", "/", "example.com/index.html", 200,
-                "OK", "text/html", "utf-8", "", "", "", "", body, strlen(body));
+                "OK", "text/html", "utf-8", "", "", "", "", hts_span_of(body));
     selftest_close(&cache);
     reconcile_put(opt, "hts-cache/old.ndx", 4096);
     reconcile_put(opt, "hts-cache/old.dat", 4096);
@@ -1695,7 +1693,7 @@ static int cache_legacy_refused_selftest(httrackp *opt, const char *dir) {
     }
     failures +=
         check_entry(opt, &cache, "example.com", "/", 200, "OK", "text/html",
-                    "utf-8", "", "", "", "", body, strlen(body));
+                    "utf-8", "", "", "", "", hts_span_of(body));
     if (fsize(reconcile_st_path(opt, "hts-cache/old.ndx")) != 4096 ||
         fsize(reconcile_st_path(opt, "hts-cache/old.dat")) != 4096) {
       printf("cache-legacy: zip-wins pass touched the legacy files\n");
@@ -1741,11 +1739,11 @@ static void corrupt_build(httrackp *opt, const char *etag) {
   remove(reconcile_st_path(opt, "hts-cache/old.zip"));
   selftest_open_for_write(&cache, opt);
   store_entry(opt, &cache, CORRUPT_ADR, "/canary.html", "canary.html", 200,
-              "OK", "text/html", "utf-8", "", "", "", "", corrupt_body_a,
-              strlen(corrupt_body_a));
+              "OK", "text/html", "utf-8", "", "", "", "",
+              hts_span_of(corrupt_body_a));
   store_entry(opt, &cache, CORRUPT_ADR, "/victim.html", "victim.html", 200,
-              "OK", "text/html", "utf-8", "", etag, "", "", corrupt_body_b,
-              strlen(corrupt_body_b));
+              "OK", "text/html", "utf-8", "", etag, "", "",
+              hts_span_of(corrupt_body_b));
   selftest_close(&cache);
 }
 
@@ -1769,8 +1767,8 @@ static void corrupt_build_disk(httrackp *opt) {
          CORRUPT_ADR "/victim.bin");
   selftest_open_for_write(&cache, opt);
   store_entry(opt, &cache, CORRUPT_ADR, "/canary.html", "canary.html", 200,
-              "OK", "text/html", "utf-8", "", "", "", "", corrupt_body_a,
-              strlen(corrupt_body_a));
+              "OK", "text/html", "utf-8", "", "", "", "",
+              hts_span_of(corrupt_body_a));
   hts_init_htsblk(&w);
   w.statuscode = 200;
   w.size = (LLint) sizeof(corrupt_body_b) - 1;
@@ -1794,9 +1792,8 @@ static void corrupt_build_disk(httrackp *opt) {
 /* Patch the nth of total occurrences of pat in new.zip. `line` demands the
    match span a whole header line, so a placeholder longer than the forged
    replacement cannot leave its tail on the value. */
-static void corrupt_patch_bytes(httrackp *opt, const char *pat, size_t patlen,
-                                const char *rep, size_t nth, size_t total,
-                                hts_boolean line) {
+static void corrupt_patch_bytes(httrackp *opt, hts_span pat, const char *rep,
+                                size_t nth, size_t total, hts_boolean line) {
   LLint fsz = 0;
   char *data = readfile2(reconcile_st_path(opt, "hts-cache/new.zip"), &fsz);
   const size_t n = (size_t) fsz;
@@ -1804,23 +1801,22 @@ static void corrupt_patch_bytes(httrackp *opt, const char *pat, size_t patlen,
   FILE *fp;
 
   assertf(data != NULL);
-  for (k = 0; k + patlen <= n; k++) {
-    if (memcmp(data + k, pat, patlen) == 0) {
+  for (k = 0; k + pat.len <= n; k++) {
+    if (memcmp(data + k, pat.p, pat.len) == 0) {
       hits++;
       if (hits == nth)
         at = k;
     }
   }
   assertf(hits == total);
-  /* either literal short of patlen would be read past its end */
-  assertf(strlen(pat) == patlen);
-  assertf(strlen(rep) == patlen);
+  /* a shorter replacement would be read past its end */
+  assertf(strlen(rep) == pat.len);
   if (line) {
     assertf(at > 0 && data[at - 1] == '\n');
-    assertf(at + patlen + 2 <= n);
-    assertf(memcmp(data + at + patlen, "\r\n", 2) == 0);
+    assertf(at + pat.len + 2 <= n);
+    assertf(memcmp(data + at + pat.len, "\r\n", 2) == 0);
   }
-  memcpy(data + at, rep, patlen);
+  memcpy(data + at, rep, pat.len);
   fp = fopen(reconcile_st_path(opt, "hts-cache/new.zip"), "wb");
   assertf(fp != NULL);
   assertf(hts_fwrite_exact(data, n, fp));
@@ -1829,9 +1825,9 @@ static void corrupt_patch_bytes(httrackp *opt, const char *pat, size_t patlen,
 }
 
 /* Forge one whole header line, same byte length, so the zip offsets hold. */
-static void corrupt_patch(httrackp *opt, const char *pat, size_t patlen,
-                          const char *rep, size_t nth, size_t total) {
-  corrupt_patch_bytes(opt, pat, patlen, rep, nth, total, HTS_TRUE);
+static void corrupt_patch(httrackp *opt, hts_span pat, const char *rep,
+                          size_t nth, size_t total) {
+  corrupt_patch_bytes(opt, pat, rep, nth, total, HTS_TRUE);
 }
 
 /* Garbage the first bytes of the victim's deflated data (2nd local header). */
@@ -2011,7 +2007,7 @@ static int corrupt_case_zip(httrackp *opt, const char *pat, const char *rep,
                             size_t nth, size_t total, const char *wantmsg,
                             const char *what) {
   corrupt_build(opt, "");
-  corrupt_patch(opt, pat, strlen(pat), rep, nth, total);
+  corrupt_patch(opt, hts_span_of(pat), rep, nth, total);
   return corrupt_expect_victim(opt, wantmsg, what);
 }
 
@@ -2046,7 +2042,8 @@ static int cache_corruption_selftest(httrackp *opt, const char *dir) {
       "Cache Read Error : Bad Filename", "X-Save naming an absolute path");
   /* smashed local file header: the entry is dropped at index load */
   corrupt_build(opt, "");
-  corrupt_patch_bytes(opt, "PK\x03\x04", 4, "XK\x03\x04", 2, 2, HTS_FALSE);
+  corrupt_patch_bytes(opt, hts_span_of("PK\x03\x04"), "XK\x03\x04", 2, 2,
+                      HTS_FALSE);
   failures += corrupt_expect_victim(opt, "File Cache Entry Not Found",
                                     "smashed local header");
 
@@ -2064,7 +2061,7 @@ static int cache_corruption_selftest(httrackp *opt, const char *dir) {
      entry; aborting would take the crawl down. Overwrite the placeholder Etag
      line in place, same byte length, so the zip offsets stay intact. */
   corrupt_build(opt, CORRUPT_LONG_ETAG);
-  corrupt_patch(opt, "Etag: " CORRUPT_LONG_ETAG, 106,
+  corrupt_patch(opt, hts_span_of("Etag: " CORRUPT_LONG_ETAG),
                 "X-StatusMessage: " /* 17 + 89 = 106 */
                 "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
                 "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
@@ -2076,7 +2073,7 @@ static int cache_corruption_selftest(httrackp *opt, const char *dir) {
   /* lastmodified[64] is narrower than msg[80], so a single hardcoded clip
      length cannot fit both. */
   corrupt_build(opt, CORRUPT_LONG_ETAG);
-  corrupt_patch(opt, "Etag: " CORRUPT_LONG_ETAG, 106,
+  corrupt_patch(opt, hts_span_of("Etag: " CORRUPT_LONG_ETAG),
                 "Last-Modified: " /* 15 + 91 = 106 */
                 "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
                 "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
@@ -2088,7 +2085,7 @@ static int cache_corruption_selftest(httrackp *opt, const char *dir) {
   /* An X-Size above INT_MAX goes negative in the (int) cast for malloc.
      A same-length X-Size line replaces the long Etag. */
   corrupt_build(opt, "AAAAAAAAAAAAAAAAAAAA");
-  corrupt_patch(opt, "Etag: AAAAAAAAAAAAAAAAAAAA", 26,
+  corrupt_patch(opt, hts_span_of("Etag: AAAAAAAAAAAAAAAAAAAA"),
                 "X-Size: 2147483648AAAAAAAA", 1, 1);
   failures += corrupt_expect_victim(opt, "Cache Read Error : Bad Size",
                                     "X-Size above INT_MAX");
@@ -2097,7 +2094,7 @@ static int cache_corruption_selftest(httrackp *opt, const char *dir) {
      is how every >2GB non-html file is stored. It must survive a header probe
      (or every update re-fetches the file); an in-memory read still rejects. */
   corrupt_build_disk(opt);
-  corrupt_patch(opt, "Etag: AAAAAAAAAAAAAAAAAAAA", 26,
+  corrupt_patch(opt, hts_span_of("Etag: AAAAAAAAAAAAAAAAAAAA"),
                 "X-Size: 2147483648AAAAAAAA", 1, 1);
   failures += corrupt_expect_disk_header(opt, (LLint) 2147483648LL,
                                          "headers-only X-Size above INT_MAX");
@@ -2107,7 +2104,7 @@ static int cache_corruption_selftest(httrackp *opt, const char *dir) {
 
   /* exactly INT_MAX pins the >= boundary: (int) r.size + 1 would overflow */
   corrupt_build_disk(opt);
-  corrupt_patch(opt, "Etag: AAAAAAAAAAAAAAAAAAAA", 26,
+  corrupt_patch(opt, hts_span_of("Etag: AAAAAAAAAAAAAAAAAAAA"),
                 "X-Size: 2147483647AAAAAAAA", 1, 1);
   failures += corrupt_expect_victim_fil(opt, "/victim.bin",
                                         "Cache Read Error : Bad Size",
@@ -2115,7 +2112,7 @@ static int cache_corruption_selftest(httrackp *opt, const char *dir) {
 
   /* the negative check must stay global, headers-only included */
   corrupt_build_disk(opt);
-  corrupt_patch(opt, "Etag: AAAAAAAAAAAAAAAAAAAA", 26,
+  corrupt_patch(opt, hts_span_of("Etag: AAAAAAAAAAAAAAAAAAAA"),
                 "X-Size: -2147483648AAAAAAA", 1, 1);
   failures += corrupt_expect_victim_fil(opt, "/victim.bin",
                                         "Cache Read Error : Bad Size",
@@ -2127,17 +2124,16 @@ static int cache_corruption_selftest(httrackp *opt, const char *dir) {
 /* Header block of the ZIP's first entry, from its local extra field. By
    position, not name: unzLocateFile compares through a 256-byte buffer and
    cannot find the multi-KB entry name this test writes. */
-static int read_first_entry_extra(const char *path, char *extra,
-                                  size_t extralen) {
+static int read_first_entry_extra(const char *path, hts_buf extra) {
   unzFile z = unzOpen(path);
   int elen = -1;
 
   if (z == NULL)
     return -1;
   if (unzGoToFirstFile(z) == UNZ_OK && unzOpenCurrentFile(z) == UNZ_OK) {
-    elen = unzGetLocalExtrafield(z, extra, (unsigned) (extralen - 1));
+    elen = unzGetLocalExtrafield(z, extra.p, (unsigned) (extra.size - 1));
     if (elen >= 0) {
-      extra[elen] = '\0';
+      extra.p[elen] = '\0';
     }
     unzCloseCurrentFile(z);
   }
@@ -2145,10 +2141,10 @@ static int read_first_entry_extra(const char *path, char *extra,
   return elen;
 }
 
-static void fill_str(char *s, size_t size, size_t len, char c) {
-  assertf(len < size);
-  memset(s, c, len);
-  s[len] = '\0';
+static void fill_str(hts_buf s, size_t len, char c) {
+  assertf(len < s.size);
+  memset(s.p, c, len);
+  s.p[len] = '\0';
 }
 
 /* The reader may only clip, so a value must read back as a prefix of
@@ -2186,18 +2182,18 @@ static int cache_header_bounds_selftest(httrackp *opt, const char *dir) {
   const char *const ok_save = "example.com/big.html";
   const char *const body = "<html><body>maxed</body></html>";
 
-  fill_str(msg, sizeof(msg), sizeof(msg) - 1, 'M');
-  fill_str(ctype, sizeof(ctype), sizeof(ctype) - 1, 'C');
-  fill_str(charset, sizeof(charset), sizeof(charset) - 1, 'H');
-  fill_str(etag, sizeof(etag), sizeof(etag) - 1, 'E');
-  fill_str(cdispo, sizeof(cdispo), sizeof(cdispo) - 1, 'D');
-  fill_str(location, sizeof(location), sizeof(location) - 1, 'L');
-  fill_str(big_adr, sizeof(big_adr), sizeof(big_adr) - 1, 'a');
+  fill_str(HTS_BUF(msg), sizeof(msg) - 1, 'M');
+  fill_str(HTS_BUF(ctype), sizeof(ctype) - 1, 'C');
+  fill_str(HTS_BUF(charset), sizeof(charset) - 1, 'H');
+  fill_str(HTS_BUF(etag), sizeof(etag) - 1, 'E');
+  fill_str(HTS_BUF(cdispo), sizeof(cdispo) - 1, 'D');
+  fill_str(HTS_BUF(location), sizeof(location) - 1, 'L');
+  fill_str(HTS_BUF(big_adr), sizeof(big_adr) - 1, 'a');
   big_fil[0] = '/';
-  fill_str(big_fil + 1, sizeof(big_fil) - 1, 2046, 'f');
-  fill_str(big_save, sizeof(big_save), sizeof(big_save) - 1, 'S');
+  fill_str(hts_buf_skip(HTS_BUF(big_fil), 1), 2046, 'f');
+  fill_str(HTS_BUF(big_save), sizeof(big_save) - 1, 'S');
   ok_fil[0] = '/';
-  fill_str(ok_fil + 1, sizeof(ok_fil) - 1, sizeof(ok_fil) - 2, 'k');
+  fill_str(hts_buf_skip(HTS_BUF(ok_fil), 1), sizeof(ok_fil) - 2, 'k');
 
   {
     char base[HTS_URLMAXSIZE];
@@ -2214,11 +2210,11 @@ static int cache_header_bounds_selftest(httrackp *opt, const char *dir) {
 
   selftest_open_for_write(&cache, opt);
   store_entry(opt, &cache, big_adr, big_fil, big_save, 200, msg, ctype, charset,
-              "Mon, 01 Jan 2024 00:00:00 GMT", etag, location, cdispo, body,
-              strlen(body));
+              "Mon, 01 Jan 2024 00:00:00 GMT", etag, location, cdispo,
+              hts_span_of(body));
   store_entry(opt, &cache, ok_adr, ok_fil, ok_save, 200, msg, ctype, charset,
-              "Mon, 01 Jan 2024 00:00:00 GMT", etag, location, cdispo, body,
-              strlen(body));
+              "Mon, 01 Jan 2024 00:00:00 GMT", etag, location, cdispo,
+              hts_span_of(body));
   selftest_close(&cache);
 
   /* Read the header straight from the ZIP, not through cache_readex: a runtime
@@ -2230,7 +2226,7 @@ static int cache_header_bounds_selftest(httrackp *opt, const char *dir) {
 
     slprintfbuff_clip(zippath, sizeof(zippath), "%shts-cache/new.zip",
                       StringBuff(opt->path_log));
-    if (read_first_entry_extra(zippath, extra, sizeof(extra)) < 0) {
+    if (read_first_entry_extra(zippath, HTS_BUF(extra)) < 0) {
       fprintf(stderr, "cache-hdrbounds: maxed entry missing from the ZIP\n");
       failures++;
     } else if (strstr(extra, cdispo) == NULL) {
@@ -2353,7 +2349,7 @@ static int urlbounds_write_foreign_zip(const char *zippath, size_t namelen) {
     return -1;
   }
   memset(&fi, 0, sizeof(fi));
-  fill_str(longname, sizeof(longname), namelen, 'z');
+  fill_str(HTS_BUF(longname), namelen, 'z');
   memcpy(longname, "http://", 7);
   for (i = 0; i < 2; i++) {
     const char *const name = i == 0 ? longname : "http://example.com/sane.html";
@@ -2389,55 +2385,57 @@ static int cache_url_bounds_selftest(httrackp *opt, const char *dir) {
   const char *const decoy_body = "<html><body>decoy</body></html>";
   const char *const lm = "Mon, 01 Jan 2024 00:00:00 GMT";
 
-  fill_str(big_adr, sizeof(big_adr), sizeof(big_adr) - 1, 'a');
+  fill_str(HTS_BUF(big_adr), sizeof(big_adr) - 1, 'a');
   big_fil[0] = '/';
-  fill_str(big_fil + 1, sizeof(big_fil) - 1, sizeof(big_fil) - 2, 'f');
+  fill_str(hts_buf_skip(HTS_BUF(big_fil), 1), sizeof(big_fil) - 2, 'f');
   memcpy(twin_fil, big_fil, sizeof(twin_fil));
   twin_fil[sizeof(twin_fil) - 2] = 'g';
   huge_fil[0] = '/';
-  fill_str(huge_fil + 1, sizeof(huge_fil) - 1, sizeof(huge_fil) - 2, 'h');
-  fill_str(huge_adr, sizeof(huge_adr), sizeof(huge_adr) - 1, 'A');
+  fill_str(hts_buf_skip(HTS_BUF(huge_fil), 1), sizeof(huge_fil) - 2, 'h');
+  fill_str(HTS_BUF(huge_adr), sizeof(huge_adr) - 1, 'A');
   decoy_fil[0] = '/';
-  fill_str(decoy_fil + 1, sizeof(decoy_fil) - 1, sizeof(decoy_fil) - 2, 'h');
+  fill_str(hts_buf_skip(HTS_BUF(decoy_fil), 1), sizeof(decoy_fil) - 2, 'h');
 
   selftest_tag = "cache-urlbounds";
   selftest_setup_dir(opt, dir);
 
   selftest_open_for_write(&cache, opt);
   store_entry(opt, &cache, big_adr, big_fil, "example.com/big.html", 200, "OK",
-              "text/html", "utf-8", lm, "", "", "", big_body, strlen(big_body));
+              "text/html", "utf-8", lm, "", "", "", hts_span_of(big_body));
   store_entry(opt, &cache, big_adr, twin_fil, "example.com/twin.html", 200,
-              "OK", "text/html", "utf-8", lm, "", "", "", twin_body,
-              strlen(twin_body));
+              "OK", "text/html", "utf-8", lm, "", "", "",
+              hts_span_of(twin_body));
   /* stored first, so a writer that clipped rather than dropped would overwrite
      it under its own key */
   store_entry(opt, &cache, big_adr, decoy_fil, "example.com/decoy.html", 200,
-              "OK", "text/html", "utf-8", lm, "", "", "", decoy_body,
-              strlen(decoy_body));
+              "OK", "text/html", "utf-8", lm, "", "", "",
+              hts_span_of(decoy_body));
   store_entry(opt, &cache, big_adr, huge_fil, "example.com/huge.html", 200,
-              "OK", "text/html", "utf-8", lm, "", "", "", "dropped", 7);
+              "OK", "text/html", "utf-8", lm, "", "", "",
+              hts_span_of("dropped"));
   store_entry(opt, &cache, huge_adr, "/short.html", "example.com/wide.html",
-              200, "OK", "text/html", "utf-8", lm, "", "", "", "dropped", 7);
+              200, "OK", "text/html", "utf-8", lm, "", "", "",
+              hts_span_of("dropped"));
   /* written after the dropped one: the drop must cost nothing but itself */
   store_entry(opt, &cache, short_adr, short_fil, "example.com/after.html", 200,
-              "OK", "text/html", "utf-8", lm, "", "", "", short_body,
-              strlen(short_body));
+              "OK", "text/html", "utf-8", lm, "", "", "",
+              hts_span_of(short_body));
   selftest_close(&cache);
 
   selftest_open_for_read(&cache, opt);
   /* the twin differs from the maxed entry only in its last byte: a key clipped
      anywhere on the path serves one for the other */
   failures += check_entry(opt, &cache, big_adr, big_fil, 200, "OK", "text/html",
-                          "utf-8", lm, "", "", "", big_body, strlen(big_body));
+                          "utf-8", lm, "", "", "", hts_span_of(big_body));
   failures +=
       check_entry(opt, &cache, big_adr, twin_fil, 200, "OK", "text/html",
-                  "utf-8", lm, "", "", "", twin_body, strlen(twin_body));
+                  "utf-8", lm, "", "", "", hts_span_of(twin_body));
   failures +=
       check_entry(opt, &cache, short_adr, short_fil, 200, "OK", "text/html",
-                  "utf-8", lm, "", "", "", short_body, strlen(short_body));
+                  "utf-8", lm, "", "", "", hts_span_of(short_body));
   failures +=
       check_entry(opt, &cache, big_adr, decoy_fil, 200, "OK", "text/html",
-                  "utf-8", lm, "", "", "", decoy_body, strlen(decoy_body));
+                  "utf-8", lm, "", "", "", hts_span_of(decoy_body));
   failures += expect_miss(opt, &cache, big_adr, huge_fil);
   failures += expect_miss(opt, &cache, huge_adr, "/short.html");
   selftest_close(&cache);
@@ -2455,12 +2453,11 @@ static int cache_url_bounds_selftest(httrackp *opt, const char *dir) {
       failures++;
     } else {
       /* the name the loader saw, minus the "http://" the index load strips */
-      fill_str(foreign_fil, sizeof(foreign_fil), CACHE_ENTRYNAME_SIZE - 2 - 7,
-               'z');
+      fill_str(HTS_BUF(foreign_fil), CACHE_ENTRYNAME_SIZE - 2 - 7, 'z');
       selftest_open_for_read(&cache, opt);
-      failures +=
-          check_entry(opt, &cache, "example.com", "/sane.html", 200, "OK",
-                      "text/html", "utf-8", "", "", "", "", "okay", 4);
+      failures += check_entry(opt, &cache, "example.com", "/sane.html", 200,
+                              "OK", "text/html", "utf-8", "", "", "", "",
+                              hts_span_of("okay"));
       failures += expect_miss(opt, &cache, "", foreign_fil);
       selftest_close(&cache);
     }
@@ -2476,10 +2473,10 @@ static int cache_url_bounds_selftest(httrackp *opt, const char *dir) {
 #define SAVEBOUNDS_REL_LEN 1000
 
 /* A path of exactly len bytes, slash-bounded like an -O directory. */
-static void savebounds_path(char *s, size_t size, size_t len) {
+static void savebounds_path(hts_buf s, size_t len) {
   assertf(len >= 2);
-  fill_str(s, size, len, 'd');
-  s[0] = s[len - 1] = '/';
+  fill_str(s, len, 'd');
+  s.p[0] = s.p[len - 1] = '/';
 }
 
 /* Read the entry back with path_html_utf8 set to `path`, and check what the
@@ -2621,11 +2618,9 @@ static int cache_savename_bounds_selftest(httrackp *opt, const char *dir) {
   memcpy(rel, rel_head, sizeof(rel_head) - 1);
   memcpy(rel + SAVEBOUNDS_REL_LEN - (sizeof(rel_tail) - 1), rel_tail,
          sizeof(rel_tail) - 1);
-  savebounds_path(path_fit, sizeof(path_fit),
-                  SAVEBOUNDS_CAP - 1 - SAVEBOUNDS_REL_LEN);
-  savebounds_path(path_over, sizeof(path_over),
-                  SAVEBOUNDS_CAP - SAVEBOUNDS_REL_LEN);
-  savebounds_path(path_huge, sizeof(path_huge), 1500);
+  savebounds_path(HTS_BUF(path_fit), SAVEBOUNDS_CAP - 1 - SAVEBOUNDS_REL_LEN);
+  savebounds_path(HTS_BUF(path_over), SAVEBOUNDS_CAP - SAVEBOUNDS_REL_LEN);
+  savebounds_path(HTS_BUF(path_huge), 1500);
   concat(save, sizeof(save), writepath, rel);
   concat(flat_save, sizeof(flat_save), writepath, "example.com/flat.html");
 
@@ -2659,7 +2654,7 @@ static int cache_savename_bounds_selftest(httrackp *opt, const char *dir) {
    store succeeded (what cache_add does). Hands back the bytes the ZIP holds for
    it, or -1 when the entry is absent. */
 static int readfail_roundtrip(const char *path, FILE *src, int want_status,
-                              char *out, size_t outsz) {
+                              hts_buf out) {
   zipFile zf = hts_zipOpen_utf8(path, APPEND_STATUS_CREATE);
   zip_fileinfo fi;
   unzFile uf;
@@ -2690,7 +2685,7 @@ static int readfail_roundtrip(const char *path, FILE *src, int want_status,
       unzClose(uf);
     return -1;
   }
-  n = unzReadCurrentFile(uf, out, (unsigned) outsz);
+  n = unzReadCurrentFile(uf, out.p, (unsigned) out.size);
   unzCloseCurrentFile(uf);
   unzClose(uf);
   return n;
@@ -2715,8 +2710,7 @@ static void readfail_store_file(httrackp *opt, cache_back *cache,
 }
 
 /* Write `len` bytes of body at the fconv()-resolved `save`. */
-static int readfail_write_source(const char *save, const char *body,
-                                 size_t len) {
+static int readfail_write_source(const char *save, hts_span body) {
   char catbuff[HTS_URLMAXSIZE * 2];
   char *path = fconv(catbuff, sizeof(catbuff), save);
   FILE *fp;
@@ -2725,7 +2719,7 @@ static int readfail_write_source(const char *save, const char *body,
   fp = FOPEN(path, "wb");
   if (fp == NULL)
     return -1;
-  if (len != 0 && !hts_fwrite_exact(body, len, fp)) {
+  if (body.len != 0 && !hts_fwrite_exact(body.p, body.len, fp)) {
     fclose(fp);
     return -1;
   }
@@ -2774,7 +2768,7 @@ static int cache_readfail_selftest(httrackp *opt, const char *dir) {
   fclose(fp);
   fp = FOPEN(fconv(catbuff, sizeof(catbuff), srcpath), "rb");
   assertf(fp != NULL);
-  n = readfail_roundtrip(zippath, fp, Z_OK, out, sizeof(out));
+  n = readfail_roundtrip(zippath, fp, Z_OK, HTS_BUF(out));
   fclose(fp);
   if (n != (int) body_len || memcmp(out, body, body_len) != 0) {
     fprintf(stderr, "cache-readfail: readable source stored %d/%d byte(s)\n", n,
@@ -2788,7 +2782,7 @@ static int cache_readfail_selftest(httrackp *opt, const char *dir) {
   fclose(fp);
   fp = FOPEN(fconv(catbuff, sizeof(catbuff), srcpath), "rb");
   assertf(fp != NULL);
-  n = readfail_roundtrip(zippath, fp, Z_OK, out, sizeof(out));
+  n = readfail_roundtrip(zippath, fp, Z_OK, HTS_BUF(out));
   fclose(fp);
   if (n != 0) {
     fprintf(stderr, "cache-readfail: empty source stored %d byte(s)\n", n);
@@ -2798,7 +2792,7 @@ static int cache_readfail_selftest(httrackp *opt, const char *dir) {
   /* a write-only stream fails every read: the entry must not reach the ZIP */
   fp = FOPEN(fconv(catbuff, sizeof(catbuff), srcpath), "wb");
   assertf(fp != NULL);
-  n = readfail_roundtrip(zippath, fp, CACHE_ZIP_READ_ERROR, out, sizeof(out));
+  n = readfail_roundtrip(zippath, fp, CACHE_ZIP_READ_ERROR, HTS_BUF(out));
   fclose(fp);
   if (n != -1) {
     fprintf(stderr, "cache-readfail: unreadable source left an entry (%d)\n",
@@ -2825,7 +2819,7 @@ static int cache_readfail_selftest(httrackp *opt, const char *dir) {
     assertf(cache.zipOutput != NULL);
     opt->state.exit_xh = 0;
 
-    if (readfail_write_source(srcpath, body, body_len) != 0) {
+    if (readfail_write_source(srcpath, hts_span_at(body, body_len)) != 0) {
       fprintf(stderr, "cache-readfail: cannot create '%s'\n", srcpath);
       return fail + 1;
     }
@@ -2863,7 +2857,7 @@ static int cache_readfail_selftest(httrackp *opt, const char *dir) {
     cache.zipOutput = NULL;
 
     if (writefail_read_entry(zippath, "http://example.com/unreadable.bin",
-                             extra, sizeof(extra), rbody, sizeof(rbody)) >= 0) {
+                             HTS_BUF(extra), HTS_BUF(rbody)) >= 0) {
       fprintf(stderr, "cache-readfail: the unreadable entry was cached\n");
       fail++;
     }
@@ -2871,8 +2865,8 @@ static int cache_readfail_selftest(httrackp *opt, const char *dir) {
       const char *const sibling = i == 0 ? "http://example.com/good.bin"
                                          : "http://example.com/good2.bin";
 
-      n = writefail_read_entry(zippath, sibling, extra, sizeof(extra), rbody,
-                               sizeof(rbody));
+      n = writefail_read_entry(zippath, sibling, HTS_BUF(extra),
+                               HTS_BUF(rbody));
       if (n != (int) body_len || memcmp(rbody, body, body_len) != 0) {
         fprintf(stderr, "cache-readfail: '%s' stored %d byte(s)\n", sibling, n);
         fail++;
@@ -2892,7 +2886,7 @@ static int cache_readfail_selftest(httrackp *opt, const char *dir) {
 
     concat(save, sizeof(save), StringBuff(opt->path_html_utf8),
            "example.com/trunc.bin");
-    if (readfail_write_source(save, body, body_len) != 0) {
+    if (readfail_write_source(save, hts_span_at(body, body_len)) != 0) {
       fprintf(stderr, "cache-readfail: cannot create '%s'\n", save);
       freet(locbuf);
       return fail + 1;
@@ -3115,9 +3109,9 @@ static size_t ref_st_build(unsigned char *dst) {
 
 /* Copy the reference's path out of the option scratch buffer, which the very
    next call reuses. */
-static void ref_st_refpath(httrackp *opt, char *dst, size_t size) {
-  strlcpybuff(dst, url_savename_refname_fullpath(opt, REF_ST_ADR, REF_ST_FIL),
-              size);
+static void ref_st_refpath(httrackp *opt, hts_buf dst) {
+  strlcpybuff(dst.p, url_savename_refname_fullpath(opt, REF_ST_ADR, REF_ST_FIL),
+              dst.size);
 }
 
 static int ref_st_str(const char *got, const char *want, const char *field) {
@@ -3141,19 +3135,19 @@ static int ref_st_int(LLint got, LLint want, const char *field) {
 /* The bytes a field must occupy on disk, spelled out rather than derived, so
    the check is independent of how the table was assembled. */
 static int ref_st_bytes(const unsigned char *file, const char *field,
-                        const unsigned char *want, size_t len) {
+                        hts_span want) {
   const size_t off = ref_off[ref_st_field(field)];
 
-  if (memcmp(file + off, want, len) != 0) {
+  if (memcmp(file + off, want.p, want.len) != 0) {
     size_t i;
 
     fprintf(stderr, "%s: %s at offset %d reads", selftest_tag, field,
             (int) off);
-    for (i = 0; i < len; i++)
+    for (i = 0; i < want.len; i++)
       fprintf(stderr, " %02x", file[off + i]);
     fprintf(stderr, ", expected");
-    for (i = 0; i < len; i++)
-      fprintf(stderr, " %02x", want[i]);
+    for (i = 0; i < want.len; i++)
+      fprintf(stderr, " %02x", (unsigned char) want.p[i]);
     fprintf(stderr, "\n");
     return 1;
   }
@@ -3217,11 +3211,11 @@ static int ref_st_check(const lien_back *back) {
 
 /* A reference the reader must turn down: no entry comes back, and none is
    left half-built. */
-static int ref_st_refuse(httrackp *opt, const char *path, const void *data,
-                         size_t size, const char *what) {
+static int ref_st_refuse(httrackp *opt, const char *path, hts_span data,
+                         const char *what) {
   lien_back *back = NULL;
 
-  st_put_file(path, data, size);
+  st_put_file(path, data.p, data.len);
   if (back_unserialize_ref(opt, REF_ST_ADR, REF_ST_FIL, &back) == 0) {
     fprintf(stderr, "%s: %s was accepted\n", selftest_tag, what);
     back_clear_entry(back);
@@ -3319,7 +3313,7 @@ static int ref_portable_selftest(httrackp *opt, const char *dir) {
   mkdir(reconcile_st_path(opt, "hts-cache"), HTS_PROTECT_FOLDER);
   mkdir(reconcile_st_path(opt, CACHE_REFNAME), HTS_PROTECT_FOLDER);
 #endif
-  ref_st_refpath(opt, path, sizeof(path));
+  ref_st_refpath(opt, HTS_BUF(path));
 
   ref_golden_size = ref_st_build(NULL);
   ref_golden = malloct(ref_golden_size);
@@ -3397,9 +3391,12 @@ static int ref_portable_selftest(httrackp *opt, const char *dir) {
       static const unsigned char neg_le[8] = {0xf8, 0xf7, 0xf6, 0xf5,
                                               0xf4, 0xf3, 0xf2, 0xf1};
 
-      fail += ref_st_bytes(got, "statuscode", u32_le, sizeof(u32_le));
-      fail += ref_st_bytes(got, "totalsize", i64_le, sizeof(i64_le));
-      fail += ref_st_bytes(got, "crange_start", neg_le, sizeof(neg_le));
+      fail += ref_st_bytes(got, "statuscode",
+                           hts_span_at((const char *) u32_le, sizeof(u32_le)));
+      fail += ref_st_bytes(got, "totalsize",
+                           hts_span_at((const char *) i64_le, sizeof(i64_le)));
+      fail += ref_st_bytes(got, "crange_start",
+                           hts_span_at((const char *) neg_le, sizeof(neg_le)));
     }
     fclose(fp);
     freet(got);
@@ -3430,8 +3427,8 @@ static int ref_portable_selftest(httrackp *opt, const char *dir) {
     old->r.statuscode = 206;
     memcpy(legacy + sizeof(blit), old, sizeof(lien_back));
     freet(old);
-    fail +=
-        ref_st_refuse(opt, path, legacy, size, "a legacy host-native record");
+    fail += ref_st_refuse(opt, path, hts_span_at((const char *) legacy, size),
+                          "a legacy host-native record");
     freet(legacy);
   }
 
@@ -3450,16 +3447,20 @@ static int ref_portable_selftest(httrackp *opt, const char *dir) {
 
     memcpy(bad, ref_golden, ref_golden_size);
     memset(bad, 'X', HTS_REF_MAGIC_SIZE);
-    fail += ref_st_refuse(opt, path, bad, ref_golden_size, "a wrong magic");
+    fail += ref_st_refuse(opt, path,
+                          hts_span_at((const char *) bad, ref_golden_size),
+                          "a wrong magic");
 
     memcpy(bad, ref_golden, ref_golden_size);
     bad[ref_off[ref_st_field("version")]] = HTS_REF_VERSION + 1;
-    fail +=
-        ref_st_refuse(opt, path, bad, ref_golden_size, "an unknown version");
+    fail += ref_st_refuse(opt, path,
+                          hts_span_at((const char *) bad, ref_golden_size),
+                          "an unknown version");
 
     for (i = 0; i < sizeof(cut) / sizeof(cut[0]); i++)
-      fail +=
-          ref_st_refuse(opt, path, ref_golden, cut[i], "a truncated record");
+      fail += ref_st_refuse(opt, path,
+                            hts_span_at((const char *) ref_golden, cut[i]),
+                            "a truncated record");
     freet(bad);
   }
 
@@ -3485,8 +3486,8 @@ static int ref_portable_selftest(httrackp *opt, const char *dir) {
     unsigned char *over =
         ref_st_oversize("url_sav", HTS_REF_MAX_STR + 1, &size);
 
-    fail +=
-        ref_st_refuse(opt, path, over, size, "a name one byte past the cap");
+    fail += ref_st_refuse(opt, path, hts_span_at((const char *) over, size),
+                          "a name one byte past the cap");
     freet(over);
   }
 
@@ -4329,12 +4330,12 @@ static int st_zip_abandon_notrunc(httrackp *opt, int argc, char **argv) {
 }
 
 /* Fill buf with text compressible enough to use the whole deflate window. */
-static void zbuf_fill(char *buf, size_t len, unsigned seed) {
+static void zbuf_fill(hts_buf buf, unsigned seed) {
   size_t i;
 
-  for (i = 0; i < len; i++) {
+  for (i = 0; i < buf.size; i++) {
     seed = seed * 1103515245u + 12345u;
-    buf[i] = (char) ('a' + (seed >> 16) % 7);
+    buf.p[i] = (char) ('a' + (seed >> 16) % 7);
   }
 }
 
@@ -4376,7 +4377,7 @@ static int cache_zbuf_selftest(const char *dir) {
         }
       }
       snprintf(name, sizeof(name), "m%02d", i);
-      zbuf_fill(data, zbuf_len(i), (unsigned) i);
+      zbuf_fill(hts_buf_at(data, zbuf_len(i)), (unsigned) i);
       assertf(zipOpenNewFileInZip(zf[z], name, &fi, NULL, 0, NULL, 0, NULL,
                                   Z_DEFLATED, Z_DEFAULT_COMPRESSION) == ZIP_OK);
       assertf(zipWriteInFileInZip(zf[z], data, (unsigned) zbuf_len(i)) ==
@@ -4405,7 +4406,7 @@ static int cache_zbuf_selftest(const char *dir) {
     const size_t len = zbuf_len(i);
 
     assertf(unzOpenCurrentFile(uf) == UNZ_OK);
-    zbuf_fill(data, len, (unsigned) i);
+    zbuf_fill(hts_buf_at(data, len), (unsigned) i);
     if (unzReadCurrentFile(uf, back, ZBUF_MAXLEN) != (int) len ||
         memcmp(back, data, len) != 0) {
       fprintf(stderr, "cache-zbuf: member %d does not read back\n", i);
@@ -4501,7 +4502,7 @@ static int refwritten_selftest(httrackp *opt, const char *dir) {
   selftest_setup_dir(opt, dir);
   (void) MKDIR(reconcile_st_path(opt, "hts-cache"));
   (void) MKDIR(reconcile_st_path(opt, CACHE_REFNAME));
-  ref_st_refpath(opt, path, sizeof(path));
+  ref_st_refpath(opt, HTS_BUF(path));
   golden = malloct(size);
   assertf(golden != NULL);
   (void) ref_st_build(golden);
@@ -4812,8 +4813,8 @@ static zipFile zwerr_open(const char *path, zwerr_ctx *c, int append) {
 }
 
 /* Write one stored member; rc[p] is what public call p returned. */
-static void zwerr_run(const char *path, zwerr_ctx *c, int zip64,
-                      const char *data, unsigned size, int rc[ZW_NPHASES]) {
+static void zwerr_run(const char *path, zwerr_ctx *c, int zip64, hts_span data,
+                      int rc[ZW_NPHASES]) {
   zip_fileinfo fi;
   zipFile zf;
   int p;
@@ -4833,7 +4834,7 @@ static void zwerr_run(const char *path, zwerr_ctx *c, int zip64,
       -MAX_WBITS, 8, Z_DEFAULT_STRATEGY, NULL, 0, 0, 0, zip64);
   if (rc[ZW_OPENFILE] == ZIP_OK) {
     c->phase = ZW_WRITE;
-    rc[ZW_WRITE] = zipWriteInFileInZip(zf, data, size);
+    rc[ZW_WRITE] = zipWriteInFileInZip(zf, data.p, (unsigned) data.len);
     c->phase = ZW_CLOSEFILE;
     rc[ZW_CLOSEFILE] = zipCloseFileInZip(zf);
   }
@@ -4842,8 +4843,8 @@ static void zwerr_run(const char *path, zwerr_ctx *c, int zip64,
 }
 
 /* Does the archive hold `data`, with a CRC that unzip accepts? */
-static hts_boolean zwerr_reads_back(const char *path, const char *data,
-                                    unsigned size) {
+static hts_boolean zwerr_reads_back(const char *path, hts_span data) {
+  const unsigned size = (unsigned) data.len;
   char catbuff[CATBUFF_SIZE];
   unzFile z = unzOpen(fconv(catbuff, sizeof(catbuff), path));
   char *out = malloct(size + 1);
@@ -4852,7 +4853,7 @@ static hts_boolean zwerr_reads_back(const char *path, const char *data,
   if (z != NULL && unzGoToFirstFile(z) == UNZ_OK &&
       unzOpenCurrentFile(z) == UNZ_OK) {
     ok = unzReadCurrentFile(z, out, size + 1) == (int) size &&
-         memcmp(out, data, size) == 0;
+         memcmp(out, data.p, size) == 0;
     if (unzCloseCurrentFile(z) != UNZ_OK)
       ok = HTS_FALSE;
   }
@@ -4882,7 +4883,7 @@ static int st_zip_write_errors(httrackp *opt, int argc, char **argv) {
   int fail = 0;
   size_t k;
 
-  gen_body(data, size, 1 /* incompressible */);
+  gen_body(hts_buf_at(data, size), 1 /* incompressible */);
   fconcat(path, sizeof(path), argv[0], "/zip-write-errors.zip");
   memset(&c, 0, sizeof(c));
   for (k = 0; k < sizeof(cases) / sizeof(cases[0]); k++) {
@@ -4890,7 +4891,7 @@ static int st_zip_write_errors(httrackp *opt, int argc, char **argv) {
 
     c.shift = cases[k].shift;
     c.fail_at = 0;
-    zwerr_run(path, &c, cases[k].zip64, data, size, rc);
+    zwerr_run(path, &c, cases[k].zip64, hts_span_at(data, size), rc);
     for (p = 0; p < ZW_NPHASES && rc[p] == ZIP_OK; p++) {
     }
     nwrites = c.writes;
@@ -4901,14 +4902,14 @@ static int st_zip_write_errors(httrackp *opt, int argc, char **argv) {
       fail++;
       continue;
     }
-    if (c.shift == 0 && !zwerr_reads_back(path, data, size)) {
+    if (c.shift == 0 && !zwerr_reads_back(path, hts_span_at(data, size))) {
       fprintf(stderr, "zip-write-errors: case %d: archive does not read back\n",
               (int) k);
       fail++;
     }
     for (w = 1; w <= nwrites; w++) {
       c.fail_at = w;
-      zwerr_run(path, &c, cases[k].zip64, data, size, rc);
+      zwerr_run(path, &c, cases[k].zip64, hts_span_at(data, size), rc);
       if (c.failed_phase < 0 || rc[c.failed_phase] == ZIP_OK) {
         fprintf(stderr,
                 "zip-write-errors: case %d: write %d of %d failed in %s, "
