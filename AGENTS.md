@@ -161,6 +161,7 @@ more care than its diff size suggests.
   too. `freet` NULLs its (lvalue) argument and tolerates NULL; `calloct(n, sz)`
   keeps calloc's arg order. Only exception: storing or calling a libc symbol
   itself (e.g. a resolver-backend function pointer).
+- **Pass an output buffer as `hts_buf`, and a read-only byte range as `hts_span`.** An internal function takes `hts_buf` (`src/htsbuf.h`) for a buffer it writes and `hts_span` (`src/htsurlport.h`) for a (pointer, length) input, never a separate pointer and size. Pass an array as `HTS_BUF(arr)`, so the compiler supplies the size. A span is not NUL-terminated, so use its helpers rather than `strlen` or `str*` calls. Grep both headers for a helper before writing one. Exported `HTSEXT_API` functions keep `(char *, size_t)`, because `htsbuf.h` is not an installed header.
 - **Exported API is `HTSEXT_API`.** Everything else is hidden by
   `-fvisibility=hidden` and free to change (check with `nm -D --defined-only
   libhttrack.so`). Touching an installed-header struct (see `DevIncludes_DATA` in
