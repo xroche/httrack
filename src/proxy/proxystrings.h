@@ -32,6 +32,7 @@ Please visit our Website: http://www.httrack.com
 #define HTS_PROXYSTRINGS_DEFSTATIC
 
 #include "htsstrings.h"
+#include "htsbuf.h"
 
 /* Tools */
 
@@ -52,21 +53,20 @@ HTS_UNUSED static void escapexml(const char *s, String * tempo) {
   }
 }
 
-HTS_UNUSED static char* file_convert(char *dest, size_t size, const char *src) {
-  size_t i;
-  for(i = 0 ; src[i] != '\0' && i + 1 < size ; i++) {
+/* Copy SRC into DEST, clipped, with native path separators. */
+HTS_UNUSED static char *file_convert(hts_buf dest, const char *src) {
+  (void) hts_buf_cpy_clip(dest, src);
 #ifdef _WIN32
-    if (src[i] == '/') {
-      dest[i] = '\\';
-    } else {
-#endif
-    dest[i] = src[i];
-#ifdef _WIN32
+  {
+    char *a;
+
+    for (a = dest.p; *a != '\0'; a++) {
+      if (*a == '/')
+        *a = '\\';
     }
-#endif
   }
-  dest[i] = '\0';
-  return dest;
+#endif
+  return dest.p;
 }
 
 #endif
