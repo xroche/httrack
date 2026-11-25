@@ -191,22 +191,18 @@ size_t escape_uri_utf(const char *const src, char *const dest,
 
 /** Percent-escape the C0 control bytes of @p src (0x00-0x1f) and copy every
     other byte verbatim, so bytes >= 0x7f keep the UTF-8 they carry. */
-size_t escape_control_url(const char *const src, char *const dest,
-                          const size_t size);
+size_t escape_control_url(const char *const src, hts_buf dest);
 
 /** Append-variant of escape_spc_url(): escapes @p src after the existing
     NUL-terminated content of @p dest. Returns the bytes appended (excluding the
     NUL). */
-size_t append_escape_spc_url(const char *const src, char *const dest,
-                             const size_t size);
+size_t append_escape_spc_url(const char *const src, hts_buf dest);
 
 /** Append-variant of escape_in_url(). See append_escape_spc_url(). */
-size_t append_escape_in_url(const char *const src, char *const dest,
-                            const size_t size);
+size_t append_escape_in_url(const char *const src, hts_buf dest);
 
 /** Append-variant of escape_check_url(). See append_escape_spc_url(). */
-size_t append_escape_check_url(const char *const src, char *const dest,
-                               const size_t size);
+size_t append_escape_check_url(const char *const src, hts_buf dest);
 
 /** In-place variant of escape_spc_url(): escapes the NUL-terminated string in
     @p dest back into @p dest. */
@@ -223,8 +219,7 @@ size_t inplace_escape_uri_utf(char *const dest, const size_t size);
 
 /** Same escaping as escape_check_url() but returns @p dest instead of the byte
     count. */
-char *escape_check_url_addr(const char *const src, char *const dest,
-                            const size_t size);
+char *escape_check_url_addr(const char *const src, hts_buf dest);
 
 /** Build one opaque MIME/MHTML content-id token in @p dest from @p adr and
     @p fil: escape_in_url() escaping with '-' for '%', so two URLs never share
@@ -719,14 +714,13 @@ int get_filetime_rfc822(const char *file, char *date, size_t size);
 HTS_INLINE void time_rfc822(char *s, size_t size, struct tm *A);
 
 HTS_INLINE int sendc(htsblk * r, const char *s);
-/* Returns the advance past the line's terminator. Unlike binput_line(), "max"
-   excludes the NUL: "s" must hold max + 1 bytes. */
-int binput(const char *buff, char *s, int max);
+/* Returns the advance past the line's terminator. */
+int binput(const char *buff, hts_buf s);
 /* Read one line from a buffer up to "end", consuming it whole even when it
-   does not fit "s". HTS_TRUE means it was cut: the value is not what was
+   does not fit S. HTS_TRUE means it was cut: the value is not what was
    written, so drop it rather than parse a prefix of it. The advance is reported
    through *offset. */
-hts_boolean binput_line(const char *buff, const char *end, char *s, int max,
+hts_boolean binput_line(const char *buff, const char *end, hts_buf s,
                         int *offset);
 /* Does treathead() read the header that "line" starts with? Keep in step. */
 hts_boolean hts_header_is_read(const char *line);
@@ -783,7 +777,8 @@ const char *jump_protocol_const(const char *source);
    written NUL-terminated into name[name_size] (truncated to fit), and the port
    in *port. The port defaults by scheme: 1080 for socks5/socks5h, else 8080. */
 void hts_parse_proxy(const char *arg, char *name, size_t name_size, int *port);
-void code64(unsigned char *a, int size_a, unsigned char *b, int crlf);
+/* Base-64 IN into OUT, with a CRLF every 80 output bytes when CRLF is set. */
+void code64(hts_span in, hts_buf out, hts_boolean crlf);
 
 char *convtolower(hts_buf catbuff, const char *a);
 int multipleStringMatch(const char *s, const char *match);
@@ -872,8 +867,8 @@ char *hts_mask_passwords(const char *s, hts_mask_mode mode);
    which test 660 checks. */
 
 /* Returns adr with its login masked as user:*** or ***, for log lines: adr
-   itself when it has no login, else a copy clipped to size bytes in buf. */
-const char *adr_nologin_r(char *buf, size_t size, const char *adr);
+   itself when it has no login, else a copy clipped to BUF. */
+const char *adr_nologin_r(hts_buf buf, const char *adr);
 
 /* Same as adr_nologin_r(), but only a URL with a scheme or "//" has a login.
    Any "scheme://" counts, not only the ones the engine fetches. */

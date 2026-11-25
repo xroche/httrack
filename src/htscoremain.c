@@ -313,7 +313,7 @@ static void cmdl_panic_value(httrackp *opt, const char *msg,
 
   if (hts_is_quoted(value, strlen(value)))
     snprintf(s, sizeof(s), "%s: \"%s " HTS_QUOTED_HINT, msg,
-             adr_nologin_r(HTS_SIZED(shown), value + 1));
+             adr_nologin_r(HTS_BUF(shown), value + 1));
   else
     snprintf(s, sizeof(s), "%s", msg);
   HTS_PANIC_PRINTF(s);
@@ -330,7 +330,7 @@ static void print_rule_nologin(const char *rule) {
       n = sizeof(tok) - 1;
     memcpy(tok, rule, n);
     tok[n] = '\0';
-    fputs(adr_nologin_r(HTS_SIZED(shown), tok), stdout);
+    fputs(adr_nologin_r(HTS_BUF(shown), tok), stdout);
     rule += n;
     if (*rule == ',' || *rule == '=')
       putchar(*rule++);
@@ -2724,7 +2724,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
               word[0] == '+' || word[0] == '-'
                   ? word
                   : unescape_http_unharm(catbuff, sizeof(catbuff), word, 1),
-              *url, url_sz);
+              hts_buf_at(*url, url_sz));
         }
       } // if argv=- etc.
 

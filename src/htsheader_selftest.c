@@ -315,8 +315,8 @@ static int st_headerline(httrackp *opt, int argc, char **argv) {
   /* one read past the block's lines, to show the walk stops at its end */
   for (i = 0; i < 4; i++) {
     int adv;
-    const hts_boolean cut =
-        binput_line(block + ptr, block + blocklen, line, max, &adv);
+    const hts_boolean cut = binput_line(block + ptr, block + blocklen,
+                                        hts_buf_at(line, (size_t) max), &adv);
 
     ptr += adv;
     printf("cut=%d over=%d line=%s\n", cut != HTS_FALSE,
@@ -361,7 +361,7 @@ static int st_binputline(httrackp *opt, int argc, char **argv) {
   }
   /* one read past the block, to show the walk stops on its terminating NUL */
   for (i = 0; i < 3; i++) {
-    const int adv = binput(block + ptr, line, max);
+    const int adv = binput(block + ptr, hts_buf_at(line, (size_t) max + 1));
 
     printf("adv=%d line=%s\n", adv, line);
     ptr += adv;

@@ -629,9 +629,9 @@ static hts_boolean ftp_may_resume(httrackp *opt, const lien_back *back,
   char masked[HTS_URLMAXSIZE * 2];
 
   if (back->r.totalsize <= back->range_req_size) {
-    hts_log_print(
-        opt, LOG_DEBUG, "FTP: not resuming %s%s, the local copy is not shorter",
-        adr_nologin_r(HTS_SIZED(masked), back->url_adr), back->url_fil);
+    hts_log_print(opt, LOG_DEBUG,
+                  "FTP: not resuming %s%s, the local copy is not shorter",
+                  adr_nologin_r(HTS_BUF(masked), back->url_adr), back->url_fil);
     return HTS_FALSE;
   }
   /* Equality, not ordering: a copy this code did not stamp carries a local
@@ -640,8 +640,7 @@ static hts_boolean ftp_may_resume(httrackp *opt, const lien_back *back,
       remote_mtime != local_mtime) {
     hts_log_print(opt, LOG_DEBUG,
                   "FTP: not resuming %s%s, the copy is not dated as the remote",
-                  adr_nologin_r(HTS_SIZED(masked), back->url_adr),
-                  back->url_fil);
+                  adr_nologin_r(HTS_BUF(masked), back->url_adr), back->url_fil);
     return HTS_FALSE;
   }
   return HTS_TRUE;
@@ -897,7 +896,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
 
     strcpybuff(back->info, "connect");
     hts_log_print(opt, LOG_DEBUG, "FTP: connecting to %s:%d",
-                  adr_nologin_r(HTS_SIZED(masked), _adr), port);
+                  adr_nologin_r(HTS_BUF(masked), _adr), port);
 
     if (!ftp_connect(back, soc_ctl, &server, timeout, opt)) {
       ftp_fail(&back->r, "Unable to connect to the server");
