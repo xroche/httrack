@@ -43,7 +43,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   dest = malloct(dsize);
 
   (void) hts_unescapeEntities(src, hts_buf_at(dest, dsize));
-  (void) hts_unescapeEntitiesWithCharset(src, dest, dsize, "iso-8859-1");
+  (void) hts_unescapeEntitiesWithCharset(src, hts_buf_at(dest, dsize),
+                                         "iso-8859-1");
 
   freet(dest);
   freet(src);

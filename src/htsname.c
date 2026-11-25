@@ -1017,7 +1017,7 @@ int url_savename(lien_adrfilsave *const afs,
 
   // decode remaining % (normally not necessary; already done in htsparse.c)
   // this will NOT decode buggy %xx (ie. not UTF-8) ones
-  if (hts_unescapeUrl(fil, HTS_SIZED(catbuff)) == 0) {
+  if (hts_unescapeUrl(fil, HTS_BUF(catbuff)) == 0) {
     strcpybuff(fil, catbuff);
   } else {
     hts_log_print(opt, LOG_WARNING,

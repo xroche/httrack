@@ -61,12 +61,12 @@ hash_add(const uint64_t hash, const unsigned char c) {
 
 #define HASH_ADD(HASH, C) ((HASH) = hash_add((HASH), (unsigned char) (C)))
 
-int hts_unescapeEntitiesWithCharset(const char *src, char *dest, const size_t max, const char *charset) {
-  return hts_unescapeEntitiesWithCharsetSpecial(src, dest, max, charset, 0);
+int hts_unescapeEntitiesWithCharset(const char *src, hts_buf dest,
+                                    const char *charset) {
+  return hts_unescapeEntitiesWithCharsetSpecial(src, dest, charset, 0);
 }
 
-int hts_unescapeEntitiesWithCharsetSpecial(const char *src, char *dest,
-                                           const size_t max,
+int hts_unescapeEntitiesWithCharsetSpecial(const char *src, hts_buf dest,
                                            const char *charset,
                                            const int flags) {
   size_t i, j, ampStart, ampStartDest;
@@ -74,7 +74,7 @@ int hts_unescapeEntitiesWithCharsetSpecial(const char *src, char *dest,
   int hex;
   uint64_t hash;
 
-  assertf(max != 0);
+  assertf(dest.size != 0);
   for (i = 0, j = 0, ampStart = (size_t) -1, ampStartDest = 0, uc = -1, hex = 0,
       hash = HASH_INIT;
        src[i] != '\0'; i++) {
@@ -117,10 +117,10 @@ int hts_unescapeEntitiesWithCharsetSpecial(const char *src, char *dest,
         
         /* success ? */
         if (uc > 0) {
-          const size_t maxOut = max - ampStartDest;
+          const hts_buf out = hts_buf_skip(dest, ampStartDest);
           /* write at position */
           if (charset != NULL && hts_isCharsetUTF8(charset)) {
-            len = hts_writeUTF8(uc, hts_buf_at(&dest[ampStartDest], maxOut));
+            len = hts_writeUTF8(uc, out);
           } else {
             size_t ulen;
             char buffer[32];
@@ -140,9 +140,9 @@ int hts_unescapeEntitiesWithCharsetSpecial(const char *src, char *dest,
               }
               if (s != NULL) {
                 const size_t sLen = strlen(s);
-                if (sLen < maxOut) {
+                if (sLen < out.size) {
                   /* Do not copy \0. */
-                  memcpy(&dest[ampStartDest], s, sLen);
+                  memcpy(out.p, s, sLen);
                   len = sLen;
                 }
                 freet(s);
@@ -153,8 +153,8 @@ int hts_unescapeEntitiesWithCharsetSpecial(const char *src, char *dest,
                 const int escLen =
                     snprintf(esc, sizeof(esc), "%%26%%23%d%%3B", uc);
 
-                if (escLen > 0 && (size_t) escLen < maxOut) {
-                  memcpy(&dest[ampStartDest], esc, (size_t) escLen);
+                if (escLen > 0 && (size_t) escLen < out.size) {
+                  memcpy(out.p, esc, (size_t) escLen);
                   len = (size_t) escLen;
                 }
               }
@@ -218,32 +218,31 @@ int hts_unescapeEntitiesWithCharsetSpecial(const char *src, char *dest,
     }
 
     /* reserve one byte for the trailing NUL written after the loop */
-    if (j + 1 >= max) {
+    if (j + 1 >= dest.size) {
       /* overflow */
       return -1;
     }
-    if (src != dest || i != j) {
-      dest[j] = src[i];
+    if (src != dest.p || i != j) {
+      dest.p[j] = src[i];
     }
     j++;
   }
-  dest[j] = '\0';
+  dest.p[j] = '\0';
 
   return 0;
 }
 
 int hts_unescapeEntities(const char *src, hts_buf dest) {
-  return hts_unescapeEntitiesWithCharset(src, dest.p, dest.size, "UTF-8");
+  return hts_unescapeEntitiesWithCharset(src, dest, "UTF-8");
 }
 
-int hts_unescapeUrlSpecial(const char *src, char *dest, const size_t max,
-                           const int flags) {
+int hts_unescapeUrlSpecial(const char *src, hts_buf dest, const int flags) {
   size_t i, j, lastI, lastJ, k, utfBufferJ, utfBufferSize;
   int seenQuery = 0;
   char utfBuffer[32];
 
-  assertf(src != dest);
-  assertf(max != 0);
+  assertf(src != dest.p);
+  assertf(dest.size != 0);
 
   for(i = 0, j = 0, k = 0, utfBufferJ = 0, utfBufferSize = 0,
       lastI = (size_t) -1, lastJ = (size_t) -1
@@ -328,7 +327,7 @@ int hts_unescapeUrlSpecial(const char *src, char *dest, const size_t max,
           /* Was the character read successfully ? */
           if (nRead == utfBufferSize) {
             /* the 'continue' below skips the NUL-reserve guard: re-check */
-            if (utfBufferJ + utfBufferSize >= max) {
+            if (utfBufferJ + utfBufferSize >= dest.size) {
               return -1;
             }
 
@@ -336,7 +335,7 @@ int hts_unescapeUrlSpecial(const char *src, char *dest, const size_t max,
             j = utfBufferJ;
 
             /* Copy full character sequence */
-            memcpy(&dest[j], utfBuffer, utfBufferSize);
+            memcpy(&dest.p[j], utfBuffer, utfBufferSize);
             j += utfBufferSize;
 
             /* Skip current character */
@@ -347,18 +346,18 @@ int hts_unescapeUrlSpecial(const char *src, char *dest, const size_t max,
     }
 
     /* reserve one byte for the trailing NUL written after the loop */
-    if (j + 1 >= max) {
+    if (j + 1 >= dest.size) {
       return -1;
     }
 
     /* Copy current */
-    dest[j++] = c;
+    dest.p[j++] = c;
   }
-  dest[j] = '\0';
+  dest.p[j] = '\0';
 
   return 0;
 }
 
-int hts_unescapeUrl(const char *src, char *dest, const size_t max) {
-  return hts_unescapeUrlSpecial(src, dest, max, 0);
+int hts_unescapeUrl(const char *src, hts_buf dest) {
+  return hts_unescapeUrlSpecial(src, dest, 0);
 }
