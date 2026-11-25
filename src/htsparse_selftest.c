@@ -110,7 +110,7 @@ static void dirtylink_case(httrackp *opt, selftest_sweep *sw, const char *str) {
     for (j = 0; j < 2; j++) {
       const hts_boolean inscript = j != 0 ? HTS_TRUE : HTS_FALSE;
       const hts_boolean got =
-          hts_dirty_link_is_url(opt, str, strlen(str), lastcs[i], inscript);
+          hts_dirty_link_is_url(opt, hts_span_of(str), lastcs[i], inscript);
 
       sw->cases++;
       if (got)
@@ -247,9 +247,8 @@ static int parse_selftest_dirtylink(httrackp *opt, hts_boolean dump) {
   sw.dump = dump;
 
   for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
-    const hts_boolean got =
-        hts_dirty_link_is_url(opt, cases[i].str, strlen(cases[i].str),
-                              cases[i].lastc, cases[i].inscript);
+    const hts_boolean got = hts_dirty_link_is_url(
+        opt, hts_span_of(cases[i].str), cases[i].lastc, cases[i].inscript);
 
     sw.cases++;
     if (got != cases[i].want) {
@@ -263,10 +262,17 @@ static int parse_selftest_dirtylink(httrackp *opt, hts_boolean dump) {
     }
   }
 
-  /* The parser passes a slice, so a read past "len" must fail here. */
-  if (!hts_dirty_link_is_url(opt, "a.gif*rest", 5, ')', HTS_TRUE) ||
-      hts_dirty_link_is_url(opt, "a.gif*rest", 10, ')', HTS_TRUE)) {
+  /* The parser passes a slice, so a read past its end must fail here. */
+  if (!hts_dirty_link_is_url(opt, hts_span_at("a.gif*rest", 5), ')',
+                             HTS_TRUE) ||
+      hts_dirty_link_is_url(opt, hts_span_at("a.gif*rest", 10), ')',
+                            HTS_TRUE)) {
     fprintf(stderr, "dirtylink: the verdict must read the first len bytes\n");
+    err = 1;
+  }
+  /* A NUL in the slice ends the string, so the '*' after it is never seen. */
+  if (!hts_dirty_link_is_url(opt, hts_span_at("a.gif\0*", 7), ')', HTS_TRUE)) {
+    fprintf(stderr, "dirtylink: a NUL must end the string\n");
     err = 1;
   }
   /* A string at the parser's cap gets no verdict, one byte under it does. */
@@ -276,9 +282,10 @@ static int parse_selftest_dirtylink(httrackp *opt, hts_boolean dump) {
     memset(big, 'a', sizeof(big) - 1);
     big[sizeof(big) - 1] = '\0';
     memcpy(big + sizeof(big) - 5, ".gif", 4);
-    if (hts_dirty_link_is_url(opt, big, HTS_URLMAXSIZE, ')', HTS_TRUE) ||
-        !hts_dirty_link_is_url(opt, big + 1, HTS_URLMAXSIZE - 1, ')',
-                               HTS_TRUE)) {
+    if (hts_dirty_link_is_url(opt, hts_span_at(big, HTS_URLMAXSIZE), ')',
+                              HTS_TRUE) ||
+        !hts_dirty_link_is_url(opt, hts_span_at(big + 1, HTS_URLMAXSIZE - 1),
+                               ')', HTS_TRUE)) {
       fprintf(stderr, "dirtylink: the length cap is off by one or absent\n");
       err = 1;
     }
@@ -642,6 +649,7 @@ static int parse_selftest_jsscan(httrackp *opt, hts_boolean dump) {
       {"x.SRC=\"pic.gif\";", 1, HTS_FALSE, HTS_FALSE, HTS_TRUE, 6, 7},
       /* .open's first argument can be a method or a type, and is neither */
       {"x.open(\"GET\",u)", 1, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
+      {"x.open(\"get\",u)", 1, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
       {"x.open(\"text/html\")", 1, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
       /* CSS lets url() drop the quotes, JavaScript's URL(x) does not */
       {"url(pic.png)", 0, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 7},
@@ -1308,6 +1316,32 @@ static int st_sink(httrackp *opt, int argc, char **argv) {
       err = 1;
     }
     freet(got);
+  }
+  /* The URL escapers stop at the last escape that fits a buffer of "size". */
+  {
+    static const struct {
+      hts_boolean parens;
+      size_t size;
+      const char *want;
+    } esc[] = {{HTS_TRUE, 7, "a%28"},
+               {HTS_TRUE, 8, "a%28b"},
+               {HTS_FALSE, 8, "a%3C"},
+               {HTS_FALSE, 9, "a%3Cb"}};
+
+    size_t k;
+
+    for (k = 0; k < sizeof(esc) / sizeof(esc[0]); k++) {
+      char buf[16];
+      const char *got = hts_parse_escape_selftest(esc[k].parens,
+                                                  esc[k].parens ? "a(b" : "a<b",
+                                                  hts_buf_at(buf, esc[k].size));
+
+      if (strcmp(got, esc[k].want) != 0) {
+        fprintf(stderr, "sink escape case %d: got \"%s\", wanted \"%s\"\n",
+                (int) k, got, esc[k].want);
+        err = 1;
+      }
+    }
   }
   if (err) {
     printf("sink self-test FAILED\n");

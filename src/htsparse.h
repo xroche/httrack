@@ -36,6 +36,8 @@ Please visit our Website: http://www.httrack.com
 #define HTSPARSE_DEFH
 
 #include "htsglobal.h"
+#include "htsurlport.h"
+#include "htsbuf.h"
 
 /* Forward definitions */
 #ifndef HTS_DEF_FWSTRUCT_htsblk
@@ -110,24 +112,29 @@ struct htsmoduleStructExtended {
 int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre);
 
 /* Strip a default ":80" (any spelling) from an absolute link's authority, in
-   place into a buffer of the given size. */
-void hts_strip_default_port(char *lien, size_t size);
+   place. */
+void hts_strip_default_port(hts_buf link);
 
 /* Self-test hook: 's' through each parser output writer, joined by '|', for a
    page saved as HTML or not and the given script state. The caller freet()s. */
+/* Self-test hook: 's' through escape_url_parens (in place) or html_inline_safe
+   into 'out'. Returns out.p. */
+const char *hts_parse_escape_selftest(const hts_boolean parens,
+                                      const char *const s, hts_buf out);
+
 char *hts_parse_sink_selftest(const hts_boolean enabled, const int inscript,
                               const int inscript_tag, const char *const s);
 
 /*
-  Does a quoted string the dirty parser found look like a link? "str" and "len"
-  are the string as the source spells it. "lastc" is the first non-blank byte
+  Does a quoted string the dirty parser found look like a link? "str" is the
+  string as the source spells it. "lastc" is the first non-blank byte
   after its closing quote, and "inscript" says it sits in JavaScript or CSS,
   not in a tag attribute. The verdict is taken on what the cut at '#' and '?'
   leaves, so "/#top" is judged as "/". A string of HTS_URLMAXSIZE bytes or more
   is refused, a length the parser never offers.
 */
-hts_boolean hts_dirty_link_is_url(httrackp *opt, const char *str, size_t len,
-                                  char lastc, hts_boolean inscript);
+hts_boolean hts_dirty_link_is_url(httrackp *opt, hts_span str, char lastc,
+                                  hts_boolean inscript);
 
 /* A link the script scanner found, as an offset and a length from the cursor
    it was given. "unquoted_end" is the byte an unquoted CSS url() operand stops

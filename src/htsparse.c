@@ -72,7 +72,7 @@ Please visit our Website: http://www.httrack.com
 #define HTS_LINK_TAIL_ROOM 16
 
 /* The parse_sink of htsparse(), under the short names its call sites use. */
-#define HT_ADD_N(PTR, COUNT) sink_add_n(&sink, (PTR), (COUNT))
+#define HT_ADD_N(PTR, COUNT) sink_add_n(&sink, hts_span_at((PTR), (COUNT)))
 #define HT_ADD(A) sink_add(&sink, (A))
 #define HT_ADD_BUF(A, N) HT_ADD_N(A, htssafe_strnlen_(A, N))
 #define HT_ADD_HTMLESCAPED(A) sink_add_htmlescaped(&sink, (A))
@@ -289,37 +289,34 @@ static void hts_automate_increment(const script_automate *aut, int steps) {
    an HTML comment (the default footer) or any other HTML context. A URL holding
    "-->" would otherwise close the footer comment and inject markup (issue #165).
    Raw '<' and '>' are not valid URL characters, so encoding them is harmless. */
-static const char *html_inline_safe(const char *src, char *dst, size_t size) {
+static const char *html_inline_safe(const char *src, hts_buf dst) {
   size_t i, j;
 
-  for(i = 0, j = 0; src[i] != '\0' && j + 4 < size; i++) {
+  for (i = 0, j = 0; src[i] != '\0' && j + 4 < dst.size; i++) {
     const char c = src[i];
 
     if (c == '<' || c == '>') {
-      dst[j++] = '%';
-      dst[j++] = '3';
-      dst[j++] = (c == '<') ? 'C' : 'E';
+      dst.p[j++] = '%';
+      dst.p[j++] = '3';
+      dst.p[j++] = (c == '<') ? 'C' : 'E';
     } else {
-      dst[j++] = c;
+      dst.p[j++] = c;
     }
   }
-  dst[j] = '\0';
-  return dst;
+  dst.p[j] = '\0';
+  return dst.p;
 }
 
-/* Copies the first max bytes of the page text s, len bytes long, into buf
-   for a debug line, with a URL login masked, or "(hidden)" when a login
-   cannot be told apart. */
-static const char *text_excerpt(httrackp *opt, hts_buf buf, const char *s,
-                                size_t len, size_t max) {
-  char *copy = malloct(len + 1);
+/* Copies the first max bytes of the page text s into buf for a debug line,
+   with a URL login masked, or "(hidden)" when a login cannot be told apart. */
+static const char *text_excerpt(httrackp *opt, hts_buf buf, hts_span s,
+                                size_t max) {
+  char *copy = hts_span_dup(s);
   const char *shown;
 
   buf.p[0] = '\0';
   if (copy == NULL)
     return buf.p;
-  memcpy(copy, s, len);
-  copy[len] = '\0';
   shown = url_nologin(opt, copy);
   if (shown == copy && jump_protocol_const(copy) == copy &&
       strchr(copy, '@') != NULL)
@@ -355,24 +352,19 @@ static const char *page_charset(const htsmoduleStruct *str,
   return *declared ? charset : "iso-8859-1";
 }
 
-/* True if [s, s+len) is exactly an HTTP method token (XHR.open's first
-   argument is a method, not a URL: #218). Case-insensitive. */
-static int is_http_method(const char *s, size_t len) {
+/* Is s exactly an HTTP method token, in any case? XHR.open's first argument
+   is a method, not a URL (#218). */
+static hts_boolean is_http_method(hts_span s) {
   static const char *const methods[] = {"GET",    "POST",  "PUT",
                                         "DELETE", "HEAD",  "OPTIONS",
                                         "PATCH",  "TRACE", NULL};
-  int i;
 
-  for (i = 0; methods[i] != NULL; i++) {
-    if (strlen(methods[i]) == len && strfield(s, methods[i]) == (int) len)
-      return 1;
-  }
-  return 0;
+  return hts_span_index_ci(s, methods) >= 0;
 }
 
 /* Contract in htsparse.h. */
-hts_boolean hts_dirty_link_is_url(httrackp *opt, const char *str, size_t len,
-                                  char lastc, hts_boolean inscript) {
+hts_boolean hts_dirty_link_is_url(httrackp *opt, hts_span str, char lastc,
+                                  hts_boolean inscript) {
   char BIGSTK tempo[HTS_URLMAXSIZE * 2];
   char type[256];
   hts_boolean url_ok = HTS_FALSE;
@@ -381,11 +373,9 @@ hts_boolean hts_dirty_link_is_url(httrackp *opt, const char *str, size_t len,
 
   /* The parser never offers more, and a caller that does gets no verdict
      rather than an aborted process. */
-  if (len >= HTS_URLMAXSIZE)
+  if (str.len >= HTS_URLMAXSIZE || !hts_buf_put_span(HTS_BUF(tempo), str))
     return HTS_FALSE;
-  tempo[0] = '\0';
   type[0] = '\0';
-  strncatbuff(tempo, str, len);
 
   /* A space is suspicious outside script code */
   if (strchr(tempo, ' ') != NULL && !inscript)
@@ -733,7 +723,7 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
     }
     // XHR.open's "GET" etc. is a method, not a URL
     if (a != NULL && ensure_not_method &&
-        is_http_method(a, (size_t) (c - a + 1)))
+        is_http_method(hts_span_at(a, (size_t) (c - a + 1))))
       a = NULL;
     // "jquery" names a module the loader resolves, never a file
     if (a != NULL && is_specifier && !js_specifier_is_url(a))
@@ -819,55 +809,55 @@ static void parse_fetch_meta(httrackp *opt, int ptr, hts_fetch_meta *fm,
 
 /* Is this raw data-src / data-srcset value a lazy-load placeholder rather
    than a URL? Templates ({{x}}, JSON) and a few placeholder words are. */
-static hts_boolean data_attr_is_not_url(const char *s, size_t len) {
+static hts_boolean data_attr_is_not_url(hts_span s) {
   static const char *const words[] = {
       "lazy",  "placeholder", "none",  "null",  "undefined",
       "false", "true",        "blank", "empty", NULL};
   size_t i;
 
-  while (len > 0 && (unsigned char) *s <= ' ') {
-    s++;
-    len--;
-  }
-  while (len > 0 && (unsigned char) s[len - 1] <= ' ')
-    len--;
-  for (i = 0; i < len && s[i] != '?'; i++) { /* a query may carry JSON */
-    if (s[i] == '{' || s[i] == '}' || s[i] == '<' || s[i] == '>' || s[i] == '"')
+  while (s.len > 0 && (unsigned char) *s.p <= ' ')
+    s = hts_span_skip(s, 1);
+  while (s.len > 0 && (unsigned char) s.p[s.len - 1] <= ' ')
+    s.len--;
+  for (i = 0; i < s.len && s.p[i] != '?'; i++) { /* a query may carry JSON */
+    const char c = s.p[i];
+
+    if (c == '{' || c == '}' || c == '<' || c == '>' || c == '"')
       return HTS_TRUE;
   }
-  return hts_span_index_ci(hts_span_at(s, len), words) >= 0;
+  return hts_span_index_ci(s, words) >= 0;
 }
 
 /* Percent-encode '(' and ')' in a link emitted into an unquoted url(...) (CSS
    or JS): a literal ')' closes the token early and the UA mis-parses the value
    (#163). The UA decodes %28/%29 back to the saved-on-disk name. */
-static void escape_url_parens(char *const s, const size_t size) {
+static void escape_url_parens(hts_buf s) {
   char BIGSTK buff[HTS_URLMAXSIZE * 2];
   size_t i, j;
 
-  for (i = 0, j = 0; s[i] != '\0' && j + 3 < size && j + 3 < sizeof(buff);
+  for (i = 0, j = 0; s.p[i] != '\0' && j + 3 < s.size && j + 3 < sizeof(buff);
        i++) {
-    if (s[i] == '(' || s[i] == ')') {
+    if (s.p[i] == '(' || s.p[i] == ')') {
       buff[j++] = '%';
       buff[j++] = '2';
-      buff[j++] = s[i] == '(' ? '8' : '9';
+      buff[j++] = s.p[i] == '(' ? '8' : '9';
     } else {
-      buff[j++] = s[i];
+      buff[j++] = s.p[i];
     }
   }
   buff[j] = '\0';
-  strlcpybuff(s, buff, size);
+  hts_buf_cpy(s, buff);
 }
 
 /* Copy a URL piece with " ' < > percent-encoded, so it cannot end the
    attribute or script string it is written into; with html, & becomes &amp;.
-   Returns the length written, or size on overflow. */
-static size_t escape_url_quotes_any(const char *const s, char *const dest,
-                                    const size_t size, const hts_boolean html) {
+   Returns the length written, or dest.size on overflow. */
+static size_t escape_url_quotes_any(const char *const s, hts_buf dest,
+                                    const hts_boolean html) {
   static const char hex[] = "0123456789abcdef";
   size_t i, j = 0;
 
-  if (size == 0)
+  if (dest.size == 0)
     return 0;
   for (i = 0; s[i] != '\0'; i++) {
     const unsigned char c = (unsigned char) s[i];
@@ -884,25 +874,25 @@ static size_t escape_url_quotes_any(const char *const s, char *const dest,
       memcpy(out, "&amp;", 5);
       n = 5;
     }
-    if (n >= size - j) {
-      dest[j] = '\0';
-      return size;
+    if (n >= dest.size - j) {
+      dest.p[j] = '\0';
+      return dest.size;
     }
-    memcpy(dest + j, out, n);
+    memcpy(dest.p + j, out, n);
     j += n;
   }
-  dest[j] = '\0';
+  dest.p[j] = '\0';
   return j;
 }
 
 static size_t escape_url_quotes(const char *const s, char *const dest,
                                 const size_t size) {
-  return escape_url_quotes_any(s, dest, size, HTS_FALSE);
+  return escape_url_quotes_any(s, hts_buf_at(dest, size), HTS_FALSE);
 }
 
 static size_t escape_url_quotes_html(const char *const s, char *const dest,
                                      const size_t size) {
-  return escape_url_quotes_any(s, dest, size, HTS_TRUE);
+  return escape_url_quotes_any(s, hts_buf_at(dest, size), HTS_TRUE);
 }
 
 /* The rewritten page htsparse() builds. */
@@ -920,21 +910,19 @@ typedef struct parse_sink {
 typedef size_t (*sink_escaper)(const char *const s, char *const dest,
                                const size_t size);
 
-/* Append 'count' bytes from 'p'. */
-static void sink_add_n(parse_sink *const sink, const char *const p,
-                       const size_t count) {
+static void sink_add_n(parse_sink *const sink, const hts_span s) {
   if (!sink->enabled)
     return;
-  TypedArrayEnsureRoom(sink->buf, count);
-  if (TypedArrayHasRoom(sink->buf, count)) {
-    TypedArrayAppend(sink->buf, p, count);
+  TypedArrayEnsureRoom(sink->buf, s.len);
+  if (TypedArrayHasRoom(sink->buf, s.len)) {
+    TypedArrayAppend(sink->buf, s.p, s.len);
   } else {
     sink->oom = HTS_TRUE;
   }
 }
 
 static void sink_add(parse_sink *const sink, const char *const s) {
-  sink_add_n(sink, s, strlen(s));
+  sink_add_n(sink, hts_span_of(s));
 }
 
 /* Set the buffer's size, latching oom rather than claiming bytes it lacks. */
@@ -1009,7 +997,7 @@ static void sink_add_absolute_url(parse_sink *const sink, const char *const adr,
   } else {
     const char *const aut = strstr(adr, "//");
 
-    sink_add_n(sink, adr, (size_t) (aut - adr) + 2);
+    sink_add_n(sink, hts_span_at(adr, (size_t) (aut - adr) + 2));
   }
   if (passprivacy)
     sink_add_url_htmlescaped(sink, jump_identification_const(adr));
@@ -1020,6 +1008,15 @@ static void sink_add_absolute_url(parse_sink *const sink, const char *const adr,
   if (fil[0] != '/')
     sink_add(sink, "/");
   sink_add_url_htmlescaped(sink, fil);
+}
+
+const char *hts_parse_escape_selftest(const hts_boolean parens,
+                                      const char *const s, hts_buf out) {
+  if (!parens)
+    return html_inline_safe(s, out);
+  hts_buf_cpy(out, s);
+  escape_url_parens(out);
+  return out.p;
 }
 
 char *hts_parse_sink_selftest(const hts_boolean enabled, const int inscript,
@@ -1057,7 +1054,8 @@ static int scheme_default_port(const char *lien) {
 
 /* Strip the scheme's own default port (80 http, 443 https, 21 ftp) from lien's
    authority in place; :80 on https/ftp stays as a real port (#638, #614). */
-void hts_strip_default_port(char *lien, size_t size) {
+void hts_strip_default_port(hts_buf link) {
+  char *const lien = link.p;
   char *a;
 
   if (!link_has_authority(lien))
@@ -1087,7 +1085,7 @@ void hts_strip_default_port(char *lien, size_t size) {
       tempo[0] = '\0';
       strncatbuff(tempo, lien, a - lien);
       strcatbuff(tempo, b); // skip the whole matched :port
-      strlcpybuff(lien, tempo, size);
+      hts_buf_cpy(link, tempo);
     }
   }
 }
@@ -1568,8 +1566,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   // prepends the scheme to them (credentials already stripped
                   // by jump_identification_const, and the scheme is a safe
                   // literal, so no re-escaping is needed).
-                  html_inline_safe(url_host, HTS_SIZED(safe_adr));
-                  html_inline_safe(urlfil(), HTS_SIZED(safe_fil));
+                  html_inline_safe(url_host, HTS_BUF(safe_adr));
+                  html_inline_safe(urlfil(), HTS_BUF(safe_fil));
                   snprintf(safe_url, sizeof(safe_url), "%s%s%s", url_scheme,
                            safe_adr, safe_fil);
                   snprintf(status_str, sizeof(status_str), "%d", r->statuscode);
@@ -1586,12 +1584,12 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     values[HTS_FOOTER_URL] = safe_url;
                     values[HTS_FOOTER_DATE] = gmttime;
                     values[HTS_FOOTER_LASTMODIFIED] = html_inline_safe(
-                        r->lastmodified, HTS_SIZED(safe_lastmod));
+                        r->lastmodified, HTS_BUF(safe_lastmod));
                     values[HTS_FOOTER_VERSION] = HTTRACK_VERSIONID;
                     values[HTS_FOOTER_MIME] =
-                        html_inline_safe(r->contenttype, HTS_SIZED(safe_ctype));
+                        html_inline_safe(r->contenttype, HTS_BUF(safe_ctype));
                     values[HTS_FOOTER_CHARSET] =
-                        html_inline_safe(r->charset, HTS_SIZED(safe_charset));
+                        html_inline_safe(r->charset, HTS_BUF(safe_charset));
                     values[HTS_FOOTER_STATUS] = status_str;
                     values[HTS_FOOTER_SIZE] = size_str;
 
@@ -1869,8 +1867,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                 opt, LOG_DEBUG,
                                 "active code (%s) detected in javascript: %s",
                                 "parse",
-                                text_excerpt(opt, HTS_BUF(str), b,
-                                             (size_t) (a - b + 1), 32));
+                                text_excerpt(
+                                    opt, HTS_BUF(str),
+                                    hts_span_at(b, (size_t) (a - b + 1)), 32));
                           }
                         }
 
@@ -2123,11 +2122,12 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       if ((opt->debug > 1) && (opt->log != NULL)) {
                         char str[64];
 
-                        hts_log_print(opt, LOG_DEBUG,
-                                      "link detected in javascript: %s",
-                                      text_excerpt(opt, HTS_BUF(str),
-                                                   html + jslink.offset,
-                                                   (size_t) jslink.length, 32));
+                        hts_log_print(
+                            opt, LOG_DEBUG, "link detected in javascript: %s",
+                            text_excerpt(opt, HTS_BUF(str),
+                                         hts_span_at(html + jslink.offset,
+                                                     (size_t) jslink.length),
+                                         32));
                       }
                       p = jslink.offset; // p non nul: TRAITER CHAINE COMME
                                          // FICHIER
@@ -2210,7 +2210,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                hts_dirty_attr_detectable(html, intag_start))) {
                             // '/' covers a value followed by a JS comment
                             int url_ok = hts_dirty_link_is_url(
-                                opt, html + 1, (size_t) count, c, inscript);
+                                opt, hts_span_at(html + 1, (size_t) count), c,
+                                inscript);
 
                             if (url_ok) {
 
@@ -2487,15 +2488,17 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                 ok = -1;        // No
               }
               // a lazy-load placeholder or template is no URL: leave it as is
-              if (ok == 0 && dataattr_p &&
-                  data_attr_is_not_url(html, (size_t) (eadr - html - 1))) {
-                const size_t len = (size_t) (eadr - html - 1);
-                char *shown = malloct(len + 8);
+              const hts_span value =
+                  hts_span_at(html, (size_t) (eadr - html - 1));
+
+              if (ok == 0 && dataattr_p && data_attr_is_not_url(value)) {
+                char *shown = malloct(value.len + 8);
 
                 if (shown != NULL)
                   hts_log_print(opt, LOG_DEBUG, "data attribute is no URL: %s",
-                                text_excerpt(opt, hts_buf_at(shown, len + 8),
-                                             html, len, len + 7));
+                                text_excerpt(opt,
+                                             hts_buf_at(shown, value.len + 8),
+                                             value, value.len + 7));
                 freet(shown);
                 not_url = HTS_TRUE;
               }
@@ -2748,7 +2751,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   }
                 }
                 // drop a default :80 port from the authority
-                hts_strip_default_port(HTS_SIZED(lien));
+                hts_strip_default_port(HTS_BUF(lien));
                 // vérifier que l'on ne doit pas ajouter de .class
                 if (!error) {
                   if (add_class) {
@@ -3413,7 +3416,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
                           // CSS url(): keep parens escaped
                           if (escape_parens)
-                            escape_url_parens(HTS_SIZED(tempo));
+                            escape_url_parens(HTS_BUF(tempo));
                         }
                         hts_log_print(
                             opt, LOG_DEBUG,
