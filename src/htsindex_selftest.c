@@ -96,7 +96,7 @@ static int st_index_guarded(const char *body, size_t n, const char *mime) {
   ok = index_keyword(hts_span_at(map + pg - n, n), mime, "page.html", "");
   munmap(map, 2 * pg);
 #else
-  char *const page = malloct(n != 0 ? n : 1);
+  char *page = malloct(n != 0 ? n : 1);
 
   assertf(page != NULL);
   memcpy(page, body, n);
