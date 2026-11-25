@@ -698,7 +698,7 @@ static hts_boolean hts_escape_start_logins(char **url, size_t *url_sz) {
 
       u[n] = '\0';
       // cap holds three bytes per input byte, so the escape cannot clip
-      (void) hts_escape_typed_login(u, out + len, cap - len);
+      (void) hts_escape_typed_login(u, hts_buf_at(out + len, cap - len));
       len += strlen(out + len);
       u[n] = c;
       u += n;
@@ -2642,7 +2642,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
               char BIGSTK pname[HTS_URLMAXSIZE * 2];
 
               opt->proxy.active = 1;
-              hts_parse_proxy(argv[na], HTS_SIZED(pname), &opt->proxy.port);
+              hts_parse_proxy(argv[na], HTS_BUF(pname), &opt->proxy.port);
               StringCopy(opt->proxy.name, pname);
             }
             break;

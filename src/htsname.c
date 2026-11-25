@@ -854,7 +854,7 @@ int url_savename(lien_adrfilsave *const afs,
   const char *const strip_rules = hts_strip_query_rules(opt);
   const char *const strip =
       strip_rules != NULL ? hts_query_strip_keys(strip_rules, adr, fil_complete,
-                                                 HTS_SIZED(stripkeys))
+                                                 HTS_BUF(stripkeys))
                           : NULL;
   const char *const print_adr = jump_protocol_const(adr);
   const char *start_pos = NULL, *nom_pos = NULL, *dot_pos = NULL;     // Position nom et point

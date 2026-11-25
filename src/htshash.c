@@ -90,7 +90,7 @@ static const char* value_sav_debug_print(void *arg, coucal_value_const a) {
 static const char *key_host_alias(const hash_struct *hash, const char *adr,
                                   hts_buf buf) {
   const char *const canon =
-      hts_host_alias(hash->host_alias, adr, hash->norm_host, buf.p, buf.size);
+      hts_host_alias(hash->host_alias, adr, hash->norm_host, buf);
 
   return canon != NULL ? canon : adr;
 }
@@ -143,7 +143,7 @@ const char *hash_url_key(hash_struct *hash, const char *adr, const char *fil,
     const char *const adr_canon = key_host_alias(hash, adr, HTS_BUF(aliasbuf));
     /* the per-URL strip keys apply even when urlhack is off */
     const char *const keys = hts_query_strip_keys(hash->strip_query, adr_canon,
-                                                  fil, HTS_SIZED(keybuf));
+                                                  fil, HTS_BUF(keybuf));
 
     return hash_url_key_(hash, adr_canon, fil, keys, dst);
   }
@@ -223,9 +223,9 @@ static int key_adrfil_equals_generic(void *arg,
     const char *const b_canon =
         key_host_alias(hash, b_adr, HTS_BUF(b_aliasbuf));
     const char *const keysa =
-        hts_query_strip_keys(hash->strip_query, a_canon, a_fil, HTS_SIZED(ka));
+        hts_query_strip_keys(hash->strip_query, a_canon, a_fil, HTS_BUF(ka));
     const char *const keysb =
-        hts_query_strip_keys(hash->strip_query, b_canon, b_fil, HTS_SIZED(kb));
+        hts_query_strip_keys(hash->strip_query, b_canon, b_fil, HTS_BUF(kb));
 
     return key_adrfil_equals_(hash, a_canon, a_fil, keysa, b_canon, b_fil,
                               keysb);

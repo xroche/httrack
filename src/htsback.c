@@ -3239,7 +3239,7 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
           if (sz > 0) {         // Fichier non vide? (question bête, sinon on transfert tout!)
             char lastmodified[256];
 
-            get_filetime_rfc822(save, HTS_SIZED(lastmodified));
+            get_filetime_rfc822(save, HTS_BUF(lastmodified));
             if (strnotempty(lastmodified)) { /* pas de If-.. possible */
               hts_log_print(opt, LOG_DEBUG,
                             "File partially present (" LLintP " bytes): %s%s",

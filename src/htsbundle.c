@@ -238,7 +238,7 @@ const char *hts_bundle_take(httrackp *opt, char *url) {
   if (why != NULL || name[0] == '\0')
     return why;
   // the scope reads the host the crawl will reach
-  if (!hts_escape_typed_login(url, HTS_SIZED(typed)))
+  if (!hts_escape_typed_login(url, HTS_BUF(typed)))
     return "invalid url";
   return bundle_add(opt, name, typed) ? NULL : "out of memory";
 }
@@ -475,7 +475,7 @@ static hts_boolean bundle_parse(httrackp *opt, bundle *b, text_src *src,
 
       // a typed login reads up to the last '@' before the first '/'
       if (strlen(value) >= HTS_URLMAXSIZE ||
-          !hts_escape_typed_login(value, HTS_SIZED(typed)) ||
+          !hts_escape_typed_login(value, HTS_BUF(typed)) ||
           strlen(typed) >= HTS_URLMAXSIZE ||
           strstr(typed, HTS_BUNDLE_SUFFIX) != NULL ||
           !cookie_url_host(typed, HTS_BUF(host)))
