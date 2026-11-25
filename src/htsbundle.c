@@ -978,7 +978,7 @@ static const char *names_note_words(char ***names, size_t *n,
 
     if (!hts_scan_token(&a, word, sizeof(word)))
       why = "address too long";
-    else if (hts_is_quoted(word, strlen(word)))
+    else if (hts_is_quoted(hts_span_of(word)))
       why = "address is quoted";
     else if (strcmp(word, HTS_NOPARAM) == 0)
       why = "address is (none)";
@@ -1010,7 +1010,7 @@ static const char *names_note_file(char ***names, size_t *n, const char *path,
     if (status == HTS_URLLIST_END)
       break;
     /* the crawl drops these lines rather than refuse them */
-    if (status == HTS_URLLIST_LINE && !hts_is_quoted(line, strlen(line)))
+    if (status == HTS_URLLIST_LINE && !hts_is_quoted(hts_span_of(line)))
       why = names_note(names, n, line);
   }
   freet(buff);

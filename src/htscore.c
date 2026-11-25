@@ -1259,7 +1259,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
                           StringBuff(opt->filelist), lineno, HTS_URLMAXSIZE);
             continue;
           }
-          if (hts_is_quoted(line, strlen(line))) {
+          if (hts_is_quoted(hts_span_of(line))) {
             hts_log_print(
                 opt, LOG_ERROR, "\"%s\", line %d: \"%s is quoted, ignored",
                 StringBuff(opt->filelist), lineno, adr_nologin(opt, line + 1));

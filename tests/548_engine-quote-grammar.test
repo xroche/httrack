@@ -9,7 +9,7 @@ set -euo pipefail
 . "${0%"${0##*/}"}./testlib.sh"
 
 # The counts are exact, so a shrinking corpus shows.
-selftest_queue_lines "quotediff: 100184 cases, 0 failures
+selftest_queue_lines "quotediff: 100186 cases, 0 failures
 quotediff: OK" quotediff
 selftest_queue_lines "quoteprop: 40000 cases, 0 failures
 quoteprop: OK" quoteprop

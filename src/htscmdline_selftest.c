@@ -337,7 +337,7 @@ static void quotediff_one(quote_stats *st, const char *in) {
 
   /* the WebHTTrack argument escape */
   legacy_cmdline_argn(&o, in, strlen(in));
-  hts_escape_arg(&n, in, strlen(in));
+  hts_escape_arg(&n, hts_span_of(in));
   st->cases++;
   if (StringLength(o) != StringLength(n) ||
       memcmp(StringBuff(o), StringBuff(n), StringLength(o)) != 0)
@@ -424,6 +424,20 @@ static int st_quotediff(httrackp *opt, int argc, char **argv) {
     quotediff_one(&st, StringBuff(big));
     StringFree(big);
   }
+  /* The span ends before the string: "a"b\ of "a"b\" */
+  {
+    static const char s[] = "\"a\"b\\\"";
+    String e = STRING_EMPTY;
+
+    st.cases += 2;
+    if (!hts_is_quoted(hts_span_at(s, 3)) || hts_is_quoted(hts_span_at(s, 2)) ||
+        hts_is_quoted(hts_span_at(s, 1)))
+      quote_fail(&st, "quoted span", s, "", "");
+    hts_escape_arg(&e, hts_span_at(s, 5));
+    if (strcmp(StringBuff(e), "\\\"a\\\"b\\\\") != 0)
+      quote_fail(&st, "escaped span", s, "\\\"a\\\"b\\\\", StringBuff(e));
+    StringFree(e);
+  }
   for (r = 0; r < 20000; r++) {
     String in = STRING_EMPTY;
 
@@ -472,7 +486,8 @@ static int st_quoteprop(httrackp *opt, int argc, char **argv) {
       StringCat(want_doitlog, StringBuff(args[i]));
       StringAddchar(want_doitlog, '\n');
       StringCat(cmdline, " \"");
-      hts_escape_arg(&cmdline, StringBuff(args[i]), StringLength(args[i]));
+      hts_escape_arg(&cmdline,
+                     hts_span_at(StringBuff(args[i]), StringLength(args[i])));
       StringAddchar(cmdline, '\"');
       /* the command line folds TAB, CR and LF to a space, even quoted */
       for (k = 0; k < StringLength(args[i]); k++) {

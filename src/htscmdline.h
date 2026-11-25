@@ -36,6 +36,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsglobal.h"
 #include "htsstrings.h"
+#include "htsurlport.h"
 
 /* The argument grammar: a space separates arguments, '"' toggles quoting, and
    inside quotes \\ and \" are the only escapes. */
@@ -62,17 +63,17 @@ char **hts_split_cmdline(char *cmd, int *nargs);
    are quoted as hts_quote_arg() does. */
 char **hts_split_webcmd(char *cmd, int *nargs);
 
-/* Append len bytes of arg to out with \\ and \" escaped, the body of a quoted
-   argument without its quotes. */
-void hts_escape_arg(String *out, const char *arg, size_t len);
+/* Append arg to out with \\ and \" escaped, the body of a quoted argument
+   without its quotes. */
+void hts_escape_arg(String *out, hts_span arg);
 
 /* Append arg to out as one argument: quoted when it holds a space, a quote or a
    backslash, "" when empty, verbatim otherwise. hts_split_args() with
    HTS_SPLIT_STRIP_QUOTES reads it back. */
 void hts_quote_arg(String *out, const char *arg);
 
-/* Do the first len bytes of arg start and end with a quote? */
-hts_boolean hts_is_quoted(const char *arg, size_t len);
+/* Does arg start and end with a quote? */
+hts_boolean hts_is_quoted(hts_span arg);
 
 /* This hint follows "<where>: <value> " when hts_is_quoted(value). */
 #define HTS_QUOTED_HINT "is quoted, remove the quotes"
