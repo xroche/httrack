@@ -1320,6 +1320,8 @@ static int st_ucs2(httrackp *opt, int argc, char **argv) {
                                mixed_utf8, HTS_FALSE));
     ST_FAIL_IF(err, ucs2_check(pairs, sizeof(pairs) / sizeof(pairs[0]),
                                pairs_utf8, HTS_TRUE));
+    /* a pair that ends the body is still a pair */
+    ST_FAIL_IF(err, ucs2_check(pairs, 2, "\xF0\x90\x80\x80", HTS_FALSE));
     {
       size_t n = 0;
       char *got = hts_ucs2_to_utf8(BYTES_SPAN(odd), HTS_TRUE, &n);
