@@ -283,7 +283,7 @@ static hts_boolean cookie_same_domain(hts_span a, const char *b) {
 #define COOKIE_HOST_MAX_COUNT 50
 #define COOKIE_HOST_MAX_BYTES 8192
 
-/* Does a record needing `need` bytes fit in data? The record it replaces is
+/* Does a record needing `need` bytes fit in the jar? The record it replaces is
    counted free. */
 static hts_boolean cookie_fits(t_cookie *cookie, const char *domain,
                                const char *cook_name, const char *path,
@@ -293,8 +293,7 @@ static hts_boolean cookie_fits(t_cookie *cookie, const char *domain,
       strlen(cookie->data) -
       (old != NULL ? (size_t) (cookie_nextfield(old) - old) : 0);
 
-  return need <= cookie->max_len && used <= cookie->max_len - need ? HTS_TRUE
-                                                                   : HTS_FALSE;
+  return need <= cookie->max_len && used <= cookie->max_len - need;
 }
 
 /* Is a host with this many records and bytes over its share? */
