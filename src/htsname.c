@@ -354,10 +354,12 @@ static int wire_patches_ext(httrackp *opt, const sniff_src *src,
     if (hts_sniff_mime_known(urlmime)) {
       unsigned char head[HTS_SNIFF_LEN];
       const size_t n = sniff_body_head(opt, src, head, sizeof(head));
-      const hts_span body = hts_span_at((const char *) head, n);
 
       if (n > 0)
-        return hts_sniff_mime_consistent(body, urlmime) ? 0 : 1;
+        return hts_sniff_mime_consistent(hts_span_at((const char *) head, n),
+                                         urlmime)
+                   ? 0
+                   : 1;
     }
     /* no bytes: reproduce the previous run's verdict (cached X-Save name) */
     if (src->prev_save != NULL && src->prev_save[0] != '\0') {

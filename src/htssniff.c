@@ -175,29 +175,35 @@ static const char *const pem_mimes[] = {
     "application/x-x509-ca-cert", "application/x-pkcs7-certificates",
     "application/x-pkcs7-mime", "application/x-pkcs7-signature", NULL};
 
-static hts_boolean mime_in(const char *const *list, const char *mime) {
+/* Is MIME the type NAME? The inline length test skips most calls. */
+static hts_boolean mime_is(hts_span mime, const char *name) {
+  const hts_span n = hts_span_of(name);
+
+  return n.len == mime.len && hts_span_eq_ci(n, mime);
+}
+
+static hts_boolean mime_in(const char *const *list, hts_span mime) {
   size_t i;
 
   for (i = 0; list[i] != NULL; i++)
-    if (strfield2(list[i], mime))
+    if (mime_is(mime, list[i]))
       return HTS_TRUE;
   return HTS_FALSE;
 }
 
-static hts_boolean mime_in_prefix(const char *const *list, const char *mime) {
+static hts_boolean mime_in_prefix(const char *const *list, hts_span mime) {
   size_t i;
 
   for (i = 0; list[i] != NULL; i++)
-    if (strfield(mime, list[i]))
+    if (hts_span_starts_with_ci(mime, hts_span_of(list[i])))
       return HTS_TRUE;
   return HTS_FALSE;
 }
 
-/* memcmp, not a span helper: an opaque call re-runs strlen(mime) per row. */
+/* Do the LEN BYTES sit at OFF in S? */
 static hts_boolean has_bytes(hts_span s, size_t off, const char *bytes,
                              size_t len) {
-  return off <= s.len && len <= s.len - off &&
-         memcmp(s.p + off, bytes, len) == 0;
+  return hts_span_starts_with(hts_span_skip(s, off), hts_span_at(bytes, len));
 }
 
 /* Case-insensitive text prefix after an optional UTF-8 BOM and WHATWG
@@ -217,7 +223,8 @@ typedef enum sniff_op {
 } sniff_op;
 
 /* Single walk for both queries so the rule set can't drift apart. */
-static hts_boolean sniff_eval(sniff_op op, hts_span s, const char *mime) {
+static hts_boolean sniff_eval(sniff_op op, hts_span s, const char *name) {
+  const hts_span mime = hts_span_of(name);
   const unsigned char *const d = (const unsigned char *) s.p;
   const size_t n = s.len;
   size_t i;
@@ -232,7 +239,7 @@ static hts_boolean sniff_eval(sniff_op op, hts_span s, const char *mime) {
   } while (0)
 
   for (i = 0; sniff_table[i].mime != NULL; i++) {
-    if (strfield2(sniff_table[i].mime, mime)) {
+    if (mime_is(mime, sniff_table[i].mime)) {
       SNIFF_RULE(has_bytes(s, sniff_table[i].off, sniff_table[i].bytes,
                            sniff_table[i].len));
     }
@@ -267,32 +274,32 @@ static hts_boolean sniff_eval(sniff_op op, hts_span s, const char *mime) {
   if (mime_in(asf_mimes, mime)) {
     SNIFF_RULE(has_bytes(s, 0, "\x30\x26\xb2\x75\x8e\x66\xcf\x11", 8));
   }
-  if (strfield2("audio/x-wav", mime)) {
+  if (mime_is(mime, "audio/x-wav")) {
     SNIFF_RULE(has_bytes(s, 0, "RIFF", 4) && has_bytes(s, 8, "WAVE", 4));
   }
-  if (strfield2("video/x-msvideo", mime)) {
+  if (mime_is(mime, "video/x-msvideo")) {
     SNIFF_RULE(has_bytes(s, 0, "RIFF", 4) && has_bytes(s, 8, "AVI ", 4));
   }
-  if (strfield2("image/webp", mime)) {
+  if (mime_is(mime, "image/webp")) {
     SNIFF_RULE(has_bytes(s, 0, "RIFF", 4) && has_bytes(s, 8, "WEBPVP", 6));
   }
-  if (strfield2("image/x-portable-anymap", mime)) {
+  if (mime_is(mime, "image/x-portable-anymap")) {
     SNIFF_RULE(n >= 2 && d[0] == 'P' && d[1] >= '1' && d[1] <= '6');
   }
-  if (strfield2("audio/x-aiff", mime)) {
+  if (mime_is(mime, "audio/x-aiff")) {
     SNIFF_RULE(has_bytes(s, 0, "FORM", 4) &&
                (has_bytes(s, 8, "AIFF", 4) || has_bytes(s, 8, "AIFC", 4)));
   }
-  if (strfield2("audio/mpeg", mime)) {
+  if (mime_is(mime, "audio/mpeg")) {
     /* MPEG audio frame sync (11 bits), valid layer and bitrate fields */
     SNIFF_RULE(n >= 2 && d[0] == 0xff && (d[1] & 0xe0) == 0xe0 &&
                (d[1] & 0x06) != 0);
   }
-  if (strfield2("audio/aac", mime)) {
+  if (mime_is(mime, "audio/aac")) {
     /* ADTS sync */
     SNIFF_RULE(n >= 2 && d[0] == 0xff && (d[1] & 0xf6) == 0xf0);
   }
-  if (strfield2("video/mp2t", mime)) {
+  if (mime_is(mime, "video/mp2t")) {
     SNIFF_RULE(n >= 1 && d[0] == 0x47 && (n <= 188 || d[188] == 0x47));
   }
   if (mime_in(xml_mimes, mime)) {
@@ -309,10 +316,10 @@ static hts_boolean sniff_eval(sniff_op op, hts_span s, const char *mime) {
   if (mime_in(pem_mimes, mime)) {
     SNIFF_RULE(has_text_prefix(s, "-----BEGIN"));
   }
-  if (is_playlist_mime_type(mime)) {
+  if (is_playlist_mime_type(name)) {
     SNIFF_RULE(has_text_prefix(s, "#EXTM3U"));
   }
-  if (strfield2("text/x-vcard", mime)) {
+  if (mime_is(mime, "text/x-vcard")) {
     SNIFF_RULE(has_text_prefix(s, "BEGIN:VCARD"));
   }
 #undef SNIFF_RULE
