@@ -1030,6 +1030,7 @@ static int st_acceptencoding(httrackp *opt, int argc, char **argv) {
     /* 64 KiB of varied (LCG) bytes: forces the multi-fread loop */
     const size_t blen = 64 * 1024;
     unsigned char *body = malloct(blen);
+    const hts_span sm = ae_bytes(small, slen), bd = ae_bytes(body, blen);
     uint32_t x = 0x1234567u;
     char inpath[HTS_URLMAXSIZE], outpath[HTS_URLMAXSIZE];
     size_t i;
@@ -1044,18 +1045,16 @@ static int st_acceptencoding(httrackp *opt, int argc, char **argv) {
       snprintf(inpath, sizeof(inpath), "%s/ae-in-%d.z", argv[0], windowBits[i]);
       snprintf(outpath, sizeof(outpath), "%s/ae-out-%d", argv[0],
                windowBits[i]);
-      assertf(ae_write_packed(inpath, windowBits[i], ae_bytes(small, slen)) ==
-              0);
+      assertf(ae_write_packed(inpath, windowBits[i], sm) == 0);
       assertf(hts_zunpack(inpath, outpath) == (int) slen);
-      assertf(ae_check_decoded(outpath, ae_bytes(small, slen)) == 0);
-      assertf(ae_write_packed(inpath, windowBits[i], ae_bytes(body, blen)) ==
-              0);
+      assertf(ae_check_decoded(outpath, sm) == 0);
+      assertf(ae_write_packed(inpath, windowBits[i], bd) == 0);
       assertf(hts_zunpack(inpath, outpath) == (int) blen);
-      assertf(ae_check_decoded(outpath, ae_bytes(body, blen)) == 0);
+      assertf(ae_check_decoded(outpath, bd) == 0);
     }
     /* A cap below the decoded size refuses the body; at the size it passes. */
     snprintf(inpath, sizeof(inpath), "%s/ae-in-%d.z", argv[0], windowBits[0]);
-    assertf(ae_write_packed(inpath, windowBits[0], ae_bytes(body, blen)) == 0);
+    assertf(ae_write_packed(inpath, windowBits[0], bd) == 0);
     assertf(hts_zunpack_max(inpath, outpath, (LLint) blen - 1) ==
             HTS_CODEC_TOOBIG);
     assertf(hts_codec_unpack_max(HTS_CODEC_DEFLATE, inpath, outpath,
@@ -1073,9 +1072,9 @@ static int st_acceptencoding(httrackp *opt, int argc, char **argv) {
     assertf(ae_check_decoded(outpath, ae_bytes(body, 64)) == 0);
     /* Identity fallback (#47): a plain body mislabeled as compressed is kept
        verbatim, small and multi-chunk (> one 8 KiB fread). */
-    assertf(ae_write_raw(inpath, ae_bytes(small, slen)) == 0);
+    assertf(ae_write_raw(inpath, sm) == 0);
     assertf(hts_zunpack(inpath, outpath) == (int) slen);
-    assertf(ae_check_decoded(outpath, ae_bytes(small, slen)) == 0);
+    assertf(ae_check_decoded(outpath, sm) == 0);
     {
       const size_t ilen = 16 * 1024;
       unsigned char *idbody = malloct(ilen);
@@ -1105,7 +1104,7 @@ static int st_acceptencoding(httrackp *opt, int argc, char **argv) {
         size_t zlen;
         FILE *f;
 
-        assertf(ae_write_packed(inpath, tr[i].wb, ae_bytes(small, slen)) == 0);
+        assertf(ae_write_packed(inpath, tr[i].wb, sm) == 0);
         f = FOPEN(inpath, "rb");
         assertf(f != NULL);
         zlen = fread(z, 1, sizeof(z), f);
@@ -1134,6 +1133,8 @@ static const unsigned char cc_br_text[] = {
 static const unsigned char cc_br_bomb[] = {0x9b, 0xff, 0xff, 0x3f, 0x00,
                                            0x24, 0x82, 0xe2, 0xb1, 0x40,
                                            0x72, 0xef, 0x7f, 0x00};
+static const hts_span cc_br = {(const char *) cc_br_text, sizeof(cc_br_text)};
+static const hts_span cc_bomb = {(const char *) cc_br_bomb, sizeof(cc_br_bomb)};
 #endif
 
 #if HTS_USEBROTLI || HTS_USEZSTD
@@ -1230,25 +1231,20 @@ static int st_contentcodings(httrackp *opt, int argc, char **argv) {
     {
       char head[16];
 
-      assertf(ae_write_raw(inpath, ae_bytes(cc_br_text, sizeof(cc_br_text))) ==
-              0);
+      assertf(ae_write_raw(inpath, cc_br) == 0);
       assertf(hts_codec_unpack(HTS_CODEC_BROTLI, inpath, outpath) ==
               (int) tlen);
       assertf(ae_check_decoded(outpath, ae_bytes(cc_text, tlen)) == 0);
-      assertf(hts_codec_head(
-                  HTS_CODEC_BROTLI,
-                  hts_span_at((const char *) cc_br_text, sizeof(cc_br_text)),
-                  HTS_BUF(head)) == sizeof(head));
+      assertf(hts_codec_head(HTS_CODEC_BROTLI, cc_br, HTS_BUF(head)) ==
+              sizeof(head));
       assertf(memcmp(head, cc_text, sizeof(head)) == 0);
       /* truncated: must fail, not fall back to a verbatim copy */
-      assertf(ae_write_raw(inpath,
-                           ae_bytes(cc_br_text, sizeof(cc_br_text) - 4)) == 0);
+      assertf(ae_write_raw(inpath, hts_span_at(cc_br.p, cc_br.len - 4)) == 0);
       assertf(hts_codec_unpack(HTS_CODEC_BROTLI, inpath, outpath) < 0);
       /* cc_br_bomb is a valid 4 MiB stream, so only the budget rejects it. */
       assertf((LLint) (4 * 1024 * 1024) >
               hts_codec_maxout((LLint) sizeof(cc_br_bomb)));
-      assertf(ae_write_raw(inpath, ae_bytes(cc_br_bomb, sizeof(cc_br_bomb))) ==
-              0);
+      assertf(ae_write_raw(inpath, cc_bomb) == 0);
       assertf(hts_codec_unpack(HTS_CODEC_BROTLI, inpath, outpath) == -1);
       assertf(hts_codec_unpack_max(HTS_CODEC_BROTLI, inpath, outpath, 1000) ==
               HTS_CODEC_TOOBIG);
@@ -1333,12 +1329,11 @@ static int st_codecerrno(httrackp *opt, int argc, char **argv) {
   assertf(errno == 0);
 #if HTS_USEBROTLI
   /* and a backend of its own, where the write goes through codec_sink() */
-  assertf(ae_write_raw(inpath, ae_bytes(cc_br_text, sizeof(cc_br_text))) == 0);
+  assertf(ae_write_raw(inpath, cc_br) == 0);
   errno = 0;
   assertf(hts_codec_unpack(HTS_CODEC_BROTLI, inpath, argv[1]) == -1);
   assertf(errno == ENOSPC);
-  assertf(ae_write_raw(inpath, ae_bytes(cc_br_text, sizeof(cc_br_text) - 4)) ==
-          0);
+  assertf(ae_write_raw(inpath, hts_span_at(cc_br.p, cc_br.len - 4)) == 0);
   errno = ENOSPC;
   assertf(hts_codec_unpack(HTS_CODEC_BROTLI, inpath, outpath) == -1);
   assertf(errno == 0);
@@ -1943,6 +1938,8 @@ static int st_intparsediff(httrackp *opt, int argc, char **argv) {
               snprintf(gen, sizeof(gen), "%s%s%s%s", spaces[w], signs[g],
                        digits[d], suffixes[x]);
               st_int_fill(HTS_BUF(in), site->templates[t], gen);
+              assertf(strlen(in) + 2 ==
+                      strlen(site->templates[t]) + strlen(gen));
               if (!site->exact &&
                   (is_signed || st_int_oversized(digits[d], site->max))) {
                 changed++;

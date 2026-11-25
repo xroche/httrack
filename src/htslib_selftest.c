@@ -3630,18 +3630,18 @@ static const char *legacy_hts_host_alias_match(const char *rules,
 static hts_boolean legacy_hts_host_alias_token_ok(hts_span tok,
                                                   hts_boolean glob) {
   char BIGSTK buff[HTS_URLMAXSIZE * 2];
-  const char *token = tok.p, *host;
-  size_t len = tok.len;
+  const char *host;
+  size_t len;
 
-  while (len > 0 && (*token == ' ' || *token == '\t')) {
-    token++;
-    len--;
-  }
-  while (len > 0 && (token[len - 1] == ' ' || token[len - 1] == '\t'))
-    len--;
+  while (tok.len > 0 && (*tok.p == ' ' || *tok.p == '\t'))
+    tok = hts_span_skip(tok, 1);
+  while (tok.len > 0 &&
+         (tok.p[tok.len - 1] == ' ' || tok.p[tok.len - 1] == '\t'))
+    tok.len--;
+  len = tok.len;
   if (len == 0 || len >= sizeof(buff))
     return HTS_FALSE;
-  memcpy(buff, token, len);
+  memcpy(buff, tok.p, len);
   buff[len] = '\0';
   while (len > 0 && buff[len - 1] == '/')
     buff[--len] = '\0';
@@ -4955,6 +4955,16 @@ static int st_contentid(httrackp *opt, int argc, char **argv) {
     }
   }
 
+  /* a clip leaves room for the NUL */
+  {
+    char tiny[4];
+
+    if (cid_unescape("abcd", HTS_BUF(tiny)) ||
+        !cid_unescape("abc", HTS_BUF(tiny)) || strcmp(tiny, "abc") != 0) {
+      printf("contentid: a 4-byte buffer took 4 bytes or refused 3\n");
+      failures++;
+    }
+  }
   if (failures == 0)
     printf("contentid: OK\n");
   return failures != 0;
@@ -5086,8 +5096,8 @@ static hts_boolean urlview_tiles(hts_span str, const hts_url_view *v) {
   const hts_span *const parts[] = {&v->scheme,  &v->userinfo, &v->host,
                                    &v->port,    &v->path,     &v->query,
                                    &v->fragment};
-  const char *const s = str.p, *at = s;
-  const size_t len = str.len;
+  const char *const end = str.p + str.len;
+  const char *at = str.p;
   size_t i;
 
   /* memchr() over 4 bytes, because strchr() would match a NUL */
@@ -5099,11 +5109,11 @@ static hts_boolean urlview_tiles(hts_span str, const hts_url_view *v) {
 
     if (!hts_span_present(*sp))
       continue;
-    if (sp->p < at || sp->len > (size_t) (s + len - sp->p))
+    if (sp->p < at || sp->len > (size_t) (end - sp->p))
       return HTS_FALSE;
     at = sp->p + sp->len;
   }
-  return at == s + len ? HTS_TRUE : HTS_FALSE;
+  return at == end ? HTS_TRUE : HTS_FALSE;
 }
 
 /* -#test=urlview [url...]: print each URL's view, or check the table. */
