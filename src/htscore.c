@@ -1236,10 +1236,10 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
         char BIGSTK line[HTS_URLLIST_LINE_SIZE];
         const char *bundle_why;
         hts_urllist_status status;
+        const hts_span list = hts_span_at(filelist_buff, filelist_sz);
 
-        while ((status =
-                    hts_urllist_next(hts_span_at(filelist_buff, filelist_sz),
-                                     &filelist_ptr, line)) != HTS_URLLIST_END) {
+        while ((status = hts_urllist_next(list, &filelist_ptr, line)) !=
+               HTS_URLLIST_END) {
           lineno++;
           if (status == HTS_URLLIST_NUL) {
             hts_log_print(opt, LOG_WARNING,

@@ -1227,7 +1227,8 @@ static int st_ucs4_oom(httrackp *opt, int argc, char **argv) {
 }
 
 /* The bytes of array A, which may be unsigned char, as a span. */
-#define BYTES_SPAN(A) hts_span_at((const char *) (A), sizeof(A))
+#define BYTES_SPAN(A)                                                          \
+  hts_span_at((const char *) (A), sizeof(A) + HTS_BUF_GUARD_(A))
 
 static int st_ucs2(httrackp *opt, int argc, char **argv) {
   /* A BOM, ASCII, a two-byte and a three-byte code point, a surrogate pair
@@ -1340,6 +1341,8 @@ static int st_ucs2(httrackp *opt, int argc, char **argv) {
                                            '<', 0, '/', 0, 'p', 0, '>',  0};
       static const unsigned char few[] = {'<', 0, 'p', 0, '>', 0, 0x2D, 0x4E};
       unsigned char bad[sizeof(text)];
+      const hts_span odd_text =
+          hts_span_at((const char *) text, sizeof(text) - 1);
       size_t k;
 
       ST_FAIL_IF(err, !hts_utf16_looks_like_text(BYTES_SPAN(text), HTS_TRUE) ||
@@ -1358,11 +1361,21 @@ static int st_ucs2(httrackp *opt, int argc, char **argv) {
       memcpy(bad, text, sizeof(text));
       bad[6] = 0x01;
       bad[7] = 0;
-      ST_FAIL_IF(err,
-                 hts_utf16_looks_like_text(BYTES_SPAN(bad), HTS_TRUE) ||
-                     !hts_utf16_looks_like_text(
-                         hts_span_at((const char *) text, sizeof(text) - 1),
-                         HTS_TRUE));
+      ST_FAIL_IF(err, hts_utf16_looks_like_text(BYTES_SPAN(bad), HTS_TRUE) ||
+                          !hts_utf16_looks_like_text(odd_text, HTS_TRUE));
+    }
+    /* 200 units allow 2 suspicious ones (1 in 200), not 3. */
+    {
+      unsigned char body[400];
+      size_t k;
+
+      for (k = 0; k < sizeof(body); k += 2) {
+        body[k] = k < 6 ? 0x01 : 'a';
+        body[k + 1] = 0;
+      }
+      ST_FAIL_IF(err, hts_utf16_looks_like_text(BYTES_SPAN(body), HTS_TRUE));
+      body[0] = 'a';
+      ST_FAIL_IF(err, !hts_utf16_looks_like_text(BYTES_SPAN(body), HTS_TRUE));
     }
     /* Every code unit alone, to pin the encoder against its ranges. */
     {
