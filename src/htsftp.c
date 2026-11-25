@@ -1035,7 +1035,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                   if (ftp_parse_mdtm(line, &remote_tm)) {
                     char date[256];
 
-                    time_rfc822(HTS_SIZED(date), &remote_tm);
+                    time_rfc822(HTS_BUF(date), &remote_tm);
                     /* Stamp the mirror as the HTTP path does, so a later pass
                        compares server-clock times instead of crossing clocks.
                      */

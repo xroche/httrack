@@ -1134,7 +1134,7 @@ static int st_contentcodings(httrackp *opt, int argc, char **argv) {
                    "bad zip file") == 0);
     errno = ENOENT;
     assertf(hts_get_zerror(UNZ_ERRNO, HTS_BUF(errbuf)) == errbuf);
-    assertf(strcmp(errbuf, hts_strerror(ENOENT, HTS_SIZED(want))) == 0);
+    assertf(strcmp(errbuf, hts_strerror(ENOENT, HTS_BUF(want))) == 0);
     /* clipped to the 8 bytes it was given, not HTS_STRERROR_SIZE */
     memset(errbuf, 'X', sizeof(errbuf));
     errno = ENOENT;

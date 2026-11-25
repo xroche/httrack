@@ -166,7 +166,7 @@ void cache_read_failed(htsblk *r, const char *what, int err) {
   char errbuf[HTS_STRERROR_SIZE];
 
   r->statuscode = STATUSCODE_INVALID;
-  htsblk_failf(r, "%s: %s", what, hts_strerror(err, HTS_SIZED(errbuf)));
+  htsblk_failf(r, "%s: %s", what, hts_strerror(err, HTS_BUF(errbuf)));
 }
 
 /* Stream fp into the cache entry opened on zf. Returns Z_OK, the zip error,

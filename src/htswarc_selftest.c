@@ -1687,9 +1687,8 @@ static void sf_expand_fixture(httrackp *opt, const char *in, size_t len,
     } else if (in[i] == '\002') {
       char mark[SINGLEFILE_MARK_MAX];
 
-      StringCat(*out,
-                singlefile_mark(opt, mark, sizeof(mark), SINGLEFILE_CLASS_ANY,
-                                StringLength(*out) - start));
+      StringCat(*out, singlefile_mark(opt, HTS_BUF(mark), SINGLEFILE_CLASS_ANY,
+                                      StringLength(*out) - start));
     } else {
       StringAddchar(*out, in[i]);
     }
@@ -2244,7 +2243,7 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
     char mark[SINGLEFILE_MARK_MAX];
     size_t k;
 
-    sf_check(singlefile_mark(opt, mark, sizeof(mark), SINGLEFILE_CLASS_ANY,
+    sf_check(singlefile_mark(opt, HTS_BUF(mark), SINGLEFILE_CLASS_ANY,
                              emit_max)[0] != '\0',
              "a span htsparse can emit was refused a mark");
     for (k = 0; k < sizeof(spans) / sizeof(spans[0]); k++) {
@@ -2257,8 +2256,8 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
       StringClear(marked);
       StringCat(marked, "<img src=\"");
       StringMemcat(marked, pad, spans[k]);
-      marklen = strlen(singlefile_mark(opt, mark, sizeof(mark),
-                                       SINGLEFILE_CLASS_ANY, spans[k]));
+      marklen = strlen(
+          singlefile_mark(opt, HTS_BUF(mark), SINGLEFILE_CLASS_ANY, spans[k]));
       StringCat(marked, mark);
       StringCat(marked, "\">\n");
       StringClear(got);

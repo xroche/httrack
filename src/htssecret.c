@@ -336,7 +336,8 @@ static hts_boolean fprint_url_span(httrackp *opt, FILE *fp, hts_span buff,
   memcpy(line, buff.p, end);
   line[end] = '\0';
   {
-    const char *const url = url_nologin_r(line + end + 1, end + 7, line + keep);
+    const char *const url =
+        url_nologin_r(hts_buf_at(line + end + 1, end + 7), line + keep);
 
     hts_secret_fwrite(opt, fp, hts_span_at(line, keep));
     hts_secret_fwrite(opt, fp, hts_span_of(url));
@@ -562,7 +563,7 @@ const char *hts_header_shown(httrackp *opt, const char *line, hts_buf dst) {
       if (header_name_in(line, url_fields)) {
         char masked[HTS_URLMAXSIZE * 2];
 
-        (void) hts_buf_cpy_clip(tail, url_nologin_r(HTS_SIZED(masked), value));
+        (void) hts_buf_cpy_clip(tail, url_nologin_r(HTS_BUF(masked), value));
       } else {
         (void) hts_buf_cpy_clip(tail, value);
       }

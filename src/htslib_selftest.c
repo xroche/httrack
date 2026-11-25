@@ -301,6 +301,21 @@ static void basic_selftests(void) {
     assertf(get_httptype_sized(opt, r.contenttype, sizeof(r.contenttype),
                                "noextfile", 1) == 1);
     assertf(strcmp(r.contenttype, "application/octet-stream") == 0);
+    // a 0 return still clears a stale buffer, unmatched rule loaded or not
+    {
+      static const char *const fils[] = {"noextfile", "", "/x.zzz"};
+      size_t k;
+
+      for (k = 0; k < sizeof(fils) / sizeof(fils[0]); k++) {
+        StringCopy(opt->mimedefs, k == 2 ? "\ncgi=text/html\n" : "\n");
+        memset(r.contenttype, 'X', sizeof(r.contenttype) - 1);
+        r.contenttype[sizeof(r.contenttype) - 1] = '\0';
+        assertf(get_httptype_sized(opt, r.contenttype, sizeof(r.contenttype),
+                                   fils[k], 0) == 0);
+        assertf(r.contenttype[0] == '\0');
+      }
+      StringCopy(opt->mimedefs, "\n");
+    }
     // empty fil: no extension to scan; must not over-read before the string.
     // flag==0 -> 0 (nothing written), flag==1 -> octet-stream.
     assertf(get_httptype_sized(opt, r.contenttype, sizeof(r.contenttype), "",
@@ -1786,7 +1801,7 @@ static int nologin_rows(httrackp *opt) {
     }
   }
   for (i = 0; i < sizeof(urls) / sizeof(urls[0]); i++) {
-    const char *got = url_nologin_r(buf, sizeof(buf), urls[i].in);
+    const char *got = url_nologin_r(HTS_BUF(buf), urls[i].in);
 
     if (strcmp(got, urls[i].want) != 0) {
       fprintf(stderr, "url_nologin: '%s' gave '%s'\n", urls[i].in, got);
@@ -5519,7 +5534,7 @@ static hts_boolean st_locale_engine_ok(const char *name) {
   int c;
 
   st_locale_date(&tm);
-  time_rfc822(buf, sizeof(buf), &tm);
+  time_rfc822(HTS_BUF(buf), &tm);
   st_locale_check(&ok, name, strcmp(buf, "Sun, 06 Nov 1994 08:49:37 GMT") == 0,
                   "time_rfc822");
   st_locale_check(&ok, name, optrate_read("0.5", &rate) == 3 && rate == 0.5,
@@ -5688,7 +5703,7 @@ static int st_lib_sized(httrackp *opt, int argc, char **argv) {
     const size_t rcap = rcaps[k];
     char *buf = st_sized_alloc(rcap);
 
-    time_rfc822(buf, rcap, &tm);
+    time_rfc822(hts_buf_at(buf, rcap), &tm);
     if (!st_sized_clip_ok(buf, rcap, date)) {
       printf("lib-sized: time_rfc822 into %u bytes\n", (unsigned) rcap);
       fail = 1;

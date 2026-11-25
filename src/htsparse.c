@@ -1599,8 +1599,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     // eol is reserved below because strcatbuff aborts rather
                     // than clips: either one would kill the crawl.
                     if (hts_footer_format(
-                            tempo + strlen(tempo),
-                            sizeof(tempo) - strlen(tempo) - strlen(eol),
+                            hts_buf_skip(
+                                hts_buf_at(tempo, sizeof(tempo) - strlen(eol)),
+                                strlen(tempo)),
                             StringBuff(opt->footer), values) >= 0) {
                       strcatbuff(tempo, eol);
                       HT_ADD(tempo);
@@ -3521,7 +3522,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                 sf_span_fits);
 
                             HT_ADD(singlefile_mark(
-                                opt, HTS_SIZED(sf_mark), sf_class,
+                                opt, HTS_BUF(sf_mark), sf_class,
                                 TypedArraySize(sink.buf) - sf_start));
                           }
                         }

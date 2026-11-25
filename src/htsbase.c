@@ -46,34 +46,34 @@ HTSEXT_API htsErrorCallback hts_get_error_callback(void) {
   return htsCallbackErr;
 }
 
-const char *hts_strerror(int err, char *buf, size_t size) {
-  assertf(buf != NULL && size != 0);
-  buf[0] = '\0';
+const char *hts_strerror(int err, hts_buf buf) {
+  assertf(buf.p != NULL && buf.size != 0);
+  buf.p[0] = '\0';
   /* Only the terminator fits, and the libcs disagree on that boundary. */
-  if (size == 1)
-    return buf;
+  if (buf.size == 1)
+    return buf.p;
 #if !HTS_STRERROR_REENTRANT
   /* This build has no reentrant form, so it stays racy. */
-  (void) strclipbuff(buf, size, strerror(err));
+  (void) strclipbuff(buf.p, buf.size, strerror(err));
 #elif defined(_MSC_VER)
-  (void) strerror_s(buf, size, err);
+  (void) strerror_s(buf.p, buf.size, err);
 #elif defined(__USE_GNU)
   {
     /* Only __USE_GNU tells the GNU variant from the XSI one, because only
        configure's probe sets _GNU_SOURCE. */
-    const char *const msg = strerror_r(err, buf, size);
+    const char *const msg = strerror_r(err, buf.p, buf.size);
 
-    if (msg != NULL && msg != buf)
-      (void) strclipbuff(buf, size, msg);
+    if (msg != NULL && msg != buf.p)
+      (void) strclipbuff(buf.p, buf.size, msg);
   }
 #else
   /* Nonzero is ERANGE or EINVAL, and buf may still hold a partial message. */
-  (void) strerror_r(err, buf, size);
+  (void) strerror_r(err, buf.p, buf.size);
 #endif
-  buf[size - 1] = '\0';
-  if (buf[0] == '\0')
-    (void) strclipbuff(buf, size, "unknown error");
-  return buf;
+  buf.p[buf.size - 1] = '\0';
+  if (buf.p[0] == '\0')
+    (void) strclipbuff(buf.p, buf.size, "unknown error");
+  return buf.p;
 }
 
 // Copy a into catbuff lower-cased, and return catbuff.p.

@@ -229,10 +229,9 @@ size_t make_content_id(const char *const adr, const char *const fil,
 
 /** Low-level percent-escaper backing the escape_* family. @p mode selects the
     character class to escape: 0 check_url, 1 in_url, 2 spc_url, 3 uri,
-    4 control_url, 30 uri_utf. @p max_size is the dest capacity including the
+    4 control_url, 30 uri_utf. @p out.size is the capacity including the
     NUL. */
-size_t x_escape_http(const char *const s, char *const dest,
-                     const size_t max_size, const int mode);
+size_t x_escape_http(const char *const s, hts_buf out, const int mode);
 
 /** Strip all control characters (byte value < 32) from @p s in place. */
 void escape_remove_control(char *const s);
@@ -343,10 +342,10 @@ static HTS_INLINE HTS_UNUSED hts_boolean hts_localtime(time_t t,
 #define HTS_STRERROR_REENTRANT 0
 #endif
 
-/* Write the message for errno value err into buf, and return buf. strerror()
+/* Write the message for errno value err into buf, and return buf.p. strerror()
    answers with a buffer the caller does not own: glibc reuses a per-thread one
    and frees it at thread exit, and POSIX allows one shared static. */
-const char *hts_strerror(int err, char *buf, size_t size);
+const char *hts_strerror(int err, hts_buf buf);
 
 /* A modification time at the finest resolution this build can read. Compare it
    only against another value hts_file_mtime() produced, because the epoch is
@@ -709,7 +708,7 @@ time_t get_filetime(const char *file);
 /* Writes file mtime as an RFC 822 GMT date into DATE, or returns 0. */
 int get_filetime_rfc822(const char *file, hts_buf date);
 /* Writes A as an RFC 822 GMT date, clipped to size bytes. */
-HTS_INLINE void time_rfc822(char *s, size_t size, struct tm *A);
+HTS_INLINE void time_rfc822(hts_buf s, struct tm *A);
 
 HTS_INLINE int sendc(htsblk * r, const char *s);
 /* Returns the advance past the line's terminator. */
@@ -733,11 +732,10 @@ int ishtml(httrackp * opt, const char *urlfil);
 /* Return 1 if EXT is an HTML extension such as "htm", else -1. */
 int ishtml_ext(hts_span ext);
 
-/* Write fil's --assume type into s (capacity ssize, NUL included); too long a
-   value is clipped, not fatal. True if a rule matched, s then holding its
-   value, which "--assume cgi=" leaves empty. */
-hts_boolean get_userhttptype(httrackp *opt, char *s, size_t ssize,
-                             const char *fil);
+/* Write fil's --assume type into s; too long a value is clipped, not fatal.
+   True if a rule matched, s then holding its value, which "--assume cgi="
+   leaves empty. */
+hts_boolean get_userhttptype(httrackp *opt, hts_buf s, const char *fil);
 int give_mimext(hts_buf s, const char *st);
 
 int may_unknown2(httrackp * opt, const char *mime, const char *filename);
@@ -869,7 +867,7 @@ const char *adr_nologin_r(hts_buf buf, const char *adr);
 
 /* Same as adr_nologin_r(), but only a URL with a scheme or "//" has a login.
    Any "scheme://" counts, not only the ones the engine fetches. */
-const char *url_nologin_r(char *buf, size_t size, const char *url);
+const char *url_nologin_r(hts_buf buf, const char *url);
 
 /* adr_nologin_r() and url_nologin_r() into a rotating buffer of opt, which
    they take only when there is a login. A NULL opt drops the login, and a
