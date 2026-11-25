@@ -1,0 +1,53 @@
+#!/bin/bash
+# A base64 part of a .mht archive keeps every line at 76 characters (RFC 2045),
+# also across the archive writer's read chunks, and decodes back to the file.
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_2543.XXXXXX") || exit 1
+cleanup() {
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+mkdir -p "${tmpdir}/root"
+# 20000 bytes spans several read chunks and is not a multiple of 57.
+awk 'BEGIN { for (i = 0; i < 20000; i++) printf "%c", 33 + (i * 7) % 90 }' \
+    >"${tmpdir}/root/blob.bin"
+test "$(wc -c <"${tmpdir}/root/blob.bin")" -eq 20000 || fail "bad fixture size"
+
+require_httrack
+local_server_start --root "${tmpdir}/root" --log "${tmpdir}/server.log"
+local_crawl --log "${tmpdir}/crawl.log" "http://127.0.0.1:${SRV_PORT}/blob.bin" \
+    -O "${tmpdir}/out" --quiet --max-time=120 --timeout=30 --robots=0 '-%M' ||
+    fail "crawl failed"
+
+mht="${tmpdir}/out/index.mht"
+test -s "$mht" || fail "no .mht archive was written"
+text=$(tr -d '\r' <"$mht")
+command grep -qx 'Content-Transfer-Encoding: base64' <<<"$text" ||
+    fail "blob.bin is not sent as base64"
+# The blob.bin part runs from the blank line after its headers to the boundary.
+body=$(awk '
+    /^Content-disposition: .*blob\.bin"$/ { part = 1; next }
+    part && !inbody && /^$/ { inbody = 1; next }
+    inbody && (/^--/ || /^$/) { exit }
+    inbody { print }' <<<"$text")
+test -n "$body" || fail "the archive holds no blob.bin body"
+
+lines=$(wc -l <<<"$body")
+# 20000 bytes make 26668 characters: 350 full lines and one of 68.
+test "$lines" -eq 351 || fail "expected 351 base64 lines, got ${lines}"
+long=$(head -n 350 <<<"$body" | awk 'length($0) != 76 { n++ } END { print n + 0 }')
+test "$long" -eq 0 || fail "${long} base64 lines are not 76 characters long"
+last=$(tail -n 1 <<<"$body")
+test "${#last}" -eq 68 || fail "the last base64 line holds ${#last} characters"
+
+if command -v base64 >/dev/null 2>&1; then
+    tr -d '\n' <<<"$body" | base64 -d >"${tmpdir}/decoded" ||
+        fail "the base64 body does not decode"
+    cmp -s "${tmpdir}/decoded" "${tmpdir}/root/blob.bin" ||
+        fail "the base64 body does not decode back to blob.bin"
+fi

@@ -174,7 +174,8 @@ void mimehtml_add_file(httrackp *opt, const char *save, const char *adr,
           mimehtml_create(opt, cid);
         }
         if (opt->state.mimefp != NULL) {
-          char buff[60 * 100];
+          /* whole base64 lines, so none straddles two code64() calls */
+          char buff[HTS_BASE64_LINE_BYTES * 100];
           char mimebuff[256];
           size_t len;
 
@@ -193,7 +194,7 @@ void mimehtml_add_file(httrackp *opt, const char *save, const char *adr,
                   mimebuff, isHtml ? "8bit" : "base64", cid);
           while ((len = fread(buff, 1, sizeof(buff), fp)) > 0) {
             if (!isHtml) {
-              char base64buff[60 * 100 * 2];
+              char base64buff[HTS_BASE64_LINE_BYTES * 100 * 2];
 
               code64(hts_span_at(buff, len), HTS_BUF(base64buff), HTS_TRUE);
               fprintf(opt->state.mimefp, "%s", base64buff);

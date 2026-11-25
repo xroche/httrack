@@ -776,7 +776,9 @@ const char *jump_protocol_const(const char *source);
    written NUL-terminated into NAME (truncated to fit), and the port in *port.
    The port defaults by scheme: 1080 for socks5/socks5h, else 8080. */
 void hts_parse_proxy(const char *arg, hts_buf name, int *port);
-/* Base-64 IN into OUT, with a CRLF every 80 output bytes when CRLF is set. */
+/* RFC 2045 caps a base64 line at 76 characters, which encode 57 input bytes. */
+#define HTS_BASE64_LINE_BYTES 57
+/* Base-64 IN into OUT, with a CRLF every 76 output bytes when CRLF is set. */
 void code64(hts_span in, hts_buf out, hts_boolean crlf);
 
 char *convtolower(hts_buf catbuff, const char *a);

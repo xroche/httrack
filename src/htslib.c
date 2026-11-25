@@ -4589,7 +4589,8 @@ void code64(hts_span in, hts_buf out, hts_boolean crlf) {
   const size_t groups = (in.len + 2) / 3;
   size_t i, j = 0, line = 0;
 
-  assertf(groups * 4 + (crlf ? groups / 20 * 2 : 0) < out.size);
+  assertf(groups * 4 + (crlf ? groups / (HTS_BASE64_LINE_BYTES / 3) * 2 : 0) <
+          out.size);
   for (i = 0; i < in.len; i += 3) {
     const size_t n = in.len - i < 3 ? in.len - i : 3;
     const unsigned long store = (unsigned long) a[i] << 16 |
@@ -4600,7 +4601,7 @@ void code64(hts_span in, hts_buf out, hts_boolean crlf) {
     out.p[j++] = alphabet[(store >> 12) & 63];
     out.p[j++] = n > 1 ? alphabet[(store >> 6) & 63] : '=';
     out.p[j++] = n > 2 ? alphabet[store & 63] : '=';
-    if (crlf && ++line == 20) {
+    if (crlf && ++line == HTS_BASE64_LINE_BYTES / 3) {
       line = 0;
       out.p[j++] = '\r';
       out.p[j++] = '\n';
