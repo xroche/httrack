@@ -2666,7 +2666,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     char BIGSTK decoded[sizeof(query)];
 
                     if (hts_unescapeEntitiesWithCharsetSpecial(
-                            query, HTS_SIZED(decoded), charset,
+                            query, HTS_BUF(decoded), charset,
                             UNESCAPE_ENTITIES_URL_QUERY) == 0) {
                       strcpybuff(query, decoded);
                     } else {
@@ -2680,7 +2680,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   // Decode remaining %XX high characters with UTF-8 
                   // but only when this leads to valid UTF-8.
                   // Otherwise, leave them unescaped.
-                  if (hts_unescapeUrlSpecial(lien, HTS_SIZED(catbuff),
+                  if (hts_unescapeUrlSpecial(lien, HTS_BUF(catbuff),
                                              UNESCAPE_URL_NO_ASCII) == 0) {
                     strcpybuff(lien, catbuff);
                   } else {

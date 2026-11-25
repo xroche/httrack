@@ -349,8 +349,8 @@ static int st_entities(httrackp *opt, int argc, char **argv) {
 
   s = strdupt(argv[0]);
   enc = argc >= 2 ? argv[1] : "UTF-8";
-  if (s != NULL &&
-      hts_unescapeEntitiesWithCharset(s, s, strlen(s) + 1, enc) == 0) {
+  if (s != NULL && hts_unescapeEntitiesWithCharset(
+                       s, hts_buf_at(s, strlen(s) + 1), enc) == 0) {
     printf("%s\n", s);
   } else {
     fprintf(stderr, "invalid string '%s'\n", argv[0]);
@@ -394,7 +394,7 @@ static void entity_sweep_one(const entity_ref *refs, const size_t n,
 
     want[len] = '\0';
   }
-  if (hts_unescapeEntitiesWithCharset(src, dest, sizeof(dest), "UTF-8") != 0 ||
+  if (hts_unescapeEntitiesWithCharset(src, HTS_BUF(dest), "UTF-8") != 0 ||
       strcmp(dest, want) != 0) {
     fprintf(stderr, "entities-sweep: '%s' gave '%s', want '%s'\n", src, dest,
             want);
@@ -595,13 +595,12 @@ static int st_utf8_strict(httrackp *opt, int argc, char **argv) {
   }
   for (i = 0; i < sizeof(urls) / sizeof(urls[0]); i++) {
     buf[0] = '\0';
-    (void) hts_unescapeUrl(urls[i][0], buf, sizeof(buf));
+    (void) hts_unescapeUrl(urls[i][0], HTS_BUF(buf));
     fail |= utf8_strict_pin("unescape", urls[i][0], buf, urls[i][1]);
   }
   for (i = 0; i < sizeof(ents) / sizeof(ents[0]); i++) {
     buf[0] = '\0';
-    (void) hts_unescapeEntitiesWithCharset(ents[i][0], buf, sizeof(buf),
-                                           "UTF-8");
+    (void) hts_unescapeEntitiesWithCharset(ents[i][0], HTS_BUF(buf), "UTF-8");
     fail |= utf8_strict_pin("entity", ents[i][0], buf, ents[i][1]);
   }
   for (i = 0; i < sizeof(hosts) / sizeof(hosts[0]); i++) {
@@ -644,18 +643,18 @@ static int st_unescape_bounds(httrackp *opt, int argc, char **argv) {
   char dest[4];
 
   assertf(hts_unescapeEntities("abcd", HTS_BUF(dest)) == -1);
-  assertf(hts_unescapeUrl("abcd", dest, sizeof(dest)) == -1);
+  assertf(hts_unescapeUrl("abcd", HTS_BUF(dest)) == -1);
   assertf(hts_unescapeEntities("abc", HTS_BUF(dest)) == 0);
   assertf(strcmp(dest, "abc") == 0);
   /* raw multi-byte UTF-8 flush path (bypasses the per-byte guard) */
-  assertf(hts_unescapeUrl("ab\xC3\xA9", dest, sizeof(dest)) == -1);
-  assertf(hts_unescapeUrl("a\xC3\xA9", dest, sizeof(dest)) == 0);
+  assertf(hts_unescapeUrl("ab\xC3\xA9", HTS_BUF(dest)) == -1);
+  assertf(hts_unescapeUrl("a\xC3\xA9", HTS_BUF(dest)) == 0);
   assertf(strcmp(dest, "a\xC3\xA9") == 0);
   {
     /* %xx-encoded flush path (utfBufferJ = lastJ rollback) */
     char wide[8];
 
-    assertf(hts_unescapeUrl("%C3%A9", wide, sizeof(wide)) == 0);
+    assertf(hts_unescapeUrl("%C3%A9", HTS_BUF(wide)) == 0);
     assertf(strcmp(wide, "\xC3\xA9") == 0);
   }
   printf("unescape-bounds self-test OK\n");
@@ -914,7 +913,7 @@ static int st_unescape_plus(httrackp *opt, int argc, char **argv) {
   for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
     char dst[64];
 
-    assertf(hts_unescapeUrlSpecial(cases[i].src, dst, sizeof(dst), 0) == 0);
+    assertf(hts_unescapeUrlSpecial(cases[i].src, HTS_BUF(dst), 0) == 0);
     assertf(strcmp(dst, cases[i].want) == 0);
   }
   printf("unescape-plus self-test OK\n");
