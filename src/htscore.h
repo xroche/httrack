@@ -370,10 +370,9 @@ void hts_record_free(httrackp *opt);
 
 /* Load the -%L file at path into *buff, NUL-terminated after its *size bytes,
    to be freed with freet(). Returns NULL, or why it could not be read, and then
-   *buff is NULL. The reason may be written in errbuf, of HTS_STRERROR_SIZE
-   bytes. */
+   *buff is NULL. The reason may be written in errbuf. */
 const char *hts_urllist_load(const char *path, char **buff, size_t *size,
-                             char *errbuf);
+                             hts_buf errbuf);
 
 /* The size of the line buffer hts_urllist_next() fills. */
 #define HTS_URLLIST_LINE_SIZE (HTS_URLMAXSIZE * 2)
