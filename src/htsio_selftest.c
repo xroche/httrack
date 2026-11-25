@@ -512,8 +512,7 @@ static int st_makeindex(httrackp *opt, int argc, char **argv) {
     size_t i;
 
     memset(out, 'Z', sizeof(out));
-    assertf(hts_template_format_str(out, sizeof(out), trailing, "X", NULL) >=
-            0);
+    assertf(hts_template_format_str(HTS_BUF(out), trailing, "X", NULL) >= 0);
     assertf(strcmp(out, want) == 0);
     for (i = strlen(want) + 1; i < sizeof(out); i++)
       assertf(out[i] == 'Z');

@@ -93,6 +93,18 @@ static int st_profilecharset(httrackp *opt, int argc, char **argv) {
       return 1;
     }
   }
+  {
+    /* the longest line the reader keeps whole, 1021 bytes */
+    FILE *const fp = fopen(path, "wb");
+    char *categ;
+
+    assertf(fp != NULL);
+    assertf(fprintf(fp, "category=%01012d\n", 0) == 1022);
+    assertf(fclose(fp) == 0);
+    categ = hts_getcategory(path);
+    assertf(categ != NULL && strlen(categ) == 1012);
+    freet(categ);
+  }
   (void) unlink(path);
   printf("profilecharset self-test OK\n");
   return 0;
