@@ -91,9 +91,9 @@ static void resp_wipe_dir(const char *dir) {
 
 /* Write the next piece to the peer once the slot has read the last one, so
    each read comes back short. Close the peer after the last piece. */
-static void resp_feed(int *peer, int soc, const uint8_t *data, size_t size,
-                      size_t *sent, unsigned int split, uint32_t *rng) {
-  size_t piece = size - *sent;
+static void resp_feed(int *peer, int soc, hts_span data, size_t *sent,
+                      unsigned int split, uint32_t *rng) {
+  size_t piece = data.len - *sent;
   int pending = 0;
 
   if (*peer < 0 ||
@@ -110,11 +110,11 @@ static void resp_feed(int *peer, int soc, const uint8_t *data, size_t size,
   if (piece > 0) {
     /* a full buffer takes part of the piece; a closed slot takes none */
     const ssize_t n =
-        send(*peer, data + *sent, piece, MSG_NOSIGNAL | MSG_DONTWAIT);
+        send(*peer, data.p + *sent, piece, MSG_NOSIGNAL | MSG_DONTWAIT);
 
-    *sent = n > 0 ? *sent + (size_t) n : size;
+    *sent = n > 0 ? *sent + (size_t) n : data.len;
   }
-  if (*sent == size) {
+  if (*sent == data.len) {
     close(*peer);
     *peer = -1;
   }
@@ -128,9 +128,7 @@ static void resp_cleanup(void) {
 }
 
 static int resp_setup(void) {
-  return fuzz_tmpdir(resp_dir, sizeof(resp_dir), "fuzz-response", resp_cleanup)
-             ? 0
-             : -1;
+  return fuzz_tmpdir(HTS_BUF(resp_dir), "fuzz-response", resp_cleanup) ? 0 : -1;
 }
 
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
@@ -238,8 +236,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
               back_status(&back[0]));
       abort();
     }
-    resp_feed(&sv[1], back[0].r.soc == sv[0] ? sv[0] : -1, data, size, &sent,
-              split, &rng);
+    resp_feed(&sv[1], back[0].r.soc == sv[0] ? sv[0] : -1,
+              fuzz_span(data, size), &sent, split, &rng);
     back_wait(sback, opt, &cache, 0);
     if (back[0].r.totalsize < -1) { /* -1 is unknown, nothing is below */
       fprintf(stderr, "fuzz-response: totalsize " LLintP "\n",

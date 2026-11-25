@@ -169,7 +169,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   hts_record_link(opt, "example.com", "/", "/dev/null", "", "", NULL);
   hts_record_link(opt, "example.com", "/index.html", "/dev/null", "", "", NULL);
 
-  buf = fuzz_strdup(data, size);
+  buf = hts_span_dup(fuzz_span(data, size));
   p = buf;
   while (p != NULL && *p != '\0') {
     char *nl = strchr(p, '\n');

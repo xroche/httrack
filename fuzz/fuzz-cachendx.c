@@ -70,8 +70,7 @@ static int fuzz_ndx_setup(void) {
   if (ndx_in[0] == '\0') {
     coucal_set_global_assert_handler(fuzz_ndx_coucal_log, NULL);
 
-    if (!fuzz_tmpdir(ndx_dir, sizeof(ndx_dir), "fuzz-cachendx",
-                     fuzz_ndx_cleanup)) {
+    if (!fuzz_tmpdir(HTS_BUF(ndx_dir), "fuzz-cachendx", fuzz_ndx_cleanup)) {
       return -1;
     }
     snprintf(ndx_in, sizeof(ndx_in), "%s/in.ndx", ndx_dir);
@@ -81,15 +80,15 @@ static int fuzz_ndx_setup(void) {
   return 0;
 }
 
-static hts_boolean fuzz_ndx_write(const char *path, const uint8_t *data,
-                                  size_t size) {
+static hts_boolean fuzz_ndx_write(const char *path, hts_span bytes) {
   FILE *const fp = fopen(path, "wb");
   hts_boolean written;
 
   if (fp == NULL) {
     return HTS_FALSE;
   }
-  written = fwrite(data, 1, size, fp) == size ? HTS_TRUE : HTS_FALSE;
+  written =
+      fwrite(bytes.p, 1, bytes.len, fp) == bytes.len ? HTS_TRUE : HTS_FALSE;
   if (fclose(fp) != 0) {
     return HTS_FALSE;
   }
@@ -109,8 +108,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     ndxSize = size;
   }
   /* the loader wants both files present, so an empty .dat is still written */
-  if (!fuzz_ndx_write(ndx_in, data, ndxSize) ||
-      !fuzz_ndx_write(ndx_dat, data + ndxSize, size - ndxSize)) {
+  if (!fuzz_ndx_write(ndx_in, fuzz_span(data, ndxSize)) ||
+      !fuzz_ndx_write(ndx_dat, fuzz_span(data + ndxSize, size - ndxSize))) {
     return 0;
   }
 

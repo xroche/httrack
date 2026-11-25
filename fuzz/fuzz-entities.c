@@ -39,7 +39,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     return 0;
   dsize = dsizes[data[0] % (sizeof(dsizes) / sizeof(dsizes[0]))];
   data++, size--;
-  src = fuzz_strdup(data, size);
+  src = hts_span_dup(fuzz_span(data, size));
   dest = malloct(dsize);
 
   (void) hts_unescapeEntities(src, hts_buf_at(dest, dsize));

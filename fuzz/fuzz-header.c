@@ -89,7 +89,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     opt->log = opt->errlog = NULL;
   }
 
-  buf = fuzz_strdup(data, size);
+  buf = hts_span_dup(fuzz_span(data, size));
   end = buf + size;
   host = hosts[(sel >> SEL_HOST_SHIFT) & SEL_HOST_MASK];
 

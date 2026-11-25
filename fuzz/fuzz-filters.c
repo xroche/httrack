@@ -30,12 +30,13 @@ Please visit our Website: http://www.httrack.com
 #include "htsfilters.h"
 
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-  char *buf = fuzz_strdup(data, size);
+  char *buf = hts_span_dup(fuzz_span(data, size));
   const char *joker = buf;
   const uint8_t *sep = memchr(data, '\0', size);
   /* Its own allocation lets ASan bound the subject apart from the pattern */
-  char *nom = sep != NULL ? fuzz_strdup(sep + 1, (data + size) - (sep + 1))
-                          : fuzz_strdup(data + size, 0);
+  char *nom = sep != NULL
+                  ? hts_span_dup(fuzz_span(sep + 1, (data + size) - (sep + 1)))
+                  : hts_span_dup(fuzz_span(data + size, 0));
 
   (void) strjoker(nom, joker, NULL, NULL);
   {

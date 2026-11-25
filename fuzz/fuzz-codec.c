@@ -53,8 +53,7 @@ static void fuzz_codec_cleanup(void) {
 
 static int fuzz_codec_setup(void) {
   if (in_path[0] == '\0') {
-    if (!fuzz_tmpdir(codec_dir, sizeof(codec_dir), "fuzz-codec",
-                     fuzz_codec_cleanup)) {
+    if (!fuzz_tmpdir(HTS_BUF(codec_dir), "fuzz-codec", fuzz_codec_cleanup)) {
       return -1;
     }
     snprintf(in_path, sizeof(in_path), "%s/in.bin", codec_dir);
@@ -77,9 +76,9 @@ typedef enum {
 } fuzz_inflate_result;
 
 /* Inflate body into *out, grown as needed, stopping once past maxout. */
-static fuzz_inflate_result fuzz_inflate(const uint8_t *body, size_t body_size,
-                                        int window_bits, LLint maxout,
-                                        unsigned char **out, size_t *len) {
+static fuzz_inflate_result fuzz_inflate(hts_span body, int window_bits,
+                                        LLint maxout, unsigned char **out,
+                                        size_t *len) {
   fuzz_inflate_result result = FUZZ_INFLATE_FAIL;
   size_t pos = 0, capacity = 0;
   z_stream strm;
@@ -91,10 +90,10 @@ static fuzz_inflate_result fuzz_inflate(const uint8_t *body, size_t body_size,
   }
   do {
     const size_t navail =
-        body_size - pos < FUZZ_CODEC_CHUNK ? body_size - pos : FUZZ_CODEC_CHUNK;
+        body.len - pos < FUZZ_CODEC_CHUNK ? body.len - pos : FUZZ_CODEC_CHUNK;
     int zerr;
 
-    strm.next_in = (const Bytef *) (body + pos);
+    strm.next_in = (const Bytef *) (body.p + pos);
     strm.avail_in = (uInt) navail;
     pos += navail;
     do {
@@ -123,20 +122,21 @@ static fuzz_inflate_result fuzz_inflate(const uint8_t *body, size_t body_size,
       result = FUZZ_INFLATE_OK;
       break;
     }
-  } while (pos < body_size);
+  } while (pos < body.len);
 done:
   inflateEnd(&strm);
   return result;
 }
 
 /* Decode with zlib alone. *out stays NULL when a verbatim copy is due. */
-static int fuzz_inflate_expect(const uint8_t *body, size_t body_size, LLint cap,
-                               unsigned char **out, size_t *len) {
+static int fuzz_inflate_expect(hts_span body, LLint cap, unsigned char **out,
+                               size_t *len) {
+  const unsigned char *const b = (const unsigned char *) body.p;
   const hts_boolean wrapped =
-      body_size >= 2 && ((body[0] == 0x1f && body[1] == 0x8b) ||
-                         ((body[0] & 0x0f) == Z_DEFLATED &&
-                          (((unsigned) body[0] << 8 | body[1]) % 31) == 0));
-  const LLint maxout = hts_codec_maxout((LLint) body_size);
+      body.len >= 2 && ((b[0] == 0x1f && b[1] == 0x8b) ||
+                        ((b[0] & 0x0f) == Z_DEFLATED &&
+                         (((unsigned) b[0] << 8 | b[1]) % 31) == 0));
+  const LLint maxout = hts_codec_maxout((LLint) body.len);
   const hts_boolean binds = cap > 0 && cap < maxout;
   const LLint budget = binds ? cap : maxout;
   const int bomb = binds ? HTS_CODEC_TOOBIG : -1;
@@ -147,7 +147,7 @@ static int fuzz_inflate_expect(const uint8_t *body, size_t body_size, LLint cap,
     const int window_bits =
         (attempt == 0) == wrapped ? 32 + MAX_WBITS : -MAX_WBITS;
 
-    switch (fuzz_inflate(body, body_size, window_bits, budget, out, len)) {
+    switch (fuzz_inflate(body, window_bits, budget, out, len)) {
     case FUZZ_INFLATE_OK:
       return (int) *len;
     case FUZZ_INFLATE_BOMB:
@@ -165,7 +165,7 @@ static int fuzz_inflate_expect(const uint8_t *body, size_t body_size, LLint cap,
   if (wrapped || !raw_data_error) {
     return -1;
   }
-  return (LLint) body_size > budget ? bomb : (int) body_size;
+  return (LLint) body.len > budget ? bomb : (int) body.len;
 }
 
 /* Read the decoded file, which must be exactly size bytes. */
@@ -183,8 +183,7 @@ static unsigned char *fuzz_read_out(int size) {
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   static const hts_codec codecs[4] = {HTS_CODEC_DEFLATE, HTS_CODEC_BROTLI,
                                       HTS_CODEC_ZSTD, HTS_CODEC_UNSUPPORTED};
-  const uint8_t *body;
-  size_t body_size;
+  hts_span body;
   hts_codec codec;
   LLint cap;
   hts_boolean sniff, written;
@@ -200,20 +199,17 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   codec = codecs[data[0] & 3];               /* bits 0-1 */
   cap = fuzz_codec_caps[(data[0] >> 2) & 7]; /* bits 2-4 */
   sniff = (data[0] & 0x20) != 0;             /* bit 5; bits 6-7 unused */
-  body = data + 1;
-  body_size = size - 1;
+  body = fuzz_span(data + 1, size - 1);
   if ((fp = fopen(in_path, "wb")) == NULL) {
     return 0;
   }
-  written = fwrite(body, 1, body_size, fp) == body_size;
+  written = fwrite(body.p, 1, body.len, fp) == body.len;
   if (fclose(fp) != 0 || !written) {
     return 0;
   }
 
   /* the MIME sniffer's prefix decoder reads the same body from memory */
-  if (sniff &&
-      hts_codec_head(codec, hts_span_at((const char *) body, body_size),
-                     HTS_BUF(head)) > sizeof(head)) {
+  if (sniff && hts_codec_head(codec, body, HTS_BUF(head)) > sizeof(head)) {
     abort();
   }
   ret = hts_codec_unpack_max(codec, in_path, out_path, cap);
@@ -221,12 +217,11 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   if (ret < HTS_CODEC_TOOBIG || (ret == HTS_CODEC_TOOBIG && cap == 0) ||
       (codec == HTS_CODEC_UNSUPPORTED && ret != -1) ||
       (ret < 0 && errno != 0) ||
-      ret > hts_codec_budget((LLint) body_size, cap)) {
+      ret > hts_codec_budget((LLint) body.len, cap)) {
     abort();
   }
   if (codec == HTS_CODEC_DEFLATE) {
-    expect =
-        fuzz_inflate_expect(body, body_size, cap, &expect_buf, &expect_len);
+    expect = fuzz_inflate_expect(body, cap, &expect_buf, &expect_len);
     if (expect != FUZZ_CODEC_NO_ORACLE && ret != expect) {
       abort();
     }
@@ -234,8 +229,10 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   if (ret >= 0) {
     unsigned char *got = fuzz_read_out(ret);
 
-    if (expect >= 0 && memcmp(got, expect_buf != NULL ? expect_buf : body,
-                              (size_t) ret) != 0) {
+    if (expect >= 0 &&
+        memcmp(got,
+               expect_buf != NULL ? expect_buf : (const unsigned char *) body.p,
+               (size_t) ret) != 0) {
       abort();
     }
     freet(got);

@@ -38,25 +38,23 @@ Please visit our Website: http://www.httrack.com
 #include <string.h>
 
 #include "htsbase.h"
+#include "htsbuf.h"
 
-/* Return a NUL-terminated heap copy, so ASan bounds every read. */
-HTS_UNUSED static char *fuzz_strdup(const uint8_t *data, size_t size) {
-  char *s = malloct(size + 1);
-
-  memcpy(s, data, size);
-  s[size] = '\0';
-  return s;
+/* Return the span over the SIZE input bytes at DATA. */
+static HTS_INLINE HTS_UNUSED hts_span fuzz_span(const uint8_t *data,
+                                                size_t size) {
+  return hts_span_at((const char *) data, size);
 }
 
 /* Create <$TMPDIR or /tmp>/<prefix>-XXXXXX in dir, and run cleanup at exit.
    Returns HTS_FALSE and registers nothing when mkdtemp fails. */
-HTS_UNUSED static hts_boolean
-fuzz_tmpdir(char *dir, size_t size, const char *prefix, void (*cleanup)(void)) {
+HTS_UNUSED static hts_boolean fuzz_tmpdir(hts_buf dir, const char *prefix,
+                                          void (*cleanup)(void)) {
   const char *const tmp = getenv("TMPDIR");
 
-  snprintf(dir, size, "%s/%s-XXXXXX",
-           tmp != NULL && *tmp != '\0' ? tmp : "/tmp", prefix);
-  if (mkdtemp(dir) == NULL)
+  hts_buf_printf_clip(dir, "%s/%s-XXXXXX",
+                      tmp != NULL && *tmp != '\0' ? tmp : "/tmp", prefix);
+  if (mkdtemp(dir.p) == NULL)
     return HTS_FALSE;
   atexit(cleanup);
   return HTS_TRUE;

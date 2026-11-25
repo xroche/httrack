@@ -71,12 +71,12 @@ static void redir_cleanup(void) {
   (void) rmdir(redir_dir);
 }
 
-static void put_file(const char *path, const uint8_t *data, size_t size) {
+static void put_file(const char *path, hts_span bytes) {
   FILE *const fp = FOPEN(path, "wb");
 
   if (fp == NULL)
     abort();
-  if (size != 0 && fwrite(data, 1, size, fp) != size)
+  if (bytes.len != 0 && fwrite(bytes.p, 1, bytes.len, fp) != bytes.len)
     abort();
   fclose(fp);
 }
@@ -152,8 +152,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
   if (!inited) {
     hts_init();
-    if (!fuzz_tmpdir(redir_dir, sizeof(redir_dir), "fuzz-redirect",
-                     redir_cleanup))
+    if (!fuzz_tmpdir(HTS_BUF(redir_dir), "fuzz-redirect", redir_cleanup))
       abort();
     snprintf(redir_sav, sizeof(redir_sav), "%s/page.html", redir_dir);
     inited = 1;
@@ -197,12 +196,12 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   ptr = 1;
 
   if (bits & OPT_PARTIAL)
-    put_file(redir_sav, rest, restlen);
+    put_file(redir_sav, fuzz_span(rest, restlen));
   if (bits & OPT_REF) {
     ref = strdupt(url_savename_refname_fullpath(opt, host, page));
     if (structcheck(ref) != 0)
       abort();
-    put_file(ref, rest, restlen);
+    put_file(ref, fuzz_span(rest, restlen));
   }
 
   hts_init_htsblk(&r);

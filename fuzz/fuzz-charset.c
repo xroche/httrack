@@ -45,7 +45,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     return 0;
   charset = charsets[data[0] % (sizeof(charsets) / sizeof(charsets[0]))];
   data++, size--;
-  s = fuzz_strdup(data, size);
+  s = hts_span_dup(fuzz_span(data, size));
 
   {
     char *utf8 = hts_convertStringToUTF8(s, size, charset);

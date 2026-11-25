@@ -52,27 +52,14 @@ Please visit our Website: http://www.httrack.com
 #define KNOB_TRAVEL_SHIFT 5  /* two bits: index into travels[] */
 #define KNOB_TRAVEL_MASK 0x03
 
-/* Copy the next NUL-separated field into dst (bounded), and advance past
-   it. Returns HTS_FALSE at the end of the input. */
-static hts_boolean fuzz_field(const uint8_t **data, size_t *size, char *dst,
-                              size_t dst_size) {
-  const uint8_t *nul;
-  size_t len;
+/* Copy the next NUL-separated field of *rest into dst, clipped, and advance
+   past it. Returns HTS_FALSE at the end of the input. */
+static hts_boolean fuzz_field(hts_span *rest, hts_buf dst) {
+  hts_span field;
 
-  if (*size == 0)
+  if (!hts_span_next_in(rest, '\0', &field))
     return HTS_FALSE;
-  nul = (const uint8_t *) memchr(*data, 0, *size);
-  len = nul != NULL ? (size_t) (nul - *data) : *size;
-  if (len >= dst_size)
-    len = dst_size - 1;
-  memcpy(dst, *data, len);
-  dst[len] = '\0';
-  *data += len;
-  *size -= len;
-  if (*size > 0) { /* skip the NUL itself */
-    *data += 1;
-    *size -= 1;
-  }
+  (void) hts_buf_put_span_clip(dst, field);
   return HTS_TRUE;
 }
 
@@ -92,6 +79,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   char rule[FUZZ_ACCEPT_RULE_MAX];
   uint8_t knobs;
   hts_boolean seeker_up;
+  hts_span rest;
   int set_prio_to = 0;
   int just_test_it = 0;
   int i;
@@ -104,15 +92,15 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   }
   knobs = data[0];
   seeker_up = (knobs & KNOB_SEEKER_UP) ? HTS_TRUE : HTS_FALSE;
-  data++, size--;
+  rest = fuzz_span(data + 1, size - 1);
 
-  if (!fuzz_field(&data, &size, adr, sizeof(adr)))
+  if (!fuzz_field(&rest, HTS_BUF(adr)))
     return 0;
-  if (!fuzz_field(&data, &size, fil, sizeof(fil)))
+  if (!fuzz_field(&rest, HTS_BUF(fil)))
     snprintf(fil, sizeof(fil), "/");
-  if (!fuzz_field(&data, &size, mime, sizeof(mime)))
+  if (!fuzz_field(&rest, HTS_BUF(mime)))
     snprintf(mime, sizeof(mime), "text/html");
-  if (!fuzz_field(&data, &size, reply, sizeof(reply)))
+  if (!fuzz_field(&rest, HTS_BUF(reply)))
     snprintf(reply, sizeof(reply), "1");
 
   memset(&hash, 0, sizeof(hash));
@@ -137,7 +125,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     filters_bind(opt, &filters, &filptr);
     /* appended like command-line rules, so the last match wins */
     for (i = 0; i < FUZZ_ACCEPT_MAXRULES; i++) {
-      if (!fuzz_field(&data, &size, rule, sizeof(rule)))
+      if (!fuzz_field(&rest, HTS_BUF(rule)))
         break;
       (void) filters_insert(opt, filptr, rule);
     }

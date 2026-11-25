@@ -88,30 +88,16 @@ static void wc_cleanup(void) {
 
 static int wc_setup(void) {
   if (wc_dir[0] == '\0' &&
-      !fuzz_tmpdir(wc_dir, sizeof(wc_dir), "fuzz-warc", wc_cleanup)) {
+      !fuzz_tmpdir(HTS_BUF(wc_dir), "fuzz-warc", wc_cleanup)) {
     return -1;
   }
   return 0;
 }
 
-/* Clip-copy: header blocks and bodies stay inside the buffer the op line
-   gave them, so an abort in the serializer names a module bug, never a
-   harness one. */
-static char *wc_field(char *dst, size_t dsize, const char *src, size_t n) {
-  if (n >= dsize) {
-    n = dsize - 1;
-  }
-  if (n > 0) {
-    memcpy(dst, src, n);
-  }
-  dst[n] = '\0';
-  return dst;
-}
-
-static int wc_hex(const char *s, char *dst, size_t dsize) {
+static int wc_hex(const char *s, hts_buf dst) {
   size_t n = 0;
 
-  while (s[0] != '\0' && s[1] != '\0' && n + 1 < dsize) {
+  while (s[0] != '\0' && s[1] != '\0' && n + 1 < dst.size) {
     unsigned int byte;
     int hi, lo;
 
@@ -127,10 +113,10 @@ static int wc_hex(const char *s, char *dst, size_t dsize) {
       break;
     }
     byte = (unsigned int) ((hi << 4) | lo);
-    dst[n++] = (char) byte;
+    dst.p[n++] = (char) byte;
     s += 2;
   }
-  dst[n] = '\0';
+  dst.p[n] = '\0';
   return (int) n;
 }
 
@@ -193,18 +179,19 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     memcpy(line, val, vallen);
     line[vallen] = '\0';
 
+    /* clipped, so an abort in the serializer names a module bug */
     if (keylen == 3 && memcmp(p, "uri", 3) == 0) {
-      wc_field(uri, sizeof(uri), line, vallen);
+      (void) hts_buf_cpy_clip(HTS_BUF(uri), line);
     } else if (keylen == 2 && memcmp(p, "ip", 2) == 0) {
-      wc_field(ip, sizeof(ip), line, vallen);
+      (void) hts_buf_cpy_clip(HTS_BUF(ip), line);
     } else if (keylen == 5 && memcmp(p, "ctype", 5) == 0) {
-      wc_field(ctype, sizeof(ctype), line, vallen);
+      (void) hts_buf_cpy_clip(HTS_BUF(ctype), line);
     } else if (keylen == 6 && memcmp(p, "reqhdr", 6) == 0) {
-      reqhdr_len = wc_hex(line, reqhdr, sizeof(reqhdr));
+      reqhdr_len = wc_hex(line, HTS_BUF(reqhdr));
     } else if (keylen == 7 && memcmp(p, "resphdr", 7) == 0) {
-      resphdr_len = wc_hex(line, resphdr, sizeof(resphdr));
+      resphdr_len = wc_hex(line, HTS_BUF(resphdr));
     } else if (keylen == 4 && memcmp(p, "body", 4) == 0) {
-      body_len = wc_hex(line, body, sizeof(body));
+      body_len = wc_hex(line, HTS_BUF(body));
       if (body_len <= 0) {
         body[0] = 'A';
         body_len = 1;
@@ -224,7 +211,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
         size_t k;
 
         *bar++ = '\0';
-        (void) wc_hex(line, hdr, sizeof(hdr));
+        (void) wc_hex(line, HTS_BUF(hdr));
         memset(out, 0, sizeof(out));
         warc_http_header_value(hdr, bar, HTS_BUF(out));
         for (k = 0; k < sizeof(out); k++)

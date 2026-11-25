@@ -69,7 +69,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     opt->log = opt->errlog = NULL;
   }
 
-  buf = fuzz_strdup(data, size);
+  buf = hts_span_dup(fuzz_span(data, size));
   reply = (const unsigned char *) buf;
   nl1 = memchr(buf, '\n', size);
   nl2 = nl1 != NULL ? memchr(nl1 + 1, '\n', size - (size_t) (nl1 + 1 - buf))

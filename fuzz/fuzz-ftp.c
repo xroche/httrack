@@ -107,7 +107,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     inited = 1;
   }
 
-  url = fuzz_strdup(data, size);
+  url = hts_span_dup(fuzz_span(data, size));
   ftp_split_url(url);
   freet(url);
 

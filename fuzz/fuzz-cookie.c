@@ -76,7 +76,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
   if (size < 2)
     return 0;
-  buf = fuzz_strdup(data + 1, size - 1);
+  buf = hts_span_dup(fuzz_span(data + 1, size - 1));
   nlines = fuzz_lines(buf, lines, sizeof(lines) / sizeof(lines[0]));
   /* Missing fields point at buf's NUL: empty, never a wild pointer. */
   for (i = 0; i < sizeof(lines) / sizeof(lines[0]); i++)

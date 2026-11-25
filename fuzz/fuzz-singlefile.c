@@ -64,19 +64,15 @@ static void sf_cleanup(void) {
 static httrackp *sf_opt = NULL;
 
 /* A missing asset would reduce the target to its parser half. */
-static void sf_write(const char *name, const char *data, size_t len) {
+static void sf_write(const char *name, hts_span bytes) {
   char path[700];
   FILE *fp;
 
   snprintf(path, sizeof(path), "%s/%s", sf_root, name);
   fp = fopen(path, "wb");
-  if (fp == NULL || fwrite(data, 1, len, fp) != len)
+  if (fp == NULL || fwrite(bytes.p, 1, bytes.len, fp) != bytes.len)
     abort();
   fclose(fp);
-}
-
-static void sf_text(const char *name, const char *data) {
-  sf_write(name, data, strlen(data));
 }
 
 /* Append ref and a valid mark, which a fixture cannot spell. */
@@ -89,21 +85,21 @@ static void sf_marked(String *out, const char *ref, char cls) {
 
 /* \001<ref>\002 in an input becomes <ref> plus its mark, which is the only
    way a corpus file can reach the mark parser at all. */
-static void sf_expand_input(const char *in, size_t len, String *out) {
+static void sf_expand_input(hts_span in, String *out) {
   size_t i, start = 0;
 
   StringClear(*out);
-  for (i = 0; i < len; i++) {
-    if (in[i] == '\001') {
+  for (i = 0; i < in.len; i++) {
+    if (in.p[i] == '\001') {
       start = StringLength(*out);
-    } else if (in[i] == '\002') {
+    } else if (in.p[i] == '\002') {
       char mark[SINGLEFILE_MARK_MAX];
 
       StringCat(*out,
                 singlefile_mark(sf_opt, HTS_BUF(mark), SINGLEFILE_CLASS_ANY,
                                 StringLength(*out) - start));
     } else {
-      StringAddchar(*out, in[i]);
+      StringAddchar(*out, in.p[i]);
     }
   }
 }
@@ -115,7 +111,7 @@ static void sf_css(const char *name, const char *pre, const char *ref,
   StringCopy(body, pre);
   sf_marked(&body, ref, SINGLEFILE_CLASS_ANY);
   StringCat(body, post);
-  sf_write(name, StringBuff(body), StringLength(body));
+  sf_write(name, hts_span_at(StringBuff(body), StringLength(body)));
   StringFree(body);
 }
 
@@ -128,15 +124,15 @@ static void sf_init(void) {
   sf_opt = hts_create_opt();
   sf_opt->log = sf_opt->errlog = NULL;
   sf_opt->single_file_max_size = FUZZ_SF_CAP;
-  if (!fuzz_tmpdir(sf_root, sizeof(sf_root), "httrack-fuzz-sf", sf_cleanup))
+  if (!fuzz_tmpdir(HTS_BUF(sf_root), "httrack-fuzz-sf", sf_cleanup))
     abort();
   snprintf(sf_page, sizeof(sf_page), "%s/page.html", sf_root);
   snprintf(path, sizeof(path), "%s/sub", sf_root);
   if (mkdir(path, 0700) != 0)
     abort();
-  sf_write("a.png", png, sizeof(png) - 1);
-  sf_write("big.png", big, sizeof(big));
-  sf_text("j.js", "var x=1;\n");
+  sf_write("a.png", hts_span_at(png, sizeof(png) - 1));
+  sf_write("big.png", hts_span_at(big, sizeof(big)));
+  sf_write("j.js", hts_span_of("var x=1;\n"));
   /* Marks let an inlined stylesheet recurse and rebase its references. */
   {
     String css = STRING_EMPTY;
@@ -148,7 +144,7 @@ static void sf_init(void) {
     StringCat(css, ")}\np{background:url(");
     sf_marked(&css, "big.png", SINGLEFILE_CLASS_ANY);
     StringCat(css, ")}\n");
-    sf_write("s.css", StringBuff(css), StringLength(css));
+    sf_write("s.css", hts_span_at(StringBuff(css), StringLength(css)));
     StringFree(css);
   }
   sf_css("sub/b.css", "p{background:url(", "../a.png", ")}\n");
@@ -166,7 +162,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     sf_init();
     inited = 1;
   }
-  sf_expand_input((const char *) data, size, &in);
+  sf_expand_input(fuzz_span(data, size), &in);
   html_len = StringLength(in);
   /* The copy is unterminated, so ASan catches a read past html_len. */
   html = malloct(html_len != 0 ? html_len : 1);
