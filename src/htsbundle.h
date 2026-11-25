@@ -80,8 +80,7 @@ hts_boolean hts_bundle_has_control(hts_span s);
 
 /* Copy the host of url, with or without a scheme, into dst as cookie_host
    does. */
-HTS_CHECK_RESULT hts_boolean cookie_url_host(const char *url, char *dst,
-                                             size_t dst_size);
+HTS_CHECK_RESULT hts_boolean cookie_url_host(const char *url, hts_buf dst);
 
 /* Field n (0-based, TAB-separated) of the jar record at line, as cookie_get
    reads it, or an empty view when the record has no such field. */
@@ -93,8 +92,7 @@ char *cookie_find_exact(char *s, const char *cook_name, const char *domain,
 
 /* Copy url's host into host, set attr, and return the domain that cookies
    pasted for url bind to: its registrable domain, or the host. NULL if none. */
-const char *cookie_flat_bind(const char *url, char *host, size_t host_size,
-                             cookie_attr *attr);
+const char *cookie_flat_bind(const char *url, hts_buf host, cookie_attr *attr);
 
 /* Store the pair "name=value" at pair as a cookie of domain. HTS_FALSE when it
    is not stored, counted in *ignored. */
@@ -132,13 +130,13 @@ typedef struct text_src {
 /* A source reading fp from its position. */
 text_src text_src_file(FILE *fp);
 
-/* A source reading the len bytes at buf, which must outlive it. The last line
+/* A source reading the bytes of text, which must outlive it. The last line
    needs no LF. */
-text_src text_src_mem(const char *buf, size_t len);
+text_src text_src_mem(hts_span text);
 
-/* Read a line into s, of size bytes, without its LF, and a CR before the LF
-   when the whole line fit. *len counts every byte of the line, cut or not. */
-void text_src_readline(text_src *src, char *s, size_t size, size_t *len);
+/* Read a line into s without its LF, and a CR before the LF when the whole
+   line fit. *len counts every byte of the line, cut or not. */
+void text_src_readline(text_src *src, hts_buf s, size_t *len);
 
 /* Load Netscape jar records from src's position to its end through filter,
    as cookie_load reads a file. given names the file in warnings, which name
@@ -153,10 +151,10 @@ void cookie_load_stream(httrackp *opt, t_cookie *cookie, text_src *src,
 hts_boolean cookie_write_replace(const char *file, const char *data,
                                  size_t len);
 
-/* Why can the len bytes of host, past any ASCII lowercasing, not take an
-   ASCII form? IDNA needs strict UTF-8, and it encodes a capital outside ASCII
-   as another host. NULL when they can. */
-const char *cookie_host_refusal(const char *host, size_t len);
+/* Why can host, past any ASCII lowercasing, not take an ASCII form? IDNA
+   needs strict UTF-8, and it encodes a capital outside ASCII as another host.
+   NULL when it can. */
+const char *cookie_host_refusal(hts_span host);
 
 #endif
 

@@ -222,7 +222,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
     memset(&attr, 0, sizeof(attr));
     bind = cookie_flat_bind(nlines > 0 ? lines[0] : "https://a.fuzz.example/x",
-                            HTS_SIZED(host), &attr);
+                            HTS_BUF(host), &attr);
     if (bind != NULL) {
       int ignored = 0;
 
@@ -244,7 +244,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     int i;
 
     if (!cookie_url_host(nlines > 0 ? lines[0] : "https://[IPv6:::1]:80/",
-                         HTS_SIZED(host)))
+                         HTS_BUF(host)))
       host[0] = '\0'; // a refused URL leaves host unwritten
     cookie_sink += (unsigned long) strlen(host);
     for (i = 0; i < 8; i++) {
