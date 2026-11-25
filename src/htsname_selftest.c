@@ -331,20 +331,20 @@ static hts_boolean st_savename_write_body(const char *path, const char *arg) {
 
 /* Copies src into dst with its '*' expanded to pad bytes of padunit. Is there a
    '*' and room for the result? */
-static hts_boolean st_expand_pad(char *dst, size_t size, const char *src,
-                                 int pad, const char *padunit) {
+static hts_boolean st_expand_pad(hts_buf dst, const char *src, int pad,
+                                 const char *padunit) {
   const char *const star = strchr(src, '*');
   const size_t unit = strlen(padunit);
   size_t head, j;
 
-  if (star == NULL || pad < 0 || strlen(src) > size ||
-      (size_t) pad > size - strlen(src))
+  if (star == NULL || pad < 0 || strlen(src) > dst.size ||
+      (size_t) pad > dst.size - strlen(src))
     return HTS_FALSE;
   head = (size_t) (star - src);
-  memcpy(dst, src, head);
+  memcpy(dst.p, src, head);
   for (j = 0; j < (size_t) pad; j++)
-    dst[head + j] = padunit[j % unit];
-  strlcpybuff(dst + head + pad, star + 1, size - head - pad);
+    dst.p[head + j] = padunit[j % unit];
+  strlcpybuff(dst.p + head + pad, star + 1, dst.size - head - pad);
   return HTS_TRUE;
 }
 
@@ -449,8 +449,8 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
   if (tplpad > 0) {
     char BIGSTK tpl[HTS_URLMAXSIZE * 4];
 
-    if (!st_expand_pad(tpl, sizeof(tpl), StringBuff(opt->savename_userdef),
-                       tplpad, padunit)) {
+    if (!st_expand_pad(HTS_BUF(tpl), StringBuff(opt->savename_userdef), tplpad,
+                       padunit)) {
       fprintf(stderr, "savename: tplpad needs a '*' in userdef, and room\n");
       return 1;
     }
@@ -470,8 +470,7 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
   memset(&probe, 0, sizeof(probe));
   memset(probe.canary, ST_POISON, sizeof(probe.canary));
   if (adrpad > 0) {
-    if (!st_expand_pad(afs->af.adr, sizeof(afs->af.adr), adr, adrpad,
-                       padunit)) {
+    if (!st_expand_pad(HTS_BUF(afs->af.adr), adr, adrpad, padunit)) {
       fprintf(stderr, "savename: adrpad needs a '*' in the adr, and room\n");
       return 1;
     }
@@ -481,8 +480,7 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
   if (filpad > 0) {
     /* '*' stands for filpad bytes: a link longer than argv can carry, argv
        being capped at HTS_CDLMAXSIZE (htscoremain.c) */
-    if (!st_expand_pad(afs->af.fil, sizeof(afs->af.fil), argv[0], filpad,
-                       padunit)) {
+    if (!st_expand_pad(HTS_BUF(afs->af.fil), argv[0], filpad, padunit)) {
       fprintf(stderr, "savename: filpad needs a '*' in the fil, and room\n");
       return 1;
     }
@@ -1485,8 +1483,7 @@ static int st_hostalias(httrackp *opt, int argc, char **argv) {
 
 /* The dedup key and compare before the no-rules fast paths, frozen. */
 static const char *legacy_hash_url_key(hash_struct *hash, const char *adr,
-                                       const char *fil, char *dst,
-                                       size_t dstsize) {
+                                       const char *fil, hts_buf dst) {
   char BIGSTK aliasbuf[HTS_URLMAXSIZE * 2];
   const char *const alias =
       hts_host_alias(hash->host_alias, adr, hash->norm_host, HTS_BUF(aliasbuf));
@@ -1496,15 +1493,15 @@ static const char *legacy_hash_url_key(hash_struct *hash, const char *adr,
                                    : jump_identification_const(adr_canon);
 
   assertf(adr_norm != NULL);
-  (void) strclipbuff(dst, dstsize, adr_norm);
+  (void) hts_buf_cpy_clip(dst, adr_norm);
   assertf(fil != NULL);
   {
     char BIGSTK keybuf[HTS_URLMAXSIZE];
     const char *const keys = hts_query_strip_keys(hash->strip_query, adr_canon,
                                                   fil, HTS_BUF(keybuf));
-    const size_t used = strlen(dst);
-    char *const tail = &dst[used];
-    const size_t avail = dstsize - used;
+    const size_t used = strlen(dst.p);
+    char *const tail = &dst.p[used];
+    const size_t avail = dst.size - used;
 
     if ((hash->norm_slash || hash->norm_query || keys != NULL) &&
         strlen(fil) < avail && strlen(fil) < HTS_URLMAXSIZE * 2) {
@@ -1514,7 +1511,7 @@ static const char *legacy_hash_url_key(hash_struct *hash, const char *adr,
       (void) strclipbuff(tail, avail, fil);
     }
   }
-  return dst;
+  return dst.p;
 }
 
 static int legacy_key_adrfil_equals(hash_struct *hash, const char *a_adr,
@@ -1583,7 +1580,8 @@ static void hashdiff_setup(hashdiff_run *run, hash_struct *hash,
     for (k = 0; k < sizeof(sizes) / sizeof(sizes[0]); k++) {
       memset(run->ko, '#', HTS_URLMAXSIZE * 4);
       memset(run->kn, '#', HTS_URLMAXSIZE * 4);
-      legacy_hash_url_key(hash, run->adr[i], run->fil[i], run->ko, sizes[k]);
+      legacy_hash_url_key(hash, run->adr[i], run->fil[i],
+                          hts_buf_at(run->ko, sizes[k]));
       hash_url_key(hash, run->adr[i], run->fil[i],
                    hts_buf_at(run->kn, sizes[k]));
       run->cases++;
@@ -1720,21 +1718,22 @@ static int st_hashdiff(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* Build the key for ADR/FIL into ARENA, whose KEYSIZE bytes are followed by
-   GUARD poisoned ones, and report whether those are still untouched. */
+/* Build the key for ADR/FIL into ARENA, whose last GUARD bytes are poisoned,
+   and report whether those are still untouched. */
 static hts_boolean st_hashkey(httrackp *opt, const char *adr, const char *fil,
-                              char *arena, size_t keysize, size_t guard) {
+                              hts_buf arena, size_t guard) {
   hash_struct hash;
   size_t i;
 
+  assertf(guard < arena.size);
   /* poisoned with '#', not 0, or the stray NUL of an off-by-one would read as
      untouched */
-  memset(arena, '#', keysize + guard);
+  memset(arena.p, '#', arena.size);
   hash_init(opt, &hash, opt->urlhack);
-  hash_url_key(&hash, adr, fil, hts_buf_at(arena, keysize));
+  hash_url_key(&hash, adr, fil, hts_buf_at(arena.p, arena.size - guard));
   hash_free(&hash);
-  for (i = keysize; i < keysize + guard; i++) {
-    if (arena[i] != '#')
+  for (i = arena.size - guard; i < arena.size; i++) {
+    if (arena.p[i] != '#')
       return HTS_FALSE;
   }
   return HTS_TRUE;
@@ -1749,6 +1748,7 @@ static int st_hashkey_bounds(httrackp *opt, int argc, char **argv) {
   char *fil = malloct(2 * keysize);
   char *cat = malloct(4 * keysize);
   char *arena = malloct(keysize + guard);
+  const hts_buf arena_buf = hts_buf_at(arena, keysize + guard);
   int hack;
 
   assertf(adr != NULL && fil != NULL && cat != NULL && arena != NULL);
@@ -1779,7 +1779,7 @@ static int st_hashkey_bounds(httrackp *opt, int argc, char **argv) {
   snprintf(cat, 4 * keysize, "%s%s", adr, fil);
   for (hack = 0; hack < 2; hack++) {
     opt->urlhack = hack != 0 ? HTS_TRUE : HTS_FALSE;
-    assertf(st_hashkey(opt, adr, fil, arena, keysize, guard));
+    assertf(st_hashkey(opt, adr, fil, arena_buf, guard));
     assertf(strcmp(arena, cat) == 0);
   }
 
@@ -1794,7 +1794,7 @@ static int st_hashkey_bounds(httrackp *opt, int argc, char **argv) {
     fil[(longadr ? 8 : keysize + 32) + 1] = '\0';
     snprintf(cat, 4 * keysize, "%s%s", adr, fil);
     opt->urlhack = (hack & 2) != 0 ? HTS_TRUE : HTS_FALSE;
-    assertf(st_hashkey(opt, adr, fil, arena, keysize, guard));
+    assertf(st_hashkey(opt, adr, fil, arena_buf, guard));
     /* clipped and terminated, and a prefix of the pair rather than garbage */
     assertf(strlen(arena) == keysize - 1);
     assertf(strncmp(arena, cat, strlen(arena)) == 0);
@@ -1819,13 +1819,13 @@ static int st_hashkey_bounds(httrackp *opt, int argc, char **argv) {
     assertf(hts_query_strip_keys(rules, adr, fil, HTS_BUF(keys)) == NULL);
     opt->urlhack = HTS_TRUE; /* and the key builder survives the same pair */
     StringCopy(opt->strip_query, rules);
-    assertf(st_hashkey(opt, adr, fil, arena, keysize, guard));
+    assertf(st_hashkey(opt, adr, fil, arena_buf, guard));
 
     /* the key builder must clip a query past the normalizer's scratch */
     snprintf(fil, 2 * keysize, "/bbz?");
     memset(&fil[5], 'q', field + 64); /* past the normalizer, inside the key */
     fil[5 + field + 64] = '\0';
-    assertf(st_hashkey(opt, "h.com", fil, arena, keysize, guard));
+    assertf(st_hashkey(opt, "h.com", fil, arena_buf, guard));
     StringCopy(opt->strip_query, "");
   }
 
@@ -1882,11 +1882,11 @@ static int st_redirect_samefile(httrackp *opt, int argc, char **argv) {
 }
 
 /* Builds an n-byte path ending in '/', so bauth_prefix() keeps all of it. */
-static void st_urlbounds_path(char *fil, size_t n) {
-  assertf(n >= 2);
-  memset(fil, 'a', n);
-  fil[0] = fil[n - 1] = '/';
-  fil[n] = '\0';
+static void st_urlbounds_path(hts_buf fil, size_t n) {
+  assertf(n >= 2 && n < fil.size);
+  memset(fil.p, 'a', n);
+  fil.p[0] = fil.p[n - 1] = '/';
+  fil.p[n] = '\0';
 }
 
 /* Each consumer of an HTS_URLMAXSIZE*2 buffer must refuse an oversized fil
@@ -1921,9 +1921,9 @@ static int st_urlbounds(httrackp *opt, int argc, char **argv) {
   opt->filters.filptr = &filptr;
 
   /* hts_testlinksize(): -1 is "forbidden" to its one caller, back_checksize */
-  st_urlbounds_path(fil, wzfits);
+  st_urlbounds_path(HTS_BUF(fil), wzfits);
   assertf(hts_testlinksize(opt, adr, fil, 1) == 0);
-  st_urlbounds_path(fil, wzfits + 1);
+  st_urlbounds_path(HTS_BUF(fil), wzfits + 1);
   assertf(hts_testlinksize(opt, adr, fil, 1) == -1);
 
   /* This goes first, because bauth_check() skips the key on an empty jar and
@@ -1958,12 +1958,12 @@ static int st_urlbounds(httrackp *opt, int argc, char **argv) {
 
   /* bauth_prefix(): the key it keeps fills its buffer to the last byte, and
      #1561's guard then refuses to store a key wider than bauth_chain */
-  st_urlbounds_path(fil, bafits);
+  st_urlbounds_path(HTS_BUF(fil), bafits);
   assertf(bauth_prefix(prefix, sizeof(prefix), adr, fil) == prefix);
   assertf(strlen(prefix) == HTS_URLMAXSIZE * 2 - 1);
   assertf(bauth_add(cookie, adr, fil, "dXNlcjpwYXNz") == 0);
   /* one byte more: no key at all, and both callers survive the NULL */
-  st_urlbounds_path(fil, bafits + 1);
+  st_urlbounds_path(HTS_BUF(fil), bafits + 1);
   assertf(bauth_prefix(prefix, sizeof(prefix), adr, fil) == NULL);
   assertf(bauth_check(cookie, adr, fil) == NULL);
   assertf(bauth_add(cookie, adr, fil, "dXNlcjpwYXNz") == 0);
@@ -1980,11 +1980,11 @@ static int st_urlbounds(httrackp *opt, int argc, char **argv) {
   opt->wizard = HTS_WIZARD_ASK;
   opt->getmode |= HTS_GETMODE_NONHTML;
   opt->robots = HTS_ROBOTS_NEVER;
-  st_urlbounds_path(fil, wzfits);
+  st_urlbounds_path(HTS_BUF(fil), wzfits);
   assertf(hts_acceptlink(opt, 0, adr, fil, NULL, NULL, HTS_FALSE, &prio,
                          NULL) == 0);
   filptr = 0; /* the primary link left its own filters */
-  st_urlbounds_path(fil, wzfits + 1);
+  st_urlbounds_path(HTS_BUF(fil), wzfits + 1);
   assertf(hts_acceptlink(opt, 0, adr, fil, NULL, NULL, HTS_FALSE, &prio,
                          NULL) == 1);
 

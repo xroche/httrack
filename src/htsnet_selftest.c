@@ -421,11 +421,11 @@ static int st_socks5(httrackp *opt, int argc, char **argv) {
 }
 
 /* Is the poison guard (non-zero, so a stray NUL shows) intact? */
-static hts_boolean st_addrport_intact(const char *p, size_t n) {
+static hts_boolean st_addrport_intact(hts_span guard) {
   size_t i;
 
-  for (i = 0; i < n; i++) {
-    if (p[i] != 'Z')
+  for (i = 0; i < guard.len; i++) {
+    if (guard.p[i] != 'Z')
       return HTS_FALSE;
   }
   return HTS_TRUE;
@@ -469,7 +469,7 @@ static void st_addrport_case(int family, unsigned int port,
   memset(arena, 'Z', full + guard);
   assertf(SOCaddr_inetntoa_port(arena, full, addr));
   assertf(strcmp(arena, expected) == 0);
-  assertf(st_addrport_intact(arena + full, guard));
+  assertf(st_addrport_intact(hts_span_at(arena + full, guard)));
 
   /* no capacity is overrun or loses the port to a long host */
   for (size = 1; size <= full; size++) {
@@ -480,7 +480,7 @@ static void st_addrport_case(int family, unsigned int port,
     /* before strlen, or a run with no terminator reads off the allocation */
     assertf(memchr(arena, '\0', size) != NULL);
     assertf(strlen(arena) < size);
-    assertf(st_addrport_intact(arena + size, full + guard - size));
+    assertf(st_addrport_intact(hts_span_at(arena + size, full + guard - size)));
     if (size <= reserved) {
       /* too small for the port at all: refuse, rather than clip it to "6553" */
       assertf(!ok);
@@ -550,15 +550,15 @@ static uint64_t st_fnv(uint64_t h, const void *p, size_t n) {
 /* Reads stream from s as back_wait() does, calling http_xfread1() only while s
    is readable. Returns a hash of the final call's result, the stored line
    buffer and the bytes left on s. */
-static uint64_t st_xfread_digest(T_SOC sv[2], const char *stream, int len,
-                                 int bufl) {
+static uint64_t st_xfread_digest(T_SOC sv[2], hts_span stream, int bufl) {
+  const int len = (int) stream.len;
   uint64_t h = 1469598103934665603ULL;
   htsblk r;
   LLint ret = 0;
   char rest[64];
   int n;
 
-  assertf(send(sv[0], stream, len, 0) == len);
+  assertf(send(sv[0], stream.p, len, 0) == len);
   /* macOS loopback delivers asynchronously, and the reads below never wait */
   if (len > 0) {
     char *seen = malloct((size_t) len);
@@ -630,9 +630,9 @@ static int st_xfread_lines(httrackp *opt, int argc, char **argv) {
       if (len > 8000 && bufl == HTS_XFREAD_LINE && stream[i] == '\n')
         stream[i] = 'x';
     }
-    a = st_xfread_digest(peek, stream, len, bufl);
+    a = st_xfread_digest(peek, hts_span_at(stream, (size_t) len), bufl);
     hts_peek_force_off(HTS_TRUE);
-    b = st_xfread_digest(bytewise, stream, len, bufl);
+    b = st_xfread_digest(bytewise, hts_span_at(stream, (size_t) len), bufl);
     hts_peek_force_off(HTS_FALSE);
     if (a != b) {
       printf("xfread-lines: case %d (len %d, bufl %d) differs\n", c, len, bufl);
@@ -1836,19 +1836,15 @@ static void st_catchurl_sized_client(void *varg) {
 }
 
 /* One capture of req into buffers of the given capacities. */
-static catch_url_status st_catchurl_sized_run(const char *req, char *url,
-                                              size_t url_size, char *method,
-                                              size_t method_size, char *data,
-                                              size_t data_size) {
+static catch_url_status st_catchurl_sized_run(const char *req, hts_buf url,
+                                              hts_buf method, hts_buf data) {
   st_catchurl_sized_arg arg;
   T_SOC srv = st_catchurl_listen(&arg.port);
   catch_url_status status;
 
   arg.req = req;
   assertf(hts_newthread(st_catchurl_sized_client, &arg) == 0);
-  status = catch_url_capture(srv, hts_buf_at(url, url_size),
-                             hts_buf_at(method, method_size),
-                             hts_buf_at(data, data_size));
+  status = catch_url_capture(srv, url, method, data);
   htsthread_wait();
   deletesoc(srv);
   return status;
@@ -1874,8 +1870,9 @@ static hts_boolean st_catchurl_width_ok(size_t method_len, size_t url_len,
   memcpy(want_url, base, sizeof(base) - 1);
   memset(want_url + sizeof(base) - 1, 'a', url_len - (sizeof(base) - 1));
   memcpy(want_url + url_len, tail, sizeof(tail));
-  got = st_catchurl_sized_run(req, url, cap, method, cap, data,
-                              CATCH_URL_DATA_SIZE);
+  got =
+      st_catchurl_sized_run(req, hts_buf_at(url, cap), hts_buf_at(method, cap),
+                            hts_buf_at(data, CATCH_URL_DATA_SIZE));
   want_url[url_len] = '\0';
   ok = got == want && (got != CATCH_URL_OK || (strcmp(url, want_url) == 0 &&
                                                strlen(method) == method_len));
@@ -1907,8 +1904,9 @@ static hts_boolean st_catchurl_line_ok(hts_boolean header, size_t len,
   memset(req + head, 'h', len);
   memcpy(req + head, start, strlen(start));
   memcpy(req + head + len, "\r\n\r\n", 5);
-  got = st_catchurl_sized_run(req, url, HTS_URLMAXSIZE * 2, method,
-                              CATCH_URL_METHOD_SIZE, data, CATCH_URL_DATA_SIZE);
+  got = st_catchurl_sized_run(req, hts_buf_at(url, HTS_URLMAXSIZE * 2),
+                              hts_buf_at(method, CATCH_URL_METHOD_SIZE),
+                              hts_buf_at(data, CATCH_URL_DATA_SIZE));
   /* the request line, the header and its CRLF, then the empty line */
   if (got == CATCH_URL_OK && header &&
       strlen(data) != strlen(ST_CATCHURL_LINE) + len + 4) {
@@ -1974,8 +1972,9 @@ static int st_catchurl_sized(httrackp *opt, int argc, char **argv) {
     hts_boolean bad;
 
     data[0] = 'Q'; /* a refused request line must leave it alone */
-    got = st_catchurl_sized_run(cases[i].req, url, cases[i].url, method,
-                                cases[i].method, data, cases[i].data);
+    got = st_catchurl_sized_run(cases[i].req, hts_buf_at(url, cases[i].url),
+                                hts_buf_at(method, cases[i].method),
+                                hts_buf_at(data, cases[i].data));
     bad = got != cases[i].want || !st_sized_guard_ok(url, cases[i].url) ||
           !st_sized_guard_ok(method, cases[i].method) ||
           !st_sized_guard_ok(data, cases[i].data) ||
