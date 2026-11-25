@@ -229,10 +229,9 @@ size_t make_content_id(const char *const adr, const char *const fil,
 
 /** Low-level percent-escaper backing the escape_* family. @p mode selects the
     character class to escape: 0 check_url, 1 in_url, 2 spc_url, 3 uri,
-    4 control_url, 30 uri_utf. @p max_size is the dest capacity including the
+    4 control_url, 30 uri_utf. @p out.size is the capacity including the
     NUL. */
-size_t x_escape_http(const char *const s, char *const dest,
-                     const size_t max_size, const int mode);
+size_t x_escape_http(const char *const s, hts_buf out, const int mode);
 
 /** Strip all control characters (byte value < 32) from @p s in place. */
 void escape_remove_control(char *const s);
@@ -709,7 +708,7 @@ time_t get_filetime(const char *file);
 /* Writes file mtime as an RFC 822 GMT date into DATE, or returns 0. */
 int get_filetime_rfc822(const char *file, hts_buf date);
 /* Writes A as an RFC 822 GMT date, clipped to size bytes. */
-HTS_INLINE void time_rfc822(char *s, size_t size, struct tm *A);
+HTS_INLINE void time_rfc822(hts_buf s, struct tm *A);
 
 HTS_INLINE int sendc(htsblk * r, const char *s);
 /* Returns the advance past the line's terminator. */
@@ -872,7 +871,7 @@ const char *adr_nologin_r(hts_buf buf, const char *adr);
 
 /* Same as adr_nologin_r(), but only a URL with a scheme or "//" has a login.
    Any "scheme://" counts, not only the ones the engine fetches. */
-const char *url_nologin_r(char *buf, size_t size, const char *url);
+const char *url_nologin_r(hts_buf buf, const char *url);
 
 /* adr_nologin_r() and url_nologin_r() into a rotating buffer of opt, which
    they take only when there is a login. A NULL opt drops the login, and a
