@@ -61,7 +61,7 @@ Please visit our Website: http://www.httrack.com
     if (len >= sizeof(afs->save))                                              \
       save_trim_dirs(buff, len, len - (sizeof(afs->save) - 1));                \
     afs->save[0] = '\0';                                                       \
-    url_savename_addstr(HTS_SIZED(afs->save), buff);                           \
+    url_savename_addstr(HTS_BUF(afs->save), buff);                             \
   }
 
 #define ADD_STANDARD_NAME(shortname)                                           \
@@ -81,7 +81,7 @@ Please visit our Website: http://www.httrack.com
     else /* sized: a long extension is dropped before the name */              \
       standard_name(hts_buf_at(buff, sizeof(afs->save) - strlen(afs->save)),   \
                     dot_pos, nom_pos, fil_complete, (shortname));              \
-    url_savename_addstr(HTS_SIZED(afs->save), buff);                           \
+    url_savename_addstr(HTS_BUF(afs->save), buff);                             \
     save_append_tail(HTS_BUF(afs->save), tail);                                \
   }
 
@@ -169,9 +169,9 @@ static void escapeReservedNames(hts_buf save, const char *const *names) {
   }
 }
 
-void url_savename_escape_reserved(char *save, size_t size) {
-  escapeReservedNames(hts_buf_at(save, size), hts_tbreserved);
-  escapeReservedNames(hts_buf_at(save, size), hts_tbdev);
+void url_savename_escape_reserved(hts_buf save) {
+  escapeReservedNames(save, hts_tbreserved);
+  escapeReservedNames(save, hts_tbdev);
 }
 
 /* Strip all // */
@@ -238,17 +238,16 @@ typedef enum wire_verdict {
 } wire_verdict;
 
 static wire_verdict wire_ext_verdict(httrackp *opt, const char *wiremime,
-                                     const char *file, char *urlmime,
-                                     size_t urlmime_size) {
+                                     const char *file, hts_buf urlmime) {
   if (may_unknown2(opt, wiremime, file))
     return WIRE_KEEPS_EXT; /* type kept verbatim (keep-list / bogus-multiple) */
-  urlmime[0] = '\0';
+  urlmime.p[0] = '\0';
   /* type implied by the URL extension, only when confidently known (flag 0) */
-  if (!get_httptype_sized(opt, urlmime, urlmime_size, file, 0))
+  if (!get_httptype_sized(opt, urlmime.p, urlmime.size, file, 0))
     return WIRE_WINS; /* URL ext implies no known type */
-  if (strfield2(wiremime, urlmime))
+  if (strfield2(wiremime, urlmime.p))
     return WIRE_KEEPS_EXT; /* agreement (no .htm->.html churn) */
-  if (!is_hypertext_mime(opt, urlmime, file) &&
+  if (!is_hypertext_mime(opt, urlmime.p, file) &&
       strfield2(wiremime, HTS_UNKNOWN_MIME))
     return WIRE_KEEPS_EXT; /* no declared type */
   return WIRE_CONTESTED;
@@ -340,7 +339,7 @@ static int wire_patches_ext(httrackp *opt, const sniff_src *src,
                             const char *wiremime, const char *file) {
   char urlmime[256];
 
-  switch (wire_ext_verdict(opt, wiremime, file, HTS_SIZED(urlmime))) {
+  switch (wire_ext_verdict(opt, wiremime, file, HTS_BUF(urlmime))) {
   case WIRE_KEEPS_EXT:
     return 0;
   case WIRE_WINS:
@@ -378,7 +377,7 @@ int hts_ext_sniff_wanted(httrackp *opt, const char *wiremime,
   char urlmime[256];
 
   return wiremime != NULL && strnotempty(wiremime) &&
-         wire_ext_verdict(opt, wiremime, file, HTS_SIZED(urlmime)) ==
+         wire_ext_verdict(opt, wiremime, file, HTS_BUF(urlmime)) ==
              WIRE_CONTESTED &&
          hts_sniff_mime_known(urlmime);
 }
@@ -406,16 +405,15 @@ static size_t utf8_cut(const char *s, size_t len) {
   return len;
 }
 
-void url_savename_addtail(char *d, size_t dsize, const char *sep,
-                          const char *s) {
+void url_savename_addtail(hts_buf d, const char *sep, const char *s) {
   const size_t slen = strlen(sep) + strlen(s);
 
-  if (slen + 1 > dsize) /* the tail alone does not fit: leave d alone */
+  if (slen + 1 > d.size) /* the tail alone does not fit: leave d alone */
     return;
-  if (strlen(d) + slen + 1 > dsize)
-    d[utf8_cut(d, dsize - slen - 1)] = '\0';
-  strlcatbuff(d, sep, dsize);
-  strlcatbuff(d, s, dsize);
+  if (strlen(d.p) + slen + 1 > d.size)
+    d.p[utf8_cut(d.p, d.size - slen - 1)] = '\0';
+  hts_buf_cat(d, sep);
+  hts_buf_cat(d, s);
 }
 
 /* Append at most n characters of s, clipped to d. HTS_FALSE if clipped. */
@@ -532,7 +530,7 @@ static void save_append_tail(hts_buf save, const char *tail) {
       save_trim_dirs(save.p, dir_len, dir_len + keep - room);
     }
   }
-  url_savename_addtail(save.p, save.size, "", tail);
+  url_savename_addtail(save, "", tail);
 }
 
 /* Append the part of name a cut keeps, when a clip left no name byte. */
@@ -626,32 +624,31 @@ static char *name_last_dot(char *path) {
 
 /* Drop the delayed-type placeholder tail when the mirror already holds the file
    the shortened name points at (#1926). HTS_TRUE when the tail was dropped. */
-static hts_boolean url_savename_undelay(httrackp *opt, char *save,
-                                        const size_t size,
+static hts_boolean url_savename_undelay(httrackp *opt, hts_buf save,
                                         /* "<id>.delayed", no leading dot */
                                         const char *delayed_tail) {
   char BIGSTK candidate[HTS_URLMAXSIZE * 2];
   char catbuff[CATBUFF_SIZE];
-  const size_t len = strlen(save);
+  const size_t len = strlen(save.p);
   size_t cut = 0; /* prefix to keep, 0 until a tail matches */
 
   /* the exact tail, so a link whose own name ends in ".<hex>" keeps it */
   if (delayed_tail != NULL && strnotempty(delayed_tail)) {
     const size_t n = strlen(delayed_tail) + 1;
 
-    if (len > n && save[len - n] == '.' &&
-        strcmp(save + len - n + 1, delayed_tail) == 0)
+    if (len > n && save.p[len - n] == '.' &&
+        strcmp(save.p + len - n + 1, delayed_tail) == 0)
       cut = len - n;
   }
   if (cut == 0) {
-    if (!IS_DELAYED_EXT(save) || len <= strlen("." DELAYED_EXT))
+    if (!IS_DELAYED_EXT(save.p) || len <= strlen("." DELAYED_EXT))
       return HTS_FALSE;
     cut = len - strlen("." DELAYED_EXT);
   }
   /* the copy below trusts this size, so refuse rather than clip */
   if (cut + 1 > sizeof(candidate))
     return HTS_FALSE;
-  strclipbuff(candidate, cut + 1, save);
+  strclipbuff(candidate, cut + 1, save.p);
   /* an undelayed run names an extensionless link by type, so its copy says
      nothing about this link's name */
   if (name_last_dot(candidate) == NULL)
@@ -664,8 +661,8 @@ static hts_boolean url_savename_undelay(httrackp *opt, char *save,
   hts_log_print(opt, LOG_DEBUG,
                 "engine: save-name: keeping the previous mirror's name %s "
                 "instead of the placeholder %s",
-                candidate, save);
-  strlcpybuff(save, candidate, size);
+                candidate, save.p);
+  hts_buf_cpy(save, candidate);
   return HTS_TRUE;
 }
 
@@ -1697,7 +1694,8 @@ int url_savename(lien_adrfilsave *const afs,
         if (a == NULL)
           strcatbuff(afs->save, "other");
         else /* an extension off the wire, clipped to leave room for the "/" */
-          url_savename_addstr(afs->save, sizeof(afs->save) - 1, a + 1);
+          url_savename_addstr(HTS_BUF_N(afs->save, sizeof(afs->save) - 1),
+                              a + 1);
         strcatbuff(afs->save, "/");
       }
         /*strcatbuff(save,a); */
@@ -1799,7 +1797,7 @@ int url_savename(lien_adrfilsave *const afs,
 
   /* Before path_html is prepended, so the user's own output directory keeps
      its name. */
-  url_savename_escape_reserved(HTS_SIZED(afs->save));
+  url_savename_escape_reserved(HTS_BUF(afs->save));
 
   /* Strip ending . or ' ' forbidden on windoz */
   cleanEndingSpaceOrDot(afs->save);
@@ -2045,7 +2043,7 @@ int url_savename(lien_adrfilsave *const afs,
   }
   // Before the collision search, so a name already taken this run still moves.
   if (ext_chg_delayed)
-    url_savename_undelay(opt, HTS_SIZED(afs->save), ext);
+    url_savename_undelay(opt, HTS_BUF(afs->save), ext);
 
   // rename on collision with another link's name
   if (opt->liens != NULL) {
@@ -2164,16 +2162,16 @@ char *url_md5(hts_buf digest, const char *fil) {
   return digest.p;
 }
 
-void url_savename_addstr(char *d, size_t dsize, const char *s) {
-  size_t i = strlen(d);
+void url_savename_addstr(hts_buf d, const char *s) {
+  size_t i = strlen(d.p);
 
-  if (i + 1 >= dsize) /* nothing fits, and d already carries its NUL */
+  if (i + 1 >= d.size) /* nothing fits, and d already carries its NUL */
     return;
-  while (*s != '\0' && i + 1 < dsize) {
-    d[i++] = *s == '\\' ? '/' : *s;
+  while (*s != '\0' && i + 1 < d.size) {
+    d.p[i++] = *s == '\\' ? '/' : *s;
     s++;
   }
-  d[i] = '\0';
+  d.p[i] = '\0';
 }
 
 hts_boolean url_savename_refname(const char *adr, const char *fil,

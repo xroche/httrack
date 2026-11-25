@@ -103,19 +103,19 @@ void standard_name(hts_buf b, const char *dot_pos, const char *nom_pos,
 /* Does url's query have a field with an '=' whose key is exactly name? Its
    value, clipped to fit, goes to dst, of size >= 1. */
 hts_boolean url_query_value(const char *url, const char *name, hts_buf dst);
-/* Append s to d (mapping '\' to '/'), clipped to dsize bytes including the NUL.
-   Clips rather than aborts: s is a crawled link, hostile by construction. */
-void url_savename_addstr(char *d, size_t dsize, const char *s);
+/* Append s to d (mapping '\' to '/'), clipped to d.size bytes including the
+   NUL. Clips rather than aborts: s is a crawled link, hostile by construction.
+ */
+void url_savename_addstr(hts_buf d, const char *s);
 /* Escape in place each path component of save that is a DOS device or engine
    directory name, ignoring case and any extension: con.txt becomes con_.txt.
    Only a trailing ' ' or '.' run ends the first component (aux.example.com).
-   size counts the NUL. A full buffer gets co_.txt, and nothing aborts. */
-void url_savename_escape_reserved(char *save, size_t size);
+   save.size counts the NUL. A full buffer gets co_.txt, and nothing aborts. */
+void url_savename_escape_reserved(hts_buf save);
 /* Append sep+s to d whole, cutting d's tail (never inside a UTF-8 character)
    for room, so the suffix always survives; nothing happens if it alone fills
-   dsize. */
-void url_savename_addtail(char *d, size_t dsize, const char *sep,
-                          const char *s);
+   d.size. */
+void url_savename_addtail(hts_buf d, const char *sep, const char *s);
 /* Read the first len bytes of path into buf. Return the count, 0 on failure. */
 size_t hts_read_file_head(const char *path, void *buf, size_t len);
 
