@@ -1341,6 +1341,17 @@ static int st_hostalias(httrackp *opt, int argc, char **argv) {
     assertf(strcmp(hts_host_alias(rules, "b.com", HTS_TRUE, HTS_BUF_N(dest, 6)),
                    "a.com") == 0);
   }
+  /* "http://" plus a 2040-byte host is the longest subject fullsubj holds */
+  {
+    char host[2042];
+
+    memset(host, 'b', 2041);
+    host[2041] = '\0';
+    assertf(hts_host_alias("*=a.com", host, HTS_TRUE, HTS_BUF(dest)) == NULL);
+    host[2040] = '\0';
+    assertf(strcmp(hts_host_alias("*=a.com", host, HTS_TRUE, HTS_BUF(dest)),
+                   "a.com") == 0);
+  }
 
   /* malformed rules are ignored... */
   assertf(hts_host_alias("b.com", "b.com", HTS_TRUE, HTS_BUF(dest)) == NULL);

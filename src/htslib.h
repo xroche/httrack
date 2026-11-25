@@ -535,9 +535,9 @@ HTS_CHECK_RESULT hts_boolean hts_is_control_free(const char *str);
 hts_boolean hts_host_is_ipv4(hts_span host);
 
 /* Base-64 "user:pass" of the userinfo in a URL or proxy name, for a Basic
-   Authorization header, into OUT (at least 1100 bytes). Returns 1
-   when filled, 0 when there is no userinfo, -1 when it is too long (765 bytes
-   max, as a clipped credential would authenticate as somebody else). */
+   Authorization header, into OUT (at least 1100 bytes). Returns 1 when filled,
+   0 when there is no userinfo, -1 when it is too long (765 bytes max, as a
+   clipped credential would authenticate as somebody else). */
 int hts_basic_auth_value(httrackp *opt, const char *url, hts_buf out);
 
 /* Copy the bare host name of a URL address into out for the TLS SNI
@@ -773,8 +773,8 @@ const char *jump_protocol_const(const char *source);
 
 /* Split a -P proxy argument "[scheme://][user:pass@]host[:port]" into the proxy
    host string (scheme and any user:pass kept, for later stripping and auth),
-   written NUL-terminated into NAME (truncated to fit), and the port
-   in *port. The port defaults by scheme: 1080 for socks5/socks5h, else 8080. */
+   written NUL-terminated into NAME (truncated to fit), and the port in *port.
+   The port defaults by scheme: 1080 for socks5/socks5h, else 8080. */
 void hts_parse_proxy(const char *arg, hts_buf name, int *port);
 /* Base-64 IN into OUT, with a CRLF every 80 output bytes when CRLF is set. */
 void code64(hts_span in, hts_buf out, hts_boolean crlf);
