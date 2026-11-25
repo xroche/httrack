@@ -30,7 +30,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscharset.h"
 
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-  char *s = fuzz_strdup(data, size);
+  char *s = hts_span_dup(fuzz_span(data, size));
 
   {
     char *idna = hts_convertStringUTF8ToIDNA(hts_span_at(s, size));

@@ -63,8 +63,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     return 0;
   if (!inited) {
     hts_init();
-    if (!fuzz_tmpdir(alias_dir, sizeof(alias_dir), "fuzz-alias",
-                     fuzz_alias_cleanup))
+    if (!fuzz_tmpdir(HTS_BUF(alias_dir), "fuzz-alias", fuzz_alias_cleanup))
       return 0;
     snprintf(alias_conf, sizeof(alias_conf), "%s/fuzz-alias.conf", alias_dir);
     inited = 1;
@@ -73,7 +72,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
           (HTS_SPLIT_FOLD_WS | HTS_SPLIT_STRIP_QUOTES | HTS_SPLIT_DROP_EMPTY);
   data++, size--;
   nul = (const uint8_t *) memchr(data, 0, size);
-  cmd = fuzz_strdup(data, nul != NULL ? (size_t) (nul - data) : size);
+  cmd =
+      hts_span_dup(fuzz_span(data, nul != NULL ? (size_t) (nul - data) : size));
 
   args = hts_split_args(cmd, &nargs, flags);
   if (args != NULL) {

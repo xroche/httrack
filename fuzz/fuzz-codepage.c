@@ -53,7 +53,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     const size_t labelLen =
         nul != NULL ? (size_t) (nul - (data + 1)) : size - 1;
 
-    label = fuzz_strdup(data + 1, labelLen);
+    label = hts_span_dup(fuzz_span(data + 1, labelLen));
     charset = label;
     data += 1 + labelLen + (nul != NULL ? 1 : 0);
     size -= 1 + labelLen + (nul != NULL ? 1 : 0);
@@ -61,7 +61,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     charset = labels[data[0] % (sizeof(labels) / sizeof(labels[0]))];
     data++, size--;
   }
-  s = fuzz_strdup(data, size);
+  s = hts_span_dup(fuzz_span(data, size));
 
   /* the decoder is only reached for a non-ASCII string on a non-UTF-8 label */
   {

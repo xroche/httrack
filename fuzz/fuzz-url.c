@@ -33,7 +33,7 @@ Please visit our Website: http://www.httrack.com
 #include "htslib.h"
 
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-  char *s = fuzz_strdup(data, size);
+  char *s = hts_span_dup(fuzz_span(data, size));
   lien_adrfil *af = calloct(1, sizeof(*af));
   /* fil_simplifie rewrites in place and may grow an empty path to "./" */
   char *path = malloct(size + 3);

@@ -50,7 +50,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     return 0;
   size--; /* the last byte is the keep_root flag, so seeds keep their text */
   keep_root = (data[size] & 1) ? HTS_TRUE : HTS_FALSE;
-  body = fuzz_strdup(data, size);
+  body = hts_span_dup(fuzz_span(data, size));
 
   memset(&robots, 0, sizeof(robots));
   info[0] = '\0';

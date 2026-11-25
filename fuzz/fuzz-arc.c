@@ -64,7 +64,7 @@ static int fuzz_arc_setup(void) {
   if (arc_in[0] == '\0') {
     coucal_set_global_assert_handler(fuzz_arc_coucal_log, NULL);
 
-    if (!fuzz_tmpdir(arc_dir, sizeof(arc_dir), "fuzz-arc", fuzz_arc_cleanup)) {
+    if (!fuzz_tmpdir(HTS_BUF(arc_dir), "fuzz-arc", fuzz_arc_cleanup)) {
       return -1;
     }
     snprintf(arc_out, sizeof(arc_out), "%s/out.arc", arc_dir);

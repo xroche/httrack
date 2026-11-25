@@ -74,40 +74,43 @@ static uint32_t rd32(const uint8_t *p) {
 
 /* Zip the records into path, headers in the local extra field as cache_add()
    writes them. */
-static void fuzz_cache_write_zip(const char *path, const uint8_t *data,
-                                 size_t size) {
+static void fuzz_cache_write_zip(const char *path, hts_span in) {
   zipFile zf = zipOpen(path, 0);
   int n;
 
   if (zf == NULL)
     return;
-  for (n = 0; n < FUZZ_CACHE_MAXENTRIES && size >= FUZZ_CACHE_RECORD_HDR; n++) {
-    const uint32_t name_len = rd16(data);
-    const uint32_t header_len = rd16(data + 2);
-    const uint32_t body_len = rd32(data + 4);
+  for (n = 0; n < FUZZ_CACHE_MAXENTRIES && in.len >= FUZZ_CACHE_RECORD_HDR;
+       n++) {
+    const uint8_t *const rec = (const uint8_t *) in.p;
+    const uint32_t name_len = rd16(rec);
+    const uint32_t header_len = rd16(rec + 2);
+    const uint32_t body_len = rd32(rec + 4);
     char name[FUZZ_CACHE_NAME_MAX];
     size_t i, used = 0;
     zip_fileinfo fi;
 
-    data += FUZZ_CACHE_RECORD_HDR, size -= FUZZ_CACHE_RECORD_HDR;
+    in = hts_span_skip(in, FUZZ_CACHE_RECORD_HDR);
     if (name_len >= sizeof(name) || header_len > FUZZ_CACHE_HEADER_MAX ||
         body_len > FUZZ_CACHE_BODY_MAX ||
-        size < (size_t) name_len + header_len + body_len)
+        in.len < (size_t) name_len + header_len + body_len)
       break;
     /* a real entry name carries no control character */
-    for (i = 0; i < name_len; i++)
-      if (data[i] >= 0x20 && data[i] != 0x7f)
-        name[used++] = (char) data[i];
+    for (i = 0; i < name_len; i++) {
+      const unsigned char c = (unsigned char) in.p[i];
+
+      if (c >= 0x20 && c != 0x7f)
+        name[used++] = (char) c;
+    }
     name[used] = '\0';
     memset(&fi, 0, sizeof(fi));
     if (used == 0 ||
-        zipOpenNewFileInZip(zf, name, &fi, data + name_len, header_len, NULL, 0,
+        zipOpenNewFileInZip(zf, name, &fi, in.p + name_len, header_len, NULL, 0,
                             NULL, Z_DEFLATED, Z_DEFAULT_COMPRESSION) != Z_OK)
       break;
-    (void) zipWriteInFileInZip(zf, data + name_len + header_len, body_len);
+    (void) zipWriteInFileInZip(zf, in.p + name_len + header_len, body_len);
     (void) zipCloseFileInZip(zf);
-    data += (size_t) name_len + header_len + body_len;
-    size -= (size_t) name_len + header_len + body_len;
+    in = hts_span_skip(in, (size_t) name_len + header_len + body_len);
   }
   (void) zipClose(zf, NULL);
 }
@@ -141,8 +144,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     return 0;
   if (!inited) {
     hts_init();
-    if (!fuzz_tmpdir(cache_dir, sizeof(cache_dir), "fuzz-cache",
-                     fuzz_cache_cleanup))
+    if (!fuzz_tmpdir(HTS_BUF(cache_dir), "fuzz-cache", fuzz_cache_cleanup))
       return 0;
     snprintf(cache_sub, sizeof(cache_sub), "%s/hts-cache", cache_dir);
     snprintf(cache_zip, sizeof(cache_zip), "%s/new.zip", cache_sub);
@@ -166,7 +168,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     if (fclose(fp) != 0 || !written)
       return 0;
   } else {
-    fuzz_cache_write_zip(cache_zip, data, size);
+    fuzz_cache_write_zip(cache_zip, fuzz_span(data, size));
   }
 
   opt = hts_create_opt();
