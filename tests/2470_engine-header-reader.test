@@ -18,6 +18,10 @@ selftest_queue '[HTTP/1.1 200 OK||][A : b |A|b][ folded||][C:d|C|d] rest=E: f' \
 selftest_queue '[x\r||][y||] rest=' span header hex:780d0d0a79
 selftest_queue '[a:|a|][b||] rest=' span header $'a:\nb'
 selftest_queue ' rest=X: y' span header $'\r\nX: y'
+# 257 bytes into a 256-byte buffer keep 255, the NUL included
+a250=$(printf 'A%.0s' {1..250})
+selftest_queue "[XXX0:$a250|XXX0|$a250] rest=" span header \
+    "hex:585858003a$(printf '41%.0s' {1..252})"
 
 selftest_queue '[A|b]' span headersplit 'A : b '
 selftest_queue '[a|]' span headersplit $'a\t:\t'
