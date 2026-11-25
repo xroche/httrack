@@ -478,13 +478,13 @@ static int st_wizardprompt(httrackp *opt, int argc, char **argv) {
   char adr[HTS_URLMAXSIZE], fil[HTS_URLMAXSIZE * 2];
 
   if (argc >= 2) {
-    hts_wizard_prompt_url(prompt, sizeof(prompt), argv[0], argv[1]);
+    hts_wizard_prompt_url(HTS_BUF(prompt), argv[0], argv[1]);
     printf("%s\n", prompt);
     return 0;
   }
 #define ASKS(adr_, fil_, expect)                                               \
   do {                                                                         \
-    hts_wizard_prompt_url(prompt, sizeof(prompt), (adr_), (fil_));             \
+    hts_wizard_prompt_url(HTS_BUF(prompt), (adr_), (fil_));                    \
     assertf(strcmp(prompt, (expect)) == 0);                                    \
   } while (0)
   ASKS("foo.com", "/dir/page.html", "foo.com/dir/page.html");
@@ -501,13 +501,13 @@ static int st_wizardprompt(httrackp *opt, int argc, char **argv) {
   memset(fil, 'b', sizeof(fil) - 1);
   fil[sizeof(fil) - 1] = '\0';
   fil[0] = '/';
-  hts_wizard_prompt_url(prompt, sizeof(prompt), adr, fil);
+  hts_wizard_prompt_url(HTS_BUF(prompt), adr, fil);
   assertf(strlen(prompt) == sizeof(prompt) - 1);
   assertf(strncmp(prompt, adr, sizeof(adr) - 1) == 0);
   assertf(prompt[sizeof(adr) - 1] == '/');
   /* and again with the separator to insert, which eats one more byte */
   fil[0] = 'b';
-  hts_wizard_prompt_url(prompt, sizeof(prompt), adr, fil);
+  hts_wizard_prompt_url(HTS_BUF(prompt), adr, fil);
   assertf(strlen(prompt) == sizeof(prompt) - 1);
   assertf(strncmp(prompt, adr, sizeof(adr) - 1) == 0);
   assertf(prompt[sizeof(adr) - 1] == '/');
@@ -515,7 +515,7 @@ static int st_wizardprompt(httrackp *opt, int argc, char **argv) {
   /* a host alone long enough to fill it leaves no room for either */
   memset(fil, 'b', sizeof(fil) - 1);
   fil[0] = '/';
-  hts_wizard_prompt_url(prompt, sizeof(prompt), fil, fil);
+  hts_wizard_prompt_url(HTS_BUF(prompt), fil, fil);
   assertf(strlen(prompt) == sizeof(prompt) - 1);
   assertf(strncmp(prompt, fil, sizeof(prompt) - 1) == 0);
 
