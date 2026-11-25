@@ -179,14 +179,14 @@ static void legacy_doit_write(String *out, const char *arg) {
 }
 
 /* htsserver.c's cat_cmdline_argn() without its HTML step, which runs after. */
-static void legacy_cmdline_argn(String *out, const char *value, size_t len) {
+static void legacy_cmdline_argn(String *out, hts_span value) {
   size_t i;
 
-  for (i = 0; i < len; i++) {
-    if (value[i] == '\\' || value[i] == '\"') {
+  for (i = 0; i < value.len; i++) {
+    if (value.p[i] == '\\' || value.p[i] == '\"') {
       StringCat(*out, "\\");
     }
-    StringMemcat(*out, &value[i], 1);
+    StringMemcat(*out, &value.p[i], 1);
   }
 }
 
@@ -210,11 +210,11 @@ static hts_boolean legacy_unquote(char *arg) {
 /* ------------------------------------------------------------ */
 
 /* Windows stdout is text mode, so control bytes are printed escaped. */
-static void cat_shown(String *out, const char *s, size_t len) {
+static void cat_shown(String *out, hts_span s) {
   size_t i;
 
-  for (i = 0; i < len; i++) {
-    const unsigned char c = (unsigned char) s[i];
+  for (i = 0; i < s.len; i++) {
+    const unsigned char c = (unsigned char) s.p[i];
 
     if (c == '\t') {
       StringCat(*out, "\\t");
@@ -272,11 +272,11 @@ static void quote_fail(quote_stats *st, const char *site, const char *in,
 
     StringCat(msg, site);
     StringCat(msg, " differs on '");
-    cat_shown(&msg, in, strlen(in));
+    cat_shown(&msg, hts_span_of(in));
     StringCat(msg, "': old '");
-    cat_shown(&msg, old, strlen(old));
+    cat_shown(&msg, hts_span_of(old));
     StringCat(msg, "' new '");
-    cat_shown(&msg, new, strlen(new));
+    cat_shown(&msg, hts_span_of(new));
     StringCat(msg, "'");
     printf("%s\n", StringBuff(msg));
     fflush(stdout); /* a later abort must not swallow it */
@@ -336,7 +336,7 @@ static void quotediff_one(quote_stats *st, const char *in) {
   StringClear(n);
 
   /* the WebHTTrack argument escape */
-  legacy_cmdline_argn(&o, in, strlen(in));
+  legacy_cmdline_argn(&o, hts_span_of(in));
   hts_escape_arg(&n, hts_span_of(in));
   st->cases++;
   if (StringLength(o) != StringLength(n) ||
@@ -572,7 +572,7 @@ static int st_splitargs(httrackp *opt, int argc, char **argv) {
   assertf(v != NULL && v[nv] == NULL);
   for (i = 0; i < nv; i++) {
     StringAddchar(out, '[');
-    cat_shown(&out, v[i], strlen(v[i]));
+    cat_shown(&out, hts_span_of(v[i]));
     StringAddchar(out, ']');
   }
   printf("%d:%s\n", nv, StringLength(out) != 0 ? StringBuff(out) : "");
@@ -592,8 +592,8 @@ static int st_quotearg(httrackp *opt, int argc, char **argv) {
       StringAddchar(line, ' ');
     hts_quote_arg(&line, argv[i]);
   }
-  cat_shown(&out, StringLength(line) != 0 ? StringBuff(line) : "",
-            StringLength(line));
+  cat_shown(&out, hts_span_at(StringLength(line) != 0 ? StringBuff(line) : "",
+                              StringLength(line)));
   printf("[%s]\n", StringLength(out) != 0 ? StringBuff(out) : "");
   StringFree(line);
   StringFree(out);

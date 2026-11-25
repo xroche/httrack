@@ -240,27 +240,27 @@ static int st_idna_encode(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* One row: host, its length, dst size, in place, expected result or NULL. */
-static int host_ascii_case(const char *host, size_t len, size_t size,
-                           hts_boolean inplace, const char *want) {
+/* One row: host, dst size, in place, expected result or NULL. */
+static int host_ascii_case(hts_span host, size_t size, hts_boolean inplace,
+                           const char *want) {
   char buf[64], before[64];
   const hts_buf dst = hts_buf_at(buf, size);
-  const char *src = host;
+  hts_span src = host;
   const size_t keep = want != NULL ? strlen(want) + 1 : 0;
 
   memset(buf, 'Z', sizeof(buf) - 1);
   buf[sizeof(buf) - 1] = '\0';
   if (inplace) {
-    strcpybuff(buf, host);
-    src = buf;
+    assertf(hts_buf_put_span(HTS_BUF(buf), host));
+    src.p = buf;
   }
   memcpy(before, buf, sizeof(buf));
   // nothing past the NUL may change, and nothing at all on a refusal
-  if (hts_host_to_ascii(dst, hts_span_at(src, len)) != (want != NULL) ||
+  if (hts_host_to_ascii(dst, src) != (want != NULL) ||
       (want != NULL && strcmp(buf, want) != 0) ||
       memcmp(buf + keep, before + keep, sizeof(buf) - keep) != 0) {
-    printf("host-ascii: '%s' (%u bytes into %u) gave '%s'\n", host,
-           (unsigned) len, (unsigned) size, buf);
+    printf("host-ascii: '%.*s' (%u bytes into %u) gave '%s'\n", (int) host.len,
+           host.p, (unsigned) host.len, (unsigned) size, buf);
     return 1;
   }
   return 0;
@@ -271,18 +271,20 @@ static int st_host_ascii(httrackp *opt, int argc, char **argv) {
   static const char mu_idna[] = "xn--mnchen-3ya.de";
   int fail = 0;
 
-  fail |= host_ascii_case("abc.com:80", 7, 64, HTS_FALSE, "abc.com");
-  fail |= host_ascii_case(mu, strlen(mu), 64, HTS_FALSE, mu_idna);
-  fail |= host_ascii_case(mu, strlen(mu), 64, HTS_TRUE, mu_idna);
-  fail |= host_ascii_case(mu, strlen(mu), sizeof(mu_idna), HTS_FALSE, mu_idna);
+  fail |=
+      host_ascii_case(hts_span_at("abc.com:80", 7), 64, HTS_FALSE, "abc.com");
+  fail |= host_ascii_case(hts_span_of(mu), 64, HTS_FALSE, mu_idna);
+  fail |= host_ascii_case(hts_span_of(mu), 64, HTS_TRUE, mu_idna);
+  fail |= host_ascii_case(hts_span_of(mu), sizeof(mu_idna), HTS_FALSE, mu_idna);
   // one byte short: refused, and dst keeps its old bytes
-  fail |= host_ascii_case(mu, strlen(mu), sizeof(mu_idna) - 1, HTS_FALSE, NULL);
-  fail |= host_ascii_case(mu, strlen(mu), sizeof(mu_idna) - 1, HTS_TRUE, NULL);
-  fail |= host_ascii_case("abc", 3, 4, HTS_FALSE, "abc");
-  fail |= host_ascii_case("abc", 3, 3, HTS_FALSE, NULL);
-  fail |= host_ascii_case("b\xc3", 2, 64, HTS_FALSE, NULL);
-  fail |= host_ascii_case("", 0, 1, HTS_FALSE, "");
-  fail |= host_ascii_case("", 0, 0, HTS_FALSE, NULL);
+  fail |=
+      host_ascii_case(hts_span_of(mu), sizeof(mu_idna) - 1, HTS_FALSE, NULL);
+  fail |= host_ascii_case(hts_span_of(mu), sizeof(mu_idna) - 1, HTS_TRUE, NULL);
+  fail |= host_ascii_case(hts_span_of("abc"), 4, HTS_FALSE, "abc");
+  fail |= host_ascii_case(hts_span_of("abc"), 3, HTS_FALSE, NULL);
+  fail |= host_ascii_case(hts_span_of("b\xc3"), 64, HTS_FALSE, NULL);
+  fail |= host_ascii_case(hts_span_of(""), 1, HTS_FALSE, "");
+  fail |= host_ascii_case(hts_span_of(""), 0, HTS_FALSE, NULL);
   if (fail)
     return 1;
   printf("host-ascii self-test OK\n");
@@ -458,8 +460,10 @@ static int st_entities_sweep(httrackp *opt, int argc, char **argv) {
   return failures == 0 ? 0 : 1;
 }
 
-/* Returns the first valid sequence length of s (Unicode table 3-7), or 0. */
-static size_t utf8_oracle(const unsigned char *s, size_t n) {
+/* Returns the first valid sequence length of in (Unicode table 3-7), or 0. */
+static size_t utf8_oracle(hts_span in) {
+  const unsigned char *const s = (const unsigned char *) in.p;
+  const size_t n = in.len;
   unsigned lo = 0x80, hi = 0xbf;
   size_t len, k;
 
@@ -491,19 +495,19 @@ static size_t utf8_oracle(const unsigned char *s, size_t n) {
   return len;
 }
 
-static int utf8_strict_bytes(const unsigned char *x, size_t n) {
+static int utf8_strict_bytes(hts_span s) {
   size_t i, m;
   hts_UCS4 uc;
   int whole = 1;
-  const size_t want = utf8_oracle(x, n);
-  const hts_span s = hts_span_at((const char *) x, n);
+  const size_t want = utf8_oracle(s);
   const size_t got = hts_readUTF8(s, &uc);
 
-  for (i = 0; i < n && whole; i += m)
-    whole = (m = utf8_oracle(&x[i], n - i)) != 0;
+  for (i = 0; i < s.len && whole; i += m)
+    whole = (m = utf8_oracle(hts_span_skip(s, i))) != 0;
   if (got != want || (hts_isStringUTF8(s) != 0) != whole) {
-    printf("utf8-strict: %02x.. (%u bytes) read %u, want %u\n", x[0],
-           (unsigned) n, (unsigned) got, (unsigned) want);
+    printf("utf8-strict: %02x.. (%u bytes) read %u, want %u\n",
+           (unsigned char) s.p[0], (unsigned) s.len, (unsigned) got,
+           (unsigned) want);
     return 1;
   }
   return 0;
@@ -556,7 +560,7 @@ static int st_utf8_strict(httrackp *opt, int argc, char **argv) {
                                          {"h\xed\xa0\x80.com", "(null)"},
                                          {"h\xc3\xa9\xa9.com", "(null)"},
                                          {"h\xc3\xa9.com", "xn--h-bga.com"}};
-  unsigned char x[4];
+  char x[4];
   unsigned a, b, c, d, i;
   hts_UCS4 cp, *u;
   size_t n;
@@ -564,17 +568,17 @@ static int st_utf8_strict(httrackp *opt, int argc, char **argv) {
   char buf[64];
 
   for (a = 0; a < 256; a++) {
-    x[0] = (unsigned char) a;
-    fail |= utf8_strict_bytes(x, 1);
+    x[0] = (char) a;
+    fail |= utf8_strict_bytes(hts_span_at(x, 1));
     for (b = 0; b < 256; b++) {
-      x[1] = (unsigned char) b;
-      fail |= utf8_strict_bytes(x, 2);
+      x[1] = (char) b;
+      fail |= utf8_strict_bytes(hts_span_at(x, 2));
       for (c = 0; c < 256; c++) {
-        x[2] = (unsigned char) c;
-        fail |= utf8_strict_bytes(x, 3);
+        x[2] = (char) c;
+        fail |= utf8_strict_bytes(hts_span_at(x, 3));
         for (d = 0; a >= 0xf0 && d < sizeof(tails); d++) {
-          x[3] = tails[d];
-          fail |= utf8_strict_bytes(x, 4);
+          x[3] = (char) tails[d];
+          fail |= utf8_strict_bytes(hts_span_at(x, 4));
         }
       }
     }

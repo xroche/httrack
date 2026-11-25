@@ -1800,21 +1800,20 @@ static void cookie_log_start(httrackp *opt, cookie_logcap *cap) {
 }
 
 /* Restore opt's log, and copy what was captured into buf. */
-static void cookie_log_stop(httrackp *opt, cookie_logcap *cap, char *buf,
-                            size_t size) {
+static void cookie_log_stop(httrackp *opt, cookie_logcap *cap, hts_buf buf) {
   size_t n;
 
   rewind(cap->log);
-  n = fread(buf, 1, size - 1, cap->log);
-  buf[n] = '\0';
+  n = fread(buf.p, 1, buf.size - 1, cap->log);
+  buf.p[n] = '\0';
   fclose(cap->log);
   opt->log = cap->saved;
   opt->debug = cap->debug;
 }
 
 /* Read the whole file at path into buf, or "" when it cannot be opened. */
-static void cookiejar_slurp(const char *path, char *buf, size_t size) {
-  st_read_file(path, buf, size);
+static void cookiejar_slurp(const char *path, hts_buf buf) {
+  st_read_file(path, buf.p, buf.size);
 }
 
 /* -#test=cookiejar <dir>: the jar keeps every cookie attribute. */
@@ -2122,7 +2121,7 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
       }
     }
     assertf(cookie_save(NULL, &jar, saved) == 0);
-    cookiejar_slurp(saved, text, sizeof(text));
+    cookiejar_slurp(saved, HTS_BUF(text));
     for (i = 0; i < sizeof(kept) / sizeof(kept[0]); i++) {
       if (strstr(text, kept[i]) == NULL) {
         printf("%s: the saved jar lost %s", LABEL, kept[i]);
@@ -2166,7 +2165,7 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
         assertf(cookie_set(&jar, "hd", "1", ".jar.test", "/", &attr) == 0);
       }
       assertf(cookie_save(NULL, &jar, saved) == 0);
-      cookiejar_slurp(saved, text, sizeof(text));
+      cookiejar_slurp(saved, HTS_BUF(text));
       for (i = 0; i < sizeof(saves) / sizeof(saves[0]); i++) {
         if (strstr(text, saves[i].saved) == NULL) {
           printf("%s: saved %s as [%s]\n", LABEL, saves[i].header, text);
@@ -2203,7 +2202,7 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
     jar.data[0] = '\0';
     cookie_log_start(opt, &cap);
     assertf(cookie_load(opt, &jar, fpath, "cookies.txt") == 1);
-    cookie_log_stop(opt, &cap, logged, sizeof(logged));
+    cookie_log_stop(opt, &cap, HTS_BUF(logged));
     big[COOKIE_MAX_PAIR - 3] = '\0';
     assertf(sprintfbuff(pair, "fit=%s", big));
     http_cookie_header(&jar, "big.test", "/", HTS_BUF(hdr));
@@ -2214,7 +2213,7 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
       err = 1;
     }
     assertf(cookie_save(NULL, &jar, saved) == 0);
-    cookiejar_slurp(saved, text, sizeof(text));
+    cookiejar_slurp(saved, HTS_BUF(text));
     if (strstr(text, big) == NULL || strstr(text, "\tnot\t") != NULL) {
       printf("%s: the saved jar lost the 4096-byte cookie\n", LABEL);
       err = 1;
@@ -2240,7 +2239,7 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
     treathead_opt(opt, &jar, "jar.test", "/", &r, fits);
     treathead_opt(opt, &jar, "jar.test", "/", &r, full);
     jar.max_len = sizeof(jar.data);
-    cookie_log_stop(opt, &cap, logged, sizeof(logged));
+    cookie_log_stop(opt, &cap, HTS_BUF(logged));
     for (p = strstr(logged, "did not store"); p != NULL;
          p = strstr(p + 1, "did not store"))
       count++;
@@ -2496,7 +2495,7 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
       jar.data[0] = '\0';
       assertf(cookie_load(NULL, &jar, fpath, "cookies.txt") == 0);
       assertf(cookie_save(NULL, &jar, saved) == 0);
-      cookiejar_slurp(saved, text, sizeof(text));
+      cookiejar_slurp(saved, HTS_BUF(text));
       if (strstr(text, "\n#HttpOnly_.d.test\tTRUE\t/\tFALSE\t0\tn\tv" LF) ==
           NULL) {
         printf("%s: an eighth HttpOnly field saved as [%s]\n", LABEL, text);
@@ -2572,7 +2571,7 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
         jar.data[0] = '\0';
         cookie_log_start(opt, &cap);
         (void) cookie_load(opt, &jar, fpath, "cookies.txt");
-        cookie_log_stop(opt, &cap, logged, sizeof(logged));
+        cookie_log_stop(opt, &cap, HTS_BUF(logged));
         if ((strstr(logged, "public suffix") != NULL) != logs[i].warns) {
           printf("%s: suffix log row %d logged [%s]\n", LABEL, (int) i, logged);
           err = 1;
@@ -2672,13 +2671,13 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
     fclose(fp);
     jar.data[0] = '\0';
     cookie_save_replacing(opt, &jar, file);
-    cookiejar_slurp(file, text, sizeof(text));
+    cookiejar_slurp(file, HTS_BUF(text));
     if (strstr(text, "# Netscape HTTP Cookie File") != text ||
         strstr(text, "gone") != NULL) {
       printf("%s: an empty jar saved as [%s]\n", LABEL, text);
       err = 1;
     }
-    cookiejar_slurp(bak, text, sizeof(text));
+    cookiejar_slurp(bak, HTS_BUF(text));
     if (strstr(text, "\tgone\t1") == NULL) {
       printf("%s: the emptied jar's .bak is [%s]\n", LABEL, text);
       err = 1;
@@ -2692,7 +2691,7 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
     }
     assertf(cookie_add(&jar, "new", "1", "jar.test", "/") == 0);
     cookie_save_replacing(opt, &jar, file);
-    cookiejar_slurp(file, text, sizeof(text));
+    cookiejar_slurp(file, HTS_BUF(text));
     if (strstr(text, "\tnew\t1") == NULL || fexist_utf8(bak)) {
       printf("%s: a missing jar was saved as [%s]\n", LABEL, text);
       err = 1;
@@ -2737,7 +2736,7 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
     jar.data[0] = '\0';
     assertf(cookie_add(&jar, "linked", "1", "jar.test", "/") == 0);
     assertf(cookie_save(NULL, &jar, link) == 0);
-    cookiejar_slurp(target, text, sizeof(text));
+    cookiejar_slurp(target, HTS_BUF(text));
     if (lstat(link, &st) != 0 || !S_ISLNK(st.st_mode) ||
         strstr(text, "\tlinked\t1") == NULL) {
       printf("%s: a project jar link left the target as [%s]\n", LABEL, text);
@@ -2758,7 +2757,7 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
     fclose(fp);
     jar.data[0] = '\0';
     assertf(cookie_save(NULL, &jar, file) == 0);
-    cookiejar_slurp(file, text, sizeof(text));
+    cookiejar_slurp(file, HTS_BUF(text));
     if (strstr(text, "# Netscape HTTP Cookie File") != text ||
         strstr(text, "gone") != NULL) {
       printf("%s: an emptied project jar saved as [%s]\n", LABEL, text);
@@ -2801,7 +2800,7 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
         cookie_save_replacing(NULL, &jar, file);
       else
         assertf(cookie_save(NULL, &jar, file) == 0);
-      cookiejar_slurp(file, text, sizeof(text));
+      cookiejar_slurp(file, HTS_BUF(text));
       if (strstr(text, "\tpid\t1") == NULL) {
         printf("%s: pass %d saved [%s]\n", LABEL, pass, text);
         err = 1;
@@ -2872,14 +2871,14 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
       cookie_save_fault_selftest = fault;
       cookie_save_replacing(NULL, &jar, file);
       cookie_save_fault_selftest = 0;
-      cookiejar_slurp(file, text, sizeof(text));
+      cookiejar_slurp(file, HTS_BUF(text));
       if ((strcmp(text, old) == 0) != fails ||
           (!fails && strstr(text, "\tnew\t1") == NULL) || fexist_utf8(tmp) ||
           fexist_utf8(baktmp)) {
         printf("%s: fault %d left the jar as [%s]\n", LABEL, fault, text);
         err = 1;
       }
-      cookiejar_slurp(bak, text, sizeof(text));
+      cookiejar_slurp(bak, HTS_BUF(text));
       if (strcmp(text, bak_kept ? older : old) != 0) {
         printf("%s: fault %d left .bak as [%s]\n", LABEL, fault, text);
         err = 1;
@@ -2925,7 +2924,7 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
       fprintf(fp, "%s", older);
       fclose(fp);
       cookie_save_replacing(NULL, &jar, file);
-      cookiejar_slurp(bak, text, sizeof(text));
+      cookiejar_slurp(bak, HTS_BUF(text));
       if (strcmp(text, older) != 0 || (i == 0) != fexist_utf8(file) ||
           fsize_utf8(file) > 0 || fexist_utf8(tmp)) {
         printf("%s: a jar %s mid-crawl left .bak as [%s]\n", LABEL,
@@ -2952,7 +2951,7 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
         err = 1;
       }
       cookie_save_fault_selftest = 0;
-      cookiejar_slurp(file, text, sizeof(text));
+      cookiejar_slurp(file, HTS_BUF(text));
       if (strcmp(text, old) != 0 || fexist_utf8(tmp) || fexist_utf8(bak)) {
         printf("%s: fault %d left the project jar as [%s]\n", LABEL, fault,
                text);
@@ -2969,10 +2968,10 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
 static const char *cookieflat_dir;
 static char cookieflat_logged[16384];
 
-/* Write len bytes of content to cookies.txt in cookieflat_dir, load it for
-   start_url with the log in cookieflat_logged, and return the load's result. */
-static int cookieflat_load(httrackp *opt, t_cookie *jar, const char *content,
-                           size_t len, const char *start_url) {
+/* Write content to cookies.txt in cookieflat_dir, load it for start_url with
+   the log in cookieflat_logged, and return the load's result. */
+static int cookieflat_load(httrackp *opt, t_cookie *jar, hts_span content,
+                           const char *start_url) {
   cookie_logcap cap;
   char fpath[HTS_URLMAXSIZE * 2];
   char file[HTS_URLMAXSIZE * 2];
@@ -2983,13 +2982,13 @@ static int cookieflat_load(httrackp *opt, t_cookie *jar, const char *content,
   assertf(sprintfbuff(file, "%scookies.txt", fpath));
   fp = FOPEN(file, "wb");
   assertf(fp != NULL);
-  assertf(fwrite(content, 1, len, fp) == len);
+  assertf(fwrite(content.p, 1, content.len, fp) == content.len);
   fclose(fp);
   jar->max_len = sizeof(jar->data);
   jar->data[0] = '\0';
   cookie_log_start(opt, &cap);
   ret = cookie_load_from(opt, jar, fpath, "cookies.txt", start_url);
-  cookie_log_stop(opt, &cap, cookieflat_logged, sizeof(cookieflat_logged));
+  cookie_log_stop(opt, &cap, HTS_BUF(cookieflat_logged));
   (void) UNLINK(file);
   return ret;
 }
@@ -3155,7 +3154,7 @@ static int st_cookieflat(httrackp *opt, int argc, char **argv) {
     size_t wanted = 0, lines = 0;
     hts_boolean missing = HTS_FALSE;
 
-    ret = cookieflat_load(opt, &jar, c, strlen(c), cases[i].start_url);
+    ret = cookieflat_load(opt, &jar, hts_span_of(c), cases[i].start_url);
     for (; cases[i].want[wanted] != NULL; wanted++) {
       if (strstr(jar.data, cases[i].want[wanted]) == NULL)
         missing = HTS_TRUE;
@@ -3185,7 +3184,7 @@ static int st_cookieflat(httrackp *opt, int argc, char **argv) {
     n += COOKIE_MAX_PAIR;
     memcpy(text + n, "; n=a\0b; z=1", 12);
     n += 12;
-    ret = cookieflat_load(opt, &jar, text, n, "http://big.test/");
+    ret = cookieflat_load(opt, &jar, hts_span_at(text, n), "http://big.test/");
     if (ret != COOKIE_LOAD_KEEP || strstr(jar.data, "\tv\txxx") == NULL ||
         strstr(jar.data, "\tw\t") != NULL ||
         strstr(jar.data, "\tn\t") != NULL ||
@@ -3206,7 +3205,7 @@ static int st_cookieflat(httrackp *opt, int argc, char **argv) {
     strcpybuff(text, "a=1;");
     for (i = 0; i < 30; i++)
       strcatbuff(text, "x;");
-    ret = cookieflat_load(opt, &jar, text, strlen(text), "http://example.net/");
+    ret = cookieflat_load(opt, &jar, hts_span_of(text), "http://example.net/");
     for (p = strstr(logged, "no name"); p != NULL; p = strstr(p + 1, "no name"))
       count++;
     if (ret != COOKIE_LOAD_KEEP || count != 10 ||
@@ -3231,7 +3230,7 @@ static int st_cookieflat(httrackp *opt, int argc, char **argv) {
         {"https://example.org", HTS_FALSE},
     };
 
-    (void) cookieflat_load(opt, &jar, "s=1", 3,
+    (void) cookieflat_load(opt, &jar, hts_span_of("s=1"),
                            "https://www.example.com:8443/a?b");
     for (i = 0; i < sizeof(sends) / sizeof(sends[0]); i++) {
       http_cookie_header(&jar, sends[i].to, "/any", HTS_BUF(hdr));

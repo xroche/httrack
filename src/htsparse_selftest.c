@@ -912,14 +912,15 @@ static int parse_selftest_jsimport(httrackp *opt) {
 }
 
 /* Is this attribute name one that never carries a link? */
-static hts_boolean tagattr_is_nodetect(const char *name, size_t len) {
+static hts_boolean tagattr_is_nodetect(hts_span name) {
   size_t i;
 
   for (i = 0; strnotempty(hts_nodetect[i]); i++) {
-    if (strlen(hts_nodetect[i]) == len && strfield(name, hts_nodetect[i]))
+    if (hts_span_eq_ci(name, hts_span_of(hts_nodetect[i])))
       return HTS_TRUE;
   }
-  if (len >= 5 && strfield(name, "xmlns") && (len == 5 || name[5] == ':'))
+  if (hts_span_starts_with_ci(name, hts_span_of("xmlns")) &&
+      (name.len == 5 || name.p[5] == ':'))
     return HTS_TRUE;
   return HTS_FALSE;
 }
@@ -968,7 +969,8 @@ static int tagattr_case(selftest_sweep *sw, const char *before,
 /* Checks what the walk may claim about a tag nobody would write, such as one
    with up to four junk bytes before the quote. The span rules restate the
    walk, so they cannot catch an off-by-one. */
-static int tagattr_probe(selftest_sweep *sw, char *text, size_t at) {
+static int tagattr_probe(selftest_sweep *sw, hts_buf buf, size_t at) {
+  char *const text = buf.p;
   const char *nend = NULL;
   const char *name;
   const char *quotep;
@@ -976,6 +978,8 @@ static int tagattr_probe(selftest_sweep *sw, char *text, size_t at) {
   int err = 0;
   size_t q;
 
+  /* room for the quote at text[at] and its NUL */
+  assertf(buf.size >= 2 && at < buf.size - 1);
   for (q = 0; q < 2; q++) {
     {
       text[at] = q ? '\'' : '"';
@@ -1017,7 +1021,7 @@ static int tagattr_probe(selftest_sweep *sw, char *text, size_t at) {
         }
       }
       if (hts_dirty_attr_detectable(quotep, text) !=
-          (tagattr_is_nodetect(name, (size_t) (nend - name)) ? HTS_FALSE
+          (tagattr_is_nodetect(hts_span_between(name, nend)) ? HTS_FALSE
                                                              : HTS_TRUE)) {
         if (sw->bad++ < 20)
           fprintf(stderr, "tagattr \"%s\": verdict does not follow the name\n",
@@ -1052,7 +1056,7 @@ static int tagattr_junk_bytes(selftest_sweep *sw) {
         text[1 + k] = alphabet[v % n];
         v /= n;
       }
-      err |= tagattr_probe(sw, text, 1 + len);
+      err |= tagattr_probe(sw, HTS_BUF(text), 1 + len);
     }
   }
   return err;
@@ -1076,7 +1080,7 @@ static int tagattr_junk_names(selftest_sweep *sw) {
         strcatbuff(text, tok[i]);
         strcatbuff(text, tok[j]);
         strcatbuff(text, tok[k]);
-        err |= tagattr_probe(sw, text, strlen(text));
+        err |= tagattr_probe(sw, HTS_BUF(text), strlen(text));
       }
     }
   }

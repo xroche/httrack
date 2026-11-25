@@ -56,14 +56,15 @@ static void wizardfilter_want(htsbuff *w, int n, const char *adr,
 
 /* A link of the given lengths: adr all 'a', fil a directory of 'b' ending on a
    slash for answers 1, 5 and 7 to anchor on, led by one when `slash`. */
-static void wizardfilter_link(char *adr, size_t adrlen, char *fil,
+static void wizardfilter_link(hts_buf adr, size_t adrlen, hts_buf fil,
                               size_t fillen, hts_boolean slash) {
-  memset(adr, 'a', adrlen);
-  adr[adrlen] = '\0';
-  memset(fil, 'b', fillen);
-  fil[0] = slash ? '/' : 'b';
-  fil[fillen - 1] = '/';
-  fil[fillen] = '\0';
+  assertf(adrlen < adr.size && fillen >= 1 && fillen < fil.size);
+  memset(adr.p, 'a', adrlen);
+  adr.p[adrlen] = '\0';
+  memset(fil.p, 'b', fillen);
+  fil.p[0] = slash ? '/' : 'b';
+  fil.p[fillen - 1] = '/';
+  fil.p[fillen] = '\0';
 }
 
 /* Asserts every answer that emits a filter for (adr, fil) emits exactly what
@@ -151,17 +152,19 @@ static int st_wizardfilter(httrackp *opt, int argc, char **argv) {
     const size_t urlmax = HTS_URLMAXSIZE * 2 - 1; /* the engine's adr and fil */
     char *adr = malloct(urlmax + 1);
     char *fil = malloct(urlmax + 1);
+    const hts_buf adrb = hts_buf_at(adr, urlmax + 1);
+    const hts_buf filb = hts_buf_at(fil, urlmax + 1);
     char *expect = malloct(HTS_FILTER_SLOT_SIZE);
     size_t total;
 
     for (total = 2040; total <= 2048; total++) {
       const size_t adrlen = total / 2, fillen = total - 1 - adrlen;
 
-      wizardfilter_link(adr, adrlen, fil, fillen, HTS_TRUE);
+      wizardfilter_link(adrb, adrlen, filb, fillen, HTS_TRUE);
       wizardfilter_emits(&f, expect, adr, fil);
     }
     /* the maximum fills both buffers and the slot, NUL included */
-    wizardfilter_link(adr, urlmax, fil, urlmax, HTS_FALSE);
+    wizardfilter_link(adrb, urlmax, filb, urlmax, HTS_FALSE);
     assertf(wizardfilter_emits(&f, expect, adr, fil) ==
             HTS_FILTER_SLOT_SIZE - 1);
     freet(adr);
