@@ -1875,7 +1875,7 @@ int url_savename(lien_adrfilsave *const afs,
   // Cap the save path: the final parent+name is copied into a fixed buffer that
   // aborts() on overflow (htssafe.h), so clamp every ceiling to fit it.
 #define HTS_SAVE_BUFSIZE (HTS_URLMAXSIZE * 2) /* sizeof(afs->save) */
-#define HTS_PATH_TAIL_RESERVE 64 /* collision suffix + ".delayed" + NUL */
+#define HTS_PATH_TAIL_RESERVE (HTS_SAVE_BUFSIZE - HTS_SAVENAME_CAP)
 #ifdef _WIN32
   // MAX_PATH minus 8.3 headroom (MSDN) minus the ".delayed" marker; raising it
   // needs the engine to "\\?\"-prefix its paths, which is separate work.

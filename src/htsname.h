@@ -55,7 +55,8 @@ HTS_STATIC int strendwith_(const char *a, const char *b) {
 
 /* url_savename() keeps output path plus name under this many bytes, so an
    output path this long leaves it no room and is refused at startup. */
-#define HTS_SAVENAME_CAP (HTS_URLMAXSIZE * 2 - 64)
+#define HTS_SAVENAME_CAP                                                       \
+  (HTS_URLMAXSIZE * 2 - 64) /* collision suffix, .delayed, NUL */
 
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE

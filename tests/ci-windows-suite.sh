@@ -321,7 +321,10 @@ ci_suite_heartbeat() {
 # syscall-trim traces the engine with strace, which only a Linux engine has.
 # connect-sync-fallback needs addresses that fail a connect at once, and nobody
 # has measured which ones Winsock fails that way.
+# mirror-path-too-long checks a limit exact to the byte, and both shells rewrite
+# the path it builds into a native one of another length.
 expected_skips_msys="01_engine-usercommand.test
+2545_local-mirror-path-too-long.test
 01_engine-footer-overflow.test
 253_local-ftp-close-once.test
 890_local-ftp-cancel-closes-sockets.test
@@ -396,7 +399,10 @@ expected_skips_msys="01_engine-usercommand.test
 # syscall-trim traces the engine with strace, which only a Linux engine has.
 # connect-sync-fallback needs addresses that fail a connect at once, and nobody
 # has measured which ones Winsock fails that way.
+# mirror-path-too-long checks a limit exact to the byte, and both shells rewrite
+# the path it builds into a native one of another length.
 expected_skips_wsl2="01_engine-usercommand.test
+2545_local-mirror-path-too-long.test
 01_engine-footer-overflow.test
 253_local-ftp-close-once.test
 890_local-ftp-cancel-closes-sockets.test
