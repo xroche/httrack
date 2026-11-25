@@ -3954,8 +3954,9 @@ static size_t st_sized(const char *p, size_t n, const char *want) {
   return p == want ? n : 0;
 }
 
-/* buf [tail-overrun]: the sizes HTS_BUF, HTS_BUF_N, HTS_SIZED and hts_buf_skip
-   give. tail-overrun takes a tail with no byte left, which must abort. */
+/* buf [tail-overrun]: the sizes HTS_BUF, HTS_BUF_N, HTS_SIZED, hts_buf_skip and
+   hts_buf_none give. tail-overrun takes a tail with no byte left, which must
+   abort. */
 static int st_buf(httrackp *opt, int argc, char **argv) {
   struct {
     char f[7];
@@ -3985,6 +3986,12 @@ static int st_buf(httrackp *opt, int argc, char **argv) {
   t = hts_buf_skip(b, 31);
   if (t.p != a + 31 || t.size != 1) {
     printf("buf: tail 31 is %d bytes\n", (int) t.size);
+    bad = 1;
+  }
+  /* a size-0 buffer is not the absent one */
+  if (!hts_buf_is_none(hts_buf_none()) || hts_buf_none().size != 0 ||
+      hts_buf_is_none(b) || hts_buf_is_none(hts_buf_at(a, 0))) {
+    printf("buf: hts_buf_none is not the absent buffer\n");
     bad = 1;
   }
   if (!bad)
@@ -5794,7 +5801,8 @@ const struct selftest_entry selftests_lib[] = {
      "the span iterator matches the rule-list parsers it replaced",
      st_spandiff},
     {"buf", "[tail-overrun]",
-     "the sizes HTS_BUF, HTS_BUF_N and hts_buf_skip give", st_buf},
+     "the sizes HTS_BUF, HTS_BUF_N, hts_buf_skip and hts_buf_none give",
+     st_buf},
     {"bufwrite", "[cpy|cat|catn|unterminated[-cpy|-catn]]",
      "the hts_buf write helpers copy, append, clip and print in bounds",
      st_bufwrite},

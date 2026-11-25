@@ -57,6 +57,16 @@ static HTS_INLINE HTS_UNUSED hts_buf hts_buf_at(char *p, size_t size) {
   return b;
 }
 
+/* Returns the absent buffer, for an optional output the caller skips. */
+static HTS_INLINE HTS_UNUSED hts_buf hts_buf_none(void) {
+  return hts_buf_at(NULL, 0);
+}
+
+/* Is B the absent buffer, rather than one the caller passed? */
+static HTS_INLINE HTS_UNUSED hts_boolean hts_buf_is_none(hts_buf b) {
+  return b.p == NULL ? HTS_TRUE : HTS_FALSE;
+}
+
 /* Return B without its first OFF bytes, aborting unless a byte is left. */
 static HTS_INLINE HTS_UNUSED hts_buf hts_buf_skip(hts_buf b, size_t off) {
   assertf(off < b.size);
@@ -110,8 +120,8 @@ hts_buf_put_span(hts_buf b, hts_span s) {
 
 /* Copy S as hts_buf_put_span does, but clip it to fit rather than empty B.
    TRUE if it all fit. */
-static HTS_INLINE HTS_UNUSED HTS_CHECK_RESULT hts_boolean
-hts_buf_put_span_clip(hts_buf b, hts_span s) {
+static HTS_INLINE HTS_UNUSED hts_boolean hts_buf_put_span_clip(hts_buf b,
+                                                               hts_span s) {
   size_t n;
 
   if (b.size == 0)

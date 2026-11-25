@@ -1421,7 +1421,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
     path_from_cmdline = coucal_readptr(NewLangList, "path", &adr) &&
                         strnotempty((const char *) adr);
   }
-  if (!htslang_load(hts_buf_at(NULL, 0), path)) {
+  if (!htslang_load(hts_buf_none(), path)) {
     fprintf(stderr, "unable to find lang.def and/or lang/ strings in %s\n",
             path);
     freet(buffer);
@@ -3012,7 +3012,7 @@ static int htslang_load(hts_buf limit_to, const char *path) {
   int selected_lang = LANG_T(path, -1);
 
   //
-  if (limit_to.p == NULL) {
+  if (hts_buf_is_none(limit_to)) {
     LANG_DELETE();
     NewLangStr = coucal_new(0);
     NewLangStrKeys = coucal_new(0);
@@ -3027,7 +3027,7 @@ static int htslang_load(hts_buf limit_to, const char *path) {
   }
 
   /* Load master file (list of keys and internal keys) */
-  if (limit_to.p == NULL) {
+  if (hts_buf_is_none(limit_to)) {
     const char *mname = "lang.def";
     FILE *fp = fopen(fconcat(catbuff, sizeof(catbuff), path, mname), "rb");
 
@@ -3081,7 +3081,7 @@ static int htslang_load(hts_buf limit_to, const char *path) {
   /* Read the key named in limit_to from the selected catalog, not lang.def's
      file name for it. Both come off disk, so every copy clips: the safe_
      helpers abort, and a long line in a catalog must not kill the server. */
-  if (limit_to.p != NULL) {
+  if (!hts_buf_is_none(limit_to)) {
     char wanted[256];
     char lbasename[1024]; /* the guard below writes it, so it outlives the if */
 
@@ -3244,7 +3244,7 @@ static void LANG_INIT(const char *path) { LANG_T(path, 0); }
 static int LANG_T(const char *path, int l) {
   if (l >= 0) {
     QLANG_T(l);
-    htslang_load(hts_buf_at(NULL, 0), path);
+    htslang_load(hts_buf_none(), path);
   }
   return QLANG_T(-1);           // 0=default (english)
 }

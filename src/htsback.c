@@ -4946,7 +4946,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                           strnotempty(back[i].url_sav)) {
                         htsblk r = cache_read(
                             opt, cache, back[i].url_adr, back[i].url_fil, NULL,
-                            hts_buf_at(NULL, 0)); // read the cache entry
+                            hts_buf_none()); // read the cache entry
 
                         if (r.statuscode == HTTP_OK) {  // OK pas d'erreur cache
                           LLint len1, len2;
