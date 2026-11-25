@@ -838,12 +838,10 @@ int hts_template_format(FILE *const out, const char *format, ...) {
 
 // note: upstream arg list MUST be NULL-terminated for safety
 // returns a negative value upon error
-int hts_template_format_str(char *buffer, size_t size, const char *format, ...) {
+int hts_template_format_str(hts_buf buffer, const char *format, ...) {
   int success;
-  hts_template_format_buf buf = { NULL, NULL, 0, 0 };
+  hts_template_format_buf buf = {NULL, buffer.p, buffer.size, 0};
   va_list args;
-  buf.buffer = buffer;
-  buf.size = size;
   va_start(args, format);
   success = hts_template_formatv(&buf, format, args);
   va_end(args);
@@ -888,19 +886,19 @@ static const char *footer_field_value(const char *const *values,
   return values[id] != NULL ? values[id] : "";
 }
 
-int hts_footer_format(char *buffer, size_t size, const char *footer,
+int hts_footer_format(hts_buf buffer, const char *footer,
                       const char *const values[HTS_FOOTER_FIELD_COUNT]) {
-  hts_template_format_buf buf = {NULL, buffer, size, 0};
+  hts_template_format_buf buf = {NULL, buffer.p, buffer.size, 0};
   size_t i;
 
-  if (footer == NULL || buffer == NULL || size == 0)
+  if (footer == NULL || buffer.p == NULL || buffer.size == 0)
     return -1;
   // %s keeps the legacy positional model, byte-for-byte for existing -%F
   // strings: addr, path, date, version, looked up by name and
   // order-independent.
   if (strstr(footer, "%s") != NULL)
     return hts_template_format_str(
-        buffer, size, footer, footer_field_value(values, HTS_FOOTER_ADDR),
+        buffer, footer, footer_field_value(values, HTS_FOOTER_ADDR),
         footer_field_value(values, HTS_FOOTER_PATH),
         footer_field_value(values, HTS_FOOTER_DATE),
         footer_field_value(values, HTS_FOOTER_VERSION), /* EOF */ NULL);
@@ -937,7 +935,7 @@ int hts_footer_format(char *buffer, size_t size, const char *footer,
       return -1;
     }
   }
-  buffer[buf.offset] = '\0';
+  buffer.p[buf.offset] = '\0';
   return 1;
 }
 
@@ -1215,25 +1213,24 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
 }
 
 /* Find the first line starting with key; never a long line's tail. */
-static size_t profile_key_line(FILE *fp, const char *key, char *line,
-                               size_t size) {
+static size_t profile_key_line(FILE *fp, const char *key, hts_buf line) {
   int c = 0;
 
-  assertf(size != 0);
+  assertf(line.size != 0);
   while (c != EOF) {
     size_t n = 0;
     int off;
 
-    while (n + 1 < size && (c = fgetc(fp)) != EOF && c != '\n') {
+    while (n + 1 < line.size && (c = fgetc(fp)) != EOF && c != '\n') {
       if (c != '\r' && c != '\t' && c != '\f')
-        line[n++] = (char) c;
+        line.p[n++] = (char) c;
     }
-    line[n] = '\0';
-    if (n + 1 >= size) {
+    line.p[n] = '\0';
+    if (n + 1 >= line.size) {
       while ((c = fgetc(fp)) != EOF && c != '\n')
         ;
     }
-    if ((off = strfield(line, key)) != 0)
+    if ((off = strfield(line.p, key)) != 0)
       return (size_t) off;
   }
   return 0;
@@ -1245,7 +1242,7 @@ char *hts_getcategory(const char *filename) {
 
   if (fp != NULL) {
     char BIGSTK line[1022];
-    const size_t off = profile_key_line(fp, "category=", HTS_SIZED(line));
+    const size_t off = profile_key_line(fp, "category=", HTS_BUF(line));
 
     if (off != 0)
       hts_unescapehttp(line + off, &categ);
@@ -1260,7 +1257,7 @@ hts_boolean hts_profile_declares_utf8(const char *filename) {
 
   if (fp != NULL) {
     char BIGSTK line[1022];
-    const size_t off = profile_key_line(fp, "charset=", HTS_SIZED(line));
+    const size_t off = profile_key_line(fp, "charset=", HTS_BUF(line));
 
     utf8 = off != 0 && hts_isCharsetUTF8(line + off);
     fclose(fp);
@@ -1299,7 +1296,7 @@ HTSEXT_API char *hts_getcategories(char *path, int type) {
 
             if (fp != NULL) {
               const size_t off =
-                  profile_key_line(fp, "category=", HTS_SIZED(line2));
+                  profile_key_line(fp, "category=", HTS_BUF(line2));
               const char *const value = line2 + off;
 
               if (off != 0 && *value != '\0' &&

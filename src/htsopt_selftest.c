@@ -103,13 +103,17 @@ static int st_footerfmt(httrackp *opt, int argc, char **argv) {
   assertf(!hts_footer_field_ok("Addr"));
   // Overflow (named and legacy) and a zero-size buffer must return <0, never
   // truncate silently or write out of bounds.
-  assertf(hts_footer_format(tiny, sizeof(tiny), "{addr}", values) < 0);
-  assertf(hts_footer_format(tiny, sizeof(tiny), "a %s b", values) < 0);
-  assertf(hts_footer_format(out, 0, "", values) < 0);
+  assertf(hts_footer_format(HTS_BUF(tiny), "{addr}", values) < 0);
+  assertf(hts_footer_format(HTS_BUF(tiny), "a %s b", values) < 0);
+  assertf(hts_footer_format(HTS_BUF_N(out, 0), "", values) < 0);
+  // An exact fit succeeds on both paths.
+  assertf(hts_footer_format(HTS_BUF(tiny), "{status}", values) == 1 &&
+          strcmp(tiny, "200") == 0);
+  assertf(hts_footer_format(HTS_BUF_N(out, 13), "%s", values) >= 0 &&
+          strcmp(out, "host.example") == 0);
   // An empty template yields an empty, terminated string.
-  assertf(hts_footer_format(out, sizeof(out), "", values) == 1 &&
-          out[0] == '\0');
-  if (hts_footer_format(out, sizeof(out), argv[0], values) < 0) {
+  assertf(hts_footer_format(HTS_BUF(out), "", values) == 1 && out[0] == '\0');
+  if (hts_footer_format(HTS_BUF(out), argv[0], values) < 0) {
     fprintf(stderr, "footerfmt: overflow\n");
     return 1;
   }

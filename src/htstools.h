@@ -92,7 +92,7 @@ HTS_INLINE int __rech_tageqbegdigits(const char *adr, const char *s);
 HTS_INLINE int rech_tageq_all(const char *adr, const char *s);
 
 int hts_template_format(FILE *const out, const char *format, ...);
-int hts_template_format_str(char *buffer, size_t size, const char *format, ...);
+int hts_template_format_str(hts_buf buffer, const char *format, ...);
 
 // Index of a footer {field} in the engine's name table (htstools.c), and the
 // slot its value occupies in the values[] handed to hts_footer_format().
@@ -121,7 +121,7 @@ const char *hts_footer_field_list(hts_buf buffer);
 // literal brace, an unknown "{...}" is left verbatim). A NULL slot expands
 // empty. Values must already be escaped for the target context by the caller.
 // Returns <0 on overflow.
-int hts_footer_format(char *buffer, size_t size, const char *footer,
+int hts_footer_format(hts_buf buffer, const char *footer,
                       const char *const values[HTS_FOOTER_FIELD_COUNT]);
 
 /* prevc is the byte before adr, normally from html_prevc. */
