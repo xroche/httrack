@@ -7,3 +7,9 @@ set -euo pipefail
 # behind it (#1160).
 out=$(httrack -O /dev/null -#test=hashkey-bounds run)
 grep -q "hashkey-bounds self-test OK" <<<"$out"
+
+# A save name one byte past its key buffer aborts rather than overflowing it.
+rc=0
+err=$(httrack -O /dev/null -#test=hashkey-bounds overlong 2>&1 >/dev/null) || rc=$?
+test "$rc" -ne 0
+grep -q "overflow while appending to a buffer failed at" <<<"$err"
