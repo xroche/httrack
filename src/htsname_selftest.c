@@ -375,7 +375,8 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
   const char *bodyfile = "st-savename-body.tmp";
   const char *tmpbodyfile = "st-savename-tmpfile.tmp";
   int statuscode = HTTP_OK, status = 0;
-  int filpad = 0, adrpad = 0, tplpad = 0;
+  int filpad = 0, adrpad = 0, tplpad = 0, htmlpad = 0;
+  const char *first = NULL;
   const char *padunit = "a"; /* the bytes filpad repeats */
   int nosback = 0;
   int rc = 0;
@@ -425,6 +426,10 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
       padunit = a + 8;
     else if (strncmp(a, "delayed=", 8) == 0) /* -%N */
       opt->savename_delayed = (hts_savename_delayed) atoi(a + 8);
+    else if (strncmp(a, "htmlpad=", 8) == 0) /* an -O path longer than argv */
+      htmlpad = atoi(a + 8);
+    else if (strncmp(a, "first=", 6) == 0) /* a fil named and recorded first */
+      first = a + 6;
     else if (strncmp(a, "nosback=", 8) == 0) /* as -#C: no backing at all */
       nosback = atoi(a + 8);
     else if (strncmp(a, "userdef=", 8) == 0) { /* -N, which selects type -1 */
@@ -450,6 +455,17 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
       return 1;
     }
     StringCopy(opt->savename_userdef, tpl);
+  }
+  if (htmlpad > 0) {
+    char BIGSTK html[HTS_URLMAXSIZE * 2];
+
+    if ((size_t) htmlpad >= sizeof(html)) {
+      fprintf(stderr, "savename: htmlpad too large\n");
+      return 1;
+    }
+    memset(html, 'p', (size_t) htmlpad);
+    html[htmlpad] = '\0';
+    StringCopy(opt->path_html_utf8, html);
   }
   memset(&probe, 0, sizeof(probe));
   memset(probe.canary, ST_POISON, sizeof(probe.canary));
@@ -574,6 +590,19 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
     headers.tmpfile = headers.tmpfile_buffer;
   }
 
+  if (first != NULL) {
+    lien_adrfilsave BIGSTK fa;
+
+    memset(&fa, 0, sizeof(fa));
+    strcpybuff(fa.af.adr, afs->af.adr);
+    strcpybuff(fa.af.fil, first);
+    url_savename(&fa, NULL, NULL, NULL, opt, sback, &cache, &hash, 0, 0,
+                 &headers);
+    if (!hts_record_link(opt, fa.af.adr, fa.af.fil, fa.save, "", "", NULL)) {
+      rc = 1;
+      goto cleanup;
+    }
+  }
   url_savename(afs, NULL, NULL, NULL, opt, sback, &cache, &hash, 0, 0,
                &headers);
   if (body != NULL)

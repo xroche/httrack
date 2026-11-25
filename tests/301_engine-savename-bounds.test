@@ -91,4 +91,10 @@ if [ "$probe" = "savename: /dev/null/www.example.com/$seg/x.html" ]; then
         'adr=*' adrpad=1024
 fi
 
+# An -O path past the byte cap gives a collision name that fills save[].
+q=$(printf '%026d' 0 | tr 0 q)
+selftest_queue "savename: $(printf '%02000d' 0 | tr 0 p)example.com/A/$q-2.html" \
+    savename "/A/$q.html" text/html adr=example.com "first=/a/$q.html" \
+    htmlpad=2000
+
 selftest_run_queued
