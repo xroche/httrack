@@ -227,7 +227,7 @@ static int st_statsrows(httrackp *opt, int argc, char **argv) {
   if (sback == NULL)
     return 1;
   b = sback->lnk;
-  hts_secret_add(opt, "SECRETTOKEN1", 12, HTS_SECRET_HEADER);
+  hts_secret_add(opt, hts_span_of("SECRETTOKEN1"), HTS_SECRET_HEADER);
   st_statsrows_slot(&b[0], STATUS_WAIT_DNS, 0, -1, "/dns");
   st_statsrows_slot(&b[1], STATUS_CONNECTING, 0, -1, "/conn");
   st_statsrows_slot(&b[2], STATUS_FTP_TRANSFER, 0, -1, "/pub/f");

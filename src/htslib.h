@@ -787,11 +787,10 @@ int multipleStringMatch(const char *s, const char *match);
    field that carries a login replaced by the fprint_redacted() marker, and
    each secret opt knows as ***. opt may be NULL. */
 void fprintfio(FILE *fp, const char *buff, const char *prefix, httrackp *opt);
-/* The first line of buff as fprintfio() shows it, written into dst (size
-   bytes, clipped): for one write, which keeps the line whole on a merged
-   stdout and stderr. Returns dst. */
-const char *hts_header_shown(httrackp *opt, const char *line, char *dst,
-                             size_t size);
+/* The first line of buff as fprintfio() shows it, written into dst, clipped:
+   for one write, which keeps the line whole on a merged stdout and stderr.
+   Returns dst.p. */
+const char *hts_header_shown(httrackp *opt, const char *line, hts_buf dst);
 
 /* The backstop behind the per-site masking: opt keeps the first
    HTS_SECRET_MAX passwords and tokens it sees, each up to HTS_SECRET_MAXLEN
@@ -812,11 +811,9 @@ typedef enum hts_secret_kind {
 void hts_secret_init(httrackp *opt);
 void hts_secret_free(httrackp *opt);
 
-/* Adds the len bytes at s to the set of opt. Thread-safe. Once the set is
-   full, or for a secret over HTS_SECRET_MAXLEN bytes, logs one warning and
-   adds nothing. */
-void hts_secret_add(httrackp *opt, const char *s, size_t len,
-                    hts_secret_kind kind);
+/* Adds s to the set of opt. Thread-safe. Once the set is full, or for a
+   secret over HTS_SECRET_MAXLEN bytes, logs one warning and adds nothing. */
+void hts_secret_add(httrackp *opt, hts_span s, hts_secret_kind kind);
 
 /* Adds the password of the login of url, in any scheme or none, raw and
    unescaped. A user alone is not added. url may be NULL. */

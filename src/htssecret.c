@@ -69,31 +69,30 @@ void hts_secret_free(httrackp *opt) {
   opt->secrets = NULL;
 }
 
-void hts_secret_add(httrackp *opt, const char *s, size_t len,
-                    hts_secret_kind kind) {
+void hts_secret_add(httrackp *opt, hts_span s, hts_secret_kind kind) {
   hts_secret_set *const set =
       opt != NULL ? (hts_secret_set *) opt->secrets : NULL;
   hts_boolean warn = HTS_FALSE, warnlong = HTS_FALSE;
   int i;
 
-  if (set == NULL || len == 0 ||
-      (kind == HTS_SECRET_HEADER && len < HTS_SECRET_TOKEN))
+  if (set == NULL || s.len == 0 ||
+      (kind == HTS_SECRET_HEADER && s.len < HTS_SECRET_TOKEN))
     return;
   hts_mutexlock(&set->lock);
   for (i = 0; i < set->count; i++)
-    if (set->kind[i] == kind && set->len[i] == len &&
-        memcmp(set->item[i], s, len) == 0)
+    if (set->kind[i] == kind && set->len[i] == s.len &&
+        memcmp(set->item[i], s.p, s.len) == 0)
       break;
-  if (len > HTS_SECRET_MAXLEN) {
+  if (s.len > HTS_SECRET_MAXLEN) {
     warnlong = set->toolong ? HTS_FALSE : HTS_TRUE;
     set->toolong = HTS_TRUE;
   } else if (i == set->count) {
     if (set->count < HTS_SECRET_MAX) {
-      char *const copy = hts_span_dup(hts_span_at(s, len));
+      char *const copy = hts_span_dup(s);
 
       if (copy != NULL) {
         set->item[set->count] = copy;
-        set->len[set->count] = len;
+        set->len[set->count] = s.len;
         set->kind[set->count] = kind;
         set->count++;
       }
@@ -130,15 +129,14 @@ void hts_secret_add_login(httrackp *opt, const char *url) {
   colon = memchr(start, ':', (size_t) (host - 1 - start));
   if (colon == NULL)
     return;
-  hts_secret_add(opt, colon + 1, (size_t) (host - 1 - (colon + 1)),
-                 HTS_SECRET_LOGIN);
+  hts_secret_add(opt, hts_span_between(colon + 1, host - 1), HTS_SECRET_LOGIN);
   // the Basic login is sent unescaped
   if (memchr(colon + 1, '%', (size_t) (host - 1 - (colon + 1))) != NULL &&
       hts_buf_put_span(HTS_BUF(pass), hts_span_between(colon + 1, host - 1))) {
     char plain[HTS_SECRET_MAXLEN + 1];
     const char *const p = unescape_http(plain, sizeof(plain), pass);
 
-    hts_secret_add(opt, p, strlen(p), HTS_SECRET_LOGIN);
+    hts_secret_add(opt, hts_span_of(p), HTS_SECRET_LOGIN);
   }
 }
 
@@ -151,53 +149,51 @@ static hts_boolean word_start(const char *s, size_t i) {
              : HTS_FALSE;
 }
 
-/* Does the n bytes at s + i stand as a login, as in "SECRET@" or
+/* Does the n bytes at s.p + i stand as a login, as in "SECRET@" or
    "user:SECRET@", whose userinfo starts a word? */
-static hts_boolean login_at(const char *s, size_t len, size_t i, size_t n) {
+static hts_boolean login_at(hts_span s, size_t i, size_t n) {
   // schemes whose "name:local@host" is an address, not a login
   static const char *const opaque[] = {"mailto", "news", "sip",
                                        "sips",   "tel",  "xmpp"};
   size_t u = i, k;
 
-  if (i + n >= len || s[i + n] != '@')
+  if (i + n >= s.len || s.p[i + n] != '@')
     return HTS_FALSE;
-  if (i != 0 && s[i - 1] == ':') {
+  if (i != 0 && s.p[i - 1] == ':') {
     u = i - 1;
-    while (u != 0 && strchr("/ \t\r\n", s[u - 1]) == NULL)
+    while (u != 0 && strchr("/ \t\r\n", s.p[u - 1]) == NULL)
       u--;
     for (k = 0; k < sizeof(opaque) / sizeof(opaque[0]); k++)
-      if (strlen(opaque[k]) == i - 1 - u && strfield(s + u, opaque[k]))
+      if (strlen(opaque[k]) == i - 1 - u && strfield(s.p + u, opaque[k]))
         return HTS_FALSE;
   }
-  return word_start(s, u);
+  return word_start(s.p, u);
 }
 
-/* Returns the length of the longest secret of set standing at s + i, or 0. A
+/* Returns the length of the longest secret of set standing at s.p + i, or 0. A
    URL password counts only as a login, a header token anywhere. */
-static size_t secret_at(const hts_secret_set *set, const char *s, size_t len,
-                        size_t i) {
+static size_t secret_at(const hts_secret_set *set, hts_span s, size_t i) {
   size_t best = 0;
   int k;
 
   for (k = 0; k < set->count; k++) {
     const size_t n = set->len[k];
 
-    if (n <= best || n > len - i || memcmp(s + i, set->item[k], n) != 0)
+    if (n <= best || n > s.len - i || memcmp(s.p + i, set->item[k], n) != 0)
       continue;
-    if (set->kind[k] == HTS_SECRET_HEADER || login_at(s, len, i, n))
+    if (set->kind[k] == HTS_SECRET_HEADER || login_at(s, i, n))
       best = n;
   }
   return best;
 }
 
-/* Copies the len bytes at s to out, if not NULL, with each secret of set
-   replaced. Returns the length written. */
-static size_t secret_scan(const hts_secret_set *set, const char *s, size_t len,
-                          char *out) {
+/* Copies s to out, if not NULL, with each secret of set replaced. Returns the
+   length written. */
+static size_t secret_scan(const hts_secret_set *set, hts_span s, char *out) {
   size_t i = 0, o = 0;
 
-  while (i < len) {
-    const size_t n = secret_at(set, s, len, i);
+  while (i < s.len) {
+    const size_t n = secret_at(set, s, i);
 
     if (n != 0) {
       if (out != NULL)
@@ -206,7 +202,7 @@ static size_t secret_scan(const hts_secret_set *set, const char *s, size_t len,
       i += n;
     } else {
       if (out != NULL)
-        out[o] = s[i];
+        out[o] = s.p[i];
       o++;
       i++;
     }
@@ -214,11 +210,10 @@ static size_t secret_scan(const hts_secret_set *set, const char *s, size_t len,
   return o;
 }
 
-/* Returns a copy of the len bytes at s with each secret of opt as ***,
-   allocated with malloct, its length in *outlen. NULL when no secret is
-   known, or *outlen set to 0 too when out of memory. */
-static char *secret_mask(httrackp *opt, const char *s, size_t len,
-                         size_t *outlen) {
+/* Returns a copy of s with each secret of opt as ***, allocated with malloct,
+   its length in *outlen. NULL when no secret is known, or *outlen set to 0 too
+   when out of memory. */
+static char *secret_mask(httrackp *opt, hts_span s, size_t *outlen) {
   hts_secret_set *const set =
       opt != NULL ? (hts_secret_set *) opt->secrets : NULL;
   char *out = NULL;
@@ -228,10 +223,10 @@ static char *secret_mask(httrackp *opt, const char *s, size_t len,
     return NULL;
   hts_mutexlock(&set->lock);
   if (set->count != 0) {
-    *outlen = secret_scan(set, s, len, NULL);
+    *outlen = secret_scan(set, s, NULL);
     out = malloct(*outlen + 1);
     if (out != NULL) {
-      secret_scan(set, s, len, out);
+      secret_scan(set, s, out);
       out[*outlen] = '\0';
     } else
       *outlen = 0;
@@ -240,18 +235,17 @@ static char *secret_mask(httrackp *opt, const char *s, size_t len,
   return out;
 }
 
-/* Writes the len bytes at s to fp, with each secret of opt as ***. */
-static void hts_secret_fwrite(httrackp *opt, FILE *fp, const char *s,
-                              size_t len) {
+/* Writes s to fp, with each secret of opt as ***. */
+static void hts_secret_fwrite(httrackp *opt, FILE *fp, hts_span s) {
   size_t n;
-  char *masked = secret_mask(opt, s, len, &n);
+  char *masked = secret_mask(opt, s, &n);
 
   if (masked != NULL)
     fwrite(masked, 1, n, fp);
   else if (n == 0)
     fputs("<out of memory>", fp);
   else
-    fwrite(s, 1, len, fp);
+    fwrite(s.p, 1, s.len, fp);
   freet(masked);
 }
 
@@ -291,7 +285,7 @@ void secret_vfprintf(httrackp *opt, FILE *fp,
     return;
   }
   (void) vsnprintf(line, (size_t) n + 1, format, args);
-  hts_secret_fwrite(opt, fp, line, (size_t) n);
+  hts_secret_fwrite(opt, fp, hts_span_at(line, (size_t) n));
   freet(line);
 }
 
@@ -310,7 +304,7 @@ HTSEXT_API void hts_hide_secrets(httrackp *opt, char *s, size_t size) {
 
   if (size == 0)
     return;
-  masked = secret_mask(opt, s, strlen(s), &n);
+  masked = secret_mask(opt, hts_span_of(s), &n);
   if (masked != NULL) {
     strclipbuff(s, size, masked);
   } else if (n == 0)
@@ -330,55 +324,53 @@ static const char *const secret_fields[] = {HTS_SPAN_WORDS(
 static const char *const url_fields[] = {
     HTS_SPAN_WORDS("Location", "Content-Location", "Referer")};
 
-/* Writes the line buff, len bytes long, with the login of its URL, from keep
-   up to end, masked. Returns HTS_FALSE, writing nothing, when out of memory. */
-static hts_boolean fprint_url_span(httrackp *opt, FILE *fp, const char *buff,
-                                   size_t len, size_t keep, size_t end) {
+/* Writes the line buff with the login of its URL, from keep up to end,
+   masked. Returns HTS_FALSE, writing nothing, when out of memory. */
+static hts_boolean fprint_url_span(httrackp *opt, FILE *fp, hts_span buff,
+                                   size_t keep, size_t end) {
   char *line = malloct(2 * end + 8);
 
   if (line == NULL)
     return HTS_FALSE;
-  memcpy(line, buff, end);
+  memcpy(line, buff.p, end);
   line[end] = '\0';
   {
     const char *const url = url_nologin_r(line + end + 1, end + 7, line + keep);
 
-    hts_secret_fwrite(opt, fp, line, keep);
-    hts_secret_fwrite(opt, fp, url, strlen(url));
-    hts_secret_fwrite(opt, fp, buff + end, len - end);
+    hts_secret_fwrite(opt, fp, hts_span_at(line, keep));
+    hts_secret_fwrite(opt, fp, hts_span_of(url));
+    hts_secret_fwrite(opt, fp, hts_span_skip(buff, end));
   }
   freet(line);
   return HTS_TRUE;
 }
 
-/* Writes the header line buff, len bytes long, with the login of its URL
-   value masked. Returns HTS_FALSE, writing nothing, when out of memory. */
-static hts_boolean fprint_url_field(httrackp *opt, FILE *fp, const char *buff,
-                                    size_t len) {
-  const char *const colon = memchr(buff, ':', len);
-  size_t keep = colon != NULL ? (size_t) (colon - buff) + 1 : len;
+/* Writes the header line buff with the login of its URL value masked. Returns
+   HTS_FALSE, writing nothing, when out of memory. */
+static hts_boolean fprint_url_field(httrackp *opt, FILE *fp, hts_span buff) {
+  const char *const colon = memchr(buff.p, ':', buff.len);
+  size_t keep = colon != NULL ? (size_t) (colon - buff.p) + 1 : buff.len;
 
-  while (keep < len && (buff[keep] == ' ' || buff[keep] == '\t'))
+  while (keep < buff.len && (buff.p[keep] == ' ' || buff.p[keep] == '\t'))
     keep++;
-  return fprint_url_span(opt, fp, buff, len, keep, len);
+  return fprint_url_span(opt, fp, buff, keep, buff.len);
 }
 
-/* Writes the request line buff, len bytes long, with the login of its target
-   masked, as a proxied ftp:// target carries one. Returns HTS_FALSE, writing
-   nothing, when buff is no "METHOD target HTTP/" line or out of memory. */
-static hts_boolean fprint_request_line(httrackp *opt, FILE *fp,
-                                       const char *buff, size_t len) {
-  const char *const sp = memchr(buff, ' ', len);
+/* Writes the request line buff with the login of its target masked, as a
+   proxied ftp:// target carries one. Returns HTS_FALSE, writing nothing, when
+   buff is no "METHOD target HTTP/" line or out of memory. */
+static hts_boolean fprint_request_line(httrackp *opt, FILE *fp, hts_span buff) {
+  const char *const sp = memchr(buff.p, ' ', buff.len);
   const char *version;
 
   if (sp == NULL)
     return HTS_FALSE;
-  version = memchr(sp + 1, ' ', len - (size_t) (sp + 1 - buff));
-  if (version == NULL || (size_t) (buff + len - version) < 6 ||
+  version = memchr(sp + 1, ' ', buff.len - (size_t) (sp + 1 - buff.p));
+  if (version == NULL || (size_t) (buff.p + buff.len - version) < 6 ||
       strncmp(version, " HTTP/", 6) != 0)
     return HTS_FALSE;
-  return fprint_url_span(opt, fp, buff, len, (size_t) (sp + 1 - buff),
-                         (size_t) (version - buff));
+  return fprint_url_span(opt, fp, buff, (size_t) (sp + 1 - buff.p),
+                         (size_t) (version - buff.p));
 }
 
 /* Finds the secret of the userinfo at the authority a: the password after the
@@ -409,10 +401,10 @@ typedef struct {
   const char *p;
 } mask_out;
 
-static void mask_copy(mask_out *m, const char *src, size_t n) {
+static void mask_copy(mask_out *m, hts_span src) {
   if (m->dst != NULL)
-    memcpy(m->dst + m->o, src, n);
-  m->o += n;
+    memcpy(m->dst + m->o, src.p, src.len);
+  m->o += src.len;
 }
 
 /* Masks the login secret of the address at a, if any, and moves *i past it. */
@@ -422,8 +414,8 @@ static void mask_at(mask_out *m, const char *a, hts_boolean token,
 
   if (!userinfo_password(jump_protocol_const(a), token, &pass, &at))
     return;
-  mask_copy(m, m->p, (size_t) (pass - m->p));
-  mask_copy(m, "***", 3);
+  mask_copy(m, hts_span_between(m->p, pass));
+  mask_copy(m, hts_span_of("***"));
   m->p = *i = at;
 }
 
@@ -441,7 +433,7 @@ static size_t mask_passwords(const char *s, char *dst, hts_mask_mode mode) {
       if ((i == s || strchr(HTS_BLANKS, i[-1]) != NULL) &&
           strchr(HTS_BLANKS "+-", *i) == NULL)
         mask_at(&m, i, HTS_TRUE, &i);
-  mask_copy(&m, m.p, strlen(m.p) + 1);
+  mask_copy(&m, hts_span_at(m.p, strlen(m.p) + 1));
   return m.o - 1;
 }
 
@@ -492,8 +484,8 @@ void hts_secret_add_headers(httrackp *opt, const char *headers) {
       const hts_span cred = hts_span_trim(hts_span_skip(value, blank_at(value)),
                                           HTS_TABORSPACES, "");
 
-      hts_secret_add(opt, value.p, value.len, HTS_SECRET_HEADER);
-      hts_secret_add(opt, cred.p, cred.len, HTS_SECRET_HEADER);
+      hts_secret_add(opt, value, HTS_SECRET_HEADER);
+      hts_secret_add(opt, cred, HTS_SECRET_HEADER);
     }
     p = line.p + line.len;
     p += strspn(p, "\r\n");
@@ -509,9 +501,9 @@ void fprintfio(FILE *fp, const char *buff, const char *prefix, httrackp *opt) {
     const size_t len = strcspn(buff, "\r\n");
 
     if (len != 0) {
+      const hts_span line = hts_span_at(buff, len);
       hts_span name, value;
-      const hts_boolean field =
-          secret_field(hts_span_at(buff, len), &name, &value);
+      const hts_boolean field = secret_field(line, &name, &value);
       size_t keep;
 
       /* a folded line continues the value above it */
@@ -521,11 +513,11 @@ void fprintfio(FILE *fp, const char *buff, const char *prefix, httrackp *opt) {
       if (nl)
         fprintf(fp, "%s", prefix);
       nl = HTS_FALSE;
-      if (!(buff == start && fprint_request_line(opt, fp, buff, len)) &&
+      if (!(buff == start && fprint_request_line(opt, fp, line)) &&
           (secret || *buff == ' ' || *buff == '\t' ||
            !header_name_in(buff, url_fields) ||
-           !fprint_url_field(opt, fp, buff, len))) {
-        hts_secret_fwrite(opt, fp, buff, keep);
+           !fprint_url_field(opt, fp, line))) {
+        hts_secret_fwrite(opt, fp, hts_span_at(buff, keep));
         if (keep < len)
           fprint_redacted(fp, len - keep);
       }
@@ -541,8 +533,7 @@ void fprintfio(FILE *fp, const char *buff, const char *prefix, httrackp *opt) {
 }
 
 /* See htslib.h. */
-const char *hts_header_shown(httrackp *opt, const char *line, char *dst,
-                             size_t size) {
+const char *hts_header_shown(httrackp *opt, const char *line, hts_buf dst) {
   const size_t len = strcspn(line, "\r\n");
   const char *const colon = memchr(line, ':', len);
   hts_span name, field;
@@ -552,30 +543,30 @@ const char *hts_header_shown(httrackp *opt, const char *line, char *dst,
                 : colon != NULL ? (size_t) (colon - line) + 1
                                 : len;
   char value[HTS_URLMAXSIZE * 2];
-  size_t n;
 
   while (keep < len && (line[keep] == ' ' || line[keep] == '\t'))
     keep++;
-  n = keep < size ? keep : size - 1;
-  memcpy(dst, line, n);
-  dst[n] = '\0';
-  if (keep < len && secret) {
-    // a clipped marker still hides the value
-    if (!slprintfbuff(dst + n, size - n, "<redacted, %lu bytes>",
-                      (unsigned long) (len - keep)))
-      (void) strclipbuff(dst + n, size - n, "<redacted>");
-  } else if (keep < len) {
-    (void) hts_span_copy(hts_span_at(line + keep, len - keep),
-                         HTS_SIZED(value));
-    if (header_name_in(line, url_fields)) {
-      char masked[HTS_URLMAXSIZE * 2];
+  // once the name is clipped, no room is left for the value
+  if (hts_buf_put_span_clip(dst, hts_span_at(line, keep)) && keep < len) {
+    const hts_buf tail = hts_buf_skip(dst, keep);
 
-      (void) strclipbuff(dst + n, size - n,
-                         url_nologin_r(HTS_SIZED(masked), value));
+    if (secret) {
+      // a clipped marker still hides the value
+      if (!hts_buf_printf(tail, "<redacted, %lu bytes>",
+                          (unsigned long) (len - keep)))
+        (void) hts_buf_cpy_clip(tail, "<redacted>");
     } else {
-      (void) strclipbuff(dst + n, size - n, value);
+      (void) hts_span_copy(hts_span_at(line + keep, len - keep),
+                           HTS_SIZED(value));
+      if (header_name_in(line, url_fields)) {
+        char masked[HTS_URLMAXSIZE * 2];
+
+        (void) hts_buf_cpy_clip(tail, url_nologin_r(HTS_SIZED(masked), value));
+      } else {
+        (void) hts_buf_cpy_clip(tail, value);
+      }
     }
   }
-  hts_hide_secrets(opt, dst, size);
-  return dst;
+  hts_hide_secrets(opt, dst.p, dst.size);
+  return dst.p;
 }

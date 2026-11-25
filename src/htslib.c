@@ -4253,7 +4253,7 @@ int hts_basic_auth_value(httrackp *opt, const char *url, hts_buf out) {
   strcpybuff(user_pass, unescape_http(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                                       user_pass));
   code64(hts_span_of(user_pass), out, HTS_FALSE);
-  hts_secret_add(opt, out.p, strlen(out.p), HTS_SECRET_HEADER);
+  hts_secret_add(opt, hts_span_of(out.p), HTS_SECRET_HEADER);
   return 1;
 }
 
