@@ -45,12 +45,12 @@ enum {
 };
 
 /* "\n", "\r", "\t", "\f", "\v", "\0" and "\\" in arg, into buf. */
-static size_t st_lines_decode(const char *arg, char *buf, size_t size) {
+static size_t st_lines_decode(const char *arg, hts_buf buf) {
   static const char from[] = "nrtfv0";
   static const char to[] = "\n\r\t\f\v\0";
   size_t n = 0;
 
-  while (*arg != '\0' && n + 1 < size) {
+  while (*arg != '\0' && n + 1 < buf.size) {
     char c = *arg++;
 
     if (c == '\\' && *arg != '\0') {
@@ -59,9 +59,9 @@ static size_t st_lines_decode(const char *arg, char *buf, size_t size) {
       c = e != NULL ? to[e - from] : *arg;
       arg++;
     }
-    buf[n++] = c;
+    buf.p[n++] = c;
   }
-  buf[n] = '\0';
+  buf.p[n] = '\0';
   return n;
 }
 
@@ -73,21 +73,21 @@ static int st_lines_flags(const char *arg) {
          (strchr(arg, 'n') != NULL ? HTS_LINE_DROP_NUL : 0);
 }
 
-static FILE *st_lines_file(const char *data, size_t len) {
+static FILE *st_lines_file(hts_span data) {
   FILE *const fp = tmpfile();
 
   assertf(fp != NULL);
-  assertf(fwrite(data, 1, len, fp) == len);
+  assertf(fwrite(data.p, 1, data.len, fp) == data.len);
   rewind(fp);
   return fp;
 }
 
-/* Print len bytes of s, control bytes and the backslash escaped. */
-static void st_lines_print(const char *s, size_t len) {
+/* Print s, control bytes and the backslash escaped. */
+static void st_lines_print(hts_span s) {
   size_t i;
 
-  for (i = 0; i < len; i++) {
-    const unsigned char c = (unsigned char) s[i];
+  for (i = 0; i < s.len; i++) {
+    const unsigned char c = (unsigned char) s.p[i];
 
     if (c == '\\')
       printf("\\\\");
@@ -120,7 +120,7 @@ static int st_readline(httrackp *opt, int argc, char **argv) {
             ST_LINE_MAXCAP);
     return 1;
   }
-  fp = st_lines_file(data, st_lines_decode(text, data, sizeof(data)));
+  fp = st_lines_file(hts_span_at(data, st_lines_decode(text, HTS_BUF(data))));
   while (!feof(fp)) {
     const int flags = st_lines_flags(argv[1]);
     hts_boolean cut;
@@ -134,7 +134,7 @@ static int st_readline(httrackp *opt, int argc, char **argv) {
 
       cut = hts_readline_alloc(fp, &sline, (size_t) cap, flags);
       printf("%s[", cut ? "!" : "");
-      st_lines_print(StringBuff(sline), StringLength(sline));
+      st_lines_print(hts_span_at(StringBuff(sline), StringLength(sline)));
       printf("]");
       StringFree(sline);
       continue;
@@ -168,7 +168,7 @@ static int st_readline(httrackp *opt, int argc, char **argv) {
       printf("!");
     } else {
       printf("[");
-      st_lines_print(line, n);
+      st_lines_print(hts_span_at(line, n));
       printf("]");
     }
   }
@@ -186,7 +186,9 @@ static hts_boolean st_legacy_full;
 
 /* Copies the removed readers: the old htslib.c linput() (TAB and FF),
    rawlinput() (none) and htsserver.h linput() (both). */
-static int legacy_linput(FILE *fp, char *s, int max, int flags) {
+static int legacy_linput(FILE *fp, hts_buf b, int flags) {
+  char *const s = b.p;
+  const int max = (int) b.size;
   int c;
   int j = 0;
 
@@ -215,7 +217,9 @@ static int legacy_linput(FILE *fp, char *s, int max, int flags) {
 }
 
 /* htsserver.h's linput_trim(). */
-static int legacy_srv_linput_trim(FILE *fp, char *s, int max) {
+static int legacy_srv_linput_trim(FILE *fp, hts_buf b) {
+  char *const s = b.p;
+  const int max = (int) b.size;
   int rlen = 0;
   char *ls = (char *) malloct(max + 1);
 
@@ -223,8 +227,9 @@ static int legacy_srv_linput_trim(FILE *fp, char *s, int max) {
   if (ls) {
     char *a;
 
-    rlen = legacy_linput(
-        fp, ls, max, HTS_LINE_DROP_TAB | HTS_LINE_DROP_FF | HTS_LINE_DROP_NUL);
+    rlen =
+        legacy_linput(fp, hts_buf_at(ls, (size_t) max),
+                      HTS_LINE_DROP_TAB | HTS_LINE_DROP_FF | HTS_LINE_DROP_NUL);
     if (rlen) {
       while ((rlen > 0) && is_realspace(ls[max(rlen - 1, 0)]))
         ls[--rlen] = '\0';
@@ -244,7 +249,9 @@ static int legacy_srv_linput_trim(FILE *fp, char *s, int max) {
 }
 
 /* htsserver.h's linput_cpp(), the lang catalog reader. */
-static int legacy_srv_linput_cpp(FILE *fp, char *s, int max) {
+static int legacy_srv_linput_cpp(FILE *fp, hts_buf b) {
+  char *const s = b.p;
+  const int max = (int) b.size;
   int rlen = 0;
 
   s[0] = '\0';
@@ -254,7 +261,7 @@ static int legacy_srv_linput_cpp(FILE *fp, char *s, int max) {
     if (rlen > 0)
       if (s[rlen - 1] == '\\')
         s[--rlen] = '\0';
-    ret = legacy_srv_linput_trim(fp, s + rlen, max - rlen);
+    ret = legacy_srv_linput_trim(fp, hts_buf_skip(b, (size_t) rlen));
     if (ret > 0)
       rlen += ret;
   } while ((s[max(rlen - 1, 0)] == '\\') && (rlen < max));
@@ -275,18 +282,18 @@ static const int st_reader_flags[ST_NREADERS] = {
     HTS_LINE_DROP_TAB | HTS_LINE_DROP_FF | HTS_LINE_DROP_NUL,
     HTS_LINE_DROP_TAB | HTS_LINE_DROP_FF | HTS_LINE_DROP_NUL};
 
-/* One read by reader r, old or new, at cap into s. Returns the offset after. */
-static long st_read(FILE *fp, int r, size_t cap, hts_boolean legacy, char *s,
+/* One read by reader r, old or new, into s. Returns the offset after. */
+static long st_read(FILE *fp, int r, hts_buf s, hts_boolean legacy,
                     hts_boolean *cut) {
   *cut = HTS_FALSE;
   if (legacy && r == ST_CPP)
-    (void) legacy_srv_linput_cpp(fp, s, (int) cap);
+    (void) legacy_srv_linput_cpp(fp, s);
   else if (legacy)
-    (void) legacy_linput(fp, s, (int) cap, st_reader_flags[r]);
+    (void) legacy_linput(fp, s, st_reader_flags[r]);
   else if (r == ST_CPP)
-    *cut = hts_readline_cpp(fp, hts_buf_at(s, cap), st_reader_flags[r]);
+    *cut = hts_readline_cpp(fp, s, st_reader_flags[r]);
   else
-    *cut = hts_readline(fp, hts_buf_at(s, cap), st_reader_flags[r]);
+    *cut = hts_readline(fp, s, st_reader_flags[r]);
   return ftell(fp);
 }
 
@@ -295,11 +302,11 @@ struct st_diff_counts {
 };
 
 static void st_diff_fail(struct st_diff_counts *k, const char *why, int r,
-                         size_t cap, const char *data, size_t len) {
+                         size_t cap, hts_span data) {
   if (++k->failures <= 5) {
     printf("linediff: %s, %s cap %d input [", why, st_reader_names[r],
            (int) cap);
-    st_lines_print(data, len);
+    st_lines_print(data);
     printf("]\n");
   }
 }
@@ -308,7 +315,7 @@ static void st_diff_fail(struct st_diff_counts *k, const char *why, int r,
    line the old reader read without running out of room must come back
    identical. Returns the number of reads. */
 static size_t st_walk(FILE *fp, int r, size_t cap, long *ends,
-                      struct st_diff_counts *k, const char *data, size_t len) {
+                      struct st_diff_counts *k, hts_span data) {
   char s[ST_LINE_BIG + ST_LINE_SLACK];
   char old[ST_LINE_BIG + ST_LINE_SLACK];
   size_t n = 0;
@@ -321,19 +328,19 @@ static size_t st_walk(FILE *fp, int r, size_t cap, long *ends,
     long old_end;
 
     memset(s, '#', sizeof(s));
-    ends[n++] = st_read(fp, r, cap, HTS_FALSE, s, &cut);
+    ends[n++] = st_read(fp, r, hts_buf_at(s, cap), HTS_FALSE, &cut);
     assertf(s[cap] == '#');
     eof = feof(fp) ? HTS_TRUE : HTS_FALSE;
     fseek(fp, start, SEEK_SET);
     st_legacy_full = HTS_FALSE;
-    old_end = st_read(fp, r, cap, HTS_TRUE, old, &unused);
+    old_end = st_read(fp, r, hts_buf_at(old, cap), HTS_TRUE, &unused);
     if (st_legacy_full) {
       k->other++;
     } else {
       k->fit++;
       if (cut || old_end != ends[n - 1] || strcmp(s, old) != 0)
-        st_diff_fail(k, "differs from legacy on a line that fits", r, cap, data,
-                     len);
+        st_diff_fail(k, "differs from legacy on a line that fits", r, cap,
+                     data);
     }
     fseek(fp, ends[n - 1], SEEK_SET);
   }
@@ -342,23 +349,22 @@ static size_t st_walk(FILE *fp, int r, size_t cap, long *ends,
 
 /* Against the old readers line by line, and the same line boundaries at every
    cap: only a line's content and its cut flag may depend on the cap. */
-static void st_diff_one(const char *data, size_t len,
-                        struct st_diff_counts *k) {
-  FILE *const fp = st_lines_file(data, len);
+static void st_diff_one(hts_span data, struct st_diff_counts *k) {
+  FILE *const fp = st_lines_file(data);
   int r;
 
   for (r = 0; r < ST_NREADERS; r++) {
     long big[ST_LINE_MAXREADS];
-    const size_t nbig = st_walk(fp, r, ST_LINE_BIG, big, k, data, len);
+    const size_t nbig = st_walk(fp, r, ST_LINE_BIG, big, k, data);
     size_t cap;
 
     for (cap = 1; cap <= 24; cap++) {
       long ends[ST_LINE_MAXREADS];
-      const size_t n = st_walk(fp, r, cap, ends, k, data, len);
+      const size_t n = st_walk(fp, r, cap, ends, k, data);
 
       k->cases++;
       if (n != nbig || memcmp(ends, big, n * sizeof(ends[0])) != 0)
-        st_diff_fail(k, "line boundaries depend on the cap", r, cap, data, len);
+        st_diff_fail(k, "line boundaries depend on the cap", r, cap, data);
     }
   }
   fclose(fp);
@@ -393,9 +399,9 @@ static int st_linediff(httrackp *opt, int argc, char **argv) {
   int n;
 
   for (i = 0; i < sizeof(corpus) / sizeof(corpus[0]); i++)
-    st_diff_one(corpus[i], strlen(corpus[i]), &k);
+    st_diff_one(hts_span_of(corpus[i]), &k);
   /* NUL is data too, and the one byte only some readers drop */
-  st_diff_one("a\0b\nc", 5, &k);
+  st_diff_one(hts_span_at("a\0b\nc", 5), &k);
   for (n = 0; n < 400; n++) {
     char data[96];
     size_t len;
@@ -409,7 +415,7 @@ static int st_linediff(httrackp *opt, int argc, char **argv) {
                     ? '\0'
                     : alphabet[(seed >> 20) % (sizeof(alphabet) - 1)];
     }
-    st_diff_one(data, len, &k);
+    st_diff_one(hts_span_at(data, len), &k);
   }
   printf("linediff: %u cases, %u lines fit, %u do not, %u failures\n", k.cases,
          k.fit, k.other, k.failures);

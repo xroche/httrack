@@ -993,21 +993,21 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* Runs hts_scan_token() into an arena of destsize bytes poisoned past its end,
-   and reports whether anything past that moved. */
-static hts_boolean st_scantoken_run(char *src, size_t destsize, char *arena,
-                                    size_t guard, hts_boolean *fit,
-                                    size_t *advance) {
+/* Runs hts_scan_token() into the first destsize bytes of an arena poisoned to
+   its end, and reports whether anything past them moved. */
+static hts_boolean st_scantoken_run(char *src, size_t destsize, hts_buf arena,
+                                    hts_boolean *fit, size_t *advance) {
   char *p = src;
   size_t i;
 
+  assertf(destsize <= arena.size);
   /* poisoned with '#', not 0, or the stray NUL of an off-by-one would read as
      untouched */
-  memset(arena, '#', destsize + guard);
-  *fit = hts_scan_token(&p, arena, destsize);
+  memset(arena.p, '#', arena.size);
+  *fit = hts_scan_token(&p, arena.p, destsize);
   *advance = (size_t) (p - src);
-  for (i = destsize; i < destsize + guard; i++) {
-    if (arena[i] != '#')
+  for (i = destsize; i < arena.size; i++) {
+    if (arena.p[i] != '#')
       return HTS_FALSE;
   }
   return HTS_TRUE;
@@ -1041,14 +1041,16 @@ static int st_scantoken(httrackp *opt, int argc, char **argv) {
       for (i = 0; i < len; i++)
         src[i] = (char) ('a' + i % 26);
       memcpy(src + len, " \tb", 4);
-      assertf(st_scantoken_run(src, destsize, arena, guard, &fit, &advance));
+      assertf(st_scantoken_run(
+          src, destsize, hts_buf_at(arena, destsize + guard), &fit, &advance));
       assertf(fit == (len <= room ? HTS_TRUE : HTS_FALSE));
       assertf(strlen(arena) == kept && memcmp(arena, src, kept) == 0);
       assertf(advance == len + 2);
 
       /* when the token ends the string, the cursor stops on its NUL */
       src[len] = '\0';
-      assertf(st_scantoken_run(src, destsize, arena, guard, &fit, &advance));
+      assertf(st_scantoken_run(
+          src, destsize, hts_buf_at(arena, destsize + guard), &fit, &advance));
       assertf(fit == (len <= room ? HTS_TRUE : HTS_FALSE));
       assertf(strlen(arena) == kept && memcmp(arena, src, kept) == 0);
       assertf(advance == len);
@@ -1335,18 +1337,17 @@ static const char *st_lockrule_other(const char *name) {
 
 /* Set up <dir>/, its progress lock and both requests, NAME stamped at WHEN. */
 static hts_boolean st_lockrule_setup(const char *dir, const char *name,
-                                     char *lock, size_t locksz, char *progress,
-                                     size_t progresssz, char *other,
-                                     size_t othersz, time_t when) {
-  strlcpybuff(lock, dir, locksz);
-  strlcatbuff(lock, name, locksz);
-  strlcpybuff(progress, dir, progresssz);
-  strlcatbuff(progress, "hts-in_progress.lock", progresssz);
-  strlcpybuff(other, dir, othersz);
-  strlcatbuff(other, st_lockrule_other(name), othersz);
-  structcheck(lock);
-  return st_lockrule_touch(progress) && st_lockrule_touch(other) &&
-         st_lockrule_touch(lock) && st_lockrule_stamp(lock, when);
+                                     hts_buf lock, hts_buf progress,
+                                     hts_buf other, time_t when) {
+  hts_buf_cpy(lock, dir);
+  hts_buf_cat(lock, name);
+  hts_buf_cpy(progress, dir);
+  hts_buf_cat(progress, "hts-in_progress.lock");
+  hts_buf_cpy(other, dir);
+  hts_buf_cat(other, st_lockrule_other(name));
+  structcheck(lock.p);
+  return st_lockrule_touch(progress.p) && st_lockrule_touch(other.p) &&
+         st_lockrule_touch(lock.p) && st_lockrule_stamp(lock.p, when);
 }
 
 /* A request the engine cannot remove must never be taken. */
@@ -1373,9 +1374,8 @@ static int st_lockrule_undeletable(httrackp *opt, const char *base,
 
   strlcpybuff(rodir, base, sizeof(rodir));
   strlcatbuff(rodir, "readonly/", sizeof(rodir));
-  if (!st_lockrule_setup(rodir, name, rolock, sizeof(rolock), roprogress,
-                         sizeof(roprogress), roother, sizeof(roother),
-                         time(NULL) + 60)) {
+  if (!st_lockrule_setup(rodir, name, HTS_BUF(rolock), HTS_BUF(roprogress),
+                         HTS_BUF(roother), time(NULL) + 60)) {
     fprintf(stderr, "%s: cannot set up %s\n", tag, rolock);
     return 1;
   }
@@ -1476,8 +1476,8 @@ static int st_lockrule(httrackp *opt, int argc, char **argv, const char *tag,
     err = 1;
   }
 
-  if (!st_lockrule_setup(base, name, lock, sizeof(lock), progress,
-                         sizeof(progress), other, sizeof(other), time(NULL))) {
+  if (!st_lockrule_setup(base, name, HTS_BUF(lock), HTS_BUF(progress),
+                         HTS_BUF(other), time(NULL))) {
     fprintf(stderr, "%s: cannot set up %s\n", tag, base);
     err = 1;
   }
@@ -1609,8 +1609,8 @@ static int st_lockpoll(httrackp *opt, int argc, char **argv) {
   StringCopy(saved, StringBuff(opt->path_log));
   StringCopy(opt->path_log, base);
   opt->log = NULL; /* each take logs, and this output is exact */
-  if (!st_lockrule_setup(base, HTS_ABORT_LOCKNAME, lock, sizeof(lock), progress,
-                         sizeof(progress), other, sizeof(other), now) ||
+  if (!st_lockrule_setup(base, HTS_ABORT_LOCKNAME, HTS_BUF(lock),
+                         HTS_BUF(progress), HTS_BUF(other), now) ||
       !st_lockrule_stamp(progress, now - 10)) {
     fprintf(stderr, "lockpoll: cannot set up %s\n", base);
     err = 1;
@@ -1821,7 +1821,7 @@ static int st_usercmdrun(httrackp *opt, int argc, char **argv) {
 /* Read text as the glued digits of an option and print "got=G value=V adv=N".
    N is the number of bytes the option pointer moved. */
 static void st_glued_read(hts_boolean wide, LLint min, LLint max,
-                          const char *text, char *out, size_t size) {
+                          const char *text, hts_buf out) {
   char buf[256];
   char *com = buf;
   LLint value = ST_GLUED_UNSET;
@@ -1837,8 +1837,8 @@ static void st_glued_read(hts_boolean wide, LLint min, LLint max,
     got = cmdl_glued_int(&com, (int) min, (int) max, &narrow);
     value = narrow;
   }
-  snprintf(out, size, "got=%d value=" LLintP " adv=%d", (int) got, value,
-           (int) (com - buf));
+  hts_buf_printf_clip(out, "got=%d value=" LLintP " adv=%d", (int) got, value,
+                      (int) (com - buf));
 }
 
 /* Parses the text with the legacy sscanf() and digit loop. */
@@ -1901,7 +1901,7 @@ static int st_gluedint(httrackp *opt, int argc, char **argv) {
 
   if (argc == 4) {
     st_glued_read(strcmp(argv[0], "llint") == 0, strtoll(argv[1], NULL, 10),
-                  strtoll(argv[2], NULL, 10), argv[3], cur, sizeof(cur));
+                  strtoll(argv[2], NULL, 10), argv[3], HTS_BUF(cur));
     printf("%s\n", cur);
     return 0;
   }
@@ -1932,7 +1932,7 @@ static int st_gluedint(httrackp *opt, int argc, char **argv) {
             }
             snprintf(want, sizeof(want), "got=%d value=" LLintP " adv=%d",
                      (int) expect, old, adv);
-            st_glued_read(sites[s].wide, 0, sites[s].max, in, cur, sizeof(cur));
+            st_glued_read(sites[s].wide, 0, sites[s].max, in, HTS_BUF(cur));
             compared++;
             if (strcmp(cur, want) != 0) {
               printf("FAIL %s \"%s\": want \"%s\" now \"%s\"\n", sites[s].name,
