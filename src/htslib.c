@@ -3533,7 +3533,7 @@ int ishtml(httrackp * opt, const char *fil) {
   if ((a = strchr(fil_noquery, '?')) != NULL) {
     *a = '\0';
   }
-  if (get_userhttptype(opt, HTS_SIZED(mime), fil_noquery)) {
+  if (get_userhttptype(opt, HTS_BUF(mime), fil_noquery)) {
     if (is_html_mime_type(mime)) {
       return 1;
     } else {

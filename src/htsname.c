@@ -798,7 +798,7 @@ static hts_boolean user_mime_ext(httrackp *opt, const char *fil, hts_buf ext) {
   char BIGSTK mime[1024];
 
   mime[0] = ext.p[0] = '\0';
-  get_userhttptype(opt, HTS_SIZED(mime), fil);
+  get_userhttptype(opt, HTS_BUF(mime), fil);
   return strnotempty(mime) && give_mimext(ext, mime) ? HTS_TRUE : HTS_FALSE;
 }
 
