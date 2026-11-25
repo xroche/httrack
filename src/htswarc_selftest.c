@@ -85,12 +85,16 @@ static unsigned char *warc_next_member(const unsigned char **in,
   return out;
 }
 
-/* Validate a synthetic transaction's .warc.gz against WARC/1.1. */
-/* Where does NEEDLE first occur in HAY, which may hold NULs? */
-static const char *warc_memstr(hts_span hay, const char *needle) {
-  return hts_memstr(hay.p, hay.len, needle, strlen(needle));
+/* Where does the first NEEDLE in HAY, which may hold NULs, end? NULL if absent.
+ */
+static const char *warc_after(hts_span hay, const char *needle) {
+  const size_t n = strlen(needle);
+  const char *const at = hts_memstr(hay.p, hay.len, needle, n);
+
+  return at != NULL ? at + n : NULL;
 }
 
+/* Validate a synthetic transaction's .warc.gz against WARC/1.1. */
 static int st_warc(httrackp *opt, int argc, char **argv) {
   char path[HTS_URLMAXSIZE];
   warc_writer *w;
@@ -172,21 +176,22 @@ static int st_warc(httrackp *opt, int argc, char **argv) {
       err = 1;
       break;
     }
+    const hts_span whole = hts_span_at((const char *) rec, rlen);
     nrec++;
     /* magic */
     ST_FAIL_IF(err, rlen < 8 || memcmp(rec, "WARC/1.", 7) != 0);
     /* record header ends at the first blank line */
-    sep = warc_memstr(hts_span_at((const char *) rec, rlen), "\r\n\r\n");
+    sep = warc_after(whole, "\r\n\r\n");
     if (sep == NULL) {
       err = 1;
       freet(rec);
       continue;
     }
-    hdr_len = (size_t) ((const unsigned char *) sep - rec) + 4;
+    hdr_len = (size_t) ((const unsigned char *) sep - rec);
     const hts_span head = hts_span_at((const char *) rec, hdr_len);
     /* Content-Length must equal the actual block length */
-    cl = warc_memstr(head, "Content-Length:");
-    if (cl == NULL || sscanf(cl + 15, "%lld", &block_len) != 1)
+    cl = warc_after(head, "Content-Length:");
+    if (cl == NULL || sscanf(cl, "%lld", &block_len) != 1)
       err = 1;
     else {
       if (hdr_len + (size_t) block_len + 4 != rlen)
@@ -194,53 +199,47 @@ static int st_warc(httrackp *opt, int argc, char **argv) {
       else if (memcmp(rec + hdr_len + block_len, "\r\n\r\n", 4) != 0)
         err = 1; /* trailer intact */
     }
-    if (warc_memstr(head, "WARC-Type: warcinfo") != NULL)
+    if (warc_after(head, "WARC-Type: warcinfo") != NULL)
       ninfo++;
-    if (warc_memstr(head, "WARC-Type: request") != NULL)
+    if (warc_after(head, "WARC-Type: request") != NULL)
       nreq++;
-    if (warc_memstr(head, "WARC-Type: response") != NULL)
+    if (warc_after(head, "WARC-Type: response") != NULL)
       nresp++;
-    if (warc_memstr(head, "WARC-Type: revisit") != NULL)
+    if (warc_after(head, "WARC-Type: revisit") != NULL)
       nrevisit++;
     /* F1: the full body must appear exactly once across the whole file (a
        revisit must not re-embed it). */
-    if (warc_memstr(hts_span_at((const char *) rec, rlen), a_body) != NULL)
+    if (warc_after(whole, a_body) != NULL)
       body_occurrences++;
     /* F1: the a2.html identical-payload-digest revisit carries no body. */
-    if (warc_memstr(head, "WARC-Target-URI: http://test.local/a2.html") !=
+    if (warc_after(head, "WARC-Target-URI: http://test.local/a2.html") !=
             NULL &&
-        warc_memstr(head, "WARC-Type: revisit") != NULL)
-      a2_bodyless =
-          (warc_memstr(hts_span_at((const char *) rec, rlen), a_body) == NULL);
+        warc_after(head, "WARC-Type: revisit") != NULL)
+      a2_bodyless = (warc_after(whole, a_body) == NULL);
     /* F3: the empty-header 304 revisit block is exactly the 2-byte separator
        (the request record shares this target URI, so match the revisit only).
      */
-    if (warc_memstr(head, "WARC-Target-URI: http://test.local/nm") != NULL &&
-        warc_memstr(head, "WARC-Type: revisit") != NULL)
+    if (warc_after(head, "WARC-Target-URI: http://test.local/nm") != NULL &&
+        warc_after(head, "WARC-Type: revisit") != NULL)
       nm_cl_ok = (block_len == 2);
     /* a.html response body round-trips; no Content-Encoding (plaintext) and the
        whitespaced Transfer-Encoding was dropped. */
-    if (warc_memstr(head, "WARC-Target-URI: http://test.local/a.html") !=
-            NULL &&
-        warc_memstr(head, "msgtype=response") != NULL) {
-      const char *bsep = warc_memstr(
-          hts_span_at((const char *) rec + hdr_len, (size_t) block_len),
-          "\r\n\r\n");
+    if (warc_after(head, "WARC-Target-URI: http://test.local/a.html") != NULL &&
+        warc_after(head, "msgtype=response") != NULL) {
+      const hts_span msg =
+          hts_span_at((const char *) rec, hdr_len + (size_t) block_len);
+      const char *bsep = warc_after(hts_span_skip(msg, hdr_len), "\r\n\r\n");
       if (bsep == NULL)
         err = 1;
       else {
-        size_t bodyoff = (size_t) (bsep - (char *) rec) + 4;
+        size_t bodyoff = (size_t) (bsep - (char *) rec);
         size_t got = rlen - 4 - bodyoff; /* minus record trailer */
         ST_FAIL_IF(err, got != sizeof(a_body) - 1 ||
                             memcmp(rec + bodyoff, a_body, got) != 0);
         seen_a_body = 1;
       }
-      ST_FAIL_IF(err, warc_memstr(hts_span_at((const char *) rec,
-                                              hdr_len + (size_t) block_len),
-                                  "Content-Encoding") != NULL ||
-                          warc_memstr(hts_span_at((const char *) rec,
-                                                  hdr_len + (size_t) block_len),
-                                      "Transfer-Encoding") != NULL);
+      ST_FAIL_IF(err, warc_after(msg, "Content-Encoding") != NULL ||
+                          warc_after(msg, "Transfer-Encoding") != NULL);
     }
     freet(rec);
   }
@@ -271,14 +270,14 @@ static int st_warc(httrackp *opt, int argc, char **argv) {
 /* Parse a record's header/block split; sets *hdr_len and *block_len, returns 0
    when Content-Length matches the actual block bytes, -1 otherwise. */
 static int warc_rec_split(hts_span rec, size_t *hdr_len, long long *block_len) {
-  const char *sep = warc_memstr(rec, "\r\n\r\n");
+  const char *sep = warc_after(rec, "\r\n\r\n");
   const char *cl;
   *block_len = 0;
   if (sep == NULL)
     return -1;
-  *hdr_len = (size_t) (sep - rec.p) + 4;
-  cl = warc_memstr(hts_span_at(rec.p, *hdr_len), "Content-Length:");
-  if (cl == NULL || sscanf(cl + 15, "%lld", block_len) != 1 ||
+  *hdr_len = (size_t) (sep - rec.p);
+  cl = warc_after(hts_span_at(rec.p, *hdr_len), "Content-Length:");
+  if (cl == NULL || sscanf(cl, "%lld", block_len) != 1 ||
       *hdr_len + (size_t) *block_len + 4 != rec.len)
     return -1;
   return 0;
@@ -341,24 +340,22 @@ static int st_warc_trunc(httrackp *opt, int argc, char **argv) {
       continue;
     }
     const hts_span head = hts_span_at((const char *) rec, hdr_len);
-    if (warc_memstr(head, "WARC-Type: response") != NULL) {
+    if (warc_after(head, "WARC-Type: response") != NULL) {
       nresp++;
-      if (warc_memstr(head, "WARC-Target-URI: http://test.local/big.bin") !=
+      if (warc_after(head, "WARC-Target-URI: http://test.local/big.bin") !=
               NULL &&
-          warc_memstr(head, "WARC-Truncated: length") != NULL)
+          warc_after(head, "WARC-Truncated: length") != NULL)
         trunc_len = 1;
-      if (warc_memstr(head, "WARC-Target-URI: http://test.local/big.gz") !=
+      if (warc_after(head, "WARC-Target-URI: http://test.local/big.gz") !=
           NULL) {
-        const char *bsep = warc_memstr(
-            hts_span_at((const char *) rec + hdr_len, (size_t) block_len),
-            "\r\n\r\n");
-        size_t bodyoff = bsep ? (size_t) (bsep - (char *) rec) + 4 : 0;
+        const hts_span block =
+            hts_span_at((const char *) rec + hdr_len, (size_t) block_len);
+        const char *bsep = warc_after(block, "\r\n\r\n");
+        size_t bodyoff = bsep ? (size_t) (bsep - (char *) rec) : 0;
         size_t got = bsep ? rlen - 4 - bodyoff : 0;
         /* WARC-Truncated: time, Content-Encoding kept, stored body == coded. */
-        if (bsep != NULL && warc_memstr(head, "WARC-Truncated: time") != NULL &&
-            warc_memstr(
-                hts_span_at((const char *) rec + hdr_len, (size_t) block_len),
-                "Content-Encoding:") != NULL &&
+        if (bsep != NULL && warc_after(head, "WARC-Truncated: time") != NULL &&
+            warc_after(block, "Content-Encoding:") != NULL &&
             got == sizeof(gz) && memcmp(rec + bodyoff, gz, sizeof(gz)) == 0)
           trunc_gz = 1;
       }
@@ -406,19 +403,19 @@ static int st_warc_ftp(httrackp *opt, int argc, char **argv) {
     ST_FAIL_IF(err, warc_rec_split(hts_span_at((const char *) rec, rlen),
                                    &hdr_len, &block_len) != 0);
     const hts_span head = hts_span_at((const char *) rec, hdr_len);
-    if (warc_memstr(head, "WARC-Type: resource") != NULL) {
+    if (warc_after(head, "WARC-Type: resource") != NULL) {
       nresource++;
       /* block is the raw payload, no HTTP envelope */
       ST_FAIL_IF(err, (size_t) block_len != sizeof(body) - 1 ||
                           memcmp(rec + hdr_len, body, sizeof(body) - 1) != 0);
-      if (warc_memstr(head, "WARC-Target-URI: ftp://ftp.local/file.bin") ==
+      if (warc_after(head, "WARC-Target-URI: ftp://ftp.local/file.bin") ==
               NULL ||
-          warc_memstr(head, "Content-Type: application/octet-stream") == NULL)
+          warc_after(head, "Content-Type: application/octet-stream") == NULL)
         err = 1;
     }
-    if (warc_memstr(head, "WARC-Type: response") != NULL)
+    if (warc_after(head, "WARC-Type: response") != NULL)
       nresp++;
-    if (warc_memstr(head, "WARC-Type: request") != NULL)
+    if (warc_after(head, "WARC-Type: request") != NULL)
       nreq++;
     freet(rec);
   }
@@ -490,8 +487,8 @@ static int st_warc_rotate(httrackp *opt, int argc, char **argv) {
       ST_FAIL_IF(err, warc_rec_split(hts_span_at((const char *) rec, rlen),
                                      &hdr_len, &block_len) != 0);
       if (first) { /* each segment leads with its own warcinfo */
-        ST_FAIL_IF(err, warc_memstr(hts_span_at((const char *) rec, hdr_len),
-                                    "WARC-Type: warcinfo") == NULL);
+        ST_FAIL_IF(err, warc_after(hts_span_at((const char *) rec, hdr_len),
+                                   "WARC-Type: warcinfo") == NULL);
         first = 0;
       }
       freet(rec);
@@ -551,13 +548,12 @@ static int st_warc_verbatim(httrackp *opt, int argc, char **argv) {
       ST_FAIL_IF(err, rlen != 0);
       break;
     }
-    if (warc_memstr(hts_span_at((const char *) rec, rlen),
-                    "msgtype=response") == NULL) {
+    const hts_span whole = hts_span_at((const char *) rec, rlen);
+    if (warc_after(whole, "msgtype=response") == NULL) {
       freet(rec);
       continue;
     }
-    if (warc_rec_split(hts_span_at((const char *) rec, rlen), &hdr_len,
-                       &block_len) != 0) {
+    if (warc_rec_split(whole, &hdr_len, &block_len) != 0) {
       err = 1;
       freet(rec);
       continue;
@@ -566,35 +562,34 @@ static int st_warc_verbatim(httrackp *opt, int argc, char **argv) {
        compressed size. */
     {
       const char *block = (char *) rec + hdr_len;
-      const char *ce = warc_memstr(hts_span_at(block, (size_t) block_len),
-                                   "Content-Encoding:");
-      const char *hcl = warc_memstr(hts_span_at(block, (size_t) block_len),
-                                    "Content-Length:");
+      const char *ce = warc_after(hts_span_at(block, (size_t) block_len),
+                                  "Content-Encoding:");
+      const char *hcl =
+          warc_after(hts_span_at(block, (size_t) block_len), "Content-Length:");
       long long http_cl = -1;
       int nce = 0;
       const char *scan = ce;
       while (scan != NULL) {
         size_t rem = (size_t) block_len - (size_t) (scan - block);
         nce++;
-        scan =
-            warc_memstr(hts_span_at(scan + 17, rem - 17), "Content-Encoding:");
+        scan = warc_after(hts_span_at(scan, rem), "Content-Encoding:");
       }
-      ST_FAIL_IF(err, ce == NULL || hts_strncasecmp(ce + 17, " gzip", 5) != 0 ||
+      ST_FAIL_IF(err, ce == NULL || hts_strncasecmp(ce, " gzip", 5) != 0 ||
                           nce != 1);
-      ST_FAIL_IF(err, warc_memstr(hts_span_at(block, (size_t) block_len),
-                                  "Transfer-Encoding:") != NULL);
-      ST_FAIL_IF(err, hcl == NULL || sscanf(hcl + 15, "%lld", &http_cl) != 1 ||
+      ST_FAIL_IF(err, warc_after(hts_span_at(block, (size_t) block_len),
+                                 "Transfer-Encoding:") != NULL);
+      ST_FAIL_IF(err, hcl == NULL || sscanf(hcl, "%lld", &http_cl) != 1 ||
                           http_cl != (long long) sizeof(a_gz));
     }
     /* Stored block bytes equal the gzip input, and inflate to the plaintext. */
     {
-      const char *bsep = warc_memstr(
+      const char *bsep = warc_after(
           hts_span_at((const char *) rec + hdr_len, (size_t) block_len),
           "\r\n\r\n");
       if (bsep == NULL)
         err = 1;
       else {
-        size_t bodyoff = (size_t) (bsep - (char *) rec) + 4;
+        size_t bodyoff = (size_t) (bsep - (char *) rec);
         size_t got = rlen - 4 - bodyoff; /* minus the record trailer */
         if (got != sizeof(a_gz) ||
             memcmp(rec + bodyoff, a_gz, sizeof(a_gz)) != 0)
@@ -961,16 +956,15 @@ static int st_warc_cdx(httrackp *opt, int argc, char **argv) {
     /* must be sorted */
     ST_FAIL_IF(err, prev[0] != '\0' && strcmp(prev, line) > 0);
     strlcpybuff(prev, line, sizeof(prev));
-    j = strstr(line, "\"url\": \"");
-    o = strstr(line, "\"offset\": \"");
-    l = strstr(line, "\"length\": \"");
-    if (j == NULL || o == NULL || l == NULL ||
-        sscanf(o + 11, "%llu", &off) != 1 ||
-        sscanf(l + 11, "%llu", &len) != 1) {
+    j = warc_after(hts_span_of(line), "\"url\": \"");
+    o = warc_after(hts_span_of(line), "\"offset\": \"");
+    l = warc_after(hts_span_of(line), "\"length\": \"");
+    if (j == NULL || o == NULL || l == NULL || sscanf(o, "%llu", &off) != 1 ||
+        sscanf(l, "%llu", &len) != 1) {
       err = 1;
       goto nextline;
     }
-    us = j + 8;
+    us = j;
     ue = strchr(us, '"');
     if (ue == NULL || (urllen = (size_t) (ue - us)) >= sizeof(url)) {
       err = 1;
@@ -996,8 +990,8 @@ static int st_warc_cdx(httrackp *opt, int argc, char **argv) {
     {
       char needle[1100];
       snprintf(needle, sizeof(needle), "WARC-Target-URI: %s\r\n", url);
-      ST_FAIL_IF(err, warc_memstr(hts_span_at((const char *) rec, rlen),
-                                  needle) == NULL);
+      ST_FAIL_IF(err, warc_after(hts_span_at((const char *) rec, rlen),
+                                 needle) == NULL);
     }
     freet(rec);
   nextline:
@@ -1054,11 +1048,11 @@ static int st_warc_cdx_utf8(httrackp *opt, int argc, char **argv) {
       if (json == NULL || !hts_isStringUTF8(hts_span_between(lp, end))) {
         fprintf(stderr, "warc-cdx-utf8: line %d is not UTF-8\n", nlines);
         err = 1;
-      } else if (warc_memstr(hts_span_at(json, (size_t) (end - json)),
-                             "/caf\\ufffd\"") != NULL) {
+      } else if (warc_after(hts_span_at(json, (size_t) (end - json)),
+                            "/caf\\ufffd\"") != NULL) {
         nescaped++;
-      } else if (warc_memstr(hts_span_at(json, (size_t) (end - json)),
-                             "/caf\xc3\xa9\"") != NULL) {
+      } else if (warc_after(hts_span_at(json, (size_t) (end - json)),
+                            "/caf\xc3\xa9\"") != NULL) {
         nverbatim++;
       }
     }
@@ -1287,13 +1281,13 @@ static int st_warc_holds(const char *name, const char *path, const char *want,
             name, path);
     err++;
   }
-  if (warc_memstr(hts_span_at(blob, len), want) == NULL) {
+  if (warc_after(hts_span_at(blob, len), want) == NULL) {
     fprintf(stderr, "warc-teardown: %s: %s lost the run holding \"%s\"\n", name,
             path, want);
     err++;
   }
   for (i = 0; i < 2; i++) {
-    if (warc_memstr(hts_span_at(blob, len), absent[i]) != NULL) {
+    if (warc_after(hts_span_at(blob, len), absent[i]) != NULL) {
       fprintf(stderr, "warc-teardown: %s: %s took \"%s\"\n", name, path,
               absent[i]);
       err++;
@@ -1382,8 +1376,8 @@ static int st_warc_disk_case(httrackp *opt, const char *dir) {
   warc_close_opt(opt);
   freet(back);
   blob = st_slurp(path, &len);
-  if (blob == NULL || warc_memstr(hts_span_at(blob, len),
-                                  "warc-disk-body-END\r\n\r\n") == NULL) {
+  if (blob == NULL || warc_after(hts_span_at(blob, len),
+                                 "warc-disk-body-END\r\n\r\n") == NULL) {
     fprintf(stderr, "warc-teardown: disk: %s lacks the whole on-disk body\n",
             path);
     err++;
@@ -1544,10 +1538,10 @@ static int st_warc_wacz(httrackp *opt, int argc, char **argv) {
       const char *body = nl ? nl + 1 : NULL;
       size_t blen =
           body ? pages->len - (size_t) (body - (char *) pages->data) : 0;
-      ST_FAIL_IF(
-          err, body == NULL || blen == 0 ||
-                   warc_memstr(hts_span_at(body, blen), "\"url\": ") == NULL ||
-                   warc_memstr(hts_span_at(body, blen), "\"ts\": ") == NULL);
+      ST_FAIL_IF(err,
+                 body == NULL || blen == 0 ||
+                     warc_after(hts_span_at(body, blen), "\"url\": ") == NULL ||
+                     warc_after(hts_span_at(body, blen), "\"ts\": ") == NULL);
     }
   }
 
@@ -1563,11 +1557,10 @@ static int st_warc_wacz(httrackp *opt, int argc, char **argv) {
       ST_FAIL_IF(err, strstr(json, "\"profile\": \"data-package\"") == NULL ||
                           strstr(json, "\"wacz_version\": \"") == NULL);
       p = json;
-      while ((p = strstr(p, "\"path\": \"")) != NULL) {
+      while ((p = warc_after(hts_span_of(p), "\"path\": \"")) != NULL) {
         char path[256], want[80], got[65];
         const char *pe, *h;
         size_t plen;
-        p += 9;
         pe = strchr(p, '"');
         if (pe == NULL || (plen = (size_t) (pe - p)) >= sizeof(path)) {
           err = 1;
@@ -1575,8 +1568,8 @@ static int st_warc_wacz(httrackp *opt, int argc, char **argv) {
         }
         memcpy(path, p, plen);
         path[plen] = '\0';
-        h = strstr(pe, "\"hash\": \"sha256:");
-        if (h == NULL || sscanf(h + 16, "%79[0-9a-f]", want) != 1) {
+        h = warc_after(hts_span_of(pe), "\"hash\": \"sha256:");
+        if (h == NULL || sscanf(h, "%79[0-9a-f]", want) != 1) {
           err = 1;
           break;
         }
@@ -1590,8 +1583,8 @@ static int st_warc_wacz(httrackp *opt, int argc, char **argv) {
                            HTS_BUF(got)) ||
                        strcmp(got, want) != 0);
         if (i < nent) {
-          const char *bytes = strstr(pe, "\"bytes\": ");
-          ST_FAIL_IF(err, bytes == NULL || strtoull(bytes + 9, NULL, 10) !=
+          const char *bytes = warc_after(hts_span_of(pe), "\"bytes\": ");
+          ST_FAIL_IF(err, bytes == NULL || strtoull(bytes, NULL, 10) !=
                                                (unsigned long long) ent[i].len);
         }
         p = pe;
@@ -1613,8 +1606,8 @@ static int st_warc_wacz(httrackp *opt, int argc, char **argv) {
       memcpy(djson, dig->data, dig->len);
       djson[dig->len] = '\0';
       ST_FAIL_IF(err, strstr(djson, "\"path\": \"datapackage.json\"") == NULL);
-      h = strstr(djson, "\"hash\": \"sha256:");
-      ST_FAIL_IF(err, h == NULL || sscanf(h + 16, "%79[0-9a-f]", want) != 1 ||
+      h = warc_after(hts_span_of(djson), "\"hash\": \"sha256:");
+      ST_FAIL_IF(err, h == NULL || sscanf(h, "%79[0-9a-f]", want) != 1 ||
                           strcmp(want, dphex) != 0);
     }
     freet(djson);
