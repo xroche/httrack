@@ -311,7 +311,7 @@ static void cmdl_panic_value(httrackp *opt, const char *msg,
 
   char shown[HTS_CDLMAXSIZE];
 
-  if (hts_is_quoted(value, strlen(value)))
+  if (hts_is_quoted(hts_span_of(value)))
     snprintf(s, sizeof(s), "%s: \"%s " HTS_QUOTED_HINT, msg,
              adr_nologin_r(HTS_BUF(shown), value + 1));
   else
@@ -344,7 +344,7 @@ static void cmdl_bad_option(httrackp *opt, const char *arg, const char *prefix,
                             const char *com) {
   char s[HTS_CDLMAXSIZE * 2 + 256];
 
-  if (hts_is_quoted(com, strlen(com)))
+  if (hts_is_quoted(hts_span_of(com)))
     snprintf(s, sizeof(s), "Option %.*s: %s " HTS_QUOTED_HINT,
              (int) (com - arg), arg, com);
   else
@@ -2164,7 +2164,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                           "Option warc-max-size needs a blank space and a size",
                           NULL))
                     return -1;
-                  if (hts_is_quoted(argv[na], strlen(argv[na]))) {
+                  if (hts_is_quoted(hts_span_of(argv[na]))) {
                     cmdl_panic_value(opt, "Option warc-max-size needs a size",
                                      argv[na]);
                     return -1;
@@ -2696,7 +2696,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
         const size_t urlSize = strlen(argv[na]);
         const size_t capa = strlen(*url) + urlSize + 32;
 
-        if (hts_is_quoted(argv[na], urlSize)) {
+        if (hts_is_quoted(hts_span_at(argv[na], urlSize))) {
           cmdl_panic_value(opt, "Argument refused", argv[na]);
           return -1;
         }

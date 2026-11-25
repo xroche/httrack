@@ -583,7 +583,7 @@ static void optvalue_error(const char *name, const char *param,
   char help[256];
 
   optalias_help_line(HTS_BUF(help), name);
-  if (hts_is_quoted(param, strlen(param)))
+  if (hts_is_quoted(hts_span_of(param)))
     hts_buf_printf_clip(return_error,
                         "Syntax error:\n\tOption --%s: %s " HTS_QUOTED_HINT
                         "\n%s",

@@ -122,14 +122,14 @@ char **hts_split_webcmd(char *cmd, int *nargs) {
   return hts_split_args(cmd, nargs, HTS_SPLIT_FOLD_WS | HTS_SPLIT_STRIP_QUOTES);
 }
 
-void hts_escape_arg(String *out, const char *arg, size_t len) {
+void hts_escape_arg(String *out, hts_span arg) {
   size_t i;
 
-  for (i = 0; i < len; i++) {
-    if (arg[i] == '\\' || arg[i] == '\"') {
+  for (i = 0; i < arg.len; i++) {
+    if (arg.p[i] == '\\' || arg.p[i] == '\"') {
       StringAddchar(*out, '\\');
     }
-    StringAddchar(*out, arg[i]);
+    StringAddchar(*out, arg.p[i]);
   }
 }
 
@@ -138,15 +138,15 @@ void hts_quote_arg(String *out, const char *arg) {
     StringCat(*out, "\"\"");
   } else if (strpbrk(arg, " \"\\") != NULL) {
     StringAddchar(*out, '\"');
-    hts_escape_arg(out, arg, strlen(arg));
+    hts_escape_arg(out, hts_span_of(arg));
     StringAddchar(*out, '\"');
   } else {
     StringCat(*out, arg);
   }
 }
 
-hts_boolean hts_is_quoted(const char *arg, size_t len) {
-  return len >= 2 && arg[0] == '\"' && arg[len - 1] == '\"';
+hts_boolean hts_is_quoted(hts_span arg) {
+  return arg.len >= 2 && arg.p[0] == '\"' && arg.p[arg.len - 1] == '\"';
 }
 
 hts_boolean hts_unquote_arg(char *arg) {
@@ -155,7 +155,7 @@ hts_boolean hts_unquote_arg(char *arg) {
   if (arg[0] != '\"') {
     return HTS_TRUE;
   }
-  if (!hts_is_quoted(arg, len)) {
+  if (!hts_is_quoted(hts_span_at(arg, len))) {
     return HTS_FALSE;
   }
   memmove(arg, arg + 1, len - 2);

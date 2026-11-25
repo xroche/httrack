@@ -1137,7 +1137,7 @@ static void cat_cmdline_argn(String *output, hts_span value) {
   size_t i;
 
   /* the HTML escape leaves the argument escapes alone, so they compose */
-  hts_escape_arg(&escaped, value.p, value.len);
+  hts_escape_arg(&escaped, value);
   for (i = 0; i < StringLength(escaped); i++) {
     const char c = StringBuff(escaped)[i];
 
