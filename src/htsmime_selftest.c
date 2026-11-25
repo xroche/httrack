@@ -179,7 +179,7 @@ static int st_sniff(httrackp *opt, int argc, char **argv) {
   char BIGSTK body[1024];
   size_t n;
 
-  n = st_decode_body(argv[1], body, sizeof(body));
+  n = st_decode_body(argv[1], HTS_BUF(body));
   printf("sniff: known=%d consistent=%d\n",
          hts_sniff_mime_known(argv[0]) == HTS_TRUE,
          hts_sniff_mime_consistent(hts_span_at(body, n), argv[0]) == HTS_TRUE);

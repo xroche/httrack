@@ -38,7 +38,7 @@ static int st_charset(httrackp *opt, int argc, char **argv) {
   size_t len;
   char *s;
 
-  len = st_decode_body(argv[1], buf, sizeof(buf));
+  len = st_decode_body(argv[1], HTS_BUF(buf));
   s = hts_convertStringToUTF8(buf, len, argv[0]);
   if (s != NULL) {
     printf("%s\n", s);
@@ -219,7 +219,7 @@ static int st_isutf8(httrackp *opt, int argc, char **argv) {
   char buf[512];
   size_t len;
 
-  len = st_decode_body(argv[0], buf, sizeof(buf));
+  len = st_decode_body(argv[0], HTS_BUF(buf));
   printf("%d\n", hts_isStringUTF8(hts_span_at(buf, len)) ? 1 : 0);
   return 0;
 }
@@ -229,7 +229,7 @@ static int st_idna_encode(httrackp *opt, int argc, char **argv) {
   size_t len;
   char *s;
 
-  len = st_decode_body(argv[0], buf, sizeof(buf));
+  len = st_decode_body(argv[0], HTS_BUF(buf));
   s = hts_convertStringUTF8ToIDNA(hts_span_at(buf, len));
   if (s != NULL) {
     printf("%s\n", s);
@@ -778,7 +778,7 @@ static int st_escape_control(httrackp *opt, int argc, char **argv) {
   size_t k, m;
 
   if (argc > 0) {
-    const size_t n = st_decode_body(argv[0], buf, sizeof(buf));
+    const size_t n = st_decode_body(argv[0], HTS_BUF(buf));
 
     assertf(n < sizeof(buf));
     escape_remove_control(buf);

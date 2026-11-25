@@ -446,7 +446,7 @@ static void makeindex_run(httrackp *opt, const char *path, const char *footer,
   hts_finish_makeindex(opt, &done, &fp, links, firstlink, footer, "", "");
   assertf(fp == NULL); /* the function closed and cleared it */
   assertf(done != 0);
-  st_read_file(path, buf.p, buf.size);
+  st_read_file(path, buf);
 }
 
 // Read a whole file into a NUL-terminated heap string, NULL if unreadable.
@@ -1242,14 +1242,15 @@ static int st_fullpath(httrackp *opt, int argc, char **argv) {
 // wrappers, exercising hts_pathToUCS2's \\?\ prefixing on Windows (#133).
 static int st_longpath(httrackp *opt, int argc, char **argv) {
   char path[HTS_URLMAXSIZE * 2];
-  size_t n = st_mkdeep(path, sizeof(path), argv[0], NULL, "longpath", NULL);
+  size_t n = st_mkdeep(HTS_BUF(path), argv[0], NULL, "longpath", NULL);
 
   if (n == 0) {
     return 1;
   }
   memcpybuff(path + n, "/leaf.bin", sizeof("/leaf.bin"));
   n += sizeof("/leaf.bin") - 1;
-  assertf(st_utf16_units(path, n) > 260); /* the limit \\?\ lifts */
+  /* the limit \\?\ lifts */
+  assertf(st_utf16_units(hts_span_at(path, n)) > 260);
 
   static const char payload[] = "longpath-ok";
   FILE *fp = FOPEN(path, "wb");
@@ -1286,8 +1287,8 @@ static int st_longpath(httrackp *opt, int argc, char **argv) {
 static int st_mirrorio(httrackp *opt, int argc, char **argv) {
   char path[HTS_URLMAXSIZE * 2];
   size_t base = 0;
-  size_t n = st_mkdeep(path, sizeof(path), argv[0],
-                       "/" ST_NONASCII "-non-ascii-seg", "mirrorio", &base);
+  size_t n = st_mkdeep(HTS_BUF(path), argv[0], "/" ST_NONASCII "-non-ascii-seg",
+                       "mirrorio", &base);
 
   if (n == 0) {
     return 1;
@@ -1296,7 +1297,8 @@ static int st_mirrorio(httrackp *opt, int argc, char **argv) {
 
   memcpybuff(path + n, "/leaf.bin", sizeof("/leaf.bin"));
   n += sizeof("/leaf.bin") - 1;
-  assertf(st_utf16_units(path, n) > 260); /* the limit \\?\ lifts */
+  /* the limit \\?\ lifts */
+  assertf(st_utf16_units(hts_span_at(path, n)) > 260);
 
   static const char payload[] = "mirrorio-ok";
 
@@ -1347,7 +1349,7 @@ static int st_mirrorio(httrackp *opt, int argc, char **argv) {
 }
 
 static void ro_put(const char *path, const char *data) {
-  st_put_file(path, data, strlen(data));
+  st_put_file(path, hts_span_of(data));
 }
 
 /* HTS_TRUE if path holds exactly data. */
@@ -1702,7 +1704,7 @@ static int st_direnum(httrackp *opt, int argc, char **argv) {
   char path[HTS_URLMAXSIZE * 2];
   size_t base = 0;
   const size_t dirlen =
-      st_mkdeep(path, sizeof(path), argv[0], "/" ST_NONASCII "-non-ascii-seg",
+      st_mkdeep(HTS_BUF(path), argv[0], "/" ST_NONASCII "-non-ascii-seg",
                 "direnum", &base);
 
   if (dirlen == 0) {

@@ -61,20 +61,20 @@ const char *st_family_name(hts_browser_family family) {
   return st_families[family];
 }
 
-void st_put_file(const char *path, const void *data, size_t size) {
+void st_put_file(const char *path, hts_span data) {
   FILE *const fp = FOPEN(path, "wb");
 
   assertf(fp != NULL);
-  assertf(hts_fwrite_exact(data, size, fp));
+  assertf(hts_fwrite_exact(data.p, data.len, fp));
   fclose(fp);
 }
 
-void st_read_file(const char *path, char *buf, size_t size) {
+void st_read_file(const char *path, hts_buf buf) {
   char *all = readfile_utf8(path);
 
-  buf[0] = '\0';
+  buf.p[0] = '\0';
   if (all != NULL) {
-    strlncatbuff(buf, all, size, size - 1);
+    hts_buf_catn(buf, all, buf.size - 1);
     freet(all);
   }
 }
@@ -97,28 +97,26 @@ char *st_slurp_ansi(const char *path, size_t *len) {
   return buf;
 }
 
-/* Decode an argument ("hex:FFD8.." or literal text) into buf. Raw non-UTF-8
-   bytes cannot survive a Windows command line, so hostile inputs go as hex. */
-size_t st_decode_body(const char *arg, char *buf, size_t size) {
+/* Raw non-UTF-8 bytes cannot survive a Windows command line, so hostile inputs
+   go as hex. */
+size_t st_decode_body(const char *arg, hts_buf buf) {
   size_t n = 0;
 
   if (strncmp(arg, "hex:", 4) == 0) {
     const char *s = arg + 4;
 
-    for (; s[0] != '\0' && s[1] != '\0' && n + 1 < size; s += 2) {
+    for (; s[0] != '\0' && s[1] != '\0' && n + 1 < buf.size; s += 2) {
       unsigned int byte;
 
       if (sscanf(s, "%2x", &byte) != 1)
         break;
-      buf[n++] = (char) byte;
+      buf.p[n++] = (char) byte;
     }
+    buf.p[n] = '\0';
   } else {
-    n = strlen(arg);
-    if (n >= size)
-      n = size - 1;
-    memcpy(buf, arg, n);
+    (void) hts_buf_put_span_clip(buf, hts_span_of(arg));
+    n = strlen(buf.p);
   }
-  buf[n] = '\0';
   return n;
 }
 
@@ -215,11 +213,11 @@ hts_boolean st_mkdir_at(const char *path, size_t n, const char *who) {
 
 // UTF-16 units a UTF-8 run costs, which is what Windows measures MAX_PATH in.
 // A stray byte is charged short, and short only ever builds a longer path.
-size_t st_utf16_units(const char *s, size_t n) {
+size_t st_utf16_units(hts_span s) {
   size_t units = 0;
 
-  for (size_t i = 0; i < n; i++) {
-    const unsigned char c = (unsigned char) s[i];
+  for (size_t i = 0; i < s.len; i++) {
+    const unsigned char c = (unsigned char) s.p[i];
 
     if ((c & 0xC0) == 0x80) {
       continue; /* continuation byte: charged with its lead */
@@ -232,22 +230,22 @@ size_t st_utf16_units(const char *s, size_t n) {
 // Build a tree under dir whose deepest path clears MAX_PATH (260): an optional
 // non-ASCII first segment, then ASCII ones (#133). 0 on failure; *baselen is
 // where teardown must stop, and is written on every path.
-size_t st_mkdeep(char *buf, size_t bufsize, const char *dir, const char *nseg,
+size_t st_mkdeep(hts_buf buf, const char *dir, const char *nseg,
                  const char *who, size_t *baselen) {
   // 40-char segments: each under the 255 per-component limit \\?\ can't lift.
   static const char seg[] = "/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-  const size_t room = bufsize - (sizeof(seg) + ST_LEAF_ROOM);
-  size_t n = (size_t) snprintf(buf, bufsize, "%s", dir);
+  const size_t room = buf.size - (sizeof(seg) + ST_LEAF_ROOM);
+  size_t n = (size_t) snprintf(buf.p, buf.size, "%s", dir);
 
-  assertf(bufsize > sizeof(seg) + ST_LEAF_ROOM);
+  assertf(buf.size > sizeof(seg) + ST_LEAF_ROOM);
   if (baselen != NULL) {
     *baselen = 0;
   }
   if (n >= room) {
     goto too_long;
   }
-  while (n > 0 && (buf[n - 1] == '/' || buf[n - 1] == '\\')) {
-    buf[--n] = '\0';
+  while (n > 0 && (buf.p[n - 1] == '/' || buf.p[n - 1] == '\\')) {
+    buf.p[--n] = '\0';
   }
   if (baselen != NULL) {
     *baselen = n;
@@ -258,25 +256,26 @@ size_t st_mkdeep(char *buf, size_t bufsize, const char *dir, const char *nseg,
     if (nseglen >= room - n) { /* room - n > 0 above */
       goto too_long;
     }
-    memcpybuff(buf + n, nseg, nseglen + 1);
+    memcpybuff(buf.p + n, nseg, nseglen + 1);
     n += nseglen;
-    if (!st_mkdir_at(buf, n, who)) {
+    if (!st_mkdir_at(buf.p, n, who)) {
       return 0;
     }
   }
   // Loop on the limit itself, over the whole path: an arithmetic bound landed
   // exactly on 260 for some base lengths, a byte count on a non-ASCII base.
-  while (st_utf16_units(buf, n) <= 260) {
+  while (st_utf16_units(hts_span_at(buf.p, n)) <= 260) {
     if (n >= room) {
       goto too_long;
     }
-    memcpybuff(buf + n, seg, sizeof(seg));
+    memcpybuff(buf.p + n, seg, sizeof(seg));
     n += sizeof(seg) - 1;
-    if (!st_mkdir_at(buf, n, who)) {
+    if (!st_mkdir_at(buf.p, n, who)) {
       return 0;
     }
   }
-  assertf(st_utf16_units(buf, n) > 260); /* what every caller depends on */
+  /* what every caller depends on */
+  assertf(st_utf16_units(hts_span_at(buf.p, n)) > 260);
   return n;
 
 too_long:

@@ -54,14 +54,16 @@ Please visit our Website: http://www.httrack.com
 /* Same, with the failure condition spelled out. */
 #define ST_FAIL_IF(var, bad) ST_CHECK(var, !(bad))
 
-size_t st_decode_body(const char *arg, char *buf, size_t size);
+/* Decode arg ("hex:FFD8.." or literal text) into buf, clipped and
+   NUL-terminated, and return its length. */
+size_t st_decode_body(const char *arg, hts_buf buf);
 
-/* Write size bytes of data to path, replacing it. Abort when that fails. */
-void st_put_file(const char *path, const void *data, size_t size);
+/* Write data to path, replacing it. Abort when that fails. */
+void st_put_file(const char *path, hts_span data);
 
-/* Copy the file at path into buf, clipped to size - 1 bytes. buf holds "" when
-   the file cannot be read. */
-void st_read_file(const char *path, char *buf, size_t size);
+/* Copy the file at path into buf, clipped to fit. buf holds "" when the file
+   cannot be read. */
+void st_read_file(const char *path, hts_buf buf);
 
 /* Read the whole file at path into a heap buffer, NUL-terminated, and set *len.
    Return NULL when it cannot be read. The caller frees it with freet(). */
@@ -121,12 +123,12 @@ HTS_CHECK_RESULT hts_boolean st_sized_guard_ok(const char *buf, size_t cap);
 HTS_CHECK_RESULT hts_boolean st_sized_clip_ok(const char *buf, size_t cap,
                                               const char *want);
 
-/* UTF-16 units s[0..n) costs, which is what Windows measures MAX_PATH in. */
-size_t st_utf16_units(const char *s, size_t n);
+/* UTF-16 units s costs, which is what Windows measures MAX_PATH in. */
+size_t st_utf16_units(hts_span s);
 
 /* Build a tree under `dir` whose deepest path clears MAX_PATH; 0 on failure.
  *baselen is where teardown must stop, and is written on every path. */
-size_t st_mkdeep(char *buf, size_t bufsize, const char *dir, const char *nseg,
+size_t st_mkdeep(hts_buf buf, const char *dir, const char *nseg,
                  const char *who, size_t *baselen);
 
 /* These are the tallies of a self-test that sweeps a parser over many

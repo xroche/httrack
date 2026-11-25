@@ -661,8 +661,7 @@ static void socwait_delayed_send(void *arg) {
 static int st_sharedline(httrackp *opt, int argc, char **argv) {
   char data[4096];
   const int cap = argc >= 2 ? atoi(argv[0]) : 0;
-  const size_t len =
-      argc >= 2 ? st_decode_body(argv[1], data, sizeof(data)) : 0;
+  const size_t len = argc >= 2 ? st_decode_body(argv[1], HTS_BUF(data)) : 0;
   char *line;
   T_SOC sv[2];
   hts_boolean cut;
