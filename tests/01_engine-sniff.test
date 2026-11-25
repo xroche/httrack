@@ -20,6 +20,8 @@ chk image/jpeg hex:FFD8FFE000104A46 "$yes"
 chk image/png hex:89504E470D0A1A0A "$yes"
 chk image/png hex:FFD8FFE000104A46 "$no" # jpeg bytes are not a png
 chk image/gif 'GIF89a' "$yes"
+chk image/gif 'gif89a' "$no"    # binary magic is case-sensitive
+chk image/tiff hex:49492A "$no" # short; an over-read sees the decoder's NUL
 chk image/bmp 'BMxxxx' "$yes"
 chk image/tiff hex:49492A00 "$yes"
 chk image/tiff hex:4D4D002A "$yes" # both endians
@@ -75,6 +77,7 @@ chk application/x-java-vm hex:CAFEBABE "$yes"
 chk application/wasm hex:0061736D "$yes"
 chk text/html $'  \r\n<!DOCTYPE html><html>' "$yes"
 chk text/html '<html lang="en">' "$yes"
+chk text/html '<HTML>' "$yes" # text magic ignores case
 # leading whitespace is the WHATWG set: SPACE, TAB, CR, LF, FF, but not VT
 for ws in 09 0C 200C EFBBBF0C; do
     chk text/html "hex:${ws}3C68746D6C3E" "$yes"

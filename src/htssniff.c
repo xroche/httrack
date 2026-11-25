@@ -175,53 +175,46 @@ static const char *const pem_mimes[] = {
     "application/x-x509-ca-cert", "application/x-pkcs7-certificates",
     "application/x-pkcs7-mime", "application/x-pkcs7-signature", NULL};
 
-static hts_boolean mime_in(const char *const *list, const char *mime) {
+/* Is MIME the type NAME? The inline length test skips most calls. */
+static hts_boolean mime_is(hts_span mime, const char *name) {
+  const hts_span n = hts_span_of(name);
+
+  return n.len == mime.len && hts_span_eq_ci(n, mime);
+}
+
+static hts_boolean mime_in(const char *const *list, hts_span mime) {
   size_t i;
 
   for (i = 0; list[i] != NULL; i++)
-    if (strfield2(list[i], mime))
+    if (mime_is(mime, list[i]))
       return HTS_TRUE;
   return HTS_FALSE;
 }
 
-static hts_boolean mime_in_prefix(const char *const *list, const char *mime) {
+static hts_boolean mime_in_prefix(const char *const *list, hts_span mime) {
   size_t i;
 
   for (i = 0; list[i] != NULL; i++)
-    if (strfield(mime, list[i]))
+    if (hts_span_starts_with_ci(mime, hts_span_of(list[i])))
       return HTS_TRUE;
   return HTS_FALSE;
 }
 
-static hts_boolean has_bytes(const unsigned char *d, size_t n, size_t off,
-                             const char *bytes, size_t len) {
-  /* overflow-safe: untrusted n alone on one side */
-  return n >= off && len <= n - off && memcmp(d + off, bytes, len) == 0
-             ? HTS_TRUE
-             : HTS_FALSE;
-}
-
-static unsigned char ascii_lower(unsigned char c) {
-  return (unsigned char) lochar(c);
+/* Do the LEN BYTES sit at OFF in S? */
+static hts_boolean has_bytes(hts_span s, size_t off, const char *bytes,
+                             size_t len) {
+  return hts_span_starts_with(hts_span_skip(s, off), hts_span_at(bytes, len));
 }
 
 /* Case-insensitive text prefix after an optional UTF-8 BOM and WHATWG
    whitespace (SPACE, TAB, CR, LF, FF, but not VT). */
-static hts_boolean has_text_prefix(const unsigned char *d, size_t n,
-                                   const char *prefix) {
-  const size_t len = strlen(prefix);
-  size_t i, k;
-
-  i = n >= 3 && memcmp(d, "\xef\xbb\xbf", 3) == 0 ? 3 : 0;
-  while (i < n && (d[i] == ' ' || d[i] == '\t' || d[i] == '\r' ||
-                   d[i] == '\n' || d[i] == '\f'))
-    i++;
-  if (len > n - i) /* i <= n from the loop above */
-    return HTS_FALSE;
-  for (k = 0; k < len; k++)
-    if (ascii_lower(d[i + k]) != ascii_lower((unsigned char) prefix[k]))
-      return HTS_FALSE;
-  return HTS_TRUE;
+static hts_boolean has_text_prefix(hts_span s, const char *prefix) {
+  if (hts_span_starts_with(s, hts_span_of("\xef\xbb\xbf")))
+    s = hts_span_skip(s, 3);
+  while (s.len != 0 && (s.p[0] == ' ' || s.p[0] == '\t' || s.p[0] == '\r' ||
+                        s.p[0] == '\n' || s.p[0] == '\f'))
+    s = hts_span_skip(s, 1);
+  return hts_span_starts_with_ci(s, hts_span_of(prefix));
 }
 
 typedef enum sniff_op {
@@ -230,8 +223,10 @@ typedef enum sniff_op {
 } sniff_op;
 
 /* Single walk for both queries so the rule set can't drift apart. */
-static hts_boolean sniff_eval(sniff_op op, const unsigned char *d, size_t n,
-                              const char *mime) {
+static hts_boolean sniff_eval(sniff_op op, hts_span s, const char *name) {
+  const hts_span mime = hts_span_of(name);
+  const unsigned char *const d = (const unsigned char *) s.p;
+  const size_t n = s.len;
   size_t i;
 
 /* KNOWN short-circuits; MATCH tests the magic */
@@ -244,92 +239,88 @@ static hts_boolean sniff_eval(sniff_op op, const unsigned char *d, size_t n,
   } while (0)
 
   for (i = 0; sniff_table[i].mime != NULL; i++) {
-    if (strfield2(sniff_table[i].mime, mime)) {
-      SNIFF_RULE(has_bytes(d, n, sniff_table[i].off, sniff_table[i].bytes,
+    if (mime_is(mime, sniff_table[i].mime)) {
+      SNIFF_RULE(has_bytes(s, sniff_table[i].off, sniff_table[i].bytes,
                            sniff_table[i].len));
     }
   }
   if (mime_in(zip_mimes, mime) || mime_in_prefix(zip_mime_prefixes, mime)) {
-    SNIFF_RULE(has_bytes(d, n, 0, "PK\3\4", 4) ||
-               has_bytes(d, n, 0, "PK\5\6", 4));
+    SNIFF_RULE(has_bytes(s, 0, "PK\3\4", 4) || has_bytes(s, 0, "PK\5\6", 4));
   }
   if (mime_in(ole_mimes, mime)) {
-    SNIFF_RULE(has_bytes(d, n, 0, "\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1", 8));
+    SNIFF_RULE(has_bytes(s, 0, "\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1", 8));
   }
   if (mime_in(tar_mimes, mime)) {
-    SNIFF_RULE(has_bytes(d, n, 257, "ustar", 5));
+    SNIFF_RULE(has_bytes(s, 257, "ustar", 5));
   }
   if (mime_in(ogg_mimes, mime)) {
-    SNIFF_RULE(has_bytes(d, n, 0, "OggS\0", 5));
+    SNIFF_RULE(has_bytes(s, 0, "OggS\0", 5));
   }
   if (mime_in(ebml_mimes, mime)) {
-    SNIFF_RULE(has_bytes(d, n, 0, "\x1a\x45\xdf\xa3", 4));
+    SNIFF_RULE(has_bytes(s, 0, "\x1a\x45\xdf\xa3", 4));
   }
   if (mime_in(bmff_mimes, mime)) {
-    SNIFF_RULE(has_bytes(d, n, 4, "ftyp", 4));
+    SNIFF_RULE(has_bytes(s, 4, "ftyp", 4));
   }
   if (mime_in(avif_mimes, mime)) {
-    SNIFF_RULE(has_bytes(d, n, 4, "ftypavif", 8) ||
-               has_bytes(d, n, 4, "ftypavis", 8));
+    SNIFF_RULE(has_bytes(s, 4, "ftypavif", 8) ||
+               has_bytes(s, 4, "ftypavis", 8));
   }
   if (mime_in(heic_mimes, mime)) {
-    SNIFF_RULE(
-        has_bytes(d, n, 4, "ftyphei", 7) || has_bytes(d, n, 4, "ftyphev", 7) ||
-        has_bytes(d, n, 4, "ftypmif1", 8) || has_bytes(d, n, 4, "ftypmsf1", 8));
+    SNIFF_RULE(has_bytes(s, 4, "ftyphei", 7) || has_bytes(s, 4, "ftyphev", 7) ||
+               has_bytes(s, 4, "ftypmif1", 8) ||
+               has_bytes(s, 4, "ftypmsf1", 8));
   }
   if (mime_in(asf_mimes, mime)) {
-    SNIFF_RULE(has_bytes(d, n, 0, "\x30\x26\xb2\x75\x8e\x66\xcf\x11", 8));
+    SNIFF_RULE(has_bytes(s, 0, "\x30\x26\xb2\x75\x8e\x66\xcf\x11", 8));
   }
-  if (strfield2("audio/x-wav", mime)) {
-    SNIFF_RULE(has_bytes(d, n, 0, "RIFF", 4) && has_bytes(d, n, 8, "WAVE", 4));
+  if (mime_is(mime, "audio/x-wav")) {
+    SNIFF_RULE(has_bytes(s, 0, "RIFF", 4) && has_bytes(s, 8, "WAVE", 4));
   }
-  if (strfield2("video/x-msvideo", mime)) {
-    SNIFF_RULE(has_bytes(d, n, 0, "RIFF", 4) && has_bytes(d, n, 8, "AVI ", 4));
+  if (mime_is(mime, "video/x-msvideo")) {
+    SNIFF_RULE(has_bytes(s, 0, "RIFF", 4) && has_bytes(s, 8, "AVI ", 4));
   }
-  if (strfield2("image/webp", mime)) {
-    SNIFF_RULE(has_bytes(d, n, 0, "RIFF", 4) &&
-               has_bytes(d, n, 8, "WEBPVP", 6));
+  if (mime_is(mime, "image/webp")) {
+    SNIFF_RULE(has_bytes(s, 0, "RIFF", 4) && has_bytes(s, 8, "WEBPVP", 6));
   }
-  if (strfield2("image/x-portable-anymap", mime)) {
+  if (mime_is(mime, "image/x-portable-anymap")) {
     SNIFF_RULE(n >= 2 && d[0] == 'P' && d[1] >= '1' && d[1] <= '6');
   }
-  if (strfield2("audio/x-aiff", mime)) {
-    SNIFF_RULE(
-        has_bytes(d, n, 0, "FORM", 4) &&
-        (has_bytes(d, n, 8, "AIFF", 4) || has_bytes(d, n, 8, "AIFC", 4)));
+  if (mime_is(mime, "audio/x-aiff")) {
+    SNIFF_RULE(has_bytes(s, 0, "FORM", 4) &&
+               (has_bytes(s, 8, "AIFF", 4) || has_bytes(s, 8, "AIFC", 4)));
   }
-  if (strfield2("audio/mpeg", mime)) {
+  if (mime_is(mime, "audio/mpeg")) {
     /* MPEG audio frame sync (11 bits), valid layer and bitrate fields */
     SNIFF_RULE(n >= 2 && d[0] == 0xff && (d[1] & 0xe0) == 0xe0 &&
                (d[1] & 0x06) != 0);
   }
-  if (strfield2("audio/aac", mime)) {
+  if (mime_is(mime, "audio/aac")) {
     /* ADTS sync */
     SNIFF_RULE(n >= 2 && d[0] == 0xff && (d[1] & 0xf6) == 0xf0);
   }
-  if (strfield2("video/mp2t", mime)) {
+  if (mime_is(mime, "video/mp2t")) {
     SNIFF_RULE(n >= 1 && d[0] == 0x47 && (n <= 188 || d[188] == 0x47));
   }
   if (mime_in(xml_mimes, mime)) {
-    SNIFF_RULE(has_text_prefix(d, n, "<?xml"));
+    SNIFF_RULE(has_text_prefix(s, "<?xml"));
   }
   if (mime_in(svg_mimes, mime)) {
-    SNIFF_RULE(has_text_prefix(d, n, "<svg") ||
-               has_text_prefix(d, n, "<!DOCTYPE svg"));
+    SNIFF_RULE(has_text_prefix(s, "<svg") ||
+               has_text_prefix(s, "<!DOCTYPE svg"));
   }
   if (mime_in(html_mimes, mime)) {
-    SNIFF_RULE(has_text_prefix(d, n, "<!DOCTYPE") ||
-               has_text_prefix(d, n, "<html") ||
-               has_text_prefix(d, n, "<head"));
+    SNIFF_RULE(has_text_prefix(s, "<!DOCTYPE") || has_text_prefix(s, "<html") ||
+               has_text_prefix(s, "<head"));
   }
   if (mime_in(pem_mimes, mime)) {
-    SNIFF_RULE(has_text_prefix(d, n, "-----BEGIN"));
+    SNIFF_RULE(has_text_prefix(s, "-----BEGIN"));
   }
-  if (is_playlist_mime_type(mime)) {
-    SNIFF_RULE(has_text_prefix(d, n, "#EXTM3U"));
+  if (is_playlist_mime_type(name)) {
+    SNIFF_RULE(has_text_prefix(s, "#EXTM3U"));
   }
-  if (strfield2("text/x-vcard", mime)) {
-    SNIFF_RULE(has_text_prefix(d, n, "BEGIN:VCARD"));
+  if (mime_is(mime, "text/x-vcard")) {
+    SNIFF_RULE(has_text_prefix(s, "BEGIN:VCARD"));
   }
 #undef SNIFF_RULE
   return HTS_FALSE;
@@ -338,13 +329,11 @@ static hts_boolean sniff_eval(sniff_op op, const unsigned char *d, size_t n,
 hts_boolean hts_sniff_mime_known(const char *mime) {
   if (mime == NULL || *mime == '\0')
     return HTS_FALSE;
-  return sniff_eval(SNIFF_QUERY_KNOWN, NULL, 0, mime);
+  return sniff_eval(SNIFF_QUERY_KNOWN, hts_span_at(NULL, 0), mime);
 }
 
-hts_boolean hts_sniff_mime_consistent(const void *data, size_t size,
-                                      const char *mime) {
-  if (data == NULL || size == 0 || mime == NULL || *mime == '\0')
+hts_boolean hts_sniff_mime_consistent(hts_span body, const char *mime) {
+  if (body.p == NULL || body.len == 0 || mime == NULL || *mime == '\0')
     return HTS_FALSE;
-  return sniff_eval(SNIFF_QUERY_MATCH, (const unsigned char *) data, size,
-                    mime);
+  return sniff_eval(SNIFF_QUERY_MATCH, body, mime);
 }

@@ -41,6 +41,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     return 0;
   skip = (size_t) (nul - data) + 1;
   (void) hts_sniff_mime_known(mime);
-  (void) hts_sniff_mime_consistent(data + skip, size - skip, mime);
+  (void) hts_sniff_mime_consistent(
+      hts_span_at((const char *) data + skip, size - skip), mime);
   return 0;
 }
