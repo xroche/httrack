@@ -86,10 +86,9 @@ static unsigned char *warc_next_member(const unsigned char **in,
 }
 
 /* Validate a synthetic transaction's .warc.gz against WARC/1.1. */
-/* This keeps the call sites' argument order around hts_memstr. */
-static const char *warc_memstr(const char *hay, const char *needle,
-                               size_t haylen, size_t nlen) {
-  return hts_memstr(hay, haylen, needle, nlen);
+/* Where does NEEDLE first occur in HAY, which may hold NULs? */
+static const char *warc_memstr(hts_span hay, const char *needle) {
+  return hts_memstr(hay.p, hay.len, needle, strlen(needle));
 }
 
 static int st_warc(httrackp *opt, int argc, char **argv) {
@@ -177,15 +176,16 @@ static int st_warc(httrackp *opt, int argc, char **argv) {
     /* magic */
     ST_FAIL_IF(err, rlen < 8 || memcmp(rec, "WARC/1.", 7) != 0);
     /* record header ends at the first blank line */
-    sep = warc_memstr((char *) rec, "\r\n\r\n", rlen, 4);
+    sep = warc_memstr(hts_span_at((const char *) rec, rlen), "\r\n\r\n");
     if (sep == NULL) {
       err = 1;
       freet(rec);
       continue;
     }
     hdr_len = (size_t) ((const unsigned char *) sep - rec) + 4;
+    const hts_span head = hts_span_at((const char *) rec, hdr_len);
     /* Content-Length must equal the actual block length */
-    cl = warc_memstr((char *) rec, "Content-Length:", hdr_len, 15);
+    cl = warc_memstr(head, "Content-Length:");
     if (cl == NULL || sscanf(cl + 15, "%lld", &block_len) != 1)
       err = 1;
     else {
@@ -194,38 +194,38 @@ static int st_warc(httrackp *opt, int argc, char **argv) {
       else if (memcmp(rec + hdr_len + block_len, "\r\n\r\n", 4) != 0)
         err = 1; /* trailer intact */
     }
-    if (warc_memstr((char *) rec, "WARC-Type: warcinfo", hdr_len, 19) != NULL)
+    if (warc_memstr(head, "WARC-Type: warcinfo") != NULL)
       ninfo++;
-    if (warc_memstr((char *) rec, "WARC-Type: request", hdr_len, 18) != NULL)
+    if (warc_memstr(head, "WARC-Type: request") != NULL)
       nreq++;
-    if (warc_memstr((char *) rec, "WARC-Type: response", hdr_len, 19) != NULL)
+    if (warc_memstr(head, "WARC-Type: response") != NULL)
       nresp++;
-    if (warc_memstr((char *) rec, "WARC-Type: revisit", hdr_len, 18) != NULL)
+    if (warc_memstr(head, "WARC-Type: revisit") != NULL)
       nrevisit++;
     /* F1: the full body must appear exactly once across the whole file (a
        revisit must not re-embed it). */
-    if (warc_memstr((char *) rec, a_body, rlen, sizeof(a_body) - 1) != NULL)
+    if (warc_memstr(hts_span_at((const char *) rec, rlen), a_body) != NULL)
       body_occurrences++;
     /* F1: the a2.html identical-payload-digest revisit carries no body. */
-    if (warc_memstr((char *) rec, "WARC-Target-URI: http://test.local/a2.html",
-                    hdr_len, 42) != NULL &&
-        warc_memstr((char *) rec, "WARC-Type: revisit", hdr_len, 18) != NULL)
+    if (warc_memstr(head, "WARC-Target-URI: http://test.local/a2.html") !=
+            NULL &&
+        warc_memstr(head, "WARC-Type: revisit") != NULL)
       a2_bodyless =
-          (warc_memstr((char *) rec, a_body, rlen, sizeof(a_body) - 1) == NULL);
+          (warc_memstr(hts_span_at((const char *) rec, rlen), a_body) == NULL);
     /* F3: the empty-header 304 revisit block is exactly the 2-byte separator
        (the request record shares this target URI, so match the revisit only).
      */
-    if (warc_memstr((char *) rec, "WARC-Target-URI: http://test.local/nm",
-                    hdr_len, 37) != NULL &&
-        warc_memstr((char *) rec, "WARC-Type: revisit", hdr_len, 18) != NULL)
+    if (warc_memstr(head, "WARC-Target-URI: http://test.local/nm") != NULL &&
+        warc_memstr(head, "WARC-Type: revisit") != NULL)
       nm_cl_ok = (block_len == 2);
     /* a.html response body round-trips; no Content-Encoding (plaintext) and the
        whitespaced Transfer-Encoding was dropped. */
-    if (warc_memstr((char *) rec, "WARC-Target-URI: http://test.local/a.html",
-                    hdr_len, 41) != NULL &&
-        warc_memstr((char *) rec, "msgtype=response", hdr_len, 16) != NULL) {
-      const char *bsep = warc_memstr((char *) rec + hdr_len, "\r\n\r\n",
-                                     (size_t) block_len, 4);
+    if (warc_memstr(head, "WARC-Target-URI: http://test.local/a.html") !=
+            NULL &&
+        warc_memstr(head, "msgtype=response") != NULL) {
+      const char *bsep = warc_memstr(
+          hts_span_at((const char *) rec + hdr_len, (size_t) block_len),
+          "\r\n\r\n");
       if (bsep == NULL)
         err = 1;
       else {
@@ -235,11 +235,12 @@ static int st_warc(httrackp *opt, int argc, char **argv) {
                             memcmp(rec + bodyoff, a_body, got) != 0);
         seen_a_body = 1;
       }
-      ST_FAIL_IF(err,
-                 warc_memstr((char *) rec, "Content-Encoding",
-                             hdr_len + (size_t) block_len, 16) != NULL ||
-                     warc_memstr((char *) rec, "Transfer-Encoding",
-                                 hdr_len + (size_t) block_len, 17) != NULL);
+      ST_FAIL_IF(err, warc_memstr(hts_span_at((const char *) rec,
+                                              hdr_len + (size_t) block_len),
+                                  "Content-Encoding") != NULL ||
+                          warc_memstr(hts_span_at((const char *) rec,
+                                                  hdr_len + (size_t) block_len),
+                                      "Transfer-Encoding") != NULL);
     }
     freet(rec);
   }
@@ -269,17 +270,16 @@ static int st_warc(httrackp *opt, int argc, char **argv) {
 
 /* Parse a record's header/block split; sets *hdr_len and *block_len, returns 0
    when Content-Length matches the actual block bytes, -1 otherwise. */
-static int warc_rec_split(const unsigned char *rec, size_t rlen,
-                          size_t *hdr_len, long long *block_len) {
-  const char *sep = warc_memstr((const char *) rec, "\r\n\r\n", rlen, 4);
+static int warc_rec_split(hts_span rec, size_t *hdr_len, long long *block_len) {
+  const char *sep = warc_memstr(rec, "\r\n\r\n");
   const char *cl;
   *block_len = 0;
   if (sep == NULL)
     return -1;
-  *hdr_len = (size_t) ((const unsigned char *) sep - rec) + 4;
-  cl = warc_memstr((const char *) rec, "Content-Length:", *hdr_len, 15);
+  *hdr_len = (size_t) (sep - rec.p) + 4;
+  cl = warc_memstr(hts_span_at(rec.p, *hdr_len), "Content-Length:");
   if (cl == NULL || sscanf(cl + 15, "%lld", block_len) != 1 ||
-      *hdr_len + (size_t) *block_len + 4 != rlen)
+      *hdr_len + (size_t) *block_len + 4 != rec.len)
     return -1;
   return 0;
 }
@@ -334,31 +334,31 @@ static int st_warc_trunc(httrackp *opt, int argc, char **argv) {
       ST_FAIL_IF(err, rlen != 0);
       break;
     }
-    if (warc_rec_split(rec, rlen, &hdr_len, &block_len) != 0) {
+    if (warc_rec_split(hts_span_at((const char *) rec, rlen), &hdr_len,
+                       &block_len) != 0) {
       err = 1;
       freet(rec);
       continue;
     }
-    if (warc_memstr((char *) rec, "WARC-Type: response", hdr_len, 19) != NULL) {
+    const hts_span head = hts_span_at((const char *) rec, hdr_len);
+    if (warc_memstr(head, "WARC-Type: response") != NULL) {
       nresp++;
-      if (warc_memstr((char *) rec,
-                      "WARC-Target-URI: http://test.local/big.bin", hdr_len,
-                      42) != NULL &&
-          warc_memstr((char *) rec, "WARC-Truncated: length", hdr_len, 22) !=
-              NULL)
+      if (warc_memstr(head, "WARC-Target-URI: http://test.local/big.bin") !=
+              NULL &&
+          warc_memstr(head, "WARC-Truncated: length") != NULL)
         trunc_len = 1;
-      if (warc_memstr((char *) rec, "WARC-Target-URI: http://test.local/big.gz",
-                      hdr_len, 41) != NULL) {
-        const char *bsep = warc_memstr((char *) rec + hdr_len, "\r\n\r\n",
-                                       (size_t) block_len, 4);
+      if (warc_memstr(head, "WARC-Target-URI: http://test.local/big.gz") !=
+          NULL) {
+        const char *bsep = warc_memstr(
+            hts_span_at((const char *) rec + hdr_len, (size_t) block_len),
+            "\r\n\r\n");
         size_t bodyoff = bsep ? (size_t) (bsep - (char *) rec) + 4 : 0;
         size_t got = bsep ? rlen - 4 - bodyoff : 0;
         /* WARC-Truncated: time, Content-Encoding kept, stored body == coded. */
-        if (bsep != NULL &&
-            warc_memstr((char *) rec, "WARC-Truncated: time", hdr_len, 20) !=
-                NULL &&
-            warc_memstr((char *) rec + hdr_len,
-                        "Content-Encoding:", (size_t) block_len, 17) != NULL &&
+        if (bsep != NULL && warc_memstr(head, "WARC-Truncated: time") != NULL &&
+            warc_memstr(
+                hts_span_at((const char *) rec + hdr_len, (size_t) block_len),
+                "Content-Encoding:") != NULL &&
             got == sizeof(gz) && memcmp(rec + bodyoff, gz, sizeof(gz)) == 0)
           trunc_gz = 1;
       }
@@ -403,21 +403,22 @@ static int st_warc_ftp(httrackp *opt, int argc, char **argv) {
       ST_FAIL_IF(err, rlen != 0);
       break;
     }
-    ST_FAIL_IF(err, warc_rec_split(rec, rlen, &hdr_len, &block_len) != 0);
-    if (warc_memstr((char *) rec, "WARC-Type: resource", hdr_len, 19) != NULL) {
+    ST_FAIL_IF(err, warc_rec_split(hts_span_at((const char *) rec, rlen),
+                                   &hdr_len, &block_len) != 0);
+    const hts_span head = hts_span_at((const char *) rec, hdr_len);
+    if (warc_memstr(head, "WARC-Type: resource") != NULL) {
       nresource++;
       /* block is the raw payload, no HTTP envelope */
       ST_FAIL_IF(err, (size_t) block_len != sizeof(body) - 1 ||
                           memcmp(rec + hdr_len, body, sizeof(body) - 1) != 0);
-      if (warc_memstr((char *) rec, "WARC-Target-URI: ftp://ftp.local/file.bin",
-                      hdr_len, 41) == NULL ||
-          warc_memstr((char *) rec, "Content-Type: application/octet-stream",
-                      hdr_len, 38) == NULL)
+      if (warc_memstr(head, "WARC-Target-URI: ftp://ftp.local/file.bin") ==
+              NULL ||
+          warc_memstr(head, "Content-Type: application/octet-stream") == NULL)
         err = 1;
     }
-    if (warc_memstr((char *) rec, "WARC-Type: response", hdr_len, 19) != NULL)
+    if (warc_memstr(head, "WARC-Type: response") != NULL)
       nresp++;
-    if (warc_memstr((char *) rec, "WARC-Type: request", hdr_len, 18) != NULL)
+    if (warc_memstr(head, "WARC-Type: request") != NULL)
       nreq++;
     freet(rec);
   }
@@ -486,10 +487,11 @@ static int st_warc_rotate(httrackp *opt, int argc, char **argv) {
         ST_FAIL_IF(err, rlen != 0);
         break;
       }
-      ST_FAIL_IF(err, warc_rec_split(rec, rlen, &hdr_len, &block_len) != 0);
+      ST_FAIL_IF(err, warc_rec_split(hts_span_at((const char *) rec, rlen),
+                                     &hdr_len, &block_len) != 0);
       if (first) { /* each segment leads with its own warcinfo */
-        ST_FAIL_IF(err, warc_memstr((char *) rec, "WARC-Type: warcinfo",
-                                    hdr_len, 19) == NULL);
+        ST_FAIL_IF(err, warc_memstr(hts_span_at((const char *) rec, hdr_len),
+                                    "WARC-Type: warcinfo") == NULL);
         first = 0;
       }
       freet(rec);
@@ -549,11 +551,13 @@ static int st_warc_verbatim(httrackp *opt, int argc, char **argv) {
       ST_FAIL_IF(err, rlen != 0);
       break;
     }
-    if (warc_memstr((char *) rec, "msgtype=response", rlen, 16) == NULL) {
+    if (warc_memstr(hts_span_at((const char *) rec, rlen),
+                    "msgtype=response") == NULL) {
       freet(rec);
       continue;
     }
-    if (warc_rec_split(rec, rlen, &hdr_len, &block_len) != 0) {
+    if (warc_rec_split(hts_span_at((const char *) rec, rlen), &hdr_len,
+                       &block_len) != 0) {
       err = 1;
       freet(rec);
       continue;
@@ -562,29 +566,31 @@ static int st_warc_verbatim(httrackp *opt, int argc, char **argv) {
        compressed size. */
     {
       const char *block = (char *) rec + hdr_len;
-      const char *ce =
-          warc_memstr(block, "Content-Encoding:", (size_t) block_len, 17);
-      const char *hcl =
-          warc_memstr(block, "Content-Length:", (size_t) block_len, 15);
+      const char *ce = warc_memstr(hts_span_at(block, (size_t) block_len),
+                                   "Content-Encoding:");
+      const char *hcl = warc_memstr(hts_span_at(block, (size_t) block_len),
+                                    "Content-Length:");
       long long http_cl = -1;
       int nce = 0;
       const char *scan = ce;
       while (scan != NULL) {
         size_t rem = (size_t) block_len - (size_t) (scan - block);
         nce++;
-        scan = warc_memstr(scan + 17, "Content-Encoding:", rem - 17, 17);
+        scan =
+            warc_memstr(hts_span_at(scan + 17, rem - 17), "Content-Encoding:");
       }
       ST_FAIL_IF(err, ce == NULL || hts_strncasecmp(ce + 17, " gzip", 5) != 0 ||
                           nce != 1);
-      ST_FAIL_IF(err, warc_memstr(block, "Transfer-Encoding:",
-                                  (size_t) block_len, 18) != NULL);
+      ST_FAIL_IF(err, warc_memstr(hts_span_at(block, (size_t) block_len),
+                                  "Transfer-Encoding:") != NULL);
       ST_FAIL_IF(err, hcl == NULL || sscanf(hcl + 15, "%lld", &http_cl) != 1 ||
                           http_cl != (long long) sizeof(a_gz));
     }
     /* Stored block bytes equal the gzip input, and inflate to the plaintext. */
     {
-      const char *bsep = warc_memstr((char *) rec + hdr_len, "\r\n\r\n",
-                                     (size_t) block_len, 4);
+      const char *bsep = warc_memstr(
+          hts_span_at((const char *) rec + hdr_len, (size_t) block_len),
+          "\r\n\r\n");
       if (bsep == NULL)
         err = 1;
       else {
@@ -990,8 +996,8 @@ static int st_warc_cdx(httrackp *opt, int argc, char **argv) {
     {
       char needle[1100];
       snprintf(needle, sizeof(needle), "WARC-Target-URI: %s\r\n", url);
-      ST_FAIL_IF(err, warc_memstr((char *) rec, needle, rlen, strlen(needle)) ==
-                          NULL);
+      ST_FAIL_IF(err, warc_memstr(hts_span_at((const char *) rec, rlen),
+                                  needle) == NULL);
     }
     freet(rec);
   nextline:
@@ -1048,11 +1054,11 @@ static int st_warc_cdx_utf8(httrackp *opt, int argc, char **argv) {
       if (json == NULL || !hts_isStringUTF8(hts_span_between(lp, end))) {
         fprintf(stderr, "warc-cdx-utf8: line %d is not UTF-8\n", nlines);
         err = 1;
-      } else if (warc_memstr(json, "/caf\\ufffd\"", (size_t) (end - json),
-                             11) != NULL) {
+      } else if (warc_memstr(hts_span_at(json, (size_t) (end - json)),
+                             "/caf\\ufffd\"") != NULL) {
         nescaped++;
-      } else if (warc_memstr(json, "/caf\xc3\xa9\"", (size_t) (end - json),
-                             7) != NULL) {
+      } else if (warc_memstr(hts_span_at(json, (size_t) (end - json)),
+                             "/caf\xc3\xa9\"") != NULL) {
         nverbatim++;
       }
     }
@@ -1263,25 +1269,12 @@ static void st_warc_emit(httrackp *opt, const char *body) {
   freet(back);
 }
 
-/* memmem(): a NUL byte anywhere in the archive would cut strstr() short. */
-static hts_boolean st_blob_has(const unsigned char *blob, size_t len,
-                               const char *s) {
-  const size_t n = strlen(s);
-  size_t i;
-
-  for (i = 0; n <= len && i <= len - n; i++) {
-    if (memcmp(blob + i, s, n) == 0)
-      return HTS_TRUE;
-  }
-  return HTS_FALSE;
-}
-
 /* The archive on disk must hold `want`'s run, and no trace of the others. */
 static int st_warc_holds(const char *name, const char *path, const char *want,
                          const char *absent1, const char *absent2) {
   const char *const absent[2] = {absent1, absent2};
   size_t len = 0, i;
-  unsigned char *blob = (unsigned char *) st_slurp(path, &len);
+  char *blob = st_slurp(path, &len);
   int err = 0;
 
   if (blob == NULL) {
@@ -1294,13 +1287,13 @@ static int st_warc_holds(const char *name, const char *path, const char *want,
             name, path);
     err++;
   }
-  if (!st_blob_has(blob, len, want)) {
+  if (warc_memstr(hts_span_at(blob, len), want) == NULL) {
     fprintf(stderr, "warc-teardown: %s: %s lost the run holding \"%s\"\n", name,
             path, want);
     err++;
   }
   for (i = 0; i < 2; i++) {
-    if (st_blob_has(blob, len, absent[i])) {
+    if (warc_memstr(hts_span_at(blob, len), absent[i]) != NULL) {
       fprintf(stderr, "warc-teardown: %s: %s took \"%s\"\n", name, path,
               absent[i]);
       err++;
@@ -1364,7 +1357,7 @@ static int st_warc_disk_case(httrackp *opt, const char *dir) {
   lien_back *back = calloct(1, sizeof(lien_back));
   char path[HTS_URLMAXSIZE];
   char catbuff[CATBUFF_SIZE];
-  unsigned char *blob;
+  char *blob;
   size_t len = 0;
   FILE *fp;
   int err = 0;
@@ -1388,8 +1381,9 @@ static int st_warc_disk_case(httrackp *opt, const char *dir) {
   warc_write_backtransaction(opt, back);
   warc_close_opt(opt);
   freet(back);
-  blob = (unsigned char *) st_slurp(path, &len);
-  if (blob == NULL || !st_blob_has(blob, len, "warc-disk-body-END\r\n\r\n")) {
+  blob = st_slurp(path, &len);
+  if (blob == NULL || warc_memstr(hts_span_at(blob, len),
+                                  "warc-disk-body-END\r\n\r\n") == NULL) {
     fprintf(stderr, "warc-teardown: disk: %s lacks the whole on-disk body\n",
             path);
     err++;
@@ -1420,26 +1414,28 @@ static int st_warc_teardown(httrackp *opt, int argc, char **argv) {
 }
 
 #if HTS_USEOPENSSL
-/* Lowercase-hex SHA-256 of n bytes into out[65]; 1 on success. */
-static int wacz_test_sha256(const void *p, size_t n, char out[65]) {
+/* Lowercase-hex SHA-256 of DATA into OUT, of at least 65 bytes; 1 on success.
+ */
+static int wacz_test_sha256(hts_span data, hts_buf out) {
   EVP_MD_CTX *c = EVP_MD_CTX_new();
   unsigned char md[EVP_MAX_MD_SIZE];
   unsigned int mdlen = 0, i;
   static const char hx[] = "0123456789abcdef";
   int ok;
+  assertf(out.size >= 65);
   if (c == NULL)
     return 0;
   ok = EVP_DigestInit_ex(c, EVP_sha256(), NULL) == 1 &&
-       (n == 0 || EVP_DigestUpdate(c, p, n) == 1) &&
+       (data.len == 0 || EVP_DigestUpdate(c, data.p, data.len) == 1) &&
        EVP_DigestFinal_ex(c, md, &mdlen) == 1 && mdlen == 32;
   EVP_MD_CTX_free(c);
   if (!ok)
     return 0;
   for (i = 0; i < 32; i++) {
-    out[i * 2] = hx[md[i] >> 4];
-    out[i * 2 + 1] = hx[md[i] & 0x0F];
+    out.p[i * 2] = hx[md[i] >> 4];
+    out.p[i * 2 + 1] = hx[md[i] & 0x0F];
   }
-  out[64] = '\0';
+  out.p[64] = '\0';
   return 1;
 }
 
@@ -1548,9 +1544,10 @@ static int st_warc_wacz(httrackp *opt, int argc, char **argv) {
       const char *body = nl ? nl + 1 : NULL;
       size_t blen =
           body ? pages->len - (size_t) (body - (char *) pages->data) : 0;
-      ST_FAIL_IF(err, body == NULL || blen == 0 ||
-                          warc_memstr(body, "\"url\": ", blen, 7) == NULL ||
-                          warc_memstr(body, "\"ts\": ", blen, 6) == NULL);
+      ST_FAIL_IF(
+          err, body == NULL || blen == 0 ||
+                   warc_memstr(hts_span_at(body, blen), "\"url\": ") == NULL ||
+                   warc_memstr(hts_span_at(body, blen), "\"ts\": ") == NULL);
     }
   }
 
@@ -1586,9 +1583,12 @@ static int st_warc_wacz(httrackp *opt, int argc, char **argv) {
         for (i = 0; i < nent; i++)
           if (strcmp(ent[i].name, path) == 0)
             break;
-        ST_FAIL_IF(err, i == nent ||
-                            !wacz_test_sha256(ent[i].data, ent[i].len, got) ||
-                            strcmp(got, want) != 0);
+        ST_FAIL_IF(err,
+                   i == nent ||
+                       !wacz_test_sha256(
+                           hts_span_at((const char *) ent[i].data, ent[i].len),
+                           HTS_BUF(got)) ||
+                       strcmp(got, want) != 0);
         if (i < nent) {
           const char *bytes = strstr(pe, "\"bytes\": ");
           ST_FAIL_IF(err, bytes == NULL || strtoull(bytes + 9, NULL, 10) !=
@@ -1605,7 +1605,9 @@ static int st_warc_wacz(httrackp *opt, int argc, char **argv) {
     char dphex[65], *djson = malloct(dig->len + 1);
     const char *h;
     char want[80];
-    if (djson == NULL || !wacz_test_sha256(dp->data, dp->len, dphex)) {
+    if (djson == NULL ||
+        !wacz_test_sha256(hts_span_at((const char *) dp->data, dp->len),
+                          HTS_BUF(dphex))) {
       err = 1;
     } else {
       memcpy(djson, dig->data, dig->len);
@@ -1658,8 +1660,7 @@ static void sf_check(int ok, const char *what) {
 
 /* Write rel (a '/'-separated path under dir), creating the directories.
    Returns HTS_FALSE if the name is one the filesystem will not take. */
-static hts_boolean sf_try_put(const char *dir, const char *rel,
-                              const void *data, size_t len) {
+static hts_boolean sf_try_put(const char *dir, const char *rel, hts_span data) {
   char BIGSTK path[HTS_URLMAXSIZE * 2];
   char catbuff[CATBUFF_SIZE];
   FILE *fp;
@@ -1669,46 +1670,45 @@ static hts_boolean sf_try_put(const char *dir, const char *rel,
   fp = FOPEN(fconv(catbuff, sizeof(catbuff), path), "wb");
   if (fp == NULL)
     return HTS_FALSE;
-  assertf(len == 0 || hts_fwrite_exact(data, len, fp));
+  assertf(data.len == 0 || hts_fwrite_exact(data.p, data.len, fp));
   fclose(fp);
   return HTS_TRUE;
 }
 
 /* Expand a fixture: \001<ref>\002 becomes <ref> plus this run's mark for it.
    The secret is random per run, so a fixture cannot spell a mark itself. */
-static void sf_expand_fixture(httrackp *opt, const char *in, size_t len,
-                              String *out) {
+static void sf_expand_fixture(httrackp *opt, hts_span in, String *out) {
   size_t i, start = 0;
 
   StringClear(*out);
-  for (i = 0; i < len; i++) {
-    if (in[i] == '\001') {
+  for (i = 0; i < in.len; i++) {
+    if (in.p[i] == '\001') {
       start = StringLength(*out);
-    } else if (in[i] == '\002') {
+    } else if (in.p[i] == '\002') {
       char mark[SINGLEFILE_MARK_MAX];
 
       StringCat(*out, singlefile_mark(opt, HTS_BUF(mark), SINGLEFILE_CLASS_ANY,
                                       StringLength(*out) - start));
     } else {
-      StringAddchar(*out, in[i]);
+      StringAddchar(*out, in.p[i]);
     }
   }
 }
 
-static void sf_put(const char *dir, const char *rel, const void *data,
-                   size_t len) {
-  assertf(sf_try_put(dir, rel, data, len));
+static void sf_put(const char *dir, const char *rel, hts_span data) {
+  assertf(sf_try_put(dir, rel, data));
 }
 
 /* sf_put() for a text fixture, expanding its \001<ref>\002 delimiters. Binary
    fixtures must not go through here: sf_png carries those very bytes. */
 static size_t sf_put_marked(httrackp *opt, const char *dir, const char *rel,
-                            const void *data, size_t len) {
+                            hts_span text) {
   String body = STRING_EMPTY;
   size_t written;
 
-  sf_expand_fixture(opt, (const char *) data, len, &body);
-  assertf(sf_try_put(dir, rel, StringBuff(body), StringLength(body)));
+  sf_expand_fixture(opt, text, &body);
+  assertf(
+      sf_try_put(dir, rel, hts_span_at(StringBuff(body), StringLength(body))));
   written = StringLength(body);
   StringFree(body);
   return written;
@@ -1746,20 +1746,20 @@ static const char *sf_payload(const char *hay, const char *prefix,
 
 /* Independent base64 decoder: the round-trip check must not lean on code64().
  */
-static unsigned char *sf_unb64(const char *s, size_t len, size_t *outlen) {
+static unsigned char *sf_unb64(hts_span s, size_t *outlen) {
   static const char alpha[] =
       "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-  unsigned char *out = (unsigned char *) malloct(len / 4 * 3 + 4);
+  unsigned char *out = (unsigned char *) malloct(s.len / 4 * 3 + 4);
   unsigned int acc = 0;
   size_t i, n = 0;
   int bits = 0;
 
   if (out == NULL)
     return NULL;
-  for (i = 0; i < len; i++) {
-    const char *const p = s[i] != '\0' ? strchr(alpha, s[i]) : NULL;
+  for (i = 0; i < s.len; i++) {
+    const char *const p = s.p[i] != '\0' ? strchr(alpha, s.p[i]) : NULL;
 
-    if (s[i] == '=')
+    if (s.p[i] == '=')
       break;
     if (p == NULL) {
       freet(out);
@@ -1788,7 +1788,7 @@ static char *sf_decode(const char *hay, const char *mime, size_t *outlen) {
   b64 = sf_payload(hay, prefix, &len);
   if (b64 == NULL)
     return NULL;
-  raw = sf_unb64(b64, len, &dlen);
+  raw = sf_unb64(hts_span_at(b64, len), &dlen);
   if (raw == NULL)
     return NULL;
   raw[dlen] = '\0';
@@ -1907,37 +1907,42 @@ static void sf_fixture(httrackp *opt, const char *root) {
   char big[4096];
 
   memset(big, 'B', sizeof(big));
-  sf_put_marked(opt, root, "page.html", sf_page, sizeof(sf_page) - 1);
-  sf_put_marked(opt, root, "deep/sub/page.html", deep, sizeof(deep) - 1);
-  sf_put(root, "other.html", "<html>o</html>", 14);
-  sf_put_marked(opt, root, "css/main.css", css, sizeof(css) - 1);
-  sf_put_marked(opt, root, "css/sub/nested.css", nested, sizeof(nested) - 1);
-  sf_put_marked(opt, root, "css/sub/two.css", two, sizeof(two) - 1);
-  sf_put(root, "js/app.js", js, sizeof(js) - 1);
-  sf_put(root, "img/a b.png", sf_png, SF_PNG_LEN);
-  sf_put(root, "img/big.png", big, sizeof(big));
-  sf_put(root, "img/sprite.svg", sf_svg, sizeof(sf_svg) - 1);
-  sf_put(root, "img/big-sprite.svg", big, sizeof(big));
-  sf_put(root, "img/b&c%d#e.png", big, sizeof(big));
-  sf_put(root, "img/in.png", sf_png, SF_PNG_LEN);
-  sf_put(root, "img/po.png", sf_png, SF_PNG_LEN);
-  sf_put(root, "img/sv.png", sf_png, SF_PNG_LEN);
-  sf_put(root, "img/bg.png", sf_png, SF_PNG_LEN);
-  sf_put(root, "img/ph.png", sf_png, SF_PNG_LEN);
-  sf_put(root, "img/lz.png", sf_png, SF_PNG_LEN);
-  sf_put(root, "img/lz2.png", sf_png, SF_PNG_LEN);
-  sf_put(root, "img/low.png", sf_png, SF_PNG_LEN);
-  sf_put(root, "img/ob.png", sf_png, SF_PNG_LEN);
-  sf_put(root, "img/em.png", sf_png, SF_PNG_LEN);
-  sf_put(root, "icon.png", sf_png, SF_PNG_LEN);
-  sf_put(root, "font/f.woff2", "wOF2\x00\x01", 6);
+  sf_put_marked(opt, root, "page.html",
+                hts_span_at(sf_page, sizeof(sf_page) - 1));
+  sf_put_marked(opt, root, "deep/sub/page.html",
+                hts_span_at(deep, sizeof(deep) - 1));
+  sf_put(root, "other.html", hts_span_of("<html>o</html>"));
+  sf_put_marked(opt, root, "css/main.css", hts_span_at(css, sizeof(css) - 1));
+  sf_put_marked(opt, root, "css/sub/nested.css",
+                hts_span_at(nested, sizeof(nested) - 1));
+  sf_put_marked(opt, root, "css/sub/two.css",
+                hts_span_at(two, sizeof(two) - 1));
+  sf_put(root, "js/app.js", hts_span_at(js, sizeof(js) - 1));
+  sf_put(root, "img/a b.png", hts_span_at(sf_png, SF_PNG_LEN));
+  sf_put(root, "img/big.png", hts_span_at(big, sizeof(big)));
+  sf_put(root, "img/sprite.svg", hts_span_at(sf_svg, sizeof(sf_svg) - 1));
+  sf_put(root, "img/big-sprite.svg", hts_span_at(big, sizeof(big)));
+  sf_put(root, "img/b&c%d#e.png", hts_span_at(big, sizeof(big)));
+  sf_put(root, "img/in.png", hts_span_at(sf_png, SF_PNG_LEN));
+  sf_put(root, "img/po.png", hts_span_at(sf_png, SF_PNG_LEN));
+  sf_put(root, "img/sv.png", hts_span_at(sf_png, SF_PNG_LEN));
+  sf_put(root, "img/bg.png", hts_span_at(sf_png, SF_PNG_LEN));
+  sf_put(root, "img/ph.png", hts_span_at(sf_png, SF_PNG_LEN));
+  sf_put(root, "img/lz.png", hts_span_at(sf_png, SF_PNG_LEN));
+  sf_put(root, "img/lz2.png", hts_span_at(sf_png, SF_PNG_LEN));
+  sf_put(root, "img/low.png", hts_span_at(sf_png, SF_PNG_LEN));
+  sf_put(root, "img/ob.png", hts_span_at(sf_png, SF_PNG_LEN));
+  sf_put(root, "img/em.png", hts_span_at(sf_png, SF_PNG_LEN));
+  sf_put(root, "icon.png", hts_span_at(sf_png, SF_PNG_LEN));
+  sf_put(root, "font/f.woff2", hts_span_at("wOF2\x00\x01", 6));
   /* Each path is where a guard's removal would land a reference. Windows
      cannot create the two with a colon, so it checks the scheme guard less. */
-  sf_put(root, "img/never.png", sf_png, SF_PNG_LEN);
-  sf_put(root, "example.com/x.png", sf_png, SF_PNG_LEN);
+  sf_put(root, "img/never.png", hts_span_at(sf_png, SF_PNG_LEN));
+  sf_put(root, "example.com/x.png", hts_span_at(sf_png, SF_PNG_LEN));
   sf_colon_ok =
-      sf_try_put(root, "http:/example.com/x.png", sf_png, SF_PNG_LEN) &&
-      sf_try_put(root, "data:text/css;base64,QUJD", "p{}", 3);
+      sf_try_put(root, "http:/example.com/x.png",
+                 hts_span_at(sf_png, SF_PNG_LEN)) &&
+      sf_try_put(root, "data:text/css;base64,QUJD", hts_span_of("p{}"));
   { /* More attributes than the tag parser records, with a '>' inside a quoted
        value: the give-up path must not rescan quote-blind. */
     String wide = STRING_EMPTY;
@@ -1952,13 +1957,14 @@ static void sf_fixture(httrackp *opt, const char *root) {
     }
     StringCat(wide,
               " title=\"> <img src=img/a%20b.png> \">end</p></body></html>");
-    sf_put_marked(opt, root, "wide.html", StringBuff(wide), StringLength(wide));
+    sf_put_marked(opt, root, "wide.html",
+                  hts_span_at(StringBuff(wide), StringLength(wide)));
     StringFree(wide);
   }
   sf_put(root, "v.mp4",
-         "\x00\x00\x00\x18"
-         "ftypisom",
-         12);
+         hts_span_at("\x00\x00\x00\x18"
+                     "ftypisom",
+                     12));
 }
 
 /* singlefileclass <tag>: the class single-file gives TAG's href, where TAG
@@ -1984,8 +1990,8 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
   size_t outlen = 0, len = 0;
 
   sf_err = 0;
-  sf_put(argv[0], "escape.png", sf_png,
-         SF_PNG_LEN); /* just outside the mirror */
+  /* just outside the mirror */
+  sf_put(argv[0], "escape.png", hts_span_at(sf_png, SF_PNG_LEN));
   fconcat(root, sizeof(root), argv[0], "mirror/");
   sf_fixture(opt, root);
   fconcat(page, sizeof(page), root, "page.html");
@@ -2200,7 +2206,7 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
     StringClear(verbatim);
     String marked = STRING_EMPTY;
 
-    sf_expand_fixture(opt, sf_page, sizeof(sf_page) - 1, &marked);
+    sf_expand_fixture(opt, hts_span_at(sf_page, sizeof(sf_page) - 1), &marked);
     (void) singlefile_rewrite_html(
         opt, root, page, hts_span_at(StringBuff(marked), StringLength(marked)),
         SINGLEFILE_MAX_PAGE_SIZE, &verbatim);
@@ -2218,7 +2224,7 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
     String marked = STRING_EMPTY;
     String got = STRING_EMPTY;
 
-    sf_expand_fixture(opt, tail, sizeof(tail) - 1, &marked);
+    sf_expand_fixture(opt, hts_span_at(tail, sizeof(tail) - 1), &marked);
     StringAddchar(marked, '9'); /* a digit past the span must not be read */
     StringClear(got);
     (void) singlefile_rewrite_html(
@@ -2349,12 +2355,14 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
     String small = STRING_EMPTY, large = STRING_EMPTY, bomb = STRING_EMPTY;
 
     fconcat(root, sizeof(root), argv[0], "bomb/");
-    css_len = sf_put_marked(opt, root, "b.css", bomb_css, sizeof(bomb_css) - 1);
+    css_len = sf_put_marked(opt, root, "b.css",
+                            hts_span_at(bomb_css, sizeof(bomb_css) - 1));
     fconcat(page, sizeof(page), root, "page.html");
     opt->single_file_max_size = 1024 * 1024;
     StringClear(small);
     StringClear(large);
-    sf_expand_fixture(opt, bomb_html, sizeof(bomb_html) - 1, &bomb);
+    sf_expand_fixture(opt, hts_span_at(bomb_html, sizeof(bomb_html) - 1),
+                      &bomb);
     (void) singlefile_rewrite_html(
         opt, root, page, hts_span_at(StringBuff(bomb), StringLength(bomb)),
         (LLint) css_len * 3, &small);
@@ -2428,10 +2436,10 @@ static int legacy_normalize_http_headers(const char *resp_hdr, long long set_cl,
 }
 
 static void legacy_http_header_value(const char *hdr, const char *name,
-                                     char *out, size_t outsz) {
+                                     hts_buf out) {
   size_t nl = strlen(name);
   const char *p = hdr;
-  out[0] = '\0';
+  out.p[0] = '\0';
   if (hdr == NULL)
     return;
   while (*p != '\0') {
@@ -2452,10 +2460,10 @@ static void legacy_http_header_value(const char *hdr, const char *name,
           vlen = k;
           break;
         }
-      if (vlen >= outsz)
-        vlen = outsz - 1;
-      memcpy(out, v, vlen);
-      out[vlen] = '\0';
+      if (vlen >= out.size)
+        vlen = out.size - 1;
+      memcpy(out.p, v, vlen);
+      out.p[vlen] = '\0';
       return;
     }
     if (eol == NULL)
@@ -2494,7 +2502,7 @@ static void warcdiff_one(parsediff_stats *st, const char *hdr) {
       memset(o, 'O', sizeof(o));
       memset(n, 'O', sizeof(n));
       st->cases++;
-      legacy_http_header_value(hdr, names[i], o, sizes[j]);
+      legacy_http_header_value(hdr, names[i], hts_buf_at(o, sizes[j]));
       warc_http_header_value(hdr, names[i], hts_buf_at(n, sizes[j]));
       if (memcmp(o, n, sizeof(o)) != 0)
         parsediff_fail(st, "http_header_value", hdr != NULL ? hdr : "(null)",
