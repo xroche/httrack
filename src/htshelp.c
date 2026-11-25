@@ -182,7 +182,7 @@ void help_wizard(httrackp * opt) {
     printf("\n");
     printf("Enter project name :");
     fflush(stdout);
-    linput(stdin, projname, 250);
+    linput(stdin, HTS_BUF_N(projname, 250));
     if (strnotempty(projname) == 0) {
       /* linput() reports neither EOF nor error, so the retry loop would spin */
       if (feof(stdin) || ferror(stdin)) {
@@ -199,7 +199,7 @@ void help_wizard(httrackp * opt) {
     printf("\nBase path (return=%s/websites/) :", hts_gethome());
   else
     printf("\nBase path (return=current directory) :");
-  linput(stdin, str, 250);
+  linput(stdin, HTS_BUF_N(str, 250));
   if (!strnotempty(str)) {
     strcatbuff(str, hts_gethome());
     strcatbuff(str, "/websites/");
@@ -215,7 +215,7 @@ void help_wizard(httrackp * opt) {
   printf("\n");
   printf("Enter URLs (separated by commas or blank spaces) :");
   fflush(stdout);
-  linput(stdin, urls, 250);
+  linput(stdin, HTS_BUF_N(urls, 250));
   if (strnotempty(urls)) {
     while((a = strchr(urls, ',')))
       *a = ' ';
@@ -252,7 +252,7 @@ void help_wizard(httrackp * opt) {
 
     // Proxy
     printf("\nProxy (return=none) :");
-    linput(stdin, str, 250);
+    linput(stdin, HTS_BUF_N(str, 250));
     if (strnotempty(str)) {
       while((a = strchr(str, ' ')))
         *a = ':';               // port
@@ -260,7 +260,7 @@ void help_wizard(httrackp * opt) {
         char str2[256];
 
         printf("\nProxy port (return=8080) :");
-        linput(stdin, str2, 250);
+        linput(stdin, HTS_BUF_N(str2, 250));
         strcatbuff(str, ":");
         if (strnotempty(str2) == 0)
           strcatbuff(str, "8080");
@@ -278,7 +278,7 @@ void help_wizard(httrackp * opt) {
     printf
       ("\nYou can define wildcards, like: -*.gif +www.*.com/*.zip -*img_*.zip\n");
     printf("Wildcards (return=none) :");
-    linput(stdin, strwild, 250);
+    linput(stdin, HTS_BUF_N(strwild, 250));
 
     // Options
     do {
@@ -286,7 +286,7 @@ void help_wizard(httrackp * opt) {
         ("\nYou can define additional options, such as recurse level (-r<number>), separated by blank spaces\n");
       printf("To see the option list, type help\n");
       printf("Additional options (return=none) :");
-      linput(stdin, str, 250);
+      linput(stdin, HTS_BUF_N(str, 250));
       if (strfield2(str, "help")) {
         help("httrack", 2);
       } else if (strnotempty(str)) {
@@ -316,7 +316,7 @@ void help_wizard(httrackp * opt) {
       printf("---> Wizard command line: httrack %s\n\n", cmd);
       printf("Ready to launch the mirror? (Y/n) :");
       fflush(stdout);
-      linput(stdin, str, 250);
+      linput(stdin, HTS_BUF_N(str, 250));
       if (strnotempty(str)) {
         if (!((str[0] == 'y') || (str[0] == 'Y'))) {
           freet(buffers);
@@ -391,7 +391,7 @@ static int help_query(const char *list, int def) {
   do {
     printf("\n: ");
     fflush(stdout);
-    linput(stdin, s, 250);
+    linput(stdin, HTS_BUF_N(s, 250));
   } while((strnotempty(s) != 0) && (sscanf(s, "%d", &opt) != 1));
   if (strnotempty(s))
     return opt;

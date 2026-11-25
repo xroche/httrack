@@ -170,8 +170,9 @@ exit 3
 EOF
 cd "$run"
 rc=0
+# A floor of 0 is refused, so the run still ends on the floor of 90.
 out=$(RUNNER_TEMP="$tmp" GITHUB_STEP_SUMMARY="$tmp/summary" WATCHDOG_TOKEN=s3cr3t \
-    bash ./ci-windows-suite.sh "$bin" 2>&1) || rc=$?
+    HTTRACK_SUITE_MIN_PASS=0 bash ./ci-windows-suite.sh "$bin" 2>&1) || rc=$?
 assert_staged
 # The skip set and the pass floor are pinned to the real suite, so a stub run
 # ends on the floor; what is under test is the tally that reaches it.

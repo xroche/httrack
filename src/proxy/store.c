@@ -1228,9 +1228,10 @@ static PT_Element PT_ReadCache__New(PT_Index index_, const char *url,
           sink.len = &headersLen;
           sink.cap = &headersCap;
           headerBuff[readSizeHeader] = '\0';
-          if (!hts_cache_read_fields(headerBuff, (size_t) readSizeHeader,
-                                     fields, sizeof(fields) / sizeof(fields[0]),
-                                     PT_AppendHeaderSink, &sink)) {
+          if (!hts_cache_read_fields(
+                  hts_span_at(headerBuff, (size_t) readSizeHeader), fields,
+                  sizeof(fields) / sizeof(fields[0]), PT_AppendHeaderSink,
+                  &sink)) {
             r->statuscode = STATUSCODE_INVALID;
             strcpybuff(r->msg, "Cache Read Error : NUL In Header");
           }
@@ -1276,7 +1277,7 @@ static PT_Element PT_ReadCache__New(PT_Index index_, const char *url,
                     strcpybuff(r->msg, "Cache Read Error : Bad Size");
                   } else {
                     FILE *fp = fopen(
-                        file_convert(HTS_SIZED(catbuff), previous_save), "rb");
+                        file_convert(HTS_BUF(catbuff), previous_save), "rb");
 
                     if (fp != NULL &&
                         !cache_fits(fp, stream_size(fp), r->size)) {
@@ -1310,7 +1311,7 @@ static PT_Element PT_ReadCache__New(PT_Index index_, const char *url,
                       r->statuscode = STATUSCODE_INVALID;
                       PT_Element_failf(
                           r, "Read error (can't open '%s') from cache",
-                          file_convert(HTS_SIZED(catbuff), previous_save));
+                          file_convert(HTS_BUF(catbuff), previous_save));
                     }
                   }
                 }

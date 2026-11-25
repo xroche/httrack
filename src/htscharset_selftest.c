@@ -734,7 +734,7 @@ static int st_escape_append_room(httrackp *opt, int argc, char **argv) {
 
     memset(buf, 'a', used);
     buf[used] = '\0';
-    ret = append_escape_check_url("bc", buf, sizeof(buf));
+    ret = append_escape_check_url("bc", HTS_BUF(buf));
     /* "bc" plus its NUL needs three bytes; the ambiguous size reports full */
     if (room < 3 || room == sizeof(void *)) {
       assertf(ret == room);

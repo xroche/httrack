@@ -94,8 +94,7 @@ coucal NewLangList = NULL;
   (HTS_LINE_DROP_TAB | HTS_LINE_DROP_FF | HTS_LINE_DROP_NUL)
 
 const char *gethomedir(void);
-static T_SOC smallserver_init(int *port, char *adr, size_t adr_size,
-                              const char *bindAddr);
+static T_SOC smallserver_init(int *port, hts_buf adr, const char *bindAddr);
 int commandRunning = 0;
 int commandEndRequested = 0;
 int commandEnd = 0;
@@ -273,8 +272,7 @@ HTS_UNUSED static int recv_bl(T_SOC soc, void *buffer, size_t len,
                               time_t deadline);
 
 /* Language files */
-HTS_UNUSED static int htslang_load(char *limit_to, size_t limit_size,
-                                   const char *apppath);
+HTS_UNUSED static int htslang_load(hts_buf limit_to, const char *apppath);
 HTS_UNUSED static void conv_printf(const char *from, char *to);
 HTS_UNUSED static void LANG_DELETE(void);
 HTS_UNUSED static void LANG_INIT(const char *path);
@@ -290,8 +288,8 @@ HTS_UNUSED static int LANG_LIST(const char *path, hts_buf buffer);
 // 0- Init the URL catcher with standard port
 
 // smallserver_init(&port,&return_host);
-T_SOC smallserver_init_std(int *port_prox, char *adr_prox, size_t adr_size,
-                           int defaultPort, const char *bindAddr) {
+T_SOC smallserver_init_std(int *port_prox, hts_buf adr_prox, int defaultPort,
+                           const char *bindAddr) {
   T_SOC soc;
 
   if (defaultPort <= 0) {
@@ -303,13 +301,12 @@ T_SOC smallserver_init_std(int *port_prox, char *adr_prox, size_t adr_size,
     int i = 0;
 
     do {
-      soc =
-          smallserver_init(&try_to_listen_to[i], adr_prox, adr_size, bindAddr);
+      soc = smallserver_init(&try_to_listen_to[i], adr_prox, bindAddr);
       *port_prox = try_to_listen_to[i];
       i++;
     } while((soc == INVALID_SOCKET) && (try_to_listen_to[i] >= 0));
   } else {
-    soc = smallserver_init(&defaultPort, adr_prox, adr_size, bindAddr);
+    soc = smallserver_init(&defaultPort, adr_prox, bindAddr);
     *port_prox = defaultPort;
   }
   return soc;
@@ -430,8 +427,7 @@ static void advertised_host(hts_buf dst, const char *bound) {
 }
 
 // smallserver_init(&port,&return_host);
-static T_SOC smallserver_init(int *port, char *adr, size_t adr_size,
-                              const char *bindAddr) {
+static T_SOC smallserver_init(int *port, hts_buf adr, const char *bindAddr) {
   T_SOC soc = INVALID_SOCKET;
   char h_loc[256 + 2];
   SOCaddr server;
@@ -462,7 +458,7 @@ static T_SOC smallserver_init(int *port, char *adr, size_t adr_size,
     char adv[sizeof(h_loc) + 2]; /* + the brackets of an IPv6 literal */
 
     advertised_host(HTS_BUF(adv), h_loc);
-    strclipbuff(adr, adr_size, adv);
+    hts_buf_cpy_clip(adr, adv);
   }
   return soc;
 }
@@ -581,27 +577,27 @@ static void copy_header_value(hts_buf dst, const char *value) {
 /** Copy query parameter "name"'s alphanumeric value into dst, of size >= 1;
     true when a non-empty one fit, and dst is left empty otherwise.
     Query-string counterpart to the POST-body checker below. */
-static hts_boolean query_alnum_value(char *dst, size_t size, const char *query,
+static hts_boolean query_alnum_value(hts_buf dst, const char *query,
                                      const char *name) {
   hts_query_field f;
   size_t n = 0;
 
-  dst[0] = '\0';
+  dst.p[0] = '\0';
   if (!hts_query_find(query, name, &f)) {
     return HTS_FALSE;
   }
-  while (n < f.val.len && n + 1 < size &&
+  while (n < f.val.len && n + 1 < dst.size &&
          hts_isalnum((unsigned char) f.val.p[n])) {
-    dst[n] = f.val.p[n];
+    dst.p[n] = f.val.p[n];
     n++;
   }
-  dst[n] = '\0';
+  dst.p[n] = '\0';
   /* Truncated, or not alphanumeric to its end, is no value at all: it must
      not reach a caller that trusted the return. */
   if (n > 0 && n == f.val.len) {
     return HTS_TRUE;
   }
-  dst[0] = '\0';
+  dst.p[0] = '\0';
   return HTS_FALSE;
 }
 
@@ -1133,15 +1129,15 @@ static void cat_js_escaped(String *dst, const char *value) {
   }
 }
 
-/* Append LEN bytes of the value of a double-quoted command-line argument:
+/* Append VALUE, the value of a double-quoted command-line argument:
    escaped for HTML, which the browser undoes when it posts the command line
    back, and for the argv splitter, which does not. */
-static void cat_cmdline_argn(String *output, const char *value, size_t len) {
+static void cat_cmdline_argn(String *output, hts_span value) {
   String escaped = STRING_EMPTY;
   size_t i;
 
   /* the HTML escape leaves the argument escapes alone, so they compose */
-  hts_escape_arg(&escaped, value, len);
+  hts_escape_arg(&escaped, value.p, value.len);
   for (i = 0; i < StringLength(escaped); i++) {
     const char c = StringBuff(escaped)[i];
 
@@ -1150,11 +1146,6 @@ static void cat_cmdline_argn(String *output, const char *value, size_t len) {
     }
   }
   StringFree(escaped);
-}
-
-/* see cat_cmdline_argn() */
-static void cat_cmdline_arg(String *output, const char *value) {
-  cat_cmdline_argn(output, value, strlen(value));
 }
 
 /* Append FLAG "<rule>" once per rule in VALUE. Whitespace separates rules,
@@ -1180,7 +1171,7 @@ static void cat_cmdline_arglist(String *output, const char *value,
       const size_t len = strcspn(p, ws);
       const char *const next = p + len + strspn(p + len, ws);
 
-      cat_cmdline_argn(output, p, len);
+      cat_cmdline_argn(output, hts_span_at(p, len));
       more = *next != '\0' &&
                      (*next == ',' || *next == '=' ||
                       (len != 0 && (p[len - 1] == ',' || p[len - 1] == '=')))
@@ -1331,15 +1322,15 @@ static void ini_publish_gated_values(void) {
   }
 }
 
-/* The first LEN bytes of VALUE shifted by DELTA, or -1 to leave it alone. An
-   empty, hand-edited or out-of-range id means whatever the reader makes of it.
-   So does 0, which already reads as the first entry on both sides. */
-static int ini_list_shift(const char *value, size_t len, int delta) {
+/* VALUE shifted by DELTA, or -1 to leave it alone. An empty, hand-edited or
+   out-of-range id means whatever the reader makes of it. So does 0, which
+   already reads as the first entry on both sides. */
+static int ini_list_shift(hts_span value, int delta) {
   char digits[16];
   char *end;
   long id;
 
-  if (len == 0 || !hts_buf_put_span(HTS_BUF(digits), hts_span_at(value, len)))
+  if (value.len == 0 || !hts_buf_put_span(HTS_BUF(digits), value))
     return -1;
   id = strtol(digits, &end, 10);
   if (*end != '\0' || id < 0 || id > INT_MAX - 1)
@@ -1365,7 +1356,7 @@ static void ini_rebase_lists(const char *ini, int delta, String *out) {
       /* Trim the CRs a textarea posts. */
       value = hts_span_trim(value, "", "\r");
       if (hts_span_copy(key, HTS_SIZED(name)) && ini_key_is_list(name))
-        id = ini_list_shift(value.p, value.len, delta);
+        id = ini_list_shift(value, delta);
     }
     if (id >= 0) {
       const hts_span tail = hts_span_skip(raw, key.len + 1 + value.len);
@@ -1430,7 +1421,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
     path_from_cmdline = coucal_readptr(NewLangList, "path", &adr) &&
                         strnotempty((const char *) adr);
   }
-  if (!htslang_load(NULL, 0, path)) {
+  if (!htslang_load(hts_buf_at(NULL, 0), path)) {
     fprintf(stderr, "unable to find lang.def and/or lang/ strings in %s\n",
             path);
     freet(buffer);
@@ -1870,7 +1861,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                     ini_key_is_checkbox(entry))
                   *pos = '\0';
                 if (ini_key_is_list(entry)) {
-                  const int id = ini_list_shift(pos, strlen(pos), 1);
+                  const int id = ini_list_shift(hts_span_of(pos), 1);
 
                   if (id >= 0) {
                     snprintf(listid, sizeof(listid), "%d", id);
@@ -2586,7 +2577,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                     /* consumed here: it shares nothing with the list and
                        option formats below */
                     if (format == 5 && langstr != NULL && outputmode != -1) {
-                      cat_cmdline_arg(&output, langstr);
+                      cat_cmdline_argn(&output, hts_span_of(langstr));
                       langstr = NULL;
                     }
                     if (langstr && outputmode != -1) {
@@ -2797,14 +2788,14 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
             smallserver_head(
                 &headers, "200 Pong",
                 "Content-type: text/html\r\n" SMALLSERVER_NO_CACHE);
-            if (query_alnum_value(HTS_SIZED(window), query, "w")) {
+            if (query_alnum_value(HTS_BUF(window), query, "w")) {
               char verb[SMALLSERVER_WINDOW_ID_MAX + 1];
 
               /* Ending a session is a command, so it carries the session id
                  like every other one. A heartbeat can only extend a life, and
                  any local peer or visited page can send one of those. */
               client_event(
-                  authed && query_alnum_value(HTS_SIZED(verb), query, "e") &&
+                  authed && query_alnum_value(HTS_BUF(verb), query, "e") &&
                           strcmp(verb, "bye") == 0
                       ? SMALLSERVER_CLIENT_LEAVING
                       : SMALLSERVER_CLIENT_PING,
@@ -3013,7 +3004,7 @@ static HTS_CHECK_RESULT hts_boolean lang_catalog_path(hts_buf dst,
   return hts_buf_printf(dst, "lang/%s.txt", hashname);
 }
 
-static int htslang_load(char *limit_to, size_t limit_size, const char *path) {
+static int htslang_load(hts_buf limit_to, const char *path) {
   const char *hashname;
   char catbuff[CATBUFF_SIZE];
 
@@ -3021,7 +3012,7 @@ static int htslang_load(char *limit_to, size_t limit_size, const char *path) {
   int selected_lang = LANG_T(path, -1);
 
   //
-  if (!limit_to) {
+  if (limit_to.p == NULL) {
     LANG_DELETE();
     NewLangStr = coucal_new(0);
     NewLangStrKeys = coucal_new(0);
@@ -3036,7 +3027,7 @@ static int htslang_load(char *limit_to, size_t limit_size, const char *path) {
   }
 
   /* Load master file (list of keys and internal keys) */
-  if (!limit_to) {
+  if (limit_to.p == NULL) {
     const char *mname = "lang.def";
     FILE *fp = fopen(fconcat(catbuff, sizeof(catbuff), path, mname), "rb");
 
@@ -3090,17 +3081,17 @@ static int htslang_load(char *limit_to, size_t limit_size, const char *path) {
   /* Read the key named in limit_to from the selected catalog, not lang.def's
      file name for it. Both come off disk, so every copy clips: the safe_
      helpers abort, and a long line in a catalog must not kill the server. */
-  if (limit_to) {
+  if (limit_to.p != NULL) {
     char wanted[256];
     char lbasename[1024]; /* the guard below writes it, so it outlives the if */
 
-    strclipbuff(wanted, sizeof(wanted), limit_to);
-    limit_to[0] = '\0';
+    strclipbuff(wanted, sizeof(wanted), limit_to.p);
+    limit_to.p[0] = '\0';
     /* Fallback: an empty result ends a caller's loop, so a catalog missing the
        key must not look like the end of the list. */
     if (hashname != NULL)
-      strclipbuff(limit_to, limit_size, hashname);
-    if (limit_to[0] != '\0' &&
+      hts_buf_cpy_clip(limit_to, hashname);
+    if (limit_to.p[0] != '\0' &&
         lang_catalog_path(HTS_BUF(lbasename), hashname)) {
       FILE *fp;
 
@@ -3114,7 +3105,7 @@ static int htslang_load(char *limit_to, size_t limit_size, const char *path) {
           if (lang_read_pair(fp, HTS_BUF_N(extkey, 8000),
                              HTS_BUF_N(value, 8000)) &&
               strcmp(extkey, wanted) == 0 && value[0] != '\0') {
-            strclipbuff(limit_to, limit_size, value);
+            hts_buf_cpy_clip(limit_to, value);
             found = HTS_TRUE;
           }
         }
@@ -3157,10 +3148,6 @@ static int htslang_load(char *limit_to, size_t limit_size, const char *path) {
       }
     }
   }
-
-  // Control limit_to
-  if (limit_to)
-    limit_to[0] = '\0';
 
   return 1;
 }
@@ -3257,7 +3244,7 @@ static void LANG_INIT(const char *path) { LANG_T(path, 0); }
 static int LANG_T(const char *path, int l) {
   if (l >= 0) {
     QLANG_T(l);
-    htslang_load(NULL, 0, path);
+    htslang_load(hts_buf_at(NULL, 0), path);
   }
   return QLANG_T(-1);           // 0=default (english)
 }
@@ -3271,7 +3258,7 @@ static int LANG_SEARCH(const char *path, const char *iso) {
   do {
     QLANG_T(i);
     strcpybuff(lang_str, "LANGUAGE_ISO");
-    htslang_load(HTS_SIZED(lang_str), path);
+    htslang_load(HTS_BUF(lang_str), path);
     if (strfield(iso, lang_str)) {
       found = i;
     }
@@ -3290,7 +3277,7 @@ static int LANG_LIST(const char *path, hts_buf buffer) {
   do {
     QLANG_T(i);
     strlcpybuff(lang_str, "LANGUAGE_NAME", sizeof(lang_str));
-    htslang_load(HTS_SIZED(lang_str), path);
+    htslang_load(HTS_BUF(lang_str), path);
     if (strlen(lang_str) > 0) {
       if (buffer.p[0])
         hts_buf_cat(buffer, "\n");

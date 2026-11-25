@@ -72,7 +72,7 @@ void cookie_records_text(const t_cookie *cookie, String *out) {
     const char *rec = line;
     int i;
 
-    a += binput(a, line, COOKIE_MAX_LINE);
+    a += binput(a, HTS_BUF_N(line, COOKIE_MAX_LINE + 1));
     // stop on the seventh TAB, so the cut takes it with the eighth field
     for (i = 0; i < 7 && extra != NULL; i++) {
       extra = strchr(extra, '\t');

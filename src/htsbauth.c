@@ -1444,16 +1444,16 @@ int cookie_load_from(httrackp *opt, t_cookie *cookie, const char *fpath,
               while(!feof(fp)) {
                 cook_name[0] = cook_value[0] = domainpathpath[0]
                 = dummy[0] = af.adr[0] = af.fil[0] = '\0';
-                linput(fp, cook_name, 250);
+                linput(fp, HTS_BUF_N(cook_name, 250));
                 if (!feof(fp)) {
-                  linput(fp, cook_value, 250);
+                  linput(fp, HTS_BUF_N(cook_value, 250));
                   if (!feof(fp)) {
                     int i;
 
-                    linput(fp, domainpathpath, 500);
+                    linput(fp, HTS_BUF_N(domainpathpath, 500));
                     /* Read 6 other useless values */
                     for(i = 0; !feof(fp) && i < 6; i++) {
-                      linput(fp, dummy, 500);
+                      linput(fp, HTS_BUF_N(dummy, 500));
                     }
                     if (strnotempty(cook_name)
                         && strnotempty(cook_value)

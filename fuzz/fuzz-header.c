@@ -115,16 +115,17 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   /* Mirror of back_wait's header loop (src/htsback.c); keep in sync. */
   if (buf[0] != '<') {
     /* status line, skipping one bogus blank line */
-    (void) binput_line(buf + ptr, end, rcvd, 2000, &adv);
+    (void) binput_line(buf + ptr, end, HTS_BUF_N(rcvd, 2000), &adv);
     ptr += adv;
     if (!strnotempty(rcvd)) {
-      (void) binput_line(buf + ptr, end, rcvd, 2000, &adv);
+      (void) binput_line(buf + ptr, end, HTS_BUF_N(rcvd, 2000), &adv);
       ptr += adv;
     }
     treatfirstline(&r, rcvd);
 
     do {
-      const hts_boolean cut = binput_line(buf + ptr, end, rcvd, 2000, &adv);
+      const hts_boolean cut =
+          binput_line(buf + ptr, end, HTS_BUF_N(rcvd, 2000), &adv);
 
       ptr += adv;
       if (cut) {
