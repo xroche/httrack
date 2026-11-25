@@ -210,12 +210,17 @@ static int st_metacharset(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+static int st_isidna(httrackp *opt, int argc, char **argv) {
+  printf("%d\n", hts_isStringIDNA(hts_span_of(argv[0])) ? 1 : 0);
+  return 0;
+}
+
 static int st_isutf8(httrackp *opt, int argc, char **argv) {
   char buf[512];
   size_t len;
 
   len = st_decode_body(argv[0], buf, sizeof(buf));
-  printf("%d\n", hts_isStringUTF8(buf, len) ? 1 : 0);
+  printf("%d\n", hts_isStringUTF8(hts_span_at(buf, len)) ? 1 : 0);
   return 0;
 }
 
@@ -239,6 +244,7 @@ static int st_idna_encode(httrackp *opt, int argc, char **argv) {
 static int host_ascii_case(const char *host, size_t len, size_t size,
                            hts_boolean inplace, const char *want) {
   char buf[64], before[64];
+  const hts_buf dst = hts_buf_at(buf, size);
   const char *src = host;
   const size_t keep = want != NULL ? strlen(want) + 1 : 0;
 
@@ -250,7 +256,7 @@ static int host_ascii_case(const char *host, size_t len, size_t size,
   }
   memcpy(before, buf, sizeof(buf));
   // nothing past the NUL may change, and nothing at all on a refusal
-  if (hts_host_to_ascii(buf, size, src, len) != (want != NULL) ||
+  if (hts_host_to_ascii(dst, hts_span_at(src, len)) != (want != NULL) ||
       (want != NULL && strcmp(buf, want) != 0) ||
       memcmp(buf + keep, before + keep, sizeof(buf) - keep) != 0) {
     printf("host-ascii: '%s' (%u bytes into %u) gave '%s'\n", host,
@@ -383,7 +389,8 @@ static void entity_sweep_one(const entity_ref *refs, const size_t n,
     /* the caller maps U+00A0 to a space */
     snprintf(want, sizeof(want), " ");
   } else {
-    const size_t len = hts_writeUTF8(hit->cp, want, sizeof(want) - 1);
+    const size_t len =
+        hts_writeUTF8(hit->cp, HTS_BUF_N(want, sizeof(want) - 1));
 
     want[len] = '\0';
   }
@@ -489,11 +496,12 @@ static int utf8_strict_bytes(const unsigned char *x, size_t n) {
   hts_UCS4 uc;
   int whole = 1;
   const size_t want = utf8_oracle(x, n);
-  const size_t got = hts_readUTF8((const char *) x, n, &uc);
+  const hts_span s = hts_span_at((const char *) x, n);
+  const size_t got = hts_readUTF8(s, &uc);
 
   for (i = 0; i < n && whole; i += m)
     whole = (m = utf8_oracle(&x[i], n - i)) != 0;
-  if (got != want || (hts_isStringUTF8((const char *) x, n) != 0) != whole) {
+  if (got != want || (hts_isStringUTF8(s) != 0) != whole) {
     printf("utf8-strict: %02x.. (%u bytes) read %u, want %u\n", x[0],
            (unsigned) n, (unsigned) got, (unsigned) want);
     return 1;
@@ -519,13 +527,13 @@ static hts_boolean utf8_write_edge(hts_UCS4 cp, size_t n) {
   size_t i;
 
   memset(buf, 'X', sizeof(buf));
-  if (hts_writeUTF8(cp, buf, n) != 0)
+  if (hts_writeUTF8(cp, hts_buf_at(buf, n)) != 0)
     return HTS_FALSE;
   for (i = 0; i < sizeof(buf); i++) {
     if (buf[i] != 'X')
       return HTS_FALSE;
   }
-  return hts_writeUTF8(cp, buf, n + 1) == n;
+  return hts_writeUTF8(cp, hts_buf_at(buf, n + 1)) == n;
 }
 
 static int st_utf8_strict(httrackp *opt, int argc, char **argv) {
@@ -577,9 +585,10 @@ static int st_utf8_strict(httrackp *opt, int argc, char **argv) {
     const hts_boolean ok = cp <= 0x10ffff && (cp < 0xd800 || cp > 0xdfff);
     hts_UCS4 back = 0;
 
-    n = hts_writeUTF8(cp, buf, sizeof(buf));
-    if ((n != 0) != ok || (ok && (hts_readUTF8(buf, n, &back) != n ||
-                                  back != cp || !utf8_write_edge(cp, n)))) {
+    n = hts_writeUTF8(cp, HTS_BUF(buf));
+    if ((n != 0) != ok ||
+        (ok && (hts_readUTF8(hts_span_at(buf, n), &back) != n || back != cp ||
+                !utf8_write_edge(cp, n)))) {
       printf("utf8-strict: U+%X wrote %u bytes\n", (unsigned) cp, (unsigned) n);
       return 1;
     }
@@ -961,6 +970,7 @@ const struct selftest_entry selftests_charset[] = {
     {"metacharset", "<html>", "extract the <meta> charset from an HTML page",
      st_metacharset},
     {"isutf8", "<hex:..|string>", "is the string valid UTF-8 (1/0)", st_isutf8},
+    {"isidna", "<host>", "has the host an xn-- label (1/0)", st_isidna},
     {"idna-encode", "<host>", "encode a hostname to IDNA/punycode",
      st_idna_encode},
     {"idna-decode", "<host>", "decode an IDNA/punycode hostname",

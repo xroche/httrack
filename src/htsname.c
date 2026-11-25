@@ -565,7 +565,7 @@ static size_t *utf8_char_offsets(const char *s, size_t *nChars) {
   if (pos == NULL)
     return NULL;
   for (i = 0, n = 0; i < size; n++) {
-    const size_t len = hts_readUTF8(s + i, size - i, NULL);
+    const size_t len = hts_readUTF8(hts_span_at(s + i, size - i), NULL);
 
     pos[n] = i;
     i += len != 0 ? len : 1;
@@ -946,7 +946,7 @@ int url_savename(lien_adrfilsave *const afs,
     || protocol == PROTOCOL_HTTPS \
     )\
     /* and contains IDNA */\
-    && hts_isStringIDNA(print_adr, strlen(print_adr))\
+    && hts_isStringIDNA(hts_span_of(print_adr))\
     ? hts_convertStringIDNAToUTF8(hts_span_of(print_adr))\
     : NULL;\
   /* Punycode can quadruple the host, and a clipped one names another host,\

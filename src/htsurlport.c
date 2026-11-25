@@ -114,12 +114,6 @@ hts_boolean hts_parse_url_port(const char *a, int *port) {
   return HTS_TRUE;
 }
 
-hts_span hts_span_of(const char *s) {
-  if (s == NULL)
-    s = "";
-  return hts_span_at(s, strlen(s));
-}
-
 hts_boolean hts_span_next_in(hts_span *rest, char sep, hts_span *field) {
   const char *stop;
 
@@ -228,26 +222,8 @@ char *hts_span_dup(hts_span s) {
   return copy;
 }
 
-hts_span hts_span_at(const char *p, size_t len) {
-  hts_span r;
-
-  r.p = p;
-  r.len = len;
-  return r;
-}
-
 hts_span hts_span_between(const char *from, const char *to) {
   return hts_span_at(from, (size_t) (to - from));
-}
-
-hts_span hts_span_skip(hts_span s, size_t n) {
-  if (n > s.len)
-    n = s.len;
-  if (n != 0) {
-    s.p += n;
-    s.len -= n;
-  }
-  return s;
 }
 
 hts_boolean hts_span_present(hts_span s) {

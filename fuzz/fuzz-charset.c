@@ -70,12 +70,12 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
     while (i < size) {
       hts_UCS4 uc = 0;
-      const size_t nr = hts_readUTF8(s + i, size - i, &uc);
+      const size_t nr = hts_readUTF8(hts_span_at(s + i, size - i), &uc);
       char out[8];
 
       if (nr == 0)
         break;
-      hts_writeUTF8(uc, HTS_SIZED(out));
+      hts_writeUTF8(uc, HTS_BUF(out));
       i += nr;
     }
   }

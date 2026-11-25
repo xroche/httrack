@@ -1438,7 +1438,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
                           // Guessed charset: never re-encode valid UTF-8 (#833)
                           if (charset != NULL && !hts_isCharsetUTF8(charset) &&
-                              (declared || !hts_isStringUTF8(s, strlen(s)))) {
+                              (declared || !hts_isStringUTF8(hts_span_of(s)))) {
                             char *sUtf =
                                 hts_convertStringToUTF8(s, strlen(s), charset);
 
@@ -2625,7 +2625,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   // string), unless the bytes already are valid UTF-8:
                   // converting those would double-encode them (#180)
                   if (hasCharset && !hts_isCharsetUTF8(charset) &&
-                      !hts_isStringUTF8(lien, strlen(lien))) {
+                      !hts_isStringUTF8(hts_span_of(lien))) {
                     char *s =
                         hts_convertStringToUTF8(lien, strlen(lien), charset);
                     if (s != NULL) {

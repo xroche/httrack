@@ -57,7 +57,7 @@ static void psl_add(coucal rules, hts_span rule) {
     kind = PSL_EXCEPTION;
     rule = hts_span_skip(rule, 1);
   }
-  if (hts_host_to_ascii(HTS_SIZED(key), rule.p, rule.len) && key[0] != '\0') {
+  if (hts_host_to_ascii(HTS_BUF(key), rule) && key[0] != '\0') {
     hts_lowcase(key);
     (void) coucal_read(rules, key, &old);
     coucal_write(rules, key, old | kind);
@@ -230,7 +230,7 @@ const char *hts_psl_registrable_domain(const char *host) {
   if (n == 0)
     return NULL;
   /* The rules are IDNA, and the conversion keeps every dot. */
-  if (!hts_isStringAscii(host, strlen(host))) {
+  if (!hts_isStringAscii(hts_span_of(host))) {
     idna = hts_convertStringUTF8ToIDNA(hts_span_of(host));
     if (idna == NULL || psl_labels(idna, idna_labels, n) != n) {
       freet(idna);

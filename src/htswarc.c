@@ -562,7 +562,7 @@ static int surt_add_utf8(wbuf *out, hts_span s) {
     const unsigned char c = (unsigned char) s.p[i];
     size_t len = 1;
     if (c >= 0x80) {
-      len = hts_readUTF8(s.p + i, s.len - i, NULL);
+      len = hts_readUTF8(hts_span_skip(s, i), NULL);
       if (len == 0) {
         if (wbuf_printf(out, "%%%02X", (unsigned) c) != 0)
           return -1;

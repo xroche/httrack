@@ -120,12 +120,12 @@ int hts_unescapeEntitiesWithCharsetSpecial(const char *src, char *dest,
           const size_t maxOut = max - ampStartDest;
           /* write at position */
           if (charset != NULL && hts_isCharsetUTF8(charset)) {
-            len = hts_writeUTF8(uc, &dest[ampStartDest], maxOut);
+            len = hts_writeUTF8(uc, hts_buf_at(&dest[ampStartDest], maxOut));
           } else {
             size_t ulen;
             char buffer[32];
             len = 0;
-            if ((ulen = hts_writeUTF8(uc, HTS_SIZED(buffer))) != 0) {
+            if ((ulen = hts_writeUTF8(uc, HTS_BUF(buffer))) != 0) {
               const hts_boolean urlQuery =
                   (flags & UNESCAPE_ENTITIES_URL_QUERY) != 0;
               char *s;
@@ -319,7 +319,8 @@ int hts_unescapeUrlSpecial(const char *src, char *dest, const size_t max,
 
         /* Flush UTF-8 buffer when completed. */
         if (k == utfBufferSize) {
-          const size_t nRead = hts_readUTF8(utfBuffer, utfBufferSize, NULL);
+          const size_t nRead =
+              hts_readUTF8(hts_span_at(utfBuffer, utfBufferSize), NULL);
 
           /* Reset UTF-8 buffer in all cases. */
           k = 0;
