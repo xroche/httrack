@@ -359,8 +359,13 @@ test ! -e "$tmpdir/missing" || fail "a missing folder was created"
 # Secure over https, for the session, and the first of a repeated name wins.
 bytes() { # bytes NAME WANT -- the bundle NAME in proj holds WANT
     local got
-    got=$(tr -d '\r' <"$tmpdir/proj/$1.hts") # CRLF on Windows
-    test "$got" = "$2" || fail "$1.hts content: [$got]"
+    got=$(
+        tr -d '\r' <"$tmpdir/proj/$1.hts" # CRLF on Windows
+        echo x
+    )
+    # the x keeps the final LF, which a write one byte short would drop
+    test "${got%x}" = "$2
+" || fail "$1.hts content: [$got]"
 }
 bytes example.com "# HTTrack bundle 1
 ua Mozilla/5.0 Test

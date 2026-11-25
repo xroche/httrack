@@ -1926,7 +1926,8 @@ HTSEXT_API hts_boolean hts_bundle_from_paste_hosts(
   if (!dry_run) {
     if (!bundle_path(HTS_BUF(path), folder, name))
       PASTE_FAIL("the folder path is too long");
-    if (!cookie_write_replace(path, StringBuff(text), StringLength(text)))
+    if (!cookie_write_replace(
+            path, hts_span_at(StringBuff(text), StringLength(text))))
       PASTE_FAIL("cannot write %s: %s", path, strerror(errno));
   }
   strcpybuff(result->name, name);
