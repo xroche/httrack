@@ -126,7 +126,7 @@ Please visit our Website: http://www.httrack.com
 /* END specific definitions */
 
 static void deletesoc_r(htsblk *r);
-static void time_rfc822_local(char *s, size_t size, struct tm *A);
+static void time_rfc822_local(hts_buf s, struct tm *A);
 
 /* variables globales */
 int _DEBUG_HEAD;
@@ -3087,7 +3087,7 @@ void time_gmt_rfc822(hts_buf s) {
   /* no local-time fallback: it would format local time and still label it GMT
    * (#806) */
   if (hts_gmtime(tt, &tmv))
-    time_rfc822(s.p, s.size, &tmv);
+    time_rfc822(s, &tmv);
   else
     s.p[0] = '\0';
 }
@@ -3108,7 +3108,7 @@ void time_local_rfc822(hts_buf s) {
   assertf(s.size != 0);
   tt = time(NULL);
   if (hts_localtime(tt, &tmv))
-    time_rfc822_local(s.p, s.size, &tmv);
+    time_rfc822_local(s, &tmv);
   else
     s.p[0] = '\0';
 }
@@ -3317,30 +3317,30 @@ int get_filetime_rfc822(const char *file, hts_buf date) {
     /* no local-time fallback: it would format local time and still label it GMT
      * (#806) */
     if (hts_gmtime(tt, &tmv)) {
-      time_rfc822(date.p, date.size, &tmv);
+      time_rfc822(date, &tmv);
       return 1;
     }
   }
   return 0;
 }
 
-void time_rfc822(char *s, size_t size, struct tm *A) {
+void time_rfc822(hts_buf s, struct tm *A) {
   if (A == NULL) {
     int localtime_returned_null = 0;
 
     assertf(localtime_returned_null);
   }
-  hts_format_rfc822(s, size, A, " GMT");
+  hts_format_rfc822(s.p, s.size, A, " GMT");
 }
 
 // Writes A as an RFC 822 date in local time.
-static void time_rfc822_local(char *s, size_t size, struct tm *A) {
+static void time_rfc822_local(hts_buf s, struct tm *A) {
   if (A == NULL) {
     int localtime_returned_null = 0;
 
     assertf(localtime_returned_null);
   }
-  hts_format_rfc822(s, size, A, "");
+  hts_format_rfc822(s.p, s.size, A, "");
 }
 
 // conversion en b,Kb,Mb
@@ -3656,9 +3656,8 @@ const char *adr_nologin_r(hts_buf out, const char *adr) {
   return out.p;
 }
 
-const char *url_nologin_r(char *buf, size_t size, const char *url) {
-  return login_start(url) != url ? adr_nologin_r(hts_buf_at(buf, size), url)
-                                 : url;
+const char *url_nologin_r(hts_buf buf, const char *url) {
+  return login_start(url) != url ? adr_nologin_r(buf, url) : url;
 }
 
 const char *adr_nologin(httrackp *opt, const char *adr) {
@@ -4674,32 +4673,32 @@ HTSEXT_API char *unescape_http_unharm(char *const catbuff, const size_t size,
 // buffer MAX 1Ko
 size_t escape_spc_url(const char *const src, char *const dest,
                       const size_t size) {
-  return x_escape_http(src, dest, size, 2);
+  return x_escape_http(src, hts_buf_at(dest, size), 2);
 }
 
 // smith / john -> smith%20%2f%20john
 HTSEXT_API size_t escape_in_url(const char *const src, 
                                 char *const dest, const size_t size) {
-  return x_escape_http(src, dest, size, 1);
+  return x_escape_http(src, hts_buf_at(dest, size), 1);
 }
 
 // smith / john -> smith%20/%20john
 size_t escape_uri(const char *const src, char *const dest, const size_t size) {
-  return x_escape_http(src, dest, size, 3);
+  return x_escape_http(src, hts_buf_at(dest, size), 3);
 }
 
 size_t escape_uri_utf(const char *const src, char *const dest,
                       const size_t size) {
-  return x_escape_http(src, dest, size, 30);
+  return x_escape_http(src, hts_buf_at(dest, size), 30);
 }
 
 HTSEXT_API size_t escape_check_url(const char *const src, char *const dest,
                                    const size_t size) {
-  return x_escape_http(src, dest, size, 0);
+  return x_escape_http(src, hts_buf_at(dest, size), 0);
 }
 
 size_t escape_control_url(const char *const src, hts_buf dest) {
-  return x_escape_http(src, dest.p, dest.size, 4);
+  return x_escape_http(src, dest, 4);
 }
 
 // same as escape_check_url, but returns char*
@@ -4811,9 +4810,10 @@ void escape_remove_control(char *const s) {
   } while(0)
 
 /* Returns the number of characters written (not taking in account the terminating \0), or 'size' upon overflow. */
-size_t x_escape_http(const char *const s, char *const dest, const size_t size,
-                     const int mode) {
+size_t x_escape_http(const char *const s, hts_buf out, const int mode) {
   static const char hex[] = "0123456789abcdef";
+  char *const dest = out.p; // ADD_CHAR writes through dest and size
+  const size_t size = out.size;
   size_t i, j;
 
   RUNTIME_TIME_CHECK_SIZE(size);
