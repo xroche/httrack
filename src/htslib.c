@@ -1210,7 +1210,7 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
                                    retour->req.accept, opt->accept_given,
                                    fetch != NULL ? fetch->dest
                                                  : HTS_FETCH_DEST_UNKNOWN,
-                                   family, HTS_SIZED(accept_buf));
+                                   family, HTS_BUF(accept_buf));
         if (strnotempty(accept) && !http_headers_have_field(custom, "Accept")) {
           HDR_OPEN(HDR_ACCEPT);
           print_buffer(&hdr, "Accept: %s" H_CRLF, accept);

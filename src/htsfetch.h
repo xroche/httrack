@@ -141,12 +141,11 @@ int hts_accept_kind_of(const char *arg);
 
 /* Return the first Accept of: dest's kind line in list, the document line for
    a frame, user_default if user_given, family's table, user_default. A list
-   line is "kind=value", the last one wins, and its value is copied into buf
-   (size bytes). */
+   line is "kind=value", the last one wins, and its value is copied into out.
+*/
 const char *hts_accept_lookup(const char *list, const char *user_default,
                               hts_boolean user_given, int dest,
-                              hts_browser_family family, char *buf,
-                              size_t size);
+                              hts_browser_family family, hts_buf out);
 
 #endif
 

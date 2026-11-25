@@ -68,6 +68,9 @@ selftest_queue none fetchdest 'link href=x' href
 selftest_queue none fetchdest 'link rel=preload as=fetch href=x' href
 selftest_queue none fetchdest 'link rel=prefetch as=script href=x' href
 selftest_queue none fetchdest 'link rel=stylesheet-x href=x' href
+# rel tokens match without case, and only whole.
+selftest_queue "dest=image $nocors" fetchdest 'link rel="Shortcut ICON" href=x' href
+selftest_queue none fetchdest 'link rel="styleshee icons" href=x' href
 selftest_queue none fetchdest 'source src=x' src
 selftest_queue none fetchdest 'img longdesc=x' longdesc
 selftest_queue none fetchdest 'a download href=x' href
