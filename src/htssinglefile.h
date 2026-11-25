@@ -37,6 +37,7 @@ Please visit our Website: http://www.httrack.com
 #define HTS_SINGLEFILE_DEFH
 
 #include "htscore.h" /* HTS_HTMLESCAPE_*_MAXEXP */
+#include "htsbuf.h"
 #include "htsopt.h"
 #include "htsstrings.h"
 #include "htsurlport.h"
@@ -97,7 +98,7 @@ hts_boolean singlefile_may_mark(httrackp *opt, hts_span body);
 
 /* Write the mark for a reference of reflen bytes into buf; returns buf, left
    empty for a reflen the pass could not read back. */
-const char *singlefile_mark(httrackp *opt, char *buf, size_t bufsize, char cls,
+const char *singlefile_mark(httrackp *opt, hts_buf buf, char cls,
                             size_t reflen);
 
 /* The class a reference in this context may inline as, or 0 to leave it alone.

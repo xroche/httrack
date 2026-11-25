@@ -84,7 +84,7 @@ static void sf_marked(String *out, const char *ref, char cls) {
   char mark[SINGLEFILE_MARK_MAX];
 
   StringCat(*out, ref);
-  StringCat(*out, singlefile_mark(sf_opt, HTS_SIZED(mark), cls, strlen(ref)));
+  StringCat(*out, singlefile_mark(sf_opt, HTS_BUF(mark), cls, strlen(ref)));
 }
 
 /* \001<ref>\002 in an input becomes <ref> plus its mark, which is the only
@@ -100,7 +100,7 @@ static void sf_expand_input(const char *in, size_t len, String *out) {
       char mark[SINGLEFILE_MARK_MAX];
 
       StringCat(*out,
-                singlefile_mark(sf_opt, HTS_SIZED(mark), SINGLEFILE_CLASS_ANY,
+                singlefile_mark(sf_opt, HTS_BUF(mark), SINGLEFILE_CLASS_ANY,
                                 StringLength(*out) - start));
     } else {
       StringAddchar(*out, in[i]);
