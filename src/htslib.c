@@ -3335,7 +3335,7 @@ void time_rfc822(hts_buf s, struct tm *A) {
 
     assertf(localtime_returned_null);
   }
-  hts_format_rfc822(s.p, s.size, A, " GMT");
+  hts_format_rfc822(s, A, " GMT");
 }
 
 // Writes A as an RFC 822 date in local time.
@@ -3345,7 +3345,7 @@ static void time_rfc822_local(hts_buf s, struct tm *A) {
 
     assertf(localtime_returned_null);
   }
-  hts_format_rfc822(s.p, s.size, A, "");
+  hts_format_rfc822(s, A, "");
 }
 
 // conversion en b,Kb,Mb

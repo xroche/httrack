@@ -199,14 +199,13 @@ hts_boolean hts_tm_filetime(const struct tm *tm, time_t *out) {
   return HTS_TRUE;
 }
 
-void hts_format_rfc822(char *s, size_t size, const struct tm *tm,
-                       const char *suffix) {
+void hts_format_rfc822(hts_buf s, const struct tm *tm, const char *suffix) {
   static const char days[7][4] = {"Sun", "Mon", "Tue", "Wed",
                                   "Thu", "Fri", "Sat"};
   static const char months[12][4] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
                                      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 
-  snprintf(s, size, "%s, %02d %s %04d %02d:%02d:%02d%s",
+  snprintf(s.p, s.size, "%s, %02d %s %04d %02d:%02d:%02d%s",
            tm->tm_wday >= 0 && tm->tm_wday < 7 ? days[tm->tm_wday] : "???",
            tm->tm_mday,
            tm->tm_mon >= 0 && tm->tm_mon < 12 ? months[tm->tm_mon] : "???",

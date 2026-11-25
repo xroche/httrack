@@ -124,6 +124,71 @@ static int st_retryafter_gate(httrackp *opt) {
   return err;
 }
 
+/* hts_format_rfc822: the RFC's example date, both suffixes, out-of-range
+   fields, and a clip that stays inside the size it was given. */
+static int st_rfc822format(httrackp *opt, int argc, char **argv) {
+  struct tm tm;
+  char out[64];
+  char small[16];
+  int err = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  memset(&tm, 0, sizeof(tm));
+  tm.tm_year = 94;
+  tm.tm_mon = 10;
+  tm.tm_mday = 6;
+  tm.tm_hour = 8;
+  tm.tm_min = 49;
+  tm.tm_sec = 37;
+  tm.tm_wday = 0;
+  hts_format_rfc822(HTS_BUF(out), &tm, " GMT");
+  if (strcmp(out, "Sun, 06 Nov 1994 08:49:37 GMT") != 0) {
+    printf("rfc822-format: FAIL gmt \"%s\"\n", out);
+    err = 1;
+  }
+  hts_format_rfc822(HTS_BUF(out), &tm, "");
+  if (strcmp(out, "Sun, 06 Nov 1994 08:49:37") != 0) {
+    printf("rfc822-format: FAIL local \"%s\"\n", out);
+    err = 1;
+  }
+  tm.tm_wday = 7;
+  tm.tm_mon = -1;
+  hts_format_rfc822(HTS_BUF(out), &tm, " GMT");
+  if (strcmp(out, "???, 06 ??? 1994 08:49:37 GMT") != 0) {
+    printf("rfc822-format: FAIL range \"%s\"\n", out);
+    err = 1;
+  }
+  // Each bound alone, so a dropped half of either guard shows.
+  tm.tm_wday = -1;
+  tm.tm_mon = 10;
+  hts_format_rfc822(HTS_BUF(out), &tm, "");
+  if (strcmp(out, "???, 06 Nov 1994 08:49:37") != 0) {
+    printf("rfc822-format: FAIL wday \"%s\"\n", out);
+    err = 1;
+  }
+  tm.tm_wday = 0;
+  tm.tm_mon = 12;
+  hts_format_rfc822(HTS_BUF(out), &tm, "");
+  if (strcmp(out, "Sun, 06 ??? 1994 08:49:37") != 0) {
+    printf("rfc822-format: FAIL mon \"%s\"\n", out);
+    err = 1;
+  }
+  // The canary past the 10-byte view must survive the clip untouched.
+  tm.tm_wday = 0;
+  tm.tm_mon = 10;
+  memset(small, 'X', sizeof(small));
+  hts_format_rfc822(HTS_BUF_N(small, 10), &tm, " GMT");
+  if (memcmp(small, "Sun, 06 N\0XXXXXX", sizeof(small)) != 0) {
+    printf("rfc822-format: FAIL clip \"%.*s\"\n", (int) sizeof(small), small);
+    err = 1;
+  }
+  if (err == 0)
+    printf("rfc822-format: OK\n");
+  return err;
+}
+
 static int st_retryafter(httrackp *opt, int argc, char **argv) {
   /* 1994-11-06 08:49:37 GMT, the RFC's own example date */
   const time_t ref = (time_t) 784111777;
@@ -2704,6 +2769,8 @@ const struct selftest_entry selftests_header[] = {
      "layout of the installed structs configure's switches decide",
      st_pubheaders},
     {"retry-after", "", "Retry-After header parser self-test", st_retryafter},
+    {"rfc822-format", "", "RFC 822 date writer: fields, suffix and clip",
+     st_rfc822format},
     {"content-length", "",
      "repeated Content-Length values must agree (RFC 9112 6.3)",
      st_contentlength},

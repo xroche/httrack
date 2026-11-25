@@ -1,0 +1,11 @@
+#!/bin/bash
+#
+# hts_format_rfc822 writes the RFC's example date, maps out-of-range fields to
+# "???", and clips inside the hts_buf it is given.
+
+set -eu
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+assert_selftest "rfc822-format: OK" rfc822-format
