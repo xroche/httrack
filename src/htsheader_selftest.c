@@ -897,9 +897,13 @@ static int st_nobody(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* The bytes at p as a span. */
+static hts_span ae_bytes(const unsigned char *p, size_t len) {
+  return hts_span_at((const char *) p, len);
+}
+
 /* Deflate src->path at windowBits (16+ gzip, + zlib, - raw); 0 on success. */
-static int ae_write_packed(const char *path, int windowBits,
-                           const unsigned char *src, size_t len) {
+static int ae_write_packed(const char *path, int windowBits, hts_span src) {
   unsigned char out[8192];
   z_stream strm;
   FILE *f;
@@ -913,8 +917,8 @@ static int ae_write_packed(const char *path, int windowBits,
     deflateEnd(&strm);
     return 1;
   }
-  strm.next_in = (const Bytef *) src;
-  strm.avail_in = (uInt) len;
+  strm.next_in = (const Bytef *) src.p;
+  strm.avail_in = (uInt) src.len;
   do {
     size_t n;
 
@@ -934,8 +938,7 @@ static int ae_write_packed(const char *path, int windowBits,
 }
 
 /* Forged raw deflate (08 1D) that misdetects as zlib; only fallback decodes */
-static int ae_write_collision(const char *path, const unsigned char *src,
-                              size_t len) {
+static int ae_write_collision(const char *path, hts_span src) {
   /* block-1 LEN low byte 0x1D: with 0x08, (0x081D)%31==0 */
   const size_t n1 = 29;
   size_t n2, p = 0;
@@ -943,10 +946,10 @@ static int ae_write_collision(const char *path, const unsigned char *src,
   FILE *f;
   int ok;
 
-  if (len < n1 || len - n1 > 0xFFFF)
+  if (src.len < n1 || src.len - n1 > 0xFFFF)
     return 1;
-  n2 = len - n1;
-  buf = malloct(10 + len);
+  n2 = src.len - n1;
+  buf = malloct(10 + src.len);
   if (buf == NULL)
     return 1;
   buf[p++] = 0x08; /* BFINAL=0, BTYPE=00, forged padding -> zlib CMF nibble */
@@ -954,14 +957,14 @@ static int ae_write_collision(const char *path, const unsigned char *src,
   buf[p++] = (unsigned char) (n1 >> 8);
   buf[p++] = (unsigned char) (~n1 & 0xff);
   buf[p++] = (unsigned char) ((~n1 >> 8) & 0xff);
-  memcpy(buf + p, src, n1);
+  memcpy(buf + p, src.p, n1);
   p += n1;
   buf[p++] = 0x01; /* BFINAL=1, BTYPE=00 */
   buf[p++] = (unsigned char) (n2 & 0xff);
   buf[p++] = (unsigned char) (n2 >> 8);
   buf[p++] = (unsigned char) (~n2 & 0xff);
   buf[p++] = (unsigned char) ((~n2 >> 8) & 0xff);
-  memcpy(buf + p, src + n1, n2);
+  memcpy(buf + p, src.p + n1, n2);
   p += n2;
   f = FOPEN(path, "wb");
   ok = (f != NULL && hts_fwrite_exact(buf, p, f));
@@ -971,22 +974,20 @@ static int ae_write_collision(const char *path, const unsigned char *src,
   return ok ? 0 : 1;
 }
 
-/* Write src[0..len) to path as-is; 0 on success. */
-static int ae_write_raw(const char *path, const unsigned char *src,
-                        size_t len) {
+/* Write src to path as-is; 0 on success. */
+static int ae_write_raw(const char *path, hts_span src) {
   FILE *const f = FOPEN(path, "wb");
   int ok;
 
   if (f == NULL)
     return 1;
-  ok = hts_fwrite_exact(src, len, f);
+  ok = hts_fwrite_exact(src.p, src.len, f);
   fclose(f);
   return ok ? 0 : 1;
 }
 
-/* Compare path's bytes to expect[0..len); 0 if equal. Streams (large files). */
-static int ae_check_decoded(const char *path, const unsigned char *expect,
-                            size_t len) {
+/* Compare path's bytes to expect; 0 if equal. Streams (large files). */
+static int ae_check_decoded(const char *path, hts_span expect) {
   unsigned char buf[8192];
   FILE *f = FOPEN(path, "rb");
   size_t off = 0, n;
@@ -994,7 +995,7 @@ static int ae_check_decoded(const char *path, const unsigned char *expect,
   if (f == NULL)
     return 1;
   while ((n = fread(buf, 1, sizeof(buf), f)) > 0) {
-    if (n > len - off || memcmp(buf, expect + off, n) != 0) {
+    if (n > expect.len - off || memcmp(buf, expect.p + off, n) != 0) {
       fclose(f);
       return 1;
     }
@@ -1003,7 +1004,7 @@ static int ae_check_decoded(const char *path, const unsigned char *expect,
       break;
   }
   fclose(f);
-  return (off == len) ? 0 : 1;
+  return (off == expect.len) ? 0 : 1;
 }
 
 /* Accept-Encoding (#450): advertise gzip+deflate; both decode (hts_zunpack) */
@@ -1043,16 +1044,18 @@ static int st_acceptencoding(httrackp *opt, int argc, char **argv) {
       snprintf(inpath, sizeof(inpath), "%s/ae-in-%d.z", argv[0], windowBits[i]);
       snprintf(outpath, sizeof(outpath), "%s/ae-out-%d", argv[0],
                windowBits[i]);
-      assertf(ae_write_packed(inpath, windowBits[i], small, slen) == 0);
+      assertf(ae_write_packed(inpath, windowBits[i], ae_bytes(small, slen)) ==
+              0);
       assertf(hts_zunpack(inpath, outpath) == (int) slen);
-      assertf(ae_check_decoded(outpath, small, slen) == 0);
-      assertf(ae_write_packed(inpath, windowBits[i], body, blen) == 0);
+      assertf(ae_check_decoded(outpath, ae_bytes(small, slen)) == 0);
+      assertf(ae_write_packed(inpath, windowBits[i], ae_bytes(body, blen)) ==
+              0);
       assertf(hts_zunpack(inpath, outpath) == (int) blen);
-      assertf(ae_check_decoded(outpath, body, blen) == 0);
+      assertf(ae_check_decoded(outpath, ae_bytes(body, blen)) == 0);
     }
     /* A cap below the decoded size refuses the body; at the size it passes. */
     snprintf(inpath, sizeof(inpath), "%s/ae-in-%d.z", argv[0], windowBits[0]);
-    assertf(ae_write_packed(inpath, windowBits[0], body, blen) == 0);
+    assertf(ae_write_packed(inpath, windowBits[0], ae_bytes(body, blen)) == 0);
     assertf(hts_zunpack_max(inpath, outpath, (LLint) blen - 1) ==
             HTS_CODEC_TOOBIG);
     assertf(hts_codec_unpack_max(HTS_CODEC_DEFLATE, inpath, outpath,
@@ -1065,14 +1068,14 @@ static int st_acceptencoding(httrackp *opt, int argc, char **argv) {
     /* Fallback teeth: raw deflate misdetected as zlib; -1 without the retry. */
     snprintf(inpath, sizeof(inpath), "%s/ae-collide.z", argv[0]);
     snprintf(outpath, sizeof(outpath), "%s/ae-collide.out", argv[0]);
-    assertf(ae_write_collision(inpath, body, 64) == 0);
+    assertf(ae_write_collision(inpath, ae_bytes(body, 64)) == 0);
     assertf(hts_zunpack(inpath, outpath) == 64);
-    assertf(ae_check_decoded(outpath, body, 64) == 0);
+    assertf(ae_check_decoded(outpath, ae_bytes(body, 64)) == 0);
     /* Identity fallback (#47): a plain body mislabeled as compressed is kept
        verbatim, small and multi-chunk (> one 8 KiB fread). */
-    assertf(ae_write_raw(inpath, small, slen) == 0);
+    assertf(ae_write_raw(inpath, ae_bytes(small, slen)) == 0);
     assertf(hts_zunpack(inpath, outpath) == (int) slen);
-    assertf(ae_check_decoded(outpath, small, slen) == 0);
+    assertf(ae_check_decoded(outpath, ae_bytes(small, slen)) == 0);
     {
       const size_t ilen = 16 * 1024;
       unsigned char *idbody = malloct(ilen);
@@ -1080,9 +1083,9 @@ static int st_acceptencoding(httrackp *opt, int argc, char **argv) {
       assertf(idbody != NULL);
       for (i = 0; i < ilen; i++)
         idbody[i] = small[i % slen];
-      assertf(ae_write_raw(inpath, idbody, ilen) == 0);
+      assertf(ae_write_raw(inpath, ae_bytes(idbody, ilen)) == 0);
       assertf(hts_zunpack(inpath, outpath) == (int) ilen);
-      assertf(ae_check_decoded(outpath, idbody, ilen) == 0);
+      assertf(ae_check_decoded(outpath, ae_bytes(idbody, ilen)) == 0);
       /* the identity copy honours a cap too */
       assertf(hts_zunpack_max(inpath, outpath, (LLint) ilen - 1) ==
               HTS_CODEC_TOOBIG);
@@ -1102,13 +1105,13 @@ static int st_acceptencoding(httrackp *opt, int argc, char **argv) {
         size_t zlen;
         FILE *f;
 
-        assertf(ae_write_packed(inpath, tr[i].wb, small, slen) == 0);
+        assertf(ae_write_packed(inpath, tr[i].wb, ae_bytes(small, slen)) == 0);
         f = FOPEN(inpath, "rb");
         assertf(f != NULL);
         zlen = fread(z, 1, sizeof(z), f);
         fclose(f);
         assertf(zlen > tr[i].cut && zlen < sizeof(z));
-        assertf(ae_write_raw(inpath, z, zlen - tr[i].cut) == 0);
+        assertf(ae_write_raw(inpath, ae_bytes(z, zlen - tr[i].cut)) == 0);
         assertf(hts_zunpack(inpath, outpath) < 0);
       }
     }
@@ -1227,22 +1230,25 @@ static int st_contentcodings(httrackp *opt, int argc, char **argv) {
     {
       char head[16];
 
-      assertf(ae_write_raw(inpath, cc_br_text, sizeof(cc_br_text)) == 0);
+      assertf(ae_write_raw(inpath, ae_bytes(cc_br_text, sizeof(cc_br_text))) ==
+              0);
       assertf(hts_codec_unpack(HTS_CODEC_BROTLI, inpath, outpath) ==
               (int) tlen);
-      assertf(ae_check_decoded(outpath, cc_text, tlen) == 0);
+      assertf(ae_check_decoded(outpath, ae_bytes(cc_text, tlen)) == 0);
       assertf(hts_codec_head(
                   HTS_CODEC_BROTLI,
                   hts_span_at((const char *) cc_br_text, sizeof(cc_br_text)),
                   HTS_BUF(head)) == sizeof(head));
       assertf(memcmp(head, cc_text, sizeof(head)) == 0);
       /* truncated: must fail, not fall back to a verbatim copy */
-      assertf(ae_write_raw(inpath, cc_br_text, sizeof(cc_br_text) - 4) == 0);
+      assertf(ae_write_raw(inpath,
+                           ae_bytes(cc_br_text, sizeof(cc_br_text) - 4)) == 0);
       assertf(hts_codec_unpack(HTS_CODEC_BROTLI, inpath, outpath) < 0);
       /* cc_br_bomb is a valid 4 MiB stream, so only the budget rejects it. */
       assertf((LLint) (4 * 1024 * 1024) >
               hts_codec_maxout((LLint) sizeof(cc_br_bomb)));
-      assertf(ae_write_raw(inpath, cc_br_bomb, sizeof(cc_br_bomb)) == 0);
+      assertf(ae_write_raw(inpath, ae_bytes(cc_br_bomb, sizeof(cc_br_bomb))) ==
+              0);
       assertf(hts_codec_unpack(HTS_CODEC_BROTLI, inpath, outpath) == -1);
       assertf(hts_codec_unpack_max(HTS_CODEC_BROTLI, inpath, outpath, 1000) ==
               HTS_CODEC_TOOBIG);
@@ -1260,21 +1266,21 @@ static int st_contentcodings(httrackp *opt, int argc, char **argv) {
       assertf(bomb != NULL && zbuf != NULL);
       zlen = ZSTD_compress(zbuf, bound, cc_text, tlen, 6);
       assertf(!ZSTD_isError(zlen));
-      assertf(ae_write_raw(inpath, zbuf, zlen) == 0);
+      assertf(ae_write_raw(inpath, ae_bytes(zbuf, zlen)) == 0);
       assertf(hts_codec_unpack(HTS_CODEC_ZSTD, inpath, outpath) == (int) tlen);
-      assertf(ae_check_decoded(outpath, cc_text, tlen) == 0);
+      assertf(ae_check_decoded(outpath, ae_bytes(cc_text, tlen)) == 0);
       assertf(hts_codec_head(HTS_CODEC_ZSTD,
                              hts_span_at((const char *) zbuf, zlen),
                              HTS_BUF(head)) == sizeof(head));
       assertf(memcmp(head, cc_text, sizeof(head)) == 0);
-      assertf(ae_write_raw(inpath, zbuf, zlen - 4) == 0);
+      assertf(ae_write_raw(inpath, ae_bytes(zbuf, zlen - 4)) == 0);
       assertf(hts_codec_unpack(HTS_CODEC_ZSTD, inpath, outpath) < 0);
       memset(bomb, 'A', bomblen);
       zlen = ZSTD_compress(zbuf, bound, bomb, bomblen, 6);
       assertf(!ZSTD_isError(zlen));
       /* the fixture must really be past the budget, whatever the ratio is */
       assertf((LLint) bomblen > hts_codec_maxout((LLint) zlen));
-      assertf(ae_write_raw(inpath, zbuf, zlen) == 0);
+      assertf(ae_write_raw(inpath, ae_bytes(zbuf, zlen)) == 0);
       assertf(hts_codec_unpack(HTS_CODEC_ZSTD, inpath, outpath) == -1);
       assertf(hts_codec_unpack_max(HTS_CODEC_ZSTD, inpath, outpath, 1000) ==
               HTS_CODEC_TOOBIG);
@@ -1300,7 +1306,7 @@ static int st_codecerrno(httrackp *opt, int argc, char **argv) {
 
   snprintf(inpath, sizeof(inpath), "%s/ce-in.z", argv[0]);
   snprintf(outpath, sizeof(outpath), "%s/ce-out", argv[0]);
-  assertf(ae_write_packed(inpath, 16 + MAX_WBITS, body, len) == 0);
+  assertf(ae_write_packed(inpath, 16 + MAX_WBITS, ae_bytes(body, len)) == 0);
   errno = ENOSPC;
   assertf(hts_zunpack(inpath, outpath) == (int) len);
   errno = 0;
@@ -1327,11 +1333,12 @@ static int st_codecerrno(httrackp *opt, int argc, char **argv) {
   assertf(errno == 0);
 #if HTS_USEBROTLI
   /* and a backend of its own, where the write goes through codec_sink() */
-  assertf(ae_write_raw(inpath, cc_br_text, sizeof(cc_br_text)) == 0);
+  assertf(ae_write_raw(inpath, ae_bytes(cc_br_text, sizeof(cc_br_text))) == 0);
   errno = 0;
   assertf(hts_codec_unpack(HTS_CODEC_BROTLI, inpath, argv[1]) == -1);
   assertf(errno == ENOSPC);
-  assertf(ae_write_raw(inpath, cc_br_text, sizeof(cc_br_text) - 4) == 0);
+  assertf(ae_write_raw(inpath, ae_bytes(cc_br_text, sizeof(cc_br_text) - 4)) ==
+          0);
   errno = ENOSPC;
   assertf(hts_codec_unpack(HTS_CODEC_BROTLI, inpath, outpath) == -1);
   assertf(errno == 0);
@@ -1408,7 +1415,7 @@ static int st_intparse(httrackp *opt, int argc, char **argv) {
 
 /* The differential below: each converted site, as it parsed before (legacy_*,
    a frozen copy using sscanf) and as it parses now, rendered into out. */
-typedef void (*st_int_site_fn)(const char *in, char *out, size_t size);
+typedef void (*st_int_site_fn)(const char *in, hts_buf out);
 
 static void st_int_treathead(const char *field, const char *in, htsblk *r) {
   char BIGSTK line[HTS_URLMAXSIZE * 2];
@@ -1420,24 +1427,24 @@ static void st_int_treathead(const char *field, const char *in, htsblk *r) {
   treathead(NULL, "www.example.com", "/", r, line);
 }
 
-static void legacy_clen(const char *in, char *out, size_t size) {
+static void legacy_clen(const char *in, hts_buf out) {
   LLint totalsize = -1;
   int empty = 0;
 
   if (sscanf(in, LLintP, &totalsize) == 1 && totalsize == 0)
     empty = 1;
-  snprintf(out, size, "totalsize=" LLintP " empty=%d", totalsize, empty);
+  hts_buf_printf_clip(out, "totalsize=" LLintP " empty=%d", totalsize, empty);
 }
 
-static void current_clen(const char *in, char *out, size_t size) {
+static void current_clen(const char *in, hts_buf out) {
   htsblk r;
 
   st_int_treathead("Content-Length:", in, &r);
-  snprintf(out, size, "totalsize=" LLintP " empty=%d", (LLint) r.totalsize,
-           (int) r.empty);
+  hts_buf_printf_clip(out, "totalsize=" LLintP " empty=%d", (LLint) r.totalsize,
+                      (int) r.empty);
 }
 
-static void legacy_crange(const char *in, char *out, size_t size) {
+static void legacy_crange(const char *in, hts_buf out) {
   LLint crange_start = 0, crange_end = 0, crange = 0;
   const char *a;
 
@@ -1465,19 +1472,19 @@ static void legacy_crange(const char *in, char *out, size_t size) {
     if (crange_start < 0 || crange_end < 0 || crange < 0)
       crange_start = crange_end = crange = 0;
   }
-  snprintf(out, size, LLintP " " LLintP " " LLintP, crange_start, crange_end,
-           crange);
+  hts_buf_printf_clip(out, LLintP " " LLintP " " LLintP, crange_start,
+                      crange_end, crange);
 }
 
-static void current_crange(const char *in, char *out, size_t size) {
+static void current_crange(const char *in, hts_buf out) {
   htsblk r;
 
   st_int_treathead("Content-Range:", in, &r);
-  snprintf(out, size, LLintP " " LLintP " " LLintP, (LLint) r.crange_start,
-           (LLint) r.crange_end, (LLint) r.crange);
+  hts_buf_printf_clip(out, LLintP " " LLintP " " LLintP, (LLint) r.crange_start,
+                      (LLint) r.crange_end, (LLint) r.crange);
 }
 
-static void legacy_keepalive(const char *in, char *out, size_t size) {
+static void legacy_keepalive(const char *in, hts_buf out) {
   int keep_alive = 0, keep_alive_t = 0, keep_alive_max = 0;
   const char *a = in;
 
@@ -1500,35 +1507,35 @@ static void legacy_keepalive(const char *in, char *out, size_t size) {
     if (keep_alive_max <= 1 || keep_alive_t < 1)
       keep_alive = 0;
   }
-  snprintf(out, size, "keep_alive=%d timeout=%d max=%d", keep_alive,
-           keep_alive_t, keep_alive_max);
+  hts_buf_printf_clip(out, "keep_alive=%d timeout=%d max=%d", keep_alive,
+                      keep_alive_t, keep_alive_max);
 }
 
-static void current_keepalive(const char *in, char *out, size_t size) {
+static void current_keepalive(const char *in, hts_buf out) {
   htsblk r;
 
   st_int_treathead("Keep-Alive:", in, &r);
-  snprintf(out, size, "keep_alive=%d timeout=%d max=%d", r.keep_alive,
-           r.keep_alive_t, r.keep_alive_max);
+  hts_buf_printf_clip(out, "keep_alive=%d timeout=%d max=%d", r.keep_alive,
+                      r.keep_alive_t, r.keep_alive_max);
 }
 
-static void legacy_ftpsize(const char *in, char *out, size_t size) {
+static void legacy_ftpsize(const char *in, hts_buf out) {
   const char *szstr = strchr(in, ' ');
   LLint value = 0;
 
   if (szstr != NULL && sscanf(szstr + 1, LLintP, &value) == HTS_SCAN_OK)
-    snprintf(out, size, "size=" LLintP, value);
+    hts_buf_printf_clip(out, "size=" LLintP, value);
   else
-    snprintf(out, size, "none");
+    hts_buf_printf_clip(out, "none");
 }
 
-static void current_ftpsize(const char *in, char *out, size_t size) {
+static void current_ftpsize(const char *in, hts_buf out) {
   LLint value = 0;
 
   if (ftp_parse_size(in, &value))
-    snprintf(out, size, "size=" LLintP, value);
+    hts_buf_printf_clip(out, "size=" LLintP, value);
   else
-    snprintf(out, size, "none");
+    hts_buf_printf_clip(out, "none");
 }
 
 static struct tm *legacy_convert_time_rfc822(struct tm *result, const char *s) {
@@ -1610,90 +1617,90 @@ static struct tm *legacy_convert_time_rfc822(struct tm *result, const char *s) {
   return NULL;
 }
 
-static void st_int_print_tm(const struct tm *tm, char *out, size_t size) {
+static void st_int_print_tm(const struct tm *tm, hts_buf out) {
   if (tm == NULL)
-    snprintf(out, size, "none");
+    hts_buf_printf_clip(out, "none");
   else
-    snprintf(out, size, "y=%d m=%d d=%d %d:%d:%d", tm->tm_year, tm->tm_mon,
-             tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
+    hts_buf_printf_clip(out, "y=%d m=%d d=%d %d:%d:%d", tm->tm_year, tm->tm_mon,
+                        tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
 }
 
-static void legacy_date(const char *in, char *out, size_t size) {
+static void legacy_date(const char *in, hts_buf out) {
   struct tm tm;
 
-  st_int_print_tm(legacy_convert_time_rfc822(&tm, in), out, size);
+  st_int_print_tm(legacy_convert_time_rfc822(&tm, in), out);
 }
 
-static void current_date(const char *in, char *out, size_t size) {
+static void current_date(const char *in, hts_buf out) {
   struct tm tm;
 
-  st_int_print_tm(convert_time_rfc822(&tm, in), out, size);
+  st_int_print_tm(convert_time_rfc822(&tm, in), out);
 }
 
 /* htsserver's and proxytrack's Content-length, which live outside the
    library: their parse, then what it decides, copied from each program. */
-static void st_int_server_read(LLint length, char *out, size_t size) {
+static void st_int_server_read(LLint length, hts_buf out) {
   const LLint buffer = 1000; // stands for buffer_size - 2
 
-  snprintf(out, size, "read=" LLintP,
-           length > buffer ? buffer
-           : length > 0    ? length
-                           : 0);
+  hts_buf_printf_clip(out, "read=" LLintP,
+                      length > buffer ? buffer
+                      : length > 0    ? length
+                                      : 0);
 }
 
-static void legacy_server(const char *in, char *out, size_t size) {
+static void legacy_server(const char *in, hts_buf out) {
   LLint length = 1000;
 
   sscanf(in, LLintP, &length);
-  st_int_server_read(length, out, size);
+  st_int_server_read(length, out);
 }
 
-static void current_server(const char *in, char *out, size_t size) {
+static void current_server(const char *in, hts_buf out) {
   const char *a = in;
   LLint length = 1000;
 
   if (hts_scan_llint(&a, 0, INT64_MAX, &length) == HTS_SCAN_REFUSED)
     length = 0;
-  st_int_server_read(length, out, size);
+  st_int_server_read(length, out);
 }
 
-static void legacy_proxytrack(const char *in, char *out, size_t size) {
+static void legacy_proxytrack(const char *in, hts_buf out) {
   int length = 0;
 
   if (sscanf(in, "%d", &length) != 1)
-    snprintf(out, size, "error");
+    hts_buf_printf_clip(out, "error");
   else
-    snprintf(out, size, "length=%d", length);
+    hts_buf_printf_clip(out, "length=%d", length);
 }
 
-static void current_proxytrack(const char *in, char *out, size_t size) {
+static void current_proxytrack(const char *in, hts_buf out) {
   const char *a = in;
   LLint value;
 
   if (hts_scan_llint(&a, 0, INT_MAX, &value) == HTS_SCAN_OK)
-    snprintf(out, size, "length=%d", (int) value);
+    hts_buf_printf_clip(out, "length=%d", (int) value);
   else
-    snprintf(out, size, "error");
+    hts_buf_printf_clip(out, "error");
 }
 
-static void legacy_port(const char *in, char *out, size_t size) {
+static void legacy_port(const char *in, hts_buf out) {
   char *end;
   long p;
 
   if (!hts_isdigit((unsigned char) *in) ||
       (p = strtol(in, &end, 10), *end != '\0') || p < 1 || p > 65535)
-    snprintf(out, size, "refused");
+    hts_buf_printf_clip(out, "refused");
   else
-    snprintf(out, size, "port=%ld", p);
+    hts_buf_printf_clip(out, "port=%ld", p);
 }
 
-static void current_port(const char *in, char *out, size_t size) {
+static void current_port(const char *in, hts_buf out) {
   int port = -1;
 
   if (hts_parse_url_port(in, &port))
-    snprintf(out, size, "port=%d", port);
+    hts_buf_printf_clip(out, "port=%d", port);
   else
-    snprintf(out, size, "refused");
+    hts_buf_printf_clip(out, "refused");
 }
 
 struct st_int_site {
@@ -1854,14 +1861,13 @@ static const struct {
 };
 
 /* Copy pattern into out with its one "%s" replaced by value. */
-static void st_int_fill(char *out, size_t size, const char *pattern,
-                        const char *value) {
+static void st_int_fill(hts_buf out, const char *pattern, const char *value) {
   const char *hole = strstr(pattern, "%s");
 
-  out[0] = '\0';
-  strlncatbuff(out, pattern, size, (size_t) (hole - pattern));
-  strlncatbuff(out, value, size, size - 1);
-  strlncatbuff(out, hole + 2, size, size - 1);
+  out.p[0] = '\0';
+  hts_buf_catn(out, pattern, (size_t) (hole - pattern));
+  hts_buf_cat(out, value);
+  hts_buf_cat(out, hole + 2);
 }
 
 /* Is the digit run at s larger than max? */
@@ -1900,7 +1906,7 @@ static int st_intparsediff(httrackp *opt, int argc, char **argv) {
   if (argc == 2) { // One input through one site, as it parses now.
     for (s = 0; s < sizeof(st_int_sites) / sizeof(st_int_sites[0]); s++)
       if (strcmp(st_int_sites[s].name, argv[0]) == 0) {
-        st_int_sites[s].current(argv[1], cur, sizeof(cur));
+        st_int_sites[s].current(argv[1], HTS_BUF(cur));
         printf("%s\n", cur);
         return 0;
       }
@@ -1910,8 +1916,8 @@ static int st_intparsediff(httrackp *opt, int argc, char **argv) {
   for (i = 0; i < sizeof(st_int_cases) / sizeof(st_int_cases[0]); i++) {
     for (s = 0; strcmp(st_int_sites[s].name, st_int_cases[i].site) != 0; s++)
       ;
-    st_int_sites[s].legacy(st_int_cases[i].in, old, sizeof(old));
-    st_int_sites[s].current(st_int_cases[i].in, cur, sizeof(cur));
+    st_int_sites[s].legacy(st_int_cases[i].in, HTS_BUF(old));
+    st_int_sites[s].current(st_int_cases[i].in, HTS_BUF(cur));
     // An overflow's legacy result is up to the libc, so a want pins only ours.
     if (strcmp(cur, st_int_cases[i].want != NULL ? st_int_cases[i].want
                                                  : old) != 0) {
@@ -1936,14 +1942,14 @@ static int st_intparsediff(httrackp *opt, int argc, char **argv) {
 
               snprintf(gen, sizeof(gen), "%s%s%s%s", spaces[w], signs[g],
                        digits[d], suffixes[x]);
-              st_int_fill(in, sizeof(in), site->templates[t], gen);
+              st_int_fill(HTS_BUF(in), site->templates[t], gen);
               if (!site->exact &&
                   (is_signed || st_int_oversized(digits[d], site->max))) {
                 changed++;
                 continue;
               }
-              site->legacy(in, old, sizeof(old));
-              site->current(in, cur, sizeof(cur));
+              site->legacy(in, HTS_BUF(old));
+              site->current(in, HTS_BUF(cur));
               compared++;
               if (strcmp(old, cur) != 0) {
                 printf("FAIL %s \"%s\": legacy \"%s\" now \"%s\"\n", site->name,
@@ -1979,7 +1985,7 @@ static int st_headerparam(httrackp *opt, int argc, char **argv) {
 }
 
 /* Each converted treathead site has a frozen legacy parse and a current one. */
-static void legacy_ctype(const char *in, char *out, size_t size) {
+static void legacy_ctype(const char *in, hts_buf out) {
   char line[1024], tempo[1100];
   char contenttype[HTS_MIMETYPE_SIZE] = "", charset[HTS_MIMETYPE_SIZE] = "";
   char *a;
@@ -2018,17 +2024,18 @@ static void legacy_ctype(const char *in, char *out, size_t size) {
   if (sscanf(line, "%1099s", tempo) == 1 &&
       strlen(tempo) < sizeof(contenttype) - 2)
     strcpybuff(contenttype, tempo);
-  snprintf(out, size, "contenttype=%s charset=%s", contenttype, charset);
+  hts_buf_printf_clip(out, "contenttype=%s charset=%s", contenttype, charset);
 }
 
-static void current_ctype(const char *in, char *out, size_t size) {
+static void current_ctype(const char *in, hts_buf out) {
   htsblk r;
 
   st_int_treathead("Content-Type:", in, &r);
-  snprintf(out, size, "contenttype=%s charset=%s", r.contenttype, r.charset);
+  hts_buf_printf_clip(out, "contenttype=%s charset=%s", r.contenttype,
+                      r.charset);
 }
 
-static void legacy_cdispo(const char *in, char *out, size_t size) {
+static void legacy_cdispo(const char *in, hts_buf out) {
   char cdispo[256] = "";
   const char *v = in;
 
@@ -2053,14 +2060,14 @@ static void legacy_cdispo(const char *in, char *out, size_t size) {
         strcpybuff(cdispo, a);
     }
   }
-  snprintf(out, size, "cdispo=%s", cdispo);
+  hts_buf_printf_clip(out, "cdispo=%s", cdispo);
 }
 
-static void current_cdispo(const char *in, char *out, size_t size) {
+static void current_cdispo(const char *in, hts_buf out) {
   htsblk r;
 
   st_int_treathead("Content-Disposition:", in, &r);
-  snprintf(out, size, "cdispo=%s", r.cdispo);
+  hts_buf_printf_clip(out, "cdispo=%s", r.cdispo);
 }
 
 static void legacy_ka_param(const char *s, int *value) {
@@ -2071,7 +2078,7 @@ static void legacy_ka_param(const char *s, int *value) {
     *value = got == HTS_SCAN_OK ? (int) v : 0;
 }
 
-static void legacy_keepalive_scan(const char *in, char *out, size_t size) {
+static void legacy_keepalive_scan(const char *in, hts_buf out) {
   int keep_alive = 0, keep_alive_t = 0, keep_alive_max = 0;
   const char *a = in;
 
@@ -2090,8 +2097,8 @@ static void legacy_keepalive_scan(const char *in, char *out, size_t size) {
     if (keep_alive_max <= 1 || keep_alive_t < 1)
       keep_alive = 0;
   }
-  snprintf(out, size, "keep_alive=%d timeout=%d max=%d", keep_alive,
-           keep_alive_t, keep_alive_max);
+  hts_buf_printf_clip(out, "keep_alive=%d timeout=%d max=%d", keep_alive,
+                      keep_alive_t, keep_alive_max);
 }
 
 /* Why a generated input may parse differently from before. */
@@ -2191,7 +2198,7 @@ static const struct st_hp_item *st_hp_first(const struct st_hp_item *const *seq,
 /* What the site must report now for the parameters in seq. */
 static void st_hp_expect(const struct st_hp_site *site,
                          const struct st_hp_item *const *seq, size_t n,
-                         char *out, size_t size, int *why) {
+                         hts_buf out, int *why) {
   size_t at = 0, i;
   const struct st_hp_item *hit;
 
@@ -2204,8 +2211,8 @@ static void st_hp_expect(const struct st_hp_site *site,
     const int timeout = t != NULL ? atoi(t->want) : 15;
     const int max = m != NULL ? atoi(m->want) : 10;
 
-    snprintf(out, size, "keep_alive=%d timeout=%d max=%d",
-             !(max <= 1 || timeout < 1), timeout, max);
+    hts_buf_printf_clip(out, "keep_alive=%d timeout=%d max=%d",
+                        !(max <= 1 || timeout < 1), timeout, max);
     return;
   }
   hit = st_hp_first(seq, n, site->param, &at);
@@ -2213,7 +2220,7 @@ static void st_hp_expect(const struct st_hp_site *site,
     *why |= HP_LATER;
   if (hit != NULL && at + 1 < n)
     *why |= HP_TRAIL;
-  snprintf(out, size, "%s%s", site->prefix, hit != NULL ? hit->want : "");
+  hts_buf_printf_clip(out, "%s%s", site->prefix, hit != NULL ? hit->want : "");
 }
 
 /* Hand cases: a NULL want means the input parses as before. */
@@ -2285,8 +2292,8 @@ static int st_hp_case(const char *name, const char *in, const char *want) {
 
   while (strcmp(site->name, name) != 0)
     site++;
-  site->legacy(in, old, sizeof(old));
-  site->current(in, cur, sizeof(cur));
+  site->legacy(in, HTS_BUF(old));
+  site->current(in, HTS_BUF(cur));
   if (strcmp(cur, want != NULL ? want : old) == 0)
     return 0;
   printf("FAIL %s \"%s\": legacy \"%s\" now \"%s\"\n", name, in, old, cur);
@@ -2296,14 +2303,14 @@ static int st_hp_case(const char *name, const char *in, const char *want) {
 /* Build generated input I from N items under SEP, and record them in seq. */
 static void st_hp_build(const struct st_hp_site *site, size_t items,
                         const char *sep, size_t n, size_t i,
-                        const struct st_hp_item **seq, char *in, size_t size) {
+                        const struct st_hp_item **seq, hts_buf in) {
   size_t k;
 
-  snprintf(in, size, "%s", site->head);
+  hts_buf_printf_clip(in, "%s", site->head);
   for (k = 0; k < n; k++, i /= items) {
     seq[k] = &site->items[i % items];
-    strlncatbuff(in, k != 0 || *site->head != '\0' ? sep : " ", size, size - 1);
-    strlncatbuff(in, seq[k]->text, size, size - 1);
+    hts_buf_cat(in, k != 0 || *site->head != '\0' ? sep : " ");
+    hts_buf_cat(in, seq[k]->text);
   }
 }
 
@@ -2341,10 +2348,10 @@ static int st_headerparamdiff(httrackp *opt, int argc, char **argv) {
           const struct st_hp_item *seq[3];
           int why, r;
 
-          st_hp_build(site, items, site->seps[sep], n, i, seq, in, sizeof(in));
-          site->legacy(in, old, sizeof(old));
-          site->current(in, cur, sizeof(cur));
-          st_hp_expect(site, seq, n, want, sizeof(want), &why);
+          st_hp_build(site, items, site->seps[sep], n, i, seq, HTS_BUF(in));
+          site->legacy(in, HTS_BUF(old));
+          site->current(in, HTS_BUF(cur));
+          st_hp_expect(site, seq, n, HTS_BUF(want), &why);
           compared++;
           if (strcmp(cur, want) != 0) {
             printf("FAIL %s \"%s\": now \"%s\" want \"%s\"\n", site->name, in,
@@ -2623,12 +2630,12 @@ static void legacy_append_custom_headers(legacy_buf *bstr,
   }
 }
 
-static void legacy_http_append_custom_headers(char *dst, size_t dst_size,
+static void legacy_http_append_custom_headers(hts_buf dst,
                                               const char *headers) {
-  legacy_buf bstr = {dst, dst_size, 0};
+  legacy_buf bstr = {dst.p, dst.size, 0};
 
-  assertf(dst != NULL && dst_size > 0);
-  bstr.pos = strlen(dst);
+  assertf(dst.p != NULL && dst.size > 0);
+  bstr.pos = strlen(dst.p);
   legacy_append_custom_headers(&bstr, headers);
 }
 
@@ -2681,7 +2688,7 @@ static void customdiff_one(parsediff_stats *st, const char *headers,
       memset(bn, 'O', cap);
       memcpy(bo, reqs[i], strlen(reqs[i]) + 1);
       memcpy(bn, reqs[i], strlen(reqs[i]) + 1);
-      legacy_http_append_custom_headers(bo, cap, headers);
+      legacy_http_append_custom_headers(hts_buf_at(bo, cap), headers);
       http_append_custom_headers(hts_buf_at(bn, cap), headers);
       st->cases++;
       if (memcmp(bo, bn, cap) != 0)

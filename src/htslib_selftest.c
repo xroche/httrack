@@ -1509,22 +1509,22 @@ static int st_random(httrackp *opt, int argc, char **argv) {
 }
 
 /* Build a path of exactly len chars under base; returns that length. */
-static size_t st_structcheck_longpath(char *dst, size_t dstsize,
-                                      const char *base, size_t len) {
+static size_t st_structcheck_longpath(hts_buf dst, const char *base,
+                                      size_t len) {
   size_t n = strlen(base);
 
-  assertf(len < dstsize && n + 2 <= len);
-  memmove(dst, base, n);
+  assertf(len < dst.size && n + 2 <= len);
+  memmove(dst.p, base, n);
   while (n < len) {
     size_t seg = len - n - 1;
 
     if (seg > 200) /* stay under the usual 255-byte component limit */
       seg = len - n == 202 ? 199 : 200; /* never leave a bare separator */
-    dst[n++] = '/';
-    memset(dst + n, 'x', seg);
+    dst.p[n++] = '/';
+    memset(dst.p + n, 'x', seg);
     n += seg;
   }
-  dst[n] = '\0';
+  dst.p[n] = '\0';
   return n;
 }
 
@@ -1536,7 +1536,7 @@ static int st_structcheck(httrackp *opt, int argc, char **argv) {
   FILE *fp;
 
   /* over the guard: refused before a single directory is created */
-  st_structcheck_longpath(path, sizeof(path), argv[0], HTS_URLMAXSIZE + 1);
+  st_structcheck_longpath(HTS_BUF(path), argv[0], HTS_URLMAXSIZE + 1);
   errno = 0;
   assertf(structcheck(path) == -1);
   assertf(errno == EINVAL);
@@ -1829,13 +1829,13 @@ static int nologin_rows(httrackp *opt) {
 }
 
 /* Reads back the log of o, from offset at, into buf. */
-static void secrets_read(FILE *fp, long at, char *buf, size_t size) {
+static void secrets_read(FILE *fp, long at, hts_buf buf) {
   size_t n;
 
   fflush(fp);
   fseek(fp, at, SEEK_SET);
-  n = fread(buf, 1, size - 1, fp);
-  buf[n] = '\0';
+  n = fread(buf.p, 1, buf.size - 1, fp);
+  buf.p[n] = '\0';
   fseek(fp, 0, SEEK_END);
 }
 
@@ -1846,7 +1846,7 @@ static int secrets_row(httrackp *o, FILE *fp, const char *line,
   const long at = ftell(fp);
 
   hts_log_print(o, LOG_NOTICE, "%s", line);
-  secrets_read(fp, at, got, sizeof(got));
+  secrets_read(fp, at, HTS_BUF(got));
   if (strstr(got, want) == NULL || (bad != NULL && strstr(got, bad) != NULL)) {
     fprintf(stderr, "secrets: '%s' logged '%s', want '%s'\n", line, got, want);
     return 1;
@@ -1882,7 +1882,7 @@ static int secrets_full(void) {
   }
   hts_log_print(o, LOG_NOTICE, "u:ZPWCAP000@h u:ZPWCAP%03d@h u:ZPWCAP%03d@h",
                 HTS_SECRET_MAX - 1, HTS_SECRET_MAX);
-  secrets_read(fp, 0, got, sizeof(got));
+  secrets_read(fp, 0, HTS_BUF(got));
   w = strstr(got, "passwords seen");
   if (strstr(got, "u:***@h u:***@h u:ZPWCAP064@h") == NULL || w == NULL ||
       strstr(w + 1, "passwords seen") != NULL) {
@@ -1943,7 +1943,7 @@ static int st_secretheaders(httrackp *opt, int argc, char **argv) {
     printf(" shown=");
     secretheaders_print(hts_header_shown(o, text, HTS_BUF(got)));
     fprintfio(fp, text, "> ", o);
-    secrets_read(fp, 0, got, sizeof(got));
+    secrets_read(fp, 0, HTS_BUF(got));
     printf(" log=");
     secretheaders_print(got);
     printf("\n");
@@ -1985,7 +1985,7 @@ static int st_secretslices(httrackp *opt, int argc, char **argv) {
         }
       }
     fprintfio(fp, text, "> ", o);
-    secrets_read(fp, 0, got, sizeof(got));
+    secrets_read(fp, 0, HTS_BUF(got));
     printf(" log=");
     secretheaders_print(got);
     if (size != 0) {
@@ -2095,7 +2095,7 @@ static int st_secrets(httrackp *opt, int argc, char **argv) {
   hts_secret_add(o, hts_span_at(big, HTS_SECRET_MAXLEN + 1), HTS_SECRET_HEADER);
   hts_secret_add(o, hts_span_at(big + 1, HTS_SECRET_MAXLEN + 1),
                  HTS_SECRET_LOGIN);
-  secrets_read(fp, at, got, sizeof(got));
+  secrets_read(fp, at, HTS_BUF(got));
   w = strstr(got, "over 1024 bytes");
   if (w == NULL || strstr(w + 1, "over 1024 bytes") != NULL) {
     fprintf(stderr, "secrets: a long secret logged '%s'\n", got);
@@ -2106,7 +2106,7 @@ static int st_secrets(httrackp *opt, int argc, char **argv) {
   at = ftell(fp);
   fprintfio(fp, "GET /?k=ZPWTOKEN123 HTTP/1.1\r\nX-K: ZPWTOKEN123\r\n", "<<< ",
             o);
-  secrets_read(fp, at, got, sizeof(got));
+  secrets_read(fp, at, HTS_BUF(got));
   if (strcmp(got, "<<< GET /?k=*** HTTP/1.1\r\n<<< X-K: ***\r\n") != 0) {
     fprintf(stderr, "secrets: fprintfio wrote '%s'\n", got);
     err = 1;
@@ -2866,19 +2866,20 @@ static int st_rtrim(httrackp *opt, int argc, char **argv) {
   return st_verdict("rtrim self-test", err);
 }
 
-/* Format LEN bytes of EXPECTED into S as two arguments, and check what came
-   back. HEAD and TAIL are scratch buffers of at least LEN+1 bytes. */
-static int strsprintf_case(String *s, const char *expected, size_t len,
-                           char *head, char *tail) {
-  const size_t half = len / 2;
+/* Format EXPECTED into S as two arguments, and check what came back. HEAD and
+   TAIL are scratch buffers. */
+static int strsprintf_case(String *s, hts_span expected, hts_buf head,
+                           hts_buf tail) {
+  const size_t len = expected.len, half = len / 2;
 
-  memcpy(head, expected, half);
-  head[half] = '\0';
-  memcpy(tail, expected + half, len - half);
-  tail[len - half] = '\0';
-  StringSprintf(*s, "%s%s", head, tail);
+  assertf(len < head.size && len < tail.size);
+  memcpy(head.p, expected.p, half);
+  head.p[half] = '\0';
+  memcpy(tail.p, expected.p + half, len - half);
+  tail.p[len - half] = '\0';
+  StringSprintf(*s, "%s%s", head.p, tail.p);
   return StringLength(*s) == len &&
-         memcmp(StringBuff(*s), expected, len) == 0 &&
+         memcmp(StringBuff(*s), expected.p, len) == 0 &&
          StringBuff(*s)[len] == '\0';
 }
 
@@ -2891,6 +2892,8 @@ static int st_strsprintf(httrackp *opt, int argc, char **argv) {
   char *expected = malloct(maxLen + 1);
   char *head = malloct(maxLen + 1);
   char *tail = malloct(maxLen + 1);
+  const hts_buf hbuf = hts_buf_at(head, maxLen + 1);
+  const hts_buf tbuf = hts_buf_at(tail, maxLen + 1);
   String reused = STRING_EMPTY;
   size_t i, len;
   int err = 0;
@@ -2929,7 +2932,7 @@ static int st_strsprintf(httrackp *opt, int argc, char **argv) {
         printf("  FAIL: capacity %u pinned to %u\n", (unsigned) caps[i],
                (unsigned) StringCapacity(s));
         err = 1;
-      } else if (!strsprintf_case(&s, expected, len, head, tail)) {
+      } else if (!strsprintf_case(&s, hts_span_at(expected, len), hbuf, tbuf)) {
         printf("  FAIL: length %u at capacity %u\n", (unsigned) len,
                (unsigned) caps[i]);
         err = 1;
@@ -2941,13 +2944,13 @@ static int st_strsprintf(httrackp *opt, int argc, char **argv) {
   /* the same String reused: its capacity grows under it between calls, and a
      shorter output must not leave the previous one behind */
   for (len = 0; !err && len <= maxLen; len++) {
-    if (!strsprintf_case(&reused, expected, len, head, tail)) {
+    if (!strsprintf_case(&reused, hts_span_at(expected, len), hbuf, tbuf)) {
       printf("  FAIL: growing length %u\n", (unsigned) len);
       err = 1;
     }
   }
   for (len = maxLen + 1; !err && len-- > 0;) {
-    if (!strsprintf_case(&reused, expected, len, head, tail)) {
+    if (!strsprintf_case(&reused, hts_span_at(expected, len), hbuf, tbuf)) {
       printf("  FAIL: shrinking length %u\n", (unsigned) len);
       err = 1;
     }
@@ -3471,8 +3474,7 @@ static int st_normfil(httrackp *opt, int argc, char **argv) {
 }
 
 /* This is the old --strip-query rule matcher. */
-static int legacy_hts_query_key_stripped(const char *arg, size_t keylen,
-                                         const char *strip) {
+static int legacy_hts_query_key_stripped(hts_span key, const char *strip) {
   const char *p = strip;
 
   while (*p != '\0') {
@@ -3490,7 +3492,7 @@ static int legacy_hts_query_key_stripped(const char *arg, size_t keylen,
       toklen--;
     if (toklen == 1 && start[0] == '*')
       return 1;
-    if (toklen == keylen && strncmp(start, arg, keylen) == 0)
+    if (toklen == key.len && memcmp(start, key.p, key.len) == 0)
       return 1;
     if (*p == ',')
       p++;
@@ -3502,12 +3504,12 @@ static int legacy_hts_query_key_stripped(const char *arg, size_t keylen,
 
 static const char *legacy_hts_query_strip_keys(const char *rules,
                                                const char *adr, const char *fil,
-                                               char *dest, size_t destsize) {
+                                               hts_buf dest) {
   const char *p, *q;
   const char *result = NULL;
   char BIGSTK url[HTS_URLMAXSIZE * 4];
 
-  if (rules == NULL || *rules == '\0' || destsize == 0)
+  if (rules == NULL || *rules == '\0' || dest.size == 0)
     return NULL;
   (void) strclipbuff(url, sizeof(url), jump_normalized_const(adr));
   if (fil[0] != '/')
@@ -3548,11 +3550,11 @@ static const char *legacy_hts_query_strip_keys(const char *rules,
     if (strjoker(url, pat, NULL, NULL) != NULL) {
       size_t klen = (size_t) (eol - keys);
 
-      if (klen >= destsize)
-        klen = destsize - 1;
-      memcpy(dest, keys, klen);
-      dest[klen] = '\0';
-      result = dest;
+      if (klen >= dest.size)
+        klen = dest.size - 1;
+      memcpy(dest.p, keys, klen);
+      dest.p[klen] = '\0';
+      result = dest.p;
     }
   }
   return result;
@@ -3625,10 +3627,11 @@ static const char *legacy_hts_host_alias_match(const char *rules,
   return canon;
 }
 
-static hts_boolean legacy_hts_host_alias_token_ok(const char *token, size_t len,
+static hts_boolean legacy_hts_host_alias_token_ok(hts_span tok,
                                                   hts_boolean glob) {
   char BIGSTK buff[HTS_URLMAXSIZE * 2];
-  const char *host;
+  const char *token = tok.p, *host;
+  size_t len = tok.len;
 
   while (len > 0 && (*token == ' ' || *token == '\t')) {
     token++;
@@ -3663,13 +3666,13 @@ static hts_boolean legacy_hts_host_alias_rule_ok(const char *rule) {
 
   if (eq == NULL || eq == rule || eq[1] == '\0')
     return HTS_FALSE;
-  if (!legacy_hts_host_alias_token_ok(eq + 1, strlen(eq + 1), HTS_FALSE))
+  if (!legacy_hts_host_alias_token_ok(hts_span_of(eq + 1), HTS_FALSE))
     return HTS_FALSE;
   for (pat = rule; pat < eq;) {
     const char *const sep = memchr(pat, ',', (size_t) (eq - pat));
     const char *const end = sep != NULL ? sep : eq;
 
-    if (!legacy_hts_host_alias_token_ok(pat, (size_t) (end - pat), HTS_TRUE))
+    if (!legacy_hts_host_alias_token_ok(hts_span_between(pat, end), HTS_TRUE))
       return HTS_FALSE;
     pat = end + 1;
   }
@@ -3678,10 +3681,10 @@ static hts_boolean legacy_hts_host_alias_rule_ok(const char *rule) {
 
 static const char *legacy_hts_host_alias_looping(const char *rules,
                                                  hts_boolean collapse_www,
-                                                 char *dest, size_t destsize) {
+                                                 hts_buf dest) {
   const char *p;
 
-  if (rules == NULL || destsize == 0)
+  if (rules == NULL || dest.size == 0)
     return NULL;
   for (p = rules; *p != '\0';) {
     const char *const line = p;
@@ -3707,10 +3710,10 @@ static const char *legacy_hts_host_alias_looping(const char *rules,
       (void) hts_host_alias_resolve(rules, canon, collapse_www, HTS_BUF(tmp),
                                     &settled);
       if (!settled) {
-        if (strlen(canon) >= destsize)
+        if (strlen(canon) >= dest.size)
           continue;
-        strlcpybuff(dest, canon, destsize);
-        return dest;
+        hts_buf_cpy(dest, canon);
+        return dest.p;
       }
     }
   }
@@ -3740,7 +3743,7 @@ static void spandiff_one(parsediff_stats *st, const char *rules,
   for (i = 0; keys[i] != NULL; i++) {
     st->cases++;
     if (hts_query_key_stripped(hts_span_of(keys[i]), rules) !=
-        (legacy_hts_query_key_stripped(keys[i], strlen(keys[i]), rules) != 0))
+        (legacy_hts_query_key_stripped(hts_span_of(keys[i]), rules) != 0))
       parsediff_fail(st, "hts_query_key_stripped", rules, keys[i], "", "");
   }
   for (i = 0; i < sizeof(adrs) / sizeof(adrs[0]); i += 2) {
@@ -3754,7 +3757,8 @@ static void spandiff_one(parsediff_stats *st, const char *rules,
       memset(o, 'O', sizeof(o));
       memset(n, 'O', sizeof(n));
       st->cases++;
-      ro = legacy_hts_query_strip_keys(rules, adr, fil, o, sizes[j]);
+      ro =
+          legacy_hts_query_strip_keys(rules, adr, fil, hts_buf_at(o, sizes[j]));
       rn = hts_query_strip_keys(rules, adr, fil, hts_buf_at(n, sizes[j]));
       if ((ro == NULL) != (rn == NULL) ||
           (ro != NULL && (rn != n || strcmp(o, n) != 0)))
@@ -3788,7 +3792,7 @@ static void spandiff_one(parsediff_stats *st, const char *rules,
       memset(o, 'O', sizeof(o));
       memset(n, 'O', sizeof(n));
       st->cases++;
-      ro = legacy_hts_host_alias_looping(rules, www, o, sizes[j]);
+      ro = legacy_hts_host_alias_looping(rules, www, hts_buf_at(o, sizes[j]));
       rn = hts_host_alias_looping(rules, www, hts_buf_at(n, sizes[j]));
       if ((ro == NULL) != (rn == NULL) || (rn != NULL && rn != n) ||
           memcmp(o, n, sizeof(o)) != 0)
@@ -3957,8 +3961,8 @@ static int st_spandiff(httrackp *opt, int argc, char **argv) {
         char o[8], n[8];
 
         if (legacy_hts_query_strip_keys(StringBuff(rules), "a.com",
-                                        StringBuff(longfil), o,
-                                        sizeof(o)) == NULL ||
+                                        StringBuff(longfil),
+                                        HTS_BUF(o)) == NULL ||
             hts_query_strip_keys(StringBuff(rules), "a.com",
                                  StringBuff(longfil), HTS_BUF(n)) == NULL)
           parsediff_fail(&st, "clipped pattern matches", StringBuff(rules),
@@ -4000,16 +4004,16 @@ static int st_spandiff(httrackp *opt, int argc, char **argv) {
 }
 
 /* CR and LF print as \r and \n, which Windows text-mode stdout leaves alone. */
-static void span_add_visible(String *out, const char *p, size_t len) {
+static void span_add_visible(String *out, hts_span s) {
   size_t i;
 
-  for (i = 0; i < len; i++) {
-    if (p[i] == '\r')
+  for (i = 0; i < s.len; i++) {
+    if (s.p[i] == '\r')
       StringCat(*out, "\\r");
-    else if (p[i] == '\n')
+    else if (s.p[i] == '\n')
       StringCat(*out, "\\n");
     else
-      StringAddchar(*out, p[i]);
+      StringAddchar(*out, s.p[i]);
   }
 }
 
@@ -4195,16 +4199,16 @@ static int st_span(httrackp *opt, int argc, char **argv) {
     /* Each field shows with the separator it ended on. */
     while (hts_span_next_in(&s, argv[1][0], &a)) {
       StringAddchar(out, '[');
-      span_add_visible(&out, a.p, (size_t) (s.p - a.p));
+      span_add_visible(&out, hts_span_between(a.p, s.p));
       StringAddchar(out, ']');
     }
   } else if (strcmp(argv[0], "nextin") == 0) {
     /* Each field shows with what is left after it. */
     while (hts_span_next_in(&s, argv[1][0], &a)) {
       StringAddchar(out, '[');
-      span_add_visible(&out, a.p, a.len);
+      span_add_visible(&out, a);
       StringAddchar(out, '|');
-      span_add_visible(&out, s.p, s.len);
+      span_add_visible(&out, s);
       StringAddchar(out, ']');
     }
   } else if (strcmp(argv[0], "split") == 0) {
@@ -4230,10 +4234,10 @@ static int st_span(httrackp *opt, int argc, char **argv) {
     }
     for (s = hts_span_at(text, n); hts_param_next(&s, argv[1][0], &a, &b);) {
       StringAddchar(out, '[');
-      span_add_visible(&out, a.p, a.len);
+      span_add_visible(&out, a);
       if (hts_span_present(b)) {
         StringAddchar(out, '|');
-        span_add_visible(&out, b.p, b.len);
+        span_add_visible(&out, b);
       }
       StringAddchar(out, ']');
     }
@@ -4249,21 +4253,21 @@ static int st_span(httrackp *opt, int argc, char **argv) {
 
     while (hts_header_next(&s, &f)) {
       StringAddchar(out, '[');
-      span_add_visible(&out, f.line.p, f.line.len);
+      span_add_visible(&out, f.line);
       StringAddchar(out, '|');
-      span_add_visible(&out, f.name.p, f.name.len);
+      span_add_visible(&out, f.name);
       StringAddchar(out, '|');
-      span_add_visible(&out, f.value.p, f.value.len);
+      span_add_visible(&out, f.value);
       StringAddchar(out, ']');
     }
     StringCat(out, " rest=");
-    span_add_visible(&out, s.p, s.len);
+    span_add_visible(&out, s);
   } else if (strcmp(argv[0], "headersplit") == 0) {
     hts_header_split(s, &a, &b);
     StringAddchar(out, '[');
-    span_add_visible(&out, a.p, a.len);
+    span_add_visible(&out, a);
     StringAddchar(out, '|');
-    span_add_visible(&out, b.p, b.len);
+    span_add_visible(&out, b);
     StringAddchar(out, ']');
   } else if (strcmp(argv[0], "trim") == 0) {
     a = hts_span_trim(s, argv[1], argv[2]);
@@ -4674,26 +4678,26 @@ static int st_pathcontained(httrackp *opt, int argc, char **argv) {
 }
 
 /* Undo make_content_id()'s escaping; 0 on a byte it never emits. */
-static int cid_unescape(const char *cid, char *dest, const size_t size) {
+static int cid_unescape(const char *cid, hts_buf dest) {
   size_t j = 0;
 
   for (; *cid != '\0'; cid++) {
-    if (j + 1 >= size)
+    if (j + 1 >= dest.size)
       return 0;
     if (*cid == '-') {
       const int c = hts_ehex(cid + 1);
 
       if (c < 0)
         return 0;
-      dest[j++] = (char) c;
+      dest.p[j++] = (char) c;
       cid += 2;
     } else if (hts_isalnum((unsigned char) *cid)) {
-      dest[j++] = *cid;
+      dest.p[j++] = *cid;
     } else {
       return 0;
     }
   }
-  dest[j] = '\0';
+  dest.p[j] = '\0';
   return 1;
 }
 
@@ -4934,7 +4938,7 @@ static int st_contentid(httrackp *opt, int argc, char **argv) {
   for (i = 0; fils[i] != NULL; i++) {
     make_content_id("www.example.com", fils[i], HTS_BUF(cid));
     snprintf(url, sizeof(url), "www.example.com%s", fils[i]);
-    if (!cid_unescape(cid, back, sizeof(back)) || strcmp(back, url) != 0) {
+    if (!cid_unescape(cid, HTS_BUF(back)) || strcmp(back, url) != 0) {
       printf("contentid: '%s' -> '%s' -> '%s'\n", url, cid, back);
       failures++;
     }
@@ -4945,7 +4949,7 @@ static int st_contentid(httrackp *opt, int argc, char **argv) {
     snprintf(fil, sizeof(fil), "/a%cb", c);
     snprintf(url, sizeof(url), "h%s", fil);
     make_content_id("h", fil, HTS_BUF(cid));
-    if (!cid_unescape(cid, back, sizeof(back)) || strcmp(back, url) != 0) {
+    if (!cid_unescape(cid, HTS_BUF(back)) || strcmp(back, url) != 0) {
       printf("contentid: byte %d -> '%s' -> '%s'\n", c, cid, back);
       failures++;
     }
@@ -5048,42 +5052,42 @@ static int st_typedlogin(httrackp *opt, int argc, char **argv) {
 }
 
 /* Append " NAME=text" for a present span to OUT, a NUL as "\0". */
-static void urlview_field(char *out, size_t size, const char *name,
-                          hts_span sp) {
-  size_t len = strlen(out);
+static void urlview_field(hts_buf out, const char *name, hts_span sp) {
+  size_t len = strlen(out.p);
   size_t i;
 
   if (!hts_span_present(sp))
     return;
-  snprintf(out + len, size - len, " %s=", name);
+  snprintf(out.p + len, out.size - len, " %s=", name);
   for (i = 0; i < sp.len; i++) {
-    len = strlen(out);
-    snprintf(out + len, size - len, sp.p[i] != '\0' ? "%c" : "\\0", sp.p[i]);
+    len = strlen(out.p);
+    snprintf(out.p + len, out.size - len, sp.p[i] != '\0' ? "%c" : "\\0",
+             sp.p[i]);
   }
 }
 
 /* Describe *V as "ok=1 scheme=... host=...", leaving absent parts out. */
-static const char *urlview_describe(char *out, size_t size, hts_boolean ok,
+static const char *urlview_describe(hts_buf out, hts_boolean ok,
                                     const hts_url_view *v) {
-  snprintf(out, size, "ok=%d", ok ? 1 : 0);
-  urlview_field(out, size, "scheme", v->scheme);
-  urlview_field(out, size, "userinfo", v->userinfo);
-  urlview_field(out, size, "host", v->host);
-  urlview_field(out, size, "port", v->port);
-  urlview_field(out, size, "path", v->path);
-  urlview_field(out, size, "query", v->query);
-  urlview_field(out, size, "fragment", v->fragment);
-  return out;
+  snprintf(out.p, out.size, "ok=%d", ok ? 1 : 0);
+  urlview_field(out, "scheme", v->scheme);
+  urlview_field(out, "userinfo", v->userinfo);
+  urlview_field(out, "host", v->host);
+  urlview_field(out, "port", v->port);
+  urlview_field(out, "path", v->path);
+  urlview_field(out, "query", v->query);
+  urlview_field(out, "fragment", v->fragment);
+  return out.p;
 }
 
 /* Does every span lie in [s, s + len), in order, the last one at the end, with
    a non-empty path starting at a terminator? */
-static hts_boolean urlview_tiles(const char *s, size_t len,
-                                 const hts_url_view *v) {
+static hts_boolean urlview_tiles(hts_span str, const hts_url_view *v) {
   const hts_span *const parts[] = {&v->scheme,  &v->userinfo, &v->host,
                                    &v->port,    &v->path,     &v->query,
                                    &v->fragment};
-  const char *at = s;
+  const char *const s = str.p, *at = s;
+  const size_t len = str.len;
   size_t i;
 
   /* memchr() over 4 bytes, because strchr() would match a NUL */
@@ -5205,14 +5209,14 @@ static int st_urlview(httrackp *opt, int argc, char **argv) {
     for (a = 0; a < argc; a++) {
       const hts_boolean ok = hts_url_view_parse(hts_span_of(argv[a]), &v);
 
-      printf("%s\n", urlview_describe(out, sizeof(out), ok, &v));
+      printf("%s\n", urlview_describe(HTS_BUF(out), ok, &v));
     }
     return 0;
   }
   for (i = 0; i < sizeof(rows) / sizeof(rows[0]); i++) {
     const hts_boolean ok = hts_url_view_parse(hts_span_of(rows[i].url), &v);
 
-    urlview_describe(out, sizeof(out), ok, &v);
+    urlview_describe(HTS_BUF(out), ok, &v);
     if (strcmp(out, rows[i].want) != 0) {
       printf("FAIL %s: %s\n", rows[i].url, out);
       failures++;
@@ -5223,8 +5227,7 @@ static int st_urlview(httrackp *opt, int argc, char **argv) {
     const hts_boolean ok =
         hts_url_view_parse(hts_span_at(bounded[i].s, bounded[i].len), &v);
 
-    if (strcmp(urlview_describe(out, sizeof(out), ok, &v), bounded[i].want) !=
-        0) {
+    if (strcmp(urlview_describe(HTS_BUF(out), ok, &v), bounded[i].want) != 0) {
       printf("FAIL bounded %s: %s\n", bounded[i].s, out);
       failures++;
     }
@@ -5244,7 +5247,7 @@ static int st_urlview(httrackp *opt, int argc, char **argv) {
     buf = malloct(len != 0 ? len : 1);
     memcpy(buf, s, len);
     (void) hts_url_view_parse(hts_span_at(buf, len), &v);
-    if (!urlview_tiles(buf, len, &v)) {
+    if (!urlview_tiles(hts_span_at(buf, len), &v)) {
       printf("FAIL tiles (%d bytes) %.*s\n", (int) len, (int) len, s);
       failures++;
     }
