@@ -115,6 +115,32 @@ for case in 5 +5 split 40 32768; do
         fail "Content-length case $case answered '$status', wanted '$want'"
 done
 
+# A refused or unsized body is not read as the next request, and Connection: close closes.
+"$python" - "$proxyport" <<'PY' || fail_dump "proxytrack kept a connection it had to close" "$ptlog"
+import socket, sys
+
+get = b"GET http://example.com/page.html HTTP/1.1\r\nHost: example.com\r\n"
+for name, req in (
+    ("refused body", b"PROPFIND /webdav/x/ HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-length: 32768\r\n\r\n" + get + b"\r\n"),
+    ("Connection: close", get + b"Connection: close\r\n\r\n"),
+    ("bad length", b"PROPFIND /webdav/x/ HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-length: x\r\nConnection: keep-alive\r\n\r\n" + get + b"\r\n"),
+):
+    sock = socket.create_connection(("127.0.0.1", int(sys.argv[1])), 30)
+    sock.settimeout(10)
+    sock.sendall(req)
+    reply = b""
+    try:
+        while True:
+            data = sock.recv(4096)
+            if not data:
+                break
+            reply += data
+    except socket.timeout:
+        sys.exit("%s: the connection stayed open" % name)
+    if reply.count(b"HTTP/1.") != 1:
+        sys.exit("%s: %r" % (name, reply))
+PY
+
 # The overflow killed the listener, so a later request is the liveness proof.
 resp=$(propfind "") ||
     fail_dump "proxytrack died before the follow-up listing" "$ptlog"
