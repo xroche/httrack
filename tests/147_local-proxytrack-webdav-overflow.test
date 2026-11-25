@@ -83,28 +83,36 @@ test "$responses" -eq 3 ||
     fail "expected the root, the file and the directory, got $responses responses: $resp"
 
 # A signed Content-length is refused with a 500. The unsigned one is the control.
-status_with_length() {
-    "$python" -c 'import socket, sys
+# split stops a byte short of the body, 40 is a short body, 32768 is too large.
+status_with_length() { # status_with_length LENGTH [CHUNK...]
+    "$python" -c 'import socket, sys, time
 sock = socket.create_connection(("127.0.0.1", int(sys.argv[1])), 30)
-sock.sendall(b"PROPFIND /webdav/x/ HTTP/1.0\r\nHost: 127.0.0.1\r\nDepth: 0\r\n"
-             b"Content-length: " + sys.argv[2].encode() + b"\r\n\r\nhello")
+sock.sendall(b"PROPFIND /webdav/x/ HTTP/1.1\r\nHost: 127.0.0.1\r\nDepth: 0\r\n"
+             b"Content-length: " + sys.argv[2].encode() + b"\r\n\r\n")
+for chunk in sys.argv[3:] or ["hello"]:
+    time.sleep(0.3)  # likely its own segment, though TCP may merge them
+    sock.sendall(chunk.encode())
+sock.shutdown(socket.SHUT_WR)
 reply = b""
-while b"\r\n" not in reply:
+while True:
     data = sock.recv(4096)
     if not data:
         break
     reply += data
-print(reply.split(b"\r\n")[0].decode("latin-1"))' "$proxyport" "$1"
+print(" ".join(l.split(b" ")[1].decode() for l in reply.split(b"\r\n") if l.startswith(b"HTTP/1.")))' "$proxyport" "$@"
 }
-for length in 5 +5; do
-    status=$(status_with_length "$length") ||
-        fail_dump "proxytrack died on Content-length: $length" "$ptlog"
-    case $length in
+get=$'GET http://example.com/page.html HTTP/1.0\r\n\r\n'
+for case in 5 +5 split 40 32768; do
+    args=("$case") want=500
+    case $case in
     5) want=207 ;;
-    *) want=500 ;;
+    split) args=(5 hell "o$get") want="207 200" ;;
     esac
-    grep -q "^HTTP/1\.[01] $want " <<<"$status" ||
-        fail "Content-length: $length answered '$status', wanted $want"
+    status=$(status_with_length "${args[@]}" | tr -d '\r') ||
+        fail_dump "proxytrack died on Content-length case $case" "$ptlog"
+    # a kept-alive connection answers the closing EOF too, so match a prefix
+    [[ "$status " == "$want "* ]] ||
+        fail "Content-length case $case answered '$status', wanted '$want'"
 done
 
 # The overflow killed the listener, so a later request is the liveness proof.
