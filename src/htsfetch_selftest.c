@@ -144,7 +144,7 @@ static int st_fetchorigin(httrackp *opt, int argc, char **argv) {
     fprintf(stderr, "fetchorigin: takes an address\n");
     return 1;
   }
-  st_decode_body(argv[0], adr, sizeof(adr));
+  st_decode_body(argv[0], HTS_BUF(adr));
   printf("%s\n", hts_fetch_origin(adr, HTS_BUF(origin)) ? origin : "(refused)");
   return 0;
 }

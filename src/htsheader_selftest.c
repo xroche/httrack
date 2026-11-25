@@ -728,8 +728,8 @@ static int st_headerdedup(httrackp *opt, int argc, char **argv) {
 
   req = malloct(capacity > 2 * half ? capacity : 2 * half);
   tmp = malloct(half);
-  reqlen = st_decode_body(argv[0], req, half);
-  blocklen = st_decode_body(argv[1], tmp, half);
+  reqlen = st_decode_body(argv[0], hts_buf_at(req, half));
+  blocklen = st_decode_body(argv[1], hts_buf_at(tmp, half));
   /* st_decode_body clips, and a clipped case grades an input nobody wrote */
   if (reqlen + 1 >= half || blocklen + 1 >= half || capacity <= reqlen) {
     fprintf(stderr, "headerdedup: argument longer than %d bytes\n",

@@ -1117,7 +1117,7 @@ static int st_cookieimport(httrackp *opt, int argc, char **argv) {
   char dir[HTS_URLMAXSIZE * 2];
   size_t base = 0;
   const size_t dirlen =
-      st_mkdeep(dir, sizeof(dir), argv[0], "/" ST_NONASCII "-cookie-seg",
+      st_mkdeep(HTS_BUF(dir), argv[0], "/" ST_NONASCII "-cookie-seg",
                 "cookieimport", &base);
 
   if (dirlen == 0) {
@@ -1813,7 +1813,7 @@ static void cookie_log_stop(httrackp *opt, cookie_logcap *cap, hts_buf buf) {
 
 /* Read the whole file at path into buf, or "" when it cannot be opened. */
 static void cookiejar_slurp(const char *path, hts_buf buf) {
-  st_read_file(path, buf.p, buf.size);
+  st_read_file(path, buf);
 }
 
 /* -#test=cookiejar <dir>: the jar keeps every cookie attribute. */

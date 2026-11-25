@@ -316,7 +316,7 @@ static int st_getext(httrackp *opt, int argc, char **argv) {
 /* Write the bytes a body= style argument decodes to into path. */
 static hts_boolean st_savename_write_body(const char *path, const char *arg) {
   char BIGSTK data[1024];
-  const size_t n = st_decode_body(arg, data, sizeof(data));
+  const size_t n = st_decode_body(arg, HTS_BUF(data));
   FILE *const fp = fopen(path, "wb");
 
   if (fp == NULL || !hts_fwrite_exact(data, n, fp)) {

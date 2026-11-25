@@ -118,7 +118,7 @@ static int st_indexkw(httrackp *opt, int argc, char **argv) {
     fprintf(stderr, "usage: indexkw <mime> <body>\n");
     return 1;
   }
-  n = st_decode_body(argv[1], body, sizeof(body));
+  n = st_decode_body(argv[1], HTS_BUF(body));
   UNLINK("index.txt"); /* a skipped page writes none */
   index_init("");
   ok = st_index_guarded(body, n, argv[0]);

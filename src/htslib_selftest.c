@@ -63,7 +63,7 @@ static int st_duration(httrackp *opt, int argc, char **argv) {
    into an output of ARGV[3] bytes. */
 static int st_base64(httrackp *opt, int argc, char **argv) {
   char one[256], in[4096], out[8192];
-  const size_t n = argc < 1 ? 0 : st_decode_body(argv[0], one, sizeof(one));
+  const size_t n = argc < 1 ? 0 : st_decode_body(argv[0], HTS_BUF(one));
   const int repeat = argc < 2 ? 1 : atoi(argv[1]);
   const size_t size = argc < 4 ? sizeof(out) : (size_t) atoi(argv[3]);
   size_t len = 0, i;
@@ -1923,7 +1923,7 @@ static int st_secretheaders(httrackp *opt, int argc, char **argv) {
         hts_free_opt(o);
       return 1;
     }
-    if (st_decode_body(argv[a], text, sizeof(text)) + 1 >= sizeof(text)) {
+    if (st_decode_body(argv[a], HTS_BUF(text)) + 1 >= sizeof(text)) {
       fprintf(stderr, "secretheaders: input over %d bytes\n",
               (int) sizeof(text) - 2);
       fclose(fp);
@@ -1964,9 +1964,8 @@ static int st_secretslices(httrackp *opt, int argc, char **argv) {
 
   (void) opt;
   if (argc < 3 || o == NULL || fp == NULL || size > sizeof(got) ||
-      st_decode_body(argv[1], headers, sizeof(headers)) + 1 >=
-          sizeof(headers) ||
-      st_decode_body(argv[2], text, sizeof(text)) + 1 >= sizeof(text)) {
+      st_decode_body(argv[1], HTS_BUF(headers)) + 1 >= sizeof(headers) ||
+      st_decode_body(argv[2], HTS_BUF(text)) + 1 >= sizeof(text)) {
     fprintf(stderr, "secretslices: bad arguments\n");
     err = 1;
   } else {
@@ -4225,7 +4224,7 @@ static int st_span(httrackp *opt, int argc, char **argv) {
     /* Each field shows as [name|value], or [name] with no value. A "hex:" text
        keeps its CRs, which Windows text-mode stdin folds. */
     char text[256];
-    const size_t n = st_decode_body(argv[2], text, sizeof(text));
+    const size_t n = st_decode_body(argv[2], HTS_BUF(text));
 
     if (n + 1 >= sizeof(text)) {
       fprintf(stderr, "span: param takes a text below 255 bytes\n");
@@ -4249,7 +4248,7 @@ static int st_span(httrackp *opt, int argc, char **argv) {
     char text[256];
     hts_header_field f;
 
-    s = hts_span_at(text, st_decode_body(argv[argc - 1], text, sizeof(text)));
+    s = hts_span_at(text, st_decode_body(argv[argc - 1], HTS_BUF(text)));
 
     while (hts_header_next(&s, &f)) {
       StringAddchar(out, '[');

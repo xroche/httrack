@@ -3215,7 +3215,7 @@ static int ref_st_refuse(httrackp *opt, const char *path, hts_span data,
                          const char *what) {
   lien_back *back = NULL;
 
-  st_put_file(path, data.p, data.len);
+  st_put_file(path, data);
   if (back_unserialize_ref(opt, REF_ST_ADR, REF_ST_FIL, &back) == 0) {
     fprintf(stderr, "%s: %s was accepted\n", selftest_tag, what);
     back_clear_entry(back);
@@ -3403,7 +3403,7 @@ static int ref_portable_selftest(httrackp *opt, const char *dir) {
   }
 
   /* and the reader takes them back, whatever host laid them down */
-  st_put_file(path, ref_golden, ref_golden_size);
+  st_put_file(path, hts_span_at((const char *) ref_golden, ref_golden_size));
   back = ref_st_accept(opt, "the golden reference", &fail);
   if (back != NULL) {
     fail += ref_st_check(back);
@@ -3470,7 +3470,7 @@ static int ref_portable_selftest(httrackp *opt, const char *dir) {
     size_t size;
     unsigned char *at = ref_st_oversize("url_sav", HTS_REF_MAX_STR, &size);
 
-    st_put_file(path, at, size);
+    st_put_file(path, hts_span_at((const char *) at, size));
     freet(at);
     back = ref_st_accept(opt, "a name declaring exactly the cap", &fail);
     if (back != NULL) {
@@ -3497,7 +3497,7 @@ static int ref_portable_selftest(httrackp *opt, const char *dir) {
     size_t size;
     unsigned char *bad = ref_st_oversize("cdispo", 3000, &size);
 
-    st_put_file(path, bad, size);
+    st_put_file(path, hts_span_at((const char *) bad, size));
     freet(bad);
     back = ref_st_accept(opt, "an over-long content-disposition", &fail);
     if (back != NULL) {
@@ -4506,7 +4506,7 @@ static int refwritten_selftest(httrackp *opt, const char *dir) {
   golden = malloct(size);
   assertf(golden != NULL);
   (void) ref_st_build(golden);
-  st_put_file(path, golden, size);
+  st_put_file(path, hts_span_at((const char *) golden, size));
 
   /* an earlier run's ref, which --continue resumes from */
   url_savename_refnames_start(opt);
@@ -4523,7 +4523,7 @@ static int refwritten_selftest(httrackp *opt, const char *dir) {
   (void) RMDIR(reconcile_st_path(opt, CACHE_REFNAME));
   url_savename_refnames_start(opt);
   (void) MKDIR(reconcile_st_path(opt, CACHE_REFNAME));
-  st_put_file(path, golden, size);
+  st_put_file(path, hts_span_at((const char *) golden, size));
   if (refwritten_read(opt)) {
     fprintf(stderr, "%s: a ref this mirror never wrote was opened\n",
             selftest_tag);
@@ -4544,7 +4544,7 @@ static int refwritten_selftest(httrackp *opt, const char *dir) {
     fprintf(stderr, "%s: cannot remove the reference\n", selftest_tag);
     fail++;
   }
-  st_put_file(path, golden, size);
+  st_put_file(path, hts_span_at((const char *) golden, size));
   if (refwritten_read(opt)) {
     fprintf(stderr, "%s: a removed ref was still tracked\n", selftest_tag);
     fail++;
