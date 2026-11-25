@@ -432,7 +432,7 @@ static const char *hts_mime_find(int key, hts_span needle) {
 HTSEXT_API hts_boolean get_httptype_sized(httrackp *opt, char *s, size_t ssize,
                                           const char *fil, hts_boolean flag) {
   // userdef wins. An empty rule ("--assume cgi=") reports "no type".
-  if (get_userhttptype(opt, s, ssize, fil)) {
+  if (get_userhttptype(opt, hts_buf_at(s, ssize), fil)) {
     return s[0] != '\0';
   }
   // regular tests
@@ -475,16 +475,12 @@ HTSEXT_API void get_httptype(httrackp *opt, char *s, const char *fil,
 }
 
 // get type of fil (php)
-// s: destination buffer, or NULL
-hts_boolean get_userhttptype(httrackp *opt, char *s, size_t ssize,
-                             const char *fil) {
-  if (s != NULL) {
-    assertf(ssize != 0);
-    if (s)
-      s[0] = '\0';
+hts_boolean get_userhttptype(httrackp *opt, hts_buf s, const char *fil) {
+  if (s.p != NULL) {
+    assertf(s.size != 0);
+    s.p[0] = '\0';
     if (fil == NULL || *fil == '\0')
       return HTS_FALSE;
-#if 1
     if (StringLength(opt->mimedefs) > 0) {
 
       /* Check --assume foooo/foo/bar.cgi=text/html, then foo/bar.cgi=text/html,
@@ -529,13 +525,13 @@ hts_boolean get_userhttptype(httrackp *opt, char *s, size_t ssize,
                 len = strcspn(&mimedefs[i], "\n");
                 /* clip, as a value that long matches no consumer (#1276) */
                 const hts_boolean fit =
-                    hts_span_copy(hts_span_at(&mimedefs[i], len), s, ssize);
+                    hts_buf_put_span_clip(s, hts_span_at(&mimedefs[i], len));
 
                 if (!fit)
                   hts_log_print(opt, LOG_WARNING,
                                 "--assume value for '%s' is %d bytes, clipped "
                                 "to %d",
-                                fil, (int) len, (int) (ssize - 1));
+                                fil, (int) len, (int) (s.size - 1));
                 return HTS_TRUE; /* SUCCESS! */
               }
             }
@@ -561,34 +557,6 @@ hts_boolean get_userhttptype(httrackp *opt, char *s, size_t ssize,
         fil = next;
       } while (fil != NULL);
     }
-#else
-    if (*buffer) {
-      char BIGSTK search[1024];
-      char *detect;
-
-      sprintf(search, "\n%s=", ext); // php=text/html
-      detect = strstr(*buffer, search);
-      if (!detect) {
-        sprintf(search, "\n%s\n", ext); // php\ncgi=text/html
-        detect = strstr(*buffer, search);
-      }
-      if (detect) {
-        detect = strchr(detect, '=');
-        if (detect) {
-          detect++;
-          if (s) {
-            char *a;
-
-            a = strchr(detect, '\n');
-            if (a) {
-              strncatbuff(s, detect, (int) (a - detect));
-            }
-          }
-          return 1;
-        }
-      }
-    }
-#endif
   }
   return HTS_FALSE;
 }
@@ -658,7 +626,7 @@ int is_userknowntype(httrackp *opt, const char *fil) {
   if (!strnotempty(fil))
     return 0;
   mime[0] = '\0';
-  get_userhttptype(opt, HTS_SIZED(mime), fil);
+  get_userhttptype(opt, HTS_BUF(mime), fil);
   if (!strnotempty(mime))
     return 0;
   else if (is_html_mime_type(mime))

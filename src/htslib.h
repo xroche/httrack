@@ -733,11 +733,10 @@ int ishtml(httrackp * opt, const char *urlfil);
 /* Return 1 if EXT is an HTML extension such as "htm", else -1. */
 int ishtml_ext(hts_span ext);
 
-/* Write fil's --assume type into s (capacity ssize, NUL included); too long a
-   value is clipped, not fatal. True if a rule matched, s then holding its
-   value, which "--assume cgi=" leaves empty. */
-hts_boolean get_userhttptype(httrackp *opt, char *s, size_t ssize,
-                             const char *fil);
+/* Write fil's --assume type into s; too long a value is clipped, not fatal.
+   True if a rule matched, s then holding its value, which "--assume cgi="
+   leaves empty. */
+hts_boolean get_userhttptype(httrackp *opt, hts_buf s, const char *fil);
 int give_mimext(hts_buf s, const char *st);
 
 int may_unknown2(httrackp * opt, const char *mime, const char *filename);

@@ -114,7 +114,7 @@ static int st_assumemime(httrackp *opt, int argc, char **argv) {
 
       memset(&s, '#', sizeof(s));
       st_assume_clips = 0;
-      assertf(get_userhttptype(opt, s.dst, sizeof(s.dst), "/x.cgi"));
+      assertf(get_userhttptype(opt, HTS_BUF(s.dst), "/x.cgi"));
       assertf(strlen(s.dst) == (len < sizeof(s.dst) ? len : sizeof(s.dst) - 1));
       assertf(memcmp(s.canary, canary, sizeof(s.canary)) == 0);
       assertf(st_assume_clips == (len < sizeof(s.dst) ? 0u : 1u));
@@ -131,7 +131,7 @@ static int st_assumemime(httrackp *opt, int argc, char **argv) {
 
       memset(&l, '#', sizeof(l));
       st_assume_clips = 0;
-      assertf(get_userhttptype(opt, l.dst, sizeof(l.dst), "/x.cgi"));
+      assertf(get_userhttptype(opt, HTS_BUF(l.dst), "/x.cgi"));
       assertf(strlen(l.dst) == (len < sizeof(l.dst) ? len : sizeof(l.dst) - 1));
       assertf(memcmp(l.canary, canary, sizeof(l.canary)) == 0);
       assertf(st_assume_clips == (len < sizeof(l.dst) ? 0u : 1u));
@@ -163,7 +163,7 @@ static int st_assumemime(httrackp *opt, int argc, char **argv) {
     char mime[256];
 
     st_assume_clips = 0;
-    assertf(get_userhttptype(opt, mime, sizeof(mime), "/x.cgi"));
+    assertf(get_userhttptype(opt, HTS_BUF(mime), "/x.cgi"));
     assertf(strcmp(mime, "text/html") == 0);
     assertf(st_assume_clips == 0);
     assertf(ishtml(opt, "/x.cgi") == 1);
