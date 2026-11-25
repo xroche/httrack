@@ -185,7 +185,7 @@ static hts_boolean digest_file(const char *path,
 }
 
 static void digest_mem(hts_span data, unsigned char digest[DIGEST_SIZE]) {
-  domd5mem(data.p, data.len, (char *) digest, 0);
+  domd5mem(data, hts_buf_at((char *) digest, DIGEST_SIZE), HTS_FALSE);
 }
 
 hts_change_bucket hts_changes_classify(hts_boolean rewritten,

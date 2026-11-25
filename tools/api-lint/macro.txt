@@ -185,7 +185,6 @@ src/htslib_selftest.c: REPOISON: uses free name s
 src/htslib_selftest.c: REPOISON: uses free name s
 src/htslib_selftest.c: RESET_DST: uses free name s
 src/htslib_selftest.c: RESET_DST: uses free name used
-src/htsmd5.c: MDCHECK: uses free name digest
 src/htsname.c: ADD_STANDARD_NAME: holds statements outside do { } while (0)
 src/htsname.c: ADD_STANDARD_NAME: uses free name afs
 src/htsname.c: ADD_STANDARD_NAME: uses free name buff
