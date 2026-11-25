@@ -476,10 +476,11 @@ htsblk cache_read_including_broken(httrackp *opt, cache_back *cache,
     lien_back *itemback = NULL;
 
     if (back_unserialize_ref(opt, adr, fil, &itemback) == 0) {
+      const char *const loc =
+          itemback->r.location != NULL ? itemback->r.location : "";
+
       if (return_location.p != NULL)
-        (void) hts_buf_cpy_clip(return_location, itemback->r.location != NULL
-                                                     ? itemback->r.location
-                                                     : "");
+        (void) hts_buf_cpy_clip(return_location, loc);
       r = itemback->r;
       /* header fields only, like cache_readex(): the entry torn down below
          owns these (#826) */
@@ -506,8 +507,7 @@ static htsblk cache_readex_new(httrackp *opt, cache_back *cache,
                                hts_buf return_save, int readonly,
                                hts_boolean include_kept);
 
-// lecture d'un fichier dans le cache
-// si save==null alors test unqiquement
+/* Read a cache entry; a NULL save reads the headers only. */
 static htsblk cache_readex_(httrackp *opt, cache_back *cache, const char *adr,
                             const char *fil, const char *save, hts_buf location,
                             hts_buf return_save, int readonly,
@@ -528,8 +528,7 @@ static htsblk cache_readex_(httrackp *opt, cache_back *cache, const char *adr,
   }
 }
 
-// lecture d'un fichier dans le cache
-// si save==null alors test unqiquement
+/* Read a cache entry; a NULL save reads the headers only. */
 htsblk cache_readex(httrackp *opt, cache_back *cache, const char *adr,
                     const char *fil, const char *save, hts_buf location,
                     hts_buf return_save, int readonly) {

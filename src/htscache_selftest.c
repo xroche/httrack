@@ -3612,7 +3612,7 @@ static int st_cache_nul(httrackp *opt, int argc, char **argv) {
   r = cache_read_ro(opt, &cache, "example.com", "/clean.html", "",
                     hts_buf_at(NULL, 0));
   if (r.statuscode != 200 || r.adr == NULL || r.size != 4 ||
-      memcmp(r.adr, "okay", 4) != 0) {
+      memcmp(r.adr, "okay", 4) != 0 || r.location != NULL) {
     fprintf(stderr, "cache-nul: control entry read as %d (%s)\n", r.statuscode,
             r.msg);
     fail = 1;
@@ -3620,7 +3620,8 @@ static int st_cache_nul(httrackp *opt, int argc, char **argv) {
   freet(r.adr);
   r = cache_read_ro(opt, &cache, "example.com", "/blank.html", "",
                     hts_buf_at(NULL, 0));
-  if (r.statuscode != 200 || r.adr == NULL || r.size != 4) {
+  if (r.statuscode != 200 || r.adr == NULL || r.size != 4 ||
+      r.location != NULL) {
     fprintf(stderr, "cache-nul: a field past the blank line read as %d (%s)\n",
             r.statuscode, r.msg);
     fail = 1;
