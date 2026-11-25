@@ -1146,8 +1146,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
       }
       /* Only chance can put this run's secret in a fetched document. */
       if (opt->single_file) {
-        sf_may_mark =
-            singlefile_may_mark(opt, hts_span_at(r->adr, (size_t) r->size));
+        sf_may_mark = singlefile_may_mark(opt, hts_blk_body(r));
       }
     }
 

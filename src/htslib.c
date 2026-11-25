@@ -396,6 +396,11 @@ hts_boolean hts_body_missing_unexpectedly(const htsblk *r) {
   return HTS_TRUE;
 }
 
+hts_span hts_blk_body(const htsblk *r) {
+  return hts_span_at(r->adr,
+                     r->adr != NULL && r->size > 0 ? (size_t) r->size : 0);
+}
+
 /* Read the next line of the custom block *REST, ended by CRLF, CR or LF.
    Unlike hts_header_next, a blank line does not end the block. */
 static hts_boolean custom_line_next(hts_span *rest, hts_span *line) {

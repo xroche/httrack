@@ -1216,10 +1216,10 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                 /* note: tmpfile is utf-8 */
                 back[p].r.out = FOPEN(back[p].tmpfile, "wb");
                 if (back[p].r.out) {
-                  if ((back[p].r.adr) && (back[p].r.size > 0)) {
-                    if (!hts_fwrite_exact(back[p].r.adr,
-                                          (size_t) back[p].r.size,
-                                          back[p].r.out)) {
+                  const hts_span body = hts_blk_body(&back[p].r);
+
+                  if (body.len > 0) {
+                    if (!hts_fwrite_exact(body.p, body.len, back[p].r.out)) {
                       back[p].r.statuscode = STATUSCODE_INVALID;
                       strcpybuff(back[p].r.msg,
                                  "Write error when decompressing");
@@ -1821,8 +1821,8 @@ static int back_record_write(back_sink *s, const lien_back *src) {
   }
   if (!back_sink_put(s, base + at, whole - at))
     return 1;
-  if (back_data_serialize(s, src->r.adr,
-                          src->r.adr ? (size_t) src->r.size : 0) == 0 &&
+  const hts_span body = hts_blk_body(&src->r);
+  if (back_data_serialize(s, body.p, body.len) == 0 &&
       back_string_serialize(s, src->r.headers) == 0 &&
       (s->fp == NULL || fflush(s->fp) == 0))
     return 0;
@@ -2141,8 +2141,7 @@ static hts_boolean ref_get_blob(FILE *fp, char **dst, uint64_t *len) {
    its partial bytes are, and the response metadata a resumed request or a
    broken-cache read needs. */
 static hts_boolean ref_put_record(FILE *fp, const lien_back *src) {
-  const uint64_t body =
-      src->r.adr != NULL && src->r.size > 0 ? (uint64_t) src->r.size : 0;
+  const uint64_t body = hts_blk_body(&src->r).len;
 
   return hts_fwrite_exact(HTS_REF_MAGIC, HTS_REF_MAGIC_SIZE, fp) &&
          ref_put_u32(fp, HTS_REF_VERSION) && ref_put_str(fp, src->url_adr) &&
