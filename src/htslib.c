@@ -1345,7 +1345,8 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
             if (got > 0) {
               if (cookie != NULL && strcmp(fil, "/robots.txt") != 0 &&
                   !bauth_add(cookie, adr, fil, autorisation))
-                hts_log_print(opt, LOG_WARNING,
+                /* debug: it repeats on every request under this login */
+                hts_log_print(opt, LOG_DEBUG,
                               "authorization not kept for later requests to %s",
                               a);
             } else if (got < 0) {

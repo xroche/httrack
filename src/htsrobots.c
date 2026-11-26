@@ -144,8 +144,9 @@ int checkrobots(const robots_wizard *robots, const char *adr, const char *fil) {
               robots->token + ptr, robots->token + toklen, HTS_BUF(line), &adv);
 
           ptr += adv;
-          /* a cut rule is a prefix, which matches more than the site wrote */
-          if (cut || (line[0] != 'A' && line[0] != 'D'))
+          /* fail closed: keep a cut Disallow, which only forbids more, and
+             skip a cut Allow, which would permit more */
+          if ((cut && line[0] == 'A') || (line[0] != 'A' && line[0] != 'D'))
             continue;
           {
             const hts_boolean is_allow =
@@ -333,6 +334,13 @@ hts_boolean checkrobots_set(robots_wizard *robots, const char *adr,
   }
   return HTS_FALSE;
 }
+
+void robots_claim(httrackp *opt, robots_wizard *robots, const char *adr) {
+  if (!checkrobots_set(robots, adr, ""))
+    hts_log_print(opt, LOG_WARNING, "No memory to record robots.txt for %s",
+                  adr_nologin(opt, adr));
+}
+
 void checkrobots_free(robots_wizard * robots) {
   if (robots->next) {
     checkrobots_free(robots->next);

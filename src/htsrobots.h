@@ -71,6 +71,9 @@ void checkrobots_free(robots_wizard * robots);
    the allocation failed. */
 HTS_CHECK_RESULT hts_boolean checkrobots_set(robots_wizard *robots,
                                              const char *adr, const char *data);
+/* Record an empty rule set for `adr`, so robots.txt is queued once; a failure
+   is logged through `opt`. */
+void robots_claim(httrackp *opt, robots_wizard *robots, const char *adr);
 /* Parse robots.txt `body` for `adr`, storing the HTTrack group's rules; `info`
    (size 0: none) gets a summary of the disallows actually kept,
    `keep_root_disallow` FALSE drops "Disallow: /", and `sitemaps` (size 0:

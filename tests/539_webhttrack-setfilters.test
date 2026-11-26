@@ -78,6 +78,7 @@ grep -q "3 scan rule(s) set and 0 added by user, 5 queued link(s) dropped" "${lo
     fail_dump "the queued links were not dropped as the list says" "${log}"
 
 # A list holding a rule with no sign is refused whole, and the log says so.
+! grep -qF "Scan rules refused" "${log}" || fail_dump "an accepted list was logged as refused" "${log}"
 htsserver_client --path /step4.html --field "sid=${sid}" \
     --field "command=set-filters=+* junk" >/dev/null
 start=$SECONDS

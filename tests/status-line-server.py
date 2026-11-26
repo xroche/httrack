@@ -69,6 +69,11 @@ CASES = {
     + HTML
     + b"Last-Modified: garbage\r\n\r\n"
     + BODY,
+    # the same on a file written straight to disk
+    "badlastmod.bin": b"HTTP/1.1 200 OK\r\n"
+    + b"Content-Type: application/octet-stream\r\n"
+    + b"Last-Modified: garbage\r\n\r\n"
+    + BODY,
     "goodlastmod": b"HTTP/1.1 200 OK\r\n"
     + HTML
     + b"Last-Modified: Mon, 01 Jan 2024 00:00:00 GMT\r\n\r\n"

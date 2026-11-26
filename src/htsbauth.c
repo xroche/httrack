@@ -1700,10 +1700,12 @@ hts_boolean bauth_add(t_cookie *cookie, const char *adr, const char *fil,
   if (cookie) {
     char *prefix = bauth_prefix(HTS_SIZED(buffer), adr, fil);
 
+    if (prefix == NULL)
+      return HTS_FALSE;
     /* exact scheme: an http entry must not hide an https login */
-    if (prefix != NULL && bauth_find(cookie, prefix))
+    if (bauth_find(cookie, prefix))
       return HTS_TRUE;
-    if (prefix != NULL) {
+    {
       bauth_chain *chain = &cookie->auth;
 
       /* A clipped prefix matches more URLs than were authenticated. */

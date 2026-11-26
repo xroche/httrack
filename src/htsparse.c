@@ -3585,13 +3585,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                               if (opt->robots) {        // récupérer robots
                                 if (ishtml(opt, afs.af.fil) != 0) {    // pas la peine pour des fichiers isolés
                                   if (checkrobots(_ROBOTS, afs.af.adr, "") != -1) {    // robots.txt ?
-                                    if (!checkrobots_set(_ROBOTS, afs.af.adr,
-                                                         ""))
-                                      hts_log_print(
-                                          opt, LOG_WARNING,
-                                          "No memory to record robots.txt "
-                                          "for %s",
-                                          adr_nologin(opt, afs.af.adr));
+                                    robots_claim(opt, _ROBOTS, afs.af.adr);
                                     if (checkrobots(_ROBOTS, afs.af.adr, "") == -1) {  // robots.txt ?
                                       // enregistrer robots.txt (MACRO)
                                       if (!hts_record_link(opt, afs.af.adr,

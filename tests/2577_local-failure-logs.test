@@ -27,26 +27,28 @@ cleanup_push cleanup
 serverpid=$!
 port=$(discover_server_port "$tmpdir/srv.out" "$serverpid") || exit 1
 
-crawl() { # crawl NAME CASE ARGS...
+crawl() { # crawl NAME PATH ARGS...
     local name=$1 page=$2 rc=0
     shift 2
     mkdir -p "$out/$name"
-    run_with_timeout 60 httrack "http://127.0.0.1:$port/$page.html" \
+    run_with_timeout 60 httrack "http://127.0.0.1:$port/$page" \
         -O "$out/$name" -c1 --robots=0 --retries=0 -%v0 -q "$@" >>"$log" 2>&1 || rc=$?
     test "$rc" -eq 0 || fail "$name: crawl failed ($rc)"
     cat "$out/$name/hts-log.txt"
 }
 
 date_line="Could not set the date of"
-logtext=$(crawl bad badlastmod -Z)
+logtext=$(crawl bad badlastmod.html -Z)
 grep -qF "$date_line" <<<"$logtext" || fail "an unparsable date left no log line"
-logtext=$(crawl good goodlastmod -Z)
+logtext=$(crawl badbin badlastmod.bin -Z)
+grep -qF "$date_line" <<<"$logtext" || fail "an unparsable date on a file left no log line"
+logtext=$(crawl good goodlastmod.html -Z)
 ! grep -qF "$date_line" <<<"$logtext" || fail "a valid date was logged as unset"
 
 exit_line="User command exited with status"
-logtext=$(crawl exit3 ok -V "exit 3")
+logtext=$(crawl exit3 ok.html -V "exit 3")
 grep -qF "$exit_line 3" <<<"$logtext" || fail "a failing -V command left no log line"
-logtext=$(crawl exit0 ok -V "exit 0")
+logtext=$(crawl exit0 ok.html -V "exit 0")
 ! grep -qF "$exit_line" <<<"$logtext" || fail "a -V command that succeeded was logged"
 
 ok "a failed file date and a failed -V command are logged"
