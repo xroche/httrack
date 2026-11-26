@@ -11,7 +11,9 @@ and a function defined only in a later branch of an unbalanced #if group go
 unreported. A span is seen only as a local, a parameter or a URL view field,
 never through a pointer copy, another struct or a macro, and only the
 NUL_READERS functions and printf-style %s count, so a span handed to any other
-function goes unreported.
+function goes unreported. The table rule misses arrays of typedef'd or struct
+elements, function-pointer arrays, const char *const *x[], and heads starting
+with a macro, and it scans only src/.
 """
 
 import argparse
