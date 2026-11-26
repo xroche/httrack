@@ -127,6 +127,17 @@ Please visit our Website: http://www.httrack.com
 
 static void deletesoc_r(htsblk *r);
 static void time_rfc822_local(hts_buf s, struct tm *A);
+/* Split byte count n into {number, unit}, both stored inside strc. */
+static char **int2bytes2(strc_int2bytes2 *strc, LLint n);
+/* Percent-escaper behind the escape_* family. mode selects the class: 0
+   check_url, 1 in_url, 2 spc_url, 3 uri, 4 control_url, 30 uri_utf. */
+static size_t x_escape_http(const char *const s, hts_buf out, const int mode);
+/* Copies src to dst, writing each byte of set that lies inside escaped, a
+   part of src, as %XX. An escape that does not fit is dropped whole. Returns
+   HTS_FALSE when dst was too small. */
+static hts_boolean hts_escape_span(hts_span src, hts_span escaped,
+                                   const char *set, hts_buf dst);
+static int hts_read(htsblk *r, hts_buf buff);
 
 /* variables globales */
 int _DEBUG_HEAD;
@@ -3369,11 +3380,6 @@ HTSEXT_API char *int2bytessec(strc_int2bytes2 * strc, long int n) {
   return concat(strc->catbuff, sizeof(strc->catbuff), buff, "/s");
 }
 
-char *int2char(strc_int2bytes2 *strc, int n) {
-  sprintf(strc->buff2, "%d", n);
-  return strc->buff2;
-}
-
 // conversion en b,Kb,Mb, nombre et type séparés
 // limite: 2.10^9.10^6B
 
@@ -3386,7 +3392,7 @@ char *int2char(strc_int2bytes2 *strc, int n) {
 #define ToLLintPiB                                                             \
   (ToLLintKiB * ToLLintKiB * ToLLintKiB * ToLLintKiB * ToLLintKiB)
 
-char **int2bytes2(strc_int2bytes2 *strc, LLint n) {
+static char **int2bytes2(strc_int2bytes2 *strc, LLint n) {
   if (n < ToLLintKiB) {
     sprintf(strc->buff1, "%d", (int) (LLint) n);
     strcpybuff(strc->buff2, "B");
@@ -4560,8 +4566,8 @@ void hts_parse_proxy(const char *arg, hts_buf name, int *port) {
                          hts_span_between(authority, at), "/?#\\", name);
 }
 
-hts_boolean hts_escape_span(hts_span src, hts_span escaped, const char *set,
-                            hts_buf dst) {
+static hts_boolean hts_escape_span(hts_span src, hts_span escaped,
+                                   const char *set, hts_buf dst) {
   size_t i, len = 0;
 
   if (dst.size == 0)
@@ -4817,7 +4823,7 @@ void escape_remove_control(char *const s) {
   } while(0)
 
 /* Returns the number of characters written (not taking in account the terminating \0), or 'size' upon overflow. */
-size_t x_escape_http(const char *const s, hts_buf out, const int mode) {
+static size_t x_escape_http(const char *const s, hts_buf out, const int mode) {
   static const char hex[] = "0123456789abcdef";
   char *const dest = out.p; // ADD_CHAR writes through dest and size
   const size_t size = out.size;
@@ -5104,7 +5110,7 @@ LLint check_downloadable_bytes(int rate) {
 // >0 : data received
 // == 0 : not yet data
 // <0: error or no data: READ_ERROR, READ_EOF or READ_TIMEOUT
-int hts_read(htsblk *r, hts_buf buff) {
+static int hts_read(htsblk *r, hts_buf buff) {
   const int size = (int) buff.size;
   int retour;
 
@@ -5164,7 +5170,9 @@ static void hts_debug_log_print(HTS_FORMAT_STRING const char *format, ...)
 static int hts_dgb_init = 0;
 static FILE *hts_dgb_init_fp = NULL;
 
-void hts_debug(int level) {
+/* Set the debug verbosity (0 is off); higher levels log more to stderr. Bit
+   0x80 redirects debug output to "hts-debug.txt". */
+static void hts_debug(int level) {
   hts_dgb_init = level;
   if (hts_dgb_init > 0) {
     hts_debug_log_print("hts_debug() called");

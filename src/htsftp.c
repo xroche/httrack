@@ -69,6 +69,8 @@ Please visit our Website: http://www.httrack.com
    wait on a stop, opt clips it to --max-time. */
 static int wait_socket_receive(lien_back *back, T_SOC soc, int timeout,
                                const httrackp *opt);
+static int run_launch_ftp(FTPDownloadStruct *pStruct);
+static int stop_ftp(lien_back *back);
 
 /* Live FTP workers, registered at spawn. Do not free their slots or opt while
    the list is non-empty (#1051). */
@@ -148,7 +150,7 @@ static void ftp_worker_done(void *pP) {
                      worker->body_returned ? NULL : "FTP transfer interrupted");
 }
 
-void back_launch_ftp(void *pP) {
+static void back_launch_ftp(void *pP) {
   FTPDownloadStruct *pStruct = (FTPDownloadStruct *) pP;
 
   if (pStruct == NULL) {
@@ -769,7 +771,7 @@ static SOCaddr *ftp_dns_resolve(httrackp *opt, lien_back *back,
 }
 
 // la véritable fonction une fois lancées les routines thread/fork
-int run_launch_ftp(FTPDownloadStruct * pStruct) {
+static int run_launch_ftp(FTPDownloadStruct *pStruct) {
   lien_back *back = pStruct->pBack;
   httrackp *opt = pStruct->pOpt;
   char user[256] = "anonymous";
@@ -1556,8 +1558,8 @@ static int wait_socket_receive(lien_back *back, T_SOC soc, int timeout,
   return r;
 }
 
-// cancel reçu?
-int stop_ftp(lien_back * back) {
+// Was a cancel received?
+static int stop_ftp(lien_back *back) {
   if (hts_load_acquire_int(&back->stop_ftp)) {
     strcpybuff(back->r.msg, "Cancelled by User");
     back->r.statuscode = STATUSCODE_INVALID;

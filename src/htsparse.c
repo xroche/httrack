@@ -2068,15 +2068,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         }
                       }
                     }
-                    // entrée dans une applet javascript
-                    /*if (!inscript) {  // sinon on est dans un obj.write("..
-                       if (p==0)
-                       if (rech_sampletag(html,"script"))
-                       if (check_tag(intag_start,"script")) {
-                       inscript=1;
-                       }
-                       } */
-
                     // Ici on procède à une analyse du code javascript pour tenter de récupérer
                     // certains fichiers évidents.
                     // C'est devenu obligatoire vu le nombre de pages qui intègrent

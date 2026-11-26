@@ -79,7 +79,7 @@ Please visit our Website: http://www.httrack.com
 
 /* End of Keyword Indexer Parameters */
 
-int mystrcmp(const void *_e1, const void *_e2);
+static int mystrcmp(const void *_e1, const void *_e2);
 
 /* The whole mirror's indexing state: only index_init resets it. */
 static struct {
@@ -451,7 +451,7 @@ done:
 
 /* Subroutines */
 
-int mystrcmp(const void *_e1, const void *_e2) {
+static int mystrcmp(const void *_e1, const void *_e2) {
   const char *const*const e1 = (const char *const*) _e1;
   const char *const*const e2 = (const char *const*) _e2;
 

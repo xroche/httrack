@@ -93,38 +93,30 @@ typedef struct OLD_htsblk {
 /* Locking */
 
 #ifdef _WIN32
-void MutexInit(PT_Mutex * pMutex) {
+static void MutexInit(PT_Mutex *pMutex) {
   *pMutex = CreateMutex(NULL, FALSE, NULL);
 }
 
-void MutexLock(PT_Mutex * pMutex) {
+static void MutexLock(PT_Mutex *pMutex) {
   WaitForSingleObject(*pMutex, INFINITE);
 }
 
-void MutexUnlock(PT_Mutex * pMutex) {
-  ReleaseMutex(*pMutex);
-}
+static void MutexUnlock(PT_Mutex *pMutex) { ReleaseMutex(*pMutex); }
 
-void MutexFree(PT_Mutex * pMutex) {
+static void MutexFree(PT_Mutex *pMutex) {
   CloseHandle(*pMutex);
   *pMutex = NULL;
 }
 #else
-void MutexInit(PT_Mutex * pMutex) {
+static void MutexInit(PT_Mutex *pMutex) {
   (void) pthread_mutex_init(pMutex, 0);
 }
 
-void MutexLock(PT_Mutex * pMutex) {
-  pthread_mutex_lock(pMutex);
-}
+static void MutexLock(PT_Mutex *pMutex) { pthread_mutex_lock(pMutex); }
 
-void MutexUnlock(PT_Mutex * pMutex) {
-  pthread_mutex_unlock(pMutex);
-}
+static void MutexUnlock(PT_Mutex *pMutex) { pthread_mutex_unlock(pMutex); }
 
-void MutexFree(PT_Mutex * pMutex) {
-  pthread_mutex_destroy(pMutex);
-}
+static void MutexFree(PT_Mutex *pMutex) { pthread_mutex_destroy(pMutex); }
 #endif
 
 /* Indexes */
@@ -159,6 +151,11 @@ static PT_Element PT_ReadCache__Old(PT_Index index, const char *url, int flags);
 static void PT_Index_Delete__Arc(PT_Index * pindex);
 static PT_Element PT_ReadCache__Arc(PT_Index index, const char *url, int flags);
 static int PT_SaveCache__Arc(PT_Indexes indexes, const char *filename);
+static PT_Index PT_LoadCache(const char *filename);
+static void PT_Index_Delete(PT_Index *pindex);
+static PT_Element PT_ReadCache(PT_Index index, const char *url, int flags);
+static int PT_IndexMerge(PT_Indexes indexes, PT_Index *pindex);
+static time_t PT_GetTimeIndex(PT_Indexes indexes);
 
 struct _PT_Index_Functions {
   /* Mandatory services */
@@ -328,7 +325,7 @@ static PT_Mutex *PT_Index_Lock(PT_Index index) {
 /* Generic cache dispatch                                       */
 /* ------------------------------------------------------------ */
 
-void PT_Index_Delete(PT_Index * pindex) {
+static void PT_Index_Delete(PT_Index *pindex) {
   if (pindex != NULL && (*pindex) != NULL) {
     PT_Index index = *pindex;
 
@@ -567,7 +564,7 @@ static int PT_GetType(const char *filename) {
   return PT_CACHE_UNDEFINED;
 }
 
-PT_Index PT_LoadCache(const char *filename) {
+static PT_Index PT_LoadCache(const char *filename) {
   int type = PT_GetType(filename);
 
   if (type != PT_CACHE_UNDEFINED) {
@@ -702,9 +699,9 @@ int PT_SaveCache(PT_Indexes indexes, const char *filename) {
   return -1;
 }
 
-int PT_EnumCache(PT_Indexes indexes,
-                 int (*callback) (void *, const char *url, PT_Element),
-                 void *arg) {
+static int PT_EnumCache(PT_Indexes indexes,
+                        int (*callback)(void *, const char *url, PT_Element),
+                        void *arg) {
   if (indexes != NULL && indexes->cil != NULL) {
     struct_coucal_enum en = coucal_enum_new(indexes->cil);
     coucal_item *chain;
@@ -738,7 +735,7 @@ time_t PT_Index_Timestamp(PT_Index index) {
   return index->slots.common.timestamp;
 }
 
-int PT_IndexMerge(PT_Indexes indexes, PT_Index * pindex) {
+static int PT_IndexMerge(PT_Indexes indexes, PT_Index *pindex) {
   if (pindex != NULL && *pindex != NULL && (*pindex)->slots.common.hash != NULL
       && indexes != NULL) {
     PT_Index index = *pindex;
@@ -855,7 +852,7 @@ int PT_LookupIndex(PT_Indexes indexes, const char *url) {
   return 0;
 }
 
-time_t PT_GetTimeIndex(PT_Indexes indexes) {
+static time_t PT_GetTimeIndex(PT_Indexes indexes) {
   if (indexes != NULL && indexes->index_size > 0) {
     int i;
     time_t maxt = indexes->index[0]->slots.common.timestamp;
@@ -893,7 +890,7 @@ PT_Element PT_ElementNew(void) {
 #define PT_Element_failf(R, ...)                                               \
   slprintfbuff_clip((R)->msg, sizeof((R)->msg), __VA_ARGS__)
 
-PT_Element PT_ReadCache(PT_Index index, const char *url, int flags) {
+static PT_Element PT_ReadCache(PT_Index index, const char *url, int flags) {
   if (index != NULL && SAFE_INDEX(index)) {
     PT_Mutex *const lock = PT_Index_Lock(index);
     PT_Element r;

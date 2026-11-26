@@ -140,7 +140,6 @@ int hts_footer_format(hts_buf buffer, const char *footer,
     : 0\
   )
 // HTS_INLINE int rech_tageq(const char* adr,const char* s);
-HTS_INLINE int rech_sampletag(const char *adr, const char *s);
 HTS_INLINE int rech_endtoken(const char *adr, const char **start);
 HTS_INLINE int check_tag(const char *from, const char *tag);
 int verif_backblue(httrackp * opt, const char *base);

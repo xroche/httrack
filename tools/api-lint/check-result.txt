@@ -65,7 +65,6 @@ src/htscookiefile.h: cookie_write
 src/htscore.h: back_fillmax
 src/htscore.h: check_fatal_io_errno
 src/htscore.h: check_stdin
-src/htscore.h: engine_stats
 src/htscore.h: filecreateempty
 src/htscore.h: filenote
 src/htscore.h: filesave
@@ -100,7 +99,6 @@ src/htsftp.h: ftp_parse_pasv
 src/htsftp.h: ftp_split_hostport
 src/htsftp.h: ftp_split_userpass
 src/htsftp.h: get_ftp_line
-src/htsftp.h: stop_ftp
 src/htshash.h: hash_read
 src/htsindex.h: index_keyword
 src/htslib.h: binput_line
@@ -120,8 +118,6 @@ src/htslib.h: hts_body_missing_unexpectedly
 src/htslib.h: hts_client_hints_of
 src/htslib.h: hts_content_length_agrees
 src/htslib.h: hts_dns_addr_index
-src/htslib.h: hts_escape_span
-src/htslib.h: hts_escape_typed_login
 src/htslib.h: hts_file_backdate
 src/htslib.h: hts_file_mtime
 src/htslib.h: hts_header_is_read
@@ -200,7 +196,6 @@ src/htstools.h: lienrelatif
 src/htstools.h: link_base_is_hostname
 src/htstools.h: link_dir_has_fragment_or_query
 src/htstools.h: link_has_authority
-src/htstools.h: rech_sampletag
 src/htstools.h: verif_external
 src/htsurlport.h: hts_header_param
 src/htsurlport.h: hts_parse_llint
@@ -247,8 +242,6 @@ src/httrack-library.h: hts_setfilters
 src/httrack-library.h: hts_wizard_host_scope
 src/proxy/proxytrack.h: set_filetime_time_t
 src/proxy/store.h: PT_AddIndex
-src/proxy/store.h: PT_EnumCache
 src/proxy/store.h: PT_Enumerate
-src/proxy/store.h: PT_IndexMerge
 src/proxy/store.h: PT_LookupIndex
 src/proxy/store.h: PT_SaveCache

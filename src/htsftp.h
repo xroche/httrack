@@ -66,8 +66,7 @@ struct FTPDownloadStruct {
 /* Capacity of every FTP control-line buffer; send_line() adds the CRLF. */
 #define FTP_LINE_SIZE 1024
 
-void launch_ftp(FTPDownloadStruct * params);
-void back_launch_ftp(void *pP);
+void launch_ftp(FTPDownloadStruct *params);
 /* Cancel every live FTP worker and block until each stops touching its backlog
    slot and opt. Call before freeing either. */
 void ftp_stop_workers(void);
@@ -84,7 +83,6 @@ int ftp_handoff_selftests(httrackp *opt);
    buffer of opt. Returns the number of failed checks. */
 int ftp_scratch_selftests(httrackp *opt);
 
-int run_launch_ftp(FTPDownloadStruct * params);
 int send_line(T_SOC soc, const char *data);
 /* Read one control-channel reply into line, clipped. A size-0 line discards
    the reply. Returns 0 on error. Optional back ends the wait on a stop, opt
@@ -137,7 +135,6 @@ hts_boolean ftp_parse_size(const char *line, LLint *size);
    HTS_FALSE for any other reply or an out-of-range field. */
 hts_boolean ftp_parse_mdtm(const char *line, struct tm *tm_time);
 T_SOC get_datasocket(hts_buf to_send);
-int stop_ftp(lien_back * back);
 char *linejmp(char *line);
 int check_socket_connect(T_SOC soc);
 #endif

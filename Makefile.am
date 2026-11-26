@@ -23,6 +23,7 @@ EXTRA_DIST = INSTALL.Linux \
 		tools/api-lint/check-result.txt \
 		tools/api-lint/span.txt \
 		tools/api-lint/pair.txt \
+		tools/api-lint/local.txt \
 		tools/api-lint/libc.txt \
 		tools/api-lint/table.txt \
 		tools/ci-sanitizer-report.sh \
