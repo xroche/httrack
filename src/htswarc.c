@@ -1080,7 +1080,8 @@ static void warc_wacz_package(warc_writer *w) {
 /* Close the current segment and open the next; writes its warcinfo. */
 static int warc_rotate(warc_writer *w);
 
-/* One WARC record for warc_emit. A NULL field omits its header. */
+/* One WARC record for warc_emit. NULL omits any field, and "" also omits all
+   but content_type, profile and truncated, which then write an empty header. */
 typedef struct {
   const char *type;
   const char *content_type;
