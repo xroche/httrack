@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# WinHTTrack compiles the engine's internal headers as C++, so their inline
-# bodies must too: C++ has no implicit void * conversion.
+# WinHTTrack compiles the engine's internal headers as C++, so they must
+# compile as C++ too: C++ has no implicit void * conversion.
 
 set -euo pipefail
 
@@ -32,8 +32,9 @@ printf 'int main() { return 0; }\n' >"$tmp/tu.cpp"
 bad=0
 count=0
 for h in "$src"/*.h; do
-    grep -q 'static HTS_INLINE' "$h" || continue
     b=$(basename "$h")
+    # A data table and a file that declares main(), neither standalone.
+    case $b in htscodepages.h | htsweb.h) continue ;; esac
     printf '#include "htsglobal.h"\n#include "htscore.h"\n#include "htscache.h"\n#include "%s"\nint main() { return 0; }\n' \
         "$b" >"$tmp/tu.cpp"
     count=$((count + 1))
@@ -43,7 +44,7 @@ for h in "$src"/*.h; do
         bad=1
     fi
 done
-[ "$count" -ge 13 ] || fail "only $count headers carry inline bodies, the sweep is too small"
+[ "$count" -ge 75 ] || fail "only $count headers were compiled, the sweep is too small"
 [ "$bad" -eq 0 ] || fail "internal headers do not compile as C++"
 echo "compiled $count internal headers as C++ with $cxx" >&2
 exit 0
