@@ -409,8 +409,6 @@ int filesave(httrackp *opt, hts_span body, const char *s,
              const char *url_adr /* = NULL */,
              const char *url_fil /* = NULL */);
 
-HTS_OWNED char *hts_cancel_file_pop(httrackp *opt);
-
 int check_fatal_io_errno(void);
 
 /* Log a disk-full abort and stop the mirror. */

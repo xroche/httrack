@@ -45,6 +45,7 @@ char *lint_own_ok(const char *s) { return strdupt(s); }
 char *lint_own_arg(char *s) { if (s != NULL) return s; return strdupt(""); }
 char *lint_own_moved(size_t n) { char *p = malloct(n + 1); p++; return p; }
 struct lint_s *lint_own_struct(void) { return malloct(8); }
+void *lint_own_void(size_t n) { return calloct(n, 2); }
 C
 cat >"${work}/src/lintowned.h" <<'C'
 HTSEXT_API char *lint_own_dup(const char *s);
@@ -54,6 +55,7 @@ HTSEXT_API HTS_OWNED char *lint_own_ok(const char *s);
 HTSEXT_API char *lint_own_arg(char *s);
 HTSEXT_API char *lint_own_moved(size_t n);
 HTSEXT_API struct lint_s *lint_own_struct(void);
+HTSEXT_API void *lint_own_void(size_t n);
 C
 sed 's/^HTS_OWNED char \*hts_mask_passwords(/char *hts_mask_passwords(/' \
     "${srcdir}/src/htslib.h" >"${work}/src/htslib.h"
@@ -84,11 +86,12 @@ rm "${work}/src/linttable.c"
 for want in "lintowned.h:1: owned: new violation: lint_own_dup " \
     "lintowned.h:2: owned: new violation: lint_own_var " \
     "lintowned.h:3: owned: new violation: lint_own_via " \
+    "lintowned.h:8: owned: new violation: lint_own_void " \
     "src/htslib.h:$(grep -n 'hts_mask_passwords(const' "${work}/src/htslib.h" | cut -d: -f1): owned: new violation: hts_mask_passwords "; do
     grep -qF "${want}" <<<"${out}" || fail "missed ${want}: ${out}"
 done
-test "$(grep -c ': owned: ' <<<"${out}")" -eq 4 || fail "flagged a non-owned return: ${out}"
-test "$(wc -l <<<"${out}")" -eq 8 || fail "unexpected output: ${out}"
+test "$(grep -c ': owned: ' <<<"${out}")" -eq 5 || fail "flagged a non-owned return: ${out}"
+test "$(wc -l <<<"${out}")" -eq 9 || fail "unexpected output: ${out}"
 rm "${work}/src/lintowned.c" "${work}/src/lintowned.h"
 cp "${srcdir}/src/htslib.h" "${work}/src/"
 

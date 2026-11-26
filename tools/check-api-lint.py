@@ -25,6 +25,8 @@ header, nor one whose definition a macro builds.
 The owned rule follows a return only into a call, or into a local whose every
 assignment is a call or NULL, so a buffer a macro or a String builds goes
 unreported.
+Even when it asks, never mark a block also stored elsewhere before it is
+returned, nor a void * grow helper over a block of pointers.
 """
 
 import argparse
