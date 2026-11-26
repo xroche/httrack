@@ -5,7 +5,6 @@ src/htsarena.h: hts_arena_take_
 src/htsback.h: back_add
 src/htsback.h: back_add_if_not_exists
 src/htsback.h: back_busy_consistent
-src/htsback.h: back_clear_entry
 src/htsback.h: back_delayed_rename
 src/htsback.h: back_new
 src/htsback.h: back_search_quick

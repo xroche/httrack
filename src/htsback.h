@@ -146,8 +146,9 @@ void back_slot_fail_nonfatal(httrackp *opt, struct_back *sback, const int p,
 void back_set_locked(struct_back * sback, const int p);
 void back_set_pinned(struct_back *sback, const int p);
 void back_set_unlocked(struct_back * sback, const int p);
-int back_delete(httrackp * opt, cache_back * cache, struct_back * sback,
-                const int p);
+/* Finalize slot p if it still needs it, then clear it. */
+void back_delete(httrackp *opt, cache_back *cache, struct_back *sback,
+                 const int p);
 /* Discard back's on-disk .delayed placeholder and its refname. */
 void back_delayed_discard(httrackp *opt, lien_back *back);
 /* Did back_add() settle this slot without a reply or a body, as a cache hit
@@ -158,7 +159,9 @@ hts_boolean back_delayed_settled_empty(const lien_back *back);
    error. */
 hts_boolean back_delayed_rename(httrackp *opt, lien_back *back,
                                 const char *newname);
-int back_clear_entry(lien_back *back);
+/* Release back's socket, buffers and temporary file, and mark it free. NULL
+   does nothing. */
+void back_clear_entry(lien_back *back);
 void back_delete_all(httrackp * opt, cache_back * cache, struct_back * sback);
 /* Keep slot p alive for keep-alive when allowed, else delete it. */
 void back_maydelete(httrackp *opt, cache_back *cache, struct_back *sback,
