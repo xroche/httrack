@@ -1,0 +1,29 @@
+#!/bin/bash
+#
+# A type probe aborted after a stop must not record the link under an empty
+# save name.
+
+set -euo pipefail
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+[ -n "${REFUSEPROBE_LIB:-}" ] || skip "REFUSEPROBE_LIB unset, no automake environment"
+[ -r "${REFUSEPROBE_LIB}" ] || skip "nothing built at ${REFUSEPROBE_LIB}"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_2585.XXXXXX")
+cleanup_push rm -rf "$tmpdir"
+require_httrack
+
+out="$tmpdir/out"
+# -M50000 is the stop that sends the delayed type check down the probe.
+local_server_start --log "$tmpdir/server.log"
+local_crawl --log "$tmpdir/crawl.log" -O "$out" -M50000 -c2 -%N1 -Z \
+    --quiet --timeout=30 --disable-security-limits --robots=0 \
+    --wrapper "${REFUSEPROBE_LIB}" "$BASEURL/dmove/index.html"
+local_server_stop "$SRV_PID"
+
+grep -q 'refuseprobe: refused in state' "$tmpdir/crawl.log" ||
+    fail "the crawl never reached the probe: $(<"$tmpdir/crawl.log")"
+log=$(<"$out/hts-log.txt")
+! grep -E -- '-> $' <<<"$log" ||
+    fail "a link was recorded under an empty name: ${log}"
