@@ -136,7 +136,7 @@ static void client_event(smallserver_client_event ev, const char *window) {
 }
 
 /* Extern */
-extern void webhttrack_main(char *cmd);
+extern void webhttrack_main(const char *cmd);
 extern void webhttrack_lock(void);
 extern void webhttrack_release(void);
 
@@ -175,7 +175,7 @@ static const char *server_content_type(const char *file) {
     return NULL;
   }
   for (i = 0; server_mime_types[i].ext != NULL; i++) {
-    if (strfield2(dot + 1, server_mime_types[i].ext)) {
+    if (hts_streq_ci(dot + 1, server_mime_types[i].ext)) {
       return server_mime_types[i].type;
     }
   }
@@ -260,9 +260,9 @@ static hts_boolean is_wizard_pane(const char *file) {
   const char *page;
 
   file = skip_separators(file);
-  if (strfield(file, "server/") == 0)
+  if (!hts_skip_prefix_ci(&file, "server/"))
     return HTS_FALSE;
-  page = skip_separators(file + 7);
+  page = skip_separators(file);
   return hts_strcasecmp(page, "about.html") != 0;
 }
 
@@ -329,7 +329,7 @@ static void add_self_name(const char *name) {
     return;
   }
   for (i = 0; i < server_self_names_count; i++) {
-    if (strfield2(server_self_names[i], name) != 0) {
+    if (hts_streq_ci(server_self_names[i], name)) {
       return;
     }
   }
@@ -511,10 +511,8 @@ typedef struct {
     Only our own plain-http authority passes: a sandboxed page sends "null", a
     foreign one its own host, and an empty Host cannot be matched at all. */
 static hts_boolean origin_is_self(const char *origin, const char *host) {
-  const int p = strfield(origin, "http://");
-  const char *const authority = origin + p;
-
-  return host[0] != '\0' && p != 0 && strfield2(authority, host) != 0;
+  return host[0] != '\0' && hts_skip_prefix_ci(&origin, "http://") &&
+         hts_streq_ci(origin, host);
 }
 
 /** Hostname part of a Host header value, URL brackets and ":port" removed.
@@ -561,12 +559,12 @@ static hts_boolean host_is_self(const char *host, const char *bound) {
   if (!host_hostname(HTS_BUF(name), host)) {
     return HTS_FALSE;
   }
-  if (strfield2(name, "localhost") != 0 || host_is_address(name) ||
-      (bound[0] != '\0' && strfield2(name, bound) != 0)) {
+  if (hts_streq_ci(name, "localhost") || host_is_address(name) ||
+      (bound[0] != '\0' && hts_streq_ci(name, bound))) {
     return HTS_TRUE;
   }
   for (i = 0; i < server_self_names_count; i++) {
-    if (strfield2(server_self_names[i], name) != 0) {
+    if (hts_streq_ci(server_self_names[i], name)) {
       return HTS_TRUE;
     }
   }
@@ -863,8 +861,8 @@ static hts_boolean theme_exists(const char *path, const char *name) {
 /* Is file under /server/themes/, in any spelling the filesystem opens? */
 static hts_boolean is_theme_url(const char *file) {
   file = skip_separators(file);
-  return strfield(file, "server/") != 0 &&
-         strfield(skip_separators(file + 7), "themes/") != 0;
+  return hts_skip_prefix_ci(&file, "server/") &&
+         hts_starts_with_ci(skip_separators(file), "themes/");
 }
 
 /* Maps a THEMES_URL "<name>/..." URL to the user's theme of that name, which
@@ -1572,11 +1570,11 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
       /* meth is rewritten later, so HEAD needs its own flag */
       hts_boolean is_head = HTS_FALSE;
 
-      if (strfield(line1, "get ")) {
+      if (hts_starts_with_ci(line1, "get ")) {
         meth = 1;
-      } else if (strfield(line1, "post ")) {
+      } else if (hts_starts_with_ci(line1, "post ")) {
         meth = 2;
-      } else if (strfield(line1, "head ")) {    /* yes, we can do that */
+      } else if (hts_starts_with_ci(line1, "head ")) { /* yes, we can do that */
         meth = 10;
         is_head = HTS_TRUE;
       }
@@ -1585,24 +1583,22 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
         length = -1;
         while (hts_shared_linputsoc(soc_c, HTS_BUF_N(line, sizeof(line) - 2),
                                     deadline, &cut) > 0) {
-          int p;
+          const char *value = line;
 
           if (cut) {
             /* A clipped header is not the one the client sent. */
-          } else if ((p = strfield(line, "Content-length:")) != 0) {
-            const char *a = line + p;
-
-            if (hts_scan_llint(&a, 0, INT64_MAX, &length) != HTS_SCAN_OK) {
+          } else if (hts_skip_prefix_ci(&value, "Content-length:")) {
+            if (hts_scan_llint(&value, 0, INT64_MAX, &length) != HTS_SCAN_OK) {
               length = -1;
               bad_length = HTS_TRUE;
             }
-          } else if ((p = strfield(line, "Origin:")) != 0) {
-            copy_header_value(HTS_BUF(origin), line + p);
-          } else if ((p = strfield(line, "Host:")) != 0) {
+          } else if (hts_skip_prefix_ci(&value, "Origin:")) {
+            copy_header_value(HTS_BUF(origin), value);
+          } else if (hts_skip_prefix_ci(&value, "Host:")) {
             /* A repeated header keeps the last value. Safe only because we are
                loopback-direct: behind a proxy honouring the first, the two
                would disagree. */
-            copy_header_value(HTS_BUF(host), line + p);
+            copy_header_value(HTS_BUF(host), value);
           }
         }
         if (meth == 2) {
@@ -1722,7 +1718,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
             /* Both ends are a separator or the NUL, already walked past. */
             key[f.key.len] = '\0';
             key[f.whole.len] = '\0';
-            if (strfield2(ua, "on")) /* hack : "on" == 1 */
+            if (hts_streq_ci(ua, "on")) /* hack : "on" == 1 */
               ua = "1";
             hts_unescapehttp(ua, &sua);
             /* Not stored: ini files fill the same table. */
@@ -1887,9 +1883,10 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
       /* Execute command */
       {
         intptr_t adr = 0;
-        int p = 0;
 
         if (coucal_readptr(NewLangList, "command", &adr)) {
+          const char *arg = (const char *) adr;
+
           if (strcmp((char *) adr, "cancel") == 0) {
             if (global_opt != NULL) {
               if (!commandEndRequested) {
@@ -1901,19 +1898,19 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                 commandEndRequested = 2;        /* will break the loop() callback */
               }
             }
-          } else if ((p = strfield((char *) adr, "cancel-file="))) {
+          } else if (hts_skip_prefix_ci(&arg, "cancel-file=")) {
             if (global_opt != NULL) {
-              hts_cancel_file_push(global_opt, (char *) adr + p);
+              hts_cancel_file_push(global_opt, arg);
             }
           } else if (strcmp((char *) adr, "cancel-parsing") == 0) {
             if (global_opt != NULL) {
               hts_cancel_parsing(global_opt);
             }
-          } else if ((p = strfield((char *) adr, "pause="))) {
+          } else if (hts_starts_with_ci(arg, "pause=")) {
             if (global_opt != NULL) {
               hts_setpause(global_opt, 1);
             }
-          } else if ((p = strfield((char *) adr, "unpause"))) {
+          } else if (hts_starts_with_ci(arg, "unpause")) {
             if (global_opt != NULL) {
               hts_setpause(global_opt, 0);
             }
@@ -1922,27 +1919,26 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
               hts_request_stop(global_opt, 1);
               commandEndRequested = 2;  /* will break the loop() callback */
             }
-          } else if ((p = strfield((char *) adr, "add-url="))) {
+          } else if (hts_skip_prefix_ci(&arg, "add-url=")) {
             if (global_opt != NULL) {
               char *ptraddr[2];
 
-              ptraddr[0] = (char *) adr + p;
+              /* hts_addurl only reads, but takes char ** */
+              ptraddr[0] = (char *) adr + (arg - (const char *) adr);
               ptraddr[1] = NULL;
               if (!hts_addurl(global_opt, ptraddr))
                 hts_log_print(global_opt, LOG_WARNING,
                               "No memory to add the URL");
             }
-          } else if ((p = strfield((char *) adr, "set-filters="))) {
+          } else if (hts_skip_prefix_ci(&arg, "set-filters=")) {
             if (global_opt != NULL) {
-              setfilters_from_text(global_opt, (char *) adr + p);
+              setfilters_from_text(global_opt, arg);
             }
-          } else if ((p = strfield((char *) adr, "add-filter="))) {
-            const char *const rule = (char *) adr + p;
-
-            if (global_opt != NULL && !hts_addfilter(global_opt, rule))
+          } else if (hts_skip_prefix_ci(&arg, "add-filter=")) {
+            if (global_opt != NULL && !hts_addfilter(global_opt, arg))
               hts_log_print(global_opt, LOG_WARNING, "Scan rule refused: %s",
-                            rule);
-          } else if ((p = strfield((char *) adr, "httrack"))) {
+                            arg);
+          } else if (hts_skip_prefix_ci(&arg, "httrack")) {
             if (!commandRunning) {
               intptr_t adrcd = 0;
 
@@ -2020,7 +2016,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                         if (strcmp((char *) adrcd, "start") == 0) {
                           /* The pages declare utf-8, so the POST body is
                              already the utf-8 argv the engine wants (#629). */
-                          webhttrack_main((char *) adr + p);
+                          webhttrack_main(arg);
                         } else {
                           hts_store_release_int(&commandRunning, 0);
                           commandEnd = 1;
@@ -2187,9 +2183,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                   if (*str == '$' && *++str == '{' && (pos = strchr(++str, '}'))
                       && (n = (pos - str)) && n < 1024) {
                     char name_[1024 + 2];
-                    char *name = name_;
+                    const char *name = name_;
                     const char *langstr = NULL;
-                    int p;
                     int format = 0;
                     int listDefault = 0;
                     int listHidden = 0; /* ids start at 1, so 0 hides none */
@@ -2205,24 +2200,21 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                     hts_boolean in_label = HTS_FALSE;
                     char datebuff[16];
 
-                    name[0] = '\0';
-                    strlncatbuff(name, str, sizeof(name_), n);
+                    name_[0] = '\0';
+                    strlncatbuff(name_, str, sizeof(name_), n);
 
                     if (strncmp(name, "/*", 2) == 0) {
                       /* comments */
-                    } else if ((p = strfield(name, "html:"))) {
-                      name += p;
+                    } else if (hts_skip_prefix_ci(&name, "html:")) {
                       format = 1;
-                    } else if ((p = strfield(name, "attr:"))) {
-                      name += p;
+                    } else if (hts_skip_prefix_ci(&name, "attr:")) {
                       format = 7;
                       /* ${attr:acceptpreset:<browser>:<kind>} expands to the
                          engine's Accept value, or to nothing. */
-                      if ((p = strfield(name, "acceptpreset:"))) {
-                        char *const colon = strchr(name + p, ':');
+                      if (hts_skip_prefix_ci(&name, "acceptpreset:")) {
+                        char *const colon = strchr(name, ':');
                         const char *v;
 
-                        name += p;
                         langstr = "";
                         if (colon != NULL) {
                           *colon = '\0';
@@ -2230,26 +2222,21 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                             langstr = v;
                         }
                       }
-                    } else if ((p = strfield(name, "js:"))) {
-                      name += p;
+                    } else if (hts_skip_prefix_ci(&name, "js:")) {
                       format = 6;
-                    } else if ((p = strfield(name, "unquoted:"))) {
-                      name += p;
+                    } else if (hts_skip_prefix_ci(&name, "unquoted:")) {
                       unquoted = HTS_TRUE;
-                    } else if ((p = strfield(name, "arg:"))) {
-                      name += p;
+                    } else if (hts_skip_prefix_ci(&name, "arg:")) {
                       format = 5;
-                    } else if ((p = strfield(name, "list:"))) {
-                      name += p;
+                    } else if (hts_skip_prefix_ci(&name, "list:")) {
                       format = 2;
-                    } else if ((p = strfield(name, "liststr:")) ||
-                               (p = strfield(name, "listlabel:"))) {
+                    } else if (hts_skip_prefix_ci(&name, "liststr:") ||
+                               (pairs =
+                                    hts_skip_prefix_ci(&name, "listlabel:"))) {
                       /* ${liststr:<var>:<key>} and ${listlabel:<var>:<key>}
                          select the entry equal to <var>, as ${listid:} does */
-                      char *const colon = strchr(name + p, ':');
+                      char *const colon = strchr(name, ':');
 
-                      pairs = strfield(name, "listlabel:") != 0;
-                      name += p;
                       format = -2;
                       if (colon != NULL) {
                         intptr_t adr = 0;
@@ -2260,14 +2247,13 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                         }
                         name = colon + 1;
                       }
-                    } else if ((p = strfield(name, "date:"))) {
+                    } else if (hts_skip_prefix_ci(&name, "date:")) {
                       /* The year follows the calendar (#1165), and
                          SOURCE_DATE_EPOCH pins it for tests. */
                       const char *epoch = getenv("SOURCE_DATE_EPOCH");
                       struct tm tmv;
                       hts_boolean ok = HTS_FALSE;
 
-                      name += p;
                       format = 0;
                       langstr = "";
                       if (strcmp(name, "year") == 0) {
@@ -2296,10 +2282,9 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                           langstr = datebuff;
                         }
                       }
-                    } else if ((p = strfield(name, "file-exists:"))) {
+                    } else if (hts_skip_prefix_ci(&name, "file-exists:")) {
                       char *pos2;
 
-                      name += p;
                       format = 0;
                       literal = HTS_TRUE;
                       pos2 = strchr(name, ':');
@@ -2313,11 +2298,10 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                           }
                         }
                       }
-                    } else if ((p = strfield(name, "do:"))) {
+                    } else if (hts_skip_prefix_ci(&name, "do:")) {
                       char *pos2;
                       char empty[2] = "";
 
-                      name += p;
                       format = 1;
                       pos2 = strchr(name, ':');
                       langstr = "";
@@ -2437,12 +2421,11 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                     }
                     /* arglist:<field>:<flag>
                        one "<flag> "rule"" per non-empty line of the field */
-                    else if ((p = strfield(name, "arglist:"))) {
+                    else if (hts_skip_prefix_ci(&name, "arglist:")) {
                       char *pos2;
 
                       langstr = "";
                       literal = HTS_TRUE;
-                      name += p;
                       pos2 = strchr(name, ':');
                       if (pos2 != NULL && outputmode != -1) {
                         intptr_t adr = 0;
@@ -2460,15 +2443,15 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                        test:<if ==0>:<if ==1>:<if == 2>..
                        ztest:<if == 0 || !exist>:<if == 1>:<if == 2>..
                      */
-                    else if ((p = strfield(name, "test:")) ||
-                             (p = strfield(name, "ztest:"))) {
+                    else if (hts_starts_with_ci(name, "test:") ||
+                             hts_starts_with_ci(name, "ztest:")) {
                       intptr_t adr = 0;
                       char *pos2;
                       int ztest = (name[0] == 'z');
 
                       langstr = "";
                       literal = HTS_TRUE;
-                      name += p;
+                      name = strchr(name, ':') + 1; /* past test: or ztest: */
                       pos2 = strchr(name, ':');
                       if (pos2 != NULL) {
                         *pos2 = '\0';
@@ -2487,7 +2470,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                               format = 0;
                             } else {
                               if (sscanf(newadr, "%d", &npos) != 1) {
-                                if (strfield(newadr, "on")) {
+                                if (hts_starts_with_ci(newadr, "on")) {
                                   npos = 1;
                                 } else {
                                   npos = 0;     /* first one will be ok */
@@ -2501,7 +2484,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                               int n2;
 
                               if (fpos == NULL) {
-                                fpos = name + strlen(name);
+                                fpos = strchr(name, '\0');
                                 end = 1;
                               }
                               n2 = (int) (fpos - name);
@@ -2517,10 +2500,9 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                           }
                         }
                       }
-                    } else if ((p = strfield(name, "listid:"))) {
+                    } else if (hts_skip_prefix_ci(&name, "listid:")) {
                       char *pos2;
 
-                      name += p;
                       format = 2;
                       pos2 = strchr(name, ':');
                       if (pos2) {
@@ -2554,12 +2536,11 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                           listHidden = (int) id;
                         *pos2 = '\0';
                       }
-                    } else if ((p = strfield(name, "checked:"))) {
-                      name += p;
+                    } else if (hts_skip_prefix_ci(&name, "checked:")) {
                       format = 3;
                     }
                     if (langstr == NULL) {
-                      if (strfield2(name, "#iso")) {
+                      if (hts_streq_ci(name, "#iso")) {
                         langstr = line2;
                         line2[0] = '\0';
                         LANG_LIST(path, HTS_BUF(line2));
@@ -3265,7 +3246,8 @@ static int LANG_SEARCH(const char *path, const char *iso) {
     QLANG_T(i);
     strcpybuff(lang_str, "LANGUAGE_ISO");
     more = htslang_load(HTS_BUF(lang_str), path);
-    if (more && strfield(iso, lang_str)) {
+    /* an empty ISO code names no language */
+    if (more && lang_str[0] != '\0' && hts_starts_with_ci(iso, lang_str)) {
       found = i;
     }
     i++;
@@ -3346,14 +3328,5 @@ static int recv_bl(T_SOC soc, void *buffer, size_t len, time_t deadline) {
   }
   return -1;
 }
-
-/*int strfield(const char* f,const char* s) {
-  int r=0;
-  while (streql(*f,*s) && ((*f)!=0) && ((*s)!=0)) { f++; s++; r++; }
-  if (*s==0)
-    return r;
-  else
-    return 0;
-}*/
 
 /* same, except + */

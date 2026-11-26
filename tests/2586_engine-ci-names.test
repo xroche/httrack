@@ -1,0 +1,15 @@
+#!/bin/bash
+#
+# hts_streq_ci, hts_starts_with_ci and hts_skip_prefix_ci fold only A-Z, and
+# agree with strfield and strfield2 except on an empty prefix.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# The count is exact, so a shrinking table shows.
+selftest_queue_lines "cinames: 13 cases, 0 failures
+cinames: OK" cinames
+
+selftest_run_queued
