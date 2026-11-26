@@ -434,7 +434,17 @@ def first_branches(text):
     return "\n".join(lines)
 
 
+_TOP_LEVEL = {}
+
+
 def top_level(code):
+    """Return top_level_scan(code), parsed once per text since every rule asks."""
+    if code not in _TOP_LEVEL:
+        _TOP_LEVEL[code] = tuple(top_level_scan(code))
+    return _TOP_LEVEL[code]
+
+
+def top_level_scan(code):
     """Yield (start, head, body) per top-level declaration: body is None for a ;.
     Brackets match on the first branch of an unbalanced #if, but head and body
     hold every branch."""
