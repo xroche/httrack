@@ -1258,6 +1258,7 @@ static int warc_rotate(warc_writer *w) {
   char openbuf[HTS_URLMAXSIZE * 2 + sizeof(WARC_TMP_SUFFIX)];
   const unsigned next = w->seg + 1;
   FILE *f;
+  hts_boolean closed;
   snprintf(namebuf, sizeof(namebuf), "%s-%05u%s", w->seg_base, next,
            w->seg_ext);
   /* Open before advancing: w->seg must only ever name a segment that exists,
@@ -1265,8 +1266,7 @@ static int warc_rotate(warc_writer *w) {
   f = hts_fopen_private(warc_open_path(w, namebuf, HTS_BUF(openbuf)), "wb");
   if (f == NULL)
     return -1;
-  if (w->f != NULL)
-    fclose(w->f);
+  closed = w->f == NULL || fclose(w->f) == 0;
   w->f = f;
   w->seg = next;
   w->offset = 0;
@@ -1274,7 +1274,8 @@ static int warc_rotate(warc_writer *w) {
     freet(w->cur_seg);
     w->cur_seg = path_basename_dup(namebuf);
   }
-  return warc_write_warcinfo_record(w);
+  /* a failed close lost the finished segment's tail */
+  return closed ? warc_write_warcinfo_record(w) : -1;
 }
 
 /* ---- request stash (engine hooks) ---- */
@@ -1567,8 +1568,14 @@ void warc_close(warc_writer *w) {
   size_t i;
   if (w == NULL)
     return;
-  if (w->f != NULL)
-    fclose(w->f);
+  /* the last buffered records only reach the disk here */
+  if (w->f != NULL && fclose(w->f) != 0 && !w->failed) {
+    char buf[HTS_URLMAXSIZE * 2];
+    hts_log_print(w->opt, LOG_ERROR | LOG_ERRNO,
+                  "WARC: could not finish writing %s",
+                  warc_seg_path(w, w->seg, HTS_BUF(buf)));
+    w->failed = HTS_TRUE;
+  }
   w->f = NULL;
   if (warc_commit(w)) {
     warc_cdx_flush(w); /* sort + write <base>.cdx beside the archive */
@@ -1650,8 +1657,10 @@ int warc_write_transaction(warc_writer *w, const char *target_uri,
   char statusbuf[16];
   char mimebuf[256];
 
-  if (resp_hdr == NULL)
+  if (resp_hdr == NULL) {
+    w->failed = HTS_TRUE;
     return -1;
+  }
 
   /* CDXJ status/mime (from the caller's status and the response Content-Type).
    */
@@ -1718,6 +1727,7 @@ int warc_write_transaction(warc_writer *w, const char *target_uri,
   if (normalize_http_headers(resp_hdr, emit_body ? (long long) body.len : -1,
                              &http) != 0) {
     wbuf_free(&http);
+    w->failed = HTS_TRUE; /* a lost record must not replace a whole run */
     return -1;
   }
 
@@ -1784,6 +1794,12 @@ int warc_write_resource(warc_writer *w, const char *target_uri, const char *ip,
 
 /* ---- engine emit hook ---- */
 
+static void warc_log_lost(httrackp *opt, const char *uri) {
+  hts_log_print(opt, LOG_ERROR | LOG_ERRNO,
+                "WARC: could not write %s, so this run's archive stops there",
+                uri);
+}
+
 void warc_write_backtransaction(httrackp *opt, lien_back *back) {
   warc_writer *w;
   char uri[HTS_URLMAXSIZE * 4 + 16];
@@ -1807,8 +1823,8 @@ void warc_write_backtransaction(httrackp *opt, lien_back *back) {
     opt->state.warc = w;
   }
   w = (warc_writer *) opt->state.warc;
-
-  if (back->r.statuscode <= 0)
+  /* records after a lost one would sit past a cut or missing record */
+  if (w->failed || back->r.statuscode <= 0)
     return;
 
   is_ftp = strfield(back->url_adr, "ftp://") != 0;
@@ -1836,8 +1852,9 @@ void warc_write_backtransaction(httrackp *opt, lien_back *back) {
 
   /* FTP has no HTTP envelope: one resource record carrying the payload. */
   if (is_ftp) {
-    warc_write_resource(w, uri, ip, back->r.contenttype, body,
-                        back->r.warc_truncated);
+    if (warc_write_resource(w, uri, ip, back->r.contenttype, body,
+                            back->r.warc_truncated) != 0)
+      warc_log_lost(opt, uri);
     return;
   }
 
@@ -1869,7 +1886,8 @@ void warc_write_backtransaction(httrackp *opt, lien_back *back) {
     resp_hdr = synth;
   }
 
-  warc_write_transaction(w, uri, ip, back->r.warc_reqhdr, resp_hdr, body,
-                         back->r.contenttype, back->r.statuscode,
-                         unchanged_kind, back->r.warc_truncated);
+  if (warc_write_transaction(w, uri, ip, back->r.warc_reqhdr, resp_hdr, body,
+                             back->r.contenttype, back->r.statuscode,
+                             unchanged_kind, back->r.warc_truncated) != 0)
+    warc_log_lost(opt, uri);
 }

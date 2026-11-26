@@ -166,20 +166,21 @@ warc_body warc_body_mem(hts_span s);
    truncated: a WARC_TRUNC_* reason to tag a cap-truncated body, else 0.
    The body is stored verbatim: Content-Encoding is kept and Content-Length set
    to body.len, so body must be the as-received (coded) bytes.
-   Returns 0 on success, -1 on error. */
-int warc_write_transaction(warc_writer *w, const char *target_uri,
-                           const char *ip, const char *req_hdr,
-                           const char *resp_hdr, warc_body body,
-                           const char *content_type, int statuscode,
-                           int unchanged_kind, int truncated);
+   Returns 0 on success, -1 on error, which marks the archive incomplete. */
+HTS_CHECK_RESULT int
+warc_write_transaction(warc_writer *w, const char *target_uri, const char *ip,
+                       const char *req_hdr, const char *resp_hdr,
+                       warc_body body, const char *content_type, int statuscode,
+                       int unchanged_kind, int truncated);
 
 /* Write one non-HTTP capture as a single WARC 'resource' record: the block is
    the raw payload (no HTTP envelope), Content-Type is the payload's own MIME.
    Used for ftp:// transfers. truncated is a WARC_TRUNC_* reason or 0.
-   Returns 0 on success, -1 on error. */
-int warc_write_resource(warc_writer *w, const char *target_uri, const char *ip,
-                        const char *content_type, warc_body body,
-                        int truncated);
+   Returns 0 on success, -1 on error, which marks the archive incomplete. */
+HTS_CHECK_RESULT int warc_write_resource(warc_writer *w, const char *target_uri,
+                                         const char *ip,
+                                         const char *content_type,
+                                         warc_body body, int truncated);
 
 #ifdef __cplusplus
 }

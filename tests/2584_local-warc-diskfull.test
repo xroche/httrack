@@ -1,0 +1,53 @@
+#!/bin/bash
+#
+# A failed WARC write is logged once, whether it fails mid-crawl or at close.
+
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+require_httrack
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_warcfull.XXXXXX")
+cleanup() { rm -rf "$tmpdir"; }
+cleanup_push cleanup
+
+skip_on_windows "a native binary does not follow an MSYS symlink to /dev/full"
+test -c /dev/full || skip "no /dev/full device"
+probe="${tmpdir}/probe"
+ln -s /dev/full "$probe" 2>/dev/null || skip "cannot symlink /dev/full"
+if printf x >"$probe" 2>/dev/null; then
+    skip "a write through /dev/full succeeds here, so it stands in for nothing"
+fi
+rm -f "$probe"
+
+local_server_start --log "${tmpdir}/server.log"
+
+# Mirror with the archive on /dev/full, and leave the WARC error lines in $lost.
+crawl_warc_full() {
+    local name="$1" dir="${tmpdir}/$1"
+
+    shift
+    mkdir -p "$dir"
+    ln -s /dev/full "${dir}/full.warc.gz"
+    local_crawl --log "${tmpdir}/log-${name}" --quiet --robots=0 -O "$dir" \
+        --warc-file "${dir}/full.warc.gz" "$@" ||
+        fail "the ${name} crawl failed: $(<"${dir}/hts-log.txt")"
+    lost=$(command grep 'WARC: could not' "${dir}/hts-log.txt" || true)
+    test "$(wc -l <<<"$lost")" -eq 1 -a -n "$lost" ||
+        fail "the ${name} arm wanted one WARC error, got: ${lost}"
+}
+
+# About 30KB of random assets: a write fails while the crawl still runs.
+crawl_warc_full write -r3 '-*' '+*/big/a/*' '+*/big/p/*' \
+    "${BASEURL}/big/index.html"
+grep -q 'archive stops there' <<<"$lost" ||
+    fail "a mid-crawl write failure was not reported: ${lost}"
+ok "a mid-crawl write failure is logged once"
+
+# One small page fits the stdio buffer, so only the close sees the failure.
+crawl_warc_full close "${BASEURL}/mini304/index.html"
+grep -q 'could not finish writing .*full\.warc\.gz' <<<"$lost" ||
+    fail "a failure at close was not reported: ${lost}"
+ok "a failure at close is logged once"

@@ -143,7 +143,6 @@ src/htstools.h: link_has_authority
 src/htsurlport.h: hts_status_reason
 src/htswarc.h: warc_open
 src/htswarc.h: warc_truncated_reason
-src/htswarc.h: warc_write_transaction
 src/htsweb.h: main
 src/htswizard.h: hts_link_is_foreign_asset
 src/htswizard.h: hts_robots_forbids
