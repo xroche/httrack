@@ -1687,7 +1687,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                 readGluedOnOff(opt->browser_headers);
                 break;
               case 'I':
-                opt->kindex = HTS_TRUE;
+                opt->kindex = 1;
                 if (hts_isdigit((unsigned char) *(com + 1))) {
                   readGluedInt(opt->kindex, 2);
                 }

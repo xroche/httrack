@@ -66,7 +66,7 @@ void cache_mayadd(httrackp * opt, cache_back * cache, htsblk * r,
             adr_nologin(opt, url_adr), url_fil, url_save);
         return;
       }
-      // The only place that adds to the cache: any answer, 404 and 301 too.
+      // Cache any answer, 404 and 301 included.
       if (statuscode_is_http(r->statuscode)) {
         if (!r->is_file) {
           // stocker fichiers (et robots.txt)
