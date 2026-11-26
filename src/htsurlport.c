@@ -388,6 +388,7 @@ static const struct {
     {305, "Use Proxy"},
     {306, "Undefined 306 error"},
     {307, "Temporary Redirect"},
+    {308, "Permanent Redirect"},
     {400, "Bad Request"},
     {401, "Unauthorized"},
     {402, "Payment Required"},

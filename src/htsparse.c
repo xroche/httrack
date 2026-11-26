@@ -2378,11 +2378,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
               }
             }
 
-            if (p_type == 1) {
-              if (*html == '#') {
-                html++;          // sauter # pour usemap etc
-              }
-            }
  srcset_next:
             /* srcset: skip leading whitespace/commas before each candidate;
                the skipped bytes flush verbatim below */
