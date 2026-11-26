@@ -238,11 +238,11 @@ char *cookie_nextfield(char *a);
 /* basic auth */
 
 /** Register credentials (auth = base-64 user:pass) for the prefix derived from
-    adr (scheme, host) and fil (path). No-op returning 0 if cookie is NULL,
-   allocation fails, a matching prefix is already stored, bauth_prefix builds no
-   key, or either string is too long for bauth_chain; returns 1 on insertion. */
-int bauth_add(t_cookie *cookie, const char *adr, const char *fil,
-              const char *auth);
+    adr (scheme, host) and fil (path). HTS_TRUE once the prefix is stored, now
+    or earlier; HTS_FALSE if cookie is NULL, allocation fails, bauth_prefix
+    builds no key, or either string is too long for bauth_chain. */
+HTS_CHECK_RESULT hts_boolean bauth_add(t_cookie *cookie, const char *adr,
+                                       const char *fil, const char *auth);
 
 /** Return the base-64 credentials of the first stored prefix that starts
     adr+fil, or NULL when none does or cookie is NULL. An https request also

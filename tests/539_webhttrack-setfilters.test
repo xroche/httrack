@@ -77,6 +77,16 @@ done
 grep -q "3 scan rule(s) set and 0 added by user, 5 queued link(s) dropped" "${log}" ||
     fail_dump "the queued links were not dropped as the list says" "${log}"
 
+# A list holding a rule with no sign is refused whole, and the log says so.
+htsserver_client --path /step4.html --field "sid=${sid}" \
+    --field "command=set-filters=+* junk" >/dev/null
+start=$SECONDS
+while ! grep -qF "Scan rules refused: +* junk" "${log}"; do
+    test "$((SECONDS - start))" -lt 30 ||
+        fail_dump "a refused list left no log line" "${log}"
+    poll_wait 0.2
+done
+
 start=$SECONDS
 while ! grep -q "HTTrack Website Copier/" "${log}"; do
     test "$((SECONDS - start))" -lt 60 || fail "the crawl did not end"

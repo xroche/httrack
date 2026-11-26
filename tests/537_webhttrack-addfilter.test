@@ -83,6 +83,16 @@ add_rule "-*/trickle/*" 0
 # The 5 pages fetched ahead and z.bin drop, and keep/k1.html stays.
 add_rule "-*/junk/*" 6
 
+# A rule with no sign is refused, and the log says so.
+htsserver_client --path /step4.html --field "sid=${sid}" \
+    --field "command=add-filter=junk" >/dev/null
+start=$SECONDS
+while ! grep -qF "Scan rule refused: junk" "${log}"; do
+    test "$((SECONDS - start))" -lt 30 ||
+        fail_dump "a refused rule left no log line" "${log}"
+    poll_wait 0.2
+done
+
 start=$SECONDS
 while ! grep -q "HTTrack Website Copier/" "${log}"; do
     test "$((SECONDS - start))" -lt 60 || fail "the crawl did not end"

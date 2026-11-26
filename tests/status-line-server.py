@@ -64,6 +64,15 @@ CASES = {
     "icy": b"ICY 200 " + b"A" * 2100 + b"\r\n\r\n" + BODY,
     "longlt": b"\n<html>" + b"A" * 2100 + b"</html>\r\n\r\n" + BODY,
     "longsplt": b" <html>" + b"A" * 2100 + b"</html>\r\n\r\n" + BODY,
+    # a date no parser reads, and its control
+    "badlastmod": b"HTTP/1.1 200 OK\r\n"
+    + HTML
+    + b"Last-Modified: garbage\r\n\r\n"
+    + BODY,
+    "goodlastmod": b"HTTP/1.1 200 OK\r\n"
+    + HTML
+    + b"Last-Modified: Mon, 01 Jan 2024 00:00:00 GMT\r\n\r\n"
+    + BODY,
 }
 
 DEFAULT = b"HTTP/1.1 200 OK\r\n" + HTML + b"\r\n" + BODY

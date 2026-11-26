@@ -171,9 +171,12 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     break;
   }
   case 3: { /* basic auth */
-    (void) bauth_add(&jar, nlines > 0 ? lines[0] : "fuzz.example",
-                     nlines > 1 ? lines[1] : "/secure/",
-                     nlines > 2 ? lines[2] : "dXNlcjpwYXNz");
+    const hts_boolean added =
+        bauth_add(&jar, nlines > 0 ? lines[0] : "fuzz.example",
+                  nlines > 1 ? lines[1] : "/secure/",
+                  nlines > 2 ? lines[2] : "dXNlcjpwYXNz");
+
+    cookie_sink += (unsigned long) added;
     {
       char *auth = bauth_check(&jar, nlines > 0 ? lines[0] : "fuzz.example",
                                nlines > 1 ? lines[1] : "/secure/x.html");

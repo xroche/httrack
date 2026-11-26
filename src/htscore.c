@@ -452,7 +452,7 @@ void hts_finish_html_file(httrackp *opt, cache_back *cache, htsblk *r,
       }
     }
     if (strnotempty(r->lastmodified))
-      set_filetime_rfc822(save, r->lastmodified);
+      hts_stamp_filetime(opt, save, r->lastmodified);
   } else {
     int fcheck = check_fatal_io_errno();
 
@@ -973,8 +973,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
 
   // initialiser verif_backblue
   verif_backblue(opt, NULL);
-  verif_external(opt, 0, 0);
-  verif_external(opt, 1, 0);
+  opt->state.verif_external_status = 0;
 
   // et templates html
   template_header =
@@ -3122,12 +3121,10 @@ void hts_savename_listed(const char *root, const char *s, hts_buf dest) {
 }
 
 // noter fichier
-int filenote(filenote_strc * strc, const char *s, filecreate_params * params) {
-  // gestion du fichier liste liste
+void filenote(filenote_strc *strc, const char *s, filecreate_params *params) {
   if (params) {
     strcpybuff(strc->path, params->path);
     strc->lst = params->lst;
-    return 0;
   } else if (strc->lst) {
     char BIGSTK savelst[HTS_URLMAXSIZE * 2];
 
@@ -3135,7 +3132,6 @@ int filenote(filenote_strc * strc, const char *s, filecreate_params * params) {
     fprintf(strc->lst, "[%s]" LF, savelst);
     fflush(strc->lst);
   }
-  return 1;
 }
 
 /* Note: utf-8 */
@@ -3170,7 +3166,13 @@ void usercommand(httrackp * opt, int _exe, const char *_cmd, const char *file,
   if (strc->exe) {
     if (file != NULL && strnotempty(file)) {
       if (strnotempty(strc->cmd)) {
-        usercommand_exe(opt, strc->cmd, file);
+        const int status = usercommand_exe(opt, strc->cmd, file);
+
+        /* -1 was logged by usercommand_exe() */
+        if (status > 0)
+          hts_log_print(opt, LOG_WARNING,
+                        "User command exited with status %d: %.64s", status,
+                        strc->cmd);
       }
     }
   }

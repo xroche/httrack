@@ -67,9 +67,10 @@ int checkrobots(const robots_wizard *robots, const char *adr, const char *fil);
 /* Free every node's strings, plus every node below `robots` but not `robots`.
  */
 void checkrobots_free(robots_wizard * robots);
-/* Store `data` as the rule blob of `adr`, adding the host if new. -1 on
-   success, 0 if the allocation failed. */
-int checkrobots_set(robots_wizard * robots, const char *adr, const char *data);
+/* Store `data` as the rule blob of `adr`, adding the host if new. HTS_FALSE if
+   the allocation failed. */
+HTS_CHECK_RESULT hts_boolean checkrobots_set(robots_wizard *robots,
+                                             const char *adr, const char *data);
 /* Parse robots.txt `body` for `adr`, storing the HTTrack group's rules; `info`
    (size 0: none) gets a summary of the disallows actually kept,
    `keep_root_disallow` FALSE drops "Disallow: /", and `sitemaps` (size 0:

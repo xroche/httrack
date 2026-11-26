@@ -160,10 +160,12 @@ hts_boolean back_delayed_rename(httrackp *opt, lien_back *back,
                                 const char *newname);
 int back_clear_entry(lien_back *back);
 void back_delete_all(httrackp * opt, cache_back * cache, struct_back * sback);
-int back_maydelete(httrackp *opt, cache_back *cache, struct_back *sback,
+/* Keep slot p alive for keep-alive when allowed, else delete it. */
+void back_maydelete(httrackp *opt, cache_back *cache, struct_back *sback,
+                    const int p);
+/* Close slot p's transfer and store it; a refusal is logged here. */
+void back_finalize(httrackp *opt, cache_back *cache, struct_back *sback,
                    const int p);
-int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
-                  const int p);
 /* Did the fetch fail to produce a response, as opposed to the engine
    deliberately passing the resource over? Only the latter may be purged, so
    this also decides whether the previous copy survives the update (#746). */

@@ -78,7 +78,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   /* The raw store path: marker + pattern lines, exactly what robots_parse
      feeds checkrobots_set. */
   memset(&raw, 0, sizeof(raw));
-  if (checkrobots_set(&raw, "raw.example", body) == -1) {
+  if (checkrobots_set(&raw, "raw.example", body)) {
     robots_sink += (unsigned long) checkrobots(&raw, "raw.example", "/a/b");
     robots_sink += (unsigned long) checkrobots(&raw, "raw.example", "/");
   }

@@ -1143,8 +1143,8 @@ hts_boolean back_set_decoded_size(htsblk *r, LLint size) {
 //
 // fermer les paramètres de transfert,
 // et notamment vérifier les fichiers compressés (décompresser), callback etc.
-int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
-                  const int p) {
+void back_finalize(httrackp *opt, cache_back *cache, struct_back *sback,
+                   const int p) {
   char catbuff[CATBUFF_SIZE];
   lien_back *const back = sback->lnk;
   const int back_max = sback->count;
@@ -1194,7 +1194,7 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
          file we refused to overwrite with the partial body (#562). */
       if (fexist_utf8(back[p].url_sav))
         filenote(&opt->state.strc, back[p].url_sav, NULL);
-      return -1;
+      return;
     }
 
     if ((back_status(&back[p]) == STATUS_READY) // ready
@@ -1386,7 +1386,7 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
              body on every later --update. */
           if (fexist_utf8(back[p].url_sav))
             filenote(&opt->state.strc, back[p].url_sav, NULL);
-          return -1;
+          return;
         }
         /* Write mode to disk */
         if (back[p].r.is_write && back[p].r.adr != NULL) {
@@ -1584,7 +1584,7 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
         if (StringNotEmpty(opt->warc_file))
           warc_write_backtransaction(opt, &back[p]);
 
-        return 0;
+        return;
       } else {                  // testmode
         if (back[p].r.statuscode / 100 >= 3) {  /* Store 3XX, 4XX, 5XX test response codes, but NOT 2XX */
           /* Cache */
@@ -1609,7 +1609,6 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
     cache_keep_previous(opt, cache, back[p].url_adr, back[p].url_fil,
                         back[p].url_sav);
   }
-  return -1;
 }
 
 /* try to keep the connection alive */
@@ -2275,8 +2274,8 @@ int back_unserialize_ref(httrackp * opt, const char *adr, const char *fil,
 }
 
 // clear, or leave for keep-alive
-int back_maydelete(httrackp * opt, cache_back * cache, struct_back * sback,
-                   const int p) {
+void back_maydelete(httrackp *opt, cache_back *cache, struct_back *sback,
+                    const int p) {
   lien_back *const back = sback->lnk;
   const int back_max = sback->count;
 
@@ -2309,12 +2308,11 @@ int back_maydelete(httrackp * opt, cache_back * cache, struct_back * sback,
         hts_log_print(opt, LOG_DEBUG,
                       "(Keep-Alive): successfully saved #%d (%s)",
                       back[p].r.debugid, adr_nologin(opt, back[p].url_adr));
-        return 1;
+        return;
       }
     }
     back_delete(opt, cache, sback, p);
   }
-  return 0;
 }
 
 // clear, or leave for keep-alive
@@ -2581,9 +2579,8 @@ static int back_flush_output(httrackp *opt, cache_back *cache,
     }
     /* set file time */
     if (back[p].r.is_write) {
-      /* a missing file only fails the call */
       if (strnotempty(back[p].url_sav) && strnotempty(back[p].r.lastmodified))
-        (void) set_filetime_rfc822(back[p].url_sav, back[p].r.lastmodified);
+        hts_stamp_filetime(opt, back[p].url_sav, back[p].r.lastmodified);
       /* executer commande utilisateur après chargement du fichier */
       //xx usercommand(opt,0,NULL,back[p].url_sav, back[p].url_adr, back[p].url_fil);
       back[p].r.is_write = 0;
@@ -3237,8 +3234,7 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
           if (sz > 0) {         // Fichier non vide? (question bête, sinon on transfert tout!)
             char lastmodified[256];
 
-            get_filetime_rfc822(save, HTS_BUF(lastmodified));
-            if (strnotempty(lastmodified)) { /* pas de If-.. possible */
+            if (get_filetime_rfc822(save, HTS_BUF(lastmodified))) {
               hts_log_print(opt, LOG_DEBUG,
                             "File partially present (" LLintP " bytes): %s%s",
                             (LLint) sz, adr_nologin(opt, back[p].url_adr),

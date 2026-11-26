@@ -552,13 +552,11 @@ int verif_backblue(httrackp *opt, const char *base) {
   return ret;
 }
 
-// flag
-int verif_external(httrackp * opt, int nb, int test) {
+int verif_external(httrackp *opt, int nb) {
   const int flag = 1 << nb;
   int *const status = &opt->state.verif_external_status;
-  if (!test)
-    *status &= ~flag;             // reset
-  else if ((*status & flag) == 0) {
+
+  if ((*status & flag) == 0) {
     *status |= flag;
     return 1;
   }

@@ -400,8 +400,10 @@ void hts_sitemap_seed(httrackp *opt, const char *starturl) {
   if (hts_record_link(opt, af.adr, "/robots.txt", "", "", "", NULL)) {
     hts_link_set_self_parented(opt, 0, 0);
     /* Claim the host so the parser does not queue robots.txt a second time. */
-    if (opt->robotsptr != NULL)
-      (void) checkrobots_set((robots_wizard *) opt->robotsptr, af.adr, "");
+    if (opt->robotsptr != NULL &&
+        !checkrobots_set((robots_wizard *) opt->robotsptr, af.adr, ""))
+      hts_log_print(opt, LOG_WARNING, "No memory to record robots.txt for %s",
+                    adr_nologin(opt, af.adr));
   }
 }
 

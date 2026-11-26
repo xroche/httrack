@@ -194,7 +194,8 @@ static void setfilters_from_text(httrackp *opt, const char *text) {
         argv[k++] = argv[i];
     }
     argv[k] = NULL;
-    hts_setfilters(opt, (const char *const *) argv);
+    if (!hts_setfilters(opt, (const char *const *) argv))
+      hts_log_print(opt, LOG_WARNING, "Scan rules refused: %s", text);
   }
   freet(argv);
   freet(copy);
@@ -272,7 +273,9 @@ HTS_UNUSED static int recv_bl(T_SOC soc, void *buffer, size_t len,
                               time_t deadline);
 
 /* Language files */
-HTS_UNUSED static int htslang_load(hts_buf limit_to, const char *apppath);
+/* Load the catalogs, or with limit_to read that key: 0 if nothing was read. */
+HTS_UNUSED HTS_CHECK_RESULT static int htslang_load(hts_buf limit_to,
+                                                    const char *apppath);
 HTS_UNUSED static void conv_printf(const char *from, char *to);
 HTS_UNUSED static void LANG_DELETE(void);
 HTS_UNUSED static void LANG_INIT(const char *path);
@@ -1928,16 +1931,20 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 
               ptraddr[0] = (char *) adr + p;
               ptraddr[1] = NULL;
-              hts_addurl(global_opt, ptraddr);
+              if (!hts_addurl(global_opt, ptraddr))
+                hts_log_print(global_opt, LOG_WARNING,
+                              "No memory to add the URL");
             }
           } else if ((p = strfield((char *) adr, "set-filters="))) {
             if (global_opt != NULL) {
               setfilters_from_text(global_opt, (char *) adr + p);
             }
           } else if ((p = strfield((char *) adr, "add-filter="))) {
-            if (global_opt != NULL) {
-              hts_addfilter(global_opt, (char *) adr + p);
-            }
+            const char *const rule = (char *) adr + p;
+
+            if (global_opt != NULL && !hts_addfilter(global_opt, rule))
+              hts_log_print(global_opt, LOG_WARNING, "Scan rule refused: %s",
+                            rule);
           } else if ((p = strfield((char *) adr, "httrack"))) {
             if (!commandRunning) {
               intptr_t adrcd = 0;
@@ -3112,7 +3119,7 @@ static int htslang_load(hts_buf limit_to, const char *path) {
         fclose(fp);
       }
     }
-    return 0;
+    return limit_to.p[0] != '\0';
   }
 
   /* Error */
@@ -3244,7 +3251,8 @@ static void LANG_INIT(const char *path) { LANG_T(path, 0); }
 static int LANG_T(const char *path, int l) {
   if (l >= 0) {
     QLANG_T(l);
-    htslang_load(hts_buf_none(), path);
+    if (!htslang_load(hts_buf_none(), path))
+      fprintf(stderr, "unable to load language %d from %s\n", l, path);
   }
   return QLANG_T(-1);           // 0=default (english)
 }
@@ -3254,16 +3262,17 @@ static int LANG_SEARCH(const char *path, const char *iso) {
   int i = 0;
   int curr_lng = LANG_T(path, -1);
   int found = 0;
+  int more;
 
   do {
     QLANG_T(i);
     strcpybuff(lang_str, "LANGUAGE_ISO");
-    htslang_load(HTS_BUF(lang_str), path);
-    if (strfield(iso, lang_str)) {
+    more = htslang_load(HTS_BUF(lang_str), path);
+    if (more && strfield(iso, lang_str)) {
       found = i;
     }
     i++;
-  } while(strlen(lang_str) > 0);
+  } while (more);
   QLANG_T(curr_lng);
   return found;
 }
@@ -3272,19 +3281,20 @@ static int LANG_LIST(const char *path, hts_buf buffer) {
   char lang_str[1024];
   int i = 0;
   int curr_lng = LANG_T(path, -1);
+  int more;
 
   buffer.p[0] = '\0';
   do {
     QLANG_T(i);
     strlcpybuff(lang_str, "LANGUAGE_NAME", sizeof(lang_str));
-    htslang_load(HTS_BUF(lang_str), path);
-    if (strlen(lang_str) > 0) {
+    more = htslang_load(HTS_BUF(lang_str), path);
+    if (more) {
       if (buffer.p[0])
         hts_buf_cat(buffer, "\n");
       hts_buf_cat(buffer, lang_str);
     }
     i++;
-  } while(strlen(lang_str) > 0);
+  } while (more);
   QLANG_T(curr_lng);
   return i;
 }

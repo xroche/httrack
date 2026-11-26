@@ -1933,6 +1933,8 @@ static int st_urlbounds(httrackp *opt, int argc, char **argv) {
   assertf(strcmp(prefix, "http://www.example.com/secure/") == 0);
   assertf(bauth_add(cookie, adr, fil, "dXNlcjpwYXNz") == 1);
   assertf(bauth_check(cookie, adr, fil) != NULL);
+  /* a prefix already stored is no failure */
+  assertf(bauth_add(cookie, adr, fil, "dXNlcjpwYXNz") == 1);
 
   /* A login learned on https is not offered to plain http, and vice versa. */
   assertf(bauth_add(cookie, "https://www.example.com", "/s/p.html",

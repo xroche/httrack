@@ -1343,8 +1343,11 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
                 hts_basic_auth_value(opt, adr, HTS_BUF(autorisation));
 
             if (got > 0) {
-              if (strcmp(fil, "/robots.txt")) /* pas robots.txt */
-                bauth_add(cookie, adr, fil, autorisation);
+              if (cookie != NULL && strcmp(fil, "/robots.txt") != 0 &&
+                  !bauth_add(cookie, adr, fil, autorisation))
+                hts_log_print(opt, LOG_WARNING,
+                              "authorization not kept for later requests to %s",
+                              a);
             } else if (got < 0) {
               /* 'a' is past the '@': the log gets the host, not the secret. */
               hts_log_print(
@@ -3199,6 +3202,13 @@ int set_filetime_rfc822(const char *file, const char *date) {
     return set_filetime(file, tm_s);
   } else
     return -1;
+}
+
+void hts_stamp_filetime(httrackp *opt, const char *file, const char *date) {
+  /* an unparsable date is common, so debug: the file keeps its fetch time */
+  if (set_filetime_rfc822(file, date) != 0)
+    hts_log_print(opt, LOG_DEBUG, "Could not set the date of %s to %s", file,
+                  date);
 }
 
 /* Note: utf-8 */

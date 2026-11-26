@@ -434,9 +434,10 @@ FILE *filecreate(filenote_strc * strct, const char *s);
 FILE *fileappend(filenote_strc * strct, const char *s);
 
 /* Create an empty file, return 1 on success, 0 on failure. */
-int filecreateempty(filenote_strc * strct, const char *filename);
+HTS_CHECK_RESULT int filecreateempty(filenote_strc *strct,
+                                     const char *filename);
 
-int filenote(filenote_strc * strct, const char *s, filecreate_params * params);
+void filenote(filenote_strc *strct, const char *s, filecreate_params *params);
 
 /* Copy into dest the form under which the local path s is listed in new.lst:
    forward slashes, with the mirror `root` stripped when s sits under it. Also
@@ -464,7 +465,8 @@ HTS_CHECK_RESULT int usercommand_expand(hts_buf dest, const char *cmd,
                                         const char *file, const char **why);
 /* Run a -V template against a save name; returns the shell's exit status, or
    -1 when the command was not run at all. */
-int usercommand_exe(httrackp *opt, const char *cmd, const char *file);
+HTS_CHECK_RESULT int usercommand_exe(httrackp *opt, const char *cmd,
+                                     const char *file);
 #ifndef _WIN32
 /* Room for "sh", "-c", the command, the shell's $0, its $1 and the NULL. */
 #define USERCOMMAND_ARGV_MAX 6

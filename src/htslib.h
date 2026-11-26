@@ -686,11 +686,14 @@ void time_local_rfc822(hts_buf s);
 /* Current UTC time as "YYYY-MM-DDThh:mm:ssZ". */
 void hts_now_iso8601(char out[32]);
 
-int set_filetime_rfc822(const char *file, const char *date);
+/* Set file mtime from an RFC 822 date; -1 if the date or the write fails. */
+HTS_CHECK_RESULT int set_filetime_rfc822(const char *file, const char *date);
+/* set_filetime_rfc822(), logging a failure at debug level. */
+void hts_stamp_filetime(httrackp *opt, const char *file, const char *date);
 /* File mtime as a UTC time_t, or (time_t) -1 if it can not be read. */
 time_t get_filetime(const char *file);
 /* Writes file mtime as an RFC 822 GMT date into DATE, or returns 0. */
-int get_filetime_rfc822(const char *file, hts_buf date);
+HTS_CHECK_RESULT int get_filetime_rfc822(const char *file, hts_buf date);
 /* Writes A as an RFC 822 GMT date, clipped to size bytes. */
 HTS_INLINE void time_rfc822(hts_buf s, struct tm *A);
 
@@ -701,8 +704,8 @@ int binput(const char *buff, hts_buf s);
    does not fit S. HTS_TRUE means it was cut: the value is not what was
    written, so drop it rather than parse a prefix of it. The advance is reported
    through *offset. */
-hts_boolean binput_line(const char *buff, const char *end, hts_buf s,
-                        int *offset);
+HTS_CHECK_RESULT hts_boolean binput_line(const char *buff, const char *end,
+                                         hts_buf s, int *offset);
 /* Does treathead() read the header that "line" starts with? Keep in step. */
 hts_boolean hts_header_is_read(const char *line);
 const char *strstrcase(const char *s, const char *o);
