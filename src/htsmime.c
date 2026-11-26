@@ -52,7 +52,7 @@ static const char *const hts_ext_dynamic[] = {
 /* types MIME
    note: application/octet-stream should not be used here
 */
-static const char *hts_mime[][2] = {
+static const char *const hts_mime[][2] = {
     {"application/acad", "dwg"},
     {"application/arj", "arj"},
     {"application/clariscad", "ccad"},
@@ -360,7 +360,7 @@ static const char *hts_mime[][2] = {
     {"", ""}};
 
 /* Post-2010 formats. Scanned after hts_mime[], so a legacy mapping wins. */
-static const char *hts_mime_modern[][2] = {
+static const char *const hts_mime_modern[][2] = {
     {"image/webp", "webp"},
     {"image/avif", "avif"},
     {"image/heic", "heic"},
@@ -407,7 +407,7 @@ void guess_httptype(httrackp *opt, char *s, const char *fil) {
 // first match in a NUL-terminated {mime,ext} table. key selects the lookup
 // column (0=mime, 1=ext); returns the other column, or NULL if no row matches
 // (a "*" partner means the row carries no value).
-static const char *hts_mime_lookup(const char *(*table)[2], int key,
+static const char *hts_mime_lookup(const char *const (*table)[2], int key,
                                    hts_span needle) {
   int j;
 
