@@ -930,7 +930,8 @@ static int theme_name_cmp(const void *a, const void *b) {
 static char *list_themes(const char *path) {
   char dir[1024];
   TypedArray(char *) names = EMPTY_TYPED_ARRAY;
-  size_t i;
+  char **v;
+  size_t n, i;
   int pass;
   String list = STRING_EMPTY;
   char *result;
@@ -959,22 +960,22 @@ static char *list_themes(const char *path) {
     } while (hts_findnext(h));
     hts_findclose(h);
   }
-  if (TypedArraySize(names) != 0) {
-    qsort(TypedArrayElts(names), TypedArraySize(names), TypedArrayWidth(names),
-          theme_name_cmp);
+  v = TypedArrayElts(names);
+  n = TypedArraySize(names);
+  if (n != 0) {
+    qsort(v, n, sizeof(v[0]), theme_name_cmp);
   }
-  for (i = 0; i < TypedArraySize(names); i++) {
+  for (i = 0; i < n; i++) {
     /* a user's theme may share its name with an installed one */
-    if (i == 0 ||
-        strcmp(TypedArrayNth(names, i), TypedArrayNth(names, i - 1)) != 0) {
+    if (i == 0 || strcmp(v[i], v[i - 1]) != 0) {
       if (StringNotEmpty(list)) {
         StringCat(list, "\n");
       }
-      cat_theme_entry(&list, TypedArrayNth(names, i));
+      cat_theme_entry(&list, v[i]);
     }
   }
-  for (i = 0; i < TypedArraySize(names); i++) {
-    freet(TypedArrayNth(names, i));
+  for (i = 0; i < n; i++) {
+    freet(v[i]);
   }
   TypedArrayFree(names);
   result = strdupt(StringNotEmpty(list) ? StringBuff(list) : "");

@@ -15,7 +15,7 @@ aborts() {
     local out rc=0
     out=$(httrack -O /dev/null -#test=idna-oom "$@" 2>&1) || rc=$?
     case "$out" in
-    *"failed at"*htscharset.c*)
+    *"charset output cannot grow failed at"*htscharset.c*)
         test "$rc" -ne 0 || fail "idna-oom $*: the assert fired but exited 0"
         ;;
     *) fail "idna-oom $*: expected an abort, got: $out" ;;
@@ -28,6 +28,8 @@ long=hex:$(printf 'c3a9%.0s' $(seq 18))2e636f6d
 
 selftest_queue "idna-oom: xn--hllo-bpa.com" idna-oom encode 0 "$hello"
 selftest_queue "idna-oom: NULL" idna-oom decode 1 xn--caf-dma.com
+# Refused with output already held, which must be freed.
+selftest_queue "idna-oom: NULL" idna-oom decode 2 abc.xn--caf-dma.com
 selftest_run_queued
 
 # The first push, then the punycode encoder's own regrowth of a long label.

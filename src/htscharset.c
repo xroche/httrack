@@ -933,7 +933,13 @@ static size_t utf8_encode(hts_UCS4 uc, unsigned char *out) {
 
 /* IDNA helpers, over a TypedArray dest. Running out of memory aborts. */
 #undef ADD_BYTE
-#define ADD_BYTE(C) assertf(TypedArrayPush(dest, (C)))
+#undef GROWN
+#define GROWN(OK)                                                              \
+  do {                                                                         \
+    if (!(OK))                                                                 \
+      abortLog("charset output cannot grow");                                  \
+  } while (0)
+#define ADD_BYTE(C) GROWN(TypedArrayPush(dest, (C)))
 #define FREE_BUFFER() TypedArrayFree(dest)
 
 char *hts_convertStringUTF8ToIDNA(hts_span s) {
@@ -988,7 +994,7 @@ char *hts_convertStringUTF8ToIDNA(hts_span s) {
                       (punycode_uint) segOutputSize, segInt, &output_length,
                       &TypedArrayTail(dest))) == punycode_big_output) {
             /* asking past the room doubles the store */
-            assertf(TypedArrayReserve(dest, TypedArrayRoom(dest) + 1));
+            GROWN(TypedArrayReserve(dest, TypedArrayRoom(dest) + 1));
             output_length = (punycode_uint) TypedArrayRoom(dest);
           }
 
@@ -1080,8 +1086,7 @@ char *hts_convertStringIDNAToUTF8(hts_span s) {
         punycode_uint output_length;
         TypedArray(punycode_uint) output = EMPTY_TYPED_ARRAY;
 
-        /* no caller passes a 1 GB label, but it would wrap the 32-bit lengths
-         */
+        /* a 1 GB label would wrap the 32-bit lengths */
         if (segSize > ((punycode_uint) -1) / 4) {
           FREE_BUFFER();
           return NULL;
@@ -1096,7 +1101,7 @@ char *hts_convertStringIDNAToUTF8(hts_span s) {
                                        &s.p[startSeg + 4], &output_length,
                                        TypedArrayElts(output))) ==
              punycode_big_output;) {
-          assertf(TypedArrayReserve(output, TypedArrayCapa(output) + 1));
+          GROWN(TypedArrayReserve(output, TypedArrayRoom(output) + 1));
           output_length = (punycode_uint) TypedArrayCapa(output);
         }
 
@@ -1270,4 +1275,5 @@ void hts_json_string(String *out, const char *s) {
 }
 
 #undef ADD_BYTE
+#undef GROWN
 #undef FREE_BUFFER
