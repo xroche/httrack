@@ -89,6 +89,7 @@ coucal NewLangList = NULL;
 #include "htscmdline.h"
 #include "htslines.h"
 #include "htsthread.h"
+#include "htsckd.h"
 
 /* This server's line readers drop TAB, form feed and NUL. */
 #define HTS_LINES_SERVER                                                       \
@@ -205,8 +206,7 @@ static void setfilters_from_text(httrackp *opt, const char *text) {
 /* Send all of buf, resuming after a short write. */
 static hts_boolean send_all(T_SOC soc, const char *buf, size_t len) {
   while (len > 0) {
-    const int chunk = len > INT_MAX ? INT_MAX : (int) len;
-    const int n = (int) send(soc, buf, chunk, 0);
+    const int n = (int) send(soc, buf, hts_sat_int(len), 0);
 
     if (n <= 0) {
 #ifndef _WIN32
@@ -3335,7 +3335,7 @@ static int recv_bl(T_SOC soc, void *buffer, size_t len, time_t deadline) {
     size_t offs = 0;
 
     while (n > 0 && size > 0 && hts_shared_readable(soc, deadline)) {
-      n = recv(soc, ((char *) buffer) + offs, (int) size, 0);
+      n = (int) recv(soc, ((char *) buffer) + offs, hts_sat_int(size), 0);
       if (n > 0) {
         offs += n;
         size -= n;

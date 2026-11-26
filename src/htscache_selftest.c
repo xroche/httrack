@@ -1727,10 +1727,11 @@ static int cache_legacy_refused_selftest(httrackp *opt, const char *dir) {
 static char corrupt_body_a[33 + 1];
 static char corrupt_body_b[44 + 1];
 
-/* Write a fresh two-entry cache: /canary.html then /victim.html. The victim
-   carries `etag`, whose byte length is what a forged same-length header line
-   overwriting it must match. */
-static void corrupt_build(httrackp *opt, const char *etag) {
+/* Write a fresh two-entry cache: /canary.html then the victim, fil with
+   contenttype ctype. The victim carries `etag`, whose byte length is what a
+   forged same-length header line overwriting it must match. */
+static void corrupt_build_as(httrackp *opt, const char *etag, const char *fil,
+                             const char *ctype) {
   cache_back cache;
 
   memset(corrupt_body_a, 'a', sizeof(corrupt_body_a) - 1);
@@ -1741,10 +1742,13 @@ static void corrupt_build(httrackp *opt, const char *etag) {
   store_entry(opt, &cache, CORRUPT_ADR, "/canary.html", "canary.html", 200,
               "OK", "text/html", "utf-8", "", "", "", "",
               hts_span_of(corrupt_body_a));
-  store_entry(opt, &cache, CORRUPT_ADR, "/victim.html", "victim.html", 200,
-              "OK", "text/html", "utf-8", "", etag, "", "",
-              hts_span_of(corrupt_body_b));
+  store_entry(opt, &cache, CORRUPT_ADR, fil, fil + 1, 200, "OK", ctype, "utf-8",
+              "", etag, "", "", hts_span_of(corrupt_body_b));
   selftest_close(&cache);
+}
+
+static void corrupt_build(httrackp *opt, const char *etag) {
+  corrupt_build_as(opt, etag, "/victim.html", "text/html");
 }
 
 /* Like corrupt_build with a 20-char Etag, but the victim is headers-only
@@ -1934,6 +1938,31 @@ static int corrupt_expect_victim(httrackp *opt, const char *wantmsg,
   return corrupt_expect_victim_fil(opt, "/victim.html", wantmsg, what);
 }
 
+/* Read the /victim.bin body straight to a file, as a non-html update does. */
+static int corrupt_expect_victim_to_disk(httrackp *opt, const char *wantmsg,
+                                         const char *what) {
+  cache_back cache;
+  htsblk v;
+  char BIGSTK save[HTS_URLMAXSIZE * 2];
+  char BIGSTK loc[HTS_URLMAXSIZE * 2];
+  int fail = 0;
+
+  concat(save, sizeof(save), StringBuff(opt->path_html_utf8),
+         CORRUPT_ADR "/victim.bin");
+  selftest_open_for_read(&cache, opt);
+  loc[0] = '\0';
+  v = cache_readex(opt, &cache, CORRUPT_ADR, "/victim.bin", save, HTS_BUF(loc),
+                   hts_buf_none(), 0);
+  if (v.statuscode != STATUSCODE_INVALID || strcmp(v.msg, wantmsg) != 0) {
+    fprintf(stderr, "%s: %s: victim: %d '%s', expected %d '%s'\n", selftest_tag,
+            what, v.statuscode, v.msg, STATUSCODE_INVALID, wantmsg);
+    fail++;
+  }
+  freet(v.adr);
+  selftest_close(&cache);
+  return fail;
+}
+
 /* Headers-only probe of the disk victim: must parse OK with the size kept. */
 static int corrupt_expect_disk_header(httrackp *opt, LLint wantsize,
                                       const char *what) {
@@ -2051,6 +2080,12 @@ static int cache_corruption_selftest(httrackp *opt, const char *dir) {
   corrupt_victim_body(opt);
   failures += corrupt_expect_victim(opt, "Cache Read Error : Read Data",
                                     "garbled deflate stream");
+
+  /* the chunked copy to disk must stop on zlib's negative error code */
+  corrupt_build_as(opt, "", "/victim.bin", "application/octet-stream");
+  corrupt_victim_body(opt);
+  failures += corrupt_expect_victim_to_disk(opt, "Cache Read Error : Read Data",
+                                            "garbled deflate stream to disk");
 
   corrupt_build(opt, "");
   corrupt_victim_crc(opt);

@@ -32,6 +32,7 @@ Please visit our Website: http://www.httrack.com
 /* ------------------------------------------------------------ */
 
 #include "htsnet.h"
+#include "htsckd.h"
 
 #include <stdio.h>
 
@@ -41,8 +42,8 @@ HTSNET_API void SOCaddr_inetntoa_(char *namebuf, size_t namebuflen,
   assertf_(namebuf != NULL, file, line);
   assertf_(ss != NULL, file, line);
 
-  if (getnameinfo(&ss->m_addr.sa, sizeof(ss->m_addr), namebuf, namebuflen, NULL,
-                  0, NI_NUMERICHOST) == 0) {
+  if (getnameinfo(&ss->m_addr.sa, sizeof(ss->m_addr), namebuf,
+                  hts_sat_int(namebuflen), NULL, 0, NI_NUMERICHOST) == 0) {
     /* remove scope id(s) */
     char *const pos = strchr(namebuf, '%');
     if (pos != NULL) {

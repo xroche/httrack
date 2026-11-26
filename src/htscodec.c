@@ -32,6 +32,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsbase.h"
 #include "htscore.h"
+#include "htsckd.h"
 #include "htscodec.h"
 #include "htsio.h"
 #include "htszlib.h"
@@ -162,6 +163,7 @@ static int codec_unpack_brotli(FILE *in, FILE *out, LLint maxout,
       BrotliDecoderCreateInstance(NULL, NULL, NULL);
   hts_boolean ok = HTS_TRUE, done = HTS_FALSE, last = HTS_FALSE;
   LLint total = 0;
+  int n;
 
   if (state == NULL)
     return -1;
@@ -202,8 +204,8 @@ static int codec_unpack_brotli(FILE *in, FILE *out, LLint maxout,
       ok = HTS_FALSE;
   }
   BrotliDecoderDestroyInstance(state);
-  if (ok && done && !ferror(in))
-    return (int) total;
+  if (ok && done && !ferror(in) && !hts_ckd_int(&n, total))
+    return n;
   return total > maxout ? HTS_CODEC_TOOBIG : -1;
 }
 
@@ -230,6 +232,7 @@ static int codec_unpack_zstd(FILE *in, FILE *out, LLint maxout, int *io_errno) {
   hts_boolean ok = HTS_TRUE, eof = HTS_FALSE;
   size_t zret = 1; /* 0 once a frame is fully flushed */
   LLint total = 0;
+  int n;
 
   if (zds == NULL)
     return -1;
@@ -270,8 +273,8 @@ static int codec_unpack_zstd(FILE *in, FILE *out, LLint maxout, int *io_errno) {
   }
   ZSTD_freeDStream(zds);
   /* zret != 0 at EOF: the last frame never completed */
-  if (ok && zret == 0 && !ferror(in))
-    return (int) total;
+  if (ok && zret == 0 && !ferror(in) && !hts_ckd_int(&n, total))
+    return n;
   return total > maxout ? HTS_CODEC_TOOBIG : -1;
 }
 

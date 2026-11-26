@@ -601,7 +601,7 @@ static int __cdecl htsshow_loop(
 
   //
   TStamp mytime;
-  long int rate = 0;
+  int rate = 0;
 
   //
   int stat_written = -1;

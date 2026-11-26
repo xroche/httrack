@@ -323,7 +323,7 @@ static int __cdecl htsshow_loop(t_hts_callbackarg * carg, httrackp * opt, lien_b
 
   //
   TStamp mytime;
-  long int rate = 0;
+  int rate = 0;
   char st[256];
 
   //

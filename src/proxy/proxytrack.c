@@ -1282,9 +1282,8 @@ static int proxytrack_start_ICP(PT_Indexes indexes, T_SOC soc) {
     int n;
 
     memset(&clientAddr, 0, sizeof(clientAddr));
-    n = recvfrom(soc, (char *) buffer, bufferSize, 0, 
-                 &SOCaddr_sockaddr(clientAddr),
-                 &clientAddrLen);
+    n = (int) recvfrom(soc, (char *) buffer, bufferSize, 0,
+                       &SOCaddr_sockaddr(clientAddr), &clientAddrLen);
     if (n != -1) {
       const char *LogRequest = "ERROR";
       const char *LogReply = "ERROR";

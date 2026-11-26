@@ -1208,7 +1208,7 @@ static int run_launch_ftp(FTPDownloadStruct *pStruct) {
 
               // réception
               if (len) {
-                len = recv(soc_dat, buff, read_len, 0);
+                len = (int) recv(soc_dat, buff, read_len, 0);
                 if (len > 0) {
                   /* This worker is the only writer, so its read is safe. */
                   hts_store_relaxed_llint(&back->r.size, back->r.size + len);
