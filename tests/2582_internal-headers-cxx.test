@@ -26,6 +26,11 @@ cleanup_push rm -rf "$tmp"
 
 src=$abs_top_srcdir/src
 inc=(-I"$src" -I"$src/coucal" -I"$abs_top_builddir/src" -I"$abs_top_builddir")
+# The build's CPPFLAGS carry the include paths of a keg-only OpenSSL on macOS.
+if [ -n "${TEST_CPPFLAGS:-}" ]; then
+    read -r -a extra_argv <<<"$TEST_CPPFLAGS"
+    inc+=("${extra_argv[@]}")
+fi
 printf 'int main() { return 0; }\n' >"$tmp/tu.cpp"
 "$cxx" "${inc[@]}" -c "$tmp/tu.cpp" -o "$tmp/tu.o" || skip "$cxx cannot build a trivial unit"
 
