@@ -946,11 +946,11 @@ static const char cookie_bom[] = "\xEF\xBB\xBF";
 /* Return where the pairs of a document.cookie line start, past blanks and a
    pasted "Cookie:" header name. */
 static char *cookie_flat_start(char *line) {
-  int n;
-
   line += strspn(line, " \t");
-  if ((n = strfield(line, "Cookie:")) != 0)
-    line += n + strspn(line + n, " \t");
+  if (hts_starts_with_ci(line, "Cookie:")) {
+    line += strlen("Cookie:");
+    line += strspn(line, " \t");
+  }
   return line;
 }
 
@@ -998,7 +998,7 @@ hts_boolean cookie_url_host(const char *url, hts_buf dst) {
   char adr[HTS_URLMAXSIZE];
 
   // file://C:/x names a Windows drive, not a host
-  if (strfield(url, "file:") && len == 2 &&
+  if (hts_starts_with_ci(url, "file:") && len == 2 &&
       hts_isalpha((unsigned char) rest[0]) &&
       (rest[1] == ':' || rest[1] == '|'))
     return HTS_FALSE;
@@ -1059,7 +1059,7 @@ const char *cookie_flat_bind(const char *url, hts_buf host, cookie_attr *attr) {
                ? NULL
                : hts_psl_registrable_domain(host.p);
   attr->host_only = domain == NULL;
-  attr->secure = strfield(url, "https:") != 0;
+  attr->secure = hts_starts_with_ci(url, "https:");
   attr->http_only = HTS_FALSE;
   attr->expires = 0;
   return domain != NULL ? domain : host.p;
@@ -1751,13 +1751,14 @@ char *bauth_check(t_cookie * cookie, const char *adr, const char *fil) {
   if (cookie) {
     char *prefix = bauth_prefix(HTS_SIZED(buffer), adr, fil);
     char *found;
+    const char *rest = adr;
 
     if (prefix == NULL)
       return NULL;
     found = bauth_find(cookie, prefix);
     /* an http login may follow a redirect to https, never the reverse */
-    if (found == NULL && strfield(adr, "https://")) {
-      prefix = bauth_prefix(HTS_SIZED(buffer), adr + 8, fil);
+    if (found == NULL && hts_skip_prefix_ci(&rest, "https://")) {
+      prefix = bauth_prefix(HTS_SIZED(buffer), rest, fil);
       if (prefix != NULL)
         found = bauth_find(cookie, prefix);
     }
@@ -1771,7 +1772,8 @@ char *bauth_prefix(char *prefix, size_t size, const char *adr,
                    const char *fil) {
   const char *const host = jump_identification_const(adr);
   /* the key carries the scheme, so an https login never matches plain http */
-  const char *const scheme = strfield(adr, "https://") ? "https://" : "http://";
+  const char *const scheme =
+      hts_starts_with_ci(adr, "https://") ? "https://" : "http://";
   const size_t used = strlen(scheme) + strlen(host);
   char *a;
 

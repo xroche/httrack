@@ -338,7 +338,7 @@ static void origin_of(const char *adr, fetch_origin *o) {
   const char *p = jump_protocol_const(adr);
   const char *at, *end;
 
-  o->https = strfield(adr, "https:") ? HTS_TRUE : HTS_FALSE;
+  o->https = hts_starts_with_ci(adr, "https:");
   end = hts_authority_end(p);
   /* The last '@' ends the userinfo. */
   at = strrchr_limit(p, '@', end);
@@ -464,7 +464,7 @@ hts_boolean hts_fetch_trustworthy(const char *adr) {
   fetch_origin o;
   hts_span host;
 
-  if (strfield(adr, "ftp:"))
+  if (hts_starts_with_ci(adr, "ftp:"))
     return HTS_FALSE;
   origin_of(adr, &o);
   host = hts_span_at(o.host, o.host_len);

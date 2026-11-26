@@ -316,7 +316,8 @@ static const char *strjoker_impl(strjoker_memo *memo, const char *chaine,
       strjoker_charge(memo, sizeof(pass));
 
       // noms réservés
-      if ((strfield(joker + 2, "file")) || (strfield(joker + 2, "name"))) {
+      if ((hts_starts_with_ci(joker + 2, "file")) ||
+          (hts_starts_with_ci(joker + 2, "name"))) {
         for(i = 0; i < 256; i++)
           pass[i] = 1;
         pass[(int) '?'] = 0;
@@ -324,14 +325,14 @@ static const char *strjoker_impl(strjoker_memo *memo, const char *chaine,
         pass[(int) '/'] = 0;
         i = joker_class_end(joker, RIGHT);
         strjoker_charge(memo, sizeof(pass) + (size_t) i);
-      } else if (strfield(joker + 2, "path")) {
+      } else if (hts_starts_with_ci(joker + 2, "path")) {
         for(i = 0; i < 256; i++)
           pass[i] = 1;
         pass[(int) '?'] = 0;
         //pass[(int) ';'] = 0;
         i = joker_class_end(joker, RIGHT);
         strjoker_charge(memo, sizeof(pass) + (size_t) i);
-      } else if (strfield(joker + 2, "param")) {
+      } else if (hts_starts_with_ci(joker + 2, "param")) {
         if (chaine[0] == '?') { // il y a un paramètre juste là
           for(i = 0; i < 256; i++)
             pass[i] = 1;

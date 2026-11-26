@@ -128,7 +128,7 @@ static hts_boolean robots_pattern_match(const char *pattern, const char *path) {
 /* fil="": is a rule set already recorded for this host? */
 int checkrobots(const robots_wizard *robots, const char *adr, const char *fil) {
   while(robots) {
-    if (robots->adr != NULL && strfield2(robots->adr, adr)) {
+    if (robots->adr != NULL && hts_streq_ci(robots->adr, adr)) {
       if (fil[0]) {
         /* RFC 9309: longest pattern wins, Allow beats Disallow on ties. */
         int ptr = 0;
@@ -207,6 +207,7 @@ void robots_parse(httrackp *opt, robots_wizard *robots, const char *adr,
     sitemaps.p[0] = '\0';
   while (bptr < body.len) {
     char *comm;
+    const char *a;
     int adv;
     hts_boolean cut;
 
@@ -219,10 +220,9 @@ void robots_parse(httrackp *opt, robots_wizard *robots, const char *adr,
       cut = HTS_FALSE; // the comment ended the value inside the buffer
     }
     hts_rtrim(line, HTS_REALSPACES);
-    if (sitemaps.size > 0 && strfield(line, "sitemap:")) {
+    a = line;
+    if (sitemaps.size > 0 && hts_skip_prefix_ci(&a, "sitemap:")) {
       // Sitemap belongs to no group (RFC 9309), so always collect it
-      char *a = line + strfield(line, "sitemap:");
-
       a += strspn(a, HTS_REALSPACES);
       /* A line at the buffer limit was truncated: a half URL is not one. */
       if (strnotempty(a) && !cut &&
@@ -230,9 +230,7 @@ void robots_parse(httrackp *opt, robots_wizard *robots, const char *adr,
         hts_buf_cat(sitemaps, a);
         hts_buf_cat(sitemaps, "\n");
       }
-    } else if (strfield(line, "user-agent:")) {
-      char *a = line + strfield(line, "user-agent:");
-
+    } else if (hts_skip_prefix_ci(&a, "user-agent:")) {
       a += strspn(a, HTS_REALSPACES);
       /* RFC 9309 2.2.1: consecutive user-agent lines name one group, and the
          first one after a rule opens a new group. */
@@ -243,8 +241,9 @@ void robots_parse(httrackp *opt, robots_wizard *robots, const char *adr,
       if (*a == '*') {
         if (!have_specific && record == 0)
           record = 1; // generic group, taken only while none named us
-      } else if (strfield(a, "httrack") || strfield(a, "winhttrack") ||
-                 strfield(a, "webhttrack")) {
+      } else if (hts_starts_with_ci(a, "httrack") ||
+                 hts_starts_with_ci(a, "winhttrack") ||
+                 hts_starts_with_ci(a, "webhttrack")) {
         if (!have_specific) {
           StringClear(blob); // the generic rules read so far are not ours
           ndropped = 0;
@@ -255,10 +254,10 @@ void robots_parse(httrackp *opt, robots_wizard *robots, const char *adr,
         }
         record = 2; // locked to the httrack groups
       }
-    } else if (strfield(line, "allow:") || strfield(line, "disallow:")) {
-      const hts_boolean is_allow = strfield(line, "allow:") != 0;
+    } else if (hts_skip_prefix_ci(&a, "allow:") ||
+               hts_skip_prefix_ci(&a, "disallow:")) {
+      const hts_boolean is_allow = hts_starts_with_ci(line, "allow:");
       const hts_boolean is_disallow = !is_allow;
-      char *a = line + strfield(line, is_allow ? "allow:" : "disallow:");
 
       in_agents = HTS_FALSE; // a rule closes the group's user-agent lines
       a += strspn(a, HTS_REALSPACES);
@@ -306,7 +305,7 @@ void robots_parse(httrackp *opt, robots_wizard *robots, const char *adr,
 hts_boolean checkrobots_set(robots_wizard *robots, const char *adr,
                             const char *data) {
   while(robots) {
-    if (robots->adr != NULL && strfield2(robots->adr, adr)) {
+    if (robots->adr != NULL && hts_streq_ci(robots->adr, adr)) {
       char *const token = strdupt(data);
 
       if (token == NULL)

@@ -104,31 +104,31 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
 #if !HTS_USEOPENSSL
   // Drop every https link: the relative arm below strips "https:" and refetches
   // it from the origin host in the clear.
-  if (strfield(lien, "https:"))
+  if (hts_starts_with_ci(lien, "https:"))
     return -2;
 #endif
 
   // filtrer les parazites (mailto & cie)
   // scheme+authority (//)
-  if ((strfield(lien, "http://"))       // scheme+//
-      || (strfield(lien, "file://"))    // scheme+//
-      || (strncmp(lien, "//", 2) == 0)  // // sans scheme (-> default)
-    ) {
+  if ((hts_starts_with_ci(lien, "http://"))    // scheme+//
+      || (hts_starts_with_ci(lien, "file://")) // scheme+//
+      || (strncmp(lien, "//", 2) == 0) // "//" with no scheme (-> default)
+  ) {
     if (ident_url_absolute(lien, adrfil) == -1) {
       ok = -1;                  // erreur URL
     }
-  } else if (strfield(lien, "ftp://")) {
+  } else if (hts_starts_with_ci(lien, "ftp://")) {
     // Note: ftp:foobar.gif is not valid
     if (ident_url_absolute(lien, adrfil) == -1) {
       ok = -1; // erreur URL
     }
-  } else if (strfield(lien, "https://")) {
+  } else if (hts_starts_with_ci(lien, "https://")) {
     if (ident_url_absolute(lien, adrfil) == -1) {
       ok = -1;                // erreur URL
     }
-  } else if ((scheme) &&
-             ((!strfield(lien, "http:")) && (!strfield(lien, "https:")) &&
-              (!strfield(lien, "ftp:")))) {
+  } else if ((scheme) && ((!hts_starts_with_ci(lien, "http:")) &&
+                          (!hts_starts_with_ci(lien, "https:")) &&
+                          (!hts_starts_with_ci(lien, "ftp:")))) {
     ok = -1;                    // unknown scheme
   } else {                      // c'est un lien relatif
     // On forme l'URL complète à partie de l'url actuelle
@@ -146,15 +146,12 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
         && ((int) strlen(lien) < HTS_URLMAXSIZE)) {
 
       /* patch scheme if necessary */
-      if (strfield(lien, "http:")) {
-        lien += 5;
+      if (hts_skip_prefix_ci(&lien, "http:")) {
         strcpybuff(adrfil->adr, jump_protocol_const(origin_adr));     // même adresse ; protocole vide (http)
-      } else if (strfield(lien, "https:")) {
-        lien += 6;
+      } else if (hts_skip_prefix_ci(&lien, "https:")) {
         strcpybuff(adrfil->adr, "https://");    // même adresse forcée en https
         strcatbuff(adrfil->adr, jump_protocol_const(origin_adr));
-      } else if (strfield(lien, "ftp:")) {
-        lien += 4;
+      } else if (hts_skip_prefix_ci(&lien, "ftp:")) {
         strcpybuff(adrfil->adr, "ftp://");      // même adresse forcée en ftp
         strcatbuff(adrfil->adr, jump_protocol_const(origin_adr));
       } else {
@@ -216,7 +213,8 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
   hts_lowcase(jump_identification(adrfil->adr));
 
   // IDNA / RFC 3492 (Punycode) handling for HTTP(s)
-  if (!link_has_authority(adrfil->adr) || strfield(adrfil->adr, "https:")) {
+  if (!link_has_authority(adrfil->adr) ||
+      hts_starts_with_ci(adrfil->adr, "https:")) {
     char *const a = jump_identification(adrfil->adr);
     const size_t room = sizeof(adrfil->adr) - (size_t) (a - adrfil->adr);
 
@@ -566,13 +564,12 @@ HTS_INLINE char html_prevc(const char *adr, const char *start) {
 /* Offset past `s<spaces>=` at adr, or 0; rech_tageq() in htstools.h checks the
  * preceding char. */
 HTS_INLINE int __rech_tageq(const char *adr, const char *s) {
-  int p;
+  const char *p = adr;
 
-  p = strfield(adr, s);
-  if (p) {
-    p += (int) strspn(&adr[p], HTS_SPACES);
-    if (adr[p] == '=') {
-      return p + 1;
+  if (hts_skip_prefix_ci(&p, s)) {
+    p += strspn(p, HTS_SPACES);
+    if (*p == '=') {
+      return (int) (p - adr) + 1;
     }
   }
   return 0;
@@ -634,15 +631,14 @@ HTS_INLINE int rech_endtoken(const char *adr, const char **start) {
 
 // same, but check beginning of adr with s (for <object src="bar.mov" .. hotspot123="foo.html">)
 HTS_INLINE int __rech_tageqbegdigits(const char *adr, const char *s) {
-  int p;
+  const char *p = adr;
 
-  p = strfield(adr, s);
-  if (p) {
-    while (hts_isdigit((unsigned char) adr[p]))
+  if (hts_skip_prefix_ci(&p, s)) {
+    while (hts_isdigit((unsigned char) *p))
       p++;                      // jump digits
-    p += (int) strspn(&adr[p], HTS_SPACES);
-    if (adr[p] == '=') {
-      return p + 1;
+    p += strspn(p, HTS_SPACES);
+    if (*p == '=') {
+      return (int) (p - adr) + 1;
     }
   }
   return 0;
@@ -660,7 +656,7 @@ HTS_INLINE int check_tag(const char *from, const char *tag) {
     s[i] = *a;
   }
   s[i] = '\0';
-  return strfield2(s, tag);   // comparer
+  return hts_streq_ci(s, tag); // comparer
 }
 
 // teste si un fichier dépasse le quota
@@ -1196,7 +1192,7 @@ static size_t profile_key_line(FILE *fp, const char *key, hts_buf line) {
   assertf(line.size != 0);
   while (c != EOF) {
     size_t n = 0;
-    int off;
+    const char *rest = line.p;
 
     while (n + 1 < line.size && (c = fgetc(fp)) != EOF && c != '\n') {
       if (c != '\r' && c != '\t' && c != '\f')
@@ -1207,8 +1203,8 @@ static size_t profile_key_line(FILE *fp, const char *key, hts_buf line) {
       while ((c = fgetc(fp)) != EOF && c != '\n')
         ;
     }
-    if ((off = strfield(line.p, key)) != 0)
-      return (size_t) off;
+    if (hts_skip_prefix_ci(&rest, key))
+      return (size_t) (rest - line.p);
   }
   return 0;
 }

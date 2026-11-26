@@ -683,12 +683,11 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
       while (hts_shared_linputsoc(soc_c, hts_buf_at(line, lineSize - 2),
                                   deadline, &cut) > 0 &&
              line[0] != 0) {
-        int p;
+        const char *a = line;
 
         if (cut) {
           /* A clipped header is not the one the client sent. */
-        } else if ((p = strfield(line, "Content-length:")) != 0) {
-          const char *a = line + p;
+        } else if (hts_skip_prefix_ci(&a, "Content-length:")) {
           LLint value;
 
           if (hts_scan_llint(&a, 0, INT_MAX, &value) == HTS_SCAN_OK) {
@@ -705,18 +704,15 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
         } else if (hts_strcasecmp(line, "Connection: keep-alive") == 0) {
           /* an earlier error or close stays final */
           keepAlive = msgCode == 0 && !closeAsked;
-        } else if ((p = strfield(line, "Host:"))) {
-          char *chost = line + p;
-
-          if (*chost == ' ')
-            chost++;
-          StringCopy(host, chost);
-        } else if ((p = strfield(line, "Depth: "))) {
-          const char *depth = line + p;
+        } else if (hts_skip_prefix_ci(&a, "Host:")) {
+          if (*a == ' ')
+            a++;
+          StringCopy(host, a);
+        } else if (hts_skip_prefix_ci(&a, "Depth: ")) {
           LLint value;
 
           /* past 1 is refused below, so clamp rather than let it wrap */
-          davDepth = hts_scan_llint(&depth, 0, INT64_MAX, &value) == HTS_SCAN_OK
+          davDepth = hts_scan_llint(&a, 0, INT64_MAX, &value) == HTS_SCAN_OK
                          ? (int) (value < 2 ? value : 2)
                          : 0;
         }

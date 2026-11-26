@@ -138,7 +138,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
       }
       if (strnotempty(rcvd))
         treathead_opt(opt, opt->cookie, host, "/", &r, rcvd);
-      if (r.statuscode == HTTP_OK && strfield(rcvd, "content-range:") &&
+      if (r.statuscode == HTTP_OK &&
+          hts_starts_with_ci(rcvd, "content-range:") &&
           !(r.crange_start == 0 && r.crange_end == r.crange - 1))
         r.statuscode = HTTP_PARTIAL_CONTENT;
     } while (strnotempty(rcvd));

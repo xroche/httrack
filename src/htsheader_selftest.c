@@ -2028,7 +2028,7 @@ static void legacy_ctype(const char *in, hts_buf out) {
     a++;
     while (is_space(*a))
       a++;
-    if (strfield(a, "charset")) {
+    if (hts_starts_with_ci(a, "charset")) {
       a += 7;
       while (is_space(*a))
         a++;

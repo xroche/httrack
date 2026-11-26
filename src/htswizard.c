@@ -482,7 +482,7 @@ static int travel_same_domain(const char *a, const char *b) {
   lb = travel_last_two_labels(hb);
   if (la == NULL || lb == NULL)
     return -1;
-  return strfield2(la, lb) ? 1 : 0;
+  return hts_streq_ci(la, lb) ? 1 : 0;
 }
 
 /* Does "adr" + '/' + "fil" fit the HTS_URLMAXSIZE*2 pair (l, lfull) that
@@ -584,7 +584,7 @@ static int hts_acceptlink_(httrackp *opt, int ptr, const char *adr,
   // doit-on traiter ce lien?.. vérifier droits de déplacement
   /* --host-alias makes the declared names one address, so a link to another
      name of the same site travels under the same-address rules */
-  meme_adresse = strfield2(adr, urladr()) ||
+  meme_adresse = hts_streq_ci(adr, urladr()) ||
                  hts_host_same_alias(hts_host_alias_rules(opt), adr, urladr(),
                                      hts_host_alias_collapse_www(opt));
   if (meme_adresse)
@@ -721,7 +721,7 @@ static int hts_acceptlink_(httrackp *opt, int ptr, const char *adr,
       while ((j > 0) && (urladr()[j] != '.'))
         j--;
       if ((i > 0) && (j > 0)) {
-        if (!strfield2(adr + i, urladr() + j)) { // !-
+        if (!hts_streq_ci(adr + i, urladr() + j)) { // !-
           if (!opt->wizard) {                    // mode non wizard
             forbidden_url = 1; // pas même .xx
             hts_log_print(opt, LOG_DEBUG,
@@ -982,7 +982,7 @@ static int hts_acceptlink_(httrackp *opt, int ptr, const char *adr,
   if (just_test_it) {
     if (forbidden_url == 1) {
       if (opt->travel & HTS_TRAVEL_TEST_ALL) { // tester tout de même
-        if (strfield(adr, "ftp://") == 0) {                   // PAS ftp!
+        if (!hts_starts_with_ci(adr, "ftp://")) { // not ftp
           forbidden_url = 1;    // oui oui toujours interdit (note: sert à rien car ==1 mais c pour comprendre)
           *just_test_it = 1;    // mais on teste
           hts_log_print(opt, LOG_DEBUG, "Testing link %s%s",
@@ -1052,6 +1052,7 @@ int hts_acceptmime(httrackp * opt, int ptr,
 
 hts_boolean hts_link_is_foreign_asset(httrackp *opt, int ptr) {
   int parent;
+  const char *host;
 
   if (ptr <= 0)
     return HTS_FALSE;
@@ -1062,10 +1063,10 @@ hts_boolean hts_link_is_foreign_asset(httrackp *opt, int ptr) {
   if (ishtml(opt, heap(ptr)->fil) != 0) /* hypertext, or no telling */
     return HTS_FALSE;
   /* adr carries the scheme and any user:pw@, so compare bare authorities. */
-  return strfield2(jump_identification_const(heap(ptr)->adr),
-                   jump_identification_const(heap(parent)->adr))
-             ? HTS_FALSE
-             : HTS_TRUE;
+  host = jump_identification_const(heap(ptr)->adr);
+  /* an empty host matches no parent, not even an empty one */
+  return *host == '\0' ||
+         !hts_streq_ci(host, jump_identification_const(heap(parent)->adr));
 }
 
 // tester taille

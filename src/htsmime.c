@@ -580,14 +580,10 @@ int give_mimext(hts_buf s, const char *st) {
   // or
   // application/mp3
   if (!ok) {
-    int p;
-    const char *a = NULL;
+    const char *a = st;
 
-    if ((p = strfield(st, "application/x-")))
-      a = st + p;
-    else if ((p = strfield(st, "application/")))
-      a = st + p;
-    if (a) {
+    if (hts_skip_prefix_ci(&a, "application/x-") ||
+        hts_skip_prefix_ci(&a, "application/")) {
       if ((int) strlen(a) >= 1) {
         if ((int) strlen(a) <= 4) {
           hts_buf_cpy(s, a);
@@ -650,7 +646,7 @@ hts_boolean may_unknown(httrackp *opt, const char *st) {
     return 1;
   }
   while (strnotempty(hts_mime_keep[j])) {
-    if (strfield2(hts_mime_keep[j], st)) { // trouvé
+    if (hts_streq_ci(hts_mime_keep[j], st)) {
       return 1;
     }
     j++;
@@ -666,8 +662,8 @@ static int may_bogus_multiple(httrackp *opt, const char *mime,
   int j;
 
   for (j = 0; strnotempty(hts_mime_bogus_multiple[j]); j++) {
-    if (strfield2(hts_mime_bogus_multiple[j],
-                  mime)) { /* found mime type in suspicious list */
+    if (hts_streq_ci(hts_mime_bogus_multiple[j],
+                     mime)) { /* found mime type in suspicious list */
       char ext[64];
 
       if (give_mimext(HTS_BUF(ext), mime)) { /* we have an extension for that */
