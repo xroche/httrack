@@ -2675,7 +2675,8 @@ int back_delete(httrackp * opt, cache_back * cache, struct_back * sback,
     (void) back_flush_output(opt, cache, sback, p);
 
     back_dns_drop(sback, p);
-    return back_clear_entry(&back[p]);
+    back_clear_entry(&back[p]);
+    return 1;
   }
   return 0;
 }
@@ -2686,17 +2687,15 @@ static void back_set_free(lien_back * back) {
   back->status = STATUS_FREE;
 }
 
-/* delete entry content (clear the entry), but don't unallocate the entry itself */
-int back_clear_entry(lien_back * back) {
+void back_clear_entry(lien_back *back) {
   if (back != NULL) {
-    // Libérer tous les sockets, handles, buffers..
     if (back->r.soc != INVALID_SOCKET) {
       deletehttp(&back->r);
       back->r.soc = INVALID_SOCKET;
     }
 
     back_free_response(&back->r);
-    if (back->chunk_adr != NULL) {      // reste un bloc à désallouer
+    if (back->chunk_adr != NULL) {
       freet(back->chunk_adr);
       back->chunk_adr = NULL;
       back->chunk_size = 0;
@@ -2709,17 +2708,12 @@ int back_clear_entry(lien_back * back) {
       back_tmpdir_drop(back->tmpfile);
       back->tmpfile = NULL;
     }
-    // Tout nettoyer
     memset(back, 0, sizeof(lien_back));
     back->r.soc = INVALID_SOCKET;
     back->r.location = back->location_buffer;
 
-    // Le plus important: libérer le champ
     back_set_free(back);
-
-    return 1;
   }
-  return 0;
 }
 
 // ajouter un lien en backing

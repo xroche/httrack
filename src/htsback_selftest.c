@@ -2895,7 +2895,7 @@ static int st_busyslots(httrackp *opt, int argc, char **argv) {
     CHECK(back_search_quick(sback) == -1);
     CHECK(back_available(sback) == 0);
     for (i = 0; i < SLOTS; i++)
-      (void) back_clear_entry(&sback->lnk[i]);
+      back_clear_entry(&sback->lnk[i]);
     /* freed slots keep their bit until the next prune, and count as free */
     CHECK(back_available(sback) == SLOTS);
     back_clean(opt, &cache, sback);
@@ -2925,8 +2925,8 @@ static int st_busyslots(httrackp *opt, int argc, char **argv) {
     back_slot_attach(sback, 64, STATUS_TRANSFER, &r, "example.com", "/");
     back_slot_attach(sback, 128, STATUS_TRANSFER, &r, "example.com", "/");
     CHECK(back_nsoc(sback) == 2);
-    (void) back_clear_entry(&sback->lnk[64]);
-    (void) back_clear_entry(&sback->lnk[128]);
+    back_clear_entry(&sback->lnk[64]);
+    back_clear_entry(&sback->lnk[128]);
     back_clean(opt, &cache, sback);
   }
 
@@ -3063,7 +3063,7 @@ static void st_busyscans_reset(httrackp *opt, cache_back *cache,
   int i;
 
   for (i = 0; i < sback->count; i++)
-    (void) back_clear_entry(&sback->lnk[i]);
+    back_clear_entry(&sback->lnk[i]);
   back_clean(opt, cache, sback);
 }
 
@@ -3570,7 +3570,39 @@ static int st_postfilewire(httrackp *opt, int argc, char **argv) {
 #endif
 }
 
+// -#test=clearentry: clearing a slot releases its buffers and frees it.
+static int st_clearentry(httrackp *opt, int argc, char **argv) {
+  struct_back *sback;
+  lien_back *slot;
+  int err = 0;
+
+  (void) argc;
+  (void) argv;
+  if ((sback = back_new(opt, 2)) == NULL)
+    return 1;
+  slot = &sback->lnk[1];
+  slot->status = STATUS_READY;
+  strcpybuff(slot->url_adr, "example.com");
+  slot->r.adr = malloct(16);
+  slot->chunk_adr = malloct(16);
+  slot->chunk_size = 16;
+  slot->is_chunk = HTS_TRUE;
+  slot->r.location = NULL;
+  back_clear_entry(slot);
+  ST_FAIL_IF(err, slot->status != STATUS_FREE);
+  ST_FAIL_IF(err, slot->r.adr != NULL || slot->chunk_adr != NULL);
+  ST_FAIL_IF(err, slot->chunk_size != 0 || slot->is_chunk);
+  ST_FAIL_IF(err, slot->url_adr[0] != '\0');
+  ST_FAIL_IF(err, slot->r.soc != INVALID_SOCKET);
+  ST_FAIL_IF(err, slot->r.location != slot->location_buffer);
+  back_clear_entry(NULL);
+  back_free(&sback);
+  return st_verdict("clearentry", err);
+}
+
 const struct selftest_entry selftests_back[] = {
+    {"clearentry", "", "clearing a slot releases its buffers and frees it",
+     st_clearentry},
     {"iofatal", "<logfile>",
      "a disk-full abort logs its line and stops the mirror", st_iofatal},
     {"strerror", "",

@@ -1,0 +1,8 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# Clearing a backlog slot releases its buffers and marks it free.
+out=$(httrack -O /dev/null -#test=clearentry)
+grep -q "^clearentry: OK$" <<<"$out"
