@@ -35,6 +35,29 @@ out=$(run) || fail "an unchanged copy fails: ${out}"
 out=$(diff -r "${work}/fresh" "${srcdir}/tools/api-lint") ||
     fail "the committed baselines are not what --update writes: ${out}"
 
+# A header function whose every non-NULL return is fresh heap needs HTS_OWNED.
+# HTSEXT_API keeps the local rule quiet, so only the owned rule fires here.
+cat >"${work}/src/lintowned.c" <<'C'
+char *lint_own_via(const char *s) { return lint_own_dup(s); }
+char *lint_own_dup(const char *s) { return strdupt(s); }
+char *lint_own_var(size_t n) { char *p = NULL; *p = 'x'; p = (char *) malloct(n); return p; }
+char *lint_own_ok(const char *s) { return strdupt(s); }
+char *lint_own_arg(char *s) { if (s != NULL) return s; return strdupt(""); }
+char *lint_own_moved(size_t n) { char *p = malloct(n + 1); p++; return p; }
+struct lint_s *lint_own_struct(void) { return malloct(8); }
+C
+cat >"${work}/src/lintowned.h" <<'C'
+HTSEXT_API char *lint_own_dup(const char *s);
+HTSEXT_API char *lint_own_var(size_t n);
+HTSEXT_API char *lint_own_via(const char *s);
+HTSEXT_API HTS_OWNED char *lint_own_ok(const char *s);
+HTSEXT_API char *lint_own_arg(char *s);
+HTSEXT_API char *lint_own_moved(size_t n);
+HTSEXT_API struct lint_s *lint_own_struct(void);
+C
+sed 's/^HTS_OWNED char \*hts_mask_passwords(/char *hts_mask_passwords(/' \
+    "${srcdir}/src/htslib.h" >"${work}/src/htslib.h"
+
 # A pointer table fires unless its pointers are const, at file scope or static.
 cat >"${work}/src/linttable.c" <<'C'
 static const char *lint_t[] = {"a", NULL};
@@ -56,8 +79,18 @@ for want in "linttable.c:1: table: new violation: lint_t[]" \
     "linttable.c:7: table: new violation: lint_x[]"; do
     grep -qF "${want}" <<<"${out}" || fail "missed ${want}: ${out}"
 done
-test "$(wc -l <<<"${out}")" -eq 4 || fail "flagged a const table: ${out}"
+test "$(grep -c ': table: ' <<<"${out}")" -eq 4 || fail "flagged a const table: ${out}"
 rm "${work}/src/linttable.c"
+for want in "lintowned.h:1: owned: new violation: lint_own_dup " \
+    "lintowned.h:2: owned: new violation: lint_own_var " \
+    "lintowned.h:3: owned: new violation: lint_own_via " \
+    "src/htslib.h:$(grep -n 'hts_mask_passwords(const' "${work}/src/htslib.h" | cut -d: -f1): owned: new violation: hts_mask_passwords "; do
+    grep -qF "${want}" <<<"${out}" || fail "missed ${want}: ${out}"
+done
+test "$(grep -c ': owned: ' <<<"${out}")" -eq 4 || fail "flagged a non-owned return: ${out}"
+test "$(wc -l <<<"${out}")" -eq 8 || fail "unexpected output: ${out}"
+rm "${work}/src/lintowned.c" "${work}/src/lintowned.h"
+cp "${srcdir}/src/htslib.h" "${work}/src/"
 
 c="${work}/src/htslib.c"
 h="${work}/src/htslib.h"

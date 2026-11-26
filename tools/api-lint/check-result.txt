@@ -72,7 +72,6 @@ src/htscore.h: filters_grow
 src/htscore.h: filters_insert
 src/htscore.h: fspc
 src/htscore.h: htsAddLink
-src/htscore.h: hts_ucs2_to_utf8
 src/htscore.h: hts_wait_available_socket
 src/htscore.h: usercommand_exe
 src/htscoremain.h: hts_self_path
@@ -203,7 +202,6 @@ src/htsurlport.h: hts_parse_url_port
 src/htsurlport.h: hts_span_copy
 src/htsurlport.h: hts_span_split
 src/htsurlport.h: hts_status_reason
-src/htswarc.h: warc_normalized_headers
 src/htswarc.h: warc_open
 src/htswarc.h: warc_truncated_reason
 src/htswarc.h: warc_write_transaction

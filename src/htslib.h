@@ -131,7 +131,7 @@ uintptr_t htswrap_read(httrackp *opt, const char *name);
     NULL when the file is missing or has no category line. The bytes are not
     converted. They are UTF-8 if the file declares Charset=UTF-8, else the
     legacy encoding (the ANSI codepage on Windows). */
-char *hts_getcategory(const char *filename);
+HTS_OWNED char *hts_getcategory(const char *filename);
 
 /** Open a capture socket on 127.0.0.1, port *port (0 picks a free port). No
     other host can reach it, because the request it captures carries the
@@ -835,7 +835,7 @@ typedef enum {
 /* Returns a copy of s, allocated with malloct, in which the password, or the
    user alone, of every start URL or proxy address in s is *** . The rest stays
    byte for byte. NULL when out of memory. */
-char *hts_mask_passwords(const char *s, hts_mask_mode mode);
+HTS_OWNED char *hts_mask_passwords(const char *s, hts_mask_mode mode);
 
 /* Log calls never print an address raw: pass adr_nologin() or url_nologin(),
    which test 660 checks. */
