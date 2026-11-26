@@ -1,0 +1,44 @@
+#!/bin/bash
+#
+# The HTTRACK_DEBUG_RESOLVE pin reads its whole address list, not a 255-byte cut.
+
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+if test "${V6_SUPPORT:-}" == "no"; then
+    echo "no IPv6 support (resolver override compiled out), skipping"
+    exit 77
+fi
+
+root=$(nativepath "$top_srcdir/tests/server-root")
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_pinlist.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "$tmpdir"
+
+local_server_start --root "$root" --bind 127.0.0.1
+
+# crawl NAME PIN: crawl pinhost with HTTRACK_DEBUG_RESOLVE=PIN
+crawl() {
+    HTTRACK_DEBUG_RESOLVE="$2" local_crawl --log "$tmpdir/$1.log" \
+        "http://pinhost:${SRV_PORT}/simple/basic.html" -O "$tmpdir/$1" \
+        -r1 -c1 --robots=0 --timeout=5 --retries=0 -q -Z || true
+}
+
+# fetched NAME: did the crawl save the page?
+fetched() {
+    test -s "$tmpdir/$1/pinhost_${SRV_PORT}/simple/basic.html"
+}
+
+pad=$(printf 'x,%.0s' $(seq 1 200))
+
+crawl short "pinhost:x,,127.0.0.1"
+fetched short || fail_dump "short pin: page not fetched" "$tmpdir/short/hts-log.txt"
+
+crawl none "pinhost:x,,y"
+! fetched none || fail "a pin with no address still reached the server"
+
+crawl long "pinhost:${pad}127.0.0.1"
+fetched long || fail_dump "address past byte 255 was dropped" "$tmpdir/long/hts-log.txt"
+
+echo "OK: the resolve pin reads its whole list"

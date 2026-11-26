@@ -339,12 +339,15 @@ static int HTS_RESOLVER_CALL override_getaddrinfo(const char *node,
       (size_t) (colon - spec) == strlen(node) &&
       strncmp(spec, node, colon - spec) == 0) {
     struct addrinfo *head = NULL, *tail = NULL;
-    char buf[256];
-    char *p;
+    hts_span rest = hts_span_of(colon + 1);
+    hts_span item;
 
-    strclipbuff(buf, sizeof(buf), colon + 1);
-    for (p = strtok(buf, ","); p != NULL; p = strtok(NULL, ",")) {
-      struct addrinfo *const ai = resolver_make_ai(p, want);
+    /* not strtok, because DNS worker threads run this */
+    while (hts_span_next_in(&rest, ',', &item)) {
+      char ip[64];
+      struct addrinfo *const ai = hts_buf_put_span(HTS_BUF(ip), item)
+                                      ? resolver_make_ai(ip, want)
+                                      : NULL;
 
       if (ai != NULL) {
         if (head == NULL)
