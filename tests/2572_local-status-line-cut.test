@@ -1,6 +1,7 @@
 #!/bin/bash
 #
-# A status line too long to read whole is kept only when its code was read.
+# A status line too long to read whole is refused only when the part read holds
+# nothing but blanks; any other cut line is read as it always was.
 
 set -euo pipefail
 
@@ -37,20 +38,29 @@ crawl() { # crawl CASE
 
 mirrored() { echo "$out/$1/127.0.0.1_$port/$1.html"; }
 
-crawl huge
-crawl hugeblank
-crawl crlfhugeblank
-
-# Control: a long phrase after the code is cut, and the reply still stands.
-test -f "$(mirrored huge)" || fail "huge: a cut reason phrase lost the page"
-
-# The blanks push the 404 out of the line read, which must not become a 200.
-for case in hugeblank crlfhugeblank; do
-    test ! -f "$(mirrored "$case")" || fail "$case: a cut status line was mirrored"
-    want="\"Status line too long\" (-1) at link 127.0.0.1:$port/$case.html"
-    logtext=$(cat "$out/$case/hts-log.txt")
+# refused CASE MSG CODE: nothing mirrored, and the log names MSG and CODE
+refused() {
+    local want="\"$2\" ($3) at link 127.0.0.1:$port/$1.html" logtext
+    test ! -f "$(mirrored "$1")" || fail "$1: mirrored, but should be refused"
+    logtext=$(cat "$out/$1/hts-log.txt")
     grep -qF "$want" <<<"$logtext" ||
-        fail_dump "$case: log lacks [$want]" "$out/$case/hts-log.txt"
+        fail_dump "$1: log lacks [$want]" "$out/$1/hts-log.txt"
+}
+
+cases="huge blankcode longlt longsplt icy hugeblank crlfhugeblank"
+for case in $cases; do
+    crawl "$case"
 done
 
-ok "a cut status line keeps its code or is refused"
+# Content before the cut: a long phrase, a code after blanks, and the junky
+# server pages a legacy server sends with no status line at all.
+for case in huge blankcode longlt longsplt; do
+    test -f "$(mirrored "$case")" || fail "$case: a cut line lost the page"
+done
+refused icy "Unknown (not HTTP/xx) response structure" -1
+
+# The blanks push the 404 out of the line read, which must not become a 200.
+refused hugeblank "Status line too long" -1
+refused crlfhugeblank "Status line too long" -1
+
+ok "a cut status line is refused only when it read nothing but blanks"

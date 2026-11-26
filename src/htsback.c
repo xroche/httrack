@@ -3704,6 +3704,22 @@ static void back_fail_unselectable(httrackp *opt, struct_back *sback, int i) {
                        "Socket number too high for select()");
 }
 
+/* Read the status line at BUFF + *PTR into LINE, past one empty line, and
+   advance *PTR. TRUE when it was cut with only blanks read. */
+static hts_boolean back_read_status_line(const char *buff, const char *end,
+                                         hts_buf line, int *ptr) {
+  int adv = 0;
+  hts_boolean cut = binput_line(buff + *ptr, end, line, &adv);
+
+  *ptr += adv;
+  if (!strnotempty(line.p)) {
+    /* bogus CRLF, or a recycled connection's trailing chunk CRLF */
+    cut = binput_line(buff + *ptr, end, line, &adv);
+    *ptr += adv;
+  }
+  return cut && line.p[strspn(line.p, " \t")] == '\0';
+}
+
 void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                TStamp stat_timestart) {
   char catbuff[CATBUFF_SIZE];
@@ -4690,21 +4706,13 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                     /* Hack for zero-length headers */
                     // ----------------------------------------
                     /* parse the header, status line first */
-                    hts_boolean cut = binput_line(
-                        back[i].r.adr + ptr, back[i].r.adr + back[i].r.size,
-                        HTS_BUF_N(rcvd, 2000), &adv);
+                    const hts_boolean blind = back_read_status_line(
+                        back[i].r.adr, back[i].r.adr + back[i].r.size,
+                        HTS_BUF_N(rcvd, 2000), &ptr);
 
-                    ptr += adv;
-                    if (strnotempty(rcvd) == 0) {
-                      /* Bogus CRLF, OR recycled connection and trailing chunk CRLF */
-                      cut = binput_line(back[i].r.adr + ptr,
-                                        back[i].r.adr + back[i].r.size,
-                                        HTS_BUF_N(rcvd, 2000), &adv);
-                      ptr += adv;
-                    }
                     treatfirstline(&back[i].r, rcvd);
-                    /* a cut line may lose its phrase, not its code */
-                    if (cut && !strfield(rcvd + strspn(rcvd, " \t"), "HTTP/")) {
+                    /* refuse a status line cut before anything but blanks */
+                    if (blind) {
                       back[i].r.statuscode = STATUSCODE_INVALID;
                       strcpybuff(back[i].r.msg, "Status line too long");
                     }
