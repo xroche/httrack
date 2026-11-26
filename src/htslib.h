@@ -150,13 +150,6 @@ hts_boolean dir_exists(const char *path);
    unknown. The pointer is a string literal; do not free it. */
 const char *infostatuscode_const(int statuscode);
 
-/** Format @p n as a decimal string into @p strc and return it. */
-char *int2char(strc_int2bytes2 *strc, int n);
-
-/** Split byte count @p n into number and unit, returning a 2-element array
-    {number, unit} stored inside @p strc. */
-char **int2bytes2(strc_int2bytes2 *strc, LLint n);
-
 /** Like jump_identification() and also strip a leading "www." or "www-4."-style
     host prefix, returning a pointer into the input to the normalized host. */
 const char *jump_normalized_const(const char *);
@@ -227,12 +220,6 @@ char *escape_check_url_addr(const char *const src, hts_buf dest);
 size_t make_content_id(const char *const adr, const char *const fil,
                        hts_buf dest);
 
-/** Low-level percent-escaper backing the escape_* family. @p mode selects the
-    character class to escape: 0 check_url, 1 in_url, 2 spc_url, 3 uri,
-    4 control_url, 30 uri_utf. @p out.size is the capacity including the
-    NUL. */
-size_t x_escape_http(const char *const s, hts_buf out, const int mode);
-
 /** Strip all control characters (byte value < 32) from @p s in place. */
 void escape_remove_control(char *const s);
 
@@ -265,10 +252,6 @@ hts_boolean may_unknown(httrackp *opt, const char *st);
 
 /** Copy @p a into @p dst, converting every '\\' to '/' on all platforms. */
 char *fslash(hts_buf dst, const char *a);
-
-/** Set the process-global debug verbosity (0 is off); higher levels log more to
-    stderr. Bit 0x80 redirects debug output to "hts-debug.txt". */
-void hts_debug(int level);
 
 #define READ_ERROR (-1)
 #define READ_EOF (-2)
@@ -395,9 +378,6 @@ int64_t hts_parse_date(const char *s, int pivot);
 
 // attach specific project log to hachtable logger
 void hts_set_hash_handler(coucal hashtable, httrackp *opt);
-
-// fonctions unix/winsock
-int hts_read(htsblk *r, hts_buf buff);
 
 /* Add to, read and reset the received-byte total, which FTP workers update
    from their thread. A lock guards it, as a 64-bit atomic needs libatomic.
@@ -842,11 +822,6 @@ const char *login_end(const char *adr);
    and '\' before the last '@' preceding the first '/' written as %XX, so its
    login reads as it always has. Returns HTS_FALSE when dst was too small. */
 hts_boolean hts_escape_typed_login(const char *url, hts_buf dst);
-/* Copies src to dst, writing each byte of set that lies inside escaped, a
-   part of src, as %XX. An escape that does not fit is dropped whole. Returns
-   HTS_FALSE when dst was too small. */
-hts_boolean hts_escape_span(hts_span src, hts_span escaped, const char *set,
-                            hts_buf dst);
 
 /* Is the name opening LINE one of the NULL-terminated NAMES, in any case? */
 hts_boolean header_name_in(const char *line, const char *const *names);

@@ -22,6 +22,9 @@ out=$("${python}" "${lint}" --root "${work}/empty" 2>&1) && fail "an empty tree 
 grep -qF "only 0 sources" <<<"${out}" || fail "no source-count error: ${out}"
 
 cp -R "${srcdir}/src" "${work}/src"
+# The callers outside src/ that the local rule counts.
+(cd "${srcdir}" && find fuzz libtest tests tools -name '*.c' | tar -cf - -T -) |
+    tar -xf - -C "${work}"
 cp -R "${srcdir}/tools/api-lint" "${work}/baseline"
 chmod -R u+w "${work}"
 run() {
@@ -74,6 +77,7 @@ int lint_probe_deleg_cmp(int x) { return lint_probe_int(x) >= 0; }
 int lint_probe_deleg_clean(int x) { return lint_probe_clean(x); }
 int lint_probe_marked_int(int x) { if (x) return -1; return 0; }
 int lint_probe_clean(int x) { return x + 1; }
+void lint_probe_api(void) {}
 size_t lint_probe_span(hts_span tok, const hts_span *out, const char *z) {
   hts_span a, b = hts_span_of(z);
   hts_url_view v;
@@ -140,6 +144,7 @@ int lint_probe_deleg_cmp(int x);
 int lint_probe_deleg_clean(int x);
 HTS_CHECK_RESULT int lint_probe_marked_int(int x);
 int lint_probe_clean(int x);
+HTSEXT_API void lint_probe_api(void);
 void lint_sink(const void *p, size_t n);
 #define lint_cmt(x) ((x) + /* a note \
    that wraps */ (x))
@@ -156,7 +161,8 @@ char *lint_probe_extern(int x);
 H
 echo 'src/htslib.h: lint_dup: evaluates x twice' >>"${work}/baseline/macro.txt"
 mkdir "${work}/src/lintprobe"
-echo 'int lint_probe_sub(const char *s) { return isalpha(s[0]); }' >"${work}/src/lintprobe/probe.c"
+printf '%s\n' 'int lint_probe_sub(const char *s) { return isalpha(s[0]); }' \
+    'int lint_probe_user(void) { return lint_probe_clean(1); }' >"${work}/src/lintprobe/probe.c"
 
 out=$(run) && fail "planted violations passed"
 at() {
@@ -211,10 +217,13 @@ for want in "src/htslib.c:$(at "${c}" "lint_probe_ctype("): ctype: new violation
     "src/htslib.c:$(at "${c}" "lint_take(w->s.p,"): pair: new violation: lint_take(w->s.p, w->s.len) splits a span" \
     "src/htslib.c:$(at "${c}" "lint_take(d, a.p"): pair: new violation: lint_take(a.p, a.len) splits a span" \
     "src/htslib.c:$(at "${c}" "lint_skip(a.p + 2"): pair: new violation: lint_skip(a.p+2, a.len-2) splits a span" \
-    "src/htslib.c:$(at "${c}" "lint_skip(a.p+1"): pair: new violation: lint_skip(a.p+1, a.len-1) splits a span"; do
+    "src/htslib.c:$(at "${c}" "lint_skip(a.p+1"): pair: new violation: lint_skip(a.p+1, a.len-1) splits a span" \
+    "src/htslib.h:$(at "${h}" "lint_probe_ptr("): local: new violation: lint_probe_ptr is used only in src/htslib.c" \
+    "src/htslib.h:$(at "${h}" "lint_probe_extern("): local: new violation: lint_probe_extern is used only in src/htslib.c"; do
     grep -qF "${want}" <<<"${out}" || fail "missed ${want}: ${out}"
 done
-test "$(wc -l <<<"${out}")" -eq 50 || fail "flagged a clean probe: ${out}"
+# 14 of the local lines are header probes: lint_probe_clean has an outside caller.
+test "$(wc -l <<<"${out}")" -eq 64 || fail "flagged a clean probe: ${out}"
 
 # Removing a known violation, or listing one that never was, leaves a stale entry.
 rm -r "${work}/src/lintprobe"

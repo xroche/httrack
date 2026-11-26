@@ -654,22 +654,6 @@ HTS_INLINE int __rech_tageqbegdigits(const char *adr, const char *s) {
   return 0;
 }
 
-// tag sans =
-HTS_INLINE int rech_sampletag(const char *adr, const char *s) {
-  int p;
-
-  if ((*(adr - 1) == '<') || (is_space(*(adr - 1)))) {  // <tag < tag etc
-    p = strfield(adr, s);
-    if (p) {
-      if (!hts_isalnum((unsigned char) adr[p])) { // <srcbis n'est pas <src
-        return 1;
-      }
-      return 0;
-    }
-  }
-  return 0;
-}
-
 // teste si le tag contenu dans from est égal à "tag"
 HTS_INLINE int check_tag(const char *from, const char *tag) {
   const char *a = from + 1;

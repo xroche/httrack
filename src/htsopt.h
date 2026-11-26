@@ -155,7 +155,7 @@ typedef struct strc_int2bytes2 strc_int2bytes2;
 struct strc_int2bytes2 {
   char catbuff[CATBUFF_SIZE]; /**< what int2bytes() and int2bytessec() return */
   char buff1[256];            /**< the number */
-  char buff2[32];             /**< the unit, and int2char()'s whole result */
+  char buff2[32];             /**< the unit */
   char *buffadr[2];           /**< {buff1, buff2}, what int2bytes2() returns */
 };
 

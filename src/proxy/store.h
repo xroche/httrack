@@ -73,34 +73,21 @@ typedef void *PT_Mutex;
 typedef pthread_mutex_t PT_Mutex;
 #endif
 
-void MutexInit(PT_Mutex * pMutex);
-void MutexLock(PT_Mutex * pMutex);
-void MutexUnlock(PT_Mutex * pMutex);
-void MutexFree(PT_Mutex * pMutex);
-
 /* Indexes */
 PT_Indexes PT_New(void);
 void PT_Delete(PT_Indexes index);
 PT_Element PT_ReadIndex(PT_Indexes indexes, const char *url, int flags);
 int PT_LookupIndex(PT_Indexes indexes, const char *url);
 int PT_AddIndex(PT_Indexes index, const char *path);
-int PT_IndexMerge(PT_Indexes indexes, PT_Index * pindex);
 PT_Index PT_GetIndex(PT_Indexes indexes, int indexId);
-time_t PT_GetTimeIndex(PT_Indexes indexes);
 
 /* Indexes list */
 PT_Element PT_Index_HTML_BuildRootInfo(PT_Indexes indexes);
 char **PT_Enumerate(PT_Indexes indexes, const char *url, int subtree);
 void PT_Enumerate_Delete(char ***plist);
-int PT_EnumCache(PT_Indexes indexes,
-                 int (*callback) (void *, const char *url, PT_Element),
-                 void *arg);
 int PT_SaveCache(PT_Indexes indexes, const char *filename);
 
 /* Index */
-PT_Index PT_LoadCache(const char *filename);
-void PT_Index_Delete(PT_Index * pindex);
-PT_Element PT_ReadCache(PT_Index index, const char *url, int flags);
 time_t PT_Index_Timestamp(PT_Index index);
 
 /* Elements*/

@@ -3,14 +3,17 @@
 macros, header functions that can fail without HTS_CHECK_RESULT, a span's
 .p handed to a function that reads up to a NUL or printed with %s, and a call
 passing x.p, x.len (or x.p + n, x.len - n) as two arguments where the callee
-could take the span.
+could take the span, and a header prototype of a function that only its
+defining file uses.
 Known cases live in tools/api-lint/, and --update rewrites those baselines.
-Known limits: a failure delegated through two calls, free names inside _Generic,
-and a function defined only in a later branch of an unbalanced #if group go
-unreported. A span is seen only as a local, a parameter or a URL view field,
-never through a pointer copy, another struct or a macro, and only the
-NUL_READERS functions and printf-style %s count, so a span handed to any other
-function goes unreported.
+Known limits: a failure delegated through two calls or to a static function,
+free names inside _Generic, and a function defined only in a later branch of an
+unbalanced #if group go unreported. A span is seen only as a local, a parameter
+or a URL view field, never through a pointer copy, another struct or a macro,
+and only the NUL_READERS functions and printf-style %s count, so a span handed
+to any other function goes unreported.
+The local rule counts names, so a function sharing its name with a field or a
+macro stays unreported.
 """
 
 import argparse
@@ -19,11 +22,14 @@ import os
 import re
 import sys
 
-RULES = ("ctype", "macro", "check-result", "span", "pair")
+RULES = ("ctype", "macro", "check-result", "span", "pair", "local")
 HEADER = "# Known %s violations. Regenerate: tools/check-api-lint.py --update\n"
 
 # Vendored trees follow their upstream's conventions.
 VENDORED = ("src/coucal", "src/minizip")
+
+# C sources outside src/ that may call an internal function.
+USERS = ("fuzz", "libtest", "tests", "tools")
 
 # Well under the tree's count, so an empty listing fails instead of passing.
 MIN_SOURCES = 100
@@ -709,6 +715,34 @@ def check_pair(code, sinks):
                     yield line_of(code, start + m.start()), call, msg
 
 
+def check_local(files, others):
+    """Yield (path, line, key, message) for a header prototype whose function
+    only its defining .c file uses."""
+    definers = collections.defaultdict(set)
+    decls = []
+    for path, code in files.items():
+        for start, head, body in top_level(code):
+            fh = function_head(head)
+            if not fh or "static" in fh[1].split() or "HTSEXT_API" in head:
+                continue
+            if body is not None and path.endswith(".c"):
+                definers[fh[0]].add(path)
+            elif body is None and path.endswith(".h"):
+                decls.append((path, start, head, fh[0]))
+    seen = collections.defaultdict(collections.Counter)
+    for path, code in list(files.items()) + list(others.items()):
+        for name, n in collections.Counter(IDENT.findall(code)).items():
+            seen[name][path] = n
+    declared = collections.Counter(name for _, _, _, name in decls)
+    for path, start, head, name in decls:
+        users = {p for p in seen[name] if not p.endswith(".h")}
+        heads = sum(n for p, n in seen[name].items() if p.endswith(".h"))
+        if len(users) == 1 and users == definers[name] and heads == declared[name]:
+            line = line_of(files[path], start + len(head) - len(head.lstrip()))
+            msg = "%s is used only in %s, make it static" % (name, users.pop())
+            yield path, line, name, msg
+
+
 def scan(root):
     """Map each rule to a list of (path, line, key, message)."""
     paths = []
@@ -736,6 +770,16 @@ def scan(root):
                 key = "%s: %s" % (name, problem)
                 found["macro"].append((path, line, key, "macro " + key))
     found["check-result"] = list(check_result(files))
+    others = {}
+    for d in USERS:
+        for top, _, names in os.walk(os.path.join(root, d)):
+            for f in sorted(names):
+                if f.endswith(".c"):
+                    with open(
+                        os.path.join(top, f), encoding="utf-8", errors="surrogateescape"
+                    ) as fh:
+                        others[os.path.join(top, f)] = strip_comments(fh.read())
+    found["local"] = list(check_local(files, others))
     for path, code in files.items():
         for line, key, msg in check_span(path, raws[path], code):
             found["span"].append((path, line, key, msg))

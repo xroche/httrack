@@ -416,8 +416,6 @@ int check_fatal_io_errno(void);
 /* Log a disk-full abort and stop the mirror. */
 void hts_io_fatal_abort(httrackp *opt);
 
-int engine_stats(void);
-
 /* Calls between two full engine_stats() refreshes in engine_stats_tick(). */
 #define HTS_STATS_TICK 256
 

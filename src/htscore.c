@@ -2394,7 +2394,7 @@ static void engine_stats_reset_counters(void) {
   HTS_STAT.nb = 0;
 }
 
-int engine_stats(void) {
+static int engine_stats(void) {
   const LLint recv = hts_stat_recv_publish();
 
   engine_stats_reset_counters();
