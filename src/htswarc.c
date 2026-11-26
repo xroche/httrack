@@ -94,6 +94,7 @@ struct warc_writer {
   hts_boolean protect_prev;   /* previous archive present: build in a temp */
   hts_boolean opened;         /* open completed; a failed one swaps nothing */
   hts_boolean failed;         /* a record or segment was lost: swap nothing */
+  hts_boolean reported; /* a loss was logged: log no more, index nothing */
   uint64_t unbacked_revisits; /* URLs this pass didn't capture here: an
                                   unbacked revisit, or nothing written at all */
   TypedArray(char *) page_lines; /* one JSON line per 200 text/html response */
@@ -1253,20 +1254,37 @@ static int warc_write_warcinfo_record(warc_writer *w) {
       w->info_id);
 }
 
+/* Final path of segment s (the run's only archive when rotation is off). */
+static const char *warc_seg_path(warc_writer *w, unsigned s, hts_buf buf) {
+  if (w->max_size == 0)
+    return w->arc_path;
+  hts_buf_printf_clip(buf, "%s-%05u%s", w->seg_base, s, w->seg_ext);
+  return buf.p;
+}
+
 static int warc_rotate(warc_writer *w) {
   char namebuf[HTS_URLMAXSIZE * 2];
   char openbuf[HTS_URLMAXSIZE * 2 + sizeof(WARC_TMP_SUFFIX)];
   const unsigned next = w->seg + 1;
   FILE *f;
-  hts_boolean closed;
   snprintf(namebuf, sizeof(namebuf), "%s-%05u%s", w->seg_base, next,
            w->seg_ext);
+  /* flush first, so a lost tail leaves no empty segment behind */
+  if (w->f != NULL && fflush(w->f) != 0) {
+    char segbuf[HTS_URLMAXSIZE * 2];
+    hts_log_print(w->opt, LOG_ERROR | LOG_ERRNO,
+                  "WARC: could not finish writing %s",
+                  warc_seg_path(w, w->seg, HTS_BUF(segbuf)));
+    w->reported = HTS_TRUE;
+    return -1;
+  }
   /* Open before advancing: w->seg must only ever name a segment that exists,
      or close-time packaging and swapping would work on a missing file. */
   f = hts_fopen_private(warc_open_path(w, namebuf, HTS_BUF(openbuf)), "wb");
   if (f == NULL)
     return -1;
-  closed = w->f == NULL || fclose(w->f) == 0;
+  if (w->f != NULL)
+    (void) fclose(w->f); /* flushed above */
   w->f = f;
   w->seg = next;
   w->offset = 0;
@@ -1274,8 +1292,7 @@ static int warc_rotate(warc_writer *w) {
     freet(w->cur_seg);
     w->cur_seg = path_basename_dup(namebuf);
   }
-  /* a failed close lost the finished segment's tail */
-  return closed ? warc_write_warcinfo_record(w) : -1;
+  return warc_write_warcinfo_record(w);
 }
 
 /* ---- request stash (engine hooks) ---- */
@@ -1504,14 +1521,6 @@ warc_writer *warc_open(httrackp *opt, const char *path) {
   return w;
 }
 
-/* Final path of segment s (the run's only archive when rotation is off). */
-static const char *warc_seg_path(warc_writer *w, unsigned s, hts_buf buf) {
-  if (w->max_size == 0)
-    return w->arc_path;
-  hts_buf_printf_clip(buf, "%s-%05u%s", w->seg_base, s, w->seg_ext);
-  return buf.p;
-}
-
 /* Swap this run's archive into place, unless it only holds revisits naming
    bodies the previous archive still has and this one does not (#759).
    HTS_FALSE: the previous archive was kept, so leave its .cdx and .wacz too. */
@@ -1523,8 +1532,14 @@ static hts_boolean warc_commit(warc_writer *w) {
   hts_boolean swap;
   unsigned s;
 
-  if (!w->protect_prev)
-    return HTS_TRUE; /* nothing was there to lose: written in place */
+  if (!w->protect_prev) {
+    /* written in place: index or package only a whole archive */
+    if (w->reported && (w->cdx_on || w->wacz_on))
+      hts_log_print(w->opt, LOG_WARNING,
+                    "WARC: wrote no index or package for the incomplete %s",
+                    warc_seg_path(w, 0, HTS_BUF(finalbuf)));
+    return !w->reported;
+  }
 
   /* Require every temp before renaming any, because a swap stopping halfway
      would mix this run's segments with the previous one's. */
@@ -1575,6 +1590,7 @@ void warc_close(warc_writer *w) {
                   "WARC: could not finish writing %s",
                   warc_seg_path(w, w->seg, HTS_BUF(buf)));
     w->failed = HTS_TRUE;
+    w->reported = HTS_TRUE;
   }
   w->f = NULL;
   if (warc_commit(w)) {
@@ -1794,7 +1810,10 @@ int warc_write_resource(warc_writer *w, const char *target_uri, const char *ip,
 
 /* ---- engine emit hook ---- */
 
-static void warc_log_lost(httrackp *opt, const char *uri) {
+static void warc_log_lost(httrackp *opt, warc_writer *w, const char *uri) {
+  if (w->reported)
+    return;
+  w->reported = HTS_TRUE;
   hts_log_print(opt, LOG_ERROR | LOG_ERRNO,
                 "WARC: could not write %s, so this run's archive stops there",
                 uri);
@@ -1854,7 +1873,7 @@ void warc_write_backtransaction(httrackp *opt, lien_back *back) {
   if (is_ftp) {
     if (warc_write_resource(w, uri, ip, back->r.contenttype, body,
                             back->r.warc_truncated) != 0)
-      warc_log_lost(opt, uri);
+      warc_log_lost(opt, w, uri);
     return;
   }
 
@@ -1889,5 +1908,5 @@ void warc_write_backtransaction(httrackp *opt, lien_back *back) {
   if (warc_write_transaction(w, uri, ip, back->r.warc_reqhdr, resp_hdr, body,
                              back->r.contenttype, back->r.statuscode,
                              unchanged_kind, back->r.warc_truncated) != 0)
-    warc_log_lost(opt, uri);
+    warc_log_lost(opt, w, uri);
 }

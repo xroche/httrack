@@ -24,30 +24,46 @@ rm -f "$probe"
 
 local_server_start --log "${tmpdir}/server.log"
 
-# Mirror with the archive on /dev/full, and leave the WARC error lines in $lost.
+# Mirror with archive $2 on /dev/full, and leave the WARC error lines in $lost.
+# Whether a lost archive fails the exit status is undecided, so accept 0 or 1.
 crawl_warc_full() {
-    local name="$1" dir="${tmpdir}/$1"
+    local name="$1" dir="${tmpdir}/$1" link="$2" rc=0
 
-    shift
+    shift 2
     mkdir -p "$dir"
-    ln -s /dev/full "${dir}/full.warc.gz"
+    ln -s /dev/full "${dir}/${link}"
     local_crawl --log "${tmpdir}/log-${name}" --quiet --robots=0 -O "$dir" \
-        --warc-file "${dir}/full.warc.gz" "$@" ||
-        fail "the ${name} crawl failed: $(<"${dir}/hts-log.txt")"
-    lost=$(command grep 'WARC: could not' "${dir}/hts-log.txt" || true)
+        "$@" || rc=$?
+    log=$(<"${dir}/hts-log.txt")
+    test "$rc" -le 1 || fail "the ${name} crawl exited ${rc}: ${log}"
+    lost=$(command grep 'WARC: could not' <<<"$log" || true)
     test "$(wc -l <<<"$lost")" -eq 1 -a -n "$lost" ||
         fail "the ${name} arm wanted one WARC error, got: ${lost}"
+    test "$(command grep -c 'Error:' <<<"$log")" -eq 1 ||
+        fail "the ${name} arm wanted one error in all: ${log}"
 }
 
 # About 30KB of random assets: a write fails while the crawl still runs.
-crawl_warc_full write -r3 '-*' '+*/big/a/*' '+*/big/p/*' \
-    "${BASEURL}/big/index.html"
+big=(-r3 '-*' '+*/big/a/*' '+*/big/p/*' "${BASEURL}/big/index.html")
+crawl_warc_full write full.warc.gz --warc-file "${tmpdir}/write/full.warc.gz" \
+    --warc-cdx "${big[@]}"
 grep -q 'archive stops there' <<<"$lost" ||
     fail "a mid-crawl write failure was not reported: ${lost}"
-ok "a mid-crawl write failure is logged once"
+test ! -e "${tmpdir}/write/full.cdx" || fail "an incomplete archive was indexed"
+ok "a mid-crawl write failure is logged once, and indexes nothing"
+
+# The first rotation flushes segment 0 onto the full device.
+crawl_warc_full rotate s-00000.warc.gz --warc-file "${tmpdir}/rotate/s" \
+    --warc-max-size 600 "${big[@]}"
+grep -q 'could not finish writing .*s-00000\.warc\.gz' <<<"$lost" ||
+    fail "a failed rotation did not name its segment: ${lost}"
+test ! -e "${tmpdir}/rotate/s-00001.warc.gz" ||
+    fail "a failed rotation left the next segment behind"
+ok "a failed rotation is logged once and opens no segment"
 
 # One small page fits the stdio buffer, so only the close sees the failure.
-crawl_warc_full close "${BASEURL}/mini304/index.html"
+crawl_warc_full close full.warc.gz --warc-file "${tmpdir}/close/full.warc.gz" \
+    "${BASEURL}/mini304/index.html"
 grep -q 'could not finish writing .*full\.warc\.gz' <<<"$lost" ||
     fail "a failure at close was not reported: ${lost}"
 ok "a failure at close is logged once"
