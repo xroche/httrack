@@ -687,7 +687,8 @@ void warc_http_header_value(const char *hdr, const char *name, hts_buf out) {
         hts_span_starts_with(hts_span_skip(f.line, n.len), hts_span_of(":"))) {
       hts_span v = f.value;
 
-      hts_buf_put_span_clip(out, hts_span_take_until(&v, "; \t"));
+      /* a header value from the wire: clip it */
+      (void) !hts_buf_put_span_clip(out, hts_span_take_until(&v, "; \t"));
       return;
     }
   }

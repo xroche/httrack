@@ -1493,7 +1493,8 @@ static int cache_brstr(char *adr, hts_buf s) {
     /* A corrupt length may pass the buffer end, so bound by what is there */
     const size_t avail = strnlen(adr + off, (size_t) i);
 
-    hts_buf_put_span_clip(s, hts_span_at(adr + off, avail));
+    (void) !hts_buf_put_span_clip(s,
+                                  hts_span_at(adr + off, avail)); // cache data
     off += (int) avail;
   } else {
     s.p[0] = '\0';
@@ -1980,7 +1981,8 @@ static char *copyArcField(const char *line, int npos, hts_buf dest) {
 
     while (*end != '\0' && *end != ARC_SP)
       end++;
-    hts_buf_put_span_clip(dest, hts_span_between(pos, end));
+    /* index->line, which holds the field, is no longer than dest */
+    (void) !hts_buf_put_span_clip(dest, hts_span_between(pos, end));
     return dest.p;
   }
   dest.p[0] = '\0';

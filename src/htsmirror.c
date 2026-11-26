@@ -1228,8 +1228,10 @@ int hts_wait_delayed(htsmoduleStruct *str, lien_adrfilsave *afs,
 
           /* Recompute filename with MIME type */
           afs->save[0] = '\0';
-          url_savename(afs, former, heap(ptr)->adr, heap(ptr)->fil, opt, sback,
-                       cache, hash, ptr, numero_passe, &back);
+          /* -1 is an abort, which leaves no name to save under */
+          if (url_savename(afs, former, heap(ptr)->adr, heap(ptr)->fil, opt,
+                           sback, cache, hash, ptr, numero_passe, &back) < 0)
+            return -1;
 
           /* Recompute authorization with MIME type */
           (void) mime_forbids_link(opt, ptr, afs, back.r.contenttype,
@@ -1291,8 +1293,10 @@ int hts_wait_delayed(htsmoduleStruct *str, lien_adrfilsave *afs,
 
           /* Recompute filename with MIME type */
           afs->save[0] = '\0';
-          url_savename(afs, former, heap(ptr)->adr, heap(ptr)->fil, opt, sback,
-                       cache, hash, ptr, numero_passe, &delayed_back);
+          if (url_savename(afs, former, heap(ptr)->adr, heap(ptr)->fil, opt,
+                           sback, cache, hash, ptr, numero_passe,
+                           &delayed_back) < 0)
+            return -1;
 
           /* Recompute authorization with MIME type */
           if (mime_forbids_link(opt, ptr, afs, delayed_back.r.contenttype,
@@ -1475,9 +1479,10 @@ int hts_wait_delayed(htsmoduleStruct *str, lien_adrfilsave *afs,
 
                   /* Recompute filename for hash lookup */
                   afs->save[0] = '\0';
-                  url_savename(afs, former, heap(ptr)->adr, heap(ptr)->fil, opt,
-                               sback, cache, hash, ptr, numero_passe,
-                               &delayed_back);
+                  if (url_savename(afs, former, heap(ptr)->adr, heap(ptr)->fil,
+                                   opt, sback, cache, hash, ptr, numero_passe,
+                                   &delayed_back) < 0)
+                    return -1;
                 } else if (cookies_changed) {
                   // #15: cookie-wall self-redirect; evict the cached
                   // fast-header so the re-issue refetches with the cookie.
@@ -1487,9 +1492,10 @@ int hts_wait_delayed(htsmoduleStruct *str, lien_adrfilsave *afs,
                                          OPT_GET_BUFF_SIZE(opt), afs->af.adr,
                                          afs->af.fil));
                   afs->save[0] = '\0';
-                  url_savename(afs, former, heap(ptr)->adr, heap(ptr)->fil, opt,
-                               sback, cache, hash, ptr, numero_passe,
-                               &delayed_back);
+                  if (url_savename(afs, former, heap(ptr)->adr, heap(ptr)->fil,
+                                   opt, sback, cache, hash, ptr, numero_passe,
+                                   &delayed_back) < 0)
+                    return -1;
                   continue_loop = 1;
                 } else {
                   hts_log_print(opt, LOG_WARNING,
@@ -1510,14 +1516,18 @@ int hts_wait_delayed(htsmoduleStruct *str, lien_adrfilsave *afs,
                pumps sockets and could move this slot out, so pin it. */
             const hts_boolean pin =
                 b >= 0 && back_status(&back[b]) != STATUS_FREE;
+            int named;
 
             afs->save[0] = '\0';
             if (pin)
               back_set_pinned(sback, b);
-            url_savename(afs, former, heap(ptr)->adr, heap(ptr)->fil, opt,
-                         sback, cache, hash, ptr, numero_passe, &delayed_back);
+            named = url_savename(afs, former, heap(ptr)->adr, heap(ptr)->fil,
+                                 opt, sback, cache, hash, ptr, numero_passe,
+                                 &delayed_back);
             if (pin)
               back_set_unlocked(sback, b);
+            if (named < 0)
+              return -1;
 
             /* Recompute authorization with MIME type */
             if (mime_forbids_link(opt, ptr, afs, delayed_back.r.contenttype,

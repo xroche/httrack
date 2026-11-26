@@ -3907,7 +3907,7 @@ static void spandiff_one(parsediff_stats *st, const char *rules,
     char *one = malloct(line.len + 1);
 
     assertf(one != NULL);
-    hts_buf_put_span_clip(hts_buf_at(one, line.len + 1), line);
+    (void) !hts_buf_put_span_clip(hts_buf_at(one, line.len + 1), line);
     st->cases++;
     if (hts_host_alias_rule_ok(one) != legacy_hts_host_alias_rule_ok(one))
       parsediff_fail(st, "hts_host_alias_rule_ok", one, "line", "", "");

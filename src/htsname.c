@@ -464,7 +464,7 @@ hts_boolean url_query_value(const char *url, const char *name, hts_buf dst) {
     return HTS_FALSE;
   }
   /* crawled query text: clip it */
-  hts_buf_put_span_clip(dst, f.val);
+  (void) !hts_buf_put_span_clip(dst, f.val);
   return HTS_TRUE;
 }
 
@@ -1180,6 +1180,8 @@ int url_savename(lien_adrfilsave *const afs,
                   }
                   (void) hts_poll_abort_request(opt);
                   if (!hts_loop_tick(sback, opt, b, ptr)) {
+                    back_delete(opt, cache, sback, b);
+                    opt->state._hts_in_html_parsing = hihp;
                     return -1;
                   } else if (opt->state._hts_cancel || !back_checkmirror(opt) ||
                              hts_is_exiting(opt)) { // cancel parsing, or exit
@@ -1253,8 +1255,11 @@ int url_savename(lien_adrfilsave *const afs,
                                                 current.fil);
                                 }
                                 if (!hts_wait_available_socket(sback, opt,
-                                                               cache, ptr))
+                                                               cache, ptr)) {
+                                  back_maydelete(opt, cache, sback, b);
+                                  opt->state._hts_in_html_parsing = hihp;
                                   return -1;
+                                }
                                 if (back_add(sback, opt, cache, moved.adr,
                                              moved.fil, methode, referer_adr,
                                              referer_fil, 1, HTS_FALSE,

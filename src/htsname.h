@@ -97,12 +97,12 @@ typedef struct lien_adrfilsave lien_adrfilsave;
 
 // note: 'headers' can either be null, or incomplete (only r member filled)
 // 'sback' may be NULL, which skips the type-probing request
-int url_savename(lien_adrfilsave *const afs,
-                 lien_adrfil *const former,
-                 const char *referer_adr, const char *referer_fil, 
-                 httrackp * opt, struct_back * sback, cache_back * cache,
-                 hash_struct * hash, int ptr, int numero_passe,
-                 const lien_back * headers);
+// Returns 0, or -1 when the loop callback aborted the probe and no name is set
+HTS_CHECK_RESULT int
+url_savename(lien_adrfilsave *const afs, lien_adrfil *const former,
+             const char *referer_adr, const char *referer_fil, httrackp *opt,
+             struct_back *sback, cache_back *cache, hash_struct *hash, int ptr,
+             int numero_passe, const lien_back *headers);
 void standard_name(hts_buf b, const char *dot_pos, const char *nom_pos,
                    const char *fil_complete, int short_ver);
 /* Does url's query have a field with an '=' whose key is exactly name? Its
