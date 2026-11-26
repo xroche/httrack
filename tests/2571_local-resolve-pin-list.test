@@ -30,7 +30,9 @@ fetched() {
     test -s "$tmpdir/$1/pinhost_${SRV_PORT}/simple/basic.html"
 }
 
-pad=$(printf 'x,%.0s' $(seq 1 200))
+# past any clip of 255 or 512 bytes
+pad=$(printf 'x,%.0s' $(seq 1 400))
+big=$(printf 'y%.0s' $(seq 1 100))
 
 crawl short "pinhost:x,,127.0.0.1"
 fetched short || fail_dump "short pin: page not fetched" "$tmpdir/short/hts-log.txt"
@@ -39,6 +41,21 @@ crawl none "pinhost:x,,y"
 ! fetched none || fail "a pin with no address still reached the server"
 
 crawl long "pinhost:${pad}127.0.0.1"
-fetched long || fail_dump "address past byte 255 was dropped" "$tmpdir/long/hts-log.txt"
+fetched long || fail_dump "address past byte 512 was dropped" "$tmpdir/long/hts-log.txt"
+
+crawl big "pinhost:${big},127.0.0.1"
+fetched big || fail_dump "an over-long item ended the list" "$tmpdir/big/hts-log.txt"
+
+crawl trailing "pinhost:127.0.0.1,"
+fetched trailing || fail_dump "a trailing comma lost the list" "$tmpdir/trailing/hts-log.txt"
+
+# the server is on 127.0.0.1 only, so ::1 is dialled and refused, not unknown
+crawl v6only "pinhost:::1"
+v6log=$(cat "$tmpdir/v6only/hts-log.txt")
+grep -qF '"Connect Error"' <<<"$v6log" ||
+    fail_dump "the IPv6 item was not read as an address" "$tmpdir/v6only/hts-log.txt"
+
+crawl v6 "pinhost:::1,127.0.0.1"
+fetched v6 || fail_dump "an IPv6 item ended the list" "$tmpdir/v6/hts-log.txt"
 
 echo "OK: the resolve pin reads its whole list"

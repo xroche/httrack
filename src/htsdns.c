@@ -342,12 +342,14 @@ static int HTS_RESOLVER_CALL override_getaddrinfo(const char *node,
     hts_span rest = hts_span_of(colon + 1);
     hts_span item;
 
-    /* not strtok, because DNS worker threads run this */
+    /* reentrant: DNS worker threads run this */
     while (hts_span_next_in(&rest, ',', &item)) {
       char ip[64];
-      struct addrinfo *const ai = hts_buf_put_span(HTS_BUF(ip), item)
-                                      ? resolver_make_ai(ip, want)
-                                      : NULL;
+      struct addrinfo *ai;
+
+      if (!hts_buf_put_span(HTS_BUF(ip), item))
+        continue;
+      ai = resolver_make_ai(ip, want);
 
       if (ai != NULL) {
         if (head == NULL)
