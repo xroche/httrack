@@ -677,9 +677,7 @@ hts_urllist_status hts_urllist_next(hts_span buff, size_t *pos,
   *pos = term + 1;
   /* an embedded NUL ends the read too, and half a URL is not one */
   if (term < buff.len && buff.p[term] == '\0') {
-    while (*pos < buff.len && buff.p[*pos] != '\n')
-      (*pos)++;
-    (*pos)++;
+    *pos += hts_span_find(hts_span_skip(buff, *pos), '\n') + 1;
     return HTS_URLLIST_NUL;
   }
   /* a clipped URL is a different URL */

@@ -320,10 +320,7 @@ static hts_boolean sf_resolve(const sf_ctx *ctx, const char *base_dir,
   const hts_span r = hts_span_trim(ref, " \t\r\n\f", " \t\r\n\f");
 
   /* A mirrored name carries no query or fragment. */
-  for (n = 0; n < r.len; n++) {
-    if (r.p[n] == '#' || r.p[n] == '?')
-      break;
-  }
+  n = hts_span_find_any(r, "#?");
   if (n == 0)
     return HTS_FALSE;
   /* Site-root-relative: no base to resolve it against. */

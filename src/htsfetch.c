@@ -98,17 +98,12 @@ static hts_boolean tag_attr_find(const char *tag_name, const char *name,
 /* Does the whitespace-separated list hold token? */
 static hts_boolean has_token(hts_span list, const char *token) {
   const hts_span want = hts_span_of(token);
-  size_t i = 0;
 
-  while (i < list.len) {
-    size_t start;
-
-    while (i < list.len && is_realspace(list.p[i]))
-      i++;
-    for (start = i; i < list.len && !is_realspace(list.p[i]); i++)
-      ;
-    if (hts_span_eq_ci(hts_span_at(list.p + start, i - start), want))
+  list = hts_span_trim(list, HTS_REALSPACES, "");
+  while (!hts_span_empty(list)) {
+    if (hts_span_eq_ci(hts_span_take_until(&list, HTS_REALSPACES), want))
       return HTS_TRUE;
+    list = hts_span_trim(list, HTS_REALSPACES, "");
   }
   return HTS_FALSE;
 }

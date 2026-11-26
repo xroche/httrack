@@ -713,13 +713,8 @@ void warc_http_header_value(const char *hdr, const char *name, hts_buf out) {
     if (hts_span_starts_with_ci(f.line, n) &&
         hts_span_starts_with(hts_span_skip(f.line, n.len), hts_span_of(":"))) {
       hts_span v = f.value;
-      size_t k;
-      for (k = 0; k < v.len; k++)
-        if (v.p[k] == ';' || v.p[k] == ' ' || v.p[k] == '\t') {
-          v.len = k;
-          break;
-        }
-      hts_buf_put_span_clip(out, v);
+
+      hts_buf_put_span_clip(out, hts_span_take_until(&v, "; \t"));
       return;
     }
   }

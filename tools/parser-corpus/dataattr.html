@@ -13,4 +13,10 @@
 <input type="hidden" name="src" value="d-hidden.gif">
 <div data-config='{"src":"d-json.gif","href":"d-json.html"}'>JSON in a data attribute</div>
 <a href="d-real.html" data-href="d-beside.html">a real link beside a data one</a>
+<!-- A lazy-load placeholder is no URL; blanks around a value and braces in its
+     query are not placeholders. -->
+<img data-src="lazy" alt="placeholder word">
+<img data-src="{{d-template.gif}}" alt="template">
+<img data-src=" d-pad.gif " alt="padded">
+<img data-src="d-query.gif?v={a}" alt="braces in the query">
 </body></html>

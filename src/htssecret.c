@@ -350,29 +350,26 @@ static hts_boolean fprint_url_span(httrackp *opt, FILE *fp, hts_span buff,
 /* Writes the header line buff with the login of its URL value masked. Returns
    HTS_FALSE, writing nothing, when out of memory. */
 static hts_boolean fprint_url_field(httrackp *opt, FILE *fp, hts_span buff) {
-  const char *const colon = memchr(buff.p, ':', buff.len);
-  size_t keep = colon != NULL ? (size_t) (colon - buff.p) + 1 : buff.len;
+  const hts_span url = hts_span_trim(
+      hts_span_skip(buff, hts_span_find(buff, ':') + 1), HTS_TABORSPACES, "");
 
-  while (keep < buff.len && (buff.p[keep] == ' ' || buff.p[keep] == '\t'))
-    keep++;
-  return fprint_url_span(opt, fp, buff, keep, buff.len);
+  return fprint_url_span(opt, fp, buff, (size_t) (url.p - buff.p), buff.len);
 }
 
 /* Writes the request line buff with the login of its target masked, as a
    proxied ftp:// target carries one. Returns HTS_FALSE, writing nothing, when
    buff is no "METHOD target HTTP/" line or out of memory. */
 static hts_boolean fprint_request_line(httrackp *opt, FILE *fp, hts_span buff) {
-  const char *const sp = memchr(buff.p, ' ', buff.len);
-  const char *version;
+  const size_t target = hts_span_find(buff, ' ') + 1;
+  size_t version;
 
-  if (sp == NULL)
+  if (target > buff.len)
     return HTS_FALSE;
-  version = memchr(sp + 1, ' ', buff.len - (size_t) (sp + 1 - buff.p));
-  if (version == NULL || (size_t) (buff.p + buff.len - version) < 6 ||
-      strncmp(version, " HTTP/", 6) != 0)
+  version = target + hts_span_find(hts_span_skip(buff, target), ' ');
+  if (!hts_span_starts_with(hts_span_skip(buff, version),
+                            hts_span_of(" HTTP/")))
     return HTS_FALSE;
-  return fprint_url_span(opt, fp, buff, (size_t) (sp + 1 - buff.p),
-                         (size_t) (version - buff.p));
+  return fprint_url_span(opt, fp, buff, target, version);
 }
 
 /* Finds the secret of the userinfo at the authority a: the password after the
@@ -448,15 +445,6 @@ char *hts_mask_passwords(const char *s, hts_mask_mode mode) {
   return dst;
 }
 
-/* Where is the first blank of S, or its end? */
-static size_t blank_at(hts_span s) {
-  size_t n = 0;
-
-  while (n < s.len && s.p[n] != ' ' && s.p[n] != '\t')
-    n++;
-  return n;
-}
-
 /* Does LINE, without its CR or LF, carry a secret field? A name with no colon
    behind it counts, its value then starting after the next blank. A fold or a
    leading ':' takes that path too and never matches. */
@@ -464,7 +452,7 @@ static hts_boolean secret_field(hts_span line, hts_span *name,
                                 hts_span *value) {
   hts_header_split(line, name, value);
   if (hts_span_empty(*name)) {
-    *name = hts_span_at(line.p, blank_at(line));
+    *name = hts_span_at(line.p, hts_span_find_any(line, HTS_TABORSPACES));
     *value = hts_span_trim(hts_span_skip(line, name->len), HTS_TABORSPACES,
                            HTS_TABORSPACES);
   }
@@ -483,8 +471,9 @@ void hts_secret_add_headers(httrackp *opt, const char *headers) {
         !hts_span_eq_ci(name, hts_span_of("Cookie")) &&
         !hts_span_eq_ci(name, hts_span_of("Set-Cookie"))) {
       // the whole value, then the credentials after the scheme ("Basic TOKEN")
-      const hts_span cred = hts_span_trim(hts_span_skip(value, blank_at(value)),
-                                          HTS_TABORSPACES, "");
+      const hts_span cred = hts_span_trim(
+          hts_span_skip(value, hts_span_find_any(value, HTS_TABORSPACES)),
+          HTS_TABORSPACES, "");
 
       hts_secret_add(opt, value, HTS_SECRET_HEADER);
       hts_secret_add(opt, cred, HTS_SECRET_HEADER);

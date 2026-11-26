@@ -1417,8 +1417,8 @@ static const char *paste_curl_cookies(httrackp *opt, t_cookie *jar,
     value = hts_span_trim(value, " ", " ");
     if (hts_span_empty(name) && !hts_span_present(value))
       continue;
-    if (memchr(name.p, '\t', name.len) != NULL ||
-        (hts_span_present(value) && memchr(value.p, '\t', value.len) != NULL)) {
+    if (hts_span_find(name, '\t') < name.len ||
+        hts_span_find(value, '\t') < value.len) {
       why = "a cookie holds a TAB";
     } else if (hts_span_empty(name) || !hts_span_present(value)) {
       why = "a cookie in the paste has no name";
@@ -1470,7 +1470,7 @@ static hts_boolean paste_host_entry(hts_span host,
   const char *reg;
 
   host = hts_span_trim(host, "", ".");
-  if (host.len > 0 && host.p[0] == '.')
+  if (hts_span_first(host) == '.')
     host = hts_span_skip(host, 1);
   if (host.len == 0 || !hts_buf_put_span(HTS_BUF(given), host))
     return HTS_FALSE;

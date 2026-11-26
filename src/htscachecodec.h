@@ -154,7 +154,7 @@ hts_cache_read_fields(hts_span block, const hts_cache_field *fields,
   const char *const end = block.p + block.len;
   char BIGSTK line[HTS_CACHE_LINE_SIZE];
 
-  if (memchr(block.p, '\0', block.len) != NULL) {
+  if (hts_span_find(block, '\0') < block.len) {
     return HTS_FALSE;
   }
   while (p < end) {

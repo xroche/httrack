@@ -1,0 +1,15 @@
+#!/bin/bash
+#
+# The span finders return the index of the first match, or the length when
+# there is none, and first/last read a byte as unsigned or -1 when empty.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# The count is exact, so a shrinking table shows.
+selftest_queue_lines "spanfind: 26 cases, 0 failures
+spanfind: OK" spanfind
+
+selftest_run_queued

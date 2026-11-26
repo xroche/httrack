@@ -146,7 +146,8 @@ void hts_quote_arg(String *out, const char *arg) {
 }
 
 hts_boolean hts_is_quoted(hts_span arg) {
-  return arg.len >= 2 && arg.p[0] == '\"' && arg.p[arg.len - 1] == '\"';
+  return arg.len >= 2 && hts_span_first(arg) == '"' &&
+         hts_span_last(arg) == '"';
 }
 
 hts_boolean hts_unquote_arg(char *arg) {

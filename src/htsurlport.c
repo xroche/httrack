@@ -115,18 +115,16 @@ hts_boolean hts_parse_url_port(const char *a, int *port) {
 }
 
 hts_boolean hts_span_next_in(hts_span *rest, char sep, hts_span *field) {
-  const char *stop;
-
   if (hts_span_empty(*rest))
     return HTS_FALSE;
-  stop = memchr(rest->p, sep, rest->len);
-  *field = stop != NULL ? hts_span_between(rest->p, stop) : *rest;
-  *rest = hts_span_skip(*rest, field->len + (stop != NULL ? 1 : 0));
+  *field = hts_span_at(rest->p, hts_span_find(*rest, sep));
+  /* past the SEP, or to the end when there is none */
+  *rest = hts_span_skip(*rest, field->len + 1);
   return HTS_TRUE;
 }
 
 static hts_boolean span_in_set(const char *set, char c) {
-  return c != '\0' && strchr(set, c) != NULL;
+  return hts_span_find_any(hts_span_at(&c, 1), set) == 0;
 }
 
 hts_boolean hts_span_empty(hts_span s) {
@@ -142,12 +140,12 @@ hts_span hts_span_trim(hts_span s, const char *left, const char *right) {
 }
 
 hts_boolean hts_span_split(hts_span s, char c, hts_span *head, hts_span *tail) {
-  const char *const at = !hts_span_empty(s) ? memchr(s.p, c, s.len) : NULL;
+  const size_t at = hts_span_find(s, c);
 
-  if (at == NULL)
+  if (at == s.len)
     return HTS_FALSE;
-  *head = hts_span_between(s.p, at);
-  *tail = hts_span_skip(s, head->len + 1);
+  *head = hts_span_at(s.p, at);
+  *tail = hts_span_skip(s, at + 1);
   return HTS_TRUE;
 }
 
@@ -177,32 +175,31 @@ hts_boolean hts_param_next(hts_span *rest, char sep, hts_span *name,
   return HTS_TRUE;
 }
 
-static hts_boolean header_blank(char c) { return c == ' ' || c == '\t'; }
+static hts_boolean header_blank(int c) { return c == ' ' || c == '\t'; }
 
 void hts_header_split(hts_span line, hts_span *name, hts_span *value) {
-  const char *const colon = !hts_span_empty(line) && !header_blank(line.p[0])
-                                ? memchr(line.p, ':', line.len)
-                                : NULL;
+  const size_t colon =
+      header_blank(hts_span_first(line)) ? line.len : hts_span_find(line, ':');
 
-  if (colon == NULL) {
+  if (colon == line.len) {
     *name = *value = hts_span_at(line.p, 0);
     return;
   }
   /* hand-trimmed, because hts_span_trim costs a strchr per byte here */
-  *name = hts_span_between(line.p, colon);
-  *value = hts_span_between(colon + 1, line.p + line.len);
-  while (!hts_span_empty(*name) && header_blank(name->p[name->len - 1]))
+  *name = hts_span_at(line.p, colon);
+  *value = hts_span_skip(line, colon + 1);
+  while (header_blank(hts_span_last(*name)))
     name->len--;
-  while (!hts_span_empty(*value) && header_blank(value->p[0]))
+  while (header_blank(hts_span_first(*value)))
     *value = hts_span_skip(*value, 1);
-  while (!hts_span_empty(*value) && header_blank(value->p[value->len - 1]))
+  while (header_blank(hts_span_last(*value)))
     value->len--;
 }
 
 hts_boolean hts_header_next(hts_span *rest, hts_header_field *f) {
   if (!hts_span_next_in(rest, '\n', &f->line))
     return HTS_FALSE;
-  if (!hts_span_empty(f->line) && f->line.p[f->line.len - 1] == '\r')
+  if (hts_span_last(f->line) == '\r')
     f->line.len--;
   hts_header_split(f->line, &f->name, &f->value);
   return !hts_span_empty(f->line);

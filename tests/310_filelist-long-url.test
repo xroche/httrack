@@ -105,9 +105,12 @@ lognot 'EOFMRK|eofmrk'
 
 # A NUL splits a line the same way, which is what a list saved as UTF-16 is
 # made of. The good line after it still loads.
-printf 'file://%s/one\0.html\nfile://%s/two.html\n' "$tmp" "$tmp" >"$tmp/nul.txt"
+printf 'file://%s/one\0.html\nfile://%s/1\0.html\nfile://%s/two.html\n' \
+    "$tmp" "$tmp" "$tmp" >"$tmp/nul.txt"
 run "$tmp/nul.txt"
 loghas "\"[^\"]*nul\.txt\", line 1: URL contains a NUL byte, ignored"
+# the read resumes past the LF, so the next line keeps its number
+loghas "\"[^\"]*nul\.txt\", line 2: URL contains a NUL byte, ignored"
 loghas '(^|[^0-9])1 links added from'
 
 exit 0
