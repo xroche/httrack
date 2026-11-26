@@ -837,6 +837,7 @@ int url_savename(lien_adrfilsave *const afs,
 
   /*char BIGSTK normadr_[HTS_URLMAXSIZE*2]; */
   char BIGSTK normadr_[HTS_URLMAXSIZE * 2], normfil_[HTS_URLMAXSIZE * 2];
+
   enum {
     PROTOCOL_HTTP,
     PROTOCOL_HTTPS,
