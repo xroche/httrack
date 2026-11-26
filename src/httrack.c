@@ -677,7 +677,7 @@ static void sig_doback(int blind) { // go to the background
 
   if (global_opt != NULL) {
     // suppress logging and asking lousy questions
-    global_opt->quiet = 1;
+    global_opt->quiet = HTS_TRUE;
     global_opt->verbosedisplay = HTS_VERBOSE_NONE;
   }
 

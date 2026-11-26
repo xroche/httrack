@@ -1983,7 +1983,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
           // ATTENTION C'EST ICI QU'ON SAUVE LE FICHIER!!
           // A failed transfer has no body: r.adr holds debris from the aborted
           // read, which would destroy the copy being re-fetched (#748).
-          if (r.statuscode > 0 && (r.adr != NULL || r.size == 0)) {
+          if (statuscode_is_http(r.statuscode) &&
+              (r.adr != NULL || r.size == 0)) {
             file_notify(opt, urladr(), urlfil(), savename(), 1, 1, r.notmodified);
             if (r.size < 0 || filesave(opt, hts_blk_body(&r), savename(),
                                        urladr(), urlfil()) != 0) {
@@ -2463,7 +2464,7 @@ void host_ban(httrackp * opt, int ptr,
   }
   // couper connexion
   for(i = 0; i < back_max; i++) {
-    if (back_status(&back[i]) >= 0) // receiving or ready
+    if (back_holds_transfer(&back[i]))
       /* host is a bare name and an FTP url_adr keeps its scheme, so no FTP slot
          matches here, and none may, because its worker is still writing it. */
       if (strfield2(back[i].url_adr, host)) {

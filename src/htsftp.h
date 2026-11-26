@@ -139,7 +139,15 @@ HTS_CHECK_RESULT hts_boolean ftp_parse_mdtm(const char *line,
                                             struct tm *tm_time);
 T_SOC get_datasocket(hts_buf to_send);
 char *linejmp(char *line);
-HTS_CHECK_RESULT int check_socket_connect(T_SOC soc);
+
+/* What a poll of a socket saw, without blocking. */
+typedef enum hts_poll_result {
+  HTS_POLL_ERROR = -1, /**< select() flagged the socket, or it is unusable */
+  HTS_POLL_NONE = 0,   /**< nothing yet */
+  HTS_POLL_READY = 1   /**< readable, or for a connect, writable */
+} hts_poll_result;
+
+HTS_CHECK_RESULT hts_poll_result check_socket_connect(T_SOC soc);
 #endif
 
 #endif

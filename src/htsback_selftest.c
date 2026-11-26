@@ -88,6 +88,48 @@ static int st_transportfailures(httrackp *opt, int argc, char **argv) {
   return st_verdict("transport-failures", err);
 }
 
+/* Each named range must split the statuses where the engine's tests did. */
+static int st_slotranges(httrackp *opt, int argc, char **argv) {
+  static const struct {
+    int status;
+    hts_boolean in_flight, holds, live;
+  } slots[] = {{STATUS_ALIVE, HTS_FALSE, HTS_FALSE, HTS_FALSE},
+               {STATUS_FREE, HTS_FALSE, HTS_FALSE, HTS_FALSE},
+               {STATUS_READY, HTS_FALSE, HTS_TRUE, HTS_FALSE},
+               {STATUS_TRANSFER, HTS_TRUE, HTS_TRUE, HTS_TRUE},
+               {STATUS_SSL_WAIT_HANDSHAKE, HTS_TRUE, HTS_TRUE, HTS_TRUE},
+               {STATUS_FTP_TRANSFER, HTS_TRUE, HTS_TRUE, HTS_FALSE},
+               {STATUS_FTP_READY, HTS_TRUE, HTS_TRUE, HTS_FALSE}};
+
+  static const struct {
+    int code;
+    hts_boolean http, internal;
+  } codes[] = {{STATUSCODE_IO_ERROR, HTS_FALSE, HTS_TRUE},
+               {STATUSCODE_INVALID, HTS_FALSE, HTS_TRUE},
+               {0, HTS_FALSE, HTS_FALSE},
+               {HTTP_OK, HTS_TRUE, HTS_FALSE},
+               {HTTP_NOT_FOUND, HTS_TRUE, HTS_FALSE}};
+
+  lien_back *b = calloct(1, sizeof(lien_back));
+  int err = 0;
+  size_t i;
+
+  if (b == NULL)
+    return 77;
+  for (i = 0; i < sizeof(slots) / sizeof(slots[0]); i++) {
+    b->status = slots[i].status;
+    ST_FAIL_IF(err, back_in_flight(b) != slots[i].in_flight);
+    ST_FAIL_IF(err, back_holds_transfer(b) != slots[i].holds);
+    ST_FAIL_IF(err, back_is_live(slots[i].status) != slots[i].live);
+  }
+  for (i = 0; i < sizeof(codes) / sizeof(codes[0]); i++) {
+    ST_FAIL_IF(err, statuscode_is_http(codes[i].code) != codes[i].http);
+    ST_FAIL_IF(err, statuscode_is_internal(codes[i].code) != codes[i].internal);
+  }
+  freet(b);
+  return st_verdict("slot-ranges", err);
+}
+
 static int st_pause(httrackp *opt, int argc, char **argv) {
   int err = 0, i, seen_low = 0, seen_high = 0;
 
@@ -1465,7 +1507,7 @@ static T_SOC st_backstop_pending(httrackp *opt, htsblk *r) {
   if (soc == INVALID_SOCKET)
     return INVALID_SOCKET;
   r->soc = soc;
-  if (check_socket_connect(soc) != 0) {
+  if (check_socket_connect(soc) != HTS_POLL_NONE) {
     strcpybuff(r->msg, "the network answers for this address");
     deletehttp(r);
     return INVALID_SOCKET;
@@ -1522,7 +1564,7 @@ static hts_boolean st_backstop_arm(httrackp *opt, struct_back *sback,
      ends slots the caller asserts are intact (the powerpc buildds). */
   Sleep(ST_BACKSTOP_SETTLE_MS);
   for (i = 0; i < slots; i++) {
-    if (check_socket_connect(sback->lnk[i].r.soc) != 0) {
+    if (check_socket_connect(sback->lnk[i].r.soc) != HTS_POLL_NONE) {
       printf("backstop: SKIP (the network answered for " ST_BACKSTOP_DEADHOST
              " within %d ms)\n",
              ST_BACKSTOP_SETTLE_MS);
@@ -3596,6 +3638,9 @@ const struct selftest_entry selftests_back[] = {
     {"mirrorcompleted", "",
      "a fresh opt has no mirror verdict, and copy_htsopt carries none",
      st_mirrorcompleted},
+    {"slotranges", "",
+     "the named slot and status-code ranges split where the engine expects",
+     st_slotranges},
     {"transportfailures", "",
      "a failed transfer is counted apart from an answered error",
      st_transportfailures},

@@ -1808,7 +1808,7 @@ void warc_write_backtransaction(httrackp *opt, lien_back *back) {
   }
   w = (warc_writer *) opt->state.warc;
 
-  if (back->r.statuscode <= 0)
+  if (!statuscode_is_http(back->r.statuscode))
     return;
 
   is_ftp = strfield(back->url_adr, "ftp://") != 0;
