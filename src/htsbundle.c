@@ -61,19 +61,18 @@ Please visit our Website: http://www.httrack.com
    request still has room for the rest. */
 #define BUNDLE_HEADERS_MAX 8192
 
+/* Owned heap strings. */
+typedef TypedArray(char *) strlist;
+
 typedef struct bundle {
   char name[HTS_BUNDLE_NAME_MAX];
   char file[HTS_URLMAXSIZE * 2];
-  char **start_urls; /* the start URLs naming it */
-  size_t nstart;
-  char **urls; /* its url lines */
-  size_t nurls;
+  strlist start_urls; /* the start URLs naming it */
+  strlist urls;       /* its url lines */
   /* lowercase domains, each covering its subdomains, or "=host" for a host
      alone */
-  char **scope;
-  size_t nscope;
-  char **home; /* the entries its start URLs and url lines alone give */
-  size_t nhome;
+  strlist scope;
+  strlist home; /* the entries its start URLs and url lines alone give */
   char *ua; /* NULL when it gives none */
   String headers;
   hts_boolean https_only;  /* Are its headers for https alone? */
@@ -84,33 +83,28 @@ typedef struct hts_bundle_state {
   TypedArray(bundle) items;
 } hts_bundle_state;
 
-static hts_boolean strlist_add(char ***list, size_t *count, const char *s) {
-  char **const grown = realloct(*list, (*count + 1) * sizeof(char *));
+static hts_boolean strlist_add(strlist *list, const char *s) {
+  char *copy = strdupt(s);
 
-  if (grown == NULL)
-    return HTS_FALSE;
-  *list = grown;
-  grown[*count] = strdupt(s);
-  if (grown[*count] == NULL)
-    return HTS_FALSE;
-  (*count)++;
-  return HTS_TRUE;
+  if (copy != NULL && TypedArrayPush(*list, copy))
+    return HTS_TRUE;
+  freet(copy);
+  return HTS_FALSE;
 }
 
-static void strlist_free(char ***list, size_t *count) {
+static void strlist_free(strlist *list) {
   size_t i;
 
-  for (i = 0; i < *count; i++)
-    freet((*list)[i]);
-  freet(*list);
-  *count = 0;
+  for (i = 0; i < TypedArraySize(*list); i++)
+    freet(TypedArrayNth(*list, i));
+  TypedArrayFree(*list);
 }
 
 /* Forget what reading b's file gave. */
 static void bundle_clear(bundle *b) {
-  strlist_free(&b->urls, &b->nurls);
-  strlist_free(&b->scope, &b->nscope);
-  strlist_free(&b->home, &b->nhome);
+  strlist_free(&b->urls);
+  strlist_free(&b->scope);
+  strlist_free(&b->home);
   freet(b->ua);
   StringClear(b->headers);
   b->https_only = HTS_FALSE;
@@ -192,7 +186,7 @@ void hts_bundle_free(httrackp *opt) {
     bundle *const b = &TypedArrayNth(st->items, i);
 
     bundle_clear(b);
-    strlist_free(&b->start_urls, &b->nstart);
+    strlist_free(&b->start_urls);
     StringFree(b->headers);
   }
   TypedArrayFree(st->items);
@@ -218,8 +212,7 @@ static hts_boolean bundle_add(httrackp *opt, const char *name,
       b = &TypedArrayNth(st->items, i);
   }
   if (b == NULL) {
-    TypedArrayEnsureRoom(st->items, 1);
-    if (!TypedArrayHasRoom(st->items, 1))
+    if (!TypedArrayReserve(st->items, 1))
       return HTS_FALSE;
     b = &TypedArrayTail(st->items);
     TypedArraySize(st->items)++;
@@ -227,7 +220,7 @@ static hts_boolean bundle_add(httrackp *opt, const char *name,
     StringInit(b->headers);
     strcpybuff(b->name, name);
   }
-  return strlist_add(&b->start_urls, &b->nstart, url);
+  return strlist_add(&b->start_urls, url);
 }
 
 const char *hts_bundle_take(httrackp *opt, char *url) {
@@ -303,20 +296,25 @@ static hts_boolean scope_covers(const char *entry, const char *host) {
 /* The host a scope entry names, without the "=" of a host alone. */
 #define SCOPE_ENTRY_HOST(entry) ((entry) + ((entry)[0] == '='))
 
-/* Does one of the n entries of list cover host? */
-static hts_boolean scope_list_covers(char *const *list, size_t n,
-                                     const char *host) {
+/* Does one of the first n entries of list cover host? */
+static hts_boolean scope_list_covers_n(const strlist *list, size_t n,
+                                       const char *host) {
   size_t i;
 
   for (i = 0; i < n; i++) {
-    if (scope_covers(list[i], host))
+    if (scope_covers(TypedArrayNth(*list, i), host))
       return HTS_TRUE;
   }
   return HTS_FALSE;
 }
 
+/* Does an entry of list cover host? */
+static hts_boolean scope_list_covers(const strlist *list, const char *host) {
+  return scope_list_covers_n(list, TypedArraySize(*list), host);
+}
+
 static hts_boolean bundle_in_scope(const bundle *b, const char *host) {
-  return scope_list_covers(b->scope, b->nscope, host);
+  return scope_list_covers(&b->scope, host);
 }
 
 /* Does one of the first n entries of b's scope cover a cookie set for domain?
@@ -325,25 +323,25 @@ static hts_boolean bundle_keeps_domain(const bundle *b, size_t n,
                                        const char *domain,
                                        char host[COOKIE_MAX_DOMAIN]) {
   return cookie_host(domain, host, COOKIE_MAX_DOMAIN) &&
-         scope_list_covers(b->scope, n, host[0] == '.' ? host + 1 : host);
+         scope_list_covers_n(&b->scope, n, host[0] == '.' ? host + 1 : host);
 }
 
-/* Add entry to the n entries of *list, up to max. NULL, or why it could not. */
-static const char *scope_list_add(char ***list, size_t *n, const char *entry,
+/* Add entry to list, up to max. NULL, or why it could not. */
+static const char *scope_list_add(strlist *list, const char *entry,
                                   size_t max) {
   size_t i;
 
-  for (i = 0; i < *n; i++) {
-    if (strcmp((*list)[i], entry) == 0)
+  for (i = 0; i < TypedArraySize(*list); i++) {
+    if (strcmp(TypedArrayNth(*list, i), entry) == 0)
       return NULL;
   }
-  if (*n >= max)
+  if (TypedArraySize(*list) >= max)
     return "more than 256 scope domains";
-  return strlist_add(list, n, entry) ? NULL : "out of memory";
+  return strlist_add(list, entry) ? NULL : "out of memory";
 }
 
 static const char *bundle_scope_add(bundle *b, const char *entry) {
-  return scope_list_add(&b->scope, &b->nscope, entry, BUNDLE_LIST_MAX);
+  return scope_list_add(&b->scope, entry, BUNDLE_LIST_MAX);
 }
 
 /* Add url's https flag, home entry and default scope to b. NULL, or why it
@@ -365,7 +363,7 @@ static const char *bundle_note_url(bundle *b, const char *url) {
   snprintf(entry, sizeof(entry), "%s%s", reg != NULL ? "" : "=",
            reg != NULL ? reg : host);
   // no cap: the start URLs and the 256 url lines bound it
-  why = scope_list_add(&b->home, &b->nhome, entry, SIZE_MAX);
+  why = scope_list_add(&b->home, entry, SIZE_MAX);
   if (why != NULL || b->scope_given)
     return why;
   return bundle_scope_add(b, entry);
@@ -480,10 +478,10 @@ static hts_boolean bundle_parse(httrackp *opt, bundle *b, text_src *src,
           strstr(typed, HTS_BUNDLE_SUFFIX) != NULL ||
           !cookie_url_host(typed, HTS_BUF(host)))
         BUNDLE_FAIL("%s, line %d: invalid url", b->file, lineno);
-      if (b->nurls >= BUNDLE_LIST_MAX)
+      if (TypedArraySize(b->urls) >= BUNDLE_LIST_MAX)
         BUNDLE_FAIL("%s, line %d: more than %d url lines", b->file, lineno,
                     BUNDLE_LIST_MAX);
-      if (!strlist_add(&b->urls, &b->nurls, typed))
+      if (!strlist_add(&b->urls, typed))
         BUNDLE_FAIL("%s: out of memory", b->file);
     } else if (hts_span_eq(key, hts_span_of("ua"))) {
       if (b->ua != NULL)
@@ -520,8 +518,7 @@ static hts_boolean bundle_jar_wins(const bundle *b, const char *jar_file) {
 
 /* Each host here had a record skipped for a clash. */
 typedef struct bundle_clashes {
-  char **hosts;
-  size_t count;
+  strlist hosts;
 } bundle_clashes;
 
 /* What bundle_admit needs about the bundle being read. */
@@ -560,7 +557,7 @@ static hts_boolean bundle_admit(cookie_filter *filter, t_cookie *cookie,
   }
   bare = host[0] == '.' ? host + 1 : host;
   // an earlier pass loaded it
-  if (scope_list_covers(ctx->b->scope, ctx->first_entry, bare))
+  if (scope_list_covers_n(&ctx->b->scope, ctx->first_entry, bare))
     return HTS_FALSE;
   if (strlen(name) > COOKIE_MAX_PAIR ||
       strlen(value) > COOKIE_MAX_PAIR - strlen(name)) {
@@ -573,9 +570,8 @@ static hts_boolean bundle_admit(cookie_filter *filter, t_cookie *cookie,
                   : !repeat) &&
              !hts_span_eq(cookie_field(other, 6), hts_span_of(value))) {
     // outside this bundle's home, a later check decides
-    if (ctx->clashes != NULL &&
-        !scope_list_covers(ctx->b->home, ctx->b->nhome, bare)) {
-      if (!strlist_add(&ctx->clashes->hosts, &ctx->clashes->count, bare))
+    if (ctx->clashes != NULL && !scope_list_covers(&ctx->b->home, bare)) {
+      if (!strlist_add(&ctx->clashes->hosts, bare))
         filter->why = "out of memory";
       ctx->clashed++;
       return HTS_FALSE;
@@ -627,10 +623,10 @@ static hts_boolean bundle_load_src(httrackp *opt, bundle *b, text_src *src,
   bundle_clear(b);
   if (!bundle_parse(opt, b, src, &cookies_line, err))
     return HTS_FALSE;
-  for (i = 0; i < b->nstart && why == NULL; i++)
-    why = bundle_note_url(b, b->start_urls[i]);
-  for (i = 0; i < b->nurls && why == NULL; i++)
-    why = bundle_note_url(b, b->urls[i]);
+  for (i = 0; i < TypedArraySize(b->start_urls) && why == NULL; i++)
+    why = bundle_note_url(b, TypedArrayNth(b->start_urls, i));
+  for (i = 0; i < TypedArraySize(b->urls) && why == NULL; i++)
+    why = bundle_note_url(b, TypedArrayNth(b->urls, i));
   if (why != NULL)
     BUNDLE_FAIL("%s: %s", b->file, why);
   memset(&ctx, 0, sizeof(ctx));
@@ -638,7 +634,7 @@ static hts_boolean bundle_load_src(httrackp *opt, bundle *b, text_src *src,
   ctx.all_bundles = all_bundles;
   ctx.clashes = clashes;
   ctx.alone = alone;
-  ctx.end_entry = b->nscope;
+  ctx.end_entry = TypedArraySize(b->scope);
   ctx.jar_wins = bundle_jar_wins(b, jar_file);
   if (clashes != NULL) {
     ctx.mine = calloct(1, sizeof(t_cookie));
@@ -711,14 +707,16 @@ static hts_boolean bundle_load(httrackp *opt, bundle *b, const char *jar_file,
 }
 
 /* Does an entry of the list a cover an entry of the list b, or the reverse? */
-static hts_boolean scope_lists_overlap(char *const *a, size_t na,
-                                       char *const *b, size_t nb) {
+static hts_boolean scope_lists_overlap(const strlist *a, const strlist *b) {
   size_t i, j;
 
-  for (i = 0; i < na; i++) {
-    for (j = 0; j < nb; j++) {
-      if (scope_covers(a[i], SCOPE_ENTRY_HOST(b[j])) ||
-          scope_covers(b[j], SCOPE_ENTRY_HOST(a[i])))
+  for (i = 0; i < TypedArraySize(*a); i++) {
+    for (j = 0; j < TypedArraySize(*b); j++) {
+      const char *const x = TypedArrayNth(*a, i);
+      const char *const y = TypedArrayNth(*b, j);
+
+      if (scope_covers(x, SCOPE_ENTRY_HOST(y)) ||
+          scope_covers(y, SCOPE_ENTRY_HOST(x)))
         return HTS_TRUE;
     }
   }
@@ -726,13 +724,13 @@ static hts_boolean scope_lists_overlap(char *const *a, size_t na,
 }
 
 static hts_boolean bundle_scopes_overlap(const bundle *a, const bundle *b) {
-  return scope_lists_overlap(a->scope, a->nscope, b->scope, b->nscope);
+  return scope_lists_overlap(&a->scope, &b->scope);
 }
 
 /* Does the home of a or b overlap the other's scope? */
 static hts_boolean bundle_homes_overlap(const bundle *a, const bundle *b) {
-  return scope_lists_overlap(a->home, a->nhome, b->scope, b->nscope) ||
-         scope_lists_overlap(a->scope, a->nscope, b->home, b->nhome);
+  return scope_lists_overlap(&a->home, &b->scope) ||
+         scope_lists_overlap(&a->scope, &b->home);
 }
 
 static hts_boolean bundle_same_identity(const bundle *a, const bundle *b) {
@@ -785,20 +783,20 @@ hts_boolean hts_bundle_load_all(httrackp *opt, const char *jar_file,
     ok = bundle_load(opt, &items[i], jar_file, all_bundles, &clashes, alone,
                      err);
   // refuse a skipped clash on a site that is a bundle's home
-  for (i = 0; i < clashes.count && ok; i++) {
+  for (i = 0; i < TypedArraySize(clashes.hosts) && ok; i++) {
     for (j = 0; j < n && ok; j++) {
-      if (scope_list_covers(items[j].home, items[j].nhome, clashes.hosts[i])) {
+      if (scope_list_covers(&items[j].home, TypedArrayNth(clashes.hosts, i))) {
         hts_buf_printf_clip(
             err, "%s: a cookie for %s has another value in another bundle",
-            items[j].file, clashes.hosts[i]);
+            items[j].file, TypedArrayNth(clashes.hosts, i));
         ok = HTS_FALSE;
       }
     }
   }
   // the log backstop hides a bundle's tokens and url-line passwords too
   for (i = 0; i < n && ok; i++) {
-    for (j = 0; j < items[i].nurls; j++)
-      hts_secret_add_login(opt, items[i].urls[j]);
+    for (j = 0; j < TypedArraySize(items[i].urls); j++)
+      hts_secret_add_login(opt, TypedArrayNth(items[i].urls, j));
     hts_secret_add_headers(opt, StringBuff(items[i].headers));
   }
   for (i = 0; i < n && ok; i++) {
@@ -828,7 +826,7 @@ hts_boolean hts_bundle_load_all(httrackp *opt, const char *jar_file,
     items[i].https_only = items[bundle_group(group, i)].https_only;
   freet(group);
   freet(all_bundles);
-  strlist_free(&clashes.hosts, &clashes.count);
+  strlist_free(&clashes.hosts);
   freet(alone);
   return ok;
 }
@@ -840,9 +838,9 @@ const char *hts_bundle_url(httrackp *opt, size_t i) {
   for (k = 0; st != NULL && k < TypedArraySize(st->items); k++) {
     const bundle *const b = &TypedArrayNth(st->items, k);
 
-    if (i < b->nurls)
-      return b->urls[i];
-    i -= b->nurls;
+    if (i < TypedArraySize(b->urls))
+      return TypedArrayNth(b->urls, i);
+    i -= TypedArraySize(b->urls);
   }
   return NULL;
 }
@@ -929,42 +927,42 @@ HTSEXT_API hts_boolean hts_bundle_cookie_in_scope(const char *const *urls,
     if (why == NULL)
       why = bundle_note_url(&b, url);
   }
-  keeps = why == NULL && bundle_keeps_domain(&b, b.nscope, cookie_domain, host);
+  keeps = why == NULL &&
+          bundle_keeps_domain(&b, TypedArraySize(b.scope), cookie_domain, host);
   bundle_clear(&b);
   StringFree(b.headers);
   return keeps;
 }
 
-/* Add name to the n names of *names unless it is there. HTS_FALSE when out of
+/* Add name to names unless it is there. HTS_FALSE when out of
    memory. */
-static hts_boolean names_add_once(char ***names, size_t *n, const char *name) {
+static hts_boolean names_add_once(strlist *names, const char *name) {
   size_t i;
 
-  for (i = 0; i < *n; i++) {
-    if (strcmp((*names)[i], name) == 0)
+  for (i = 0; i < TypedArraySize(*names); i++) {
+    if (strcmp(TypedArrayNth(*names, i), name) == 0)
       return HTS_TRUE;
   }
-  return strlist_add(names, n, name);
+  return strlist_add(names, name);
 }
 
 /* Add to *names the bundle that the start URL url names, if any. Returns NULL,
    or why the crawl refuses url. */
-static const char *names_note(char ***names, size_t *n, const char *url) {
+static const char *names_note(strlist *names, const char *url) {
   char copy[HTS_URLLIST_LINE_SIZE];
   char name[HTS_BUNDLE_NAME_MAX];
   const char *why;
 
   strcpybuff(copy, url);
   why = bundle_cut(copy, HTS_BUF(name));
-  if (why == NULL && name[0] != '\0' && !names_add_once(names, n, name))
+  if (why == NULL && name[0] != '\0' && !names_add_once(names, name))
     why = "out of memory";
   return why;
 }
 
 /* Add to *names the bundles the words of urls name, as the command line reads
    them. Returns NULL, or why the crawl refuses a word. */
-static const char *names_note_words(char ***names, size_t *n,
-                                    const char *urls) {
+static const char *names_note_words(strlist *names, const char *urls) {
   char *copy = strdupt(urls);
   char *a = copy;
   const char *why = NULL;
@@ -988,7 +986,7 @@ static const char *names_note_words(char ***names, size_t *n,
              strcmp(word, "+") == 0 || hts_rule_would_be_read_as_opt(word))
       why = "address list holds an option";
     else if (word[0] != '+' && word[0] != '-')
-      why = names_note(names, n, word);
+      why = names_note(names, word);
   }
   freet(copy);
   return why;
@@ -996,7 +994,7 @@ static const char *names_note_words(char ***names, size_t *n,
 
 /* Add to *names the bundles the lines of the -%L file path name. Returns NULL,
    or why the file cannot be read or the crawl refuses a line. */
-static const char *names_note_file(char ***names, size_t *n, const char *path,
+static const char *names_note_file(strlist *names, const char *path,
                                    hts_buf errbuf) {
   char *buff;
   size_t size;
@@ -1012,7 +1010,7 @@ static const char *names_note_file(char ***names, size_t *n, const char *path,
       break;
     /* the crawl drops these lines rather than refuse them */
     if (status == HTS_URLLIST_LINE && !hts_is_quoted(hts_span_of(line)))
-      why = names_note(names, n, line);
+      why = names_note(names, line);
   }
   freet(buff);
   return why;
@@ -1021,8 +1019,7 @@ static const char *names_note_file(char ***names, size_t *n, const char *path,
 HTSEXT_API int hts_bundle_names_in_use(const char *urls, const char *list_file,
                                        char ***names, char *error,
                                        size_t error_size) {
-  char **list = NULL;
-  size_t n = 0;
+  strlist list = EMPTY_TYPED_ARRAY;
   char errbuf[HTS_STRERROR_SIZE];
   const char *why = NULL;
 
@@ -1033,27 +1030,21 @@ HTSEXT_API int hts_bundle_names_in_use(const char *urls, const char *list_file,
   else
     *names = NULL;
   if (why == NULL && urls != NULL)
-    why = names_note_words(&list, &n, urls);
+    why = names_note_words(&list, urls);
   if (why == NULL && list_file != NULL)
-    why = names_note_file(&list, &n, list_file, HTS_BUF(errbuf));
-  if (why == NULL) {
-    char **const grown = realloct(list, (n + 1) * sizeof(char *));
-
-    if (grown == NULL) {
-      why = "out of memory";
-    } else {
-      list = grown;
-      list[n] = NULL;
-    }
-  }
+    why = names_note_file(&list, list_file, HTS_BUF(errbuf));
+  // room for the NULL terminator
+  if (why == NULL && !TypedArrayReserve(list, 1))
+    why = "out of memory";
   if (why != NULL) {
-    strlist_free(&list, &n);
+    strlist_free(&list);
     if (error != NULL && error_size != 0)
       strlncatbuff(error, why, error_size, error_size - 1);
     return -1;
   }
-  *names = list;
-  return (int) n;
+  TypedArrayTail(list) = NULL;
+  *names = TypedArrayElts(list);
+  return (int) TypedArraySize(list);
 }
 
 HTSEXT_API void hts_bundle_names_free(char **names) {
@@ -1077,8 +1068,7 @@ HTS_STATIC_ASSERT(HTS_PASTE_URL_SIZE == HTS_CDLMAXSIZE, paste_url_size);
 
 /* What a pasted cURL command gives. */
 typedef struct paste_curl {
-  char **words;
-  size_t nwords;
+  strlist words;
   const char *url;  /* the URL word, or NULL */
   const char *ua;   /* the User-Agent, or NULL */
   const char *auth; /* the whole Authorization header line, or NULL */
@@ -1243,9 +1233,9 @@ static const char *curl_split(const char *s, paste_curl *c) {
     word[len] = '\0';
     if (hts_bundle_has_control(hts_span_at(word, len)))
       why = "the text holds a control byte";
-    else if (c->nwords >= PASTE_WORDS_MAX)
+    else if (TypedArraySize(c->words) >= PASTE_WORDS_MAX)
       why = "the command has too many words";
-    else if (!strlist_add(&c->words, &c->nwords, word))
+    else if (!strlist_add(&c->words, word))
       why = "out of memory";
   }
   freet(word);
@@ -1286,9 +1276,11 @@ static const char *curl_options(paste_curl *c) {
       "-e",         "--referer",     "-F",           "--form"};
   size_t i, k;
 
-  for (i = 1; i < c->nwords; i++) {
-    const char *const w = c->words[i];
-    const char *const arg = i + 1 < c->nwords ? c->words[i + 1] : NULL;
+  for (i = 1; i < TypedArraySize(c->words); i++) {
+    const char *const w = TypedArrayNth(c->words, i);
+    const char *const arg = i + 1 < TypedArraySize(c->words)
+                                ? TypedArrayNth(c->words, i + 1)
+                                : NULL;
     hts_boolean known = HTS_FALSE;
 
     if (w[0] != '-' || strcmp(w, "--url") == 0) {
@@ -1299,7 +1291,7 @@ static const char *curl_options(paste_curl *c) {
       }
       if (c->url != NULL)
         return "the command holds more than one URL";
-      c->url = c->words[i];
+      c->url = TypedArrayNth(c->words, i);
       continue;
     }
     for (k = 0; k < sizeof(no_arg) / sizeof(no_arg[0]) && !known; k++)
@@ -1391,12 +1383,12 @@ static hts_boolean paste_bundle(bundle *b, const char *name, const char *url) {
   StringInit(b->headers);
   strcpybuff(b->name, name);
   snprintf(b->file, sizeof(b->file), "%s.hts", name);
-  return strlist_add(&b->start_urls, &b->nstart, url);
+  return strlist_add(&b->start_urls, url);
 }
 
 static void paste_bundle_free(bundle *b) {
   bundle_clear(b);
-  strlist_free(&b->start_urls, &b->nstart);
+  strlist_free(&b->start_urls);
   StringFree(b->headers);
 }
 
@@ -1453,9 +1445,10 @@ static hts_boolean paste_scope_round_trips(const bundle *b) {
   char entry[SCOPE_ENTRY_SIZE];
   size_t i;
 
-  for (i = 0; i < b->nscope; i++) {
-    if (bundle_scope_entry(SCOPE_ENTRY_HOST(b->scope[i]), entry) != NULL ||
-        strcmp(entry, b->scope[i]) != 0)
+  for (i = 0; i < TypedArraySize(b->scope); i++) {
+    if (bundle_scope_entry(SCOPE_ENTRY_HOST(TypedArrayNth(b->scope, i)),
+                           entry) != NULL ||
+        strcmp(entry, TypedArrayNth(b->scope, i)) != 0)
       return HTS_FALSE;
   }
   return HTS_TRUE;
@@ -1519,7 +1512,8 @@ static const char *paste_load_records(httrackp *opt, bundle *b,
                                       const String *text, t_cookie *jar,
                                       const char *hosts, int *left_out,
                                       int *line) {
-  const size_t own = b->nscope;
+  const strlist *const scope = &b->scope;
+  const size_t own = TypedArraySize(*scope);
   t_cookie *all = calloct(1, sizeof(t_cookie));
   bundle_jar ctx;
   cookie_filter filter;
@@ -1542,9 +1536,9 @@ static const char *paste_load_records(httrackp *opt, bundle *b,
   filter.ctx = &ctx;
   why = paste_load_pass(opt, &filter, text, jar, &stored, line);
   // the address's own records first, so the hosts never crowd them out
-  if (why == NULL && b->nscope > own) {
+  if (why == NULL && TypedArraySize(*scope) > own) {
     ctx.first_entry = own;
-    ctx.end_entry = b->nscope;
+    ctx.end_entry = TypedArraySize(*scope);
     ctx.give_way = HTS_TRUE;
     ctx.admitted = 0;
     filter.full_skips = HTS_TRUE;
@@ -1566,29 +1560,32 @@ static void paste_scope_text(const bundle *b, size_t own, const t_cookie *jar,
   hts_boolean *used;
   hts_boolean any = HTS_FALSE;
   const char *a = jar->data;
+  const strlist *const scope = &b->scope;
+  const size_t n = TypedArraySize(*scope);
   size_t i;
 
-  if (b->nscope == own)
+  if (n == own)
     return;
-  used = calloct(b->nscope, sizeof(*used));
+  used = calloct(n, sizeof(*used));
   if (used == NULL)
     return;
   while (*a != '\0') {
     a += binput(a, HTS_BUF(line));
     if (!cookie_host(cookie_get(HTS_SIZED(buffer), line, 0), HTS_SIZED(host)))
       continue;
-    for (i = 0; i < b->nscope; i++) {
-      if (scope_covers(b->scope[i], host[0] == '.' ? host + 1 : host)) {
+    for (i = 0; i < n; i++) {
+      if (scope_covers(TypedArrayNth(*scope, i),
+                       host[0] == '.' ? host + 1 : host)) {
         used[i] = HTS_TRUE;
         any = any || i >= own;
         break;
       }
     }
   }
-  for (i = 0; any && i < b->nscope; i++) {
+  for (i = 0; any && i < n; i++) {
     if (i < own || used[i]) {
       StringCat(*text, "scope ");
-      StringCat(*text, SCOPE_ENTRY_HOST(b->scope[i]));
+      StringCat(*text, SCOPE_ENTRY_HOST(TypedArrayNth(*scope, i)));
       StringCat(*text, LF);
     }
   }
@@ -1890,7 +1887,7 @@ HTSEXT_API hts_boolean hts_bundle_from_paste_hosts(
     why = bundle_note_url(&b, base);
     if (why != NULL)
       PASTE_FAIL("%s", why);
-    own = b.nscope;
+    own = TypedArraySize(b.scope);
     why = paste_load_records(opt, &b, &records, jar, hosts, &dropped, &line);
     if (why != NULL)
       PASTE_FAIL("line %d of the paste: %s", line, why);
@@ -1957,7 +1954,7 @@ done:
   freet(all);
   paste_bundle_free(&b);
   paste_bundle_free(&check);
-  strlist_free(&c.words, &c.nwords);
+  strlist_free(&c.words);
   StringFree(c.cookies);
   StringFree(records);
   StringFree(text);

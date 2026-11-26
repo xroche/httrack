@@ -79,7 +79,7 @@ static HTS_UNUSED void hts_record_assert_memory_failed(const size_t size) {
 #define TypedArrayRoom(A) (TypedArrayCapa(A) - TypedArraySize(A))
 
 /** Array elements, of type T*. A grow can move the store, so do not keep this
-    pointer across an Add, Append or EnsureRoom. **/
+    pointer across an Add, Push, Append, Reserve or EnsureRoom. **/
 #define TypedArrayElts(A) ((A).data.elts)
 
 /** Array pointer, of type void*. **/
@@ -104,6 +104,61 @@ static HTS_UNUSED void hts_record_assert_memory_failed(const size_t size) {
  **/
 #define TypedArrayHasRoom(A, ROOM) (TypedArrayRoom(A) >= (ROOM))
 
+/** Make room for ROOM more elements of WIDTH bytes past SIZE in the store
+    *PTR of *CAPA elements. HTS_FALSE leaves both unchanged: the allocation
+    failed, or the room would not fit a size_t. Use TypedArrayReserve(). **/
+static HTS_UNUSED HTS_CHECK_RESULT hts_boolean
+hts_array_reserve_(void **const ptr, size_t *const capa, const size_t size,
+                   const size_t room, const size_t width) {
+  /* Largest element count whose byte size still fits a size_t. */
+  const size_t maxCapa = (size_t) -1 / width;
+  const size_t minCapa = maxCapa < 16 ? maxCapa : 16;
+  size_t newCapa = *capa;
+  void *newPtr;
+
+  /* ASan copies the whole store on a same-size realloc. */
+  if (*capa - size >= room)
+    return HTS_TRUE;
+  if (room > maxCapa - size)
+    return HTS_FALSE;
+  /* Saturating: a plain newCapa*2 wraps to 0 and the loop never ends. */
+  while (newCapa - size < room) {
+    newCapa = newCapa < minCapa       ? minCapa
+              : newCapa > maxCapa / 2 ? maxCapa
+                                      : newCapa * 2;
+  }
+  /* Via a temporary: realloc keeps the old block on failure. */
+  newPtr = realloct(*ptr, newCapa * width);
+  if (newPtr == NULL)
+    return HTS_FALSE;
+  *ptr = newPtr;
+  *capa = newCapa;
+  return HTS_TRUE;
+}
+
+/** Make room for 'ROOM' more elements. Returns HTS_TRUE when there is room,
+    HTS_FALSE with the array unchanged when there is not, overflow included. **/
+#define TypedArrayReserve(A, ROOM)                                             \
+  hts_array_reserve_(&TypedArrayPtr(A), &TypedArrayCapa(A), TypedArraySize(A), \
+                     (ROOM), TypedArrayWidth(A))
+
+/** Add element 'E' at the end. Returns HTS_TRUE, or HTS_FALSE with the array
+    unchanged when the store cannot grow. 'E' is read after any grow. **/
+#define TypedArrayPush(A, E)                                                   \
+  (TypedArrayReserve(A, 1)                                                     \
+       ? (TypedArrayTail(A) = (E), TypedArraySize(A)++, HTS_TRUE)              \
+       : HTS_FALSE)
+
+/** Return N, aborting unless N < SIZE. Use TypedArrayAt(). **/
+static HTS_UNUSED size_t hts_array_index_(const size_t n, const size_t size) {
+  assertf(n < size);
+  return n;
+}
+
+/** Nth element of the array, as an lvalue. Aborts unless N < size. **/
+#define TypedArrayAt(A, N)                                                     \
+  TypedArrayNth(A, hts_array_index_((N), TypedArraySize(A)))
+
 /**
  * Ensure at least 'ROOM' more elements can be put in the array.
  * A failed allocation leaves the array unchanged (check TypedArrayHasRoom()).
@@ -114,25 +169,10 @@ static HTS_UNUSED void hts_record_assert_memory_failed(const size_t size) {
     const size_t room_ = (ROOM);                                               \
     /* Largest element count whose byte size still fits a size_t. */           \
     const size_t maxCapa_ = (size_t) -1 / TypedArrayWidth(A);                  \
-    const size_t minCapa_ = maxCapa_ < 16 ? maxCapa_ : 16;                     \
-    size_t capa_ = TypedArrayCapa(A);                                          \
-    void *newPtr_;                                                             \
     assertf(room_ <= maxCapa_ - TypedArraySize(A));                            \
-    /* ASan copies the whole store on a same-size realloc. */                  \
-    if (TypedArrayHasRoom(A, room_))                                           \
+    /* Callers learn of a failed grow from TypedArrayHasRoom(). */             \
+    if (!TypedArrayReserve(A, room_))                                          \
       break;                                                                   \
-    /* Saturating: a plain capa_*2 wraps to 0 and the loop never ends. */      \
-    while (capa_ - TypedArraySize(A) < room_) {                                \
-      capa_ = capa_ < minCapa_       ? minCapa_                                \
-              : capa_ > maxCapa_ / 2 ? maxCapa_                                \
-                                     : capa_ * 2;                              \
-    }                                                                          \
-    /* Via a temporary: realloc keeps the old block on failure. */             \
-    newPtr_ = realloct(TypedArrayPtr(A), capa_ * TypedArrayWidth(A));          \
-    if (newPtr_ != NULL) {                                                     \
-      TypedArrayPtr(A) = newPtr_;                                              \
-      TypedArrayCapa(A) = capa_;                                               \
-    }                                                                          \
   } while (0)
 
 /** Add element 'E' at the end. The array is left untouched when the store
