@@ -59,7 +59,8 @@ hts_boolean hts_isStringAscii(hts_span s) {
 
 #define IS_ALNUM(C) ( ((C) >= 'A' && (C) <= 'Z') || ((C) >= 'a' && (C) <= 'z') || ((C) >= '0' && (C) <= '9') )
 #define CHAR_LOWER(C) lochar(C)
-static int hts_equalsAlphanum(const char *a, const char *b) {
+
+static hts_boolean hts_equalsAlphanum(const char *a, const char *b) {
   size_t i, j;
   for(i = 0, j = 0;; i++, j++) {
     /* Skip non-alnum */
@@ -71,10 +72,10 @@ static int hts_equalsAlphanum(const char *a, const char *b) {
     }
     /* End of string ? (note: a[i] == b[j]) */
     else if (a[i] == '\0') {
-      return 1;
+      return HTS_TRUE;
     }
   }
-  return 0;
+  return HTS_FALSE;
 }
 #undef IS_ALNUM
 #undef CHAR_LOWER

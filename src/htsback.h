@@ -120,8 +120,8 @@ void back_copy_static(const lien_back * src, lien_back * dst);
 #define HTS_REF_MAX_BLOB ((uint64_t) 1024 * 1024 * 1024)
 
 /* The slot spool is host-native and valid only in the run that wrote it. */
-int back_serialize(FILE * fp, const lien_back * src);
-int back_unserialize(FILE * fp, lien_back ** dst);
+hts_boolean back_serialize(FILE *fp, const lien_back *src);
+hts_boolean back_unserialize(FILE *fp, lien_back **dst);
 /* The resume state outlives the run, so its format is portable. */
 int back_serialize_ref(httrackp * opt, const lien_back * src);
 int back_unserialize_ref(httrackp * opt, const char *adr, const char *fil,
@@ -202,7 +202,7 @@ int back_cleanup_background(httrackp *opt, cache_back *cache,
    run spools anything. */
 void back_spool_sweep(httrackp *opt);
 /* Can this slot be swapped out to disk? Hidden, shared with the self-test. */
-int slot_can_be_cached_on_disk(const lien_back *back);
+hts_boolean slot_can_be_cached_on_disk(const lien_back *back);
 void back_info(struct_back * sback, int i, int j, FILE * fp);
 void back_infostr(struct_back *sback, int i, int j, hts_buf s);
 LLint back_transferred(LLint add, struct_back * sback);

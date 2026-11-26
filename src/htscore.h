@@ -350,11 +350,11 @@ char **hts_setfilters_take(httrackp *opt);
 hts_boolean hts_maxlinks_no_room(const httrackp *opt);
 
 /* Record a link on the heap. All strings are copied (caller keeps ownership).
-   Returns 1 on success, 0 if the link limit (opt->maxlink) is reached. */
-int hts_record_link(httrackp * opt,
-                    const char *address, const char *file, const char *save,
-                    const char *ref_address, const char *ref_file,
-                    const char *codebase);
+   HTS_FALSE when the link limit (opt->maxlink) is reached or memory ran out. */
+hts_boolean hts_record_link(httrackp *opt, const char *address,
+                            const char *file, const char *save,
+                            const char *ref_address, const char *ref_file,
+                            const char *codebase);
 
 /* Make the most recently recorded link its own parent: a normal fetch (no
    test, no import) at the given depth and pass, with the full retry budget. */
@@ -419,8 +419,9 @@ void hts_io_fatal_abort(httrackp *opt);
 
 /* Throttled engine_stats() for a hot loop, which counts its calls in *calls.
    Calls 0, HTS_STATS_TICK, 2*HTS_STATS_TICK... run engine_stats() and return
-   its result. The others only reset the counters it resets, and return 0. */
-int engine_stats_tick(unsigned int *calls);
+   its result. The others only reset the counters it resets, and return
+   HTS_FALSE. */
+hts_boolean engine_stats_tick(unsigned int *calls);
 
 void host_ban(httrackp * opt, int ptr, struct_back * sback, const char *host);
 

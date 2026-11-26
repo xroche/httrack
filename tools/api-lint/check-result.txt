@@ -62,6 +62,7 @@ src/htscookiefile.h: cookie_write
 src/htscore.h: back_fillmax
 src/htscore.h: check_fatal_io_errno
 src/htscore.h: check_stdin
+src/htscore.h: engine_stats_tick
 src/htscore.h: filesave
 src/htscore.h: filters_grow
 src/htscore.h: filters_insert

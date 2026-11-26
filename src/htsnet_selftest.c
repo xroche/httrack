@@ -838,12 +838,12 @@ static int st_ftpline(httrackp *opt, int argc, char **argv) {
   assertf(send(sv[1], "220 short reply\r\n221 bye\r\n", 26, 0) == 26);
   deletesoc(sv[1]);
   line[0] = '\0';
-  assertf(get_ftp_line(NULL, sv[0], HTS_BUF(line), 5, NULL) != 0);
+  assertf(get_ftp_line(NULL, sv[0], HTS_BUF(line), 5, NULL));
   assertf(strlen(line) == 1023 && line[1022] == 'x');
   memset(line, '#', sizeof(line)); // a zero canary would hide a stray NUL
-  assertf(get_ftp_line(NULL, sv[0], HTS_BUF_N(line, 8), 5, NULL) != 0);
+  assertf(get_ftp_line(NULL, sv[0], HTS_BUF_N(line, 8), 5, NULL));
   assertf(strcmp(line, "220 sho") == 0 && line[8] == '#' && line[63] == '#');
-  assertf(get_ftp_line(NULL, sv[0], hts_buf_none(), 5, NULL) != 0);
+  assertf(get_ftp_line(NULL, sv[0], hts_buf_none(), 5, NULL));
   deletesoc(sv[0]);
   printf("ftp-line self-test OK (bounded %d-byte reply)\n",
          (int) sizeof(flood));

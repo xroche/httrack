@@ -50,19 +50,19 @@ typedef struct htsblk htsblk;
    origin authority (url_adr, e.g. "https://host:port"). Sends the CONNECT
    request (with Proxy-Authorization when the proxy carries credentials) and
    reads the proxy's status line, so the caller's TLS handshake then runs
-   end-to-end with the origin. Blocks up to `timeout` seconds. Returns 1 on a
-   2xx tunnel, 0 on failure (retour->msg/statuscode set). */
-int http_proxy_tunnel(httrackp *opt, htsblk *retour, const char *adr,
-                      int timeout);
+   end-to-end with the origin. Blocks up to `timeout` seconds. Returns HTS_TRUE
+   on a 2xx tunnel, HTS_FALSE on failure (retour->msg/statuscode set). */
+hts_boolean http_proxy_tunnel(httrackp *opt, htsblk *retour, const char *adr,
+                              int timeout);
 
 /* SOCKS5 (RFC 1928, RFC 1929 auth) handshake on the raw proxy socket, before
    any TLS: `retour->soc` must be TCP-connected to the proxy and `adr` is the
    origin (url_adr). The origin name is sent verbatim (ATYP=domain), so the
    proxy resolves it; a bracketed IPv6 literal origin is rejected. Blocks up to
-   `timeout` seconds. Returns 1 with the stream positioned on the first origin
-   byte, 0 on failure (retour->msg set). */
-int socks5_handshake(httrackp *opt, htsblk *retour, const char *adr,
-                     int timeout);
+   `timeout` seconds. Returns HTS_TRUE with the stream positioned on the first
+   origin byte, HTS_FALSE on failure (retour->msg set). */
+hts_boolean socks5_handshake(httrackp *opt, htsblk *retour, const char *adr,
+                             int timeout);
 
 /* Self-test hook (-#test=socks5): run the handshake against `reply`, a scripted
    server byte stream, instead of a socket. `sent` captures the client frames,
@@ -76,7 +76,8 @@ typedef struct socks5_test_io {
   char msg[256];
 } socks5_test_io;
 
-int socks5_handshake_scripted(httrackp *opt, const char *adr,
-                              const char *proxy_name, socks5_test_io *io);
+hts_boolean socks5_handshake_scripted(httrackp *opt, const char *adr,
+                                      const char *proxy_name,
+                                      socks5_test_io *io);
 
 #endif

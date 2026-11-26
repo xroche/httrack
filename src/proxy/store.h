@@ -77,7 +77,7 @@ typedef pthread_mutex_t PT_Mutex;
 PT_Indexes PT_New(void);
 void PT_Delete(PT_Indexes index);
 PT_Element PT_ReadIndex(PT_Indexes indexes, const char *url, int flags);
-int PT_LookupIndex(PT_Indexes indexes, const char *url);
+hts_boolean PT_LookupIndex(PT_Indexes indexes, const char *url);
 int PT_AddIndex(PT_Indexes index, const char *path);
 PT_Index PT_GetIndex(PT_Indexes indexes, int indexId);
 

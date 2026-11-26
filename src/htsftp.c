@@ -69,8 +69,8 @@ Please visit our Website: http://www.httrack.com
    wait on a stop, opt clips it to --max-time. */
 static int wait_socket_receive(lien_back *back, T_SOC soc, int timeout,
                                const httrackp *opt);
-static int run_launch_ftp(FTPDownloadStruct *pStruct);
-static int stop_ftp(lien_back *back);
+static void run_launch_ftp(FTPDownloadStruct *pStruct);
+static hts_boolean stop_ftp(lien_back *back);
 
 /* Live FTP workers, registered at spawn. Do not free their slots or opt while
    the list is non-empty (#1051). */
@@ -771,7 +771,7 @@ static SOCaddr *ftp_dns_resolve(httrackp *opt, lien_back *back,
 }
 
 // la véritable fonction une fois lancées les routines thread/fork
-static int run_launch_ftp(FTPDownloadStruct *pStruct) {
+static void run_launch_ftp(FTPDownloadStruct *pStruct) {
   lien_back *back = pStruct->pBack;
   httrackp *opt = pStruct->pOpt;
   char user[256] = "anonymous";
@@ -1295,7 +1295,6 @@ done:
     _T_SOC_close(soc_servdat);
   if (soc_dat != INVALID_SOCKET)
     _T_SOC_close(soc_dat);
-  return 0;
 }
 
 /* Listen on this host's own address for an active-mode data connection, and
@@ -1391,8 +1390,8 @@ int send_line(T_SOC soc, const char *data) {
 #endif
 }
 
-int get_ftp_line(lien_back *back, T_SOC soc, hts_buf line, int timeout,
-                 const httrackp *opt) {
+hts_boolean get_ftp_line(lien_back *back, T_SOC soc, hts_buf line, int timeout,
+                         const httrackp *opt) {
   char BIGSTK data[1024];
   int i, ok, multiline;
 
@@ -1408,7 +1407,7 @@ int get_ftp_line(lien_back *back, T_SOC soc, hts_buf line, int timeout,
   if (!hts_soc_selectable(soc)) {
     if (line.size != 0)
       hts_buf_printf_clip(line, "500 *read error");
-    return 0;
+    return HTS_FALSE;
   }
   do {
     char b;
@@ -1418,12 +1417,12 @@ int get_ftp_line(lien_back *back, T_SOC soc, hts_buf line, int timeout,
     case -1:                   // erreur de lecture
       if (line.size != 0)
         hts_buf_printf_clip(line, "500 *read error");
-      return 0;
+      return HTS_FALSE;
       break;
     case 0:
       if (line.size != 0)
         hts_buf_printf_clip(line, "500 *read timeout (%d)", timeout);
-      return 0;
+      return HTS_FALSE;
       break;
     }
 
@@ -1436,7 +1435,7 @@ int get_ftp_line(lien_back *back, T_SOC soc, hts_buf line, int timeout,
     default:
       if (line.size != 0)
         hts_buf_printf_clip(line, "500 *read error");
-      return 0;                 // error
+      return HTS_FALSE; // error
       break;
     }
     if (((b == 13) || (b == 10)) && (i > 0)) {  // CR/LF
@@ -1559,11 +1558,11 @@ static int wait_socket_receive(lien_back *back, T_SOC soc, int timeout,
 }
 
 // Was a cancel received?
-static int stop_ftp(lien_back *back) {
+static hts_boolean stop_ftp(lien_back *back) {
   if (hts_load_acquire_int(&back->stop_ftp)) {
     strcpybuff(back->r.msg, "Cancelled by User");
     back->r.statuscode = STATUSCODE_INVALID;
-    return 1;
+    return HTS_TRUE;
   }
-  return 0;
+  return HTS_FALSE;
 }
