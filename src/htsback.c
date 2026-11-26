@@ -1219,7 +1219,7 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                   const hts_span body = hts_blk_body(&back[p].r);
 
                   if (body.len > 0) {
-                    if (!hts_fwrite_exact(body.p, body.len, back[p].r.out)) {
+                    if (!hts_fwrite_span(body, back[p].r.out)) {
                       back[p].r.statuscode = STATUSCODE_INVALID;
                       strcpybuff(back[p].r.msg,
                                  "Write error when decompressing");
@@ -1726,9 +1726,9 @@ static hts_boolean back_source_get(back_source *s, void *dst, size_t size) {
   return HTS_TRUE;
 }
 
-static int back_data_serialize(back_sink *s, const void *data, size_t size) {
-  if (back_sink_put(s, &size, sizeof(size)) &&
-      (size == 0 || back_sink_put(s, data, size)))
+static int back_data_serialize(back_sink *s, hts_span data) {
+  if (back_sink_put(s, &data.len, sizeof(data.len)) &&
+      (data.len == 0 || back_sink_put(s, data.p, data.len)))
     return 0;
   return 1;                     /* error */
 }
@@ -1736,7 +1736,7 @@ static int back_data_serialize(back_sink *s, const void *data, size_t size) {
 static int back_string_serialize(back_sink *s, const char *str) {
   size_t size = (str != NULL) ? (strlen(str) + 1) : 0;
 
-  return back_data_serialize(s, str, size);
+  return back_data_serialize(s, hts_span_at(str, size));
 }
 
 /* Stores the buffer through a void *, never the caller's own pointer type,
@@ -1815,14 +1815,13 @@ static int back_record_write(back_sink *s, const lien_back *src) {
     if (off < at) /* the table is out of struct order */
       return 1;
     if ((off != at && !back_sink_put(s, base + at, off - at)) ||
-        back_data_serialize(s, base + off, lens[i]) != 0)
+        back_data_serialize(s, hts_span_at(base + off, lens[i])) != 0)
       return 1;
     at = off + back_spool_strings[i].size;
   }
   if (!back_sink_put(s, base + at, whole - at))
     return 1;
-  const hts_span body = hts_blk_body(&src->r);
-  if (back_data_serialize(s, body.p, body.len) == 0 &&
+  if (back_data_serialize(s, hts_blk_body(&src->r)) == 0 &&
       back_string_serialize(s, src->r.headers) == 0 &&
       (s->fp == NULL || fflush(s->fp) == 0))
     return 0;

@@ -1811,7 +1811,7 @@ static int st_ioexact(httrackp *opt, int argc, char **argv) {
      of the destination keeps its poison. */
   fp = FOPEN(path, "wb");
   assertf(fp != NULL);
-  assertf(hts_fwrite_exact(payload, 4, fp) == HTS_TRUE);
+  assertf(hts_fwrite_span(hts_span_at(payload, 4), fp) == HTS_TRUE);
   assertf(fclose(fp) == 0);
   memset(readback, poison, 16);
   fp = FOPEN(path, "rb");
@@ -1831,6 +1831,8 @@ static int st_ioexact(httrackp *opt, int argc, char **argv) {
   assertf(fp != NULL);
   assertf(hts_fwrite_exact(payload, 4, fp) == HTS_FALSE);
   assertf(hts_fwrite_exact(payload, 0, fp) == HTS_TRUE);
+  assertf(hts_fwrite_span(hts_span_at(payload, 4), fp) == HTS_FALSE);
+  assertf(hts_fwrite_span(hts_span_at(NULL, 0), fp) == HTS_TRUE);
   assertf(fclose(fp) == 0);
 
   /* Short WRITE: the cases above only get 0, which a helper accepting any

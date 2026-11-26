@@ -2719,7 +2719,7 @@ static int readfail_write_source(const char *save, hts_span body) {
   fp = FOPEN(path, "wb");
   if (fp == NULL)
     return -1;
-  if (body.len != 0 && !hts_fwrite_exact(body.p, body.len, fp)) {
+  if (!hts_fwrite_span(body, fp)) {
     fclose(fp);
     return -1;
   }

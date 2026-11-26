@@ -1,0 +1,3 @@
+# Known pair violations. Regenerate: tools/check-api-lint.py --update
+src/htsbuf.h: StringMemcat(s.p, s.len)
+src/htsbuf.h: StringMemcpy(s.p, s.len)

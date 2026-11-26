@@ -1364,9 +1364,9 @@ static void ini_rebase_lists(const char *ini, int delta, String *out) {
       snprintf(shifted, sizeof(shifted), "%d", id);
       StringMemcat(*out, raw.p, key.len + 1);
       StringCat(*out, shifted);
-      StringMemcat(*out, tail.p, tail.len);
+      StringCatSpan(out, tail);
     } else {
-      StringMemcat(*out, raw.p, raw.len);
+      StringCatSpan(out, raw);
     }
   }
 }

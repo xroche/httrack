@@ -35,6 +35,7 @@ Please visit our Website: http://www.httrack.com
 #define HTSBUF_DEFH
 
 #include "htssafe.h"
+#include "htsstrings.h"
 #include "htsurlport.h"
 
 #include <stdarg.h>
@@ -60,6 +61,16 @@ static HTS_INLINE HTS_UNUSED hts_buf hts_buf_at(char *p, size_t size) {
 /* Returns the absent buffer, for an optional output the caller skips. */
 static HTS_INLINE HTS_UNUSED hts_buf hts_buf_none(void) {
   return hts_buf_at(NULL, 0);
+}
+
+/* Append the bytes of S to BLK, as StringMemcat. S must not point into BLK. */
+static HTS_INLINE HTS_UNUSED void StringCatSpan(String *blk, hts_span s) {
+  StringMemcat(*blk, s.p, s.len);
+}
+
+/* Replace the content of BLK with the bytes of S, as StringMemcpy. */
+static HTS_INLINE HTS_UNUSED void StringCopySpan(String *blk, hts_span s) {
+  StringMemcpy(*blk, s.p, s.len);
 }
 
 /* Is B the absent buffer, rather than one the caller passed? */

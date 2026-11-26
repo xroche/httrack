@@ -123,7 +123,7 @@ hts_boolean singlefile_may_mark(httrackp *opt, hts_span body) {
 
   if (intro == NULL)
     return HTS_FALSE;
-  if (hts_memstr(body.p, body.len, intro, strlen(intro)) != NULL) {
+  if (hts_memstr(body, hts_span_of(intro)) != NULL) {
     hts_log_print(opt, LOG_ERROR,
                   "single-file: document already carries this run's mark, "
                   "leaving it alone");
@@ -717,7 +717,7 @@ static void sf_expand(sf_ctx *ctx, const char *base_dir, int depth,
   size_t i = 0, flushed = 0;
 
   if (intro == NULL) {
-    StringMemcat(*out, body.p, body.len);
+    StringCatSpan(out, body);
     return;
   }
   while (i + SINGLEFILE_INTRO_LEN <= body.len) {
@@ -742,13 +742,13 @@ static void sf_expand(sf_ctx *ctx, const char *base_dir, int depth,
                    cls, &resolved, out)) {
       if (!resolved)
         sf_warn_unresolved(ctx, ref);
-      StringMemcat(*out, ref.p, ref.len);
+      StringCatSpan(out, ref);
     }
     ctx->marks++;
     i += marklen;
     flushed = i;
   }
-  StringMemcat(*out, body.p + flushed, body.len - flushed);
+  StringCatSpan(out, hts_span_skip(body, flushed));
 }
 
 /* ------------------------------------------------------------ */
@@ -802,7 +802,7 @@ static hts_boolean sf_replace_file(httrackp *opt, const char *path,
     StringFree(tmp);
     return HTS_FALSE;
   }
-  if (body.len > 0 && !hts_fwrite_exact(body.p, body.len, fp))
+  if (!hts_fwrite_span(body, fp))
     ok = HTS_FALSE;
 #ifndef _WIN32
   /* The spool bypassed filecreate(), so set the mode it would have. */

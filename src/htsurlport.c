@@ -230,37 +230,39 @@ hts_boolean hts_span_present(hts_span s) {
   return s.p != NULL ? HTS_TRUE : HTS_FALSE;
 }
 
-// Compare N bytes, where a NUL is a byte like any other.
-static hts_boolean span_bytes_eq(const char *a, const char *b, size_t n,
-                                 hts_boolean fold) {
+// Compare the bytes of A and B, where a NUL is a byte like any other.
+static hts_boolean span_bytes_eq(hts_span a, hts_span b, hts_boolean fold) {
   size_t i;
 
-  if (n == 0)
+  if (a.len != b.len)
+    return HTS_FALSE;
+  if (a.len == 0)
     return HTS_TRUE; // either may be the NULL of an absent view field
   if (!fold)
-    return memcmp(a, b, n) == 0;
-  for (i = 0; i < n; i++)
-    if (hts_tolower((unsigned char) a[i]) != hts_tolower((unsigned char) b[i]))
+    return memcmp(a.p, b.p, a.len) == 0;
+  for (i = 0; i < a.len; i++)
+    if (hts_tolower((unsigned char) a.p[i]) !=
+        hts_tolower((unsigned char) b.p[i]))
       return HTS_FALSE;
   return HTS_TRUE;
 }
 
 hts_boolean hts_span_eq(hts_span a, hts_span b) {
-  return a.len == b.len && span_bytes_eq(a.p, b.p, a.len, HTS_FALSE);
+  return span_bytes_eq(a, b, HTS_FALSE);
 }
 
 hts_boolean hts_span_eq_ci(hts_span a, hts_span b) {
-  return a.len == b.len && span_bytes_eq(a.p, b.p, a.len, HTS_TRUE);
+  return span_bytes_eq(a, b, HTS_TRUE);
 }
 
 hts_boolean hts_span_starts_with(hts_span s, hts_span prefix) {
   return s.len >= prefix.len &&
-         span_bytes_eq(s.p, prefix.p, prefix.len, HTS_FALSE);
+         span_bytes_eq(hts_span_at(s.p, prefix.len), prefix, HTS_FALSE);
 }
 
 hts_boolean hts_span_starts_with_ci(hts_span s, hts_span prefix) {
   return s.len >= prefix.len &&
-         span_bytes_eq(s.p, prefix.p, prefix.len, HTS_TRUE);
+         span_bytes_eq(hts_span_at(s.p, prefix.len), prefix, HTS_TRUE);
 }
 
 hts_boolean hts_span_ends_with(hts_span s, hts_span suffix) {
@@ -281,7 +283,7 @@ static int span_index(hts_span s, const char *const *words, hts_boolean fold) {
   for (i = 0; words[i] != NULL; i++) {
     const hts_span w = hts_span_of(words[i]);
 
-    if (s.len == w.len && span_bytes_eq(s.p, w.p, s.len, fold))
+    if (span_bytes_eq(s, w, fold))
       return i;
   }
   return -1;

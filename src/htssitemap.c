@@ -110,7 +110,8 @@ static hts_boolean sitemap_root_is(hts_span s, const char *name) {
     } else if (doc[i] != '<') {
       return HTS_FALSE; /* character data before any element: not XML */
     } else if (i + 4 <= size && memcmp(doc + i, "<!--", 4) == 0) {
-      const char *const e = hts_memstr(doc + i, size - i, "-->", 3);
+      const char *const e =
+          hts_memstr(hts_span_at(doc + i, size - i), hts_span_of("-->"));
 
       if (e == NULL)
         return HTS_FALSE;
@@ -197,7 +198,7 @@ int hts_sitemap_scan(hts_span body, int maxurls, hts_boolean *is_index,
     *is_index = sitemap_root_is(hts_span_at(doc, size), "sitemapindex");
 
   for (p = doc; n < maxurls;) {
-    const char *loc = hts_memstr(p, (size_t) (end - p), "<loc", 4);
+    const char *loc = hts_memstr(hts_span_between(p, end), hts_span_of("<loc"));
     const char *val;
     const char *stop;
     size_t len;

@@ -981,7 +981,7 @@ static int ae_write_raw(const char *path, hts_span src) {
 
   if (f == NULL)
     return 1;
-  ok = hts_fwrite_exact(src.p, src.len, f);
+  ok = hts_fwrite_span(src, f);
   fclose(f);
   return ok ? 0 : 1;
 }
