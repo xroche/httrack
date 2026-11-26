@@ -242,7 +242,7 @@ catch_url_status catch_url_capture(T_SOC soc, hts_buf url, hts_buf method,
 
                 // Copier le reste (post éventuel)
                 while ((len > 0) &&
-                       ((r = recv(soc, data.p + pos, len, 0)) > 0)) {
+                       ((r = (int) recv(soc, data.p + pos, len, 0)) > 0)) {
                   pos += r;
                   len -= r;
                   data.p[pos] = '\0'; // terminer par NULL

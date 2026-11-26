@@ -105,7 +105,89 @@ static int st_ckd(httrackp *opt, int argc, char **argv) {
   return errors == 0 ? 0 : 1;
 }
 
+/* Count narrowing mismatches; a refused value must leave *r untouched. */
+static int ckd_narrow_check(void) {
+  struct {
+    int64_t v;
+    hts_boolean overflow;
+  } ints[] = {
+      {0, HTS_FALSE},        {-1, HTS_FALSE},
+      {INT_MAX, HTS_FALSE},  {(int64_t) INT_MAX + 1, HTS_TRUE},
+      {INT_MIN, HTS_FALSE},  {(int64_t) INT_MIN - 1, HTS_TRUE},
+      {INT64_MAX, HTS_TRUE}, {INT64_MIN, HTS_TRUE},
+  };
+
+  struct {
+    int64_t v;
+    hts_boolean overflow;
+  } sizes[] = {
+      {0, HTS_FALSE},
+      {-1, HTS_TRUE},
+      {INT64_MIN, HTS_TRUE},
+      {INT_MAX, HTS_FALSE},
+#if SIZE_MAX < INT64_MAX
+      {(int64_t) SIZE_MAX, HTS_FALSE},
+      {(int64_t) SIZE_MAX + 1, HTS_TRUE},
+#else
+      {INT64_MAX, HTS_FALSE},
+#endif
+  };
+  struct {
+    size_t v;
+    int want;
+  } sats[] = {
+      {0, 0},
+      {(size_t) INT_MAX - 1, INT_MAX - 1},
+      {INT_MAX, INT_MAX},
+      {(size_t) INT_MAX + 1, INT_MAX},
+      {SIZE_MAX, INT_MAX},
+  };
+
+  int errors = 0;
+  size_t i;
+
+  for (i = 0; i < sizeof(ints) / sizeof(ints[0]); i++) {
+    int r = 42;
+    const hts_boolean ovf = hts_ckd_int(&r, ints[i].v);
+    const int want = ovf ? 42 : (int) ints[i].v;
+
+    if (ovf != ints[i].overflow || r != want) {
+      printf("int case %u: got %d/%d\n", (unsigned) i, ovf, r);
+      errors++;
+    }
+  }
+  for (i = 0; i < sizeof(sizes) / sizeof(sizes[0]); i++) {
+    size_t r = 42;
+    const hts_boolean ovf = hts_ckd_size(&r, sizes[i].v);
+    const size_t want = ovf ? 42 : (size_t) sizes[i].v;
+
+    if (ovf != sizes[i].overflow || r != want) {
+      printf("size case %u: got %d/%" PRIuMAX "\n", (unsigned) i, ovf,
+             (uintmax_t) r);
+      errors++;
+    }
+  }
+  for (i = 0; i < sizeof(sats) / sizeof(sats[0]); i++) {
+    if (hts_sat_int(sats[i].v) != sats[i].want) {
+      printf("sat case %u: got %d\n", (unsigned) i, hts_sat_int(sats[i].v));
+      errors++;
+    }
+  }
+  return errors;
+}
+
+/* -#test=ckd-narrow: checks the narrowing helpers at the int and size_t
+   edges. */
+static int st_ckd_narrow(httrackp *opt, int argc, char **argv) {
+  const int errors = ckd_narrow_check();
+
+  printf("%s\n", errors == 0 ? "ok" : "FAIL");
+  return errors == 0 ? 0 : 1;
+}
+
 const struct selftest_entry selftests_ckd[] = {
     {"ckd", "", "checked size_t add and multiply at their boundaries", st_ckd},
+    {"ckd-narrow", "", "checked narrowing to int and size_t at their edges",
+     st_ckd_narrow},
     {NULL, NULL, NULL, NULL},
 };

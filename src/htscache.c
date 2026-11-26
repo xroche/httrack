@@ -39,6 +39,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsbasenet.h"
 #include "htsmd5.h"
 #include "htslines.h"
+#include "htsckd.h"
 #include <limits.h>
 #include <time.h>
 
@@ -864,6 +865,7 @@ static htsblk cache_readex_new(httrackp *opt, cache_back *cache,
             } else
 #endif
             {                   // lire en mémoire
+              size_t n = 0;
 
               // We need to get bytes on memory, but the previous version is (supposed to be) on disk.
               if (!dataincache) {
@@ -892,23 +894,23 @@ static htsblk cache_readex_new(httrackp *opt, cache_back *cache,
                     strcpybuff(r.msg,
                                "Previous cache file not found (empty filename)");
                   }
-                } else if (r.size >= INT_MAX) { /* too big to read in memory */
+                } else if (hts_ckd_size(&n, r.size) ||
+                           n >= INT_MAX) { /* too big to read in memory */
                   r.statuscode = STATUSCODE_INVALID;
                   strcpybuff(r.msg, "Cache Read Error : Bad Size");
                 } else { /* Read in memory from disk */
                   FILE *const fp = FOPEN(fconv(catbuff, sizeof(catbuff), previous_save), "rb");
 
                   if (fp != NULL) {
-                    r.adr = (char *) malloct((int) r.size + 1);
+                    r.adr = (char *) malloct(n + 1);
                     if (r.adr != NULL) {
-                      if (r.size > 0 &&
-                          !hts_fread_exact(r.adr, (size_t) r.size, fp)) {
+                      if (n > 0 && !hts_fread_exact(r.adr, n, fp)) {
                         int last_errno = errno;
 
                         cache_read_failed(&r, "Read error in cache disk data",
                                           last_errno);
-                      } else if (r.size >= 0)
-                        *(r.adr + r.size) = '\0';
+                      } else
+                        r.adr[n] = '\0';
                     } else {
                       r.statuscode = STATUSCODE_INVALID;
                       strcpybuff(r.msg,
@@ -924,10 +926,13 @@ static htsblk cache_readex_new(httrackp *opt, cache_back *cache,
               }
               // Data in cache.
               else {
-                // lire fichier (d'un coup)
-                r.adr = (char *) malloct((int) r.size + 1);
+                /* unzReadCurrentFile() returns an int count */
+                r.adr = !hts_ckd_size(&n, r.size) && n < INT_MAX
+                            ? (char *) malloct(n + 1)
+                            : NULL;
                 if (r.adr != NULL) {
-                  if (unzReadCurrentFile((unzFile) cache->zipInput, r.adr, (int) r.size) != r.size) {   // erreur
+                  if (unzReadCurrentFile((unzFile) cache->zipInput, r.adr,
+                                         (unsigned) n) != r.size) {
                     freet(r.adr);
                     r.adr = NULL;
                     r.statuscode = STATUSCODE_INVALID;

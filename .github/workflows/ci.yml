@@ -32,9 +32,11 @@ jobs:
         # werror is per-leg: these four run pinned images, so a new warning is
         # our own. The -O3 -flto leg is left out, since a distribution builds
         # that way and we do not pick its optimizer's warnings.
+        # One clang leg keeps 64-to-32 narrowing a warning, so vendored code builds,
+        # and a step below makes it fatal for ours.
         include:
           - { arch: x86-64, runner: ubuntu-24.04, cc: gcc, cflags: -g -O2, werror: --enable-werror }
-          - { arch: x86-64, runner: ubuntu-24.04, cc: clang, cflags: -g -O2, werror: --enable-werror }
+          - { arch: x86-64, runner: ubuntu-24.04, cc: clang, cflags: -g -O2 -Wshorten-64-to-32 -Wno-error=shorten-64-to-32, werror: --enable-werror }
           - { arch: arm64, runner: ubuntu-24.04-arm, cc: gcc, cflags: -g -O2, werror: --enable-werror }
           - { arch: arm64, runner: ubuntu-24.04-arm, cc: clang, cflags: -g -O2, werror: --enable-werror }
           # Ubuntu builds httrack this way; no other leg here does.
@@ -99,7 +101,24 @@ jobs:
           grep -q "define HAVE_SPAWN_H 1" config.h
 
       - name: Build
-        run: make -j"$(nproc)"
+        run: |
+          set -euo pipefail
+          make -j"$(nproc)" 2>&1 | tee "$RUNNER_TEMP/build.log"
+
+      # Vendored coucal and minizip are exempt: their fixes go upstream.
+      - name: Reject 64-to-32 narrowing
+        if: contains(matrix.cflags, '-Wshorten-64-to-32')
+        run: |
+          set -euo pipefail
+          # proves the flag reached the build, so an empty log means clean
+          grep -q -e '^CFLAGS = .*-Wshorten-64-to-32' src/Makefile
+          hits=$(grep -E '\[-Wshorten-64-to-32\]' "$RUNNER_TEMP/build.log" \
+            | grep -vE '/src/(coucal|minizip)/' || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            echo "::error::64-bit value narrowed to 32 bits; use hts_ckd_int, hts_ckd_size or hts_sat_int (src/htsckd.h)"
+            exit 1
+          fi
 
       # FTP_PASV is 1 in every build, so #if !FTP_PASV never reaches a compiler
       # and rots unnoticed (#1091). Compiling is all this proves; nothing runs it.

@@ -2102,7 +2102,7 @@ static int hts_peek(htsblk *r, hts_buf buff) {
     sigpipe_mask m;
 
     sigpipe_hold(&m);
-    ret = SSL_peek(r->ssl_con, buff.p, (int) buff.size);
+    ret = SSL_peek(r->ssl_con, buff.p, hts_sat_int(buff.size));
     sigpipe_release(&m);
     if (ret <= 0) {
       const int err_code = SSL_get_error(r->ssl_con, ret);
@@ -2114,7 +2114,7 @@ static int hts_peek(htsblk *r, hts_buf buff) {
     return ret;
   }
 #endif
-  ret = recv(r->soc, buff.p, (int) buff.size, MSG_PEEK);
+  ret = (int) recv(r->soc, buff.p, hts_sat_int(buff.size), MSG_PEEK);
   if (ret == 0)
     return READ_EOF;
   return ret < 0 ? READ_ERROR : ret;
@@ -5111,7 +5111,7 @@ LLint check_downloadable_bytes(int rate) {
 // == 0 : not yet data
 // <0: error or no data: READ_ERROR, READ_EOF or READ_TIMEOUT
 static int hts_read(htsblk *r, hts_buf buff) {
-  const int size = (int) buff.size;
+  const int size = hts_sat_int(buff.size);
   int retour;
 
   if (r->is_file) {
@@ -5145,7 +5145,7 @@ static int hts_read(htsblk *r, hts_buf buff) {
       }
     } else {
 #endif
-      retour = recv(r->soc, buff.p, size, 0);
+      retour = (int) recv(r->soc, buff.p, size, 0);
       if (retour == 0) {
         retour = READ_EOF;
       } else if (retour < 0) {

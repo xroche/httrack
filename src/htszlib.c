@@ -35,6 +35,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsbase.h"
 #include "htscore.h"
 #include "htsio.h"
+#include "htsckd.h"
 #include "htscodec.h"
 #include "htszlib.h"
 
@@ -148,8 +149,8 @@ int hts_zunpack_max(const char *filename, const char *newfile, LLint cap) {
               break;
             navail = fread(inbuf, 1, sizeof(inbuf), in);
           } while (navail > 0);
-          if (ok && zerr == Z_STREAM_END)
-            ret = (int) size;
+          if (ok && zerr == Z_STREAM_END && hts_ckd_int(&ret, size))
+            ret = -1;
         }
         inflateEnd(&strm);
         /* stdio may still hold the tail, so the close is a write of its own */
@@ -183,8 +184,8 @@ int hts_zunpack_max(const char *filename, const char *newfile, LLint cap) {
             }
             size += (LLint) navail;
           }
-          if (size >= 0 && !ferror(in))
-            ret = (int) size;
+          if (size >= 0 && !ferror(in) && hts_ckd_int(&ret, size))
+            ret = -1;
         }
         if (fpout != NULL && fclose(fpout) != 0) {
           io_errno = errno;

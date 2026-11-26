@@ -22,7 +22,7 @@ Please visit our Website: http://www.httrack.com
 */
 
 /* ------------------------------------------------------------ */
-/* File: htsckd.h checked size_t arithmetic                     */
+/* File: htsckd.h checked size_t arithmetic and narrowing      */
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
@@ -31,12 +31,13 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsglobal.h"
 
+#include <limits.h>
 #include <stddef.h>
 #include <stdint.h>
 
 /** @file htsckd.h
- *  C23 ckd_add() and ckd_mul() for size_t, engine-internal and never
- *  installed. **/
+ *  C23 ckd_add() and ckd_mul() for size_t, plus checked narrowing,
+ *  engine-internal and never installed. **/
 
 #if defined(__has_builtin)
 #if __has_builtin(__builtin_add_overflow) &&                                   \
@@ -80,6 +81,31 @@ static HTS_UNUSED HTS_CHECK_RESULT hts_boolean hts_ckd_mul(size_t *r, size_t a,
 #else
   return hts_ckd_mul_portable(r, a, b);
 #endif
+}
+
+/** Sets *r = v and returns HTS_FALSE if v fits an int; otherwise returns
+ *  HTS_TRUE and leaves *r alone. **/
+static HTS_UNUSED HTS_CHECK_RESULT hts_boolean hts_ckd_int(int *r, int64_t v) {
+  if (v < INT_MIN || v > INT_MAX)
+    return HTS_TRUE;
+  *r = (int) v;
+  return HTS_FALSE;
+}
+
+/** Sets *r = v and returns HTS_FALSE if v fits a size_t; otherwise
+ *  (negative, or too big on a 32-bit target) returns HTS_TRUE and leaves *r
+ *  alone. **/
+static HTS_UNUSED HTS_CHECK_RESULT hts_boolean hts_ckd_size(size_t *r,
+                                                            int64_t v) {
+  if (v < 0 || (uint64_t) v > SIZE_MAX)
+    return HTS_TRUE;
+  *r = (size_t) v;
+  return HTS_FALSE;
+}
+
+/** Returns v capped at INT_MAX, for an I/O length an int API takes. **/
+static HTS_UNUSED int hts_sat_int(size_t v) {
+  return v < INT_MAX ? (int) v : INT_MAX;
 }
 
 #endif
