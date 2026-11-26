@@ -138,8 +138,7 @@ static intptr_t changes_slot(hts_changes *changes, const char *file,
   if (coucal_read(changes->index, file, &slot))
     return slot - 1;
 
-  TypedArrayEnsureRoom(changes->entries, 1);
-  if (!TypedArrayHasRoom(changes->entries, 1)) {
+  if (!TypedArrayReserve(changes->entries, 1)) {
     changes->overflow = HTS_TRUE;
     return -1;
   }

@@ -1111,6 +1111,62 @@ static int array_growth_selftests(void) {
   return err;
 }
 
+/* Returns 0 when TypedArrayReserve, Push and At report what they did. */
+static int array_push_selftests(void) {
+  TypedArray(char) a = EMPTY_TYPED_ARRAY;
+  TypedArray(arrays_wide_t) w = EMPTY_TYPED_ARRAY;
+  /* volatile keeps the overflowing rooms runtime values. */
+  volatile size_t room;
+  void *ptr;
+  size_t capa, size, i;
+  int err = 0;
+
+  /* A push at capacity grows the store and keeps what it held. */
+  ST_FAIL_IF(err, !TypedArrayPush(a, 'a'));
+  while (TypedArrayRoom(a) != 0)
+    ST_FAIL_IF(err, !TypedArrayPush(a, (char) ('a' + TypedArraySize(a))));
+  capa = TypedArrayCapa(a);
+  ST_FAIL_IF(err, !TypedArrayPush(a, 'z'));
+  ST_FAIL_IF(err, TypedArrayCapa(a) <= capa || TypedArraySize(a) != capa + 1);
+  for (i = 1; i < capa; i++)
+    ST_FAIL_IF(err, TypedArrayNth(a, i) != (char) ('a' + i));
+
+  /* A room past what a size_t can hold fails and changes nothing. */
+  ptr = TypedArrayPtr(a);
+  capa = TypedArrayCapa(a);
+  size = TypedArraySize(a);
+  room = (size_t) -1 - size + 1;
+  ST_FAIL_IF(err, TypedArrayReserve(a, room));
+  room = ((size_t) -1) / sizeof(arrays_wide_t) + 1;
+  ST_FAIL_IF(err, TypedArrayReserve(w, room));
+  ST_FAIL_IF(err, TypedArrayPtr(w) != NULL || TypedArrayCapa(w) != 0);
+  ST_FAIL_IF(err, TypedArrayPtr(a) != ptr || TypedArrayCapa(a) != capa ||
+                      TypedArraySize(a) != size);
+
+  /* A push after the failed reserve still lands. */
+  ST_FAIL_IF(err, !TypedArrayPush(a, '!'));
+  ST_FAIL_IF(err, TypedArraySize(a) != size + 1);
+
+  /* At reads and writes the last element. */
+  ST_FAIL_IF(err, TypedArrayAt(a, TypedArraySize(a) - 1) != '!');
+  TypedArrayAt(a, TypedArraySize(a) - 1) = '?';
+  ST_FAIL_IF(err, TypedArrayNth(a, TypedArraySize(a) - 1) != '?');
+
+  /* A push whose grow the allocator refuses fails and changes nothing. */
+  while (TypedArrayRoom(a) != 0)
+    ST_FAIL_IF(err, !TypedArrayPush(a, '.'));
+  ptr = TypedArrayPtr(a);
+  capa = TypedArrayCapa(a);
+  hts_realloct_fault_selftest = 1;
+  ST_FAIL_IF(err, TypedArrayPush(a, 'x'));
+  hts_realloct_fault_selftest = 0;
+  ST_FAIL_IF(err, TypedArrayPtr(a) != ptr || TypedArrayCapa(a) != capa ||
+                      TypedArraySize(a) != capa);
+
+  TypedArrayFree(a);
+  return err;
+}
+
 /* The arena's promise is that what it hands out never moves, so this keeps
    every pointer it returns and re-reads them all at the end. */
 static int st_arena(httrackp *opt, int argc, char **argv) {
@@ -1453,6 +1509,19 @@ static int st_arrays(httrackp *opt, int argc, char **argv) {
     printf("arrays: growth failure %s\n", err ? "FAIL" : "OK");
     TypedArrayFree(a);
     return err;
+  } else if (argc >= 1 && strcmp(argv[0], "push") == 0) {
+    const int err = array_push_selftests();
+
+    printf("arrays: push %s\n", err ? "FAIL" : "OK");
+    return err;
+  } else if (argc >= 1 && strcmp(argv[0], "at-past-end") == 0) {
+    TypedArray(char) a = EMPTY_TYPED_ARRAY;
+
+    room = 0;
+    (void) TypedArrayPush(a, 'a');
+    printf("arrays: NOT aborted (%d)\n", TypedArrayAt(a, room + 1));
+    TypedArrayFree(a);
+    return 1;
   } else {
     const int err = array_growth_selftests();
 
@@ -5922,7 +5991,7 @@ const struct selftest_entry selftests_lib[] = {
      "a \"..\" component, and a name carrying its own root, are refused; a "
      "\"..\" inside a name is not",
      st_pathcontained},
-    {"arrays", "[overflow-capa|overflow-loop]",
+    {"arrays", "[overflow-capa|overflow-loop|push|at-past-end]",
      "htsarrays.h growth reaches the requested room, or reports it failed",
      st_arrays},
     {"ucs4-oom", "", "a UCS4 re-encode the allocator refuses aborts",

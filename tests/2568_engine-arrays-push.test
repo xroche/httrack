@@ -1,0 +1,24 @@
+#!/bin/bash
+#
+# TypedArrayReserve and TypedArrayPush return whether they made room, leaving
+# the array unchanged when not, and TypedArrayAt aborts past the end.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+assert_selftest "arrays: push OK" arrays push
+
+err=$(httrack -O /dev/null -#test=arrays at-past-end 2>&1) || true
+case "$err" in
+*"arrays: NOT aborted"*)
+    fail "an index past the end was NOT caught"
+    ;;
+*"n < size"*) ;;
+*)
+    fail "expected the index bound to abort, got: $err"
+    ;;
+esac
+
+exit 0

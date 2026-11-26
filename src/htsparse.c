@@ -910,8 +910,7 @@ typedef size_t (*sink_escaper)(const char *const s, char *const dest,
 static void sink_add_n(parse_sink *const sink, const hts_span s) {
   if (!sink->enabled)
     return;
-  TypedArrayEnsureRoom(sink->buf, s.len);
-  if (TypedArrayHasRoom(sink->buf, s.len)) {
+  if (TypedArrayReserve(sink->buf, s.len)) {
     TypedArrayAppend(sink->buf, s.p, s.len);
   } else {
     sink->oom = HTS_TRUE;
@@ -939,8 +938,7 @@ static void sink_add_escaped(parse_sink *const sink, const char *const s,
   if (!sink->enabled)
     return;
   want = strlen(s) * factor + 1024;
-  TypedArrayEnsureRoom(sink->buf, want);
-  if (TypedArrayHasRoom(sink->buf, want)) {
+  if (TypedArrayReserve(sink->buf, want)) {
     TypedArraySize(sink->buf) +=
         escape(s, &TypedArrayTail(sink->buf), TypedArrayRoom(sink->buf));
   } else {

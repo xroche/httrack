@@ -5,8 +5,11 @@ src/htsarrays.h: TypedArray: uses free name elts
 src/htsarrays.h: TypedArrayAdd: evaluates A twice
 src/htsarrays.h: TypedArrayAppend: evaluates A twice
 src/htsarrays.h: TypedArrayAppend: evaluates PTR twice
+src/htsarrays.h: TypedArrayAt: evaluates A twice
 src/htsarrays.h: TypedArrayEnsureRoom: evaluates A twice
 src/htsarrays.h: TypedArrayFree: evaluates A twice
+src/htsarrays.h: TypedArrayPush: evaluates A twice
+src/htsarrays.h: TypedArrayReserve: evaluates A twice
 src/htsarrays.h: TypedArrayRoom: evaluates A twice
 src/htsarrays.h: TypedArrayTail: evaluates A twice
 src/htsback.c: BACK_FOR_EACH_BUSY: holds statements outside do { } while (0)
