@@ -1865,7 +1865,7 @@ void warc_write_backtransaction(httrackp *opt, lien_back *back) {
   }
   w = (warc_writer *) opt->state.warc;
   /* records after a lost one would sit past a cut or missing record */
-  if (w->failed || back->r.statuscode <= 0)
+  if (w->failed || !statuscode_is_http(back->r.statuscode))
     return;
 
   is_ftp = strfield(back->url_adr, "ftp://") != 0;

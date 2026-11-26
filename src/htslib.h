@@ -1094,6 +1094,18 @@ HTS_STATIC int strfield(const char *f, const char *s) {
 
 /* clang-format on */
 
+/* Did a server answer? HTTP codes are positive, and HTTrack's own
+   (BackStatusCode) negative. Zero is neither: not set yet, for example
+   during an FTP transfer. */
+static HTS_INLINE HTS_UNUSED hts_boolean statuscode_is_http(int code) {
+  return code > 0;
+}
+
+/* Is code one of HTTrack's own BackStatusCode values, not the server's? */
+static HTS_INLINE HTS_UNUSED hts_boolean statuscode_is_internal(int code) {
+  return code < 0;
+}
+
 /* MSVC ships these POSIX functions under other names. Kept out of the installed
    headers: they would rewrite the same identifiers in a consumer's own code. */
 #ifdef _MSC_VER

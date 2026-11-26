@@ -67,8 +67,8 @@ Please visit our Website: http://www.httrack.com
 
 /* Wait up to timeout seconds for soc to become readable. Optional back ends the
    wait on a stop, opt clips it to --max-time. */
-static int wait_socket_receive(lien_back *back, T_SOC soc, int timeout,
-                               const httrackp *opt);
+static hts_poll_result wait_socket_receive(lien_back *back, T_SOC soc,
+                                           int timeout, const httrackp *opt);
 static void run_launch_ftp(FTPDownloadStruct *pStruct);
 static hts_boolean stop_ftp(lien_back *back);
 
@@ -699,18 +699,18 @@ static hts_boolean ftp_connect(lien_back *back, T_SOC soc, SOCaddr *server,
   if (!hts_socket_connect_started(soc, server, opt, &pending))
     return HTS_FALSE;
   if (pending) {
-    int ready;
+    hts_poll_result ready;
 
     /* state.stop counts here, unlike in the waits below: a mirror the user
        stopped has nothing to finish on a connection never established. */
-    while ((ready = check_socket_connect(soc)) == 0) {
+    while ((ready = check_socket_connect(soc)) == HTS_POLL_NONE) {
       if (hts_load_acquire_int(&back->stop_ftp) ||
           (opt != NULL && hts_load_acquire_int(&opt->state.stop)) ||
           hts_timeout_elapsed(started, mtime_monotonic(), timeout))
         return HTS_FALSE;
       Sleep(100);
     }
-    if (ready < 0 || connect_socket_error(soc) != 0)
+    if (ready == HTS_POLL_ERROR || connect_socket_error(soc) != 0)
       return HTS_FALSE;
   }
   /* the rest of the session reads and writes this socket blocking */
@@ -718,7 +718,7 @@ static hts_boolean ftp_connect(lien_back *back, T_SOC soc, SOCaddr *server,
 }
 
 #if !FTP_PASV
-static int check_socket(T_SOC soc);
+static hts_poll_result check_socket(T_SOC soc);
 
 /* The active-mode counterpart: an unbounded accept() waits for a data
    connection the server may never make (#1074). */
@@ -731,7 +731,7 @@ static T_SOC ftp_accept(lien_back *back, T_SOC soc, int timeout,
   if (!socket_set_nonblocking(soc, HTS_TRUE))
     return INVALID_SOCKET;
   /* state.stop counts as in ftp_connect: nothing is established yet */
-  while (check_socket(soc) == 0) {
+  while (check_socket(soc) == HTS_POLL_NONE) {
     if (hts_load_acquire_int(&back->stop_ftp) ||
         (opt != NULL && hts_load_acquire_int(&opt->state.stop)) ||
         hts_timeout_elapsed(started, mtime_monotonic(), timeout))
@@ -1192,17 +1192,19 @@ static void run_launch_ftp(FTPDownloadStruct *pStruct) {
               // attendre les données
               len = 1;          // pas d'erreur pour le moment
               switch (wait_socket_receive(back, soc_dat, timeout, opt)) {
-              case -1:
+              case HTS_POLL_ERROR:
                 ftp_fail(&back->r, "FTP read error");
                 len = 0;        // fin
                 break;
-              case 0:
+              case HTS_POLL_NONE:
                 /* stop_ftp() names the real reason when it is the stop that
                    cut the wait short. */
                 if (!stop_ftp(back))
                   htsblk_failf(&back->r, "Time out (%d)", timeout);
                 back->r.statuscode = STATUSCODE_INVALID;
                 len = 0;        // fin
+                break;
+              case HTS_POLL_READY:
                 break;
               }
 
@@ -1254,7 +1256,8 @@ static void run_launch_ftp(FTPDownloadStruct *pStruct) {
 
           // 226 Transfer complete?
           if (back->r.statuscode != -1) {
-            if (wait_socket_receive(back, soc_ctl, timeout_onfly, opt) > 0) {
+            if (wait_socket_receive(back, soc_ctl, timeout_onfly, opt) ==
+                HTS_POLL_READY) {
               // récupérer 226 transfer complete
               get_ftp_line(back, soc_ctl, HTS_BUF(line), timeout, opt);
               if (line[0] == '2') {     // OK
@@ -1371,7 +1374,7 @@ int send_line(T_SOC soc, const char *data) {
   if (n < 0 || n >= (int) sizeof(line))
     return 0;
   // check_socket_connect() refuses it too, but the analyzer does not follow it
-  if (!hts_soc_selectable(soc) || check_socket_connect(soc) != 1) {
+  if (!hts_soc_selectable(soc) || check_socket_connect(soc) != HTS_POLL_READY) {
 #if FTP_DEBUG
     printf("!SOC WRITE ERROR\n");
 #endif
@@ -1412,17 +1415,18 @@ hts_boolean get_ftp_line(lien_back *back, T_SOC soc, hts_buf line, int timeout,
   do {
     char b;
 
-    // vérifier données
     switch (wait_socket_receive(back, soc, timeout, opt)) {
-    case -1:                   // erreur de lecture
+    case HTS_POLL_ERROR:
       if (line.size != 0)
         hts_buf_printf_clip(line, "500 *read error");
       return HTS_FALSE;
       break;
-    case 0:
+    case HTS_POLL_NONE:
       if (line.size != 0)
         hts_buf_printf_clip(line, "500 *read timeout (%d)", timeout);
       return HTS_FALSE;
+      break;
+    case HTS_POLL_READY:
       break;
     }
 
@@ -1474,16 +1478,12 @@ char *linejmp(char *line) {
     return line;
 }
 
-// test socket:
-// 0 : no data
-// 1 : data detected
-// -1: error
-static int check_socket(T_SOC soc) {
+static hts_poll_result check_socket(T_SOC soc) {
   fd_set fds, fds_e;            // poll structures
   struct timeval tv;            // structure for select
 
   if (!hts_soc_selectable(soc))
-    return -1;
+    return HTS_POLL_ERROR;
   FD_ZERO(&fds);
   FD_ZERO(&fds_e);
   // socket read 
@@ -1495,20 +1495,20 @@ static int check_socket(T_SOC soc) {
   // poll!     
   select((int) soc + 1, &fds, NULL, &fds_e, &tv);
   if (FD_ISSET(soc, &fds_e)) {  // error detected
-    return -1;
+    return HTS_POLL_ERROR;
   } else if (FD_ISSET(soc, &fds)) {
-    return 1;
+    return HTS_POLL_READY;
   }
-  return 0;
+  return HTS_POLL_NONE;
 }
 
 // check if connected
-int check_socket_connect(T_SOC soc) {
+hts_poll_result check_socket_connect(T_SOC soc) {
   fd_set fds, fds_e;            // poll structures
   struct timeval tv;            // structure for select
 
   if (!hts_soc_selectable(soc))
-    return -1;
+    return HTS_POLL_ERROR;
   FD_ZERO(&fds);
   FD_ZERO(&fds_e);
   // socket write 
@@ -1520,18 +1520,17 @@ int check_socket_connect(T_SOC soc) {
   // poll!     
   select((int) soc + 1, NULL, &fds, &fds_e, &tv);
   if (FD_ISSET(soc, &fds_e)) {  // error detected
-    return -1;
+    return HTS_POLL_ERROR;
   } else if (FD_ISSET(soc, &fds)) {
-    return 1;
+    return HTS_POLL_READY;
   }
-  return 0;
+  return HTS_POLL_NONE;
 }
 
-// attendre des données
-static int wait_socket_receive(lien_back *back, T_SOC soc, int timeout,
-                               const httrackp *opt) {
+static hts_poll_result wait_socket_receive(lien_back *back, T_SOC soc,
+                                           int timeout, const httrackp *opt) {
   const TStamp ltime = mtime_monotonic();
-  int r;
+  hts_poll_result r;
 
   timeout = ftp_wait_left(opt, timeout);
 
@@ -1541,7 +1540,7 @@ static int wait_socket_receive(lien_back *back, T_SOC soc, int timeout,
 #endif
   /* A stop raised by the engine ends the wait on the next 100ms tick instead of
      after the full timeout, so teardown does not sit on a silent server. */
-  while ((!(r = check_socket(soc))) &&
+  while ((r = check_socket(soc)) == HTS_POLL_NONE &&
          (back == NULL || !hts_load_acquire_int(&back->stop_ftp)) &&
          !hts_timeout_elapsed(ltime, mtime_monotonic(), timeout)) {
     Sleep(100);

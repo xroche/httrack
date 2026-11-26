@@ -751,12 +751,12 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
 #else
   /* Terminal is a tty, may ask questions and display funny information */
   if (hts_stdout_isterminal()) {
-    opt->quiet = 0;
+    opt->quiet = HTS_FALSE;
     opt->verbosedisplay = HTS_VERBOSE_SIMPLE;
   }
   /* Not a tty, no stdin input or funny output! */
   else {
-    opt->quiet = 1;
+    opt->quiet = HTS_TRUE;
     opt->verbosedisplay = HTS_VERBOSE_NONE;
   }
 #endif
@@ -889,10 +889,10 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                   result += taken;
                 }
               } else if (strcmp(tmp_argv[0] + 2, "quiet") == 0) {
-                opt->quiet = 1; // ne pas poser de questions! (nohup par exemple)
+                opt->quiet = HTS_TRUE; // never prompt, for example under nohup
               } else if (strcmp(tmp_argv[0] + 2, "continue") == 0) {
                 argv_url = -1;  /* forcer */
-                opt->quiet = 1;
+                opt->quiet = HTS_TRUE;
               }
             }
           }
@@ -967,7 +967,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
 
                 check_path(&opt->path_log, argv_firsturl);
                 if (check_path(&opt->path_html, argv_firsturl)) {
-                  opt->dir_topindex = 1;        // rebuilt top index
+                  opt->dir_topindex = HTS_TRUE; // rebuilt top index
                 }
               }
             }
@@ -1392,11 +1392,11 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
           case 'g':            // récupérer un (ou plusieurs) fichiers isolés
             opt->wizard = HTS_WIZARD_AUTO;
             opt->cache = HTS_CACHE_NONE; // ni de cache
-            opt->makeindex = 0; // ni d'index
+            opt->makeindex = HTS_FALSE;  // no index either
             httrack_logmode = 1;        // erreurs à l'écran
             opt->savename_type = 1003;  // mettre dans le répertoire courant
             opt->depth = 0;     // ne pas explorer la page
-            opt->accept_cookie = 0;     // pas de cookies
+            opt->accept_cookie = HTS_FALSE; // no cookies
             opt->robots = HTS_ROBOTS_NEVER; // pas de robots
             break;
           case 'w':
@@ -1439,10 +1439,10 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
             opt->travel |= HTS_TRAVEL_TEST_ALL;
             break;
           case 'n':
-            opt->nearlink = 1;
+            opt->nearlink = HTS_TRUE;
             break;
           case 'x':
-            opt->external = 1;
+            opt->external = HTS_TRUE;
             break;
             //
           case 'U':
@@ -1459,12 +1459,12 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
             break;
             //
           case 'Y':
-            opt->mirror_first_page = 1;
+            opt->mirror_first_page = HTS_TRUE;
             break;
             //
           case 'q':
           case 'i':
-            opt->quiet = 1;
+            opt->quiet = HTS_TRUE;
             break;
             //
           case 'Q':
@@ -2202,11 +2202,11 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                   }
                 } else if (*(com + 1) == 'c') { // --warc-cdx: sorted CDXJ index
                   com++;
-                  opt->warc_cdx = 1;
+                  opt->warc_cdx = HTS_TRUE;
                 } else if (*(com + 1) == 'z') { // --wacz: WACZ package
                   com++;
-                  opt->warc_wacz = 1;
-                  opt->warc_cdx = 1; // WACZ embeds the CDXJ index
+                  opt->warc_wacz = HTS_TRUE;
+                  opt->warc_cdx = HTS_TRUE; // WACZ embeds the CDXJ index
                   if (!StringNotEmpty(opt->warc_file))
                     StringCopy(opt->warc_file, WARC_AUTONAME);
                 } else { // --warc: auto-named archive under the output dir
@@ -2577,7 +2577,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                 HTS_PANIC_PRINTF("Option #~ is disabled for security reasons");
                 break;
               case 'f':
-                opt->flush = 1;
+                opt->flush = HTS_TRUE;
                 break;
               case 'h':
                 printf("HTTrack version " HTTRACK_VERSION "%s\n",
@@ -2587,10 +2587,10 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
               case 'p':        /* opt->aff_progress=1; deprecated */
                 break;
               case 'S':
-                opt->shell = 1;
+                opt->shell = HTS_TRUE;
                 break;          // stdin sur un shell
               case 'K':
-                opt->keyboard = 1;
+                opt->keyboard = HTS_TRUE;
                 break;          // vérifier stdin
                 //
               case 'L':
@@ -2600,10 +2600,10 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                 readGluedInt(opt->maxfilter, HTS_FILTERS_MAX);
                 break;
               case 'Z':
-                opt->makestat = 1;
+                opt->makestat = HTS_TRUE;
                 break;
               case 'T':
-                opt->maketrack = 1;
+                opt->maketrack = HTS_TRUE;
                 break;
               case 'u':
                 readGluedInt(opt->waittime, INT_MAX);
@@ -2620,7 +2620,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                 return -1;
                 break;
               case 'd':
-                opt->parsedebug = 1;
+                opt->parsedebug = HTS_TRUE;
                 break;
 
                 /* autotest */
@@ -2684,9 +2684,9 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
               }
               StringCopy(opt->sys_com, argv[na]);
               if (StringNotEmpty(opt->sys_com))
-                opt->sys_com_exec = 1;
+                opt->sys_com_exec = HTS_TRUE;
               else
-                opt->sys_com_exec = 0;  // -V "" désactive l'option
+                opt->sys_com_exec = HTS_FALSE; // -V "" turns it off
             }
             break;
             //

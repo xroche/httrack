@@ -5704,7 +5704,7 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   opt->check_cert = HTS_DEFAULT;
   opt->mptcp_connections = 0;
   opt->mptcp_fallbacks = 0;
-  opt->upper_links_refused = 0;
+  opt->upper_links_refused = HTS_FALSE;
   opt->abort_left_partial = HTS_FALSE;
   StringCopy(opt->why_url, "");
   opt->pause_min_ms = 0;

@@ -67,6 +67,23 @@ static HTS_INLINE HTS_UNUSED int back_status(const lien_back *b) {
   return hts_load_acquire_int(&b->status);
 }
 
+/* Is a transfer still running on this slot, FTP included? */
+static HTS_INLINE HTS_UNUSED hts_boolean back_in_flight(const lien_back *b) {
+  return back_status(b) > STATUS_READY;
+}
+
+/* Does the slot hold a transfer, running or done but not yet taken? */
+static HTS_INLINE HTS_UNUSED hts_boolean
+back_holds_transfer(const lien_back *b) {
+  return back_status(b) >= STATUS_READY;
+}
+
+/* Slot carrying a transfer of ours. An FTP one is its worker thread's, which
+   owns socket and slot, so no sweep may touch it. */
+static HTS_INLINE HTS_UNUSED hts_boolean back_is_live(const int status) {
+  return status > STATUS_READY && status < STATUS_FTP_TRANSFER;
+}
+
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
 

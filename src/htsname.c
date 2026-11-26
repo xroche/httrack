@@ -1099,7 +1099,8 @@ int url_savename(lien_adrfilsave *const afs,
           else if (opt->savename_delayed != HTS_SAVENAME_DELAYED_NONE &&
                    !hts_load_acquire_int(&opt->state.stop)) {
             // Check if the file is ready in backing.
-            if (headers != NULL && back_status(headers) >= 0 && !is_redirect) {
+            if (headers != NULL && back_holds_transfer(headers) &&
+                !is_redirect) {
               const sniff_src src = {sback, headers, adr, fil, NULL};
 
               ext_chg = resolve_extension(opt, &src, headers->r.cdispo,
@@ -1172,7 +1173,7 @@ int url_savename(lien_adrfilsave *const afs,
 
                 do {
                   // temps à attendre, et remplir autant que l'on peut le cache (backing)
-                  if (back_status(&back[b]) > 0) {
+                  if (back_in_flight(&back[b])) {
                     back_wait(sback, opt, cache, 0);
                   }
                   if (ptr >= 0) {
@@ -1189,7 +1190,7 @@ int url_savename(lien_adrfilsave *const afs,
                     stop_looping = 1;
                   }
                   // traitement des 304,303..
-                  if (back_status(&back[b]) <= 0) {
+                  if (!back_in_flight(&back[b])) {
                     if (HTTP_IS_REDIRECT(back[b].r.statuscode)) {       // agh moved.. un tit tour de plus
                       if ((petits_tours < 5) && former != NULL) { // on va pas tourner en rond non plus!
                         if (strnotempty(back[b].r.location)) {    // location existe!
@@ -1309,8 +1310,7 @@ int url_savename(lien_adrfilsave *const afs,
                       }
                     }           // ok, leaving
                   }
-                } while (!stop_looping && back_status(&back[b]) > 0 &&
-                         back_status(&back[b]) < 1000);
+                } while (!stop_looping && back_is_live(back_status(&back[b])));
 
                 // Si non déplacé, forcer type?
                 if (!has_been_moved) {

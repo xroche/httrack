@@ -66,22 +66,8 @@ void cache_mayadd(httrackp * opt, cache_back * cache, htsblk * r,
             adr_nologin(opt, url_adr), url_fil, url_save);
         return;
       }
-      // c'est le seul endroit ou l'on ajoute des elements dans le cache (fichier entier ou header)
-      // on stocke tout fichier "ok", mais également les réponses 404,301,302...
-      if (
-#if 1
-           r->statuscode > 0
-#else
-           /* We don't store 5XX errors, because it might be a server problem */
-           (r->statuscode == HTTP_OK)   /* stocker réponse standard, plus */
-           ||(r->statuscode == 204)     /* no content */
-           ||HTTP_IS_REDIRECT(r->statuscode)    /* redirect */
-           ||(r->statuscode == 401)     /* authorization */
-           ||(r->statuscode == 403)     /* unauthorized */
-           ||(r->statuscode == 404)     /* not found */
-           ||(r->statuscode == 410)     /* gone */
-#endif
-        ) {                     /* ne pas stocker si la page générée est une erreur */
+      // Cache any answer, 404 and 301 included.
+      if (statuscode_is_http(r->statuscode)) {
         if (!r->is_file) {
           // stocker fichiers (et robots.txt)
           if (url_save == NULL || (strnotempty(url_save))
@@ -230,7 +216,8 @@ void cache_keep_previous(httrackp *opt, cache_back *cache, const char *url_adr,
   /* The entry must name this very file: fexist() upstream proves only that
      something occupies the name, which a collision flip fills with another
      URL's file. */
-  if (r.statuscode > 0 && strcmp(previous_save, url_save) == 0) {
+  if (statuscode_is_http(r.statuscode) &&
+      strcmp(previous_save, url_save) == 0) {
     hts_log_print(opt, LOG_DEBUG, "keeping the previous cache entry for %s%s",
                   adr_nologin(opt, url_adr), url_fil);
     cache_add_ex(opt, cache, &r, url_adr, url_fil, url_save, opt->all_in_cache,

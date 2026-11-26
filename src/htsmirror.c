@@ -103,7 +103,7 @@ static hts_boolean hts_link_may_carry_links(httrackp *opt, cache_back *cache,
 
   if (HTTP_IS_REDIRECT(prev.statuscode))
     return HTS_TRUE;
-  if (prev.statuscode > 0) /* answered: an error mirrored nothing */
+  if (statuscode_is_http(prev.statuscode)) /* an error mirrored nothing */
     return HTTP_IS_OK(prev.statuscode) && strnotempty(prev_save) &&
            is_hypertext_mime(opt, prev.contenttype, prev_save) &&
            !hts_mirrored_copy_is_binary(prev_save);
@@ -900,7 +900,7 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct *str,
         break;
 
       // Receive data
-      if (back_status(&back[b]) > 0)
+      if (back_in_flight(&back[b]))
         back_wait(sback, opt, cache, HTS_STAT.stat_timestart);
 
       // Continue to the loop if link still present
@@ -1336,7 +1336,7 @@ int hts_wait_delayed(htsmoduleStruct *str, lien_adrfilsave *afs,
 
           // temps à attendre, et remplir autant que l'on peut le cache
           // (backing)
-          if (back_status(&back[b]) > 0) {
+          if (back_in_flight(&back[b])) {
             back_wait(sback, opt, cache, 0);
           }
           if (ptr >= 0) {

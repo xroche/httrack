@@ -1,0 +1,10 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# The engine tests slot and status-code ranges through named predicates, so each
+# boundary status must land on the side the old literal tests put it.
+assert_selftest "slot-ranges: OK" slotranges run
