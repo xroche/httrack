@@ -3570,14 +3570,21 @@ static int st_postfilewire(httrackp *opt, int argc, char **argv) {
 #endif
 }
 
-// -#test=clearentry: clearing a slot releases its buffers and frees it.
+// -#test=clearentry <dir>: clearing a slot releases what it holds and frees it.
 static int st_clearentry(httrackp *opt, int argc, char **argv) {
   struct_back *sback;
   lien_back *slot;
+  char name[HTS_URLMAXSIZE * 2];
+  FILE *fp;
   int err = 0;
+#ifndef _WIN32
+  int sv[2];
+#endif
 
-  (void) argc;
-  (void) argv;
+  if (argc < 1) {
+    fprintf(stderr, "usage: -#test=clearentry <writable directory>\n");
+    return 1;
+  }
   if ((sback = back_new(opt, 2)) == NULL)
     return 1;
   slot = &sback->lnk[1];
@@ -3588,20 +3595,36 @@ static int st_clearentry(httrackp *opt, int argc, char **argv) {
   slot->chunk_size = 16;
   slot->is_chunk = HTS_TRUE;
   slot->r.location = NULL;
+  ST_FAIL_IF(err, !sprintfbuff(name, "%s/clearentry.tmp", argv[0]));
+  if ((fp = FOPEN(name, "wb")) != NULL)
+    fclose(fp);
+  ST_FAIL_IF(err, !fexist(name));
+  strcpybuff(slot->tmpfile_buffer, name);
+  slot->tmpfile = slot->tmpfile_buffer;
+#ifndef _WIN32
+  ST_FAIL_IF(err, socketpair(AF_UNIX, SOCK_STREAM, 0, sv) != 0);
+  slot->r.soc = sv[0];
+#endif
   back_clear_entry(slot);
   ST_FAIL_IF(err, slot->status != STATUS_FREE);
   ST_FAIL_IF(err, slot->r.adr != NULL || slot->chunk_adr != NULL);
   ST_FAIL_IF(err, slot->chunk_size != 0 || slot->is_chunk);
-  ST_FAIL_IF(err, slot->url_adr[0] != '\0');
+  ST_FAIL_IF(err, slot->url_adr[0] != '\0' || slot->tmpfile != NULL);
   ST_FAIL_IF(err, slot->r.soc != INVALID_SOCKET);
   ST_FAIL_IF(err, slot->r.location != slot->location_buffer);
+  ST_FAIL_IF(err, fexist(name));
+#ifndef _WIN32
+  ST_FAIL_IF(err, fcntl(sv[0], F_GETFD) != -1); /* the socket was closed */
+  close(sv[1]);
+#endif
   back_clear_entry(NULL);
   back_free(&sback);
   return st_verdict("clearentry", err);
 }
 
 const struct selftest_entry selftests_back[] = {
-    {"clearentry", "", "clearing a slot releases its buffers and frees it",
+    {"clearentry", "<dir>",
+     "clearing a slot releases its socket, buffers and temporary file",
      st_clearentry},
     {"iofatal", "<logfile>",
      "a disk-full abort logs its line and stops the mirror", st_iofatal},

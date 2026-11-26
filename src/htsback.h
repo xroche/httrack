@@ -159,7 +159,8 @@ hts_boolean back_delayed_settled_empty(const lien_back *back);
    error. */
 hts_boolean back_delayed_rename(httrackp *opt, lien_back *back,
                                 const char *newname);
-/* Release back's socket, buffers and temporary file, and mark it free. */
+/* Release back's socket, buffers and temporary file, and mark it free. NULL
+   does nothing. */
 void back_clear_entry(lien_back *back);
 void back_delete_all(httrackp * opt, cache_back * cache, struct_back * sback);
 /* Keep slot p alive for keep-alive when allowed, else delete it. */
