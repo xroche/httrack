@@ -1686,6 +1686,7 @@ static const char *paste_name(const char *url, char name[HTS_BUNDLE_NAME_MAX]) {
   const char *h = host;
   // "_con.com" is what the escape below makes of con.com
   const char *const taken = "the name is kept for an escaped device name";
+  const hts_buf nb = hts_buf_at(name, HTS_BUNDLE_NAME_MAX);
   const char *escape;
   hts_boolean www;
   size_t len;
@@ -1709,8 +1710,7 @@ static const char *paste_name(const char *url, char name[HTS_BUNDLE_NAME_MAX]) {
   if (*h == '_' && bundle_name_is_device(h + 1))
     return taken;
   escape = bundle_name_is_device(h) ? "_" : "";
-  if (!hts_buf_try_cpy(hts_buf_at(name, HTS_BUNDLE_NAME_MAX), escape) ||
-      !hts_buf_try_cat(hts_buf_at(name, HTS_BUNDLE_NAME_MAX), h))
+  if (!hts_buf_try_cpy(nb, escape) || !hts_buf_try_cat(nb, h))
     return "invalid login bundle name: 128 bytes or more";
   return hts_bundle_name_refusal(name);
 }

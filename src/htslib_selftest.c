@@ -4273,8 +4273,7 @@ static int st_bufwrite(httrackp *opt, int argc, char **argv) {
   return bad;
 }
 
-/* Poison B's eight bytes with 'P' and the canary after them with 'C', then
-   hold TEXT unless it is NULL. */
+/* Fill B with 'P' and its canary with 'C', then copy TEXT in unless NULL. */
 static void st_buftry_reset(char *b, size_t size, const char *text) {
   memset(b, 'P', size);
   memset(b + 8, 'C', size - 8);
@@ -4296,8 +4295,7 @@ static hts_boolean st_buftry_is(const char *b, size_t size, const char *want) {
   return HTS_TRUE;
 }
 
-/* buftry: hts_buf_try_cpy and hts_buf_try_cat write all or refuse, in bounds.
- */
+/* buftry: hts_buf_try_cpy and hts_buf_try_cat copy whole or refuse. */
 static int st_buftry(httrackp *opt, int argc, char **argv) {
   char r[12]; /* an 8-byte buffer, then a 4-byte canary */
   const hts_buf b = HTS_BUF_N(r, 8);

@@ -299,7 +299,7 @@ sed 's/^#define heap(N).*/#define heap(N) (N)/' "${srcdir}/src/htscore.h" >"${wo
 sed 's/^int url_savename(/HTS_CHECK_RESULT int url_savename(/' "${srcdir}/src/htsname.h" >"${work}/src/htsname.h"
 echo 'src/htslib.c: isdigit(gone)' >>"${work}/baseline/ctype.txt"
 echo 'src/htslib.c: gone: strcpy(x)' >>"${work}/baseline/libc.txt"
-known='src/htsconcat.c: concat: strcat(catbuff)'
+known='src/htscache_selftest.c: cache_selftests: sprintf(save)'
 test "$(grep -cxF "${known}" "${work}/baseline/libc.txt")" -eq 2 || fail "no known entry to drop: ${known}"
 awk -v k="${known}" '$0 == k && !d { d = 1; next } 1' "${work}/baseline/libc.txt" >"${work}/libc.txt"
 mv "${work}/libc.txt" "${work}/baseline/libc.txt"
@@ -312,7 +312,7 @@ for want in "ctype.txt: ctype: stale baseline entry, delete it: src/htslib.c: is
     "macro.txt: macro: stale baseline entry, delete it: ${dup}" \
     "check-result.txt: check-result: stale baseline entry, delete it: src/htsname.h: url_savename" \
     "libc.txt: libc: stale baseline entry, delete it: src/htslib.c: gone: strcpy(x)" \
-    "libc: new violation: strcat(catbuff) in concat is unbounded"; do
+    "libc: new violation: sprintf(save) in cache_selftests is unbounded"; do
     grep -qF "${want}" <<<"${out}" || fail "missed ${want}: ${out}"
 done
 test "$(wc -l <<<"${out}")" -eq 6 || fail "unexpected output: ${out}"

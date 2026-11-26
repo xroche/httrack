@@ -188,10 +188,10 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
               strncpy(adrfil->fil, origin_fil, ((int) (a - origin_fil)) + 1);
               *(adrfil->fil + ((int) (a - origin_fil)) + 1) = '\0';
 
-              // copier chemin relatif
-              if (((int) strlen(adrfil->fil) + (int) strlen(lien)) < HTS_URLMAXSIZE) {
-                strcatbuff(adrfil->fil, lien + ((*lien == '/') ? 1 : 0));
-                // simplifier url pour les ../
+              // append the relative path
+              if (hts_buf_try_cat(HTS_BUF_N(adrfil->fil, HTS_URLMAXSIZE),
+                                  lien + ((*lien == '/') ? 1 : 0))) {
+                // resolve the ../ segments
                 fil_simplifie(adrfil->fil);
               } else
                 ok = -1;        // erreur

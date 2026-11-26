@@ -2847,7 +2847,6 @@ int ident_url_absolute(const char *url, lien_adrfil *adrfil) {
 
     if (q[0] != '/') // the default page
       strcatbuff(adrfil->fil, "/");
-    // fil[] holds the path plus a possible leading '/' the top strlen() misses.
     if (!hts_buf_try_cat(HTS_BUF(adrfil->fil), q))
       return -1;
     // SECURITE:
