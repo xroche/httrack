@@ -129,9 +129,20 @@ static void deletesoc_r(htsblk *r);
 static void time_rfc822_local(hts_buf s, struct tm *A);
 /* Split byte count n into {number, unit}, both stored inside strc. */
 static char **int2bytes2(strc_int2bytes2 *strc, LLint n);
-/* Percent-escaper behind the escape_* family. mode selects the class: 0
-   check_url, 1 in_url, 2 spc_url, 3 uri, 4 control_url, 30 uri_utf. */
-static size_t x_escape_http(const char *const s, hts_buf out, const int mode);
+
+/* Which bytes an escape_* function percent-escapes, one per function. */
+typedef enum hts_escape_class {
+  HTS_ESC_CHECK_URL,
+  HTS_ESC_IN_URL,
+  HTS_ESC_SPC_URL,
+  HTS_ESC_URI,
+  HTS_ESC_CONTROL_URL,
+  HTS_ESC_URI_UTF
+} hts_escape_class;
+
+/* Percent-escaper behind the escape_* family. */
+static size_t x_escape_http(const char *const s, hts_buf out,
+                            const hts_escape_class mode);
 /* Copies src to dst, writing each byte of set that lies inside escaped, a
    part of src, as %XX. An escape that does not fit is dropped whole. Returns
    HTS_FALSE when dst was too small. */
@@ -4695,32 +4706,32 @@ HTSEXT_API char *unescape_http_unharm(char *const catbuff, const size_t size,
 // buffer MAX 1Ko
 size_t escape_spc_url(const char *const src, char *const dest,
                       const size_t size) {
-  return x_escape_http(src, hts_buf_at(dest, size), 2);
+  return x_escape_http(src, hts_buf_at(dest, size), HTS_ESC_SPC_URL);
 }
 
 // smith / john -> smith%20%2f%20john
 HTSEXT_API size_t escape_in_url(const char *const src, 
                                 char *const dest, const size_t size) {
-  return x_escape_http(src, hts_buf_at(dest, size), 1);
+  return x_escape_http(src, hts_buf_at(dest, size), HTS_ESC_IN_URL);
 }
 
 // smith / john -> smith%20/%20john
 size_t escape_uri(const char *const src, char *const dest, const size_t size) {
-  return x_escape_http(src, hts_buf_at(dest, size), 3);
+  return x_escape_http(src, hts_buf_at(dest, size), HTS_ESC_URI);
 }
 
 size_t escape_uri_utf(const char *const src, char *const dest,
                       const size_t size) {
-  return x_escape_http(src, hts_buf_at(dest, size), 30);
+  return x_escape_http(src, hts_buf_at(dest, size), HTS_ESC_URI_UTF);
 }
 
 HTSEXT_API size_t escape_check_url(const char *const src, char *const dest,
                                    const size_t size) {
-  return x_escape_http(src, hts_buf_at(dest, size), 0);
+  return x_escape_http(src, hts_buf_at(dest, size), HTS_ESC_CHECK_URL);
 }
 
 size_t escape_control_url(const char *const src, hts_buf dest) {
-  return x_escape_http(src, dest, 4);
+  return x_escape_http(src, dest, HTS_ESC_CONTROL_URL);
 }
 
 // same as escape_check_url, but returns char*
@@ -4832,7 +4843,8 @@ void escape_remove_control(char *const s) {
   } while(0)
 
 /* Returns the number of characters written (not taking in account the terminating \0), or 'size' upon overflow. */
-static size_t x_escape_http(const char *const s, hts_buf out, const int mode) {
+static size_t x_escape_http(const char *const s, hts_buf out,
+                            const hts_escape_class mode) {
   static const char hex[] = "0123456789abcdef";
   char *const dest = out.p; // ADD_CHAR writes through dest and size
   const size_t size = out.size;
@@ -4850,28 +4862,28 @@ static size_t x_escape_http(const char *const s, hts_buf out, const int mode) {
     const unsigned char c = (unsigned char) s[i];
     int test = 0;
 
-    if (mode == 0)
+    switch (mode) {
+    case HTS_ESC_CHECK_URL:
       test = c == '"' || c == ' ' || CHAR_SPECIAL(c);
-    else if (mode == 1)
-      test = CHAR_RESERVED(c)
-             || CHAR_DELIM(c)
-             || CHAR_UNWISE(c)
-             || CHAR_SPECIAL(c)
-             || CHAR_XXAVOID(c)
-             || CHAR_MARK(c);
-    else if (mode == 2)
-      test = c == ' ';       // n'escaper que espace
-    else if (mode == 3)         // échapper que ce qui est nécessaire
-      test = CHAR_SPECIAL(c)
-             || CHAR_XXAVOID(c);
-    else if (mode == 4) // C0 controls only, leaving high bytes (UTF-8)
+      break;
+    case HTS_ESC_IN_URL:
+      test = CHAR_RESERVED(c) || CHAR_DELIM(c) || CHAR_UNWISE(c) ||
+             CHAR_SPECIAL(c) || CHAR_XXAVOID(c) || CHAR_MARK(c);
+      break;
+    case HTS_ESC_SPC_URL:
+      test = c == ' ';
+      break;
+    case HTS_ESC_URI: // only what must be escaped
+      test = CHAR_SPECIAL(c) || CHAR_XXAVOID(c);
+      break;
+    case HTS_ESC_CONTROL_URL: // C0 controls only, leaving high bytes (UTF-8)
       test = CHAR_LOW(c);
-    else if (mode == 30)      // échapper que ce qui est nécessaire
-      test = (c != '/' && CHAR_RESERVED(c))
-        || CHAR_DELIM(c)
-        || CHAR_UNWISE(c)
-        || CHAR_SPECIAL(c)
-        || CHAR_XXAVOID(c);
+      break;
+    case HTS_ESC_URI_UTF:
+      test = (c != '/' && CHAR_RESERVED(c)) || CHAR_DELIM(c) ||
+             CHAR_UNWISE(c) || CHAR_SPECIAL(c) || CHAR_XXAVOID(c);
+      break;
+    }
 
     if (!test) {
       ADD_CHAR(c);
@@ -5637,7 +5649,7 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   opt->fragment = -1;           // pas de fragmentation
   opt->nearlink = HTS_FALSE;
   opt->makeindex = HTS_TRUE;
-  opt->kindex = HTS_FALSE;
+  opt->kindex = HTS_KINDEX_OFF;
   opt->delete_old = HTS_TRUE;
   opt->background_on_suspend = HTS_TRUE;
   opt->makestat = HTS_FALSE;

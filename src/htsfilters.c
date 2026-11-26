@@ -52,8 +52,8 @@ Please visit our Website: http://www.httrack.com
 // optionnel: taille à contrôller (ou numéro, etc) en pointeur
 //            (en de détection de *size, la taille limite est écrite par dessus *size)
 // exemple: +-*.gif*[<5] == supprimer GIF si <5KB
-int fa_strjoker(int type, char **filters, int nfil, const char *nom, LLint * size,
-                int *size_flag, int *depth) {
+int fa_strjoker(hts_joker_kind type, char **filters, int nfil, const char *nom,
+                LLint *size, int *size_flag, int *depth) {
   int verdict = 0;              // on sait pas
   int i;
   LLint sizelimit = 0;
@@ -65,11 +65,11 @@ int fa_strjoker(int type, char **filters, int nfil, const char *nom, LLint * siz
     int filteroffs = 1;
 
     if (strncmp(filters[i] + filteroffs, "mime:", 5) == 0) {
-      if (type == 0)            // regular filters
+      if (type == HTS_JOKER_URL)
         continue;
       filteroffs += 5;          // +mime:text/html
-    } else {                    // mime filters
-      if (type != 0)
+    } else {
+      if (type != HTS_JOKER_URL)
         continue;
     }
     if (size)
@@ -92,9 +92,9 @@ int fa_strjoker(int type, char **filters, int nfil, const char *nom, LLint * siz
   return verdict;
 }
 
-int fa_strjoker_dual(int type, char **filters, int nfil, const char *nom1,
-                     const char *nom2, LLint *size, int *size_flag,
-                     int *depth) {
+int fa_strjoker_dual(hts_joker_kind type, char **filters, int nfil,
+                     const char *nom1, const char *nom2, LLint *size,
+                     int *size_flag, int *depth) {
   int depth1 = 0, depth2 = 0;
   int flag1 = 0, flag2 = 0;
   LLint sz1 = 0, sz2 = 0;

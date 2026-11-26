@@ -68,8 +68,8 @@ static int st_filtersize(httrackp *opt, int argc, char **argv) {
   sz = -1;
   if (known)
     sscanf(argv[0], LLintP, &sz);
-  verdict = fa_strjoker(0, &argv[2], argc - 2, argv[1], known ? &sz : NULL,
-                        known ? &size_flag : NULL, NULL);
+  verdict = fa_strjoker(HTS_JOKER_URL, &argv[2], argc - 2, argv[1],
+                        known ? &sz : NULL, known ? &size_flag : NULL, NULL);
   printf("verdict=%s size_flag=%d\n",
          verdict > 0   ? "allowed"
          : verdict < 0 ? "forbidden"
@@ -78,11 +78,13 @@ static int st_filtersize(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* Mime-type filter verdict via fa_strjoker(type=1): only mime: rules apply. */
+/* Mime-type filter verdict via fa_strjoker(HTS_JOKER_MIME): only mime: rules
+ * apply. */
 static int st_filtermime(httrackp *opt, int argc, char **argv) {
   int verdict;
 
-  verdict = fa_strjoker(1, &argv[1], argc - 1, argv[0], NULL, NULL, NULL);
+  verdict = fa_strjoker(HTS_JOKER_MIME, &argv[1], argc - 1, argv[0], NULL, NULL,
+                        NULL);
   printf("verdict=%s\n", verdict > 0   ? "allowed"
                          : verdict < 0 ? "forbidden"
                                        : "unknown");
@@ -175,8 +177,8 @@ static int st_filtermemo(httrackp *opt, int argc, char **argv) {
 static int st_filterdual(httrackp *opt, int argc, char **argv) {
   int depth = -1, verdict;
 
-  verdict = fa_strjoker_dual(0, &argv[2], argc - 2, argv[0], argv[1], NULL,
-                             NULL, &depth);
+  verdict = fa_strjoker_dual(HTS_JOKER_URL, &argv[2], argc - 2, argv[0],
+                             argv[1], NULL, NULL, &depth);
   printf("verdict=%s rule=%d\n",
          verdict > 0   ? "allowed"
          : verdict < 0 ? "forbidden"
@@ -332,7 +334,8 @@ static int st_filtercap(httrackp *opt, int argc, char **argv) {
     assertf(log != NULL);                                                      \
     opt->log = log;                                                            \
     taken = filters_insert(opt, filptr, (pattern));                            \
-    verdict = fa_strjoker(0, filters, filptr, subject, NULL, NULL, NULL);      \
+    verdict = fa_strjoker(HTS_JOKER_URL, filters, filptr, subject, NULL, NULL, \
+                          NULL);                                               \
     rewind(log);                                                               \
     if (fgets(line, (int) sizeof(line), log) == NULL)                          \
       line[0] = '\0';                                                          \

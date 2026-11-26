@@ -836,8 +836,8 @@ static int hts_acceptlink_(httrackp *opt, int ptr, const char *adr,
         {
           int jokDepth = 0;
 
-          jok = fa_strjoker_dual(/*url */ 0, _FILTERS, *_FILTERS_PTR, lfull, l,
-                                 NULL, NULL, &jokDepth);
+          jok = fa_strjoker_dual(HTS_JOKER_URL, _FILTERS, *_FILTERS_PTR, lfull,
+                                 l, NULL, NULL, &jokDepth);
           mdepth = _FILTERS[jokDepth];
         }
 
@@ -1019,9 +1019,8 @@ int hts_acceptmime(httrackp * opt, int ptr,
   int jok = 0;
 
   /* Authorized ? */
-  jok =
-    fa_strjoker( /*mime */ 1, _FILTERS, *_FILTERS_PTR, mime, NULL, NULL,
-                &jokDepth);
+  jok = fa_strjoker(HTS_JOKER_MIME, _FILTERS, *_FILTERS_PTR, mime, NULL, NULL,
+                    &jokDepth);
   if (jok != 0) {
     mdepth = _FILTERS[jokDepth];
     if (jok == 1) {             // autorisé
@@ -1085,7 +1084,7 @@ int hts_testlinksize(httrackp * opt, const char *adr, const char *fil, LLint siz
     hts_url_forms(&lb, &fb, adr, fil);
     // filters: 0 = unknown, 1 = accepted, -1 = refused
     jok =
-        fa_strjoker_dual(/*url */ 0, *opt->filters.filters,
+        fa_strjoker_dual(HTS_JOKER_URL, *opt->filters.filters,
                          *opt->filters.filptr, lfull, l, &sz, &size_flag, NULL);
     if (jok == 1) {
       hts_log_print(opt, LOG_DEBUG,

@@ -989,7 +989,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
                  "templates/index-footer.html"), HTS_INDEX_FOOTER);
 
   // Initialiser indexation
-  if (opt->kindex)
+  if (opt->kindex != HTS_KINDEX_OFF)
     index_init(StringBuff(opt->path_html));
 
   // effacer bloc cache
@@ -1570,7 +1570,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
             stre.info_shell_ = &info_shell;
 
             /* Parse */
-            if (hts_mirror_wait_for_next_file(&str, &stre) == 2)
+            if (hts_mirror_wait_for_next_file(&str, &stre) ==
+                HTS_NEXT_FILE_DONE)
               goto jump_if_done;
           }
 
@@ -2229,7 +2230,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
   singlefile_process_mirror(opt);
 
   // Indexation
-  if (opt->kindex)
+  if (opt->kindex != HTS_KINDEX_OFF)
     index_finish(StringBuff(opt->path_html), opt->kindex);
 
   // afficher résumé dans log
@@ -2541,7 +2542,8 @@ int filters_match_url(char **filters, int nfil, const char *adr,
   htsbuff lb = htsbuff_array(l), fb = htsbuff_array(lfull);
 
   hts_url_forms(&lb, &fb, adr, fil);
-  return fa_strjoker_dual(0, filters, nfil, lfull, l, NULL, NULL, depth);
+  return fa_strjoker_dual(HTS_JOKER_URL, filters, nfil, lfull, l, NULL, NULL,
+                          depth);
 }
 
 /* Does the whole rule array refuse queued link lpos? Sets *rule, if not NULL,

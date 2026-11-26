@@ -407,6 +407,13 @@ typedef enum hts_hostcontrol {
   HTS_HOSTCONTROL_BAN_SLOW = 1 << 1     /**< ban a too-slow host (-H2) */
 } hts_hostcontrol;
 
+/** Keyword index to build (opt->kindex, -%IN). */
+typedef enum hts_kindex {
+  HTS_KINDEX_OFF = 0,  /**< none (-%I0) */
+  HTS_KINDEX_TEXT = 1, /**< index.txt (-%I, -%I1) */
+  HTS_KINDEX_HTML = 2  /**< sindex.html (-%I2) */
+} hts_kindex;
+
 #ifndef HTS_DEF_FWSTRUCT_lien_buffers
 #define HTS_DEF_FWSTRUCT_lien_buffers
 typedef struct lien_buffers lien_buffers;
@@ -447,7 +454,7 @@ struct httrackp {
                                    hts-paused.lock file is deleted (-GN) */
   hts_tristate nearlink;      /**< also get off-site files a page needs (-n) */
   hts_boolean makeindex;      /**< build a top-level index.html (-I) */
-  hts_boolean kindex;         /**< build a searchable keyword index (-%I) */
+  int kindex;                 /**< keyword index, from hts_kindex (-%IN) */
   hts_tristate delete_old;    /**< delete obsolete local files (-X) */
   int timeout;                /**< connection timeout in seconds (-TN) */
   int rateout;                /**< give up below this rate, bytes/s (-JN) */

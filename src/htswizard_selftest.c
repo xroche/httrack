@@ -586,7 +586,8 @@ static int st_wizardinsert(httrackp *opt, int argc, char **argv) {
   } while (0)
 #define RESET() wz_seed(opt, filters, &filptr, NULL)
 /* asks the array as it stands about `url` */
-#define VERDICT(url) fa_strjoker(0, filters, filptr, (url), NULL, NULL, NULL)
+#define VERDICT(url)                                                           \
+  fa_strjoker(HTS_JOKER_URL, filters, filptr, (url), NULL, NULL, NULL)
 
   if (argc >= 2) {
     int sep = argc;

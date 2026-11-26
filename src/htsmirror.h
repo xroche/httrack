@@ -61,13 +61,19 @@ hts_boolean hts_poll_abort_request(httrackp *opt);
 void hts_mirror_process_user_interaction(htsmoduleStruct *str,
                                          htsmoduleStructExtended *stre);
 
+/* What hts_mirror_wait_for_next_file() tells its caller to do with the link. */
+typedef enum hts_next_file {
+  HTS_NEXT_FILE_CONTINUE = 0, /**< go on with it (also when an exit is asked) */
+  HTS_NEXT_FILE_DONE = 2      /**< already done: skip it */
+} hts_next_file;
+
 /*
   Get the next file on the queue, waiting for it, handling other files in
   background.. Parameters: The public module structure, and the private module
-  variables. Returns 2 when the link is already done and is skipped, else 0.
+  variables.
 */
-int hts_mirror_wait_for_next_file(htsmoduleStruct *str,
-                                  htsmoduleStructExtended *stre);
+hts_next_file hts_mirror_wait_for_next_file(htsmoduleStruct *str,
+                                            htsmoduleStructExtended *stre);
 
 /*
   Wait for (adr, fil, save) to be started, that is,
