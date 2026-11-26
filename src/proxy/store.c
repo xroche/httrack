@@ -168,7 +168,7 @@ struct _PT_Index_Functions {
   int (*PT_SaveCache) (PT_Indexes indexes, const char *filename);
 };
 
-static _PT_Index_Functions _IndexFuncts[] = {
+static const _PT_Index_Functions _IndexFuncts[] = {
     {PT_LoadCache__New, PT_Index_Delete__New, PT_ReadCache__New,
      PT_SaveCache__New},
     {PT_LoadCache__Old, PT_Index_Delete__Old, PT_ReadCache__Old, NULL},

@@ -64,7 +64,7 @@ void hts_mirror_process_user_interaction(htsmoduleStruct *str,
 /*
   Get the next file on the queue, waiting for it, handling other files in
   background.. Parameters: The public module structure, and the private module
-  variables Returns 0 upon success
+  variables. Returns 2 when the link is already done and is skipped, else 0.
 */
 int hts_mirror_wait_for_next_file(htsmoduleStruct *str,
                                   htsmoduleStructExtended *stre);

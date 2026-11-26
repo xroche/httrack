@@ -120,47 +120,19 @@ const char *warc_truncated_reason(int code) {
 
 /* ---- growable byte buffer (overflow-safe, project allocators) ---- */
 
-typedef struct {
-  char *data;
-  size_t len;
-  size_t cap;
-} wbuf;
+typedef TypedArray(char) wbuf;
 
-static void wbuf_free(wbuf *b) {
-  freet(b->data);
-  b->len = b->cap = 0;
-}
+static void wbuf_free(wbuf *b) { TypedArrayFree(*b); }
 
-/* Make room for n more bytes; returns 0 on success, -1 on OOM/overflow. */
-static int wbuf_reserve(wbuf *b, size_t n) {
-  size_t ncap;
-  char *nd;
-  if (n > (size_t) -1 - b->len)
-    return -1;
-  if (b->len + n <= b->cap)
-    return 0;
-  ncap = b->cap ? b->cap : 256;
-  while (ncap < b->len + n) {
-    if (ncap > (size_t) -1 / 2)
-      return -1;
-    ncap *= 2;
-  }
-  nd = realloct(b->data, ncap);
-  if (nd == NULL)
-    return -1;
-  b->data = nd;
-  b->cap = ncap;
-  return 0;
+static hts_span wbuf_span(const wbuf *b) {
+  return hts_span_at(TypedArrayElts(*b), TypedArraySize(*b));
 }
 
 /* Append n bytes; returns 0 on success, -1 on OOM/overflow. */
 static int wbuf_add(wbuf *b, const void *p, size_t n) {
-  if (n == 0) /* an empty source may be NULL, and memcpy forbids that */
-    return 0;
-  if (wbuf_reserve(b, n) != 0)
+  if (!TypedArrayReserve(*b, n))
     return -1;
-  memcpy(b->data + b->len, p, n);
-  b->len += n;
+  TypedArrayAppend(*b, (const char *) p, n);
   return 0;
 }
 
@@ -191,15 +163,16 @@ static int wbuf_printf(wbuf *b, HTS_FORMAT_STRING const char *fmt, ...) {
   if ((size_t) n < sizeof(tmp))
     return wbuf_add(b, tmp, (size_t) n);
   need = (size_t) n + 1; /* +1: vsnprintf always writes the NUL */
-  if (wbuf_reserve(b, need) != 0)
+  if (!TypedArrayReserve(*b, need))
     return -1;
   va_start(ap, fmt);
-  n = vsnprintf(b->data + b->len, need, fmt, ap);
+  n = vsnprintf(&TypedArrayTail(*b), need, fmt, ap);
   va_end(ap);
   /* Never advance past what was reserved, whatever the second pass returns. */
   if (n < 0 || (size_t) n >= need)
     return -1;
-  b->len += (size_t) n; /* the NUL is scratch, overwritten by the next append */
+  /* The NUL is scratch, overwritten by the next append. */
+  TypedArraySize(*b) += (size_t) n;
   return 0;
 }
 
@@ -722,25 +695,22 @@ void warc_http_header_value(const char *hdr, const char *name, hts_buf out) {
 
 /* see htswarc.h */
 char *warc_normalized_headers(const char *resp_hdr, long long set_cl) {
-  wbuf b = {NULL, 0, 0};
+  wbuf b = EMPTY_TYPED_ARRAY;
 
   if (normalize_http_headers(resp_hdr, set_cl, &b) != 0 ||
       wbuf_add(&b, "", 1) != 0) {
     wbuf_free(&b);
     return NULL;
   }
-  return b.data;
+  return TypedArrayElts(b);
 }
 
 /* Take ownership of a CDXJ line; frees it and returns -1 on OOM. */
 static int cdx_lines_add(warc_writer *w, char *line) {
-  TypedArrayEnsureRoom(w->cdx_lines, 1);
-  if (!TypedArrayHasRoom(w->cdx_lines, 1)) {
+  if (!TypedArrayPush(w->cdx_lines, line)) {
     freet(line);
     return -1;
   }
-  TypedArrayTail(w->cdx_lines) = line;
-  TypedArraySize(w->cdx_lines)++;
   return 0;
 }
 
@@ -787,7 +757,7 @@ static void warc_cdx_add(warc_writer *w, const char *target_uri,
     goto fail;
   if (wbuf_puts(&line, "}") != 0 || wbuf_add(&line, "", 1) != 0) /* NUL */
     goto fail;
-  if (cdx_lines_add(w, line.data) == 0)
+  if (cdx_lines_add(w, TypedArrayElts(line)) == 0)
     return; /* ownership transferred */
   return;   /* cdx_lines_add already freed on failure */
 fail:
@@ -861,13 +831,10 @@ static void warc_page_add(warc_writer *w, const char *url, const char *date) {
     wbuf_free(&line);
     return;
   }
-  TypedArrayEnsureRoom(w->page_lines, 1);
-  if (!TypedArrayHasRoom(w->page_lines, 1)) {
+  if (!TypedArrayPush(w->page_lines, TypedArrayElts(line))) {
     wbuf_free(&line);
     return;
   }
-  TypedArrayTail(w->page_lines) = line.data;
-  TypedArraySize(w->page_lines)++;
   if (w->main_url == NULL) {
     w->main_url = strdupt(url);
     w->main_date = strdupt(date);
@@ -1042,9 +1009,8 @@ static void warc_wacz_package(warc_writer *w) {
     if (wbuf_puts(&pages, TypedArrayNth(w->page_lines, i)) != 0 ||
         wbuf_add(&pages, "\n", 1) != 0)
       err = 1;
-  if (!err &&
-      wacz_add_mem(zf, "pages/pages.jsonl", hts_span_at(pages.data, pages.len),
-                   "pages.jsonl", &resources, first) != 0)
+  if (!err && wacz_add_mem(zf, "pages/pages.jsonl", wbuf_span(&pages),
+                           "pages.jsonl", &resources, first) != 0)
     err = 1;
   wbuf_free(&pages);
 
@@ -1065,21 +1031,21 @@ static void warc_wacz_package(warc_writer *w) {
        cdx_json_str(&dp, w->main_date != NULL ? w->main_date : created) != 0))
     err = 1;
   if (!err && (wbuf_puts(&dp, ", \"resources\": [") != 0 ||
-               wbuf_add(&dp, resources.data, resources.len) != 0 ||
+               wbuf_add_span(&dp, wbuf_span(&resources)) != 0 ||
                wbuf_puts(&dp, "]}") != 0))
     err = 1;
-  if (!err && wacz_add_mem(zf, "datapackage.json", hts_span_at(dp.data, dp.len),
-                           NULL, NULL, 0) != 0)
+  if (!err &&
+      wacz_add_mem(zf, "datapackage.json", wbuf_span(&dp), NULL, NULL, 0) != 0)
     err = 1;
 
   /* datapackage-digest.json chains the integrity of datapackage.json. */
   memset(&digest, 0, sizeof(digest));
-  if (!err && sha256_hex_mem(hts_span_at(dp.data, dp.len), dp_hex)) {
+  if (!err && sha256_hex_mem(wbuf_span(&dp), dp_hex)) {
     if (wbuf_printf(&digest,
                     "{\"path\": \"datapackage.json\", \"hash\": \"sha256:%s\"}",
                     dp_hex) != 0 ||
-        wacz_add_mem(zf, "datapackage-digest.json",
-                     hts_span_at(digest.data, digest.len), NULL, NULL, 0) != 0)
+        wacz_add_mem(zf, "datapackage-digest.json", wbuf_span(&digest), NULL,
+                     NULL, 0) != 0)
       err = 1;
   } else {
     err = 1;
@@ -1219,7 +1185,7 @@ static int warc_emit(warc_writer *w, const char *type, const char *content_type,
     goto done;
   { /* member start (before writing): CDXJ offset for this record */
     uint64_t rec_offset = w->offset;
-    if (member_write(&m, hts_span_at(hdr.data, hdr.len)) != 0 ||
+    if (member_write(&m, wbuf_span(&hdr)) != 0 ||
         stream_block(http_section, http_hdr, has_body, body, write_sink, &m) !=
             0 ||
         member_write(&m, hts_span_of("\r\n\r\n")) != 0) {
@@ -1442,7 +1408,7 @@ warc_writer *warc_open(httrackp *opt, const char *path) {
     warc_close(w);
     return NULL;
   }
-  w->info_fields = strdupt(info.data);
+  w->info_fields = strdupt(TypedArrayElts(info));
   wbuf_free(&info);
   if (w->info_fields == NULL) {
     warc_close(w);
@@ -1635,8 +1601,8 @@ hts_boolean warc_surt(const char *url, hts_buf out) {
   hts_boolean rc = HTS_FALSE;
   memset(&b, 0, sizeof(b));
   if (surt_canon(url, &b) == 0 && wbuf_add(&b, "", 1) == 0 &&
-      b.len <= out.size) {
-    hts_buf_cpy(out, b.data);
+      TypedArraySize(b) <= out.size) {
+    hts_buf_cpy(out, TypedArrayElts(b));
     rc = HTS_TRUE;
   }
   wbuf_free(&b);
@@ -1762,8 +1728,7 @@ int warc_write_transaction(warc_writer *w, const char *target_uri,
                 "application/http;msgtype=response", target_uri, ip, NULL,
                 refers_uri, refers_date, profile, have_pdig ? pdig : NULL,
                 emit_body ? warc_truncated_reason(truncated) : NULL, statusbuf,
-                mimebuf, 1, hts_span_at(http.data, http.len), emit_body, body,
-                resp_id) != 0) {
+                mimebuf, 1, wbuf_span(&http), emit_body, body, resp_id) != 0) {
     wbuf_free(&http);
     return -1;
   }

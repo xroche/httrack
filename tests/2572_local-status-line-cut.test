@@ -1,0 +1,66 @@
+#!/bin/bash
+#
+# A status line too long to read whole is refused only when the part read holds
+# nothing but blanks; any other cut line is read as it always was.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+python=$(find_python) || skip "python3 missing"
+
+server=$(nativepath "$top_srcdir/tests/status-line-server.py")
+tmpdir=$(mktemp -d)
+out=$tmpdir/out
+serverpid=
+log=$tmpdir/crawl.log
+fail_dump_var log
+
+cleanup() {
+    stop_server "$serverpid"
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+"$python" "$server" >"$tmpdir/srv.out" 2>"$tmpdir/srv.err" &
+serverpid=$!
+port=$(discover_server_port "$tmpdir/srv.out" "$serverpid") || exit 1
+
+crawl() { # crawl CASE
+    local rc=0
+    mkdir -p "$out/$1"
+    run_with_timeout 60 httrack "http://127.0.0.1:$port/$1.html" \
+        -O "$out/$1" -c1 --robots=0 --retries=0 -%v0 -q >>"$log" 2>&1 || rc=$?
+    test "$rc" -ne 124 || fail "$1: crawl hit the deadline"
+    test "$rc" -le 128 || fail "$1: crawl ended abnormally ($rc)"
+}
+
+mirrored() { echo "$out/$1/127.0.0.1_$port/$1.html"; }
+
+# refused CASE MSG CODE: nothing mirrored, and the log names MSG and CODE
+refused() {
+    local want="\"$2\" ($3) at link 127.0.0.1:$port/$1.html" logtext
+    test ! -f "$(mirrored "$1")" || fail "$1: mirrored, but should be refused"
+    logtext=$(cat "$out/$1/hts-log.txt")
+    grep -qF "$want" <<<"$logtext" ||
+        fail_dump "$1: log lacks [$want]" "$out/$1/hts-log.txt"
+}
+
+cases="huge blankcode longlt longsplt icy hugeblank crlfhugeblank"
+for case in $cases; do
+    crawl "$case"
+done
+
+# Content before the cut: a long phrase, a code after blanks, and the junky
+# server pages a legacy server sends with no status line at all.
+for case in huge blankcode longlt longsplt; do
+    test -f "$(mirrored "$case")" || fail "$case: a cut line lost the page"
+done
+refused icy "Unknown (not HTTP/xx) response structure" -1
+
+# The blanks push the 404 out of the line read, which must not become a 200.
+refused hugeblank "Status line too long" -1
+refused crlfhugeblank "Status line too long" -1
+
+ok "a cut status line is refused only when it read nothing but blanks"

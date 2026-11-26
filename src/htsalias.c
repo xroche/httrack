@@ -76,7 +76,7 @@ Please visit our Website: http://www.httrack.com
 
   A name may appear twice, and the FIRST row wins, also for reverse lookups.
 */
-const char *hts_optalias[][4] = {
+const char *const hts_optalias[][4] = {
   /*   {"","","",""}, */
   {"path", "-O", "param1", "output path"},
   {"mirror", "-w", "single", ""},

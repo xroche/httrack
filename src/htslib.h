@@ -1061,14 +1061,14 @@ void *hts_get_callback(t_hts_htmlcheck_callbacks * callbacks,
 //HTS_INLINE int is_realspace(char);
 
 #define HTTP_IS_REDIRECT(code) ( \
-     (code) == 301               \
-  || (code) == 302               \
-  || (code) == 303               \
-  || (code) == 307               \
-  || (code) == 308               \
+     (code) == HTTP_MOVED_PERMANENTLY \
+  || (code) == HTTP_FOUND               \
+  || (code) == HTTP_SEE_OTHER           \
+  || (code) == HTTP_TEMPORARY_REDIRECT  \
+  || (code) == HTTP_PERMANENT_REDIRECT  \
   )
 #define HTTP_IS_NOTMODIFIED(code) ( \
-     (code) == 304               \
+     (code) == HTTP_NOT_MODIFIED \
   )
 #define HTTP_IS_OK(code) ( ( (code) / 100 ) == 2 )
 #define HTTP_IS_ERROR(code) ( !HTTP_IS_OK(code) && !HTTP_IS_REDIRECT(code) && !HTTP_IS_NOTMODIFIED(code) )

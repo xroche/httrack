@@ -48,7 +48,7 @@ Please visit our Website: http://www.httrack.com
    zeros cost nothing, so 0000000001 is the value 1. */
 hts_boolean optalias_digits_fit(hts_span digits);
 
-extern const char *hts_optalias[][4];
+extern const char *const hts_optalias[][4];
 int optalias_check(int argc, const char *const *argv, int n_arg,
                    int *return_argc, char **return_argv,
                    size_t return_argv_size, hts_buf return_error);

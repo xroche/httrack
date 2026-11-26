@@ -34,13 +34,14 @@ Please visit our Website: http://www.httrack.com
 #include "htscore.h"
 #include "htsbase.h"
 
-/* ne pas renommer les types renvoyés (souvent types inconnus) */
-static const char *hts_mime_keep[] = {"application/octet-stream", "text/plain",
-                                      "application/xml", "text/xml", ""};
+/* Mime types kept as sent, since they often mean "unknown". */
+static const char *const hts_mime_keep[] = {"application/octet-stream",
+                                            "text/plain", "application/xml",
+                                            "text/xml", ""};
 
 /* bogus servers returns these mime types when the extension is seen within the
  * filename */
-static const char *hts_mime_bogus_multiple[] = {
+static const char *const hts_mime_bogus_multiple[] = {
     "application/x-wais-source", /* src (src.rpm) */
     ""};
 
@@ -52,7 +53,7 @@ static const char *const hts_ext_dynamic[] = {
 /* types MIME
    note: application/octet-stream should not be used here
 */
-static const char *hts_mime[][2] = {
+static const char *const hts_mime[][2] = {
     {"application/acad", "dwg"},
     {"application/arj", "arj"},
     {"application/clariscad", "ccad"},
@@ -360,7 +361,7 @@ static const char *hts_mime[][2] = {
     {"", ""}};
 
 /* Post-2010 formats. Scanned after hts_mime[], so a legacy mapping wins. */
-static const char *hts_mime_modern[][2] = {
+static const char *const hts_mime_modern[][2] = {
     {"image/webp", "webp"},
     {"image/avif", "avif"},
     {"image/heic", "heic"},
@@ -407,7 +408,7 @@ void guess_httptype(httrackp *opt, char *s, const char *fil) {
 // first match in a NUL-terminated {mime,ext} table. key selects the lookup
 // column (0=mime, 1=ext); returns the other column, or NULL if no row matches
 // (a "*" partner means the row carries no value).
-static const char *hts_mime_lookup(const char *(*table)[2], int key,
+static const char *hts_mime_lookup(const char *const (*table)[2], int key,
                                    hts_span needle) {
   int j;
 

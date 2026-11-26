@@ -1,0 +1,8 @@
+#!/bin/bash
+#
+# HTTP_IS_REDIRECT and HTTP_IS_NOTMODIFIED name exactly their statuses.
+
+set -euo pipefail
+
+out=$(httrack -O /dev/null -#test=redirectcodes run)
+grep -q "redirectcodes self-test OK" <<<"$out"

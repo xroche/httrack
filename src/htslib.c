@@ -5594,7 +5594,7 @@ static void unplug_wrappers(httrackp * opt) {
 }
 
 HTSEXT_API httrackp *hts_create_opt(void) {
-  static const char *defaultModules[] = {"httrack-plugin", NULL};
+  static const char *const defaultModules[] = {"httrack-plugin", NULL};
   httrackp *opt = malloct(sizeof(httrackp));
 
   /* default options */

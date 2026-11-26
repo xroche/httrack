@@ -156,7 +156,7 @@ const char *hts_dirty_attr_name(const char *quote, const char *tag_start,
 }
 
 /* Attribute names that never hold a link. */
-const char *hts_nodetect[] = {
+const char *const hts_nodetect[] = {
     "accept-charset", "accesskey", "action",   "align",    "alt",     "axes",
     "axis",           "char",      "charset",  "cite",     "class",   "classid",
     "code",           "color",     "datetime", "dir",      "enctype", "face",
@@ -164,8 +164,8 @@ const char *hts_nodetect[] = {
     "name",           "prompt",    "scheme",   "size",     "style",   "target",
     "title",          "type",      "valign",   "version",  "width",   ""};
 
-const char *hts_main_mime[] = {"application", "audio", "image", "message",
-                               "multipart",   "text",  "video", ""};
+const char *const hts_main_mime[] = {"application", "audio", "image", "message",
+                                     "multipart",   "text",  "video", ""};
 
 /* Is this attribute a framework binding (Vue :x, v-x, @x, Angular [x], (x),
    Alpine x-bind:x)? Its value is a JavaScript expression, never a URL. */
@@ -910,8 +910,7 @@ typedef size_t (*sink_escaper)(const char *const s, char *const dest,
 static void sink_add_n(parse_sink *const sink, const hts_span s) {
   if (!sink->enabled)
     return;
-  TypedArrayEnsureRoom(sink->buf, s.len);
-  if (TypedArrayHasRoom(sink->buf, s.len)) {
+  if (TypedArrayReserve(sink->buf, s.len)) {
     TypedArrayAppend(sink->buf, s.p, s.len);
   } else {
     sink->oom = HTS_TRUE;
@@ -939,8 +938,7 @@ static void sink_add_escaped(parse_sink *const sink, const char *const s,
   if (!sink->enabled)
     return;
   want = strlen(s) * factor + 1024;
-  TypedArrayEnsureRoom(sink->buf, want);
-  if (TypedArrayHasRoom(sink->buf, want)) {
+  if (TypedArrayReserve(sink->buf, want)) {
     TypedArraySize(sink->buf) +=
         escape(s, &TypedArrayTail(sink->buf), TypedArrayRoom(sink->buf));
   } else {
@@ -2369,11 +2367,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
               }
             }
 
-            if (p_type == 1) {
-              if (*html == '#') {
-                html++;          // sauter # pour usemap etc
-              }
-            }
  srcset_next:
             /* srcset: skip leading whitespace/commas before each candidate;
                the skipped bytes flush verbatim below */

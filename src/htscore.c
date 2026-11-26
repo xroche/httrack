@@ -237,13 +237,11 @@ static size_t hts_record_link_alloc(httrackp *opt) {
   memset(link, 0, sizeof(*link));
 
   // Add new lien_url pointer to the array of links, plus the guard NULL
-  TypedArrayEnsureRoom(liensbuf->ptr, 2);
-  if (!TypedArrayHasRoom(liensbuf->ptr, 2)) {
+  if (!TypedArrayReserve(liensbuf->ptr, 2)) {
     return (size_t) -1;
   }
   TypedArrayAdd(liensbuf->ptr, link);
-  TypedArrayAdd(liensbuf->ptr, NULL);
-  TypedArraySize(liensbuf->ptr)--;
+  TypedArrayTail(liensbuf->ptr) = NULL;
 
   // Update pointer as it may have changed,
   // and update heap top index
@@ -1573,18 +1571,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
             stre.info_shell_ = &info_shell;
 
             /* Parse */
-            switch (hts_mirror_wait_for_next_file(&str, &stre)) {
-            case -1:
-              retcode = -1;
-              goto cleanup;
-            case 2:
-              // Jump to 'continue'
-              // This is one of the very very rare cases where goto
-              // is acceptable
-              // A supplemental flag and if( ) { } would be really messy
+            if (hts_mirror_wait_for_next_file(&str, &stre) == 2)
               goto jump_if_done;
-            }
-
           }
 
         }
