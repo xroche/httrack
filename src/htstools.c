@@ -172,13 +172,9 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
           if (a)
             *a = '\0';
           /* Every other arm keeps fil under HTS_URLMAXSIZE, and callers size
-             their buffers from that. The subtraction is safe because fil holds
-             origin_fil, which the enclosing test already bounded. */
-          if (strlen(lien) < HTS_URLMAXSIZE - strlen(adrfil->fil)) {
-            strcatbuff(adrfil->fil, lien);
-          } else {
-            ok = -1; // erreur URL
-          }
+             their buffers from that. */
+          if (!hts_buf_try_cat(HTS_BUF_N(adrfil->fil, HTS_URLMAXSIZE), lien))
+            ok = -1; // URL too long
         } else {
           const char *a = strchr(origin_fil, '?');
 

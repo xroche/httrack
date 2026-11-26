@@ -993,9 +993,8 @@ int url_savename(lien_adrfilsave *const afs,
 
       strcpybuff(fil_complete_patche, normfil);
       // a full-length path has no room for the /
-      if (!hts_striplastchar(fil_complete_patche, '/') &&
-          strlen(fil_complete_patche) < sizeof(fil_complete_patche) - 1)
-        strcatbuff(fil_complete_patche, "/");
+      if (!hts_striplastchar(fil_complete_patche, '/'))
+        (void) !hts_buf_try_cat(HTS_BUF(fil_complete_patche), "/");
       i = hash_read(hash, normadr, fil_complete_patche,
                     HASH_STRUCT_ORIGINAL_ADR_PATH); // table 2: former adr+fil
       if (i >= 0) {

@@ -368,10 +368,9 @@ void hts_sitemap_seed(httrackp *opt, const char *starturl) {
   lien_adrfil af;
 
   if (StringNotEmpty(opt->sitemap_url)) {
-    if (strlen(StringBuff(opt->sitemap_url)) >= sizeof(url)) {
+    if (!hts_buf_try_cpy(HTS_BUF(url), StringBuff(opt->sitemap_url))) {
       hts_log_print(opt, LOG_ERROR, "Sitemap URL too long");
     } else {
-      strcpybuff(url, StringBuff(opt->sitemap_url));
       if (strstr(url, ":/") == NULL)
         hts_log_print(opt, LOG_ERROR, "Sitemap URL must be absolute: %s",
                       url_nologin(opt, url));
@@ -380,9 +379,8 @@ void hts_sitemap_seed(httrackp *opt, const char *starturl) {
     }
   }
   if (starturl == NULL || starturl[0] == '\0' ||
-      strlen(starturl) >= sizeof(url))
+      !hts_buf_try_cpy(HTS_BUF(url), starturl))
     return;
-  strcpybuff(url, starturl);
   if (ident_url_absolute(url, &af) < 0)
     return;
   {
@@ -475,11 +473,9 @@ static hts_boolean sitemap_seed_url(void *arg, const char *url) {
                   "Sitemap: URL cap reached, ignoring the rest");
     return HTS_FALSE;
   }
-  /* strcpybuff aborts rather than truncating: never feed it unchecked input. */
-  if (strlen(url) >= sizeof(buff))
+  if (!hts_buf_try_cpy(HTS_BUF(buff), url))
     return HTS_TRUE;
   st->nurls++;
-  strcpybuff(buff, url);
   before = opt->lien_tot;
   if (htsAddLink(c->str, buff))
     c->accepted++;
@@ -495,9 +491,8 @@ static hts_boolean sitemap_seed_child(void *arg, const char *url) {
   char BIGSTK buff[HTS_URLMAXSIZE];
   lien_adrfil af;
 
-  if (strlen(url) >= sizeof(buff))
+  if (!hts_buf_try_cpy(HTS_BUF(buff), url))
     return HTS_TRUE;
-  strcpybuff(buff, url);
   if (ident_url_absolute(buff, &af) < 0)
     return HTS_TRUE;
   if (!strfield2(af.adr, c->adr)) {

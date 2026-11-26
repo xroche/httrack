@@ -1,0 +1,11 @@
+#!/bin/bash
+#
+# hts_buf_try_cpy and hts_buf_try_cat (-#test=buftry) copy whole or refuse,
+# and never write past the buffer.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+assert_selftest "buftry: OK" buftry

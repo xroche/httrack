@@ -612,9 +612,8 @@ hts_boolean cookie_domain_allowed(const char *domain, const char *host) {
   // a Netscape jar writes ".example.com" where RFC 6265 stores example.com
   if (domain[0] == '.')
     domain++;
-  if (domain[0] == '\0' || strlen(domain) >= sizeof(dom))
+  if (domain[0] == '\0' || !hts_buf_try_cpy(HTS_BUF(dom), domain))
     return HTS_FALSE;
-  strcpybuff(dom, domain);
   hts_lowcase(dom);
   if (strcmp(dom, host) == 0)
     return HTS_TRUE;
@@ -905,10 +904,8 @@ static hts_boolean cookie_resolve(hts_buf file, const char *name) {
   struct stat st;
 
   if (real != NULL) {
-    const hts_boolean fits = strlen(real) < file.size;
+    const hts_boolean fits = hts_buf_try_cpy(file, real);
 
-    if (fits)
-      hts_buf_cpy(file, real);
     freet(real);
     return fits;
   }

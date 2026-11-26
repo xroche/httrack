@@ -444,11 +444,10 @@ static T_SOC smallserver_init(int *port, hts_buf adr, const char *bindAddr) {
   strcpybuff(h_loc, "127.0.0.1");
   if (bindAddr != NULL && *bindAddr != '\0') {
     /* advertise the bound address, else the URL we print is unreachable */
-    if (strlen(bindAddr) >= sizeof(h_loc) ||
+    if (!hts_buf_try_cpy(HTS_BUF(h_loc), bindAddr) ||
         !hts_shared_gethost(bindAddr, &server)) {
       return INVALID_SOCKET;
     }
-    strcpybuff(h_loc, bindAddr);
   }
   strcpybuff(server_bound_addr, h_loc);
 

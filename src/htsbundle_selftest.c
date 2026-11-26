@@ -42,11 +42,10 @@ static int st_bundlecut(httrackp *opt, int argc, char **argv) {
   char err[1024];
   const char *why;
 
-  if (argc != 1 || strlen(argv[0]) >= sizeof(url)) {
+  if (argc != 1 || !hts_buf_try_cpy(HTS_BUF(url), argv[0])) {
     fprintf(stderr, "bundlecut: takes <url>\n");
     return 1;
   }
-  strcpybuff(url, argv[0]);
   hts_bundle_free(opt);
   why = hts_bundle_take(opt, url);
   if (why != NULL) {
@@ -121,8 +120,7 @@ static int st_bundle(httrackp *opt, int argc, char **argv) {
       opt->cookie = NULL;
     } else if (strncmp(argv[i], "host:", 5) != 0 &&
                strncmp(argv[i], "hide:", 5) != 0 &&
-               strlen(argv[i]) < sizeof(buff)) {
-      strcpybuff(buff, argv[i]);
+               hts_buf_try_cpy(HTS_BUF(buff), argv[i])) {
       assertf(hts_bundle_take(opt, buff) == NULL);
     }
   }
