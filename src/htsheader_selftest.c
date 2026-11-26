@@ -844,6 +844,39 @@ static int st_status(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Which statuses HTTP_IS_REDIRECT and HTTP_IS_NOTMODIFIED name. */
+static int st_redirectcodes(httrackp *opt, int argc, char **argv) {
+  static const struct {
+    int code;
+    hts_boolean redirect;
+    hts_boolean notmodified;
+  } cases[] = {
+      {300, HTS_FALSE, HTS_FALSE}, {301, HTS_TRUE, HTS_FALSE},
+      {302, HTS_TRUE, HTS_FALSE},  {303, HTS_TRUE, HTS_FALSE},
+      {304, HTS_FALSE, HTS_TRUE},  {305, HTS_FALSE, HTS_FALSE},
+      {306, HTS_FALSE, HTS_FALSE}, {307, HTS_TRUE, HTS_FALSE},
+      {308, HTS_TRUE, HTS_FALSE},  {309, HTS_FALSE, HTS_FALSE},
+  };
+
+  size_t i;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+    const int code = cases[i].code;
+
+    if (!HTTP_IS_REDIRECT(code) != !cases[i].redirect ||
+        !HTTP_IS_NOTMODIFIED(code) != !cases[i].notmodified) {
+      fprintf(stderr, "status %d: wrong redirect or not-modified class\n",
+              code);
+      return 1;
+    }
+  }
+  printf("redirectcodes self-test OK\n");
+  return 0;
+}
+
 /* Which statuses excuse a response that stored no body. */
 static int st_nobody(httrackp *opt, int argc, char **argv) {
   /* every status the engine excuses, and near misses that it must not */
@@ -2823,6 +2856,8 @@ const struct selftest_entry selftests_header[] = {
      "stream",
      st_codecerrno},
     {"status", "", "HTTP status code -> reason phrase self-test", st_status},
+    {"redirectcodes", "", "which statuses count as redirect or not modified",
+     st_redirectcodes},
     {"nobody", "",
      "which statuses excuse a response that stored no body, and the body span",
      st_nobody},
