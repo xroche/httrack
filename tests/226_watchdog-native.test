@@ -1145,8 +1145,8 @@ paired_window() { # paired_window SCRIPT WINDOW
     printf 'RUN 2_room.test at 41s\n' >"$tmp/room.log"
     sink_start 201
     # Ignore the exit statuses, because the posts are the evidence.
-    (run_posting $(($2 * 4 + 60)) -File "$1" -ProgressLog "$(nativepath "$tmp/full.log")" \
-        -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds "$2") >/dev/full 2>&1 &
+    run_posting $(($2 * 4 + 60)) -File "$1" -ProgressLog "$(nativepath "$tmp/full.log")" \
+        -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds "$2" >/dev/full 2>&1 &
     bg=$!
     run_posting $(($2 * 4 + 60)) -File "$1" -ProgressLog "$(nativepath "$tmp/room.log")" \
         -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds "$2" >/dev/null 2>&1 || true
@@ -1162,12 +1162,11 @@ fullstdout_leg() {
         read -r full room <<<"$(paired_window "$1" "$window")"
         # Three, so the leg sees the loop survive more than a single failed write.
         test "$full" -lt 3 || return 0
-        test "$room" -ge 3 || {
+        # Four, so a loop that dies after two writes stands two posts behind.
+        test "$room" -ge 4 || {
             unmeasured "$full posts with a full stdout and $room with room to write in the $round round: too starved to judge"
             return "$UNMEASURED"
         }
-        # One post behind its twin is the box's jitter, not a dead loop.
-        test "$full" -lt $((room - 1)) || return 0
     done
     echo "$full posts with a full stdout against $room with room to write in the same window, in both rounds: a failed log write took the loop with it"
     return 1
