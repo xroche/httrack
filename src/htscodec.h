@@ -61,12 +61,14 @@ extern hts_boolean hts_codec_is_archive_ext(hts_codec codec, hts_span ext);
 
 /* Decode filename into newfile and return its size, or -1 on failure. On -1,
    errno is the local failure's, or 0 when the coded body was at fault. */
-extern int hts_codec_unpack(hts_codec codec, const char *filename,
-                            const char *newfile);
+extern HTS_CHECK_RESULT int
+hts_codec_unpack(hts_codec codec, const char *filename, const char *newfile);
 
 /* Run hts_codec_unpack() with the output also capped at cap when > 0. */
-extern int hts_codec_unpack_max(hts_codec codec, const char *filename,
-                                const char *newfile, LLint cap);
+extern HTS_CHECK_RESULT int hts_codec_unpack_max(hts_codec codec,
+                                                 const char *filename,
+                                                 const char *newfile,
+                                                 LLint cap);
 /* Returned when the caller's cap stopped the body. A bomb gives -1. */
 #define HTS_CODEC_TOOBIG (-2)
 
@@ -87,7 +89,7 @@ extern size_t hts_codec_head(hts_codec codec, hts_span in, hts_buf out);
 extern LLint hts_codec_maxout(LLint in_size);
 
 /* Return the size of in and rewind it, or -1 if unknown. */
-extern LLint hts_codec_coded_size(FILE *in);
+extern HTS_CHECK_RESULT LLint hts_codec_coded_size(FILE *in);
 
 #endif
 

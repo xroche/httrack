@@ -96,8 +96,8 @@ hts_scan_result hts_scan_llint(const char **s, LLint min, LLint max,
     return HTS_SCAN_OK;
   }
   if ((*p == '-' || *p == '+') && is_decimal_digit(p[1]))
-    (void) hts_parse_llint(p + 1, &end, min, max,
-                           &ignored); // only to skip the refused digits
+    (void) !hts_parse_llint(p + 1, &end, min, max,
+                            &ignored); // only to skip the refused digits
   if (end == p)
     return HTS_SCAN_NONE;
   *s = end;

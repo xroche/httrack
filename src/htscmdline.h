@@ -53,15 +53,15 @@ Please visit our Website: http://www.httrack.com
    the HTS_SPLIT_* flags. Returns a malloct'ed vector of pointers into cmd
    (freet the vector, never its entries), or NULL when it cannot be sized or
    allocated. */
-char **hts_split_args(char *cmd, int *nargs, int flags);
+HTS_CHECK_RESULT char **hts_split_args(char *cmd, int *nargs, int flags);
 
 /* Split the WebHTTrack filter list with hts_split_args() under
    HTS_SPLIT_FOLD_WS. */
-char **hts_split_cmdline(char *cmd, int *nargs);
+HTS_CHECK_RESULT char **hts_split_cmdline(char *cmd, int *nargs);
 
 /* hts_split_args() for the command line a WebHTTrack page posts, whose values
    are quoted as hts_quote_arg() does. */
-char **hts_split_webcmd(char *cmd, int *nargs);
+HTS_CHECK_RESULT char **hts_split_webcmd(char *cmd, int *nargs);
 
 /* Append arg to out with \\ and \" escaped, the body of a quoted argument
    without its quotes. */
@@ -80,6 +80,6 @@ hts_boolean hts_is_quoted(hts_span arg);
 
 /* Strip one surrounding quote pair from arg in place, if it starts with a
    quote. HTS_FALSE when that quote is not closed at its end. */
-hts_boolean hts_unquote_arg(char *arg);
+HTS_CHECK_RESULT hts_boolean hts_unquote_arg(char *arg);
 
 #endif

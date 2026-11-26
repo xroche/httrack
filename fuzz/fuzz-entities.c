@@ -42,9 +42,10 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   src = hts_span_dup(fuzz_span(data, size));
   dest = malloct(dsize);
 
-  (void) hts_unescapeEntities(src, hts_buf_at(dest, dsize));
-  (void) hts_unescapeEntitiesWithCharset(src, hts_buf_at(dest, dsize),
-                                         "iso-8859-1");
+  // an overflow only clips dest, which is all this drives
+  (void) !hts_unescapeEntities(src, hts_buf_at(dest, dsize));
+  (void) !hts_unescapeEntitiesWithCharset(src, hts_buf_at(dest, dsize),
+                                          "iso-8859-1");
 
   freet(dest);
   freet(src);

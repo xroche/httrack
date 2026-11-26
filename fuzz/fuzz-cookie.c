@@ -231,8 +231,9 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
       pair[0] = '\0';
       strlncatbuff(pair, lines[0], sizeof(pair), sizeof(pair) - 1);
-      (void) cookie_flat_pair(NULL, &jar, pair, bind, &attr, lines[0],
-                              &ignored);
+      // a refused pair is counted in ignored
+      (void) !cookie_flat_pair(NULL, &jar, pair, bind, &attr, lines[0],
+                               &ignored);
       cookie_sink += (unsigned long) ignored;
     }
     StringInit(text);

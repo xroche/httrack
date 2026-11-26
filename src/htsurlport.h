@@ -42,8 +42,8 @@ Please visit our Website: http://www.httrack.com
 /* Read the unsigned decimal digits at s into *out if the value is in [min, max]
    and return TRUE, or return FALSE and leave *out alone. *end (if not NULL) is
    set past the digits, and overflow is refused before it can happen. */
-hts_boolean hts_parse_llint(const char *s, const char **end, LLint min,
-                            LLint max, LLint *out);
+HTS_CHECK_RESULT hts_boolean hts_parse_llint(const char *s, const char **end,
+                                             LLint min, LLint max, LLint *out);
 
 /* What hts_scan_llint() found. */
 typedef enum {
@@ -62,7 +62,7 @@ hts_scan_result hts_scan_llint(const char **s, LLint min, LLint max,
    and *port set for a bare decimal in 1..65535, else FALSE and *port left
    alone. Not sscanf("%d"), which range-checks nothing and wraps past INT_MAX.
    Its own file so proxytrack, which does not link the library, can share it. */
-hts_boolean hts_parse_url_port(const char *a, int *port);
+HTS_CHECK_RESULT hts_boolean hts_parse_url_port(const char *a, int *port);
 
 /* P points at LEN read-only bytes, which may hold NULs and lack an end NUL. */
 typedef struct {
@@ -150,7 +150,8 @@ hts_span hts_span_trim(hts_span s, const char *left, const char *right);
 
 /* Split S at its first C into *HEAD and *TAIL, C in neither. Return HTS_FALSE
    and leave both unchanged when S holds no C. */
-hts_boolean hts_span_split(hts_span s, char c, hts_span *head, hts_span *tail);
+HTS_CHECK_RESULT hts_boolean hts_span_split(hts_span s, char c, hts_span *head,
+                                            hts_span *tail);
 
 /* Read the field of *REST up to SEP into *FIELD and shrink *REST past that SEP.
    Return FALSE once *REST is empty, so "" yields nothing and "a," yields only
@@ -190,7 +191,7 @@ HTS_CHECK_RESULT int hts_span_index_ci(hts_span s, const char *const *words);
 
 /* Copy S into DST as a terminated string, clipped to SIZE - 1 bytes. Return
    FALSE if it was clipped, or if SIZE is 0, which writes nothing. */
-hts_boolean hts_span_copy(hts_span s, char *dst, size_t size);
+HTS_CHECK_RESULT hts_boolean hts_span_copy(hts_span s, char *dst, size_t size);
 
 /* Does the SEP-separated LIST hold TOKEN, A-Z compared as a-z? Each item is
    trimmed of " \t\n\v\f\r" first, and an empty item never matches. */
@@ -250,8 +251,10 @@ hts_span hts_fil_ext(const char *fil);
    runs to the end. Return TRUE with the value in OUT, or FALSE when NAME is
    absent or its value does not fit SIZE - 1 bytes. FALSE leaves OUT empty,
    unless SIZE is 0, which writes nothing. */
-hts_boolean hts_header_param(const char *value, const char *seps,
-                             const char *name, char *out, size_t size);
+HTS_CHECK_RESULT hts_boolean hts_header_param(const char *value,
+                                              const char *seps,
+                                              const char *name, char *out,
+                                              size_t size);
 
 /* Return the static reason phrase of HTTP status CODE, or NULL if unknown.
    It sits here for proxytrack, and HTSEXT_API would break its MSVC build. */

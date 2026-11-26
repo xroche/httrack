@@ -45,7 +45,8 @@ Please visit our Website: http://www.httrack.com
    caller wanting seconds uses hts_utc_seconds(), never mktime() (#1491). This
    file is separate so proxytrack, which does not link the library, can share
    it. */
-struct tm *convert_time_rfc822(struct tm *result, const char *s);
+HTS_CHECK_RESULT struct tm *convert_time_rfc822(struct tm *result,
+                                                const char *s);
 
 /* Writes tm as "Sun, 06 Nov 1994 08:49:37" then suffix (" GMT" or "") into s,
    in English under any LC_TIME, as HTTP requires. */
@@ -53,8 +54,8 @@ void hts_format_rfc822(hts_buf s, const struct tm *tm, const char *suffix);
 
 /* As convert_time_rfc822, but a two-digit year up to PIVOT means 20xx and one
    above it 19xx. HTTP dates use 50, and cookies use 69 (RFC 6265 5.1.1). */
-struct tm *convert_time_rfc822_pivot(struct tm *result, const char *s,
-                                     int pivot);
+HTS_CHECK_RESULT struct tm *convert_time_rfc822_pivot(struct tm *result,
+                                                      const char *s, int pivot);
 
 /* Return the Unix time of the UTC date in tm, in 64 bits because a 32-bit
    time_t ends in 2038. Out-of-range fields carry over as with timegm(). */
@@ -64,10 +65,10 @@ int64_t hts_utc_seconds(const struct tm *tm);
 time_t hts_time_clip(int64_t t);
 
 /* Does t fit this platform's time_t exactly? If so, store it in *out. */
-hts_boolean hts_time_exact(int64_t t, time_t *out);
+HTS_CHECK_RESULT hts_boolean hts_time_exact(int64_t t, time_t *out);
 
 /* Store the file time for the UTC date in tm in *out, clipped to time_t. False
    when the date is the epoch or one second before it, which mean no date. */
-hts_boolean hts_tm_filetime(const struct tm *tm, time_t *out);
+HTS_CHECK_RESULT hts_boolean hts_tm_filetime(const struct tm *tm, time_t *out);
 
 #endif

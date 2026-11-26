@@ -95,7 +95,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
       (void) optalias_check(nargs, (const char *const *) args, i, &rac, ra,
                             HTS_CDLMAXSIZE, HTS_BUF(err));
-      (void) optalias_help(args[i]);
+      (void) !optalias_help(args[i]); // fuzzes the lookup, not its answer
       (void) optrate_read(args[i], &rate);
 
       /* a quoted argument must split back to itself */

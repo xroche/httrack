@@ -50,7 +50,7 @@ typedef enum unescapeFlags {
 } unescapeFlags;
 
 /* Return the value of hex digit c, or -1. */
-static HTS_INLINE HTS_UNUSED int hts_ehexh(const char c) {
+static HTS_INLINE HTS_UNUSED HTS_CHECK_RESULT int hts_ehexh(const char c) {
   if (c >= '0' && c <= '9')
     return c - '0';
   else if (c >= 'a' && c <= 'f')
@@ -62,7 +62,7 @@ static HTS_INLINE HTS_UNUSED int hts_ehexh(const char c) {
 }
 
 /* Return the value of the two hex digits at s, or -1. */
-static HTS_INLINE HTS_UNUSED int hts_ehex(const char *s) {
+static HTS_INLINE HTS_UNUSED HTS_CHECK_RESULT int hts_ehex(const char *s) {
   const int c1 = hts_ehexh(s[0]);
 
   if (c1 >= 0) {
@@ -82,7 +82,7 @@ static HTS_INLINE HTS_UNUSED int hts_ehex(const char *s) {
  * needs to hold as much space as the source.
  * Returns 0 upon success, -1 upon overflow or error.
  **/
-extern int hts_unescapeEntities(const char *src, hts_buf dest);
+extern HTS_CHECK_RESULT int hts_unescapeEntities(const char *src, hts_buf dest);
 
 /**
  * Unescape HTML entities (as per HTML 4.0 Specification)
@@ -91,8 +91,9 @@ extern int hts_unescapeEntities(const char *src, hts_buf dest);
  * needs to hold as much space as the source.
  * Returns 0 upon success, -1 upon overflow or error.
  **/
-extern int hts_unescapeEntitiesWithCharset(const char *src, hts_buf dest,
-                                           const char *charset);
+extern HTS_CHECK_RESULT int
+hts_unescapeEntitiesWithCharset(const char *src, hts_buf dest,
+                                const char *charset);
 
 /**
  * Flags for hts_unescapeEntitiesWithCharsetSpecial(). Keep them distinct from
@@ -112,9 +113,9 @@ typedef enum unescapeEntitiesFlags {
  * the string (UNESCAPE_ENTITIES_URL_QUERY).
  * Returns 0 upon success, -1 upon overflow or error.
  **/
-extern int hts_unescapeEntitiesWithCharsetSpecial(const char *src, hts_buf dest,
-                                                  const char *charset,
-                                                  const int flags);
+extern HTS_CHECK_RESULT int
+hts_unescapeEntitiesWithCharsetSpecial(const char *src, hts_buf dest,
+                                       const char *charset, const int flags);
 
 /**
  * Unescape an URL-encoded string. The implicit charset is UTF-8.
@@ -123,7 +124,7 @@ extern int hts_unescapeEntitiesWithCharsetSpecial(const char *src, hts_buf dest,
  * Note: source and destination MUST NOT be the same.
  * Returns 0 upon success, -1 upon overflow or error.
  **/
-extern int hts_unescapeUrl(const char *src, hts_buf dest);
+extern HTS_CHECK_RESULT int hts_unescapeUrl(const char *src, hts_buf dest);
 
 /**
  * Unescape an URL-encoded string. The implicit charset is UTF-8.
@@ -133,7 +134,7 @@ extern int hts_unescapeUrl(const char *src, hts_buf dest);
  * Note: source and destination MUST NOT be the same.
  * Returns 0 upon success, -1 upon overflow or error.
  **/
-extern int hts_unescapeUrlSpecial(const char *src, hts_buf dest,
-                                  const int flags);
+extern HTS_CHECK_RESULT int
+hts_unescapeUrlSpecial(const char *src, hts_buf dest, const int flags);
 
 #endif

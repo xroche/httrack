@@ -622,12 +622,13 @@ static int st_utf8_strict(httrackp *opt, int argc, char **argv) {
   }
   for (i = 0; i < sizeof(urls) / sizeof(urls[0]); i++) {
     buf[0] = '\0';
-    (void) hts_unescapeUrl(urls[i][0], HTS_BUF(buf));
+    // the pins judge what lands in buf
+    (void) !hts_unescapeUrl(urls[i][0], HTS_BUF(buf));
     fail |= utf8_strict_pin("unescape", urls[i][0], buf, urls[i][1]);
   }
   for (i = 0; i < sizeof(ents) / sizeof(ents[0]); i++) {
     buf[0] = '\0';
-    (void) hts_unescapeEntitiesWithCharset(ents[i][0], HTS_BUF(buf), "UTF-8");
+    (void) !hts_unescapeEntitiesWithCharset(ents[i][0], HTS_BUF(buf), "UTF-8");
     fail |= utf8_strict_pin("entity", ents[i][0], buf, ents[i][1]);
   }
   for (i = 0; i < sizeof(hosts) / sizeof(hosts[0]); i++) {
