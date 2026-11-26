@@ -345,6 +345,29 @@ static int st_idna_decode(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Converts the host with the Nth realloct refused, printing the result or
+   NULL; a growth that cannot fail gracefully aborts instead. */
+static int st_idna_oom(httrackp *opt, int argc, char **argv) {
+  char buf[512];
+  hts_span host;
+  char *s;
+
+  (void) opt;
+  if (argc < 3 ||
+      (strcmp(argv[0], "encode") != 0 && strcmp(argv[0], "decode") != 0)) {
+    fprintf(stderr, "usage: idna-oom <encode|decode> <N> <host>\n");
+    return 1;
+  }
+  host = hts_span_at(buf, st_decode_body(argv[2], HTS_BUF(buf)));
+  hts_realloct_fault_selftest = atoi(argv[1]);
+  s = argv[0][0] == 'e' ? hts_convertStringUTF8ToIDNA(host)
+                        : hts_convertStringIDNAToUTF8(host);
+  hts_realloct_fault_selftest = 0;
+  printf("idna-oom: %s\n", s != NULL ? s : "NULL");
+  freet(s);
+  return 0;
+}
+
 static int st_entities(httrackp *opt, int argc, char **argv) {
   char *s;
   const char *enc;
@@ -993,6 +1016,8 @@ const struct selftest_entry selftests_charset[] = {
      st_idna_encode},
     {"idna-decode", "<host>", "decode an IDNA/punycode hostname",
      st_idna_decode},
+    {"idna-oom", "<encode|decode> <N> <host>",
+     "an IDNA conversion whose Nth realloct is refused", st_idna_oom},
     {"host-ascii", "", "hts_host_to_ascii() converts, bounds and refuses",
      st_host_ascii},
     {"copy-utf8", "", "hts_copyStringUTF8() clips on a sequence boundary",

@@ -42,6 +42,7 @@ Please visit our Website: http://www.httrack.com
 #include "htslib.h"
 #include "htsio.h"
 #include "htsbuf.h"
+#include "htsarrays.h"
 #include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -928,10 +929,9 @@ static int theme_name_cmp(const void *a, const void *b) {
    line, as a heap string that is empty when there are none. */
 static char *list_themes(const char *path) {
   char dir[1024];
-  char **names = NULL;
-  size_t count = 0;
-  size_t capacity = 0;
-  size_t i;
+  TypedArray(char *) names = EMPTY_TYPED_ARRAY;
+  char **v;
+  size_t n, i;
   int pass;
   String list = STRING_EMPTY;
   char *result;
@@ -948,39 +948,36 @@ static char *list_themes(const char *path) {
       const char *const name = hts_findgetname(h);
 
       if (name != NULL && theme_in(dir, name)) {
-        if (count == capacity) {
-          char **const grown =
-              (char **) realloct(names, (capacity + 16) * sizeof(names[0]));
+        char *copy;
 
-          if (grown == NULL) {
-            break;
-          }
-          names = grown;
-          capacity += 16;
+        if (!TypedArrayReserve(names, 1)) {
+          break;
         }
-        if ((names[count] = strdupt(name)) != NULL) {
-          count++;
+        if ((copy = strdupt(name)) != NULL) {
+          TypedArrayAdd(names, copy);
         }
       }
     } while (hts_findnext(h));
     hts_findclose(h);
   }
-  if (count != 0) {
-    qsort(names, count, sizeof(names[0]), theme_name_cmp);
+  v = TypedArrayElts(names);
+  n = TypedArraySize(names);
+  if (n != 0) {
+    qsort(v, n, sizeof(v[0]), theme_name_cmp);
   }
-  for (i = 0; i < count; i++) {
+  for (i = 0; i < n; i++) {
     /* a user's theme may share its name with an installed one */
-    if (i == 0 || strcmp(names[i], names[i - 1]) != 0) {
+    if (i == 0 || strcmp(v[i], v[i - 1]) != 0) {
       if (StringNotEmpty(list)) {
         StringCat(list, "\n");
       }
-      cat_theme_entry(&list, names[i]);
+      cat_theme_entry(&list, v[i]);
     }
   }
-  for (i = 0; i < count; i++) {
-    freet(names[i]);
+  for (i = 0; i < n; i++) {
+    freet(v[i]);
   }
-  freet(names);
+  TypedArrayFree(names);
   result = strdupt(StringNotEmpty(list) ? StringBuff(list) : "");
   StringFree(list);
   return result;

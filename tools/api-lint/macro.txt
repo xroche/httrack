@@ -52,12 +52,8 @@ src/htscache_selftest.c: JSON_IS: uses free name err
 src/htscache_selftest.c: JSON_IS: uses free name out
 src/htscachecodec.h: ZIP_FIELD_INT: uses free name LLintP
 src/htscachecodec.h: ZIP_FIELD_INT_FORCE: uses free name LLintP
-src/htscharset.c: ADD_BYTE: uses free name capa
 src/htscharset.c: ADD_BYTE: uses free name dest
-src/htscharset.c: ADD_BYTE: uses free name destSize
 src/htscharset.c: FREE_BUFFER: uses free name dest
-src/htscharset.c: INCREASE_CAPA: uses free name capa
-src/htscharset.c: INCREASE_CAPA: uses free name dest
 src/htscookie_selftest.c: HC_FAIL: uses free name err
 src/htscookie_selftest.c: ROWS: holds statements outside do { } while (0)
 src/htscore.c: LOAD_IN_MEMORY_IF_NECESSARY: uses free name is_loaded_from_file

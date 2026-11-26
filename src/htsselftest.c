@@ -35,6 +35,7 @@ Please visit our Website: http://www.httrack.com
    handler prints one result line and returns the process exit code. */
 
 #include "htsselftest_int.h"
+#include "htsarrays.h"
 
 /* ------------------------------------------------------------ */
 /* Batch runner: many self-tests in one process.                */
@@ -49,44 +50,31 @@ Please visit our Website: http://www.httrack.com
 
 /* Read stdin to EOF, NUL-terminated; *size excludes that terminator. */
 static char *st_batch_slurp(size_t *size) {
-  size_t capa = 65536, len = 0;
-  char *buff = malloct(capa);
+  TypedArray(char) buff = EMPTY_TYPED_ARRAY;
 
-  if (buff == NULL)
-    return NULL;
   for (;;) {
     size_t n;
 
-    if (len + 1 >= capa) {
-      char *grown;
-
-      if (capa > (size_t) -1 / 2) {
-        freet(buff);
-        return NULL;
-      }
-      grown = realloct(buff, capa * 2);
-      if (grown == NULL) {
-        freet(buff);
-        return NULL;
-      }
-      buff = grown;
-      capa *= 2;
+    /* Room to read a byte and still terminate. */
+    if (!TypedArrayReserve(buff, 2)) {
+      TypedArrayFree(buff);
+      return NULL;
     }
-    n = fread(&buff[len], 1, capa - len - 1, stdin);
+    n = fread(&TypedArrayTail(buff), 1, TypedArrayRoom(buff) - 1, stdin);
     if (n == 0) {
       /* Else a read error reads as EOF, and the tail of the script is dropped
          as silently as if it had never been written. */
       if (ferror(stdin)) {
-        freet(buff);
+        TypedArrayFree(buff);
         return NULL;
       }
       break;
     }
-    len += n;
+    TypedArraySize(buff) += n;
   }
-  buff[len] = '\0';
-  *size = len;
-  return buff;
+  TypedArrayTail(buff) = '\0';
+  *size = TypedArraySize(buff);
+  return TypedArrayElts(buff);
 }
 
 /* Case argument count, or -1 if the field is not one: atoi() would read a name
