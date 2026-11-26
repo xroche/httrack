@@ -140,14 +140,14 @@ enum {
   PT_CACHE_MAX = PT_CACHE__ARC
 };
 
-static int PT_LoadCache__New(PT_Index index, const char *filename);
+static hts_boolean PT_LoadCache__New(PT_Index index, const char *filename);
 static void PT_Index_Delete__New(PT_Index * pindex);
 static PT_Element PT_ReadCache__New(PT_Index index, const char *url, int flags);
 static int PT_SaveCache__New(PT_Indexes indexes, const char *filename);
- /**/ static int PT_LoadCache__Old(PT_Index index, const char *filename);
+static hts_boolean PT_LoadCache__Old(PT_Index index, const char *filename);
 static void PT_Index_Delete__Old(PT_Index * pindex);
 static PT_Element PT_ReadCache__Old(PT_Index index, const char *url, int flags);
-/**/ static int PT_LoadCache__Arc(PT_Index index, const char *filename);
+static hts_boolean PT_LoadCache__Arc(PT_Index index, const char *filename);
 static void PT_Index_Delete__Arc(PT_Index * pindex);
 static PT_Element PT_ReadCache__Arc(PT_Index index, const char *url, int flags);
 static int PT_SaveCache__Arc(PT_Indexes indexes, const char *filename);
@@ -159,7 +159,7 @@ static time_t PT_GetTimeIndex(PT_Indexes indexes);
 
 struct _PT_Index_Functions {
   /* Mandatory services */
-  int (*PT_LoadCache) (PT_Index index, const char *filename);
+  hts_boolean (*PT_LoadCache)(PT_Index index, const char *filename);
   void (*PT_Index_Delete) (PT_Index * pindex);
   /* called with the index lock held */
   PT_Element (*PT_ReadCache)(PT_Index index, const char *url, int flags);
@@ -296,14 +296,15 @@ static time_t file_timestamp(const char *file) {
   return (time_t) 0;
 }
 
-static int PT_Index_Check__(PT_Index index, const char *file, int line) {
+static hts_boolean PT_Index_Check__(PT_Index index, const char *file,
+                                    int line) {
   if (index == NULL)
-    return 0;
+    return HTS_FALSE;
   if (index->type >= PT_CACHE_MIN && index->type <= PT_CACHE_MAX)
-    return 1;
+    return HTS_TRUE;
   proxytrack_print_log(CRITICAL, "index corrupted in memory at %s:%d", file,
                        line);
-  return 0;
+  return HTS_FALSE;
 }
 
 #define SAFE_INDEX(index) PT_Index_Check__(index, __FILE__, __LINE__)
@@ -834,7 +835,7 @@ PT_Element PT_ReadIndex(PT_Indexes indexes, const char *url, int flags) {
   return NULL;
 }
 
-int PT_LookupIndex(PT_Indexes indexes, const char *url) {
+hts_boolean PT_LookupIndex(PT_Indexes indexes, const char *url) {
   if (indexes != NULL) {
     intptr_t index_id;
 
@@ -842,14 +843,14 @@ int PT_LookupIndex(PT_Indexes indexes, const char *url) {
       url += 7;
     if (coucal_read(indexes->cil, url, &index_id)) {
       if (index_id >= 0 && index_id < indexes->index_size) {
-        return 1;
+        return HTS_TRUE;
       } else {
         proxytrack_print_log(CRITICAL,
                              "PT_ReadCache:Corrupted central index locator");
       }
     }
   }
-  return 0;
+  return HTS_FALSE;
 }
 
 static time_t PT_GetTimeIndex(PT_Indexes indexes) {
@@ -1075,7 +1076,7 @@ static void index_bad_new(void *arg, const char *what, int entry) {
   fprintf(stderr, "%s #%d" LF, what, entry);
 }
 
-int PT_LoadCache__New(PT_Index index_, const char *filename) {
+hts_boolean PT_LoadCache__New(PT_Index index_, const char *filename) {
   if (index_ != NULL && filename != NULL) {
     PT_Index__New index = &index_->slots.formatNew;
     unzFile zFile = index->zFile = unzOpen(filename);
@@ -1095,7 +1096,7 @@ int PT_LoadCache__New(PT_Index index_, const char *filename) {
       /* Ready directory entries */
       if (hts_cache_walk_index(zFile, index_entry_new, index_bad_new, &walk,
                                &entries) == Z_OK) {
-        return 1;
+        return HTS_TRUE;
       } else {
         coucal_delete(&index->hash);
         index = NULL;
@@ -1104,7 +1105,7 @@ int PT_LoadCache__New(PT_Index index_, const char *filename) {
       index = NULL;
     }
   }
-  return 0;
+  return HTS_FALSE;
 }
 
 /* Append "name: value\r\n" to *headers, doubling its *cap-byte block.
@@ -1595,7 +1596,7 @@ static hts_boolean cache_rLLint(FILE *fp, long int datSize, unsigned long *i) {
   return HTS_TRUE;
 }
 
-static int PT_LoadCache__Old(PT_Index index_, const char *filename) {
+static hts_boolean PT_LoadCache__Old(PT_Index index_, const char *filename) {
   if (index_ != NULL && filename != NULL) {
     char *pos = strrchr(filename, '.');
     PT_Index__Old cache = &index_->slots.formatOld;
@@ -1614,7 +1615,7 @@ static int PT_LoadCache__Old(PT_Index index_, const char *filename) {
 
       /* a base clipped to fit would name a different pair of files */
       if (nLen > sizeof(cache->filenameDat) - sizeof(".dat")) {
-        return 0;
+        return HTS_FALSE;
       }
       strlncatbuff(cache->filenameDat, filename, sizeof(cache->filenameDat),
                    nLen);
@@ -1707,12 +1708,12 @@ static int PT_LoadCache__Old(PT_Index index_, const char *filename) {
           }
           /* Not needed anymore! */
           freet(use);
-          return 1;
+          return HTS_TRUE;
         }
       }
     }
   }
-  return 0;
+  return HTS_FALSE;
 }
 
 static String DecodeUrl(const char *url) {
@@ -2247,7 +2248,7 @@ static hts_boolean arcDataHoldsARecord(PT_Index__Arc index, long int from,
   return HTS_FALSE;
 }
 
-int PT_LoadCache__Arc(PT_Index index_, const char *filename) {
+hts_boolean PT_LoadCache__Arc(PT_Index index_, const char *filename) {
   if (index_ != NULL && filename != NULL) {
     PT_Index__Arc index = &index_->slots.formatArc;
 
@@ -2274,7 +2275,7 @@ int PT_LoadCache__Arc(PT_Index index_, const char *filename) {
           fprintf(stderr, "Unexpected bad signature #%s" LF, index->line);
           fclose(index->file);
           index->file = NULL;
-          return 0;
+          return HTS_FALSE;
         }
         /* Timestamp */
         index->timestamp = getArcTimestamp(index->line);
@@ -2284,7 +2285,7 @@ int PT_LoadCache__Arc(PT_Index index_, const char *filename) {
           fprintf(stderr, "Unexpected bad data offset size first entry" LF);
           fclose(index->file);
           index->file = NULL;
-          return 0;
+          return HTS_FALSE;
         }
         /* Read all meta-entries (not data) */
         while(!feof(index->file)) {
@@ -2352,7 +2353,7 @@ int PT_LoadCache__Arc(PT_Index index_, const char *filename) {
         }
 
         /* OK */
-        return 1;
+        return HTS_TRUE;
       } else {
         fprintf(stderr, "Bad file (empty ?)" LF);
       }
@@ -2363,7 +2364,7 @@ int PT_LoadCache__Arc(PT_Index index_, const char *filename) {
   } else {
     fprintf(stderr, "Bad arguments" LF);
   }
-  return 0;
+  return HTS_FALSE;
 }
 
 static PT_Element PT_ReadCache__Arc(PT_Index index_, const char *url,

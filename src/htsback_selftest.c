@@ -422,8 +422,8 @@ static int st_backswap(httrackp *opt, int argc, char **argv) {
       if (inmemory) {
         back.r.adr = strdupt(body);
       }
-      if (fp == NULL || back_serialize(fp, &back) != 0 ||
-          fseek(fp, 0, SEEK_SET) != 0 || back_unserialize(fp, &copy) != 0) {
+      if (fp == NULL || !back_serialize(fp, &back) ||
+          fseek(fp, 0, SEEK_SET) != 0 || !back_unserialize(fp, &copy)) {
         fprintf(stderr, "backswap: round-trip failed for a %s slot\n",
                 inmemory ? "buffered" : "direct-to-disk");
         err = 1;
@@ -469,7 +469,7 @@ static int st_backswap(httrackp *opt, int argc, char **argv) {
     back.r.size = (LLint) sizeof(body) - 1;
     back.r.adr = strdupt(body);
     back.r.headers = strdupt(hdrs);
-    if (fp == NULL || back_serialize(fp, &back) != 0 ||
+    if (fp == NULL || !back_serialize(fp, &back) ||
         (whole_len = ftell(fp)) <= 0 || fseek(fp, 0, SEEK_SET) != 0) {
       fprintf(stderr, "backswap: could not serialize a slot with headers\n");
       err = 1;
@@ -501,7 +501,7 @@ static int st_backswap(httrackp *opt, int argc, char **argv) {
             fseek(cfp, 0, SEEK_SET) != 0) {
           fprintf(stderr, "backswap: could not stage a %ld-byte slot\n", cut);
           err = 1;
-        } else if (back_unserialize(cfp, &copy) == 0) {
+        } else if (back_unserialize(cfp, &copy)) {
           if (!complete) {
             fprintf(stderr, "backswap: %ld of %ld bytes unserialized anyway\n",
                     cut, whole_len);
@@ -553,7 +553,7 @@ static int st_backswap(httrackp *opt, int argc, char **argv) {
           fseek(cfp, 0, SEEK_SET) != 0) {
         fprintf(stderr, "backswap: could not stage a bad size header\n");
         err = 1;
-      } else if (back_unserialize(cfp, &copy) == 0) {
+      } else if (back_unserialize(cfp, &copy)) {
         fprintf(stderr, "backswap: a %lu-byte size header unserialized\n",
                 (unsigned long) bad[c]);
         err = 1;
@@ -578,7 +578,7 @@ static char *st_spool_record(const lien_back *back, long *len) {
   char *buf = NULL;
 
   *len = 0;
-  if (fp != NULL && back_serialize(fp, back) == 0 && (*len = ftell(fp)) > 0 &&
+  if (fp != NULL && back_serialize(fp, back) && (*len = ftell(fp)) > 0 &&
       fseek(fp, 0, SEEK_SET) == 0 && (buf = malloct((size_t) *len)) != NULL &&
       fread(buf, 1, (size_t) *len, fp) != (size_t) *len) {
     freet(buf);
@@ -593,7 +593,7 @@ static lien_back *st_spool_read(hts_span rec) {
   lien_back *copy = NULL;
 
   if (fp != NULL && fwrite(rec.p, 1, rec.len, fp) == rec.len &&
-      fseek(fp, 0, SEEK_SET) == 0 && back_unserialize(fp, &copy) != 0 &&
+      fseek(fp, 0, SEEK_SET) == 0 && !back_unserialize(fp, &copy) &&
       copy != NULL) {
     fprintf(stderr, "spoolrecord: a refused record kept a slot\n");
     copy = NULL; /* leaked, but the test fails anyway */
@@ -839,7 +839,7 @@ static int st_spoolrecord(httrackp *opt, int argc, char **argv) {
   {
     FILE *const fp = tmpfile();
 
-    if (fp == NULL || back_serialize(fp, back) == 0 || ftell(fp) != 0) {
+    if (fp == NULL || back_serialize(fp, back) || ftell(fp) != 0) {
       fprintf(stderr, "spoolrecord: an unterminated field was serialized\n");
       err = 1;
     }

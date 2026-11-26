@@ -288,16 +288,16 @@ void hts_record_free(httrackp *opt) {
   opt->liens = NULL;  // no longer defined
 }
 
-// adds a new link and returns a non-zero value upon success
-static int hts_record_link_(httrackp * opt,
-                            const char *address, const char *file, const char *save,
-                            const char *ref_address, const char *ref_file,
-                            const char *codebase) {
+static hts_boolean hts_record_link_(httrackp *opt, const char *address,
+                                    const char *file, const char *save,
+                                    const char *ref_address,
+                                    const char *ref_file,
+                                    const char *codebase) {
   // create a new entry
   const size_t lien_tot = hts_record_link_alloc(opt);
   lien_url*const link = lien_tot != (size_t) -1 ? opt->liens[lien_tot] : NULL;
   if (link == NULL) {
-    return 0;
+    return HTS_FALSE;
   }
   // record string fields
   if ( (link->adr = hts_record_link_strdup(opt, address)) == NULL
@@ -307,7 +307,7 @@ static int hts_record_link_(httrackp * opt,
     || (link->former_fil = hts_record_link_strdup(opt, ref_file)) == NULL
     ) {
     hts_record_link_drop_latest(opt);
-    return 0;
+    return HTS_FALSE;
   }
 
   // record codebase for java classes
@@ -316,7 +316,7 @@ static int hts_record_link_(httrackp * opt,
     if (len > 6 && strncmp(&file[len - 6], ".class", 6) == 0) {
       if ((link->cod = hts_record_link_strdup(opt, codebase)) == NULL) {
         hts_record_link_drop_latest(opt);
-        return 0;
+        return HTS_FALSE;
       }
     }
   }
@@ -324,8 +324,7 @@ static int hts_record_link_(httrackp * opt,
   // add entry in the hashtables
   hash_write(opt->hash, lien_tot);
 
-  // success
-  return 1;
+  return HTS_TRUE;
 }
 
 /* See htscore.h. */
@@ -333,11 +332,11 @@ hts_boolean hts_maxlinks_no_room(const httrackp *opt) {
   return opt->maxlink > 0 && opt->lien_tot + 2 > opt->maxlink;
 }
 
-int hts_record_link(httrackp * opt,
-                    const char *address, const char *file, const char *save,
-                    const char *ref_address, const char *ref_file,
-                    const char *codebase) {
-  int success;
+hts_boolean hts_record_link(httrackp *opt, const char *address,
+                            const char *file, const char *save,
+                            const char *ref_address, const char *ref_file,
+                            const char *codebase) {
+  hts_boolean success;
 
   hts_secret_add_login(opt, address);
   success = hts_record_link_(opt, address, file, save, ref_address, ref_file,
@@ -2379,7 +2378,7 @@ static void engine_stats_reset_counters(void) {
   HTS_STAT.nb = 0;
 }
 
-static int engine_stats(void) {
+static hts_boolean engine_stats(void) {
   const LLint recv = hts_stat_recv_publish();
 
   engine_stats_reset_counters();
@@ -2401,7 +2400,7 @@ static int engine_stats(void) {
           HTS_STAT.istat_bytes[i] = recv;
           HTS_STAT.istat_timestart[i] = cdif;
         }
-        return 1;               /* refreshed */
+        return HTS_TRUE; /* refreshed */
       }
     }
 
@@ -2415,14 +2414,14 @@ static int engine_stats(void) {
       }
     }
   }
-  return 0;
+  return HTS_FALSE;
 }
 
-int engine_stats_tick(unsigned int *calls) {
+hts_boolean engine_stats_tick(unsigned int *calls) {
   if ((*calls)++ % HTS_STATS_TICK == 0)
     return engine_stats();
   engine_stats_reset_counters();
-  return 0;
+  return HTS_FALSE;
 }
 
 #define _FILTERS     (*opt->filters.filters)

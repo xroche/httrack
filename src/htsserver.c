@@ -274,9 +274,10 @@ HTS_UNUSED static int recv_bl(T_SOC soc, void *buffer, size_t len,
                               time_t deadline);
 
 /* Language files */
-/* Load the catalogs, or with limit_to read that key: 0 if nothing was read. */
-HTS_UNUSED HTS_CHECK_RESULT static int htslang_load(hts_buf limit_to,
-                                                    const char *apppath);
+/* Load the catalogs, or with limit_to read that key: HTS_FALSE if nothing was
+   read. */
+HTS_UNUSED HTS_CHECK_RESULT static hts_boolean
+htslang_load(hts_buf limit_to, const char *apppath);
 HTS_UNUSED static void conv_printf(const char *from, char *to);
 HTS_UNUSED static void LANG_DELETE(void);
 HTS_UNUSED static void LANG_INIT(const char *path);
@@ -3007,7 +3008,7 @@ static HTS_CHECK_RESULT hts_boolean lang_catalog_path(hts_buf dst,
   return hts_buf_printf(dst, "lang/%s.txt", hashname);
 }
 
-static int htslang_load(hts_buf limit_to, const char *path) {
+static hts_boolean htslang_load(hts_buf limit_to, const char *path) {
   const char *hashname;
   char catbuff[CATBUFF_SIZE];
 
@@ -3069,7 +3070,7 @@ static int htslang_load(hts_buf limit_to, const char *path) {
       }                         // while
       fclose(fp);
     } else {
-      return 0;
+      return HTS_FALSE;
     }
   }
 
@@ -3120,7 +3121,7 @@ static int htslang_load(hts_buf limit_to, const char *path) {
 
   /* Error */
   if (!hashname)
-    return 0;
+    return HTS_FALSE;
 
   /* Load specific language file */
   {
@@ -3138,7 +3139,7 @@ static int htslang_load(hts_buf limit_to, const char *path) {
         hashname = LANGINTKEY(name);
       }
       if (!lang_catalog_path(HTS_BUF(lbasename), hashname)) {
-        return 0;
+        return HTS_FALSE;
       }
       fp = fopen(fconcat(catbuff, sizeof(catbuff), path, lbasename), "rb");
       if (fp) {
@@ -3147,12 +3148,12 @@ static int htslang_load(hts_buf limit_to, const char *path) {
         lang_load_catalog(fp, loops > 0, HTS_FALSE);
         fclose(fp);
       } else {
-        return 0;
+        return HTS_FALSE;
       }
     }
   }
 
-  return 1;
+  return HTS_TRUE;
 }
 
 /* NOTE : also contains the "webhttrack" hack */
@@ -3258,7 +3259,7 @@ static int LANG_SEARCH(const char *path, const char *iso) {
   int i = 0;
   int curr_lng = LANG_T(path, -1);
   int found = 0;
-  int more;
+  hts_boolean more;
 
   do {
     QLANG_T(i);
@@ -3277,7 +3278,7 @@ static int LANG_LIST(const char *path, hts_buf buffer) {
   char lang_str[1024];
   int i = 0;
   int curr_lng = LANG_T(path, -1);
-  int more;
+  hts_boolean more;
 
   buffer.p[0] = '\0';
   do {

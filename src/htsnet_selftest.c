@@ -236,7 +236,7 @@ static int st_socks5(httrackp *opt, int argc, char **argv) {
   len = socks5_reply(script, 0x01, v4, sizeof(v4));
   io.reply = script;
   io.reply_len = len;
-  assertf(socks5_handshake_scripted(opt, "origin.test", proxy, &io) == 1);
+  assertf(socks5_handshake_scripted(opt, "origin.test", proxy, &io));
   assertf(SOCKS5_SENTINEL_LEFT(io, len));
   /* the greeting offers no-auth only, and the origin goes out by name, port 80
    */
@@ -248,32 +248,32 @@ static int st_socks5(httrackp *opt, int argc, char **argv) {
   len = socks5_reply(script, 0x04, v6, sizeof(v6));
   io.reply = script;
   io.reply_len = len;
-  assertf(socks5_handshake_scripted(opt, "origin.test", proxy, &io) == 1);
+  assertf(socks5_handshake_scripted(opt, "origin.test", proxy, &io));
   assertf(SOCKS5_SENTINEL_LEFT(io, len));
 
   len = socks5_reply(script, 0x03, domain, sizeof(domain));
   io.reply = script;
   io.reply_len = len;
-  assertf(socks5_handshake_scripted(opt, "origin.test", proxy, &io) == 1);
+  assertf(socks5_handshake_scripted(opt, "origin.test", proxy, &io));
   assertf(SOCKS5_SENTINEL_LEFT(io, len));
 
   /* an unknown address type has no known length: fail, never guess */
   len = socks5_reply(script, 0x02, v4, sizeof(v4));
   io.reply = script;
   io.reply_len = len;
-  assertf(socks5_handshake_scripted(opt, "origin.test", proxy, &io) == 0);
+  assertf(!socks5_handshake_scripted(opt, "origin.test", proxy, &io));
 
   /* truncated frames (here: no BND.PORT) fail instead of over-reading */
   len = socks5_reply(script, 0x01, v4, sizeof(v4)) - 3;
   io.reply = script;
   io.reply_len = len;
-  assertf(socks5_handshake_scripted(opt, "origin.test", proxy, &io) == 0);
+  assertf(!socks5_handshake_scripted(opt, "origin.test", proxy, &io));
 
   /* explicit origin port is encoded big-endian (8443 = 0x20fb) */
   len = socks5_reply(script, 0x01, v4, sizeof(v4));
   io.reply = script;
   io.reply_len = len;
-  assertf(socks5_handshake_scripted(opt, "origin.test:8443", proxy, &io) == 1);
+  assertf(socks5_handshake_scripted(opt, "origin.test:8443", proxy, &io));
   assertf(memcmp(io.sent + io.sent_len - 2, "\x20\xfb", 2) == 0);
 
   /* 4294967376 overflows sscanf("%d") into 80, and must be refused (#614). */
@@ -287,7 +287,7 @@ static int st_socks5(httrackp *opt, int argc, char **argv) {
       len = socks5_reply(script, 0x01, v4, sizeof(v4));
       io.reply = script;
       io.reply_len = len;
-      assertf(socks5_handshake_scripted(opt, bad[k], proxy, &io) == 0);
+      assertf(!socks5_handshake_scripted(opt, bad[k], proxy, &io));
       assertf(io.sent_len == 0);
     }
   }
@@ -302,7 +302,7 @@ static int st_socks5(httrackp *opt, int argc, char **argv) {
       len = socks5_reply(script, 0x01, v4, sizeof(v4));
       io.reply = script;
       io.reply_len = len;
-      assertf(socks5_handshake_scripted(opt, hostile[k], proxy, &io) == 0);
+      assertf(!socks5_handshake_scripted(opt, hostile[k], proxy, &io));
       assertf(io.sent_len == 0);
     }
   }
@@ -319,8 +319,7 @@ static int st_socks5(httrackp *opt, int argc, char **argv) {
     io.reply = auth_script;
     io.reply_len = sizeof(auth_script);
     assertf(socks5_handshake_scripted(opt, "origin.test",
-                                      "socks5://us%3aer:p:ass@127.0.0.1",
-                                      &io) == 1);
+                                      "socks5://us%3aer:p:ass@127.0.0.1", &io));
     assertf(SOCKS5_SENTINEL_LEFT(io, sizeof(auth_script)));
     assertf(memcmp(io.sent, "\x05\x02\x00\x02", 4) == 0);
     assertf(memcmp(io.sent + 4, "\x01\x05us:er\x05p:ass", 13) == 0);
@@ -329,16 +328,16 @@ static int st_socks5(httrackp *opt, int argc, char **argv) {
   /* a proxy demanding auth we cannot provide, and one refusing every method */
   io.reply = (const unsigned char *) "\x05\x02";
   io.reply_len = 2;
-  assertf(socks5_handshake_scripted(opt, "origin.test", proxy, &io) == 0);
+  assertf(!socks5_handshake_scripted(opt, "origin.test", proxy, &io));
   io.reply = (const unsigned char *) "\x05\xff";
   io.reply_len = 2;
-  assertf(socks5_handshake_scripted(opt, "origin.test", proxy, &io) == 0);
+  assertf(!socks5_handshake_scripted(opt, "origin.test", proxy, &io));
 
   /* a refused CONNECT is an error, not a tunnel */
   io.reply = (const unsigned char
                   *) "\x05\x00\x05\x05\x00\x01\x7f\x00\x00\x01\x1f\x90";
   io.reply_len = 12;
-  assertf(socks5_handshake_scripted(opt, "origin.test", proxy, &io) == 0);
+  assertf(!socks5_handshake_scripted(opt, "origin.test", proxy, &io));
 
   /* over-long host or credentials are rejected before anything is sent */
   {
@@ -351,7 +350,7 @@ static int st_socks5(httrackp *opt, int argc, char **argv) {
       strcatbuff(host, "a");
     io.reply = script;
     io.reply_len = len;
-    assertf(socks5_handshake_scripted(opt, host, proxy, &io) == 0);
+    assertf(!socks5_handshake_scripted(opt, host, proxy, &io));
     assertf(io.sent_len == 0);
 
     strcpybuff(name, "socks5://user:");
@@ -360,7 +359,7 @@ static int st_socks5(httrackp *opt, int argc, char **argv) {
     strcatbuff(name, "@127.0.0.1");
     io.reply = script;
     io.reply_len = len;
-    assertf(socks5_handshake_scripted(opt, "origin.test", name, &io) == 0);
+    assertf(!socks5_handshake_scripted(opt, "origin.test", name, &io));
     assertf(io.sent_len == 0);
   }
 
@@ -377,7 +376,7 @@ static int st_socks5(httrackp *opt, int argc, char **argv) {
     len = socks5_reply(big, 0x03, maxdomain, sizeof(maxdomain));
     io.reply = big;
     io.reply_len = len;
-    assertf(socks5_handshake_scripted(opt, "origin.test", proxy, &io) == 1);
+    assertf(socks5_handshake_scripted(opt, "origin.test", proxy, &io));
     assertf(SOCKS5_SENTINEL_LEFT(io, len));
 
     memset(host, 'h', 255);
@@ -385,7 +384,7 @@ static int st_socks5(httrackp *opt, int argc, char **argv) {
     len = socks5_reply(script, 0x01, v4, sizeof(v4));
     io.reply = script;
     io.reply_len = len;
-    assertf(socks5_handshake_scripted(opt, host, proxy, &io) == 1);
+    assertf(socks5_handshake_scripted(opt, host, proxy, &io));
     assertf(io.sent_len == 3 + 7 + 255);
 
     strcpybuff(name, "socks5://");
@@ -398,7 +397,7 @@ static int st_socks5(httrackp *opt, int argc, char **argv) {
            sizeof(auth));
     io.reply = auth;
     io.reply_len = sizeof(auth);
-    assertf(socks5_handshake_scripted(opt, "origin.test", name, &io) == 1);
+    assertf(socks5_handshake_scripted(opt, "origin.test", name, &io));
     assertf(io.consumed == sizeof(auth));
     assertf(io.sent_len == 4 + 3 + 255 + 255 + 7 + 11);
   }
@@ -406,13 +405,12 @@ static int st_socks5(httrackp *opt, int argc, char **argv) {
   /* ATYP=domain cannot carry an IPv6 literal, so a bracketed origin fails. */
   io.reply = script;
   io.reply_len = len;
-  assertf(socks5_handshake_scripted(opt, "[::1]", proxy, &io) == 0);
+  assertf(!socks5_handshake_scripted(opt, "[::1]", proxy, &io));
   assertf(io.sent_len == 0);
   assertf(strstr(io.msg, "IPv6") != NULL);
   io.reply = script;
   io.reply_len = len;
-  assertf(socks5_handshake_scripted(opt, "[2001:db8::1]:8443", proxy, &io) ==
-          0);
+  assertf(!socks5_handshake_scripted(opt, "[2001:db8::1]:8443", proxy, &io));
   assertf(io.sent_len == 0);
   assertf(strstr(io.msg, "IPv6") != NULL);
 
@@ -838,12 +836,12 @@ static int st_ftpline(httrackp *opt, int argc, char **argv) {
   assertf(send(sv[1], "220 short reply\r\n221 bye\r\n", 26, 0) == 26);
   deletesoc(sv[1]);
   line[0] = '\0';
-  assertf(get_ftp_line(NULL, sv[0], HTS_BUF(line), 5, NULL) != 0);
+  assertf(get_ftp_line(NULL, sv[0], HTS_BUF(line), 5, NULL));
   assertf(strlen(line) == 1023 && line[1022] == 'x');
   memset(line, '#', sizeof(line)); // a zero canary would hide a stray NUL
-  assertf(get_ftp_line(NULL, sv[0], HTS_BUF_N(line, 8), 5, NULL) != 0);
+  assertf(get_ftp_line(NULL, sv[0], HTS_BUF_N(line, 8), 5, NULL));
   assertf(strcmp(line, "220 sho") == 0 && line[8] == '#' && line[63] == '#');
-  assertf(get_ftp_line(NULL, sv[0], hts_buf_none(), 5, NULL) != 0);
+  assertf(get_ftp_line(NULL, sv[0], hts_buf_none(), 5, NULL));
   deletesoc(sv[0]);
   printf("ftp-line self-test OK (bounded %d-byte reply)\n",
          (int) sizeof(flood));

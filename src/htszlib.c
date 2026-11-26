@@ -226,7 +226,7 @@ size_t hts_zhead(hts_span in, hts_buf out) {
   return n;
 }
 
-int hts_extract_meta(const char *path) {
+hts_boolean hts_extract_meta(const char *path) {
   char catbuff[CATBUFF_SIZE];
   unzFile zFile = hts_unzOpen_utf8(
       fconcat(catbuff, sizeof(catbuff), path, "hts-cache/new.zip"));
@@ -274,13 +274,13 @@ int hts_extract_meta(const char *path) {
     }
     zipClose(zFileOut, "Meta-data extracted by HTTrack/" HTTRACK_VERSION);
     unzClose(zFile);
-    return 1;
+    return HTS_TRUE;
   }
   if (zFileOut != NULL)
     zipClose(zFileOut, NULL);
   if (zFile != NULL)
     unzClose(zFile);
-  return 0;
+  return HTS_FALSE;
 }
 
 const char *hts_get_zerror(int err, hts_buf buf) {

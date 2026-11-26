@@ -76,8 +76,8 @@ static const char *hts_host_port(const char *adr, const char *host) {
   return port != NULL && port >= host ? port : NULL;
 }
 
-int http_proxy_tunnel(httrackp *opt, htsblk *retour, const char *adr,
-                      int timeout) {
+hts_boolean http_proxy_tunnel(httrackp *opt, htsblk *retour, const char *adr,
+                              int timeout) {
   const T_SOC soc = retour->soc;
   const char *const host = jump_identification_const(adr); // host[:port]
   const char *const portsep = hts_host_port(adr, host);    // ":port" or NULL
@@ -87,7 +87,7 @@ int http_proxy_tunnel(httrackp *opt, htsblk *retour, const char *adr,
   int code;
 
   if (soc == INVALID_SOCKET)
-    return 0;
+    return HTS_FALSE;
 
   // CONNECT needs an explicit host:port; default :80 for http, :443 for https
   authority[0] = '\0';
@@ -103,7 +103,7 @@ int http_proxy_tunnel(httrackp *opt, htsblk *retour, const char *adr,
   // the CONNECT request (the host is already sanitized upstream)
   if (!hts_is_control_free(authority)) {
     strcpybuff(retour->msg, "proxy CONNECT: invalid host");
-    return 0;
+    return HTS_FALSE;
   }
 
   snprintf(req, sizeof(req), "CONNECT %s HTTP/1.0" H_CRLF "Host: %s" H_CRLF,
@@ -118,7 +118,7 @@ int http_proxy_tunnel(httrackp *opt, htsblk *retour, const char *adr,
 
     if (got < 0) {
       strcpybuff(retour->msg, "proxy CONNECT: credentials too long");
-      return 0;
+      return HTS_FALSE;
     }
     if (got > 0) {
       strlcatbuff(req, "Proxy-Authorization: Basic ", sizeof(req));
@@ -147,7 +147,7 @@ int http_proxy_tunnel(httrackp *opt, htsblk *retour, const char *adr,
         if (!wouldblock || !check_writeinput_t(soc, timeout) ||
             ++stalls > 100) {
           strcpybuff(retour->msg, "proxy CONNECT: write error");
-          return 0;
+          return HTS_FALSE;
         }
       }
     }
@@ -156,13 +156,13 @@ int http_proxy_tunnel(httrackp *opt, htsblk *retour, const char *adr,
   // proxy status line: "HTTP/1.x <code> ..."
   if (proxy_getline(soc, HTS_BUF(line), timeout) < 0) {
     strcpybuff(retour->msg, "proxy CONNECT: no response");
-    return 0;
+    return HTS_FALSE;
   }
   code = hts_status_line_code(line);
   if (code < 200 || code >= 300) {
     htsblk_failf(retour, "proxy CONNECT refused: %s",
                  strnotempty(line) ? line : "(no status)");
-    return 0;
+    return HTS_FALSE;
   }
 
   // drain headers to the blank line; cap the count so a flooding proxy can't
@@ -175,18 +175,18 @@ int http_proxy_tunnel(httrackp *opt, htsblk *retour, const char *adr,
 
       if (n < 0) {
         strcpybuff(retour->msg, "proxy CONNECT: truncated response");
-        return 0;
+        return HTS_FALSE;
       }
       if (n == 0)
         break; // blank line: tunnel ready
       if (++headers > 64) {
         strcpybuff(retour->msg, "proxy CONNECT: too many response headers");
-        return 0;
+        return HTS_FALSE;
       }
     }
   }
 
-  return 1;
+  return HTS_TRUE;
 }
 
 /* SOCKS5 client (RFC 1928, RFC 1929 auth), hostname mode only: the proxy
@@ -214,13 +214,13 @@ typedef struct socks5_stream {
 #define SOCKS5_BUF(ARR)                                                        \
   hts_buf_at((char *) (ARR), sizeof(ARR) + HTS_BUF_GUARD_(ARR))
 
-static int socks5_fail(hts_buf msg, const char *text) {
+static hts_boolean socks5_fail(hts_buf msg, const char *text) {
   hts_buf_cpy(msg, text);
-  return 0;
+  return HTS_FALSE;
 }
 
 /* Fill buf or fail, because a short read would desync the SOCKS stream. */
-static int socks5_read_n(socks5_stream *st, hts_buf buf) {
+static hts_boolean socks5_read_n(socks5_stream *st, hts_buf buf) {
   const size_t n = buf.size;
   size_t got = 0;
   int stalls = 0;
@@ -229,10 +229,10 @@ static int socks5_read_n(socks5_stream *st, hts_buf buf) {
     socks5_test_io *const io = st->io;
 
     if (n > io->reply_len - io->consumed)
-      return 0;
+      return HTS_FALSE;
     memcpy(buf.p, io->reply + io->consumed, n);
     io->consumed += n;
-    return 1;
+    return HTS_TRUE;
   }
   while (got < n) {
     const int r = (int) recv(st->soc, buf.p + got, (int) (n - got), 0);
@@ -241,18 +241,18 @@ static int socks5_read_n(socks5_stream *st, hts_buf buf) {
       got += (size_t) r;
       stalls = 0;
     } else if (r == 0) {
-      return 0; // proxy closed mid-frame
+      return HTS_FALSE; // proxy closed mid-frame
     } else {
       const hts_boolean wouldblock = hts_socket_would_block();
       if (!wouldblock || !check_readinput_t(st->soc, st->timeout) ||
           ++stalls > 100)
-        return 0;
+        return HTS_FALSE;
     }
   }
-  return 1;
+  return HTS_TRUE;
 }
 
-static int socks5_write_all(socks5_stream *st, hts_span buf) {
+static hts_boolean socks5_write_all(socks5_stream *st, hts_span buf) {
   const char *p = buf.p;
   size_t remain = buf.len;
   int stalls = 0;
@@ -261,10 +261,10 @@ static int socks5_write_all(socks5_stream *st, hts_span buf) {
     socks5_test_io *const io = st->io;
 
     if (buf.len > sizeof(io->sent) - io->sent_len)
-      return 0;
+      return HTS_FALSE;
     memcpy(io->sent + io->sent_len, buf.p, buf.len);
     io->sent_len += buf.len;
-    return 1;
+    return HTS_TRUE;
   }
   while (remain > 0) {
     // Not sendc(): the socket is still plain here, and that would route to TLS
@@ -278,10 +278,10 @@ static int socks5_write_all(socks5_stream *st, hts_span buf) {
       const hts_boolean wouldblock = hts_socket_would_block();
       if (!wouldblock || !check_writeinput_t(st->soc, st->timeout) ||
           ++stalls > 100)
-        return 0;
+        return HTS_FALSE;
     }
   }
-  return 1;
+  return HTS_TRUE;
 }
 
 static const char *socks5_rep_message(unsigned char rep) {
@@ -309,7 +309,7 @@ static const char *socks5_rep_message(unsigned char rep) {
 
 /* The reply's BND.ADDR is variable-length: consume exactly what ATYP says, or
    the leftover bytes prepend to the first origin (or TLS) read. */
-static int socks5_read_reply(socks5_stream *st, hts_buf msg) {
+static hts_boolean socks5_read_reply(socks5_stream *st, hts_buf msg) {
   unsigned char head[4];
   unsigned char addr[SOCKS5_MAXFIELD];
   unsigned char port[2];
@@ -322,7 +322,7 @@ static int socks5_read_reply(socks5_stream *st, hts_buf msg) {
   if (head[1] != 0x00) {
     hts_buf_printf_clip(msg, "SOCKS5 connect failed: %s",
                         socks5_rep_message(head[1]));
-    return 0;
+    return HTS_FALSE;
   }
   switch (head[3]) {
   case SOCKS5_ATYP_IPV4:
@@ -346,11 +346,11 @@ static int socks5_read_reply(socks5_stream *st, hts_buf msg) {
     return socks5_fail(msg, "SOCKS5: truncated reply address");
   if (!socks5_read_n(st, SOCKS5_BUF(port))) // BND.PORT, unused
     return socks5_fail(msg, "SOCKS5: truncated reply port");
-  return 1;
+  return HTS_TRUE;
 }
 
-static int socks5_negotiate(socks5_stream *st, hts_span host, int port,
-                            hts_span user, hts_span pass, hts_buf msg) {
+static hts_boolean socks5_negotiate(socks5_stream *st, hts_span host, int port,
+                                    hts_span user, hts_span pass, hts_buf msg) {
   // socks5_credentials refuses an empty username
   const hts_boolean want_auth = user.len != 0;
   unsigned char frame[3 + SOCKS5_MAXFIELD + SOCKS5_MAXFIELD];
@@ -412,8 +412,8 @@ static int socks5_negotiate(socks5_stream *st, hts_span host, int port,
 
 /* Decode the proxy userinfo into the two RFC 1929 fields. Split on the first
    colon of the still-escaped string, so a %3A stays inside the username. */
-static int socks5_credentials(httrackp *opt, const char *proxy_name,
-                              hts_buf user, hts_buf pass, hts_buf msg) {
+static hts_boolean socks5_credentials(httrackp *opt, const char *proxy_name,
+                                      hts_buf user, hts_buf pass, hts_buf msg) {
   const char *const a = jump_identification_const(proxy_name); // past the '@'
   const char *const astart = jump_protocol_const(proxy_name);
   char userinfo[1024];
@@ -435,12 +435,13 @@ static int socks5_credentials(httrackp *opt, const char *proxy_name,
     return socks5_fail(msg, "SOCKS5: credentials too long");
   if (user.p[0] == '\0')
     return socks5_fail(msg, "SOCKS5: empty proxy username");
-  return 1;
+  return HTS_TRUE;
 }
 
-static int socks5_handshake_stream(httrackp *opt, socks5_stream *st,
-                                   const char *adr, const char *proxy_name,
-                                   int ssl, hts_buf msg) {
+static hts_boolean socks5_handshake_stream(httrackp *opt, socks5_stream *st,
+                                           const char *adr,
+                                           const char *proxy_name, int ssl,
+                                           hts_buf msg) {
   const char *const start = jump_identification_const(adr);
   const char *const portsep = hts_host_port(adr, start);
   const hts_span host =
@@ -462,14 +463,14 @@ static int socks5_handshake_stream(httrackp *opt, socks5_stream *st,
     return socks5_fail(msg, "SOCKS5: invalid origin port");
   if (link_has_authorization(proxy_name)) {
     if (!socks5_credentials(opt, proxy_name, HTS_BUF(user), HTS_BUF(pass), msg))
-      return 0;
+      return HTS_FALSE;
   }
   return socks5_negotiate(st, host, port, hts_span_of(user), hts_span_of(pass),
                           msg);
 }
 
-int socks5_handshake(httrackp *opt, htsblk *retour, const char *adr,
-                     int timeout) {
+hts_boolean socks5_handshake(httrackp *opt, htsblk *retour, const char *adr,
+                             int timeout) {
   socks5_stream st;
 #if HTS_USEOPENSSL
   const int ssl = retour->ssl;
@@ -478,7 +479,7 @@ int socks5_handshake(httrackp *opt, htsblk *retour, const char *adr,
 #endif
 
   if (retour->soc == INVALID_SOCKET)
-    return 0;
+    return HTS_FALSE;
   st.soc = retour->soc;
   st.timeout = timeout;
   st.io = NULL;
@@ -486,8 +487,9 @@ int socks5_handshake(httrackp *opt, htsblk *retour, const char *adr,
                                  HTS_BUF(retour->msg));
 }
 
-int socks5_handshake_scripted(httrackp *opt, const char *adr,
-                              const char *proxy_name, socks5_test_io *io) {
+hts_boolean socks5_handshake_scripted(httrackp *opt, const char *adr,
+                                      const char *proxy_name,
+                                      socks5_test_io *io) {
   socks5_stream st;
 
   st.soc = INVALID_SOCKET;

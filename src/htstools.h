@@ -144,7 +144,7 @@ HTS_INLINE int rech_endtoken(const char *adr, const char **start);
 HTS_INLINE int check_tag(const char *from, const char *tag);
 int verif_backblue(httrackp * opt, const char *base);
 /* Is this the first call for external page nb since the mirror started? */
-HTS_CHECK_RESULT int verif_external(httrackp *opt, int nb);
+HTS_CHECK_RESULT hts_boolean verif_external(httrackp *opt, int nb);
 
 int istoobig(httrackp *opt, LLint size, LLint maxhtml, LLint maxnhtml,
              char *type);

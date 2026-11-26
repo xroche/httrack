@@ -548,15 +548,15 @@ int verif_backblue(httrackp *opt, const char *base) {
   return ret;
 }
 
-int verif_external(httrackp *opt, int nb) {
+hts_boolean verif_external(httrackp *opt, int nb) {
   const int flag = 1 << nb;
   int *const status = &opt->state.verif_external_status;
 
   if ((*status & flag) == 0) {
     *status |= flag;
-    return 1;
+    return HTS_TRUE;
   }
-  return 0;
+  return HTS_FALSE;
 }
 
 HTS_INLINE char html_prevc(const char *adr, const char *start) {

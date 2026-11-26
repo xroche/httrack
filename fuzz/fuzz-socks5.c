@@ -61,7 +61,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   const char *proxy = "socks5://127.0.0.1";
   const unsigned char *reply;
   char *nl1, *nl2;
-  int ok;
+  hts_boolean ok;
 
   if (opt == NULL) {
     hts_init();

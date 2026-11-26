@@ -1373,7 +1373,7 @@ static int st_statstick(httrackp *opt, int argc, char **argv) {
     HTS_STAT.HTS_TOTAL_RECV = -1;
     HTS_STAT.stat_nsocket = HTS_STAT.stat_errors = HTS_STAT.nbk = 7;
     HTS_STAT.nb = 7;
-    if (engine_stats_tick(&tick) != 0) {
+    if (engine_stats_tick(&tick)) {
       fprintf(stderr, "statstick call %u: rate refresh below 2048 bytes\n", i);
       err = 1;
     }
@@ -1399,12 +1399,12 @@ static int st_statstick(httrackp *opt, int argc, char **argv) {
   HTS_STAT.istat_timestart[0] = HTS_STAT.istat_timestart[1] =
       mtime_monotonic() - 5000;
   tick = 1;
-  if (engine_stats_tick(&tick) != 0) {
+  if (engine_stats_tick(&tick)) {
     fprintf(stderr, "statstick: off-tick refreshed the rate\n");
     err = 1;
   }
   tick = HTS_STATS_TICK;
-  if (engine_stats_tick(&tick) != 1 || HTS_STAT.rate <= 0) {
+  if (!engine_stats_tick(&tick) || HTS_STAT.rate <= 0) {
     fprintf(stderr, "statstick: full tick did not refresh the rate\n");
     err = 1;
   }

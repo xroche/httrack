@@ -85,10 +85,10 @@ int ftp_scratch_selftests(httrackp *opt);
 
 int send_line(T_SOC soc, const char *data);
 /* Read one control-channel reply into line, clipped. A size-0 line discards
-   the reply. Returns 0 on error. Optional back ends the wait on a stop, opt
-   clips it to --max-time. */
-int get_ftp_line(lien_back *back, T_SOC soc, hts_buf line, int timeout,
-                 const httrackp *opt);
+   the reply. Returns HTS_FALSE on error. Optional back ends the wait on a
+   stop, opt clips it to --max-time. */
+hts_boolean get_ftp_line(lien_back *back, T_SOC soc, hts_buf line, int timeout,
+                         const httrackp *opt);
 /* Start of the authority in a URL address: the scheme and its slashes skipped.
    Bracket-aware, unlike a hand-rolled split on the first ':'. */
 char *ftp_jump_authority(char *url_adr);
