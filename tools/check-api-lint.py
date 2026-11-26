@@ -11,7 +11,9 @@ and a function defined only in a later branch of an unbalanced #if group go
 unreported. A span is seen only as a local, a parameter or a URL view field,
 never through a pointer copy, another struct or a macro, and only the
 NUL_READERS functions and printf-style %s count, so a span handed to any other
-function goes unreported.
+function goes unreported. A K&R definition is keyed "(file scope)", and raw libc
+calls through a macro alias, (strcpy)(...), a function pointer or __builtin_*
+are not seen.
 """
 
 import argparse
@@ -718,15 +720,17 @@ LIBC_WRAPPERS = ("src/htssafe.h",)
 
 
 def enclosing_name(code, functions, at):
-    """The function, or the #define, holding position at."""
-    for start, end, name in functions:
-        if start <= at < end:
-            return name
+    """Return the name of the #define or function holding position at."""
     first = code.rfind("\n", 0, at) + 1
     while first > 1 and code[first - 2] == "\\":
         first = code.rfind("\n", 0, first - 1) + 1
     m = DEFINE.match(code[first : code.find("\n", first)])
-    return m.group(1) if m else "(file scope)"
+    if m:
+        return m.group(1)
+    for start, end, name in functions:
+        if start <= at < end:
+            return name
+    return "(file scope)"
 
 
 def check_libc(path, code):
@@ -744,7 +748,10 @@ def check_libc(path, code):
         call = squash("%s(%s)" % (m.group(1), dest.strip()))
         where = enclosing_name(code, functions, m.start())
         key = "%s: %s" % (where, call)
-        msg = "%s in %s is unbounded, use a htssafe.h helper" % (call, where)
+        msg = "%s in %s is unbounded, use an hts_buf or htssafe.h helper" % (
+            call,
+            where,
+        )
         yield line_of(code, m.start()), key, msg
 
 

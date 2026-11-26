@@ -112,9 +112,12 @@ void lint_probe_pair(hts_span a, struct { hts_span s; } *w, char *d) {
   lint_skip(a.p+1, a.len-1);
   lint_skip(a.p + 1, a.len - 2);
 }
-void lint_probe_libc(char *d, const char *s, struct { char b[8]; } *w) {
+void lint_probe_libc(char *d, const char *s, struct { char b[8]; } *w, va_list ap) {
   strcpy(d, s);
   sprintf(w->b, "%d", 1);
+  vsprintf(w->b, s, ap);
+  strncpy(d, s, 2);
+  strncat(w->b, s, 2);
   strcpybuff(d, s);
   snprintf(d, 4, "strcpy(d, s)");
   hts_strcat(d, s);
@@ -164,6 +167,7 @@ char *lint_probe_extern(int x);
 #define lint_after(x) ((x) + (x))
 #define LINT_CAT(d, s) \
   strcat(d, s)
+static inline void lint_probe_after_cat(void) { }
 H
 echo 'src/htslib.h: lint_dup: evaluates x twice' >>"${work}/baseline/macro.txt"
 mkdir "${work}/src/lintprobe"
@@ -224,11 +228,14 @@ for want in "src/htslib.c:$(at "${c}" "lint_probe_ctype("): ctype: new violation
     "src/htslib.c:$(at "${c}" "lint_skip(a.p + 2"): pair: new violation: lint_skip(a.p+2, a.len-2) splits a span" \
     "src/htslib.c:$(at "${c}" "lint_skip(a.p+1"): pair: new violation: lint_skip(a.p+1, a.len-1) splits a span" \
     "src/htslib.c:$(at "${c}" "strcpy(d, s);"): libc: new violation: strcpy(d) in lint_probe_libc is unbounded" \
-    "src/htslib.c:$(at "${c}" "sprintf(w->b"): libc: new violation: sprintf(w->b) in lint_probe_libc is unbounded" \
+    "src/htslib.c:$(at "${c}" "sprintf(w->b, \"%d"): libc: new violation: sprintf(w->b) in lint_probe_libc is unbounded" \
+    "src/htslib.c:$(at "${c}" "vsprintf(w->b"): libc: new violation: vsprintf(w->b) in lint_probe_libc is unbounded" \
+    "src/htslib.c:$(at "${c}" "strncpy(d, s, 2)"): libc: new violation: strncpy(d) in lint_probe_libc is unbounded" \
+    "src/htslib.c:$(at "${c}" "strncat(w->b"): libc: new violation: strncat(w->b) in lint_probe_libc is unbounded" \
     "src/htslib.h:$(at "${h}" "strcat(d, s)"): libc: new violation: strcat(d) in LINT_CAT is unbounded"; do
     grep -qF "${want}" <<<"${out}" || fail "missed ${want}: ${out}"
 done
-test "$(wc -l <<<"${out}")" -eq 53 || fail "flagged a clean probe: ${out}"
+test "$(wc -l <<<"${out}")" -eq 56 || fail "flagged a clean probe: ${out}"
 
 # Removing a known violation, or listing one that never was, leaves a stale entry; dropping a live entry flags it.
 rm -r "${work}/src/lintprobe"
