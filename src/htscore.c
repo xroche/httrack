@@ -1571,18 +1571,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
             stre.info_shell_ = &info_shell;
 
             /* Parse */
-            switch (hts_mirror_wait_for_next_file(&str, &stre)) {
-            case -1:
-              retcode = -1;
-              goto cleanup;
-            case 2:
-              // Jump to 'continue'
-              // This is one of the very very rare cases where goto
-              // is acceptable
-              // A supplemental flag and if( ) { } would be really messy
+            if (hts_mirror_wait_for_next_file(&str, &stre) == 2)
               goto jump_if_done;
-            }
-
           }
 
         }
