@@ -1,0 +1,75 @@
+#!/bin/bash
+#
+# On GCC 11+, HTS_OWNED_BY(hts_free) must make free() on an hts_strdup() result
+# warn, in C and in C++, while each documented deallocator stays silent.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+top=$(cd "$top_srcdir" && pwd)
+# htsfeatures.h is generated, so a hand run outside make check has none.
+[ -n "${abs_top_builddir:-}" ] || skip "abs_top_builddir unset, no automake environment"
+tmp=$(mktemp -d) || exit 1
+cleanup_push rm -rf "$tmp"
+
+cat >"$tmp/probe.c" <<'PROBE'
+#include "httrack-library.h"
+#if !defined(__GNUC__) || __GNUC__ < 11 || defined(__clang__)
+#error not GCC 11 or later
+#endif
+int probe(void);
+int probe(void) {
+  char *const dup = hts_strdup("a");
+  char *const lib = hts_convertStringToUTF8("a", 1, "utf-8");
+  char *const sys = hts_convertStringToUTF8("b", 1, "utf-8");
+  const int ok = dup != NULL && lib != NULL && sys != NULL;
+
+#ifdef MISMATCH
+  free(dup);
+#else
+  hts_free(dup);
+#endif
+  hts_free(lib);
+  free(sys);
+  return ok;
+}
+PROBE
+cp "$tmp/probe.c" "$tmp/probe.cc"
+
+# The control runs first, so another compile error is not taken for the warning.
+check() { # check LANG COMPILER-ARGV...
+    local lang=$1 src
+    shift
+    src=$tmp/probe.c
+    [ "$lang" = C ] || src=$tmp/probe.cc
+    "$@" -c -o "$tmp/probe.o" -Werror=mismatched-dealloc "$src" 2>"$tmp/ctl.err" ||
+        fail_dump "$lang: a documented deallocator warns" "$tmp/ctl.err"
+    if "$@" -c -o "$tmp/probe.o" -Werror=mismatched-dealloc -DMISMATCH "$src" 2>"$tmp/bad.err"; then
+        fail "$lang: free() on an hts_strdup() result compiles silently with $1"
+    fi
+    grep -q 'mismatched-dealloc' "$tmp/bad.err" ||
+        fail_dump "$lang: the mismatch probe fails for another reason" "$tmp/bad.err"
+    echo "OK: $lang ($1) warns on free() of an hts_strdup() result"
+}
+
+inc=(-I"$abs_top_builddir" -I"$abs_top_builddir/src" -I"$top/src")
+# Configure's CPPFLAGS carries brew's keg-only openssl include path.
+if [ -n "${TEST_CPPFLAGS:-}" ]; then
+    read -r -a extra <<<"$TEST_CPPFLAGS"
+    inc+=("${extra[@]}")
+fi
+printf '#if !defined(__GNUC__) || __GNUC__ < 11 || defined(__clang__)\n#error\n#endif\n' >"$tmp/gcc11.c"
+read -r -a cc <<<"${CC:-cc}"
+command -v "${cc[0]}" >/dev/null 2>&1 || skip "no C compiler (${cc[0]})"
+"${cc[@]}" -fsyntax-only "$tmp/gcc11.c" 2>/dev/null || skip "${cc[0]} is not GCC 11 or later"
+check C "${cc[@]}" "${inc[@]}"
+
+read -r -a cxx <<<"${CXX:-c++}"
+if command -v "${cxx[0]}" >/dev/null 2>&1 &&
+    "${cxx[@]}" -x c++ -fsyntax-only "$tmp/gcc11.c" 2>/dev/null; then
+    check C++ "${cxx[@]}" "${inc[@]}"
+else
+    echo "note: no GCC 11+ C++ compiler, C++ leg not run" >&2
+fi

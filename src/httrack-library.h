@@ -258,20 +258,20 @@ HTSEXT_API int htswrap_add(httrackp *opt, const char *name, void *fct);
 
 /* Internal library allocators, if a different libc is being used by the client
  */
+/** free() through the library allocator. NULL is accepted. */
+HTSEXT_API void hts_free(void *data);
+
 /** strdup() through the library allocator. Returns a heap copy freed with
     hts_free(), or NULL on failure. */
-HTSEXT_API char *hts_strdup(const char *string);
+HTS_OWNED_BY(hts_free) HTSEXT_API char *hts_strdup(const char *string);
 
 /** malloc() through the library allocator. Free with hts_free(). NULL on OOM.
  */
-HTSEXT_API void *hts_malloc(size_t size);
+HTS_OWNED_BY(hts_free) HTSEXT_API void *hts_malloc(size_t size);
 
 /** realloc() through the library allocator. NULL on failure, leaving the
    original block unchanged. */
 HTSEXT_API void *hts_realloc(void *const data, const size_t size);
-
-/** free() through the library allocator. NULL is accepted. */
-HTSEXT_API void hts_free(void *data);
 
 /* Other functions */
 /** Does nothing, kept for ABI compatibility. Always returns 0. */
@@ -287,11 +287,12 @@ HTSEXT_API int hts_buildtopindex(httrackp *opt, const char *path,
 
 /** Scan every mirror project under @p path and return a CRLF-separated list:
     @p type==1 gives the distinct category names, any other value gives the
-    project directory names. The caller frees the result with freet(), and it
-    may be NULL. @p path loses a trailing '/' in place. The bytes are UTF-8,
-    except on Windows, where winprofile.ini and the directory names are in the
-    local ANSI codepage. */
-HTSEXT_API char *hts_getcategories(char *path, int type);
+    project directory names. The caller frees the result with free() or
+    hts_free(), and it may be NULL. @p path loses a trailing '/' in place. The
+    bytes are UTF-8, except on Windows, where winprofile.ini and the directory
+    names are in the local ANSI codepage. */
+HTS_OWNED HTS_FREED_BY(hts_free) HTSEXT_API
+    char *hts_getcategories(char *path, int type);
 
 /* Catch-URL */
 /** Open a loopback capture socket (a mini-proxy), trying the usual proxy ports
@@ -846,21 +847,22 @@ HTSEXT_API void hts_mutexrelease(htsmutex *mutex);
 
 /* Charset conversion */
 
-/** Convert 's' from 'charset' to UTF-8. Caller frees; NULL upon error, an
-    allocation failure included. */
-HTS_CHECK_RESULT HTSEXT_API char *
-hts_convertStringToUTF8(const char *s, size_t size, const char *charset);
+/** Convert 's' from 'charset' to UTF-8. Free with free() or hts_free(). NULL
+    upon error, an allocation failure included. */
+HTS_OWNED HTS_FREED_BY(hts_free) HTSEXT_API
+    char *hts_convertStringToUTF8(const char *s, size_t size,
+                                  const char *charset);
 
 #ifdef _WIN32
-/** Convert the current system codepage to UTF-8. Caller frees; NULL upon
-    error. Windows only. */
-HTS_CHECK_RESULT HTSEXT_API char *hts_convertStringSystemToUTF8(const char *s,
-                                                                size_t size);
+/** Convert the current system codepage to UTF-8. Free with free() or
+    hts_free(). NULL upon error. Windows only. */
+HTS_OWNED HTS_FREED_BY(hts_free) HTSEXT_API
+    char *hts_convertStringSystemToUTF8(const char *s, size_t size);
 
-/** Convert UTF-8 to the current system codepage. Caller frees; NULL upon
-    error. Windows only. */
-HTS_CHECK_RESULT HTSEXT_API char *hts_convertStringUTF8ToSystem(const char *s,
-                                                                size_t size);
+/** Convert UTF-8 to the current system codepage. Free with free() or
+    hts_free(). NULL upon error. Windows only. */
+HTS_OWNED HTS_FREED_BY(hts_free) HTSEXT_API
+    char *hts_convertStringUTF8ToSystem(const char *s, size_t size);
 
 /** Replace the CRT's ANSI argv by a UTF-8 one decoded from the real UTF-16
     command line. Keeps the CRT's argv on failure, and the new array is

@@ -556,7 +556,7 @@ def check_result(files):
             if not fh:
                 continue
             name, ret = fh
-            if re.search(r"\b(HTS_CHECK_RESULT|HTS_OWNED)\b", head):
+            if re.search(r"\b(HTS_CHECK_RESULT|HTS_OWNED(?:_BY)?)\b", head):
                 marked.add(name)
             if body is not None and "static" not in ret.split():
                 bodies[name].append(body)
