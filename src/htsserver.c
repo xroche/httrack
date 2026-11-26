@@ -274,7 +274,8 @@ HTS_UNUSED static int recv_bl(T_SOC soc, void *buffer, size_t len,
                               time_t deadline);
 
 /* Language files */
-/* Load the catalogs, or with limit_to read that key: 0 if nothing was read. */
+/* Load the catalogs, or with limit_to read that key: HTS_FALSE if nothing was
+   read. */
 HTS_UNUSED HTS_CHECK_RESULT static hts_boolean
 htslang_load(hts_buf limit_to, const char *apppath);
 HTS_UNUSED static void conv_printf(const char *from, char *to);

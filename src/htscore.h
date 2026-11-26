@@ -421,7 +421,7 @@ void hts_io_fatal_abort(httrackp *opt);
    Calls 0, HTS_STATS_TICK, 2*HTS_STATS_TICK... run engine_stats() and return
    its result. The others only reset the counters it resets, and return
    HTS_FALSE. */
-hts_boolean engine_stats_tick(unsigned int *calls);
+HTS_CHECK_RESULT hts_boolean engine_stats_tick(unsigned int *calls);
 
 void host_ban(httrackp * opt, int ptr, struct_back * sback, const char *host);
 
