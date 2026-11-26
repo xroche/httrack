@@ -718,7 +718,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
   char *argv_firsturl = NULL; // names the project by default
   size_t url_sz = 65535;
 
-  /* 0, or HTS_EXIT_MIRROR_ABORTED for a mirror that started and did not end */
+  /* 0, HTS_EXIT_MIRROR_ABORTED or HTS_EXIT_WARC_INCOMPLETE */
   int exit_code = 0;
 
   // the parametres
@@ -3094,6 +3094,11 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
         hts_worker_faulted()) {
       exit_code = HTS_EXIT_MIRROR_ABORTED;
       HTS_PANIC_PRINTF("mirror aborted before completion, see the log file");
+    }
+    if (exit_code == 0 && warc_lost_opt(opt)) {
+      exit_code = HTS_EXIT_WARC_INCOMPLETE;
+      HTS_PANIC_PRINTF(
+          "the WARC archive is incomplete or missing, see the log file");
     }
 
     /* Not after a fault: that mirror is not resumable. */

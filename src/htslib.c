@@ -1642,13 +1642,13 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
     const hts_span v = header_value(value);
 
     if (v.len < sizeof(retour->lastmodified))
-      hts_buf_put_span_clip(HTS_BUF(retour->lastmodified), v);
+      (void) !hts_buf_put_span_clip(HTS_BUF(retour->lastmodified), v); // fits
   } else if (HEADER_IS(name, "Etag")) {
     if (retour) {
       const hts_span v = header_value(value);
 
       if (v.len < 64)
-        hts_buf_put_span_clip(HTS_BUF(retour->etag), v);
+        (void) !hts_buf_put_span_clip(HTS_BUF(retour->etag), v); // fits
       else
         retour->etag[0] = '\0';
     }
@@ -1905,8 +1905,9 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
         if (hts_span_present(v) && word == key.len) {
           /* RFC 6265 4.1.1 makes the quotes part of a quoted cookie-value. */
           if (key.len > 0 && key.len < 200 && v.len < 8000) {
-            hts_buf_put_span_clip(HTS_BUF(name), key);
-            hts_buf_put_span_clip(HTS_BUF(value), v);
+            /* both fit, by the bounds above */
+            (void) !hts_buf_put_span_clip(HTS_BUF(name), key);
+            (void) !hts_buf_put_span_clip(HTS_BUF(value), v);
             if (first) {
               // the first pair is the cookie, and "name=" may erase one
               strcpybuff(cook_name, name);
@@ -3902,13 +3903,14 @@ static const char *hts_query_strip_keys_match(const char *rules,
       continue;
     if (hts_span_split(line, '=', &pattern, &keys)) {
       /* Clip a too-long pattern, never skip it. */
-      hts_buf_put_span_clip(HTS_BUF(pat), pattern);
+      (void) !hts_buf_put_span_clip(HTS_BUF(pat), pattern);
     } else {
       strcpybuff(pat, "*");
       keys = line;
     }
     if (strjoker(url, pat, NULL, NULL) != NULL) {
-      hts_buf_put_span_clip(dest, keys);
+      /* a user rule; every key lookup clips it alike */
+      (void) !hts_buf_put_span_clip(dest, keys);
       result = dest.p;
     }
   }

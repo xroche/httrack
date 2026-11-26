@@ -324,6 +324,8 @@ ci_suite_heartbeat() {
 # mirror-path-too-long checks a limit exact to the byte, and both shells rewrite
 # the path it builds into a native one of another length.
 # postfile-wire reads its request back through a socketpair, which Winsock lacks.
+# warc-diskfull points the archive at an MSYS symlink to /dev/full, which a
+# native binary reads as a plain file.
 expected_skips_msys="01_engine-usercommand.test
 2545_local-mirror-path-too-long.test
 01_engine-footer-overflow.test
@@ -363,6 +365,7 @@ expected_skips_msys="01_engine-usercommand.test
 288_testlib-holdport.test
 350_local-diskfull-abort.test
 352_engine-filesave-diskfull.test
+2584_local-warc-diskfull.test
 355_local-write-error-not-eof.test
 377_engine-install-paths.test
 398_engine-build-features.test
@@ -443,6 +446,7 @@ expected_skips_wsl2="01_engine-usercommand.test
 288_testlib-holdport.test
 350_local-diskfull-abort.test
 352_engine-filesave-diskfull.test
+2584_local-warc-diskfull.test
 355_local-write-error-not-eof.test
 377_engine-install-paths.test
 398_engine-build-features.test

@@ -1132,7 +1132,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
 
             htsbuff_cpy(&fb, type ? "+" : "-");
             htsbuff_cat(&fb, tempo);
-            filters_insert(opt, filptr, rule); /* bumps filptr when stored */
+            /* bumps filptr when stored, and logs a drop */
+            (void) !filters_insert(opt, filptr, rule);
           }
 
           if (!filters_grow(opt, 1)) {
@@ -2450,7 +2451,7 @@ void host_ban(httrackp * opt, int ptr,
     htsbuff_cpy(&fb, "-");
     htsbuff_cat(&fb, host);
     htsbuff_cat(&fb, "/*"); // forbid host/*
-    filters_insert(opt, *_FILTERS_PTR, rule);
+    (void) !filters_insert(opt, *_FILTERS_PTR, rule); // it logs a drop
   }
   // oups
   if (strlen(host) <= 1) {      // euhh?? longueur <= 1
@@ -3370,8 +3371,10 @@ hts_boolean hts_wait_available_socket(struct_back *sback, httrackp *opt,
     /* time limit (-E) exceeded, or an exit: stop waiting for a socket (#481) */
     if (!back_checkmirror(opt) || hts_is_exiting(opt))
       break;
-    if (!hts_loop_tick(sback, opt, -1, ptr))
+    if (!hts_loop_tick(sback, opt, -1, ptr)) {
+      opt->state._hts_in_html_parsing = prev;
       return HTS_FALSE;
+    }
   }
   opt->state._hts_in_html_parsing = prev;
   return HTS_TRUE;

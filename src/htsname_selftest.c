@@ -594,15 +594,15 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
     memset(&fa, 0, sizeof(fa));
     strcpybuff(fa.af.adr, afs->af.adr);
     strcpybuff(fa.af.fil, first);
-    url_savename(&fa, NULL, NULL, NULL, opt, sback, &cache, &hash, 0, 0,
-                 &headers);
+    assertf(url_savename(&fa, NULL, NULL, NULL, opt, sback, &cache, &hash, 0, 0,
+                         &headers) == 0);
     if (!hts_record_link(opt, fa.af.adr, fa.af.fil, fa.save, "", "", NULL)) {
       rc = 1;
       goto cleanup;
     }
   }
-  url_savename(afs, NULL, NULL, NULL, opt, sback, &cache, &hash, 0, 0,
-               &headers);
+  assertf(url_savename(afs, NULL, NULL, NULL, opt, sback, &cache, &hash, 0, 0,
+                       &headers) == 0);
   if (body != NULL)
     (void) UNLINK(bodyfile);
   if (tmpbody != NULL)
@@ -654,8 +654,8 @@ static int st_savename_collide(httrackp *opt, int argc, char **argv) {
               (char) hts_toupper((unsigned char) afs.af.fil[1 + j]);
       }
       strcatbuff(afs.af.fil, ".html");
-      url_savename(&afs, NULL, NULL, NULL, opt, sback, &cache, &hash, 0, 0,
-                   NULL);
+      assertf(url_savename(&afs, NULL, NULL, NULL, opt, sback, &cache, &hash, 0,
+                           0, NULL) == 0);
       snprintf(want, sizeof(want), "example.com%.*s", (int) sizeof(word),
                afs.af.fil);
       if (k != 0)
@@ -812,8 +812,8 @@ static int st_savename_sequence(httrackp *opt, int argc, char **argv) {
       memset(&former, 0, sizeof(former));
       strcpybuff(afs.af.adr, adr);
       strcpybuff(afs.af.fil, fil);
-      url_savename(&afs, &former, "example.com", "/", opt, sback, &cache, &hash,
-                   1, 0, NULL);
+      assertf(url_savename(&afs, &former, "example.com", "/", opt, sback,
+                           &cache, &hash, 1, 0, NULL) == 0);
       if (strcmp(afs.save, name) != 0) {
         fprintf(stderr,
                 "savename-sequence: case %u step %u: %s%s named %s, not %s\n",

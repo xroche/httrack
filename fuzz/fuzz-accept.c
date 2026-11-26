@@ -59,7 +59,7 @@ static hts_boolean fuzz_field(hts_span *rest, hts_buf dst) {
 
   if (!hts_span_next_in(rest, '\0', &field))
     return HTS_FALSE;
-  (void) hts_buf_put_span_clip(dst, field);
+  (void) !hts_buf_put_span_clip(dst, field);
   return HTS_TRUE;
 }
 
@@ -127,7 +127,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     for (i = 0; i < FUZZ_ACCEPT_MAXRULES; i++) {
       if (!fuzz_field(&rest, HTS_BUF(rule)))
         break;
-      (void) filters_insert(opt, filptr, rule);
+      (void) !filters_insert(opt, filptr, rule); // a drop is a valid input
     }
 
     (void) hts_acceptlink(opt, 1, adr, fil, NULL, NULL, HTS_FALSE, &set_prio_to,

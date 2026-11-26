@@ -5,7 +5,6 @@ src/htsarena.h: hts_arena_take_
 src/htsback.h: back_add
 src/htsback.h: back_add_if_not_exists
 src/htsback.h: back_busy_consistent
-src/htsback.h: back_clear_entry
 src/htsback.h: back_delayed_rename
 src/htsback.h: back_new
 src/htsback.h: back_search_quick
@@ -18,7 +17,6 @@ src/htsbacktrace.h: hts_backtrace_altstack
 src/htsbauth.h: cookie_domain_match
 src/htsbauth.h: cookie_is_secure_record
 src/htsbauth.h: cookie_sendable
-src/htsbuf.h: hts_buf_put_span_clip
 src/htsbundle.h: hts_bundle_has_control
 src/htscache.h: cache_header
 src/htscache.h: cache_repair
@@ -35,7 +33,6 @@ src/htscore.h: check_fatal_io_errno
 src/htscore.h: check_stdin
 src/htscore.h: filesave
 src/htscore.h: filters_grow
-src/htscore.h: filters_insert
 src/htscore.h: fspc
 src/htscore.h: htsAddLink
 src/htscore.h: hts_wait_available_socket
@@ -98,7 +95,6 @@ src/htsmirror.h: hts_take_lock_request
 src/htsmirror.h: hts_wait_delayed
 src/htsmodules.h: hts_parse_externals
 src/htsname.h: url_query_value
-src/htsname.h: url_savename
 src/htsname.h: url_savename_refname_remove
 src/htsnet.h: SOCaddr_inetntoa_port_
 src/htsnet.h: SOCaddr_sinport_
@@ -143,7 +139,6 @@ src/htstools.h: link_has_authority
 src/htsurlport.h: hts_status_reason
 src/htswarc.h: warc_open
 src/htswarc.h: warc_truncated_reason
-src/htswarc.h: warc_write_transaction
 src/htsweb.h: main
 src/htswizard.h: hts_link_is_foreign_asset
 src/htswizard.h: hts_robots_forbids

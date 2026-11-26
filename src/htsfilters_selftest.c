@@ -606,9 +606,9 @@ static int st_filterremove(httrackp *opt, int argc, char **argv) {
   assertf(filters_init(&filters, opt->maxfilter, 0) != 0);
   opt->filters.filters = &filters;
   opt->filters.filptr = &filptr;
-  filters_insert(opt, 0, "-a*");
-  filters_insert(opt, 1, "-b*");
-  filters_insert(opt, 2, "-c*");
+  assertf(filters_insert(opt, 0, "-a*"));
+  assertf(filters_insert(opt, 1, "-b*"));
+  assertf(filters_insert(opt, 2, "-c*"));
   filters_remove(opt, 1, 0);
   ok = filptr == 3 && strcmp(filters[0], "-a*") == 0 &&
        strcmp(filters[1], "-b*") == 0 && strcmp(filters[2], "-c*") == 0;
@@ -750,9 +750,9 @@ static int st_filterlayout(httrackp *opt, int argc, char **argv) {
   assertf(filters_init(&filters, opt->maxfilter, 0) != 0);
   opt->filters.filters = &filters;
   opt->filters.filptr = &filptr;
-  filters_insert(opt, 0, "-wiz*");
-  filters_insert(opt, 1, "-user*");
-  filters_insert(opt, 2, "-ban*");
+  assertf(filters_insert(opt, 0, "-wiz*"));
+  assertf(filters_insert(opt, 1, "-user*"));
+  assertf(filters_insert(opt, 2, "-ban*"));
   opt->wizard_filters = 1;
   opt->user_filters = 1;
   assertf(hts_setfilters(opt, set));
@@ -790,9 +790,9 @@ static int st_filterkeep(httrackp *opt, int argc, char **argv) {
   assertf(filters_init(&filters, opt->maxfilter, 0) != 0);
   opt->filters.filters = &filters;
   opt->filters.filptr = &filptr;
-  filters_insert(opt, 0, "+*");
-  filters_insert(opt, 1, "-*/pic/*");
-  filters_insert(opt, 2, "-banned.example/*"); /* an engine host ban */
+  assertf(filters_insert(opt, 0, "+*"));
+  assertf(filters_insert(opt, 1, "-*/pic/*"));
+  assertf(filters_insert(opt, 2, "-banned.example/*")); /* an engine host ban */
   opt->wizard_filters = 0;
   opt->user_filters = 2;
   /* a start URL the rules refuse, a link they allow, one on a banned host */

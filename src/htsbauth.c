@@ -404,7 +404,8 @@ static hts_boolean cookie_make_room(t_cookie *cookie, const char *domain,
       h = (h + 1) & (mask - 1);
     if (table[h] == 0) {
       hosts[nh].dom = pool_end;
-      hts_buf_put_span_clip(hts_buf_at(pool_end, d.len + 1), d);
+      (void) !hts_buf_put_span_clip(hts_buf_at(pool_end, d.len + 1),
+                                    d); // sized to fit
       pool_end += d.len + 1;
       table[h] = ++nh;
     }
@@ -1669,7 +1670,7 @@ const char *cookie_get(char *buffer, size_t buffer_size,
   if (field.p == cookie_no_field)
     return cookie_no_field;
   /* only a caller with a buffer under COOKIE_MAX_LINE can clip here */
-  hts_buf_put_span_clip(hts_buf_at(buffer, buffer_size), field);
+  (void) !hts_buf_put_span_clip(hts_buf_at(buffer, buffer_size), field);
   return buffer;
 }
 

@@ -6,7 +6,7 @@ TESTS = @TESTS_LIST@
 # Committed binary fixture read by 01_zlib-cache-golden.test. List it
 # explicitly: automake does not expand wildcards in EXTRA_DIST, so a glob would
 # silently drop it from the dist tarball and break "make distcheck".
-EXTRA_DIST = $(TESTS) renamefail.c unlinkfail.c threadattrfail.c gaistall.c nobacktrace.c altstackprobe.c nopieprobe.c printnumprobe.c closetrack.c ftpcancel.c stopresume.c seekfail.c pubheaderlayout.c chainplug.c sendheadrefuse.c preprocessnopage.c mirrorverdict.c crawl-test.sh run-all-tests.sh check-network.sh check-test-names.sh \
+EXTRA_DIST = $(TESTS) renamefail.c unlinkfail.c threadattrfail.c gaistall.c nobacktrace.c altstackprobe.c nopieprobe.c printnumprobe.c closetrack.c ftpcancel.c stopresume.c seekfail.c pubheaderlayout.c chainplug.c sendheadrefuse.c preprocessnopage.c refuseprobe.c mirrorverdict.c crawl-test.sh run-all-tests.sh check-network.sh check-test-names.sh \
 	proxy-https-server.py socks5-server.py proxy-connect-server.py \
 	proxytestlib.py tls-stall-server.py warc-validate.py wacz-validate.py \
 	header-injection-server.py header-injection-check.py \
@@ -115,6 +115,8 @@ TESTS_ENVIRONMENT += STOPRESUME_LIB=$(abs_builddir)/$(LT_CV_OBJDIR)/libstopresum
 TESTS_ENVIRONMENT += SENDHEADREFUSE_LIB=$(abs_builddir)/$(LT_CV_OBJDIR)/libsendheadrefuse.so
 # 2406_plugin-preprocess-nopage.test loads this through --wrapper.
 TESTS_ENVIRONMENT += PREPROCESSNOPAGE_LIB=$(abs_builddir)/$(LT_CV_OBJDIR)/libpreprocessnopage.so
+# 2585_plugin-probe-abort-no-empty-name.test loads this through --wrapper.
+TESTS_ENVIRONMENT += REFUSEPROBE_LIB=$(abs_builddir)/$(LT_CV_OBJDIR)/librefuseprobe.so
 TESTS_ENVIRONMENT += SEEKFAIL_LA=$(abs_builddir)/libseekfail.la
 TESTS_ENVIRONMENT += SEEKFAIL_LIB=$(abs_builddir)/$(LT_CV_OBJDIR)/libseekfail.so
 TESTS_ENVIRONMENT += STRINGOOM_BIN=$(abs_builddir)/stringoom$(EXEEXT)
@@ -140,7 +142,8 @@ TESTS_ENVIRONMENT += HTTRACK_STDERR_WRAP_EXE=$(abs_builddir)/stderrwrap$(EXEEXT)
 check_LTLIBRARIES = librenamefail.la libunlinkfail.la libthreadattrfail.la \
 	libnobacktrace.la libaltstackprobe.la libclosetrack.la libftpcancel.la \
 	libstopresume.la \
-	libseekfail.la libsendheadrefuse.la libpreprocessnopage.la libgaistall.la
+	libseekfail.la libsendheadrefuse.la libpreprocessnopage.la libgaistall.la \
+	librefuseprobe.la
 librenamefail_la_SOURCES = renamefail.c
 librenamefail_la_LDFLAGS = -module -avoid-version -rpath $(abs_builddir)
 librenamefail_la_LIBADD = $(DL_LIBS)
@@ -204,6 +207,12 @@ libpreprocessnopage_la_SOURCES = preprocessnopage.c
 libpreprocessnopage_la_CPPFLAGS = $(libsendheadrefuse_la_CPPFLAGS)
 libpreprocessnopage_la_LDFLAGS = $(libsendheadrefuse_la_LDFLAGS)
 libpreprocessnopage_la_LIBADD = $(libsendheadrefuse_la_LIBADD)
+
+# loop callback aborting a post-stop type probe, for 2585.
+librefuseprobe_la_SOURCES = refuseprobe.c
+librefuseprobe_la_CPPFLAGS = $(libsendheadrefuse_la_CPPFLAGS)
+librefuseprobe_la_LDFLAGS = $(libsendheadrefuse_la_LDFLAGS)
+librefuseprobe_la_LIBADD = $(libsendheadrefuse_la_LIBADD)
 
 # realloc stub for 152_engine-string-oom.test; links nothing, so it stays a
 # plain binary rather than a libtool wrapper script.
