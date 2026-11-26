@@ -171,8 +171,8 @@ int hts_mirror_check_moved(htsmoduleStruct *str,
           // a case problem in the host means the server is buggy
           // ("RFC says.." : host name IS case insensitive)
           // identical up to case, so we are going in circles
-          if ((strfield2(moved->adr, urladr()) != 0) &&
-              (strfield2(moved->fil, urlfil()) != 0)) {
+          if (hts_streq_ci(moved->adr, urladr()) &&
+              hts_streq_ci(moved->fil, urlfil())) {
             if (strcmp(moved->fil, urlfil()) == 0) {
               error = 1;
               get_it = -1; // do nothing
@@ -1466,7 +1466,7 @@ int hts_wait_delayed(htsmoduleStruct *str, lien_adrfilsave *afs,
                   }
 
                   // ftp: stop!
-                  if (strfield(mov_url, "ftp://")) {
+                  if (hts_starts_with_ci(mov_url, "ftp://")) {
                     strcpybuff(afs->af.adr, moved.adr);
                     strcpybuff(afs->af.fil, moved.fil);
                     break;

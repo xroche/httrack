@@ -1120,7 +1120,8 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
     for (i = 0; i < argc; i++) {
       if (argv[i][0] == '-') {
         if (argv[i][1] == '-') {        // --xxx
-          if ((strfield2(argv[i] + 2, "clean")) || (strfield2(argv[i] + 2, "tide"))) {  // nettoyer
+          if (hts_streq_ci(argv[i] + 2, "clean") ||
+              hts_streq_ci(argv[i] + 2, "tide")) {
             argv[i][1] = '\0';
             {
               static const char *const log_names[] = {
@@ -1143,12 +1144,13 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
             purge_ref_dir(opt);
             RMDIR(hts_logpath(opt, "hts-cache"));
             //
-          } else if (strfield2(argv[i] + 2, "catchurl")) {      // capture d'URL via proxy temporaire!
+          } else if (hts_streq_ci(argv[i] + 2, "catchurl")) {
+            /* capture a URL through a temporary proxy */
             argv_url = 1;       // forcer a passer les parametres
             /* argv[i] is "--catchurl"; "#P" fits after its first char */
             strlcpybuff(argv[i] + 1, "#P", strlen(argv[i] + 1) + 1);
             //
-          } else if (strfield2(argv[i] + 2, "updatehttrack")) {
+          } else if (hts_streq_ci(argv[i] + 2, "updatehttrack")) {
             /* Never implemented anywhere, and refusing it stops the untouched
                string being re-walked as the cluster -u -p -d -a -t -e -h, whose
                h exits 0 with an empty mirror. */
@@ -1157,7 +1159,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
             slprintfbuff_clip(s, sizeof(s), "%s is not implemented", argv[i]);
             HTS_PANIC_PRINTF(s);
             return -1;
-          } else if (strfield2(argv[i] + 2, "bundle-dir")) {
+          } else if (hts_streq_ci(argv[i] + 2, "bundle-dir")) {
             i++; /* The option parser reads its value. */
           }
           //

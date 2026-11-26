@@ -115,9 +115,9 @@ static size_t reservedNameAt(const char *save, const char *c,
   int i;
 
   for (i = 0; names[i][0] != '\0'; i++) {
-    const size_t len = (size_t) strfield(c, names[i]);
+    const size_t len = strlen(names[i]);
 
-    if (len == 0)
+    if (!hts_starts_with_ci(c, names[i]))
       continue;
     if (c == save) {
       /* The first component usually holds the hostname (#842), so only a
@@ -245,10 +245,10 @@ static wire_verdict wire_ext_verdict(httrackp *opt, const char *wiremime,
   /* type implied by the URL extension, only when confidently known (flag 0) */
   if (!get_httptype_sized(opt, urlmime.p, urlmime.size, file, 0))
     return WIRE_WINS; /* URL ext implies no known type */
-  if (strfield2(wiremime, urlmime.p))
+  if (hts_streq_ci(wiremime, urlmime.p))
     return WIRE_KEEPS_EXT; /* agreement (no .htm->.html churn) */
   if (!is_hypertext_mime(opt, urlmime.p, file) &&
-      strfield2(wiremime, HTS_UNKNOWN_MIME))
+      hts_streq_ci(wiremime, HTS_UNKNOWN_MIME))
     return WIRE_KEEPS_EXT; /* no declared type */
   return WIRE_CONTESTED;
 }
@@ -365,7 +365,7 @@ static int wire_patches_ext(httrackp *opt, const sniff_src *src,
       prevmime[0] = '\0';
       if (get_httptype_sized(opt, prevmime, sizeof(prevmime), src->prev_save,
                              0) &&
-          strfield2(prevmime, urlmime))
+          hts_streq_ci(prevmime, urlmime))
         return 0;
     }
   }
@@ -736,7 +736,7 @@ static int savename_collision_next(hts_buf save, const httrackp *opt,
 static hts_boolean savename_same_link(const httrackp *opt, int i,
                                       const char *normadr,
                                       const char *normfil) {
-  return strfield2(heap(i)->adr, normadr) != 0 &&
+  return normadr[0] != '\0' && hts_streq_ci(heap(i)->adr, normadr) &&
          strcmp(heap(i)->fil, normfil) == 0;
 }
 
@@ -808,7 +808,7 @@ static void add_host_dir(lien_adrfilsave *const afs, const httrackp *opt,
   if (!opt->savename_83) {
     /* no crawled host is longer, and the type's directories still fit */
     strlncatbuff(afs->save, host, sizeof(afs->save), HTS_URLMAXSIZE);
-  } else if (strlen(host) > 4 && strfield(host, "www.")) {
+  } else if (strlen(host) > 4 && hts_starts_with_ci(host, "www.")) {
     hts_appendStringUTF8(HTS_BUF(afs->save), host + 4, max_char);
   } else {
     hts_appendStringUTF8(HTS_BUF(afs->save), host, max_char);
@@ -921,11 +921,11 @@ int url_savename(lien_adrfilsave *const afs,
   }
 
   // à afficher sans ftp://
-  if (strfield(adr_complete, "https:")) {
+  if (hts_starts_with_ci(adr_complete, "https:")) {
     protocol = PROTOCOL_HTTPS;
-  } else if (strfield(adr_complete, "ftp:")) {
+  } else if (hts_starts_with_ci(adr_complete, "ftp:")) {
     protocol = PROTOCOL_FTP;
-  } else if (strfield(adr_complete, "file:")) {
+  } else if (hts_starts_with_ci(adr_complete, "file:")) {
     protocol = PROTOCOL_FILE;
   } else {
     protocol = PROTOCOL_HTTP;
@@ -1235,8 +1235,7 @@ int url_savename(lien_adrfilsave *const afs,
                               }
 
                               // ftp: stop!
-                              if (strfield(mov_url, "ftp://")
-                                ) {     // ftp, ok on arrête
+                              if (hts_starts_with_ci(mov_url, "ftp://")) {
                                 has_been_moved = 1;
                                 back_maydelete(opt, cache, sback, b);   // ok
                                 strcpybuff(current.adr, moved.adr);
@@ -1368,8 +1367,7 @@ int url_savename(lien_adrfilsave *const afs,
 
   // Donner nom par défaut?
   if (hts_lastchar(fil) == '/') {
-    if (!strfield(adr_complete, "ftp://")
-      ) {
+    if (!hts_starts_with_ci(adr_complete, "ftp://")) {
       save_append_tail(HTS_BUF(fil), DEFAULT_HTML);
     } else {
       if (!opt->proxy.active)
