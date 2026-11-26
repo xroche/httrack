@@ -146,8 +146,9 @@ void back_slot_fail_nonfatal(httrackp *opt, struct_back *sback, const int p,
 void back_set_locked(struct_back * sback, const int p);
 void back_set_pinned(struct_back *sback, const int p);
 void back_set_unlocked(struct_back * sback, const int p);
-int back_delete(httrackp * opt, cache_back * cache, struct_back * sback,
-                const int p);
+/* Finalize slot p if it still needs it, then clear it. */
+void back_delete(httrackp *opt, cache_back *cache, struct_back *sback,
+                 const int p);
 /* Discard back's on-disk .delayed placeholder and its refname. */
 void back_delayed_discard(httrackp *opt, lien_back *back);
 /* Did back_add() settle this slot without a reply or a body, as a cache hit

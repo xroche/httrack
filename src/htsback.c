@@ -2641,8 +2641,8 @@ void back_delayed_discard(httrackp *opt, lien_back *back) {
   (void) UNLINK(back->url_sav);
 }
 
-int back_delete(httrackp * opt, cache_back * cache, struct_back * sback,
-                const int p) {
+void back_delete(httrackp *opt, cache_back *cache, struct_back *sback,
+                 const int p) {
   lien_back *const back = sback->lnk;
   const int back_max = sback->count;
 
@@ -2676,9 +2676,7 @@ int back_delete(httrackp * opt, cache_back * cache, struct_back * sback,
 
     back_dns_drop(sback, p);
     back_clear_entry(&back[p]);
-    return 1;
   }
-  return 0;
 }
 
 /* the entry is available again */
