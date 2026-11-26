@@ -34,13 +34,14 @@ Please visit our Website: http://www.httrack.com
 #include "htscore.h"
 #include "htsbase.h"
 
-/* ne pas renommer les types renvoyés (souvent types inconnus) */
-static const char *hts_mime_keep[] = {"application/octet-stream", "text/plain",
-                                      "application/xml", "text/xml", ""};
+/* Mime types kept as sent, since they often mean "unknown". */
+static const char *const hts_mime_keep[] = {"application/octet-stream",
+                                            "text/plain", "application/xml",
+                                            "text/xml", ""};
 
 /* bogus servers returns these mime types when the extension is seen within the
  * filename */
-static const char *hts_mime_bogus_multiple[] = {
+static const char *const hts_mime_bogus_multiple[] = {
     "application/x-wais-source", /* src (src.rpm) */
     ""};
 

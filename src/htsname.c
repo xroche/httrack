@@ -837,10 +837,16 @@ int url_savename(lien_adrfilsave *const afs,
 
   /*char BIGSTK normadr_[HTS_URLMAXSIZE*2]; */
   char BIGSTK normadr_[HTS_URLMAXSIZE * 2], normfil_[HTS_URLMAXSIZE * 2];
-  enum { PROTOCOL_HTTP, PROTOCOL_HTTPS, PROTOCOL_FTP, PROTOCOL_FILE,
-      PROTOCOL_UNKNOWN };
-  static const char *protocol_str[] =
-    { "http", "https", "ftp", "file", "unknown" };
+  enum {
+    PROTOCOL_HTTP,
+    PROTOCOL_HTTPS,
+    PROTOCOL_FTP,
+    PROTOCOL_FILE,
+    PROTOCOL_UNKNOWN
+  };
+
+  static const char *const protocol_str[] = {"http", "https", "ftp", "file",
+                                             "unknown"};
   int protocol = PROTOCOL_HTTP;
   const char *const adr = jump_identification_const(adr_complete);
   // copy of fil, used for lookups (see urlhack)
