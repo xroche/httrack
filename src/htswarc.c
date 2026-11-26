@@ -59,6 +59,13 @@ Please visit our Website: http://www.httrack.com
 /* opt->state.warc value meaning "no writer, and do not open one": the open
    failed, or the session is done with the archive. */
 #define WARC_DISABLED ((void *) ~(uintptr_t) 0)
+/* Same, after closing an archive that lost a record. */
+#define WARC_LOST ((void *) (~(uintptr_t) 0 - 1))
+
+/* Does opt->state.warc hold a writer? */
+static hts_boolean warc_live(const void *state) {
+  return state != NULL && state != WARC_DISABLED && state != WARC_LOST;
+}
 
 /* Suffix of the in-progress archive when a previous one must survive it. */
 #define WARC_TMP_SUFFIX ".tmp"
@@ -1579,11 +1586,8 @@ static hts_boolean warc_commit(warc_writer *w) {
   return HTS_FALSE;
 }
 
-void warc_close(warc_writer *w) {
-  size_t i;
-  if (w == NULL)
-    return;
-  /* the last buffered records only reach the disk here */
+/* Close the open segment, where its last buffered records reach the disk. */
+static void warc_close_file(warc_writer *w) {
   if (w->f != NULL && fclose(w->f) != 0 && !w->failed) {
     char buf[HTS_URLMAXSIZE * 2];
     hts_log_print(w->opt, LOG_ERROR | LOG_ERRNO,
@@ -1593,6 +1597,13 @@ void warc_close(warc_writer *w) {
     w->reported = HTS_TRUE;
   }
   w->f = NULL;
+}
+
+void warc_close(warc_writer *w) {
+  size_t i;
+  if (w == NULL)
+    return;
+  warc_close_file(w);
   if (warc_commit(w)) {
     warc_cdx_flush(w); /* sort + write <base>.cdx beside the archive */
 #if HTS_USEOPENSSL
@@ -1633,16 +1644,26 @@ hts_boolean warc_surt(const char *url, hts_buf out) {
 }
 
 void warc_close_opt(httrackp *opt) {
-  if (opt->state.warc != NULL && opt->state.warc != WARC_DISABLED) {
-    warc_close((warc_writer *) opt->state.warc);
+  hts_boolean lost = opt->state.warc == WARC_LOST;
+
+  if (warc_live(opt->state.warc)) {
+    warc_writer *const w = (warc_writer *) opt->state.warc;
+
+    warc_close_file(w); /* a loss there must count before w is freed */
+    lost = w->reported;
+    warc_close(w);
   }
   /* final: teardown still finalizes slots, and a reopen there would orphan a
      .tmp nobody closes (#1060) */
-  opt->state.warc = WARC_DISABLED;
+  opt->state.warc = lost ? WARC_LOST : WARC_DISABLED;
+}
+
+hts_boolean warc_lost_opt(const httrackp *opt) {
+  return opt->state.warc == WARC_LOST;
 }
 
 void warc_abort_opt(httrackp *opt) {
-  if (opt->state.warc != NULL && opt->state.warc != WARC_DISABLED) {
+  if (warc_live(opt->state.warc)) {
     warc_writer *const w = (warc_writer *) opt->state.warc;
     /* the session is rolling back, so this run must replace nothing */
     w->failed = HTS_TRUE;
@@ -1829,7 +1850,7 @@ void warc_write_backtransaction(httrackp *opt, lien_back *back) {
   int unchanged_kind;
   int is_ftp;
 
-  if (opt->state.warc == WARC_DISABLED)
+  if (opt->state.warc == WARC_DISABLED || opt->state.warc == WARC_LOST)
     return;
   if (opt->state.warc == NULL) {
     w = warc_open(opt, StringBuff(opt->warc_file));

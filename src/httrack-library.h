@@ -172,6 +172,10 @@ HTSEXT_API void htsthread_wait(void);
     clear of the 2 hts_is_exiting() reports for a run that saw no connection. */
 #define HTS_EXIT_MIRROR_ABORTED 3
 
+/** hts_main()/hts_main2() exit code for a mirror that ran to the end but whose
+    WARC archive lost a record. An abort or a refused command line wins. */
+#define HTS_EXIT_WARC_INCOMPLETE 4
+
 /** Run a full mirror from a command-line argv (argv[0] is ignored, as in
    main()). Creates a fresh option set, runs the engine, and frees it. Returns
    the engine exit code. Call hts_init() first. */
@@ -183,7 +187,8 @@ HTSEXT_API int hts_main(int argc, char **argv);
     hts_free_opt().
 
     Returns 0 when the mirror ran to the end, HTS_EXIT_MIRROR_ABORTED when the
-    engine aborted it, and -1 or 1 for a command line it refused before any
+    engine aborted it, HTS_EXIT_WARC_INCOMPLETE when it ran to the end but
+    lost WARC records, and -1 or 1 for a command line it refused before any
     mirror started; hts_errmsg() describes any non-zero return. A mirror the
     caller stopped itself (hts_request_stop(), a callback returning 0, SIGINT
     on the command line) still returns 0: it ended as asked. */

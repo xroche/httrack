@@ -106,8 +106,12 @@ void warc_write_backtransaction(httrackp *opt, lien_back *back);
    warc_abort_opt() are final: a later transaction reopens nothing. */
 void warc_close_opt(httrackp *opt);
 
-/* Same, but discards this run's archive: keeps the previous one and drops
-   the temporaries. For a rolled-back session that transferred nothing. */
+/* Did the archive warc_close_opt() closed lose a record? */
+hts_boolean warc_lost_opt(const httrackp *opt);
+
+/* Same as warc_close_opt(), but discards this run's archive: keeps the previous
+   one and drops the temporaries. For a rolled-back session that transferred
+   nothing. */
 void warc_abort_opt(httrackp *opt);
 
 /* --- Direct writer API (used by the hooks above and the self-test). --- */
