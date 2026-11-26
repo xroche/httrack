@@ -112,6 +112,15 @@ void lint_probe_pair(hts_span a, struct { hts_span s; } *w, char *d) {
   lint_skip(a.p+1, a.len-1);
   lint_skip(a.p + 1, a.len - 2);
 }
+void lint_probe_libc(char *d, const char *s, struct { char b[8]; } *w) {
+  strcpy(d, s);
+  sprintf(w->b, "%d", 1);
+  strcpybuff(d, s);
+  snprintf(d, 4, "strcpy(d, s)");
+  hts_strcat(d, s);
+  w->strncat(d, s);
+  /* vsprintf(d, s) */
+}
 C
 cat >>"${h}" <<'H'
 #define lint_twice(x) ((x) + (x))
@@ -153,6 +162,8 @@ char *lint_probe_extern(int x);
 #endif
 #warning don't use this
 #define lint_after(x) ((x) + (x))
+#define LINT_CAT(d, s) \
+  strcat(d, s)
 H
 echo 'src/htslib.h: lint_dup: evaluates x twice' >>"${work}/baseline/macro.txt"
 mkdir "${work}/src/lintprobe"
@@ -211,18 +222,26 @@ for want in "src/htslib.c:$(at "${c}" "lint_probe_ctype("): ctype: new violation
     "src/htslib.c:$(at "${c}" "lint_take(w->s.p,"): pair: new violation: lint_take(w->s.p, w->s.len) splits a span" \
     "src/htslib.c:$(at "${c}" "lint_take(d, a.p"): pair: new violation: lint_take(a.p, a.len) splits a span" \
     "src/htslib.c:$(at "${c}" "lint_skip(a.p + 2"): pair: new violation: lint_skip(a.p+2, a.len-2) splits a span" \
-    "src/htslib.c:$(at "${c}" "lint_skip(a.p+1"): pair: new violation: lint_skip(a.p+1, a.len-1) splits a span"; do
+    "src/htslib.c:$(at "${c}" "lint_skip(a.p+1"): pair: new violation: lint_skip(a.p+1, a.len-1) splits a span" \
+    "src/htslib.c:$(at "${c}" "strcpy(d, s);"): libc: new violation: strcpy(d) in lint_probe_libc is unbounded" \
+    "src/htslib.c:$(at "${c}" "sprintf(w->b"): libc: new violation: sprintf(w->b) in lint_probe_libc is unbounded" \
+    "src/htslib.h:$(at "${h}" "strcat(d, s)"): libc: new violation: strcat(d) in LINT_CAT is unbounded"; do
     grep -qF "${want}" <<<"${out}" || fail "missed ${want}: ${out}"
 done
-test "$(wc -l <<<"${out}")" -eq 50 || fail "flagged a clean probe: ${out}"
+test "$(wc -l <<<"${out}")" -eq 53 || fail "flagged a clean probe: ${out}"
 
-# Removing a known violation, or listing one that never was, leaves a stale entry.
+# Removing a known violation, or listing one that never was, leaves a stale entry; dropping a live entry flags it.
 rm -r "${work}/src/lintprobe"
 cp "${srcdir}/src/htslib.c" "${srcdir}/src/htslib.h" "${work}/src/"
 cp "${srcdir}/tools/api-lint/macro.txt" "${work}/baseline/"
 sed 's/^#define heap(N).*/#define heap(N) (N)/' "${srcdir}/src/htscore.h" >"${work}/src/htscore.h"
 sed 's/^int url_savename(/HTS_CHECK_RESULT int url_savename(/' "${srcdir}/src/htsname.h" >"${work}/src/htsname.h"
 echo 'src/htslib.c: isdigit(gone)' >>"${work}/baseline/ctype.txt"
+echo 'src/htslib.c: gone: strcpy(x)' >>"${work}/baseline/libc.txt"
+known='src/htscore.c: httpmirror: strcpy(page_charset)'
+test "$(grep -cxF "${known}" "${work}/baseline/libc.txt")" -eq 2 || fail "no known entry to drop: ${known}"
+awk -v k="${known}" '$0 == k && !d { d = 1; next } 1' "${work}/baseline/libc.txt" >"${work}/libc.txt"
+mv "${work}/libc.txt" "${work}/baseline/libc.txt"
 dup='src/htssafe.h: strcatbuff: evaluates A twice'
 test "$(grep -cxF "${dup}" "${work}/baseline/macro.txt")" -eq 2 || fail "no duplicate entry to test: ${dup}"
 echo "${dup}" >>"${work}/baseline/macro.txt"
@@ -230,7 +249,9 @@ out=$(run) && fail "stale entries passed"
 for want in "ctype.txt: ctype: stale baseline entry, delete it: src/htslib.c: isdigit(gone)" \
     "macro.txt: macro: stale baseline entry, delete it: src/htscore.h: heap: uses free name opt" \
     "macro.txt: macro: stale baseline entry, delete it: ${dup}" \
-    "check-result.txt: check-result: stale baseline entry, delete it: src/htsname.h: url_savename"; do
+    "check-result.txt: check-result: stale baseline entry, delete it: src/htsname.h: url_savename" \
+    "libc.txt: libc: stale baseline entry, delete it: src/htslib.c: gone: strcpy(x)" \
+    "libc: new violation: strcpy(page_charset) in httpmirror is unbounded"; do
     grep -qF "${want}" <<<"${out}" || fail "missed ${want}: ${out}"
 done
-test "$(wc -l <<<"${out}")" -eq 4 || fail "unexpected output: ${out}"
+test "$(wc -l <<<"${out}")" -eq 6 || fail "unexpected output: ${out}"

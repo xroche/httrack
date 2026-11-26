@@ -3,7 +3,8 @@
 macros, header functions that can fail without HTS_CHECK_RESULT, a span's
 .p handed to a function that reads up to a NUL or printed with %s, and a call
 passing x.p, x.len (or x.p + n, x.len - n) as two arguments where the callee
-could take the span.
+could take the span, and raw strcpy, strcat, strncpy, strncat, sprintf or
+vsprintf calls outside the htssafe.h wrappers.
 Known cases live in tools/api-lint/, and --update rewrites those baselines.
 Known limits: a failure delegated through two calls, free names inside _Generic,
 and a function defined only in a later branch of an unbalanced #if group go
@@ -19,7 +20,7 @@ import os
 import re
 import sys
 
-RULES = ("ctype", "macro", "check-result", "span", "pair")
+RULES = ("ctype", "macro", "check-result", "span", "pair", "libc")
 HEADER = "# Known %s violations. Regenerate: tools/check-api-lint.py --update\n"
 
 # Vendored trees follow their upstream's conventions.
@@ -709,6 +710,44 @@ def check_pair(code, sinks):
                     yield line_of(code, start + m.start()), call, msg
 
 
+LIBC_CALL = re.compile(
+    r"(?<![\w.>])(strcpy|strcat|strncpy|strncat|sprintf|vsprintf)\s*\("
+)
+# The wrappers that make these calls safe live here.
+LIBC_WRAPPERS = ("src/htssafe.h",)
+
+
+def enclosing_name(code, functions, at):
+    """The function, or the #define, holding position at."""
+    for start, end, name in functions:
+        if start <= at < end:
+            return name
+    first = code.rfind("\n", 0, at) + 1
+    while first > 1 and code[first - 2] == "\\":
+        first = code.rfind("\n", 0, first - 1) + 1
+    m = DEFINE.match(code[first : code.find("\n", first)])
+    return m.group(1) if m else "(file scope)"
+
+
+def check_libc(path, code):
+    """Yield (line, key, message) for each raw unbounded copy or format call."""
+    if path in LIBC_WRAPPERS:
+        return
+    functions = []
+    for start, head, body in top_level(code):
+        fh = function_head(head) if body is not None else None
+        if fh:
+            functions.append((start, start + len(head) + len(body), fh[0]))
+    for m in LIBC_CALL.finditer(code):
+        open_at = m.end() - 1
+        dest = split_top(code[open_at + 1 : matching(code, open_at) - 1], ",")[0]
+        call = squash("%s(%s)" % (m.group(1), dest.strip()))
+        where = enclosing_name(code, functions, m.start())
+        key = "%s: %s" % (where, call)
+        msg = "%s in %s is unbounded, use a htssafe.h helper" % (call, where)
+        yield line_of(code, m.start()), key, msg
+
+
 def scan(root):
     """Map each rule to a list of (path, line, key, message)."""
     paths = []
@@ -743,6 +782,9 @@ def scan(root):
     for path, code in files.items():
         for line, key, msg in check_pair(code, sinks):
             found["pair"].append((path, line, key, msg))
+    for path, code in files.items():
+        for line, key, msg in check_libc(path, code):
+            found["libc"].append((path, line, key, msg))
     return found
 
 
