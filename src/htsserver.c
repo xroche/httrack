@@ -1923,8 +1923,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
             if (global_opt != NULL) {
               char *ptraddr[2];
 
-              /* hts_addurl only reads, but takes char ** */
-              ptraddr[0] = (char *) adr + (arg - (const char *) adr);
+              /* the exported hts_addurl takes char **, but only reads */
+              ptraddr[0] = (char *) (uintptr_t) arg;
               ptraddr[1] = NULL;
               if (!hts_addurl(global_opt, ptraddr))
                 hts_log_print(global_opt, LOG_WARNING,
@@ -2231,12 +2231,13 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                     } else if (hts_skip_prefix_ci(&name, "list:")) {
                       format = 2;
                     } else if (hts_skip_prefix_ci(&name, "liststr:") ||
-                               (pairs =
-                                    hts_skip_prefix_ci(&name, "listlabel:"))) {
+                               hts_starts_with_ci(name, "listlabel:")) {
                       /* ${liststr:<var>:<key>} and ${listlabel:<var>:<key>}
                          select the entry equal to <var>, as ${listid:} does */
-                      char *const colon = strchr(name, ':');
+                      char *colon;
 
+                      pairs = hts_skip_prefix_ci(&name, "listlabel:");
+                      colon = strchr(name, ':');
                       format = -2;
                       if (colon != NULL) {
                         intptr_t adr = 0;
@@ -2463,9 +2464,10 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                           if (*newadr || ztest) {
                             int npos = 0;
 
-                            name = pos2 + 1;
+                            char *opt = pos2 + 1;
+
                             format = 4;
-                            if (strchr(name, ':') == NULL) {
+                            if (strchr(opt, ':') == NULL) {
                               npos = 0; /* first is good if only one : */
                               format = 0;
                             } else {
@@ -2478,25 +2480,26 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                                 }
                               }
                             }
-                            while(*name && *name != '}' && npos >= 0) {
+                            while (*opt && *opt != '}' && npos >= 0) {
                               int end = 0;
-                              char *fpos = strchr(name, ':');
+                              char *fpos = strchr(opt, ':');
                               int n2;
 
                               if (fpos == NULL) {
-                                fpos = strchr(name, '\0');
+                                fpos = opt + strlen(opt);
                                 end = 1;
                               }
-                              n2 = (int) (fpos - name);
+                              n2 = (int) (fpos - opt);
                               if (npos == 0) {
-                                langstr = name;
+                                langstr = opt;
                                 *fpos = '\0';
                               } else if (end) {
                                 npos = 0;
                               }
-                              name += n2 + 1;
+                              opt += n2 + 1;
                               npos--;
                             }
+                            name = opt;
                           }
                         }
                       }
