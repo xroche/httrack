@@ -434,6 +434,119 @@ static int st_warc_ftp(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* Does every needle appear in the record header head? */
+static hts_boolean st_warc_has_all(hts_span head, const char *const *needles) {
+  for (; *needles != NULL; needles++) {
+    if (warc_after(head, *needles) == NULL) {
+      fprintf(stderr, "warc-fields: missing %s\n", *needles);
+      return HTS_FALSE;
+    }
+  }
+  return HTS_TRUE;
+}
+
+/* Each optional header lands on the record that carries it. */
+static int st_warc_fields(httrackp *opt, int argc, char **argv) {
+  static const char *const resource[] = {
+      "WARC-Target-URI: ftp://ftp.local/cut.bin", "WARC-IP-Address: 192.0.2.7",
+      "WARC-Truncated: length",
+#if HTS_USEOPENSSL
+      "WARC-Payload-Digest: sha1:",
+#endif
+      NULL};
+#if HTS_USEOPENSSL
+  static const char *const revisit[] = {
+      "WARC-Target-URI: http://www.example.com/dup",
+      "WARC-Refers-To-Target-URI: http://www.example.com/one",
+      "WARC-Refers-To-Date: ",
+      "WARC-Profile: http://netpreserve.org/warc/1.1/"
+      "revisit/identical-payload-digest",
+      NULL};
+#endif
+  char path[HTS_URLMAXSIZE], cpath[HTS_URLMAXSIZE];
+  warc_writer *w;
+  unsigned char *data;
+  char *cdx;
+  size_t data_len = 0, cdx_len = 0;
+  const unsigned char *p, *end;
+  const hts_boolean saved_cdx = opt->warc_cdx;
+  int err = 0, nresource = 0, nrevisit = 0;
+
+  fconcat(path, sizeof(path), argv[0], "warc-fields.warc.gz");
+  fconcat(cpath, sizeof(cpath), argv[0], "warc-fields.cdx");
+  opt->warc_cdx = 1;
+  w = warc_open(opt, path);
+  assertf(w != NULL);
+  assertf(warc_write_transaction(
+              w, "http://www.example.com/one", "127.0.0.1",
+              "GET /one HTTP/1.1\r\nHost: www.example.com\r\n\r\n",
+              "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n",
+              warc_body_mem(hts_span_at("same body\n", 10)), NULL, 200, 0,
+              0) == 0);
+  assertf(warc_write_transaction(
+              w, "http://www.example.com/dup", "127.0.0.1",
+              "GET /dup HTTP/1.1\r\nHost: www.example.com\r\n\r\n",
+              "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n",
+              warc_body_mem(hts_span_at("same body\n", 10)), NULL, 200, 0,
+              0) == 0);
+  assertf(warc_write_resource(w, "ftp://ftp.local/cut.bin", "192.0.2.7",
+                              "application/octet-stream",
+                              warc_body_mem(hts_span_at("cut", 3)),
+                              WARC_TRUNC_LENGTH) == 0);
+  warc_close(w);
+  opt->warc_cdx = saved_cdx;
+
+  /* the resource's index line takes its mime from the caller */
+  cdx = st_slurp(cpath, &cdx_len);
+  assertf(cdx != NULL);
+  ST_FAIL_IF(err, strstr(cdx, "\"url\": \"ftp://ftp.local/cut.bin\", \"mime\": "
+                              "\"application/octet-stream\"") == NULL);
+  freet(cdx);
+
+  data = (unsigned char *) st_slurp(path, &data_len);
+  assertf(data != NULL);
+  p = data;
+  end = data + data_len;
+  while (p < end) {
+    size_t rlen = 0, hdr_len = 0;
+    long long block_len = 0;
+    unsigned char *rec = warc_next_member(&p, end, &rlen);
+    if (rec == NULL) {
+      ST_FAIL_IF(err, rlen != 0);
+      break;
+    }
+    ST_FAIL_IF(err, warc_rec_split(hts_span_at((const char *) rec, rlen),
+                                   &hdr_len, &block_len) != 0);
+    const hts_span head = hts_span_at((const char *) rec, hdr_len);
+    if (warc_after(head, "WARC-Type: resource\r\n") != NULL) {
+      nresource++;
+      ST_FAIL_IF(err, !st_warc_has_all(head, resource));
+    }
+#if HTS_USEOPENSSL
+    if (warc_after(head, "WARC-Type: revisit\r\n") != NULL) {
+      nrevisit++;
+      const char *const date = warc_after(head, "WARC-Refers-To-Date: ");
+      ST_FAIL_IF(err, !st_warc_has_all(head, revisit));
+      /* a full YYYY-MM-DDTHH:MM:SSZ value, then the line end */
+      ST_FAIL_IF(err, date == NULL || date + 22 > head.p + head.len ||
+                          date[4] != '-' || date[10] != 'T' ||
+                          date[19] != 'Z' ||
+                          memcmp(date + 20, "\r\n", 2) != 0 ||
+                          strspn(date, "0123456789") != 4);
+    }
+#endif
+    freet(rec);
+  }
+  freet(data);
+#if HTS_USEOPENSSL
+  ST_FAIL_IF(err, nrevisit != 1);
+#endif
+  ST_FAIL_IF(err, nresource != 1);
+  printf("warc-fields: resource=%d revisit=%d: %s\n", nresource, nrevisit,
+         err ? "FAIL" : "OK");
+  return err;
+}
+
 /* --warc-max-size rotates into <base>-00000.warc.gz, -00001, ...; each segment
    is independently valid and begins with its own warcinfo. */
 static int st_warc_rotate(httrackp *opt, int argc, char **argv) {
@@ -2625,6 +2738,8 @@ const struct selftest_entry selftests_warc[] = {
      st_warc_trunc},
     {"warc-ftp", "<dir>", "ftp resource record (no HTTP envelope)",
      st_warc_ftp},
+    {"warc-fields", "<dir>", "optional headers land on revisit and resource",
+     st_warc_fields},
     {"warc-rotate", "<dir>", "--warc-max-size segment rotation",
      st_warc_rotate},
     {"warc-verbatim", "<dir>", "verbatim compressed response body (default)",
