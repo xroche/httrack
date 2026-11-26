@@ -114,7 +114,8 @@ static HTS_INLINE HTS_UNUSED int hts_span_last(hts_span s) {
 
 /* Return the index of the first C in S, or S.len when S holds none. */
 static HTS_INLINE HTS_UNUSED size_t hts_span_find(hts_span s, char c) {
-  const char *const at = s.len != 0 ? memchr(s.p, c, s.len) : NULL;
+  const char *const at =
+      s.len != 0 ? (const char *) memchr(s.p, c, s.len) : NULL;
 
   return at != NULL ? (size_t) (at - s.p) : s.len;
 }

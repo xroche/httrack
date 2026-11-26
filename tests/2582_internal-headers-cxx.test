@@ -1,0 +1,49 @@
+#!/bin/bash
+#
+# WinHTTrack compiles the engine's internal headers as C++, so their inline
+# bodies must too: C++ has no implicit void * conversion.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+if [ -z "${abs_top_builddir:-}" ] || [ -z "${abs_top_srcdir:-}" ]; then
+    echo "no automake environment, skipping" >&2
+    exit 77
+fi
+cxx=""
+for cand in "${CXX:-}" g++ clang++ c++; do
+    if [ -n "$cand" ] && command -v "$cand" >/dev/null 2>&1; then
+        cxx=$cand
+        break
+    fi
+done
+[ -n "$cxx" ] || skip "no C++ compiler found"
+
+tmp=$(mktemp -d) || exit 1
+cleanup_push rm -rf "$tmp"
+
+src=$abs_top_srcdir/src
+inc=(-I"$src" -I"$src/coucal" -I"$abs_top_builddir/src" -I"$abs_top_builddir")
+printf 'int main() { return 0; }\n' >"$tmp/tu.cpp"
+"$cxx" "${inc[@]}" -c "$tmp/tu.cpp" -o "$tmp/tu.o" || skip "$cxx cannot build a trivial unit"
+
+bad=0
+count=0
+for h in "$src"/*.h; do
+    grep -q 'static HTS_INLINE' "$h" || continue
+    b=$(basename "$h")
+    printf '#include "htsglobal.h"\n#include "htscore.h"\n#include "htscache.h"\n#include "%s"\nint main() { return 0; }\n' \
+        "$b" >"$tmp/tu.cpp"
+    count=$((count + 1))
+    if ! "$cxx" "${inc[@]}" -c "$tmp/tu.cpp" -o "$tmp/tu.o" 2>"$tmp/cc.log"; then
+        echo "$b does not compile as C++:" >&2
+        grep -m5 'error' "$tmp/cc.log" >&2 || true
+        bad=1
+    fi
+done
+[ "$count" -ge 13 ] || fail "only $count headers carry inline bodies, the sweep is too small"
+[ "$bad" -eq 0 ] || fail "internal headers do not compile as C++"
+echo "compiled $count internal headers as C++ with $cxx" >&2
+exit 0
