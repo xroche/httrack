@@ -420,7 +420,9 @@ static hts_boolean custom_line_next(hts_span *rest, hts_span *line) {
 
 /* Does LINE continue the line before it? */
 static hts_boolean header_folded(hts_span line) {
-  return !hts_span_empty(line) && (line.p[0] == ' ' || line.p[0] == '\t');
+  const int c = hts_span_first(line);
+
+  return c == ' ' || c == '\t';
 }
 
 /* Servers differ on "Host : x", so the engine sends it as Host without the
@@ -601,7 +603,7 @@ static void append_custom_headers(buff_struct *bstr, const char *headers) {
     if (keep) {
       /* a folded line has no name, and a kept named line has a colon */
       const char *const from =
-          header_folded(line) ? line.p : memchr(line.p, ':', line.len);
+          line.p + (header_folded(line) ? 0 : hts_span_find(line, ':'));
 
       /* One write, so a line that does not fit leaves nothing behind. */
       print_buffer(bstr, "%.*s%.*s", (int) name.len, name.p,
@@ -4497,7 +4499,7 @@ hts_boolean hts_host_is_ipv4(hts_span host) {
 }
 
 hts_boolean hts_host_is_address(hts_span host) {
-  return memchr(host.p, ':', host.len) != NULL || hts_host_is_ipv4(host);
+  return hts_span_find(host, ':') < host.len || hts_host_is_ipv4(host);
 }
 
 hts_boolean hts_proxy_is_socks(const char *name) {

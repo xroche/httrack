@@ -509,16 +509,14 @@ static hts_boolean ftp_decode_userinfo(hts_span src, hts_buf dst) {
 /* Split a hostile-URL "user[:pass]" userinfo (see htsftp.h). */
 hts_boolean ftp_split_userpass(hts_span info, hts_buf user, hts_buf pass) {
   /* the raw colon, so %3A stays in the name */
-  const char *const colon = memchr(info.p, ':', info.len);
-  const size_t user_len = colon != NULL ? (size_t) (colon - info.p) : info.len;
+  hts_span name = info, word;
+  const hts_boolean has_pass = hts_span_split(info, ':', &name, &word);
 
   assertf(user.size > 0 && pass.size > 0); /* the size-1 math underflows on 0 */
   // fail safe for a caller that ignores the result
   user.p[0] = pass.p[0] = '\0';
-  if (!ftp_decode_userinfo(hts_span_at(info.p, user_len), user) ||
-      (colon != NULL &&
-       !ftp_decode_userinfo(hts_span_at(colon + 1, info.len - user_len - 1),
-                            pass))) {
+  if (!ftp_decode_userinfo(name, user) ||
+      (has_pass && !ftp_decode_userinfo(word, pass))) {
     user.p[0] = pass.p[0] = '\0';
     return HTS_FALSE;
   }

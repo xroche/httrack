@@ -4566,6 +4566,73 @@ static int st_spanlist(httrackp *opt, int argc, char **argv) {
   return failures != 0;
 }
 
+/* Check the span byte finders on an empty span, a match at either end and none.
+ */
+static int st_spanfind(httrackp *opt, int argc, char **argv) {
+  static const struct {
+    char fn; /* f find, a find_any, t take_until, < first, > last */
+    const char *s;
+    size_t len;
+    const char *arg; /* the byte to find is arg[0] */
+    long want;       /* an index, a byte, or -1 */
+  } cases[] = {
+      {'f', NULL, 0, "a", 0},       {'f', "abc", 3, "a", 0},
+      {'f', "abc", 3, "c", 2},      {'f', "abc", 3, "x", 3},
+      {'f', "abc", 2, "c", 2},      {'f', "a\0b", 3, "", 1},
+      {'f', "aba", 3, "a", 0},      {'a', NULL, 0, "a", 0},
+      {'a', "abc", 3, "xa", 0},     {'a', "abc", 3, "c", 2},
+      {'a', "abc", 3, "xy", 3},     {'a', "a\0b", 3, "b", 2},
+      {'a', "a\0b", 3, "", 3},      {'a', "abc", 2, "c", 2},
+      {'t', NULL, 0, ";", 0},       {'t', "ab;c", 4, ";", 2},
+      {'t', ";a", 2, ";", 0},       {'t', "ab", 2, ";", 2},
+      {'<', NULL, 0, "", -1},       {'<', "ab", 2, "", 'a'},
+      {'<', "\xff", 1, "", 0xff},   {'<', "\0", 1, "", 0},
+      {'>', NULL, 0, "", -1},       {'>', "ab", 2, "", 'b'},
+      {'>', "ab\xe9", 3, "", 0xe9}, {'>', "ab", 1, "", 'a'},
+  };
+
+  size_t i, failures = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+    const hts_span s = hts_span_at(cases[i].s, cases[i].len);
+    hts_span rest = s;
+    long got;
+
+    switch (cases[i].fn) {
+    case 'f':
+      got = (long) hts_span_find(s, cases[i].arg[0]);
+      break;
+    case 'a':
+      got = (long) hts_span_find_any(s, cases[i].arg);
+      break;
+    case 't':
+      got = (long) hts_span_take_until(&rest, cases[i].arg).len;
+      /* the rest starts at the byte that stopped the take */
+      if (rest.p != s.p + got || rest.len != s.len - (size_t) got)
+        got = -2;
+      break;
+    case '<':
+      got = hts_span_first(s);
+      break;
+    default:
+      got = hts_span_last(s);
+      break;
+    }
+    if (got != cases[i].want) {
+      printf("spanfind: case %d gave %ld\n", (int) i, got);
+      failures++;
+    }
+  }
+  printf("spanfind: %d cases, %d failures\n",
+         (int) (sizeof(cases) / sizeof(cases[0])), (int) failures);
+  if (failures == 0)
+    printf("spanfind: OK\n");
+  return failures != 0;
+}
+
 /* Feed each line of a file to treathead_opt() the way the response loop does,
    and print what it read. A "%%" line starts a new response. */
 static int st_headerparse(httrackp *opt, int argc, char **argv) {
@@ -5890,6 +5957,8 @@ const struct selftest_entry selftests_lib[] = {
     {"spanindex", "", "the word a span matches in a NULL-terminated list",
      st_spanindex},
     {"spanlist", "", "the token a span list holds", st_spanlist},
+    {"spanfind", "", "the byte a span finder stops at, from either end",
+     st_spanfind},
     {"headerparse", "<file>",
      "the fields treathead_opt() reads from each response in a file",
      st_headerparse},

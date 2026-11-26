@@ -53,7 +53,7 @@ static void psl_add(coucal rules, hts_span rule) {
   if (rule.len > 2 && hts_span_starts_with(rule, hts_span_of("*."))) {
     kind = PSL_WILDCARD;
     rule = hts_span_skip(rule, 2);
-  } else if (rule.len > 1 && rule.p[0] == '!') {
+  } else if (rule.len > 1 && hts_span_first(rule) == '!') {
     kind = PSL_EXCEPTION;
     rule = hts_span_skip(rule, 1);
   }
@@ -73,11 +73,7 @@ static void psl_install(coucal rules, hts_span version) {
 
 /* Return the leading bytes of S up to its first blank or CR. */
 static hts_span psl_word(hts_span s) {
-  size_t n = 0;
-
-  while (n < s.len && s.p[n] != ' ' && s.p[n] != '\t' && s.p[n] != '\r')
-    n++;
-  return hts_span_at(s.p, n);
+  return hts_span_take_until(&s, " \t\r");
 }
 
 /* Add the rule on one line of a list file, or note its VERSION stamp. */

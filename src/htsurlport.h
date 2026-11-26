@@ -102,6 +102,45 @@ static HTS_INLINE HTS_UNUSED hts_span hts_span_skip(hts_span s, size_t n) {
   return s;
 }
 
+/* Return the first byte of S as an unsigned char, or -1 when S is empty. */
+static HTS_INLINE HTS_UNUSED int hts_span_first(hts_span s) {
+  return s.len != 0 ? (unsigned char) s.p[0] : -1;
+}
+
+/* Return the last byte of S as an unsigned char, or -1 when S is empty. */
+static HTS_INLINE HTS_UNUSED int hts_span_last(hts_span s) {
+  return s.len != 0 ? (unsigned char) s.p[s.len - 1] : -1;
+}
+
+/* Return the index of the first C in S, or S.len when S holds none. */
+static HTS_INLINE HTS_UNUSED size_t hts_span_find(hts_span s, char c) {
+  const char *const at = s.len != 0 ? memchr(s.p, c, s.len) : NULL;
+
+  return at != NULL ? (size_t) (at - s.p) : s.len;
+}
+
+/* Return the index of the first byte of S found in SET, or S.len. SET never
+   matches a NUL. */
+static HTS_INLINE HTS_UNUSED size_t hts_span_find_any(hts_span s,
+                                                      const char *set) {
+  size_t i;
+
+  for (i = 0; i < s.len; i++)
+    if (s.p[i] != '\0' && strchr(set, s.p[i]) != NULL)
+      break;
+  return i;
+}
+
+/* Return the bytes of *REST before its first byte found in SET, and leave
+ *REST starting at that byte, or empty at its end. */
+static HTS_INLINE HTS_UNUSED hts_span hts_span_take_until(hts_span *rest,
+                                                          const char *set) {
+  const hts_span head = hts_span_at(rest->p, hts_span_find_any(*rest, set));
+
+  *rest = hts_span_skip(*rest, head.len);
+  return head;
+}
+
 /* Is S present? An absent hts_url_view part is not, but an empty one is. */
 hts_boolean hts_span_present(hts_span s);
 

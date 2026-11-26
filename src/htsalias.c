@@ -444,11 +444,7 @@ static const char *optalias_suffix(hts_optclass type, const char *value) {
 }
 
 hts_boolean optalias_digits_fit(hts_span digits) {
-  size_t i;
-
-  for (i = 0; i < digits.len && digits.p[i] == '0'; i++) {
-  }
-  return digits.len - i <= HTS_SAVENAME_PRESET_MAX_DIGITS;
+  return hts_span_trim(digits, "0", "").len <= HTS_SAVENAME_PRESET_MAX_DIGITS;
 }
 
 /* A bare digit run -N reads as a preset number. */

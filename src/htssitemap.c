@@ -181,7 +181,7 @@ int hts_sitemap_scan(hts_span body, int maxurls, hts_boolean *is_index,
     return 0;
 
   /* Content-Encoding gzip is undone upstream; only the container is left. */
-  if ((unsigned char) body.p[0] == 0x1f && (unsigned char) body.p[1] == 0x8b) {
+  if (hts_span_starts_with(body, hts_span_at("\x1f\x8b", 2))) {
     unpacked = sitemap_gunzip(body, &size);
     if (unpacked == NULL)
       return -1;
