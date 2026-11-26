@@ -1,0 +1,56 @@
+#!/bin/bash
+#
+# A status line too long to read whole is kept only when its code was read.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+python=$(find_python) || skip "python3 missing"
+
+server=$(nativepath "$top_srcdir/tests/status-line-server.py")
+tmpdir=$(mktemp -d)
+out=$tmpdir/out
+serverpid=
+log=$tmpdir/crawl.log
+fail_dump_var log
+
+cleanup() {
+    stop_server "$serverpid"
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+"$python" "$server" >"$tmpdir/srv.out" 2>"$tmpdir/srv.err" &
+serverpid=$!
+port=$(discover_server_port "$tmpdir/srv.out" "$serverpid") || exit 1
+
+crawl() { # crawl CASE
+    local rc=0
+    mkdir -p "$out/$1"
+    run_with_timeout 60 httrack "http://127.0.0.1:$port/$1.html" \
+        -O "$out/$1" -c1 --robots=0 --retries=0 -%v0 -q >>"$log" 2>&1 || rc=$?
+    test "$rc" -ne 124 || fail "$1: crawl hit the deadline"
+    test "$rc" -le 128 || fail "$1: crawl ended abnormally ($rc)"
+}
+
+mirrored() { echo "$out/$1/127.0.0.1_$port/$1.html"; }
+
+crawl huge
+crawl hugeblank
+crawl crlfhugeblank
+
+# Control: a long phrase after the code is cut, and the reply still stands.
+test -f "$(mirrored huge)" || fail "huge: a cut reason phrase lost the page"
+
+# The blanks push the 404 out of the line read, which must not become a 200.
+for case in hugeblank crlfhugeblank; do
+    test ! -f "$(mirrored "$case")" || fail "$case: a cut status line was mirrored"
+    want="\"Status line too long\" (-1) at link 127.0.0.1:$port/$case.html"
+    logtext=$(cat "$out/$case/hts-log.txt")
+    grep -qF "$want" <<<"$logtext" ||
+        fail_dump "$case: log lacks [$want]" "$out/$case/hts-log.txt"
+done
+
+ok "a cut status line keeps its code or is refused"

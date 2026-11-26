@@ -49,6 +49,10 @@ CASES = {
     "ltjunk": b"<html><body>marker_junk</body></html>\r\n\r\n" + BODY,
     # a status line well past the reader's 1024-byte line buffer
     "huge": b"HTTP/1.1 200 " + b"A" * 4000 + b"\r\n\r\n" + BODY,
+    # a 404 pushed past the 2000-byte line the engine reads, by blanks
+    "hugeblank": b" " * 2100 + b"HTTP/1.1 404 Not Found\r\n" + HTML + b"\r\n" + BODY,
+    # the same after the empty line a recycled connection can leave
+    "crlfhugeblank": b"\r\n" + b" " * 2100 + b"HTTP/1.1 404 Not Found\r\n\r\n" + BODY,
 }
 
 DEFAULT = b"HTTP/1.1 200 OK\r\n" + HTML + b"\r\n" + BODY

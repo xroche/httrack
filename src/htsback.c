@@ -4690,19 +4690,24 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                     /* Hack for zero-length headers */
                     // ----------------------------------------
                     /* parse the header, status line first */
-                    binput_line(back[i].r.adr + ptr,
-                                back[i].r.adr + back[i].r.size,
-                                HTS_BUF_N(rcvd, 2000), &adv);
+                    hts_boolean cut = binput_line(
+                        back[i].r.adr + ptr, back[i].r.adr + back[i].r.size,
+                        HTS_BUF_N(rcvd, 2000), &adv);
+
                     ptr += adv;
                     if (strnotempty(rcvd) == 0) {
                       /* Bogus CRLF, OR recycled connection and trailing chunk CRLF */
-                      binput_line(back[i].r.adr + ptr,
-                                  back[i].r.adr + back[i].r.size,
-                                  HTS_BUF_N(rcvd, 2000), &adv);
+                      cut = binput_line(back[i].r.adr + ptr,
+                                        back[i].r.adr + back[i].r.size,
+                                        HTS_BUF_N(rcvd, 2000), &adv);
                       ptr += adv;
                     }
-                    // traiter status-line
                     treatfirstline(&back[i].r, rcvd);
+                    /* a cut line may lose its phrase, not its code */
+                    if (cut && !strfield(rcvd + strspn(rcvd, " \t"), "HTTP/")) {
+                      back[i].r.statuscode = STATUSCODE_INVALID;
+                      strcpybuff(back[i].r.msg, "Status line too long");
+                    }
 
                     if (_DEBUG_HEAD) {
                       if (ioinfo) {
