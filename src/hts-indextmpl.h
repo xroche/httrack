@@ -39,459 +39,459 @@ Please visit our Website: http://www.httrack.com
 /* Index for each project */
 /*
 regen:
-(for i in *; do echo $i; cat $i | sed -e 's/"/\\"/g' | sed -e 's/^\(.*\)$/  "\1"LF\\/'; done) > /tmp/1.txt
+(for i in *; do echo $i; cat $i | sed -e 's/"/\\"/g' | sed -e 's/^\(.*\)$/  "\1" LF\\/'; done) > /tmp/1.txt
 */
 /* %s = INFO */
 #define HTS_INDEX_HEADER \
-  "<!-- Note: Template file not found, using internal one -->"LF\
-  "<html xmlns=\"http://www.w3.org/1999/xhtml\" lang=\"en\">"LF\
-  ""LF\
-  "<head>"LF\
-  "	<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" />"LF\
-  "	<meta name=\"description\" content=\"HTTrack is an easy-to-use website mirror utility. It allows you to download a World Wide website from the Internet to a local directory,building recursively all structures, getting html, images, and other files from the server to your computer. Links are rebuiltrelatively so that you can freely browse to the local site (works with any browser). You can mirror several sites together so that you can jump from one toanother. You can, also, update an existing mirror site, or resume an interrupted download. The robot is fully configurable, with an integrated help\" />"LF\
-  "	<meta name=\"keywords\" content=\"httrack, HTTRACK, HTTrack, winhttrack, WINHTTRACK, WinHTTrack, offline browser, web mirror utility, aspirateur web, surf offline, web capture, www mirror utility, browse offline, local  site builder, website mirroring, aspirateur www, internet grabber, capture de site web, internet tool, hors connexion, unix, dos, windows 95, windows 98, solaris, ibm580, AIX 4.0, HTS, HTGet, web aspirator, web aspirateur, libre, GPL, GNU, free software\" />"LF\
-  "	<title>Local index - HTTrack Website Copier</title>"LF\
-  "  %s"LF\
-  "	<style type=\"text/css\">"LF\
-  "	<!--"LF\
-  ""LF\
-  "body {"LF\
-  "	margin: 0;  padding: 0;  margin-bottom: 15px;  margin-top: 8px;"LF\
-  "	background: #77b;"LF\
-  "}"LF\
-  "body, td {"LF\
-  "	font: 14px \"Trebuchet MS\", Verdana, Arial, Helvetica, sans-serif;"LF\
-  "	}"LF\
-  ""LF\
-  "#subTitle {"LF\
-  "	background: #000;  color: #fff;  padding: 4px;  font-weight: bold; "LF\
-  "	}"LF\
-  ""LF\
-  "#siteNavigation a, #siteNavigation .current {"LF\
-  "	font-weight: bold;  color: #448;"LF\
-  "	}"LF\
-  "#siteNavigation a:link    { text-decoration: none; }"LF\
-  "#siteNavigation a:visited { text-decoration: none; }"LF\
-  ""LF\
-  "#siteNavigation .current { background-color: #ccd; }"LF\
-  ""LF\
-  "#siteNavigation a:hover   { text-decoration: none;  background-color: #fff;  color: #000; }"LF\
-  "#siteNavigation a:active  { text-decoration: none;  background-color: #ccc; }"LF\
-  ""LF\
-  ""LF\
-  "a:link    { text-decoration: underline;  color: #00f; }"LF\
-  "a:visited { text-decoration: underline;  color: #000; }"LF\
-  "a:hover   { text-decoration: underline;  color: #c00; }"LF\
-  "a:active  { text-decoration: underline; }"LF\
-  ""LF\
-  "#pageContent {"LF\
-  "	clear: both;"LF\
-  "	border-bottom: 6px solid #000;"LF\
-  "	padding: 10px;  padding-top: 20px;"LF\
-  "	line-height: 1.65em;"LF\
-	" background-image: url(backblue.gif);"LF\
-	" background-repeat: no-repeat;"LF\
-	" background-position: top right;"LF\
-  "	}"LF\
-  ""LF\
-  "#pageContent, #siteNavigation {"LF\
-  "	background-color: #ccd;"LF\
-  "	}"LF\
-  ""LF\
-  ""LF\
-  ".imgLeft  { float: left;   margin-right: 10px;  margin-bottom: 10px; }"LF\
-  ".imgRight { float: right;  margin-left: 10px;   margin-bottom: 10px; }"LF\
-  ""LF\
-  "hr { height: 1px;  color: #000;  background-color: #000;  margin-bottom: 15px; }"LF\
-  ""LF\
-  "h1 { margin: 0;  font-weight: bold;  font-size: 2em; }"LF\
-  "h2 { margin: 0;  font-weight: bold;  font-size: 1.6em; }"LF\
-  "h3 { margin: 0;  font-weight: bold;  font-size: 1.3em; }"LF\
-  "h4 { margin: 0;  font-weight: bold;  font-size: 1.18em; }"LF\
-  ""LF\
-  ".blak { background-color: #000; }"LF\
-  ".hide { display: none; }"LF\
-  ".tableWidth { min-width: 400px; }"LF\
-  ""LF\
-  ".tblRegular       { border-collapse: collapse; }"LF\
-  ".tblRegular td    { padding: 6px;  background-image: url(fade.gif);  border: 2px solid #99c; }"LF\
-  ".tblHeaderColor, .tblHeaderColor td { background: #99c; }"LF\
-  ".tblNoBorder td   { border: 0; }"LF\
-  ""LF\
-  ""LF\
-  "// -->"LF\
-  "</style>"LF\
-  ""LF\
-  "</head>"LF\
-  ""LF\
-  "<body>"LF\
-  "<table width=\"76%%\" border=\"0\" align=\"center\" cellspacing=\"0\" cellpadding=\"3\" class=\"tableWidth\">"LF\
-  "	<tr>"LF\
-  "	<td id=\"subTitle\">HTTrack Website Copier - Open Source offline browser</td>"LF\
-  "	</tr>"LF\
-  "</table>"LF\
-  "<table width=\"76%%\" border=\"0\" align=\"center\" cellspacing=\"0\" cellpadding=\"0\" class=\"tableWidth\">"LF\
-  "<tr class=\"blak\">"LF\
-  "<td>"LF\
-  "	<table width=\"100%%\" border=\"0\" align=\"center\" cellspacing=\"1\" cellpadding=\"0\">"LF\
-  "	<tr>"LF\
-  "	<td colspan=\"6\"> "LF\
-  "		<table width=\"100%%\" border=\"0\" align=\"center\" cellspacing=\"0\" cellpadding=\"10\">"LF\
-  "		<tr> "LF\
-  "		<td id=\"pageContent\"> "LF\
-  "<!-- ==================== End prologue ==================== -->"LF\
-  ""LF\
-  "<H1 ALIGN=Center>Index of locally available sites:</H1>"LF\
-  "  <TABLE BORDER=\"0\" WIDTH=\"100%%\" CELLSPACING=\"1\" CELLPADDING=\"0\">"LF
+  "<!-- Note: Template file not found, using internal one -->" LF\
+  "<html xmlns=\"http://www.w3.org/1999/xhtml\" lang=\"en\">" LF\
+  "" LF\
+  "<head>" LF\
+  "	<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" />" LF\
+  "	<meta name=\"description\" content=\"HTTrack is an easy-to-use website mirror utility. It allows you to download a World Wide website from the Internet to a local directory,building recursively all structures, getting html, images, and other files from the server to your computer. Links are rebuiltrelatively so that you can freely browse to the local site (works with any browser). You can mirror several sites together so that you can jump from one toanother. You can, also, update an existing mirror site, or resume an interrupted download. The robot is fully configurable, with an integrated help\" />" LF\
+  "	<meta name=\"keywords\" content=\"httrack, HTTRACK, HTTrack, winhttrack, WINHTTRACK, WinHTTrack, offline browser, web mirror utility, aspirateur web, surf offline, web capture, www mirror utility, browse offline, local  site builder, website mirroring, aspirateur www, internet grabber, capture de site web, internet tool, hors connexion, unix, dos, windows 95, windows 98, solaris, ibm580, AIX 4.0, HTS, HTGet, web aspirator, web aspirateur, libre, GPL, GNU, free software\" />" LF\
+  "	<title>Local index - HTTrack Website Copier</title>" LF\
+  "  %s" LF\
+  "	<style type=\"text/css\">" LF\
+  "	<!--" LF\
+  "" LF\
+  "body {" LF\
+  "	margin: 0;  padding: 0;  margin-bottom: 15px;  margin-top: 8px;" LF\
+  "	background: #77b;" LF\
+  "}" LF\
+  "body, td {" LF\
+  "	font: 14px \"Trebuchet MS\", Verdana, Arial, Helvetica, sans-serif;" LF\
+  "	}" LF\
+  "" LF\
+  "#subTitle {" LF\
+  "	background: #000;  color: #fff;  padding: 4px;  font-weight: bold; " LF\
+  "	}" LF\
+  "" LF\
+  "#siteNavigation a, #siteNavigation .current {" LF\
+  "	font-weight: bold;  color: #448;" LF\
+  "	}" LF\
+  "#siteNavigation a:link    { text-decoration: none; }" LF\
+  "#siteNavigation a:visited { text-decoration: none; }" LF\
+  "" LF\
+  "#siteNavigation .current { background-color: #ccd; }" LF\
+  "" LF\
+  "#siteNavigation a:hover   { text-decoration: none;  background-color: #fff;  color: #000; }" LF\
+  "#siteNavigation a:active  { text-decoration: none;  background-color: #ccc; }" LF\
+  "" LF\
+  "" LF\
+  "a:link    { text-decoration: underline;  color: #00f; }" LF\
+  "a:visited { text-decoration: underline;  color: #000; }" LF\
+  "a:hover   { text-decoration: underline;  color: #c00; }" LF\
+  "a:active  { text-decoration: underline; }" LF\
+  "" LF\
+  "#pageContent {" LF\
+  "	clear: both;" LF\
+  "	border-bottom: 6px solid #000;" LF\
+  "	padding: 10px;  padding-top: 20px;" LF\
+  "	line-height: 1.65em;" LF\
+	" background-image: url(backblue.gif);" LF\
+	" background-repeat: no-repeat;" LF\
+	" background-position: top right;" LF\
+  "	}" LF\
+  "" LF\
+  "#pageContent, #siteNavigation {" LF\
+  "	background-color: #ccd;" LF\
+  "	}" LF\
+  "" LF\
+  "" LF\
+  ".imgLeft  { float: left;   margin-right: 10px;  margin-bottom: 10px; }" LF\
+  ".imgRight { float: right;  margin-left: 10px;   margin-bottom: 10px; }" LF\
+  "" LF\
+  "hr { height: 1px;  color: #000;  background-color: #000;  margin-bottom: 15px; }" LF\
+  "" LF\
+  "h1 { margin: 0;  font-weight: bold;  font-size: 2em; }" LF\
+  "h2 { margin: 0;  font-weight: bold;  font-size: 1.6em; }" LF\
+  "h3 { margin: 0;  font-weight: bold;  font-size: 1.3em; }" LF\
+  "h4 { margin: 0;  font-weight: bold;  font-size: 1.18em; }" LF\
+  "" LF\
+  ".blak { background-color: #000; }" LF\
+  ".hide { display: none; }" LF\
+  ".tableWidth { min-width: 400px; }" LF\
+  "" LF\
+  ".tblRegular       { border-collapse: collapse; }" LF\
+  ".tblRegular td    { padding: 6px;  background-image: url(fade.gif);  border: 2px solid #99c; }" LF\
+  ".tblHeaderColor, .tblHeaderColor td { background: #99c; }" LF\
+  ".tblNoBorder td   { border: 0; }" LF\
+  "" LF\
+  "" LF\
+  "// -->" LF\
+  "</style>" LF\
+  "" LF\
+  "</head>" LF\
+  "" LF\
+  "<body>" LF\
+  "<table width=\"76%%\" border=\"0\" align=\"center\" cellspacing=\"0\" cellpadding=\"3\" class=\"tableWidth\">" LF\
+  "	<tr>" LF\
+  "	<td id=\"subTitle\">HTTrack Website Copier - Open Source offline browser</td>" LF\
+  "	</tr>" LF\
+  "</table>" LF\
+  "<table width=\"76%%\" border=\"0\" align=\"center\" cellspacing=\"0\" cellpadding=\"0\" class=\"tableWidth\">" LF\
+  "<tr class=\"blak\">" LF\
+  "<td>" LF\
+  "	<table width=\"100%%\" border=\"0\" align=\"center\" cellspacing=\"1\" cellpadding=\"0\">" LF\
+  "	<tr>" LF\
+  "	<td colspan=\"6\"> " LF\
+  "		<table width=\"100%%\" border=\"0\" align=\"center\" cellspacing=\"0\" cellpadding=\"10\">" LF\
+  "		<tr> " LF\
+  "		<td id=\"pageContent\"> " LF\
+  "<!-- ==================== End prologue ==================== -->" LF\
+  "" LF\
+  "<H1 ALIGN=Center>Index of locally available sites:</H1>" LF\
+  "  <TABLE BORDER=\"0\" WIDTH=\"100%%\" CELLSPACING=\"1\" CELLPADDING=\"0\">" LF
 
 /* %s = URL */
 /* %s = TITLE */
 #define HTS_INDEX_BODY \
-  "<!-- Note: Template file not found, using internal one -->"LF\
-  "		<TR>"LF\
-  "			<TD BACKGROUND=\"fade.gif\">"LF\
-  "				&middot;"LF\
-  "					<A HREF=\"%s\">"LF\
-  "						%s"LF\
-  "					</A>		"LF\
-  "			</TD>"LF\
-  "		</TR>"LF
+  "<!-- Note: Template file not found, using internal one -->" LF\
+  "		<TR>" LF\
+  "			<TD BACKGROUND=\"fade.gif\">" LF\
+  "				&middot;" LF\
+  "					<A HREF=\"%s\">" LF\
+  "						%s" LF\
+  "					</A>		" LF\
+  "			</TD>" LF\
+  "		</TR>" LF
 
 /* %s = INFO */
 /* %s = REDIRECT */
 #define HTS_INDEX_FOOTER \
-  "<!-- Note: Template file not found, using internal one -->"LF\
-  "	</TABLE>"LF\
-  "	<BR>"LF\
-  "	<BR>"LF\
-  "	<BR>"LF\
-  "  	<H6 ALIGN=\"RIGHT\">"LF\
-  "	<I>Mirror and index made by HTTrack Website Copier [XR&amp;CO]</I>"LF\
-  "	</H6>"LF\
-  "	%s"LF\
-  "	<!-- Thanks for using HTTrack Website Copier! -->"LF\
-  "	%s"LF\
-  ""LF\
-  "<!-- ==================== Start epilogue ==================== -->"LF\
-  "		</td>"LF\
-  "		</tr>"LF\
-  "		</table>"LF\
-  "	</td>"LF\
-  "	</tr>"LF\
-  "	</table>"LF\
-  "</td>"LF\
-  "</tr>"LF\
-  "</table>"LF\
-  ""LF\
-  "<table width=\"76%%\" border=\"0\" align=\"center\" valign=\"bottom\" cellspacing=\"0\" cellpadding=\"0\">"LF\
-  "	<tr>"LF\
-  "	<td id=\"footer\"><small>&copy; 1998 Xavier Roche &amp; other contributors - Web Design: Leto Kauler.</small></td>"LF\
-  "	</tr>"LF\
-  "</table>"LF\
-  ""LF\
-  "</body>"LF\
-  ""LF\
-  "</html>"LF\
-  ""LF\
-  ""LF
+  "<!-- Note: Template file not found, using internal one -->" LF\
+  "	</TABLE>" LF\
+  "	<BR>" LF\
+  "	<BR>" LF\
+  "	<BR>" LF\
+  "  	<H6 ALIGN=\"RIGHT\">" LF\
+  "	<I>Mirror and index made by HTTrack Website Copier [XR&amp;CO]</I>" LF\
+  "	</H6>" LF\
+  "	%s" LF\
+  "	<!-- Thanks for using HTTrack Website Copier! -->" LF\
+  "	%s" LF\
+  "" LF\
+  "<!-- ==================== Start epilogue ==================== -->" LF\
+  "		</td>" LF\
+  "		</tr>" LF\
+  "		</table>" LF\
+  "	</td>" LF\
+  "	</tr>" LF\
+  "	</table>" LF\
+  "</td>" LF\
+  "</tr>" LF\
+  "</table>" LF\
+  "" LF\
+  "<table width=\"76%%\" border=\"0\" align=\"center\" valign=\"bottom\" cellspacing=\"0\" cellpadding=\"0\">" LF\
+  "	<tr>" LF\
+  "	<td id=\"footer\"><small>&copy; 1998 Xavier Roche &amp; other contributors - Web Design: Leto Kauler.</small></td>" LF\
+  "	</tr>" LF\
+  "</table>" LF\
+  "" LF\
+  "</body>" LF\
+  "" LF\
+  "</html>" LF\
+  "" LF\
+  "" LF
 
 /* Index for all projects (top index) */
 /* %s = INFO */
 #define HTS_TOPINDEX_HEADER \
-  "<!-- Note: Template file not found, using internal one -->"LF\
-  "<html xmlns=\"http://www.w3.org/1999/xhtml\" lang=\"en\">"LF\
-  ""LF\
-  "<head>"LF\
-  "	<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" />"LF\
-  "	<meta name=\"description\" content=\"HTTrack is an easy-to-use website mirror utility. It allows you to download a World Wide website from the Internet to a local directory,building recursively all structures, getting html, images, and other files from the server to your computer. Links are rebuiltrelatively so that you can freely browse to the local site (works with any browser). You can mirror several sites together so that you can jump from one toanother. You can, also, update an existing mirror site, or resume an interrupted download. The robot is fully configurable, with an integrated help\" />"LF\
-  "	<meta name=\"keywords\" content=\"httrack, HTTRACK, HTTrack, winhttrack, WINHTTRACK, WinHTTrack, offline browser, web mirror utility, aspirateur web, surf offline, web capture, www mirror utility, browse offline, local  site builder, website mirroring, aspirateur www, internet grabber, capture de site web, internet tool, hors connexion, unix, dos, windows 95, windows 98, solaris, ibm580, AIX 4.0, HTS, HTGet, web aspirator, web aspirateur, libre, GPL, GNU, free software\" />"LF\
-  "	<title>List of available projects - HTTrack Website Copier</title>"LF\
-  "	%s"LF\
-  ""LF\
-  "	<style type=\"text/css\">"LF\
-  "	<!--"LF\
-  ""LF\
-  "body {"LF\
-  "	margin: 0;  padding: 0;  margin-bottom: 15px;  margin-top: 8px;"LF\
-  "	background: #77b;"LF\
-  "}"LF\
-  "body, td {"LF\
-  "	font: 14px \"Trebuchet MS\", Verdana, Arial, Helvetica, sans-serif;"LF\
-  "	}"LF\
-  ""LF\
-  "#subTitle {"LF\
-  "	background: #000;  color: #fff;  padding: 4px;  font-weight: bold; "LF\
-  "	}"LF\
-  ""LF\
-  "#siteNavigation a, #siteNavigation .current {"LF\
-  "	font-weight: bold;  color: #448;"LF\
-  "	}"LF\
-  "#siteNavigation a:link    { text-decoration: none; }"LF\
-  "#siteNavigation a:visited { text-decoration: none; }"LF\
-  ""LF\
-  "#siteNavigation .current { background-color: #ccd; }"LF\
-  ""LF\
-  "#siteNavigation a:hover   { text-decoration: none;  background-color: #fff;  color: #000; }"LF\
-  "#siteNavigation a:active  { text-decoration: none;  background-color: #ccc; }"LF\
-  ""LF\
-  ""LF\
-  "a:link    { text-decoration: underline;  color: #00f; }"LF\
-  "a:visited { text-decoration: underline;  color: #000; }"LF\
-  "a:hover   { text-decoration: underline;  color: #c00; }"LF\
-  "a:active  { text-decoration: underline; }"LF\
-  ""LF\
-  "#pageContent {"LF\
-  "	clear: both;"LF\
-  "	border-bottom: 6px solid #000;"LF\
-  "	padding: 10px;  padding-top: 20px;"LF\
-  "	line-height: 1.65em;"LF\
-	" background-image: url(backblue.gif);"LF\
-	" background-repeat: no-repeat;"LF\
-	" background-position: top right;"LF\
-  "	}"LF\
-  ""LF\
-  "#pageContent, #siteNavigation {"LF\
-  "	background-color: #ccd;"LF\
-  "	}"LF\
-  ""LF\
-  ""LF\
-  ".imgLeft  { float: left;   margin-right: 10px;  margin-bottom: 10px; }"LF\
-  ".imgRight { float: right;  margin-left: 10px;   margin-bottom: 10px; }"LF\
-  ""LF\
-  "hr { height: 1px;  color: #000;  background-color: #000;  margin-bottom: 15px; }"LF\
-  ""LF\
-  "h1 { margin: 0;  font-weight: bold;  font-size: 2em; }"LF\
-  "h2 { margin: 0;  font-weight: bold;  font-size: 1.6em; }"LF\
-  "h3 { margin: 0;  font-weight: bold;  font-size: 1.3em; }"LF\
-  "h4 { margin: 0;  font-weight: bold;  font-size: 1.18em; }"LF\
-  ""LF\
-  ".blak { background-color: #000; }"LF\
-  ".hide { display: none; }"LF\
-  ".tableWidth { min-width: 400px; }"LF\
-  ""LF\
-  ".tblRegular       { border-collapse: collapse; }"LF\
-  ".tblRegular td    { padding: 6px;  background-image: url(fade.gif);  border: 2px solid #99c; }"LF\
-  ".tblHeaderColor, .tblHeaderColor td { background: #99c; }"LF\
-  ".tblNoBorder td   { border: 0; }"LF\
-  ""LF\
-  ""LF\
-  "// -->"LF\
-  "</style>"LF\
-  ""LF\
-  "</head>"LF\
-  ""LF\
-  "<body>"LF\
-  "<table width=\"76%%\" border=\"0\" align=\"center\" cellspacing=\"0\" cellpadding=\"3\" class=\"tableWidth\">"LF\
-  "	<tr>"LF\
-  "	<td id=\"subTitle\">HTTrack Website Copier - Open Source offline browser</td>"LF\
-  "	</tr>"LF\
-  "</table>"LF\
-  "<table width=\"76%%\" border=\"0\" align=\"center\" cellspacing=\"0\" cellpadding=\"0\" class=\"tableWidth\">"LF\
-  "<tr class=\"blak\">"LF\
-  "<td>"LF\
-  "	<table width=\"100%%\" border=\"0\" align=\"center\" cellspacing=\"1\" cellpadding=\"0\">"LF\
-  "	<tr>"LF\
-  "	<td colspan=\"6\"> "LF\
-  "		<table width=\"100%%\" border=\"0\" align=\"center\" cellspacing=\"0\" cellpadding=\"10\">"LF\
-  "		<tr> "LF\
-  "		<td id=\"pageContent\"> "LF\
-  "<!-- ==================== End prologue ==================== -->"LF\
-  ""LF\
-  ""LF\
-  "<h1 ALIGN=Center>Index of locally available projects:</H1>"LF\
-  "  <table border=\"0\" width=\"100%%\" cellspacing=\"1\" cellpadding=\"0\">"LF
+  "<!-- Note: Template file not found, using internal one -->" LF\
+  "<html xmlns=\"http://www.w3.org/1999/xhtml\" lang=\"en\">" LF\
+  "" LF\
+  "<head>" LF\
+  "	<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" />" LF\
+  "	<meta name=\"description\" content=\"HTTrack is an easy-to-use website mirror utility. It allows you to download a World Wide website from the Internet to a local directory,building recursively all structures, getting html, images, and other files from the server to your computer. Links are rebuiltrelatively so that you can freely browse to the local site (works with any browser). You can mirror several sites together so that you can jump from one toanother. You can, also, update an existing mirror site, or resume an interrupted download. The robot is fully configurable, with an integrated help\" />" LF\
+  "	<meta name=\"keywords\" content=\"httrack, HTTRACK, HTTrack, winhttrack, WINHTTRACK, WinHTTrack, offline browser, web mirror utility, aspirateur web, surf offline, web capture, www mirror utility, browse offline, local  site builder, website mirroring, aspirateur www, internet grabber, capture de site web, internet tool, hors connexion, unix, dos, windows 95, windows 98, solaris, ibm580, AIX 4.0, HTS, HTGet, web aspirator, web aspirateur, libre, GPL, GNU, free software\" />" LF\
+  "	<title>List of available projects - HTTrack Website Copier</title>" LF\
+  "	%s" LF\
+  "" LF\
+  "	<style type=\"text/css\">" LF\
+  "	<!--" LF\
+  "" LF\
+  "body {" LF\
+  "	margin: 0;  padding: 0;  margin-bottom: 15px;  margin-top: 8px;" LF\
+  "	background: #77b;" LF\
+  "}" LF\
+  "body, td {" LF\
+  "	font: 14px \"Trebuchet MS\", Verdana, Arial, Helvetica, sans-serif;" LF\
+  "	}" LF\
+  "" LF\
+  "#subTitle {" LF\
+  "	background: #000;  color: #fff;  padding: 4px;  font-weight: bold; " LF\
+  "	}" LF\
+  "" LF\
+  "#siteNavigation a, #siteNavigation .current {" LF\
+  "	font-weight: bold;  color: #448;" LF\
+  "	}" LF\
+  "#siteNavigation a:link    { text-decoration: none; }" LF\
+  "#siteNavigation a:visited { text-decoration: none; }" LF\
+  "" LF\
+  "#siteNavigation .current { background-color: #ccd; }" LF\
+  "" LF\
+  "#siteNavigation a:hover   { text-decoration: none;  background-color: #fff;  color: #000; }" LF\
+  "#siteNavigation a:active  { text-decoration: none;  background-color: #ccc; }" LF\
+  "" LF\
+  "" LF\
+  "a:link    { text-decoration: underline;  color: #00f; }" LF\
+  "a:visited { text-decoration: underline;  color: #000; }" LF\
+  "a:hover   { text-decoration: underline;  color: #c00; }" LF\
+  "a:active  { text-decoration: underline; }" LF\
+  "" LF\
+  "#pageContent {" LF\
+  "	clear: both;" LF\
+  "	border-bottom: 6px solid #000;" LF\
+  "	padding: 10px;  padding-top: 20px;" LF\
+  "	line-height: 1.65em;" LF\
+	" background-image: url(backblue.gif);" LF\
+	" background-repeat: no-repeat;" LF\
+	" background-position: top right;" LF\
+  "	}" LF\
+  "" LF\
+  "#pageContent, #siteNavigation {" LF\
+  "	background-color: #ccd;" LF\
+  "	}" LF\
+  "" LF\
+  "" LF\
+  ".imgLeft  { float: left;   margin-right: 10px;  margin-bottom: 10px; }" LF\
+  ".imgRight { float: right;  margin-left: 10px;   margin-bottom: 10px; }" LF\
+  "" LF\
+  "hr { height: 1px;  color: #000;  background-color: #000;  margin-bottom: 15px; }" LF\
+  "" LF\
+  "h1 { margin: 0;  font-weight: bold;  font-size: 2em; }" LF\
+  "h2 { margin: 0;  font-weight: bold;  font-size: 1.6em; }" LF\
+  "h3 { margin: 0;  font-weight: bold;  font-size: 1.3em; }" LF\
+  "h4 { margin: 0;  font-weight: bold;  font-size: 1.18em; }" LF\
+  "" LF\
+  ".blak { background-color: #000; }" LF\
+  ".hide { display: none; }" LF\
+  ".tableWidth { min-width: 400px; }" LF\
+  "" LF\
+  ".tblRegular       { border-collapse: collapse; }" LF\
+  ".tblRegular td    { padding: 6px;  background-image: url(fade.gif);  border: 2px solid #99c; }" LF\
+  ".tblHeaderColor, .tblHeaderColor td { background: #99c; }" LF\
+  ".tblNoBorder td   { border: 0; }" LF\
+  "" LF\
+  "" LF\
+  "// -->" LF\
+  "</style>" LF\
+  "" LF\
+  "</head>" LF\
+  "" LF\
+  "<body>" LF\
+  "<table width=\"76%%\" border=\"0\" align=\"center\" cellspacing=\"0\" cellpadding=\"3\" class=\"tableWidth\">" LF\
+  "	<tr>" LF\
+  "	<td id=\"subTitle\">HTTrack Website Copier - Open Source offline browser</td>" LF\
+  "	</tr>" LF\
+  "</table>" LF\
+  "<table width=\"76%%\" border=\"0\" align=\"center\" cellspacing=\"0\" cellpadding=\"0\" class=\"tableWidth\">" LF\
+  "<tr class=\"blak\">" LF\
+  "<td>" LF\
+  "	<table width=\"100%%\" border=\"0\" align=\"center\" cellspacing=\"1\" cellpadding=\"0\">" LF\
+  "	<tr>" LF\
+  "	<td colspan=\"6\"> " LF\
+  "		<table width=\"100%%\" border=\"0\" align=\"center\" cellspacing=\"0\" cellpadding=\"10\">" LF\
+  "		<tr> " LF\
+  "		<td id=\"pageContent\"> " LF\
+  "<!-- ==================== End prologue ==================== -->" LF\
+  "" LF\
+  "" LF\
+  "<h1 ALIGN=Center>Index of locally available projects:</H1>" LF\
+  "  <table border=\"0\" width=\"100%%\" cellspacing=\"1\" cellpadding=\"0\">" LF
 
 /* %s = URL */
 /* %s = TITLE */
 #define HTS_TOPINDEX_BODY \
-  "<!-- Note: Template file not found, using internal one -->"LF\
-  "		<TR>"LF\
-  "		  <TD BACKGROUND=\"fade.gif\">"LF\
-  "                    &middot; <A HREF=\"%s/index.html\">%s</A>"LF\
-  "   		  </TD>"LF\
-  "		</TR>"LF
+  "<!-- Note: Template file not found, using internal one -->" LF\
+  "		<TR>" LF\
+  "		  <TD BACKGROUND=\"fade.gif\">" LF\
+  "                    &middot; <A HREF=\"%s/index.html\">%s</A>" LF\
+  "   		  </TD>" LF\
+  "		</TR>" LF
 
 #define HTS_TOPINDEX_BODYCAT \
-  "<!-- Note: Template file not found, using internal one -->"LF\
-  "		<TH>"LF\
-  "		<BR/>"LF\
-  "			%s"LF\
-  "		</TH>"LF
+  "<!-- Note: Template file not found, using internal one -->" LF\
+  "		<TH>" LF\
+  "		<BR/>" LF\
+  "			%s" LF\
+  "		</TH>" LF
 
 /* %s = INFO */
 #define HTS_TOPINDEX_FOOTER \
-  "<!-- Note: Template file not found, using internal one -->"LF\
-  "	</TABLE>"LF\
-  "	<BR>"LF\
-  "	<H6 ALIGN=\"RIGHT\">"LF\
-  "         <I>Mirror and index made by HTTrack Website Copier [XR&amp;CO]</I>"LF\
-  "	</H6>"LF\
-  "	%s"LF\
-  "	<!-- Thanks for using HTTrack Website Copier! -->"LF\
-  ""LF\
-  "<!-- ==================== Start epilogue ==================== -->"LF\
-  "		</td>"LF\
-  "		</tr>"LF\
-  "		</table>"LF\
-  "	</td>"LF\
-  "	</tr>"LF\
-  "	</table>"LF\
-  "</td>"LF\
-  "</tr>"LF\
-  "</table>"LF\
-  ""LF\
-  "<table width=\"76%%\" border=\"0\" align=\"center\" valign=\"bottom\" cellspacing=\"0\" cellpadding=\"0\">"LF\
-  "	<tr>"LF\
-  "	<td id=\"footer\"><small>&copy; 1998 Xavier Roche &amp; other contributors - Web Design: Leto Kauler.</small></td>"LF\
-  "	</tr>"LF\
-  "</table>"LF\
-  ""LF\
-  "</body>"LF\
-  ""LF\
-  "</html>"LF\
-  ""LF\
-  ""LF
+  "<!-- Note: Template file not found, using internal one -->" LF\
+  "	</TABLE>" LF\
+  "	<BR>" LF\
+  "	<H6 ALIGN=\"RIGHT\">" LF\
+  "         <I>Mirror and index made by HTTrack Website Copier [XR&amp;CO]</I>" LF\
+  "	</H6>" LF\
+  "	%s" LF\
+  "	<!-- Thanks for using HTTrack Website Copier! -->" LF\
+  "" LF\
+  "<!-- ==================== Start epilogue ==================== -->" LF\
+  "		</td>" LF\
+  "		</tr>" LF\
+  "		</table>" LF\
+  "	</td>" LF\
+  "	</tr>" LF\
+  "	</table>" LF\
+  "</td>" LF\
+  "</tr>" LF\
+  "</table>" LF\
+  "" LF\
+  "<table width=\"76%%\" border=\"0\" align=\"center\" valign=\"bottom\" cellspacing=\"0\" cellpadding=\"0\">" LF\
+  "	<tr>" LF\
+  "	<td id=\"footer\"><small>&copy; 1998 Xavier Roche &amp; other contributors - Web Design: Leto Kauler.</small></td>" LF\
+  "	</tr>" LF\
+  "</table>" LF\
+  "" LF\
+  "</body>" LF\
+  "" LF\
+  "</html>" LF\
+  "" LF\
+  "" LF
 
 /* Other files (fade and backblue images) */
 
-#define HTS_LOG_SECURITY_WARNING "note:\tthe hts-log.txt file, and hts-cache folder, may contain sensitive information,"LF\
-  "\tsuch as username/password authentication for websites mirrored in this project"LF\
-  "\tdo not share these files/folders if you want these information to remain private"LF
+#define HTS_LOG_SECURITY_WARNING "note:\tthe hts-log.txt file, and hts-cache folder, may contain sensitive information," LF\
+  "\tsuch as username/password authentication for websites mirrored in this project" LF\
+  "\tdo not share these files/folders if you want these information to remain private" LF
 
 /* Written verbatim, not through hts_template_format: no %s, no doubled %. */
 #define HTS_DATA_UNKNOWN_HTML \
-  "<html xmlns=\"http://www.w3.org/1999/xhtml\" lang=\"en\">"LF\
-  ""LF\
-  "<head>"LF\
-  "	<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" />"LF\
-  "	<meta name=\"description\" content=\"HTTrack is an easy-to-use website mirror utility. It allows you to download a World Wide website from the Internet to a local directory,building recursively all structures, getting html, images, and other files from the server to your computer. Links are rebuiltrelatively so that you can freely browse to the local site (works with any browser). You can mirror several sites together so that you can jump from one toanother. You can, also, update an existing mirror site, or resume an interrupted download. The robot is fully configurable, with an integrated help\" />"LF\
-  "	<meta name=\"keywords\" content=\"httrack, HTTRACK, HTTrack, winhttrack, WINHTTRACK, WinHTTrack, offline browser, web mirror utility, aspirateur web, surf offline, web capture, www mirror utility, browse offline, local  site builder, website mirroring, aspirateur www, internet grabber, capture de site web, internet tool, hors connexion, unix, dos, windows 95, windows 98, solaris, ibm580, AIX 4.0, HTS, HTGet, web aspirator, web aspirateur, libre, GPL, GNU, free software\" />"LF\
-  "	<title>Page not retrieved! - HTTrack Website Copier</title>"LF\
-  "	<style type=\"text/css\">"LF\
-  "	<!--"LF\
-  ""LF\
-  "body {"LF\
-  "	margin: 0;  padding: 0;  margin-bottom: 15px;  margin-top: 8px;"LF\
-  "	background: #77b;"LF\
-  "}"LF\
-  "body, td {"LF\
-  "	font: 14px \"Trebuchet MS\", Verdana, Arial, Helvetica, sans-serif;"LF\
-  "	}"LF\
-  ""LF\
-  "#subTitle {"LF\
-  "	background: #000;  color: #fff;  padding: 4px;  font-weight: bold; "LF\
-  "	}"LF\
-  ""LF\
-  "#siteNavigation a, #siteNavigation .current {"LF\
-  "	font-weight: bold;  color: #448;"LF\
-  "	}"LF\
-  "#siteNavigation a:link    { text-decoration: none; }"LF\
-  "#siteNavigation a:visited { text-decoration: none; }"LF\
-  ""LF\
-  "#siteNavigation .current { background-color: #ccd; }"LF\
-  ""LF\
-  "#siteNavigation a:hover   { text-decoration: none;  background-color: #fff;  color: #000; }"LF\
-  "#siteNavigation a:active  { text-decoration: none;  background-color: #ccc; }"LF\
-  ""LF\
-  ""LF\
-  "a:link    { text-decoration: underline;  color: #00f; }"LF\
-  "a:visited { text-decoration: underline;  color: #000; }"LF\
-  "a:hover   { text-decoration: underline;  color: #c00; }"LF\
-  "a:active  { text-decoration: underline; }"LF\
-  ""LF\
-  "#pageContent {"LF\
-  "	clear: both;"LF\
-  "	border-bottom: 6px solid #000;"LF\
-  "	padding: 10px;  padding-top: 20px;"LF\
-  "	line-height: 1.65em;"LF\
-	" background-image: url(backblue.gif);"LF\
-	" background-repeat: no-repeat;"LF\
-	" background-position: top right;"LF\
-  "	}"LF\
-  ""LF\
-  "#pageContent, #siteNavigation {"LF\
-  "	background-color: #ccd;"LF\
-  "	}"LF\
-  ""LF\
-  ""LF\
-  ".imgLeft  { float: left;   margin-right: 10px;  margin-bottom: 10px; }"LF\
-  ".imgRight { float: right;  margin-left: 10px;   margin-bottom: 10px; }"LF\
-  ""LF\
-  "hr { height: 1px;  color: #000;  background-color: #000;  margin-bottom: 15px; }"LF\
-  ""LF\
-  "h1 { margin: 0;  font-weight: bold;  font-size: 2em; }"LF\
-  "h2 { margin: 0;  font-weight: bold;  font-size: 1.6em; }"LF\
-  "h3 { margin: 0;  font-weight: bold;  font-size: 1.3em; }"LF\
-  "h4 { margin: 0;  font-weight: bold;  font-size: 1.18em; }"LF\
-  ""LF\
-  ".blak { background-color: #000; }"LF\
-  ".hide { display: none; }"LF\
-  ".tableWidth { min-width: 400px; }"LF\
-  ""LF\
-  ".tblRegular       { border-collapse: collapse; }"LF\
-  ".tblRegular td    { padding: 6px;  background-image: url(fade.gif);  border: 2px solid #99c; }"LF\
-  ".tblHeaderColor, .tblHeaderColor td { background: #99c; }"LF\
-  ".tblNoBorder td   { border: 0; }"LF\
-  ""LF\
-  ""LF\
-  "// -->"LF\
-  "</style>"LF\
-  ""LF\
-  "</head>"LF\
-  ""LF\
-  "<body>"LF\
-  "<table width=\"76%\" border=\"0\" align=\"center\" cellspacing=\"0\" cellpadding=\"3\" class=\"tableWidth\">"LF\
-  "	<tr>"LF\
-  "	<td id=\"subTitle\">HTTrack Website Copier - Open Source offline browser</td>"LF\
-  "	</tr>"LF\
-  "</table>"LF\
-  "<table width=\"76%\" border=\"0\" align=\"center\" cellspacing=\"0\" cellpadding=\"0\" class=\"tableWidth\">"LF\
-  "<tr class=\"blak\">"LF\
-  "<td>"LF\
-  "	<table width=\"100%\" border=\"0\" align=\"center\" cellspacing=\"1\" cellpadding=\"0\">"LF\
-  "	<tr>"LF\
-  "	<td colspan=\"6\"> "LF\
-  "		<table width=\"100%\" border=\"0\" align=\"center\" cellspacing=\"0\" cellpadding=\"10\">"LF\
-  "		<tr> "LF\
-  "		<td id=\"pageContent\"> "LF\
-  "<!-- ==================== End prologue ==================== -->"LF\
-  "<h1><strong><u>Oops!...</u></strong></h1>"LF\
-  "<h3>This page has <font color=\"red\"><em>not</em></font> been retrieved by HTTrack Website Copier. </h3>"LF\
-  "<script language=\"Javascript\">"LF\
-  "<!--"LF\
-  "  var loc=document.location.toString();"LF\
-  "  if (loc) {"LF\
-  "    var pos=loc.indexOf('link=');"LF\
-  "    if (pos>0) {"LF\
-  "      document.write('Clic to the link <b>below</b> to go to the online location!<br><a href=\"'+loc.substring(pos+5)+'\">'+loc.substring(pos+5)+'</a><br>');"LF\
-  "    } else"LF\
-  "      document.write('(no location defined)');"LF\
-  "  }"LF\
-  "// -->"LF\
-  "</script>"LF\
-  "<h6 align=\"right\">Mirror by HTTrack Website Copier</h6>"LF\
-  "<!-- ==================== Start epilogue ==================== -->"LF\
-  "		</td>"LF\
-  "		</tr>"LF\
-  "		</table>"LF\
-  "	</td>"LF\
-  "	</tr>"LF\
-  "	</table>"LF\
-  "</td>"LF\
-  "</tr>"LF\
-  "</table>"LF\
-  ""LF\
-  "<table width=\"76%\" height=\"100%\" border=\"0\" align=\"center\" valign=\"bottom\" cellspacing=\"0\" cellpadding=\"0\">"LF\
-  "	<tr>"LF\
-  "	<td id=\"footer\"><small>&copy; 1998 Xavier Roche &amp; other contributors - Web Design: Leto Kauler.</small></td>"LF\
-  "	</tr>"LF\
-  "</table>"LF\
-  ""LF\
-  "</body>"LF\
-  ""LF\
-  "</html>"LF\
-  ""LF\
-  ""LF
+  "<html xmlns=\"http://www.w3.org/1999/xhtml\" lang=\"en\">" LF\
+  "" LF\
+  "<head>" LF\
+  "	<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" />" LF\
+  "	<meta name=\"description\" content=\"HTTrack is an easy-to-use website mirror utility. It allows you to download a World Wide website from the Internet to a local directory,building recursively all structures, getting html, images, and other files from the server to your computer. Links are rebuiltrelatively so that you can freely browse to the local site (works with any browser). You can mirror several sites together so that you can jump from one toanother. You can, also, update an existing mirror site, or resume an interrupted download. The robot is fully configurable, with an integrated help\" />" LF\
+  "	<meta name=\"keywords\" content=\"httrack, HTTRACK, HTTrack, winhttrack, WINHTTRACK, WinHTTrack, offline browser, web mirror utility, aspirateur web, surf offline, web capture, www mirror utility, browse offline, local  site builder, website mirroring, aspirateur www, internet grabber, capture de site web, internet tool, hors connexion, unix, dos, windows 95, windows 98, solaris, ibm580, AIX 4.0, HTS, HTGet, web aspirator, web aspirateur, libre, GPL, GNU, free software\" />" LF\
+  "	<title>Page not retrieved! - HTTrack Website Copier</title>" LF\
+  "	<style type=\"text/css\">" LF\
+  "	<!--" LF\
+  "" LF\
+  "body {" LF\
+  "	margin: 0;  padding: 0;  margin-bottom: 15px;  margin-top: 8px;" LF\
+  "	background: #77b;" LF\
+  "}" LF\
+  "body, td {" LF\
+  "	font: 14px \"Trebuchet MS\", Verdana, Arial, Helvetica, sans-serif;" LF\
+  "	}" LF\
+  "" LF\
+  "#subTitle {" LF\
+  "	background: #000;  color: #fff;  padding: 4px;  font-weight: bold; " LF\
+  "	}" LF\
+  "" LF\
+  "#siteNavigation a, #siteNavigation .current {" LF\
+  "	font-weight: bold;  color: #448;" LF\
+  "	}" LF\
+  "#siteNavigation a:link    { text-decoration: none; }" LF\
+  "#siteNavigation a:visited { text-decoration: none; }" LF\
+  "" LF\
+  "#siteNavigation .current { background-color: #ccd; }" LF\
+  "" LF\
+  "#siteNavigation a:hover   { text-decoration: none;  background-color: #fff;  color: #000; }" LF\
+  "#siteNavigation a:active  { text-decoration: none;  background-color: #ccc; }" LF\
+  "" LF\
+  "" LF\
+  "a:link    { text-decoration: underline;  color: #00f; }" LF\
+  "a:visited { text-decoration: underline;  color: #000; }" LF\
+  "a:hover   { text-decoration: underline;  color: #c00; }" LF\
+  "a:active  { text-decoration: underline; }" LF\
+  "" LF\
+  "#pageContent {" LF\
+  "	clear: both;" LF\
+  "	border-bottom: 6px solid #000;" LF\
+  "	padding: 10px;  padding-top: 20px;" LF\
+  "	line-height: 1.65em;" LF\
+	" background-image: url(backblue.gif);" LF\
+	" background-repeat: no-repeat;" LF\
+	" background-position: top right;" LF\
+  "	}" LF\
+  "" LF\
+  "#pageContent, #siteNavigation {" LF\
+  "	background-color: #ccd;" LF\
+  "	}" LF\
+  "" LF\
+  "" LF\
+  ".imgLeft  { float: left;   margin-right: 10px;  margin-bottom: 10px; }" LF\
+  ".imgRight { float: right;  margin-left: 10px;   margin-bottom: 10px; }" LF\
+  "" LF\
+  "hr { height: 1px;  color: #000;  background-color: #000;  margin-bottom: 15px; }" LF\
+  "" LF\
+  "h1 { margin: 0;  font-weight: bold;  font-size: 2em; }" LF\
+  "h2 { margin: 0;  font-weight: bold;  font-size: 1.6em; }" LF\
+  "h3 { margin: 0;  font-weight: bold;  font-size: 1.3em; }" LF\
+  "h4 { margin: 0;  font-weight: bold;  font-size: 1.18em; }" LF\
+  "" LF\
+  ".blak { background-color: #000; }" LF\
+  ".hide { display: none; }" LF\
+  ".tableWidth { min-width: 400px; }" LF\
+  "" LF\
+  ".tblRegular       { border-collapse: collapse; }" LF\
+  ".tblRegular td    { padding: 6px;  background-image: url(fade.gif);  border: 2px solid #99c; }" LF\
+  ".tblHeaderColor, .tblHeaderColor td { background: #99c; }" LF\
+  ".tblNoBorder td   { border: 0; }" LF\
+  "" LF\
+  "" LF\
+  "// -->" LF\
+  "</style>" LF\
+  "" LF\
+  "</head>" LF\
+  "" LF\
+  "<body>" LF\
+  "<table width=\"76%\" border=\"0\" align=\"center\" cellspacing=\"0\" cellpadding=\"3\" class=\"tableWidth\">" LF\
+  "	<tr>" LF\
+  "	<td id=\"subTitle\">HTTrack Website Copier - Open Source offline browser</td>" LF\
+  "	</tr>" LF\
+  "</table>" LF\
+  "<table width=\"76%\" border=\"0\" align=\"center\" cellspacing=\"0\" cellpadding=\"0\" class=\"tableWidth\">" LF\
+  "<tr class=\"blak\">" LF\
+  "<td>" LF\
+  "	<table width=\"100%\" border=\"0\" align=\"center\" cellspacing=\"1\" cellpadding=\"0\">" LF\
+  "	<tr>" LF\
+  "	<td colspan=\"6\"> " LF\
+  "		<table width=\"100%\" border=\"0\" align=\"center\" cellspacing=\"0\" cellpadding=\"10\">" LF\
+  "		<tr> " LF\
+  "		<td id=\"pageContent\"> " LF\
+  "<!-- ==================== End prologue ==================== -->" LF\
+  "<h1><strong><u>Oops!...</u></strong></h1>" LF\
+  "<h3>This page has <font color=\"red\"><em>not</em></font> been retrieved by HTTrack Website Copier. </h3>" LF\
+  "<script language=\"Javascript\">" LF\
+  "<!--" LF\
+  "  var loc=document.location.toString();" LF\
+  "  if (loc) {" LF\
+  "    var pos=loc.indexOf('link=');" LF\
+  "    if (pos>0) {" LF\
+  "      document.write('Clic to the link <b>below</b> to go to the online location!<br><a href=\"'+loc.substring(pos+5)+'\">'+loc.substring(pos+5)+'</a><br>');" LF\
+  "    } else" LF\
+  "      document.write('(no location defined)');" LF\
+  "  }" LF\
+  "// -->" LF\
+  "</script>" LF\
+  "<h6 align=\"right\">Mirror by HTTrack Website Copier</h6>" LF\
+  "<!-- ==================== Start epilogue ==================== -->" LF\
+  "		</td>" LF\
+  "		</tr>" LF\
+  "		</table>" LF\
+  "	</td>" LF\
+  "	</tr>" LF\
+  "	</table>" LF\
+  "</td>" LF\
+  "</tr>" LF\
+  "</table>" LF\
+  "" LF\
+  "<table width=\"76%\" height=\"100%\" border=\"0\" align=\"center\" valign=\"bottom\" cellspacing=\"0\" cellpadding=\"0\">" LF\
+  "	<tr>" LF\
+  "	<td id=\"footer\"><small>&copy; 1998 Xavier Roche &amp; other contributors - Web Design: Leto Kauler.</small></td>" LF\
+  "	</tr>" LF\
+  "</table>" LF\
+  "" LF\
+  "</body>" LF\
+  "" LF\
+  "</html>" LF\
+  "" LF\
+  "" LF
 
 #define HTS_DATA_UNKNOWN_HTML_LEN 0
 

@@ -132,7 +132,7 @@ hts_cache_store_field(const hts_cache_field *fields, size_t count,
   } else if (fields[i].kind == HTS_CACHE_FIELD_STRING) {
     /* a corrupt cache can carry a field wider than ours; clipping keeps the
        entry, where aborting would take the crawl down */
-    (void) strclipbuff(fields[i].dest, fields[i].dest_size, value);
+    (void) strclipbuff((char *) fields[i].dest, fields[i].dest_size, value);
   }
   return HTS_TRUE;
 }
