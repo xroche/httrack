@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# On GCC 11+, HTS_OWNED_BY(hts_free) must make free() on an hts_strdup() result
-# warn, in C and in C++, while each documented deallocator stays silent.
+# On GCC 11+, a mismatched release of an exported owned result must warn, in C
+# and in C++, while each documented deallocator stays silent.
 
 set -euo pipefail
 
@@ -19,20 +19,28 @@ cat >"$tmp/probe.c" <<'PROBE'
 #if !defined(__GNUC__) || __GNUC__ < 11 || defined(__clang__)
 #error not GCC 11 or later
 #endif
-int probe(void);
-int probe(void) {
+int probe(char *path);
+int probe(char *path) {
   char *const dup = hts_strdup("a");
-  char *const lib = hts_convertStringToUTF8("a", 1, "utf-8");
-  char *const sys = hts_convertStringToUTF8("b", 1, "utf-8");
-  const int ok = dup != NULL && lib != NULL && sys != NULL;
+  void *const mem = hts_malloc(1);
+  char *const categ = hts_getcategories(path, 1);
+  char *const utf8 = hts_convertStringToUTF8("a", 1, "utf-8");
+  const int ok = dup != NULL && mem != NULL && utf8 != NULL;
 
-#ifdef MISMATCH
+#if defined(BAD_DUP)
   free(dup);
+#elif defined(BAD_MEM)
+  free(mem);
+#elif defined(BAD_CATEG)
+  fclose((FILE *) categ);
+#elif defined(BAD_UTF8)
+  fclose((FILE *) utf8);
 #else
   hts_free(dup);
+  hts_free(mem);
+  hts_free(categ);
+  free(utf8);
 #endif
-  hts_free(lib);
-  free(sys);
   return ok;
 }
 PROBE
@@ -46,12 +54,15 @@ check() { # check LANG COMPILER-ARGV...
     [ "$lang" = C ] || src=$tmp/probe.cc
     "$@" -c -o "$tmp/probe.o" -Werror=mismatched-dealloc "$src" 2>"$tmp/ctl.err" ||
         fail_dump "$lang: a documented deallocator warns" "$tmp/ctl.err"
-    if "$@" -c -o "$tmp/probe.o" -Werror=mismatched-dealloc -DMISMATCH "$src" 2>"$tmp/bad.err"; then
-        fail "$lang: free() on an hts_strdup() result compiles silently with $1"
-    fi
-    grep -q 'mismatched-dealloc' "$tmp/bad.err" ||
-        fail_dump "$lang: the mismatch probe fails for another reason" "$tmp/bad.err"
-    echo "OK: $lang ($1) warns on free() of an hts_strdup() result"
+    # fclose() is foreign to every allocator here, so it proves the marking.
+    for bad in BAD_DUP BAD_MEM BAD_CATEG BAD_UTF8; do
+        if "$@" -c -o "$tmp/probe.o" -Werror=mismatched-dealloc -D"$bad" "$src" 2>"$tmp/bad.err"; then
+            fail "$lang: the $bad release compiles silently with $1"
+        fi
+        grep -q 'mismatched-dealloc' "$tmp/bad.err" ||
+            fail_dump "$lang: the $bad probe fails for another reason" "$tmp/bad.err"
+    done
+    echo "OK: $lang ($1) warns on each mismatched release"
 }
 
 inc=(-I"$abs_top_builddir" -I"$abs_top_builddir/src" -I"$top/src")
