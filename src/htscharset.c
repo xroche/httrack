@@ -39,6 +39,7 @@ Please visit our Website: http://www.httrack.com
 #include "htssafe.h"
 #include "htsckd.h"
 #include "htsurlport.h"
+#include "htsarrays.h"
 
 #include <stdint.h>
 #include <stdarg.h>
@@ -930,26 +931,13 @@ static size_t utf8_encode(hts_UCS4 uc, unsigned char *out) {
   return 0;
 }
 
-/* IDNA helpers. */
+/* IDNA helpers, over a TypedArray dest. Running out of memory aborts. */
 #undef ADD_BYTE
-#undef INCREASE_CAPA
-#define INCREASE_CAPA()                                                        \
-  do {                                                                         \
-    capa = capa < 16 ? 16 : (capa << 1);                                       \
-    dest = realloct(dest, capa * sizeof(dest[0]));                             \
-    assertf(dest != NULL);                                                     \
-  } while (0)
-#define ADD_BYTE(C) do { \
-  if (capa == destSize) { \
-    INCREASE_CAPA(); \
-  } \
-  dest[destSize++] = (C); \
-} while(0)
-#define FREE_BUFFER() freet(dest)
+#define ADD_BYTE(C) assertf(TypedArrayPush(dest, (C)))
+#define FREE_BUFFER() TypedArrayFree(dest)
 
 char *hts_convertStringUTF8ToIDNA(hts_span s) {
-  char *dest = NULL;
-  size_t capa = 0, destSize = 0;
+  TypedArray(char) dest = EMPTY_TYPED_ARRAY;
   size_t i, startSeg;
   int nonAsciiFound;
 
@@ -995,12 +983,13 @@ char *hts_convertStringUTF8ToIDNA(hts_span s) {
           }
 
           /* encode */
-          output_length = (punycode_uint) ( capa - destSize );
+          output_length = (punycode_uint) TypedArrayRoom(dest);
           while ((status = punycode_encode(
                       (punycode_uint) segOutputSize, segInt, &output_length,
-                      &dest[destSize])) == punycode_big_output) {
-            INCREASE_CAPA();
-            output_length = (punycode_uint) (capa - destSize);
+                      &TypedArrayTail(dest))) == punycode_big_output) {
+            /* asking past the room doubles the store */
+            assertf(TypedArrayReserve(dest, TypedArrayRoom(dest) + 1));
+            output_length = (punycode_uint) TypedArrayRoom(dest);
           }
 
           /* cleanup */
@@ -1008,7 +997,7 @@ char *hts_convertStringUTF8ToIDNA(hts_span s) {
 
           /* success ? */
           if (status == punycode_success) {
-            destSize += output_length;
+            TypedArraySize(dest) += output_length;
           } else {
             FREE_BUFFER();
             return NULL;
@@ -1037,7 +1026,7 @@ char *hts_convertStringUTF8ToIDNA(hts_span s) {
     }
   }
 
-  return dest;
+  return TypedArrayElts(dest);
 }
 
 hts_boolean hts_host_to_ascii(hts_buf dst, hts_span host) {
@@ -1079,8 +1068,7 @@ hts_boolean hts_isStringIDNA(hts_span s) {
 }
 
 char *hts_convertStringIDNAToUTF8(hts_span s) {
-  char *dest = NULL;
-  size_t capa = 0, destSize = 0;
+  TypedArray(char) dest = EMPTY_TYPED_ARRAY;
   size_t i, startSeg;
   for (i = startSeg = 0; i <= s.len; i++) {
     const unsigned char c = i < s.len ? s.p[i] : 0;
@@ -1089,33 +1077,27 @@ char *hts_convertStringIDNAToUTF8(hts_span s) {
       /* IDNA segment ? */
       if (segSize > 4 && hts_strncasecmp(&s.p[startSeg], "xn--", 4) == 0) {
         punycode_status status;
-        punycode_uint output_capa;
         punycode_uint output_length;
-        punycode_uint *output_dest;
+        TypedArray(punycode_uint) output = EMPTY_TYPED_ARRAY;
 
-        /* no caller passes a 1 GB label, but the 32-bit capa must not wrap */
+        /* no caller passes a 1 GB label, but it would wrap the 32-bit lengths
+         */
         if (segSize > ((punycode_uint) -1) / 4) {
           FREE_BUFFER();
           return NULL;
         }
-        /* encode. pre-reserve buffer. */
-        for(output_capa = 16 ; output_capa < segSize 
-          ; output_capa <<= 1) ;
-        output_dest =
-            (punycode_uint *) calloct(output_capa, sizeof(punycode_uint));
-        if (output_dest == NULL) {
+        /* decode, into room for one code point per input byte */
+        if (!TypedArrayReserve(output, segSize)) {
           FREE_BUFFER();
           return NULL;
         }
-        for (output_length = output_capa;
+        for (output_length = (punycode_uint) TypedArrayCapa(output);
              (status = punycode_decode((punycode_uint) segSize - 4,
                                        &s.p[startSeg + 4], &output_length,
-                                       output_dest)) == punycode_big_output;) {
-          output_capa <<= 1;
-          output_dest = (punycode_uint *) realloct(
-              output_dest, output_capa * sizeof(punycode_uint));
-          assertf(output_dest != NULL);
-          output_length = output_capa;
+                                       TypedArrayElts(output))) ==
+             punycode_big_output;) {
+          assertf(TypedArrayReserve(output, TypedArrayCapa(output) + 1));
+          output_length = (punycode_uint) TypedArrayCapa(output);
         }
 
         /* success ? */
@@ -1123,7 +1105,7 @@ char *hts_convertStringIDNAToUTF8(hts_span s) {
           punycode_uint j;
           for (j = 0; j < output_length; j++) {
             unsigned char seq[4];
-            const size_t n = utf8_encode(output_dest[j], seq);
+            const size_t n = utf8_encode(TypedArrayNth(output, j), seq);
             size_t k;
 
             if (n == 0) {
@@ -1137,7 +1119,7 @@ char *hts_convertStringIDNAToUTF8(hts_span s) {
         }
 
         /* cleanup */
-        freet(output_dest);
+        TypedArrayFree(output);
 
         /* error ? */
         if (status != punycode_success) {
@@ -1158,12 +1140,11 @@ char *hts_convertStringIDNAToUTF8(hts_span s) {
     }
   }
 
-  return dest;
+  return TypedArrayElts(dest);
 }
 
 hts_UCS4 *hts_convertUTF8StringToUCS4(hts_span s, size_t *nChars) {
-  hts_UCS4 *dest = NULL;
-  size_t capa = 0, destSize = 0;
+  TypedArray(hts_UCS4) dest = EMPTY_TYPED_ARRAY;
 
   if (nChars != NULL) {
     *nChars = 0;
@@ -1187,7 +1168,7 @@ hts_UCS4 *hts_convertUTF8StringToUCS4(hts_span s, size_t *nChars) {
   }
   ADD_BYTE('\0');
 
-  return dest;
+  return TypedArrayElts(dest);
 }
 
 hts_boolean hts_isStringUTF8(hts_span s) {
@@ -1207,8 +1188,7 @@ hts_boolean hts_isStringUTF8(hts_span s) {
 
 char *hts_convertUCS4StringToUTF8(const hts_UCS4 *s, size_t nChars) {
   size_t i;
-  char *dest = NULL;
-  size_t capa = 0, destSize = 0;
+  TypedArray(char) dest = EMPTY_TYPED_ARRAY;
   for(i = 0 ; i < nChars ; i++) {
     unsigned char seq[4];
     size_t n = utf8_encode(s[i], seq), k;
@@ -1222,7 +1202,7 @@ char *hts_convertUCS4StringToUTF8(const hts_UCS4 *s, size_t nChars) {
   }
   ADD_BYTE('\0');
 
-  return dest;
+  return TypedArrayElts(dest);
 }
 
 size_t hts_writeUTF8(hts_UCS4 uc, hts_buf dest) {
@@ -1290,4 +1270,4 @@ void hts_json_string(String *out, const char *s) {
 }
 
 #undef ADD_BYTE
-#undef INCREASE_CAPA
+#undef FREE_BUFFER

@@ -1,0 +1,40 @@
+#!/bin/bash
+#
+# A refused growth of an IDNA conversion's output aborts, and a refused
+# punycode decode buffer returns NULL (driven by 'httrack -#test=idna-oom').
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+ulimit -c 0 # a deliberate abort must not litter the box with cores
+
+# Usage: aborts <mode> <N> <host>
+aborts() {
+    local out rc=0
+    out=$(httrack -O /dev/null -#test=idna-oom "$@" 2>&1) || rc=$?
+    case "$out" in
+    *"failed at"*htscharset.c*)
+        test "$rc" -ne 0 || fail "idna-oom $*: the assert fired but exited 0"
+        ;;
+    *) fail "idna-oom $*: expected an abort, got: $out" ;;
+    esac
+}
+
+# héllo.com, and 18 é in one label so the encoder outgrows its first room.
+hello=hex:68c3a96c6c6f2e636f6d
+long=hex:$(printf 'c3a9%.0s' $(seq 18))2e636f6d
+
+selftest_queue "idna-oom: xn--hllo-bpa.com" idna-oom encode 0 "$hello"
+selftest_queue "idna-oom: NULL" idna-oom decode 1 xn--caf-dma.com
+selftest_run_queued
+
+# The first push, then the punycode encoder's own regrowth of a long label.
+aborts encode 1 "$hello"
+aborts encode 2 "$long"
+# A plain label, then a decoded code point.
+aborts decode 1 abc.com
+aborts decode 2 xn--caf-dma.com
+
+exit 0

@@ -39,6 +39,7 @@ Please visit our Website: http://www.httrack.com
 #include "htswarc.h"
 #include "htschanges.h"
 #include "htsthread.h"
+#include "htsarrays.h"
 #include <limits.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -82,9 +83,7 @@ typedef struct back_spooled {
 /* Where a spool record goes: a file, or a growing buffer when fp is NULL. */
 typedef struct back_sink {
   FILE *fp;
-  char *buf;
-  size_t len;
-  size_t cap;
+  TypedArray(char) buf;
 } back_sink;
 
 /* Where a spool record is read from: a file, or a buffer when fp is NULL. */
@@ -1696,22 +1695,9 @@ void back_copy_static(const lien_back * src, lien_back * dst) {
 static hts_boolean back_sink_put(back_sink *s, const void *data, size_t size) {
   if (s->fp != NULL)
     return hts_fwrite_exact(data, size, s->fp);
-  if (size > s->cap - s->len) {
-    size_t cap = s->cap <= SIZE_MAX / 2 ? s->cap * 2 : SIZE_MAX;
-    char *buf;
-
-    if (size > SIZE_MAX - s->len)
-      return HTS_FALSE;
-    if (cap - s->len < size)
-      cap = s->len + size;
-    if ((buf = realloct(s->buf, cap)) == NULL)
-      return HTS_FALSE;
-    s->buf = buf;
-    s->cap = cap;
-  }
-  if (size != 0)
-    memcpy(s->buf + s->len, data, size);
-  s->len += size;
+  if (!TypedArrayReserve(s->buf, size))
+    return HTS_FALSE;
+  TypedArrayAppend(s->buf, (const char *) data, size);
   return HTS_TRUE;
 }
 
@@ -1930,24 +1916,25 @@ int back_unserialize(FILE *fp, lien_back **dst) {
    with freet(). Returns NULL on failure. */
 static back_spooled *back_spool_record(const lien_back *back) {
   back_sink s;
-  char *buf;
   void *mem;
+  void *fit;
   back_spooled *rec;
+  size_t len;
 
   memset(&s, 0, sizeof(s));
-  s.cap = BACK_SPOOLED_HEAD + 4096;
-  if ((s.buf = malloct(s.cap)) == NULL)
+  if (!TypedArrayReserve(s.buf, BACK_SPOOLED_HEAD + 4096))
     return NULL;
-  s.len = BACK_SPOOLED_HEAD;
+  TypedArraySize(s.buf) = BACK_SPOOLED_HEAD;
   if (back_record_write(&s, back) != 0) {
-    freet(s.buf);
+    TypedArrayFree(s.buf);
     return NULL;
   }
-  if (s.len < s.cap && (buf = realloct(s.buf, s.len)) != NULL)
-    s.buf = buf;
-  mem = s.buf;
+  len = TypedArraySize(s.buf);
+  mem = TypedArrayPtr(s.buf);
+  if (len < TypedArrayCapa(s.buf) && (fit = realloct(mem, len)) != NULL)
+    mem = fit;
   rec = mem;
-  rec->len = s.len - BACK_SPOOLED_HEAD;
+  rec->len = len - BACK_SPOOLED_HEAD;
   return rec;
 }
 
