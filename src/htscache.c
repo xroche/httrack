@@ -821,13 +821,15 @@ static htsblk cache_readex_new(httrackp *opt, cache_back *cache,
                   LLint size = r.size;
 
                   if (size > 0) {
-                    size_t nl;
+                    int nl;
 
                     do {
-                      nl =
-                        unzReadCurrentFile((unzFile) cache->zipInput, buff,
-                                           (int) minimum(size, 32768));
-                      if (nl > 0) {
+                      nl = unzReadCurrentFile((unzFile) cache->zipInput, buff,
+                                              (unsigned) minimum(size, 32768));
+                      if (nl < 0) { /* a zlib error code, not a length */
+                        r.statuscode = STATUSCODE_INVALID;
+                        strcpybuff(r.msg, "Cache Read Error : Read Data");
+                      } else if (nl > 0) {
                         size -= nl;
                         if (!hts_fwrite_exact(buff, (size_t) nl,
                                               r.out)) { // erreur
@@ -866,6 +868,9 @@ static htsblk cache_readex_new(httrackp *opt, cache_back *cache,
 #endif
             {                   // lire en mémoire
               size_t n = 0;
+              /* the reads below count in int */
+              const hts_boolean bad_size =
+                  hts_ckd_size(&n, r.size) || n >= INT_MAX;
 
               // We need to get bytes on memory, but the previous version is (supposed to be) on disk.
               if (!dataincache) {
@@ -894,8 +899,7 @@ static htsblk cache_readex_new(httrackp *opt, cache_back *cache,
                     strcpybuff(r.msg,
                                "Previous cache file not found (empty filename)");
                   }
-                } else if (hts_ckd_size(&n, r.size) ||
-                           n >= INT_MAX) { /* too big to read in memory */
+                } else if (bad_size) {
                   r.statuscode = STATUSCODE_INVALID;
                   strcpybuff(r.msg, "Cache Read Error : Bad Size");
                 } else { /* Read in memory from disk */
@@ -926,10 +930,7 @@ static htsblk cache_readex_new(httrackp *opt, cache_back *cache,
               }
               // Data in cache.
               else {
-                /* unzReadCurrentFile() returns an int count */
-                r.adr = !hts_ckd_size(&n, r.size) && n < INT_MAX
-                            ? (char *) malloct(n + 1)
-                            : NULL;
+                r.adr = bad_size ? NULL : (char *) malloct(n + 1);
                 if (r.adr != NULL) {
                   if (unzReadCurrentFile((unzFile) cache->zipInput, r.adr,
                                          (unsigned) n) != r.size) {

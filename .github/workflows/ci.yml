@@ -113,7 +113,7 @@ jobs:
           # proves the flag reached the build, so an empty log means clean
           grep -q -e '^CFLAGS = .*-Wshorten-64-to-32' src/Makefile
           hits=$(grep -E '\[-Wshorten-64-to-32\]' "$RUNNER_TEMP/build.log" \
-            | grep -vE '/src/(coucal|minizip)/' || true)
+            | grep -vE '(^|/)(coucal|minizip)/' || true)
           if [ -n "$hits" ]; then
             echo "$hits"
             echo "::error::64-bit value narrowed to 32 bits; use hts_ckd_int, hts_ckd_size or hts_sat_int (src/htsckd.h)"

@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Runs the checked size_t arithmetic self-test.
+# Runs the checked size_t arithmetic and narrowing self-test.
 
 set -euo pipefail
 
