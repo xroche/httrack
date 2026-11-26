@@ -1701,11 +1701,10 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
       // An empty/whitespace Content-Type value yields no token: keep the
       // sentinel default rather than reading an uninitialized tempo.
       if (sscanf(value, "%1099s", tempo) == 1) { // tempo[1100], server data
-        if (strlen(tempo) < sizeof(retour->contenttype) - 2) // pas trop long!!
-          strcpybuff(retour->contenttype, tempo);
-        else
-          strcpybuff(retour->contenttype,
-                     "application/octet-stream-unknown"); // erreur
+        if (!hts_buf_try_cpy(
+                HTS_BUF_N(retour->contenttype, sizeof(retour->contenttype) - 2),
+                tempo))
+          strcpybuff(retour->contenttype, "application/octet-stream-unknown");
       }
     }
   } else if (HEADER_IS(name, "Content-Range")) {
@@ -2852,11 +2851,8 @@ int ident_url_absolute(const char *url, lien_adrfil *adrfil) {
 
     if (q[0] != '/') // the default page
       strcatbuff(adrfil->fil, "/");
-    // fil[] holds the path plus a possible leading '/' the top strlen() misses.
-    if (strlen(q) >= sizeof(adrfil->fil) - strlen(adrfil->fil))
+    if (!hts_buf_try_cat(HTS_BUF(adrfil->fil), q))
       return -1;
-
-    strcatbuff(adrfil->fil, q);
     // SECURITE:
     // simplifier url pour les ../
     fil_simplifie(adrfil->fil);

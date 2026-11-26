@@ -4273,6 +4273,78 @@ static int st_bufwrite(httrackp *opt, int argc, char **argv) {
   return bad;
 }
 
+/* Fill B with 'P' and its canary with 'C', then copy TEXT in unless NULL. */
+static void st_buftry_reset(char *b, size_t size, const char *text) {
+  memset(b, 'P', size);
+  memset(b + 8, 'C', size - 8);
+  if (text != NULL)
+    memcpy(b, text, strlen(text) + 1);
+}
+
+/* Does B read as WANT (with its NUL), and keep its poison and canary after? */
+static hts_boolean st_buftry_is(const char *b, size_t size, const char *want) {
+  const size_t n = strlen(want) + 1;
+  size_t i;
+
+  if (memcmp(b, want, n) != 0)
+    return HTS_FALSE;
+  for (i = n; i < size; i++) {
+    if (b[i] != (i < 8 ? 'P' : 'C'))
+      return HTS_FALSE;
+  }
+  return HTS_TRUE;
+}
+
+/* buftry: hts_buf_try_cpy and hts_buf_try_cat copy whole or refuse. */
+static int st_buftry(httrackp *opt, int argc, char **argv) {
+  char r[12]; /* an 8-byte buffer, then a 4-byte canary */
+  const hts_buf b = HTS_BUF_N(r, 8);
+  int bad = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  /* try_cpy: an exact fit, one over, an empty S, then sizes 1 and 0 */
+  st_buftry_reset(r, sizeof(r), NULL);
+  bad |=
+      !hts_buf_try_cpy(b, "1234567") || !st_buftry_is(r, sizeof(r), "1234567");
+  st_buftry_reset(r, sizeof(r), NULL);
+  bad |= hts_buf_try_cpy(b, "12345678") || !st_buftry_is(r, sizeof(r), "");
+  st_buftry_reset(r, sizeof(r), NULL);
+  bad |= !hts_buf_try_cpy(b, "") || !st_buftry_is(r, sizeof(r), "");
+  st_buftry_reset(r, sizeof(r), NULL);
+  bad |=
+      !hts_buf_try_cpy(hts_buf_at(r, 1), "") || !st_buftry_is(r, sizeof(r), "");
+  st_buftry_reset(r, sizeof(r), NULL);
+  bad |=
+      hts_buf_try_cpy(hts_buf_at(r, 1), "a") || !st_buftry_is(r, sizeof(r), "");
+  st_buftry_reset(r, sizeof(r), NULL);
+  bad |= hts_buf_try_cpy(hts_buf_at(r, 0), "") || r[0] != 'P';
+  bad |= hts_buf_try_cpy(hts_buf_none(), "");
+  /* try_cat: an exact fit, one over, an empty S, a full B, sizes 1 and 0 */
+  st_buftry_reset(r, sizeof(r), "abc");
+  bad |= !hts_buf_try_cat(b, "defg") || !st_buftry_is(r, sizeof(r), "abcdefg");
+  st_buftry_reset(r, sizeof(r), "abc");
+  bad |= hts_buf_try_cat(b, "defgh") || !st_buftry_is(r, sizeof(r), "abc");
+  st_buftry_reset(r, sizeof(r), "abc");
+  bad |= !hts_buf_try_cat(b, "") || !st_buftry_is(r, sizeof(r), "abc");
+  st_buftry_reset(r, sizeof(r), "1234567");
+  bad |= hts_buf_try_cat(b, "x") || !st_buftry_is(r, sizeof(r), "1234567");
+  bad |= !hts_buf_try_cat(b, "") || !st_buftry_is(r, sizeof(r), "1234567");
+  st_buftry_reset(r, sizeof(r), "");
+  bad |=
+      !hts_buf_try_cat(hts_buf_at(r, 1), "") || !st_buftry_is(r, sizeof(r), "");
+  bad |=
+      hts_buf_try_cat(hts_buf_at(r, 1), "a") || !st_buftry_is(r, sizeof(r), "");
+  st_buftry_reset(r, sizeof(r), NULL);
+  bad |= hts_buf_try_cat(hts_buf_at(r, 0), "") || r[0] != 'P';
+  bad |= hts_buf_try_cat(hts_buf_none(), "");
+  /* a B with no NUL is already over, so even "" is refused */
+  bad |= hts_buf_try_cat(b, "") || r[7] != 'P' || r[8] != 'C';
+  printf(bad ? "buftry: FAILED\n" : "buftry: OK\n");
+  return bad;
+}
+
 /* Print what a span primitive reads as [bytes], for next|nextsep|nextin|split C
    TEXT, param C TEXT, trim L R TEXT, copy SIZE TEXT, or
    header|headersplit TEXT. */
@@ -6060,6 +6132,8 @@ const struct selftest_entry selftests_lib[] = {
     {"bufwrite", "[cpy|cat|catn|unterminated[-cpy|-catn]]",
      "the hts_buf write helpers copy, append, clip and print in bounds",
      st_bufwrite},
+    {"buftry", "", "hts_buf_try_cpy and hts_buf_try_cat write all or refuse",
+     st_buftry},
     {"span",
      "<next|nextsep|split|param|trim|copy|header|headersplit> [args] <text>",
      "the fields and copies the span primitive makes", st_span},

@@ -384,11 +384,11 @@ static const char *bundle_scope_entry(const char *value,
 
   if (value[0] == '.')
     value++;
-  if (value[0] == '\0' || strlen(value) >= sizeof(dom) ||
+  if (value[0] == '\0' ||
       strspn(value, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-                    "0123456789.-") != strlen(value))
+                    "0123456789.-") != strlen(value) ||
+      !hts_buf_try_cpy(HTS_BUF(dom), value))
     return "invalid scope";
-  strcpybuff(dom, value);
   hts_lowcase(dom);
   if (hts_host_is_address(hts_span_of(dom)))
     snprintf(entry, SCOPE_ENTRY_SIZE, "=%s", dom);
@@ -918,12 +918,10 @@ HTSEXT_API hts_boolean hts_bundle_cookie_in_scope(const char *const *urls,
     char url[HTS_URLMAXSIZE];
     char name[HTS_BUNDLE_NAME_MAX];
 
-    if (urls[i] == NULL || strlen(urls[i]) >= sizeof(url))
+    if (urls[i] == NULL || !hts_buf_try_cpy(HTS_BUF(url), urls[i]))
       why = "invalid url";
-    else {
-      strcpybuff(url, urls[i]);
+    else
       why = bundle_cut(url, HTS_BUF(name));
-    }
     if (why == NULL)
       why = bundle_note_url(&b, url);
   }
@@ -1688,6 +1686,7 @@ static const char *paste_name(const char *url, char name[HTS_BUNDLE_NAME_MAX]) {
   const char *h = host;
   // "_con.com" is what the escape below makes of con.com
   const char *const taken = "the name is kept for an escaped device name";
+  const hts_buf nb = hts_buf_at(name, HTS_BUNDLE_NAME_MAX);
   const char *escape;
   hts_boolean www;
   size_t len;
@@ -1711,10 +1710,8 @@ static const char *paste_name(const char *url, char name[HTS_BUNDLE_NAME_MAX]) {
   if (*h == '_' && bundle_name_is_device(h + 1))
     return taken;
   escape = bundle_name_is_device(h) ? "_" : "";
-  if (strlen(h) >= HTS_BUNDLE_NAME_MAX - strlen(escape))
+  if (!hts_buf_try_cpy(nb, escape) || !hts_buf_try_cat(nb, h))
     return "invalid login bundle name: 128 bytes or more";
-  strlcpybuff(name, escape, HTS_BUNDLE_NAME_MAX);
-  strlcatbuff(name, h, HTS_BUNDLE_NAME_MAX);
   return hts_bundle_name_refusal(name);
 }
 

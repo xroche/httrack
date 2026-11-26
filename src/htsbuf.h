@@ -129,6 +129,25 @@ hts_buf_put_span(hts_buf b, hts_span s) {
   return HTS_TRUE;
 }
 
+/* Copy S into B. FALSE, with B emptied, unless it all fits. */
+static HTS_INLINE HTS_UNUSED HTS_CHECK_RESULT hts_boolean
+hts_buf_try_cpy(hts_buf b, const char *s) {
+  return hts_buf_put_span(b, hts_span_of(s));
+}
+
+/* Append S to B's text. FALSE, with B as it was, unless it all fits. */
+static HTS_INLINE HTS_UNUSED HTS_CHECK_RESULT hts_boolean
+hts_buf_try_cat(hts_buf b, const char *s) {
+  char *const end = b.size != 0 ? (char *) memchr(b.p, '\0', b.size) : NULL;
+  const size_t len = strlen(s);
+
+  /* no NUL within B means its text already overflows it */
+  if (end == NULL || len >= b.size - (size_t) (end - b.p))
+    return HTS_FALSE;
+  memcpy(end, s, len + 1);
+  return HTS_TRUE;
+}
+
 /* Copy S as hts_buf_put_span does, but clip it to fit rather than empty B.
    TRUE if it all fit. */
 static HTS_INLINE HTS_UNUSED hts_boolean hts_buf_put_span_clip(hts_buf b,

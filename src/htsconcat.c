@@ -36,30 +36,21 @@ Please visit our Website: http://www.httrack.com
 
 #include "htssafe.h"
 #include "htslib.h"
+#include "htsbuf.h"
 
 /* Concatenate a and b into catbuff; an overflow stops before the part that
    does not fit. */
 #undef concat
 HTSEXT_API char *concat(char *catbuff, size_t size, const char *a, const char *b) {
-  size_t max = 0;
+  const hts_buf out = hts_buf_at(catbuff, size);
 
   RUNTIME_TIME_CHECK_SIZE(size);
 
   catbuff[0] = '\0';
-  if (a != NULL && a[0] != '\0') {
-    max += strlen(a);
-    if (max >= size) {
-      return catbuff;
-    }
-    strcat(catbuff, a);
-  }
-  if (b != NULL && b[0] != '\0') {
-    max += strlen(b);
-    if (max >= size) {
-      return catbuff;
-    }
-    strcat(catbuff, b);
-  }
+  if (a != NULL && !hts_buf_try_cat(out, a))
+    return catbuff;
+  if (b != NULL)
+    (void) !hts_buf_try_cat(out, b);
   return catbuff;
 }
 

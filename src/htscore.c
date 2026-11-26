@@ -1850,18 +1850,16 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
           /* Detect charset to convert links into proper UTF8 filenames */
           page_charset[0] = '\0';
           if (opt->convert_utf8) {
-            /* HTTP charset is prioritary over meta */
+            /* HTTP charset is prioritary over meta; one too long stays unset */
             if (r.charset[0] != '\0') {
-              if (strlen(r.charset) < sizeof(page_charset)) {
-                strcpy(page_charset, r.charset);
-              }
+              (void) !hts_buf_try_cpy(HTS_BUF(page_charset), r.charset);
             }
             /* Attempt to find a meta charset */
             else if (is_html_mime_type(r.contenttype)) {
               char *charset = hts_getCharsetFromMeta(hts_blk_body(&r));
 
-              if (charset != NULL && strlen(charset) < sizeof(page_charset)) {
-                strcpy(page_charset, charset);
+              if (charset != NULL) {
+                (void) !hts_buf_try_cpy(HTS_BUF(page_charset), charset);
               }
               freet(charset);
             }
