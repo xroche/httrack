@@ -170,7 +170,7 @@ static HTS_UNUSED size_t hts_array_index_(const size_t n, const size_t size) {
     /* Largest element count whose byte size still fits a size_t. */           \
     const size_t maxCapa_ = (size_t) -1 / TypedArrayWidth(A);                  \
     assertf(room_ <= maxCapa_ - TypedArraySize(A));                            \
-    /* A failed grow shows in TypedArrayHasRoom(). */                          \
+    /* Callers learn of a failed grow from TypedArrayHasRoom(). */             \
     if (!TypedArrayReserve(A, room_))                                          \
       break;                                                                   \
   } while (0)

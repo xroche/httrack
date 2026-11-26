@@ -297,8 +297,8 @@ static hts_boolean scope_covers(const char *entry, const char *host) {
 #define SCOPE_ENTRY_HOST(entry) ((entry) + ((entry)[0] == '='))
 
 /* Does one of the first n entries of list cover host? */
-static hts_boolean scope_list_covers(const strlist *list, size_t n,
-                                     const char *host) {
+static hts_boolean scope_list_covers_n(const strlist *list, size_t n,
+                                       const char *host) {
   size_t i;
 
   for (i = 0; i < n; i++) {
@@ -308,8 +308,13 @@ static hts_boolean scope_list_covers(const strlist *list, size_t n,
   return HTS_FALSE;
 }
 
+/* Does an entry of list cover host? */
+static hts_boolean scope_list_covers(const strlist *list, const char *host) {
+  return scope_list_covers_n(list, TypedArraySize(*list), host);
+}
+
 static hts_boolean bundle_in_scope(const bundle *b, const char *host) {
-  return scope_list_covers(&b->scope, TypedArraySize(b->scope), host);
+  return scope_list_covers(&b->scope, host);
 }
 
 /* Does one of the first n entries of b's scope cover a cookie set for domain?
@@ -318,7 +323,7 @@ static hts_boolean bundle_keeps_domain(const bundle *b, size_t n,
                                        const char *domain,
                                        char host[COOKIE_MAX_DOMAIN]) {
   return cookie_host(domain, host, COOKIE_MAX_DOMAIN) &&
-         scope_list_covers(&b->scope, n, host[0] == '.' ? host + 1 : host);
+         scope_list_covers_n(&b->scope, n, host[0] == '.' ? host + 1 : host);
 }
 
 /* Add entry to list, up to max. NULL, or why it could not. */
@@ -552,7 +557,7 @@ static hts_boolean bundle_admit(cookie_filter *filter, t_cookie *cookie,
   }
   bare = host[0] == '.' ? host + 1 : host;
   // an earlier pass loaded it
-  if (scope_list_covers(&ctx->b->scope, ctx->first_entry, bare))
+  if (scope_list_covers_n(&ctx->b->scope, ctx->first_entry, bare))
     return HTS_FALSE;
   if (strlen(name) > COOKIE_MAX_PAIR ||
       strlen(value) > COOKIE_MAX_PAIR - strlen(name)) {
@@ -565,8 +570,7 @@ static hts_boolean bundle_admit(cookie_filter *filter, t_cookie *cookie,
                   : !repeat) &&
              !hts_span_eq(cookie_field(other, 6), hts_span_of(value))) {
     // outside this bundle's home, a later check decides
-    if (ctx->clashes != NULL &&
-        !scope_list_covers(&ctx->b->home, TypedArraySize(ctx->b->home), bare)) {
+    if (ctx->clashes != NULL && !scope_list_covers(&ctx->b->home, bare)) {
       if (!strlist_add(&ctx->clashes->hosts, bare))
         filter->why = "out of memory";
       ctx->clashed++;
@@ -781,8 +785,7 @@ hts_boolean hts_bundle_load_all(httrackp *opt, const char *jar_file,
   // refuse a skipped clash on a site that is a bundle's home
   for (i = 0; i < TypedArraySize(clashes.hosts) && ok; i++) {
     for (j = 0; j < n && ok; j++) {
-      if (scope_list_covers(&items[j].home, TypedArraySize(items[j].home),
-                            TypedArrayNth(clashes.hosts, i))) {
+      if (scope_list_covers(&items[j].home, TypedArrayNth(clashes.hosts, i))) {
         hts_buf_printf_clip(
             err, "%s: a cookie for %s has another value in another bundle",
             items[j].file, TypedArrayNth(clashes.hosts, i));
@@ -931,7 +934,7 @@ HTSEXT_API hts_boolean hts_bundle_cookie_in_scope(const char *const *urls,
   return keeps;
 }
 
-/* Add name to the n names of *names unless it is there. HTS_FALSE when out of
+/* Add name to names unless it is there. HTS_FALSE when out of
    memory. */
 static hts_boolean names_add_once(strlist *names, const char *name) {
   size_t i;
@@ -1509,7 +1512,8 @@ static const char *paste_load_records(httrackp *opt, bundle *b,
                                       const String *text, t_cookie *jar,
                                       const char *hosts, int *left_out,
                                       int *line) {
-  const size_t own = TypedArraySize(b->scope);
+  const strlist *const scope = &b->scope;
+  const size_t own = TypedArraySize(*scope);
   t_cookie *all = calloct(1, sizeof(t_cookie));
   bundle_jar ctx;
   cookie_filter filter;
@@ -1532,9 +1536,9 @@ static const char *paste_load_records(httrackp *opt, bundle *b,
   filter.ctx = &ctx;
   why = paste_load_pass(opt, &filter, text, jar, &stored, line);
   // the address's own records first, so the hosts never crowd them out
-  if (why == NULL && TypedArraySize(b->scope) > own) {
+  if (why == NULL && TypedArraySize(*scope) > own) {
     ctx.first_entry = own;
-    ctx.end_entry = TypedArraySize(b->scope);
+    ctx.end_entry = TypedArraySize(*scope);
     ctx.give_way = HTS_TRUE;
     ctx.admitted = 0;
     filter.full_skips = HTS_TRUE;
@@ -1556,19 +1560,21 @@ static void paste_scope_text(const bundle *b, size_t own, const t_cookie *jar,
   hts_boolean *used;
   hts_boolean any = HTS_FALSE;
   const char *a = jar->data;
+  const strlist *const scope = &b->scope;
+  const size_t n = TypedArraySize(*scope);
   size_t i;
 
-  if (TypedArraySize(b->scope) == own)
+  if (n == own)
     return;
-  used = calloct(TypedArraySize(b->scope), sizeof(*used));
+  used = calloct(n, sizeof(*used));
   if (used == NULL)
     return;
   while (*a != '\0') {
     a += binput(a, HTS_BUF(line));
     if (!cookie_host(cookie_get(HTS_SIZED(buffer), line, 0), HTS_SIZED(host)))
       continue;
-    for (i = 0; i < TypedArraySize(b->scope); i++) {
-      if (scope_covers(TypedArrayNth(b->scope, i),
+    for (i = 0; i < n; i++) {
+      if (scope_covers(TypedArrayNth(*scope, i),
                        host[0] == '.' ? host + 1 : host)) {
         used[i] = HTS_TRUE;
         any = any || i >= own;
@@ -1576,10 +1582,10 @@ static void paste_scope_text(const bundle *b, size_t own, const t_cookie *jar,
       }
     }
   }
-  for (i = 0; any && i < TypedArraySize(b->scope); i++) {
+  for (i = 0; any && i < n; i++) {
     if (i < own || used[i]) {
       StringCat(*text, "scope ");
-      StringCat(*text, SCOPE_ENTRY_HOST(TypedArrayNth(b->scope, i)));
+      StringCat(*text, SCOPE_ENTRY_HOST(TypedArrayNth(*scope, i)));
       StringCat(*text, LF);
     }
   }

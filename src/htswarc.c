@@ -171,8 +171,8 @@ static int wbuf_printf(wbuf *b, HTS_FORMAT_STRING const char *fmt, ...) {
   /* Never advance past what was reserved, whatever the second pass returns. */
   if (n < 0 || (size_t) n >= need)
     return -1;
-  TypedArraySize(*b) +=
-      (size_t) n; /* the NUL is scratch, overwritten by the next append */
+  /* The NUL is scratch, overwritten by the next append. */
+  TypedArraySize(*b) += (size_t) n;
   return 0;
 }
 

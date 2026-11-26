@@ -10,6 +10,16 @@ set -euo pipefail
 
 assert_selftest "arrays: push OK" arrays push
 
+# A missing overflow bound spins, so cap the run (macOS has no timeout(1)).
+bounded() {
+    if command -v timeout >/dev/null; then timeout -k 5 10 "$@"; else "$@"; fi
+}
+got=$(bounded httrack -O /dev/null -#test=arrays reserve-overflow 2>&1) || true
+case "$got" in
+*"arrays: reserve overflow OK"*) ;;
+*) fail "expected an overflowing reserve to fail at once, got: $got" ;;
+esac
+
 err=$(httrack -O /dev/null -#test=arrays at-past-end 2>&1) || true
 case "$err" in
 *"arrays: NOT aborted"*)
