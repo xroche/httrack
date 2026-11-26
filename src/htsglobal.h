@@ -104,16 +104,31 @@ Please visit our Website: http://www.httrack.com
 #endif
 #endif
 
-/* HTS_OWNED: the result is a fresh heap block the caller frees with freet().
-   Never on a function that can return its argument, a ring slot or a static. */
-#ifndef HTS_OWNED
+/* HTS_FREED_BY(dealloc): DEALLOC, declared before it, may release the result.
+   GCC then warns when another deallocator releases it. */
+#ifndef HTS_FREED_BY
 #if defined(__GNUC__) && __GNUC__ >= 11 && !defined(__clang__)
-#define HTS_OWNED HTS_CHECK_RESULT __attribute__((malloc, malloc(free, 1)))
-#elif defined(__GNUC__)
-#define HTS_OWNED HTS_CHECK_RESULT __attribute__((malloc))
+#define HTS_FREED_BY(dealloc) __attribute__((malloc(dealloc, 1)))
 #else
-#define HTS_OWNED HTS_CHECK_RESULT
+#define HTS_FREED_BY(dealloc)
 #endif
+#endif
+
+/* HTS_OWNED_BY(dealloc): the result is a fresh heap block the caller releases
+   with DEALLOC. Never on a function that can return its argument, a ring slot
+   or a static. */
+#ifndef HTS_OWNED_BY
+#ifdef __GNUC__
+#define HTS_OWNED_BY(dealloc)                                                  \
+  HTS_CHECK_RESULT __attribute__((malloc)) HTS_FREED_BY(dealloc)
+#else
+#define HTS_OWNED_BY(dealloc) HTS_CHECK_RESULT
+#endif
+#endif
+
+/* HTS_OWNED: a fresh heap block the caller frees with freet(). */
+#ifndef HTS_OWNED
+#define HTS_OWNED HTS_OWNED_BY(free)
 #endif
 
 /* Marks a printf-style format parameter so MSVC /analyze checks callers. */

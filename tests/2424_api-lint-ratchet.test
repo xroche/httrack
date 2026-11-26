@@ -46,6 +46,7 @@ char *lint_own_arg(char *s) { if (s != NULL) return s; return strdupt(""); }
 char *lint_own_moved(size_t n) { char *p = malloct(n + 1); p++; return p; }
 struct lint_s *lint_own_struct(void) { return malloct(8); }
 void *lint_own_void(size_t n) { return calloct(n, 2); }
+char *lint_own_by(const char *s) { if (s == NULL) return NULL; return strdupt(s); }
 C
 cat >"${work}/src/lintowned.h" <<'C'
 HTSEXT_API char *lint_own_dup(const char *s);
@@ -56,6 +57,7 @@ HTSEXT_API char *lint_own_arg(char *s);
 HTSEXT_API char *lint_own_moved(size_t n);
 HTSEXT_API struct lint_s *lint_own_struct(void);
 HTSEXT_API void *lint_own_void(size_t n);
+HTSEXT_API HTS_OWNED_BY(hts_free) char *lint_own_by(const char *s);
 C
 sed 's/^HTS_OWNED char \*hts_mask_passwords(/char *hts_mask_passwords(/' \
     "${srcdir}/src/htslib.h" >"${work}/src/htslib.h"
