@@ -1124,41 +1124,36 @@ static HTS_INLINE HTS_UNUSED hts_boolean statuscode_is_internal(int code) {
    record we EMIT or PERSIST, so "unknown/unknown" never reaches a consumer
    (a served Content-Type, a ProxyTrack .arc record, ...). */
 #define hts_effective_mime(m)                                                  \
-  (strfield2((m), HTS_UNKNOWN_MIME) ? HTS_HYPERTEXT_DEFAULT_MIME : (m))
+  (hts_streq_ci((m), HTS_UNKNOWN_MIME) ? HTS_HYPERTEXT_DEFAULT_MIME : (m))
 
 #define is_html_mime_type(a)                                                   \
-  ((strfield2((a), "text/html") != 0) ||                                       \
-   (strfield2((a), "application/xhtml+xml") != 0) ||                           \
-   (strfield2((a), HTS_UNKNOWN_MIME) !=                                        \
-    0) /* no declared type: treat as html */                                   \
-  )
+  (hts_streq_ci((a), "text/html") ||                                           \
+   hts_streq_ci((a), "application/xhtml+xml") ||                               \
+   hts_streq_ci((a), HTS_UNKNOWN_MIME) /* no declared type: treat as html */)
 /* Every JavaScript type we link-scan: IANA's text/javascript, which is what
    servers send and what our own table emits for .mjs, plus the legacy
    application spellings .js still maps to. */
 #define is_javascript_mime_type(a)                                             \
-  ((strfield2((a), "text/javascript") != 0) ||                                 \
-   (strfield2((a), "application/javascript") != 0) ||                          \
-   (strfield2((a), "application/x-javascript") != 0) ||                        \
-   (strfield2((a), "application/ecmascript") != 0))
+  (hts_streq_ci((a), "text/javascript") ||                                     \
+   hts_streq_ci((a), "application/javascript") ||                              \
+   hts_streq_ci((a), "application/x-javascript") ||                            \
+   hts_streq_ci((a), "application/ecmascript"))
 #define is_hypertext_mime__(a)                                                 \
   (is_html_mime_type(a) || is_javascript_mime_type(a) ||                       \
-   (strfield2((a), "text/css") !=                                              \
-    0) /*|| (strfield2((a),"text/vnd.wap.wml")!=0)*/                           \
-   || (strfield2((a), "image/svg+xml") != 0) ||                                \
-   (strfield2((a), "image/svg-xml") !=                                         \
-    0) /*|| (strfield2((a),"audio/x-pn-realaudio")!=0) */                      \
-   || (strfield2((a), "application/x-authorware-map") != 0) ||                 \
-   (strfield2((a), "application/rss+xml") != 0) ||                             \
-   (strfield2((a), "application/atom+xml") != 0))
+   hts_streq_ci((a), "text/css") || hts_streq_ci((a), "image/svg+xml") ||      \
+   hts_streq_ci((a), "image/svg-xml") ||                                       \
+   hts_streq_ci((a), "application/x-authorware-map") ||                        \
+   hts_streq_ci((a), "application/rss+xml") ||                                 \
+   hts_streq_ci((a), "application/atom+xml"))
 /* Every spelling servers use for an m3u playlist, HLS's included. */
 #define is_playlist_mime_type(a)                                               \
-  ((strfield2((a), "audio/x-mpegurl") != 0) ||                                 \
-   (strfield2((a), "audio/mpegurl") != 0) ||                                   \
-   (strfield2((a), "application/x-mpegurl") != 0) ||                           \
-   (strfield2((a), "application/vnd.apple.mpegurl") != 0))
+  (hts_streq_ci((a), "audio/x-mpegurl") ||                                     \
+   hts_streq_ci((a), "audio/mpegurl") ||                                       \
+   hts_streq_ci((a), "application/x-mpegurl") ||                               \
+   hts_streq_ci((a), "application/vnd.apple.mpegurl"))
 /* TODO: text/xml and application/xml, once their content is checked. */
 #define may_be_hypertext_mime__(a)                                             \
-  ((strfield2((a), "audio/x-pn-realaudio") != 0) || is_playlist_mime_type(a))
+  (hts_streq_ci((a), "audio/x-pn-realaudio") || is_playlist_mime_type(a))
 
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
@@ -1228,17 +1223,18 @@ HTS_STATIC int may_be_hypertext_mime(httrackp * opt, const char *mime,
 }
 
 // compare (mime, file) with reference
-HTS_STATIC int compare_mime(httrackp * opt, const char *mime, const char *file,
-                            const char *reference) {
+HTS_STATIC HTS_CHECK_RESULT int compare_mime(httrackp *opt, const char *mime,
+                                             const char *file,
+                                             const char *reference) {
   if (is_hypertext_mime__(mime) || may_be_hypertext_mime__(mime))
-    return strfield2(mime, reference);
+    return hts_streq_ci(mime, reference);
   if (file != NULL && file[0] != '\0' && may_unknown(opt, mime)) {
     char guessed[256];
 
     guessed[0] = '\0';
     if (!guess_httptype_sized(opt, guessed, sizeof(guessed), file))
       return 0;
-    return strfield2(guessed, reference);
+    return hts_streq_ci(guessed, reference);
   }
   return 0;
 }
