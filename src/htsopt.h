@@ -272,8 +272,8 @@ struct htsoptstate {
   unsigned int debug_state;  /**< one bit per debug warning already logged */
   unsigned int tmpnameid; /**< counter for temporary file names */
   int is_ended;           /**< mirror has finished */
-  void *warc; /**< WARC writer (warc_writer*), or NULL, or the WARC_DISABLED
-                   sentinel (htswarc.c) */
+  void *warc; /**< WARC writer (warc_writer*), or NULL, or a WARC_DISABLED
+                   or WARC_LOST sentinel (htswarc.c) */
 };
 
 /** One module the engine has loaded, either from -%W (--callback) or from the
