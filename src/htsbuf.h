@@ -150,8 +150,8 @@ hts_buf_try_cat(hts_buf b, const char *s) {
 
 /* Copy S as hts_buf_put_span does, but clip it to fit rather than empty B.
    TRUE if it all fit. */
-static HTS_INLINE HTS_UNUSED hts_boolean hts_buf_put_span_clip(hts_buf b,
-                                                               hts_span s) {
+static HTS_INLINE HTS_UNUSED HTS_CHECK_RESULT hts_boolean
+hts_buf_put_span_clip(hts_buf b, hts_span s) {
   size_t n;
 
   if (b.size == 0)

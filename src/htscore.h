@@ -529,7 +529,8 @@ void filters_bind(httrackp *opt, char ***ptrfilters, int *filptr);
 
 /* Insert pattern at pos. Warn and return HTS_FALSE when it is too long or the
    array is full (#1270). */
-hts_boolean filters_insert(httrackp *opt, int pos, const char *pattern);
+HTS_CHECK_RESULT hts_boolean filters_insert(httrackp *opt, int pos,
+                                            const char *pattern);
 
 /* Remove the n rules starting at pos, shifting the rest down. */
 void filters_remove(httrackp *opt, int pos, int n);

@@ -114,7 +114,7 @@ size_t st_decode_body(const char *arg, hts_buf buf) {
     }
     buf.p[n] = '\0';
   } else {
-    (void) hts_buf_put_span_clip(buf, hts_span_of(arg));
+    (void) !hts_buf_put_span_clip(buf, hts_span_of(arg));
     n = strlen(buf.p);
   }
   return n;

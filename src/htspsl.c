@@ -68,7 +68,7 @@ static void psl_add(coucal rules, hts_span rule) {
 static void psl_install(coucal rules, hts_span version) {
   coucal_delete(&psl_rules);
   psl_rules = rules;
-  hts_buf_put_span_clip(HTS_BUF(psl_version), version);
+  (void) !hts_buf_put_span_clip(HTS_BUF(psl_version), version); // shown only
 }
 
 /* Return the leading bytes of S up to its first blank or CR. */

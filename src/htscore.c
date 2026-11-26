@@ -1132,7 +1132,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
 
             htsbuff_cpy(&fb, type ? "+" : "-");
             htsbuff_cat(&fb, tempo);
-            filters_insert(opt, filptr, rule); /* bumps filptr when stored */
+            /* bumps filptr when stored, and logs a drop */
+            (void) !filters_insert(opt, filptr, rule);
           }
 
           if (!filters_grow(opt, 1)) {
@@ -2449,7 +2450,7 @@ void host_ban(httrackp * opt, int ptr,
     htsbuff_cpy(&fb, "-");
     htsbuff_cat(&fb, host);
     htsbuff_cat(&fb, "/*"); // forbid host/*
-    filters_insert(opt, *_FILTERS_PTR, rule);
+    (void) !filters_insert(opt, *_FILTERS_PTR, rule); // it logs a drop
   }
   // oups
   if (strlen(host) <= 1) {      // euhh?? longueur <= 1

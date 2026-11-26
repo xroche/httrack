@@ -464,7 +464,7 @@ hts_boolean url_query_value(const char *url, const char *name, hts_buf dst) {
     return HTS_FALSE;
   }
   /* crawled query text: clip it */
-  hts_buf_put_span_clip(dst, f.val);
+  (void) !hts_buf_put_span_clip(dst, f.val);
   return HTS_TRUE;
 }
 
