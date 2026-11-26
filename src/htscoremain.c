@@ -3097,7 +3097,8 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
     }
     if (exit_code == 0 && warc_lost_opt(opt)) {
       exit_code = HTS_EXIT_WARC_INCOMPLETE;
-      HTS_PANIC_PRINTF("the WARC archive is incomplete, see the log file");
+      HTS_PANIC_PRINTF(
+          "the WARC archive is incomplete or missing, see the log file");
     }
 
     /* Not after a fault: that mirror is not resumable. */

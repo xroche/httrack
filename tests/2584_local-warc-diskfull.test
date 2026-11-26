@@ -10,7 +10,10 @@ set -euo pipefail
 require_httrack
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_warcfull.XXXXXX")
-cleanup() { rm -rf "$tmpdir"; }
+cleanup() {
+    chmod -R u+w "$tmpdir"
+    rm -rf "$tmpdir"
+}
 cleanup_push cleanup
 
 skip_on_windows "a native binary does not follow an MSYS symlink to /dev/full"
@@ -32,6 +35,25 @@ local_crawl --log "${tmpdir}/log-whole" --quiet --robots=0 -O "${tmpdir}/whole" 
     --warc-file "${tmpdir}/whole/ok.warc.gz" "${BASEURL}/mini304/index.html" ||
     fail "a crawl with a whole archive exited $?"
 ok "a crawl with a whole archive exits 0"
+
+# An archive that cannot be created was asked for and not produced either.
+ro="${tmpdir}/readonly"
+mkdir -p "$ro"
+chmod a-w "$ro"
+if : 2>/dev/null >"${ro}/probe"; then
+    echo "a read-only directory is writable here (root?): no create arm"
+else
+    rc=0
+    local_crawl --log "${tmpdir}/log-noopen" --quiet --robots=0 \
+        -O "${tmpdir}/noopen" --warc-file "${ro}/no.warc.gz" \
+        "${BASEURL}/mini304/index.html" || rc=$?
+    log=$(<"${tmpdir}/noopen/hts-log.txt")
+    test "$rc" -eq "$LOST_STATUS" ||
+        fail "an archive that was never created exited ${rc}: ${log}"
+    grep -q 'could not create WARC archive' <<<"$log" ||
+        fail "the failed archive was not reported: ${log}"
+    ok "an archive that cannot be created exits ${LOST_STATUS}"
+fi
 
 # Mirror with archive $2 on /dev/full, and leave the WARC error lines in $lost.
 crawl_warc_full() {

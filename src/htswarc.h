@@ -106,7 +106,7 @@ void warc_write_backtransaction(httrackp *opt, lien_back *back);
    warc_abort_opt() are final: a later transaction reopens nothing. */
 void warc_close_opt(httrackp *opt);
 
-/* Did the archive warc_close_opt() closed lose a record? */
+/* Did the archive lose a record, or fail to be created? */
 hts_boolean warc_lost_opt(const httrackp *opt);
 
 /* Same as warc_close_opt(), but discards this run's archive: keeps the previous

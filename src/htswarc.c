@@ -59,7 +59,7 @@ Please visit our Website: http://www.httrack.com
 /* opt->state.warc value meaning "no writer, and do not open one": the open
    failed, or the session is done with the archive. */
 #define WARC_DISABLED ((void *) ~(uintptr_t) 0)
-/* Same, after closing an archive that lost a record. */
+/* Same, for an archive that lost a record or could not be created. */
 #define WARC_LOST ((void *) (~(uintptr_t) 0 - 1))
 
 /* Does opt->state.warc hold a writer? */
@@ -1855,7 +1855,7 @@ void warc_write_backtransaction(httrackp *opt, lien_back *back) {
   if (opt->state.warc == NULL) {
     w = warc_open(opt, StringBuff(opt->warc_file));
     if (w == NULL) {
-      opt->state.warc = WARC_DISABLED;
+      opt->state.warc = WARC_LOST; /* asked for and not produced */
       hts_log_print(opt, LOG_ERROR, "could not create WARC archive %s",
                     StringBuff(opt->warc_file));
       return;
