@@ -5,8 +5,9 @@ macros, header functions that can fail without HTS_CHECK_RESULT, a span's
 passing x.p, x.len (or x.p + n, x.len - n) as two arguments where the callee
 could take the span, raw strcpy, strcat, strncpy, strncat, sprintf or
 vsprintf calls outside the htssafe.h wrappers, a file-scope or static array of
-pointers whose pointers are not const, which stays writable, and a header
-prototype of a function that only its defining file uses.
+pointers whose pointers are not const, which stays writable, a header
+prototype of a function that only its defining file uses, and a header
+function returning a fresh char or void pointer without HTS_OWNED.
 Known cases live in tools/api-lint/, and --update rewrites those baselines.
 Known limits: a failure delegated through two calls or to a static function,
 free names inside _Generic, and a function defined only in a later branch of an
@@ -21,6 +22,11 @@ with a macro, and it scans only src/.
 The local rule counts names, so a function sharing its name with a field or a
 macro stays unreported. It never sees a function whose prototype is not in a
 header, nor one whose definition a macro builds.
+The owned rule follows a return only into a call, or into a local whose every
+assignment is a call or NULL, so a buffer a macro or a String builds goes
+unreported.
+Even when it asks, never mark a block also stored elsewhere before it is
+returned, nor a void * grow helper over a block of pointers.
 """
 
 import argparse
@@ -29,7 +35,17 @@ import os
 import re
 import sys
 
-RULES = ("ctype", "macro", "check-result", "span", "pair", "libc", "table", "local")
+RULES = (
+    "ctype",
+    "macro",
+    "check-result",
+    "span",
+    "pair",
+    "libc",
+    "table",
+    "local",
+    "owned",
+)
 HEADER = "# Known %s violations. Regenerate: tools/check-api-lint.py --update\n"
 
 # Vendored trees follow their upstream's conventions.
@@ -540,7 +556,7 @@ def check_result(files):
             if not fh:
                 continue
             name, ret = fh
-            if "HTS_CHECK_RESULT" in head:
+            if re.search(r"\b(HTS_CHECK_RESULT|HTS_OWNED)\b", head):
                 marked.add(name)
             if body is not None and "static" not in ret.split():
                 bodies[name].append(body)
@@ -819,6 +835,94 @@ def check_table(code):
         yield line_of(code, m.start()), m.group(1), msg
 
 
+# Calls whose result is a fresh heap pointer the caller frees.
+ALLOCATORS = frozenset(
+    "malloct calloct realloct strdupt hts_span_dup StringAcquire".split()
+)
+OWNED_TYPE = re.compile(r"^(?:(?:const|unsigned|signed)\s+)*(?:char|void)\s*\*$")
+OWNED_CALL = re.compile(r"(?:\([\w\s*]+\)\s*)?([A-Za-z_]\w*)\s*\(")
+NULLS = ("NULL", "0", "(NULL)")
+
+
+def dereferenced(body, at):
+    """Is the name at AT the target of a *name, rather than a declared name?"""
+    before = body[max(0, at - 64) : at].rstrip()
+    if not before.endswith("*"):
+        return False
+    before = before.rstrip("* \t\n")
+    return not before or not (before[-1].isalnum() or before[-1] == "_")
+
+
+def owned_deps(body):
+    """Return the callees that must all be owned for every non-NULL return of
+    BODY to be fresh, or None when one never is."""
+    deps = set()
+
+    def call(e):
+        m = OWNED_CALL.match(e)
+        if m is None or matching(e, m.end() - 1) != len(e):
+            return False
+        deps.add(m.group(1))
+        return True
+
+    values = [squash(v).strip() for v in re.findall(r"\breturn\b\s*([^;]*);", body)]
+    values = [v for v in values if v not in NULLS]
+    if not values:
+        return None
+    for v in values:
+        if call(v):
+            continue
+        var = re.fullmatch(r"\(?\s*([A-Za-z_]\w*)\s*\)?", v)
+        if not var:
+            return None
+        name = re.escape(var.group(1))
+        sets = [
+            m.group(1)
+            for m in re.finditer(r"(?<![\w.>])%s\s*=(?!=)\s*([^;]*)" % name, body)
+            if not dereferenced(body, m.start())
+        ]
+        moved = r"(?<![\w.>])%s\s*(\+\+|--|[-+]=)|(\+\+|--)\s*%s\b" % (name, name)
+        if not sets or re.search(moved, body):
+            return None
+        if not all(e.strip() in NULLS or call(e.strip()) for e in sets):
+            return None
+    return deps
+
+
+def check_owned(files):
+    """Yield (path, line, key, message) for a header function returning a fresh
+    char or void pointer without HTS_OWNED."""
+    deps = collections.defaultdict(list)
+    decls = []
+    marked = set()
+    for path, code in files.items():
+        for start, head, body in top_level(code):
+            fh = function_head(head)
+            if not fh or "*" not in fh[1]:
+                continue
+            name, ret = fh
+            if "HTS_OWNED" in head:
+                marked.add(name)
+            if body is not None:
+                deps[name].append(owned_deps(body))
+            if path.endswith(".h"):
+                decls.append((path, start, head, name, ret))
+    owned = set(ALLOCATORS) | marked
+    grew = True
+    while grew:
+        grew = False
+        for name, found in deps.items():
+            if name not in owned and all(d is not None and d <= owned for d in found):
+                owned.add(name)
+                grew = True
+    for path, start, head, name, ret in decls:
+        ret = squash(re.sub(r"\b(static|extern|inline|[A-Z][A-Z0-9_]*)\b", " ", ret))
+        if name in marked or name not in owned or not OWNED_TYPE.match(ret.strip()):
+            continue
+        line = line_of(files[path], start + len(head) - len(head.lstrip()))
+        yield path, line, name, "%s returns a fresh pointer without HTS_OWNED" % name
+
+
 def scan(root):
     """Map each rule to a list of (path, line, key, message)."""
     paths = []
@@ -856,6 +960,7 @@ def scan(root):
                     ) as fh:
                         others[os.path.join(top, f)] = strip_comments(fh.read())
     found["local"] = list(check_local(files, others))
+    found["owned"] = list(check_owned(files))
     for path, code in files.items():
         for line, key, msg in check_span(path, raws[path], code):
             found["span"].append((path, line, key, msg))

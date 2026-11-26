@@ -52,8 +52,8 @@ typedef unsigned int hts_UCS4;
  * Convert the string "s" from UTF-8 to charset "charset".
  * Return NULL upon error.
  **/
-HTS_CHECK_RESULT extern char *hts_convertStringFromUTF8(hts_span s,
-                                                        const char *charset);
+HTS_OWNED extern char *hts_convertStringFromUTF8(hts_span s,
+                                                 const char *charset);
 
 /**
  * Same, but refusing to lose a code point the charset can not represent:
@@ -61,13 +61,13 @@ HTS_CHECK_RESULT extern char *hts_convertStringFromUTF8(hts_span s,
  * substituted string (Windows substitutes, iconv fails).
  * Return NULL upon error.
  **/
-HTS_CHECK_RESULT extern char *
-hts_convertStringFromUTF8Strict(hts_span s, const char *charset);
+HTS_OWNED extern char *hts_convertStringFromUTF8Strict(hts_span s,
+                                                       const char *charset);
 
 /**
  * Convert an UTF-8 string to an IDNA (RFC 3492) string.
  **/
-HTS_CHECK_RESULT extern char *hts_convertStringUTF8ToIDNA(hts_span s);
+HTS_OWNED extern char *hts_convertStringUTF8ToIDNA(hts_span s);
 
 /**
  * Write the ASCII (IDNA) form of host into dst; dst may overlap host.
@@ -78,7 +78,7 @@ extern hts_boolean hts_host_to_ascii(hts_buf dst, hts_span host);
 /**
  * Convert an IDNA (RFC 3492) string to an UTF-8 string.
  **/
-HTS_CHECK_RESULT extern char *hts_convertStringIDNAToUTF8(hts_span s);
+HTS_OWNED extern char *hts_convertStringIDNAToUTF8(hts_span s);
 
 /**
  * Has the given string any IDNA segments ?
@@ -89,7 +89,7 @@ extern hts_boolean hts_isStringIDNA(hts_span s);
  * Extract the <meta> charset from the HTML in page (HTML5 charset= or legacy
  * http-equiv form). Returns a malloc'ed string, or NULL if none.
  **/
-HTS_CHECK_RESULT extern char *hts_getCharsetFromMeta(hts_span page);
+HTS_OWNED extern char *hts_getCharsetFromMeta(hts_span page);
 
 /**
  * Is the given string an ASCII string ?
@@ -131,14 +131,14 @@ extern size_t hts_appendStringUTF8(hts_buf dest, const char *src,
  * Convert an UTF-8 string into an Unicode string (0-terminated).
  * Each byte that hts_isStringUTF8() would refuse becomes one U+FFFD.
  **/
-HTS_CHECK_RESULT extern hts_UCS4 *hts_convertUTF8StringToUCS4(hts_span s,
-                                                              size_t *nChars);
+HTS_OWNED extern hts_UCS4 *hts_convertUTF8StringToUCS4(hts_span s,
+                                                       size_t *nChars);
 
 /**
  * Convert an Unicode string into an UTF-8 string.
  **/
-HTS_CHECK_RESULT extern char *hts_convertUCS4StringToUTF8(const hts_UCS4 *s,
-                                                          size_t nChars);
+HTS_OWNED extern char *hts_convertUCS4StringToUTF8(const hts_UCS4 *s,
+                                                   size_t nChars);
 
 /**
  * Write the Unicode character 'uc' in 'dest', keeping one byte free.
@@ -173,19 +173,19 @@ extern void hts_json_string(String *out, const char *s);
  * Convert UTF-8 to WCHAR.
  * This function is WIN32 specific.
  **/
-extern LPWSTR hts_convertUTF8StringToUCS2(hts_span s, int *pwsize);
+HTS_OWNED extern LPWSTR hts_convertUTF8StringToUCS2(hts_span s, int *pwsize);
 
 /**
  * Convert from WCHAR.
  * This function is WIN32 specific.
  **/
-extern char *hts_convertUCS2StringToUTF8(LPWSTR woutput, int wsize);
+HTS_OWNED extern char *hts_convertUCS2StringToUTF8(LPWSTR woutput, int wsize);
 
 /**
  * Convert a UTF-8 path to UCS-2 for the wide file APIs, with a \\?\ prefix
  * above MAX_PATH (#133). Internal and WIN32 only. The caller frees it.
  **/
-extern LPWSTR hts_pathToUCS2(const char *path);
+HTS_OWNED extern LPWSTR hts_pathToUCS2(const char *path);
 
 #endif
 

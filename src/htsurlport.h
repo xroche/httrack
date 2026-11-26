@@ -222,7 +222,7 @@ HTS_CHECK_RESULT hts_boolean hts_header_next(hts_span *rest,
                                              hts_header_field *f);
 
 /* A malloct'ed copy of S as a C string, or NULL when out of memory. */
-HTS_CHECK_RESULT char *hts_span_dup(hts_span s);
+HTS_OWNED char *hts_span_dup(hts_span s);
 
 /* Is S one or more decimal digits? */
 HTS_CHECK_RESULT hts_boolean hts_span_is_digits(hts_span s);

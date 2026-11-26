@@ -122,8 +122,10 @@ void hts_strip_default_port(hts_buf link);
 const char *hts_parse_escape_selftest(const hts_boolean parens,
                                       const char *const s, hts_buf out);
 
-char *hts_parse_sink_selftest(const hts_boolean enabled, const int inscript,
-                              const int inscript_tag, const char *const s);
+HTS_OWNED char *hts_parse_sink_selftest(const hts_boolean enabled,
+                                        const int inscript,
+                                        const int inscript_tag,
+                                        const char *const s);
 
 /*
   Does a quoted string the dirty parser found look like a link? "str" is the

@@ -67,11 +67,11 @@ void st_read_file(const char *path, hts_buf buf);
 
 /* Read the whole file at path into a heap buffer, NUL-terminated, and set *len.
    Return NULL when it cannot be read. The caller frees it with freet(). */
-char *st_slurp(const char *path, size_t *len);
+HTS_OWNED char *st_slurp(const char *path, size_t *len);
 
 /* Same as st_slurp, but path is in the system charset (not UTF-8 on Windows).
  */
-char *st_slurp_ansi(const char *path, size_t *len);
+HTS_OWNED char *st_slurp_ansi(const char *path, size_t *len);
 
 /* Set *dest to the Sec-Fetch-Dest named name, "empty" being UNKNOWN. Return
    HTS_FALSE, after complaining, when name is no destination. */
@@ -114,7 +114,7 @@ int st_verdict(const char *label, int err);
    ST_SIZED_GUARD bytes of a non-zero canary. Starts as "". Free with freet().
  */
 #define ST_SIZED_GUARD 16
-char *st_sized_alloc(size_t cap);
+HTS_OWNED char *st_sized_alloc(size_t cap);
 
 /* Is the canary past buf[cap] untouched? */
 HTS_CHECK_RESULT hts_boolean st_sized_guard_ok(const char *buf, size_t cap);
@@ -143,7 +143,7 @@ void parsediff_fail(parsediff_stats *st, const char *site, const char *in,
                     const char *arg, const char *old, const char *cur);
 
 /* Return a malloct'd run of N copies of C, which the caller frees. */
-char *parsediff_run(char c, size_t n);
+HTS_OWNED char *parsediff_run(char c, size_t n);
 
 /* Append to OUT up to MAXTOK - 1 tokens drawn from ALPHABET by the LCG SEED. */
 void parsediff_random(String *out, uint32_t *seed, const char *const *alphabet,

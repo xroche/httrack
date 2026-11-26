@@ -104,6 +104,18 @@ Please visit our Website: http://www.httrack.com
 #endif
 #endif
 
+/* HTS_OWNED: the result is a fresh heap block the caller frees with freet().
+   Never on a function that can return its argument, a ring slot or a static. */
+#ifndef HTS_OWNED
+#if defined(__GNUC__) && __GNUC__ >= 11 && !defined(__clang__)
+#define HTS_OWNED HTS_CHECK_RESULT __attribute__((malloc, malloc(free, 1)))
+#elif defined(__GNUC__)
+#define HTS_OWNED HTS_CHECK_RESULT __attribute__((malloc))
+#else
+#define HTS_OWNED HTS_CHECK_RESULT
+#endif
+#endif
+
 /* Marks a printf-style format parameter so MSVC /analyze checks callers. */
 #ifndef HTS_FORMAT_STRING
 #ifdef _MSC_VER

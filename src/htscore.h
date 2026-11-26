@@ -320,7 +320,7 @@ HTS_STATIC int cache_readable(cache_back * cache) {
 /* Library-internal only (engine TUs). */
 #ifdef HTS_INTERNAL_BYTECODE
 
-char *hts_cancel_file_pop(httrackp * opt);
+HTS_OWNED char *hts_cancel_file_pop(httrackp *opt);
 
 /* Path of NAME inside the mirror log dir, in the rotating concat buffer. */
 static HTS_INLINE HTS_UNUSED char *hts_logpath(httrackp *opt,
@@ -409,8 +409,6 @@ int filesave(httrackp *opt, hts_span body, const char *s,
              const char *url_adr /* = NULL */,
              const char *url_fil /* = NULL */);
 
-char *hts_cancel_file_pop(httrackp * opt);
-
 int check_fatal_io_errno(void);
 
 /* Log a disk-full abort and stop the mirror. */
@@ -486,7 +484,8 @@ void hts_finish_makeindex(httrackp *opt, int *makeindex_done,
    dangling last byte as U+FFFD. 'swap' selects little-endian input. Returns a
    NUL-terminated buffer to release with freet(), its length (NUL excluded) in
    *outsize, or NULL when the result does not fit memory. */
-char *hts_ucs2_to_utf8(hts_span src, hts_boolean swap, size_t *outsize);
+HTS_OWNED char *hts_ucs2_to_utf8(hts_span src, hts_boolean swap,
+                                 size_t *outsize);
 
 /* Does the UTF-16 src read as text: some ASCII, and next to no lone
    surrogates, private-use, noncharacters or C0 controls? */

@@ -1,0 +1,4 @@
+# Known owned violations. Regenerate: tools/check-api-lint.py --update
+src/htsstrings.h: StringAcquire
+src/httrack-library.h: hts_convertStringSystemToUTF8
+src/httrack-library.h: hts_convertStringUTF8ToSystem

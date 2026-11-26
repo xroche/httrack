@@ -134,18 +134,18 @@ int cache_zip_store_stream(zipFile zf, FILE *fp);
    frees with freet(), or NULL (readfile_or substitutes defaultdata). Bytes are
    not transcoded, readfile_utf8 only takes a UTF-8 path, and *size, when
    non-NULL, gets the byte count without the NUL. */
-HTS_CHECK_RESULT char *readfile2(const char *fil, LLint *size);
+HTS_OWNED char *readfile2(const char *fil, LLint *size);
 
 /* readfile2() refusing a body too large for the int indexes downstream, on the
    same stat that sizes the read: a caller checking the size itself would leave
    a window for the file to grow. NULL when it does not fit. "fil" is UTF-8,
    as a mirror path is. */
-HTS_CHECK_RESULT char *readfile2_inmem(const char *fil, LLint *size);
+HTS_OWNED char *readfile2_inmem(const char *fil, LLint *size);
 
-HTS_CHECK_RESULT char *readfile_utf8(const char *fil);
+HTS_OWNED char *readfile_utf8(const char *fil);
 
-HTS_CHECK_RESULT char *readfile2_utf8(const char *fil, LLint *size);
+HTS_OWNED char *readfile2_utf8(const char *fil, LLint *size);
 
-HTS_CHECK_RESULT char *readfile_or(const char *fil, const char *defaultdata);
+HTS_OWNED char *readfile_or(const char *fil, const char *defaultdata);
 
 #endif

@@ -70,7 +70,7 @@ void warc_http_header_value(const char *hdr, const char *name, hts_buf out);
    the caller frees with freet. A SET_CL of 0 or more replaces Content-Length
    with that value, and -1 keeps it. Return NULL when RESP_HDR is NULL or memory
    runs out. Exposed for the -#test=warcspandiff test. */
-char *warc_normalized_headers(const char *resp_hdr, long long set_cl);
+HTS_OWNED char *warc_normalized_headers(const char *resp_hdr, long long set_cl);
 
 typedef struct warc_writer warc_writer;
 
