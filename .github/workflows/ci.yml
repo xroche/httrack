@@ -105,7 +105,7 @@ jobs:
           set -euo pipefail
           make -j"$(nproc)" 2>&1 | tee "$RUNNER_TEMP/build.log"
 
-      # Vendored coucal and minizip are exempt: their fixes go upstream.
+      # Vendored minizip is exempt: its fixes go upstream.
       - name: Reject 64-to-32 narrowing
         if: contains(matrix.cflags, '-Wshorten-64-to-32')
         run: |
@@ -113,7 +113,7 @@ jobs:
           # proves the flag reached the build, so an empty log means clean
           grep -q -e '^CFLAGS = .*-Wshorten-64-to-32' src/Makefile
           hits=$(grep -E '\[-Wshorten-64-to-32\]' "$RUNNER_TEMP/build.log" \
-            | grep -vE '(^|/)(coucal|minizip)/' || true)
+            | grep -vE '(^|/)minizip/' || true)
           if [ -n "$hits" ]; then
             echo "$hits"
             echo "::error::64-bit value narrowed to 32 bits; use hts_ckd_int, hts_ckd_size or hts_sat_int (src/htsckd.h)"
