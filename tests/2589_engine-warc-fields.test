@@ -1,0 +1,19 @@
+#!/bin/bash
+#
+# Each optional WARC header lands on the record that carries it.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+httrack_bin=$(httrack_path)
+
+scratch=$(mktemp -d)
+cleanup_push rm -rf "$scratch"
+
+out=$("$httrack_bin" -O /dev/null "-#test=warc-fields" "$scratch/")
+echo "$out"
+case "$out" in
+*": OK") ;;
+*) exit 1 ;;
+esac

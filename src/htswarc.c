@@ -1080,23 +1080,43 @@ static void warc_wacz_package(warc_writer *w) {
 /* Close the current segment and open the next; writes its warcinfo. */
 static int warc_rotate(warc_writer *w);
 
-/* Emit one full WARC record. When http_section, the block holds http_hdr
-   (maybe empty) and a CRLF, then body when has_body. block_len is counted the
-   way stream_block emits. truncated is a WARC-Truncated reason or NULL, and
-   out_id (may be NULL) receives the record id. */
-static int warc_emit(warc_writer *w, const char *type, const char *content_type,
-                     const char *target_uri, const char *ip,
-                     const char *concurrent_to, const char *refers_uri,
-                     const char *refers_date, const char *profile,
-                     const char *payload_digest, const char *truncated,
-                     const char *cdx_status, const char *cdx_mime,
-                     int http_section, hts_span http_hdr, int has_body,
-                     warc_body body, char out_id[64]) {
+/* One WARC record for warc_emit. A NULL field omits its header. */
+typedef struct {
+  const char *type;
+  const char *content_type;
+  /* optional WARC-* header fields */
+  const char *target_uri;
+  const char *ip;
+  const char *concurrent_to;
+  const char *refers_uri;
+  const char *refers_date;
+  const char *profile;
+  const char *payload_digest;
+  const char *truncated; /* a WARC-Truncated reason */
+  /* CDXJ and WACZ index fields, never written into the record */
+  const char *cdx_status;
+  const char *cdx_mime;
+  /* the block: http_hdr (maybe empty) and a CRLF when http_section, then body
+     when has_body */
+  hts_boolean http_section;
+  hts_span http_hdr;
+  hts_boolean has_body;
+  warc_body body;
+} warc_record;
+
+static int stream_record(const warc_record *rec, warc_sink sink, void *ctx) {
+  return stream_block(rec->http_section, rec->http_hdr, rec->has_body,
+                      rec->body, sink, ctx);
+}
+
+/* Emit one full WARC record. block_len is counted the way stream_block emits,
+   and out_id (may be NULL) receives the record id. */
+static int warc_emit(warc_writer *w, const warc_record *rec, char out_id[64]) {
   wbuf hdr;
   member m;
   char id[64], date[32];
-  size_t sep = http_section ? 2 : 0;
-  size_t payload = has_body ? body.len : 0;
+  size_t sep = rec->http_section ? 2 : 0;
+  size_t payload = rec->has_body ? rec->body.len : 0;
   size_t block_len;
   int rc = -1;
 #if HTS_USEOPENSSL
@@ -1110,7 +1130,7 @@ static int warc_emit(warc_writer *w, const char *type, const char *content_type,
   /* Rotate to the next segment before this record when the current one is full;
      never split a record, and never rotate a warcinfo (it opens a segment). */
   if (w->max_size > 0 && w->seg_base != NULL && w->offset >= w->max_size &&
-      strcmp(type, "warcinfo") != 0) {
+      strcmp(rec->type, "warcinfo") != 0) {
     if (warc_rotate(w) != 0) {
       w->failed = HTS_TRUE;
       return -1;
@@ -1118,11 +1138,11 @@ static int warc_emit(warc_writer *w, const char *type, const char *content_type,
   }
 
   /* F4: overflow-safe block length; http_hdr.len+sep is provably small. */
-  if (payload > (size_t) -1 - http_hdr.len - sep) {
+  if (payload > (size_t) -1 - rec->http_hdr.len - sep) {
     w->failed = HTS_TRUE;
     return -1;
   }
-  block_len = http_hdr.len + sep + payload;
+  block_len = rec->http_hdr.len + sep + payload;
 
   memset(&hdr, 0, sizeof(hdr));
   warc_make_id(w, id);
@@ -1133,8 +1153,7 @@ static int warc_emit(warc_writer *w, const char *type, const char *content_type,
   d.block = EVP_MD_CTX_new();
   d.payload = NULL;
   if (d.block != NULL && EVP_DigestInit_ex(d.block, EVP_sha1(), NULL) == 1 &&
-      stream_block(http_section, http_hdr, has_body, body, digest_sink, &d) ==
-          0 &&
+      stream_record(rec, digest_sink, &d) == 0 &&
       EVP_DigestFinal_ex(d.block, md, &mdlen) == 1 && mdlen == 20) {
     base32_20(md, block_b32);
     have_block_digest = 1;
@@ -1144,48 +1163,49 @@ static int warc_emit(warc_writer *w, const char *type, const char *content_type,
 #endif
 
   if (wbuf_puts(&hdr, "WARC/1.1\r\n") != 0 ||
-      wbuf_printf(&hdr, "WARC-Type: %s\r\n", type) != 0 ||
+      wbuf_printf(&hdr, "WARC-Type: %s\r\n", rec->type) != 0 ||
       wbuf_printf(&hdr, "WARC-Record-ID: %s\r\n", id) != 0 ||
       wbuf_printf(&hdr, "WARC-Date: %s\r\n", date) != 0)
     goto done;
-  if (content_type != NULL &&
-      wbuf_printf(&hdr, "Content-Type: %s\r\n", content_type) != 0)
+  if (rec->content_type != NULL &&
+      wbuf_printf(&hdr, "Content-Type: %s\r\n", rec->content_type) != 0)
     goto done;
   if (wbuf_printf(&hdr, "Content-Length: %llu\r\n",
                   (unsigned long long) block_len) != 0)
     goto done;
-  if (w->info_id[0] != '\0' && strcmp(type, "warcinfo") != 0 &&
+  if (w->info_id[0] != '\0' && strcmp(rec->type, "warcinfo") != 0 &&
       wbuf_printf(&hdr, "WARC-Warcinfo-ID: %s\r\n", w->info_id) != 0)
     goto done;
-  if (target_uri != NULL && target_uri[0] != '\0' &&
-      wbuf_printf(&hdr, "WARC-Target-URI: %s\r\n", target_uri) != 0)
+  if (rec->target_uri != NULL && rec->target_uri[0] != '\0' &&
+      wbuf_printf(&hdr, "WARC-Target-URI: %s\r\n", rec->target_uri) != 0)
     goto done;
-  if (ip != NULL && ip[0] != '\0' &&
-      wbuf_printf(&hdr, "WARC-IP-Address: %s\r\n", ip) != 0)
+  if (rec->ip != NULL && rec->ip[0] != '\0' &&
+      wbuf_printf(&hdr, "WARC-IP-Address: %s\r\n", rec->ip) != 0)
     goto done;
-  if (concurrent_to != NULL && concurrent_to[0] != '\0' &&
-      wbuf_printf(&hdr, "WARC-Concurrent-To: %s\r\n", concurrent_to) != 0)
+  if (rec->concurrent_to != NULL && rec->concurrent_to[0] != '\0' &&
+      wbuf_printf(&hdr, "WARC-Concurrent-To: %s\r\n", rec->concurrent_to) != 0)
     goto done;
-  if (profile != NULL &&
-      wbuf_printf(&hdr, "WARC-Profile: %s\r\n", profile) != 0)
+  if (rec->profile != NULL &&
+      wbuf_printf(&hdr, "WARC-Profile: %s\r\n", rec->profile) != 0)
     goto done;
-  if (refers_uri != NULL && refers_uri[0] != '\0' &&
-      wbuf_printf(&hdr, "WARC-Refers-To-Target-URI: %s\r\n", refers_uri) != 0)
+  if (rec->refers_uri != NULL && rec->refers_uri[0] != '\0' &&
+      wbuf_printf(&hdr, "WARC-Refers-To-Target-URI: %s\r\n", rec->refers_uri) !=
+          0)
     goto done;
-  if (refers_date != NULL && refers_date[0] != '\0' &&
-      wbuf_printf(&hdr, "WARC-Refers-To-Date: %s\r\n", refers_date) != 0)
+  if (rec->refers_date != NULL && rec->refers_date[0] != '\0' &&
+      wbuf_printf(&hdr, "WARC-Refers-To-Date: %s\r\n", rec->refers_date) != 0)
     goto done;
 #if HTS_USEOPENSSL
   if (have_block_digest &&
       wbuf_printf(&hdr, "WARC-Block-Digest: sha1:%s\r\n", block_b32) != 0)
     goto done;
 #endif
-  if (payload_digest != NULL && payload_digest[0] != '\0' &&
-      wbuf_printf(&hdr, "WARC-Payload-Digest: sha1:%s\r\n", payload_digest) !=
-          0)
+  if (rec->payload_digest != NULL && rec->payload_digest[0] != '\0' &&
+      wbuf_printf(&hdr, "WARC-Payload-Digest: sha1:%s\r\n",
+                  rec->payload_digest) != 0)
     goto done;
-  if (truncated != NULL &&
-      wbuf_printf(&hdr, "WARC-Truncated: %s\r\n", truncated) != 0)
+  if (rec->truncated != NULL &&
+      wbuf_printf(&hdr, "WARC-Truncated: %s\r\n", rec->truncated) != 0)
     goto done;
   if (wbuf_puts(&hdr, "\r\n") != 0)
     goto done;
@@ -1195,8 +1215,7 @@ static int warc_emit(warc_writer *w, const char *type, const char *content_type,
   { /* member start (before writing): CDXJ offset for this record */
     uint64_t rec_offset = w->offset;
     if (member_write(&m, wbuf_span(&hdr)) != 0 ||
-        stream_block(http_section, http_hdr, has_body, body, write_sink, &m) !=
-            0 ||
+        stream_record(rec, write_sink, &m) != 0 ||
         member_write(&m, hts_span_of("\r\n\r\n")) != 0) {
       member_end(&m);
       goto done;
@@ -1206,17 +1225,18 @@ static int warc_emit(warc_writer *w, const char *type, const char *content_type,
 
     w->offset = warc_stream_offset(w->f, w->offset);
     /* Index response/revisit/resource records only (not warcinfo/request). */
-    if (w->cdx_on && target_uri != NULL && target_uri[0] != '\0' &&
-        (strcmp(type, "response") == 0 || strcmp(type, "revisit") == 0 ||
-         strcmp(type, "resource") == 0))
-      warc_cdx_add(w, target_uri, date, cdx_status, cdx_mime, payload_digest,
-                   rec_offset, w->offset - rec_offset);
+    if (w->cdx_on && rec->target_uri != NULL && rec->target_uri[0] != '\0' &&
+        (strcmp(rec->type, "response") == 0 ||
+         strcmp(rec->type, "revisit") == 0 ||
+         strcmp(rec->type, "resource") == 0))
+      warc_cdx_add(w, rec->target_uri, date, rec->cdx_status, rec->cdx_mime,
+                   rec->payload_digest, rec_offset, w->offset - rec_offset);
     /* WACZ pages: top-level 200 text/html captures. */
-    if (w->wacz_on && target_uri != NULL && target_uri[0] != '\0' &&
-        strcmp(type, "response") == 0 && cdx_status != NULL &&
-        strcmp(cdx_status, "200") == 0 && cdx_mime != NULL &&
-        hts_strncasecmp(cdx_mime, "text/html", 9) == 0)
-      warc_page_add(w, target_uri, date);
+    if (w->wacz_on && rec->target_uri != NULL && rec->target_uri[0] != '\0' &&
+        strcmp(rec->type, "response") == 0 && rec->cdx_status != NULL &&
+        strcmp(rec->cdx_status, "200") == 0 && rec->cdx_mime != NULL &&
+        hts_strncasecmp(rec->cdx_mime, "text/html", 9) == 0)
+      warc_page_add(w, rec->target_uri, date);
   }
   if (out_id != NULL)
     strlcpybuff(out_id, id, 64);
@@ -1253,13 +1273,16 @@ static const char *warc_open_path(warc_writer *w, const char *final,
 
 /* Emit the warcinfo that heads a segment; sets w->info_id for its records. */
 static int warc_write_warcinfo_record(warc_writer *w) {
-  w->info_id[0] = '\0'; /* warcinfo itself carries no WARC-Warcinfo-ID */
-  return warc_emit(
-      w, "warcinfo", "application/warc-fields", NULL, NULL, NULL, NULL, NULL,
-      NULL, NULL, NULL, NULL, NULL, 0, hts_span_at(NULL, 0), 1,
-      warc_body_mem(hts_span_at(
+  const warc_record rec = {
+      .type = "warcinfo",
+      .content_type = "application/warc-fields",
+      .has_body = HTS_TRUE,
+      .body = warc_body_mem(hts_span_at(
           w->info_fields, w->info_fields != NULL ? strlen(w->info_fields) : 0)),
-      w->info_id);
+  };
+
+  w->info_id[0] = '\0'; /* warcinfo itself carries no WARC-Warcinfo-ID */
+  return warc_emit(w, &rec, w->info_id);
 }
 
 /* Final path of segment s (the run's only archive when rotation is off). */
@@ -1772,22 +1795,44 @@ int warc_write_transaction(warc_writer *w, const char *target_uri,
   /* Response first, because its id links the request via WARC-Concurrent-To.
      Tag WARC-Truncated only on a full response, since a revisit is a dedup. */
   resp_id[0] = '\0';
-  if (warc_emit(w, is_revisit ? "revisit" : "response",
-                "application/http;msgtype=response", target_uri, ip, NULL,
-                refers_uri, refers_date, profile, have_pdig ? pdig : NULL,
-                emit_body ? warc_truncated_reason(truncated) : NULL, statusbuf,
-                mimebuf, 1, wbuf_span(&http), emit_body, body, resp_id) != 0) {
-    wbuf_free(&http);
-    return -1;
-  }
-  wbuf_free(&http);
+  {
+    const warc_record resp = {
+        .type = is_revisit ? "revisit" : "response",
+        .content_type = "application/http;msgtype=response",
+        .target_uri = target_uri,
+        .ip = ip,
+        .refers_uri = refers_uri,
+        .refers_date = refers_date,
+        .profile = profile,
+        .payload_digest = have_pdig ? pdig : NULL,
+        .truncated = emit_body ? warc_truncated_reason(truncated) : NULL,
+        .cdx_status = statusbuf,
+        .cdx_mime = mimebuf,
+        .http_section = HTS_TRUE,
+        .http_hdr = wbuf_span(&http),
+        .has_body = emit_body,
+        .body = body,
+    };
+    const int resp_rc = warc_emit(w, &resp, resp_id);
 
-  if (req_hdr != NULL && req_hdr[0] != '\0' &&
-      warc_emit(w, "request", "application/http;msgtype=request", target_uri,
-                NULL, resp_id, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0,
-                hts_span_at(NULL, 0), 1, warc_body_mem(hts_span_of(req_hdr)),
-                NULL) != 0)
-    return -1;
+    wbuf_free(&http);
+    if (resp_rc != 0)
+      return -1;
+  }
+
+  if (req_hdr != NULL && req_hdr[0] != '\0') {
+    const warc_record req = {
+        .type = "request",
+        .content_type = "application/http;msgtype=request",
+        .target_uri = target_uri,
+        .concurrent_to = resp_id,
+        .has_body = HTS_TRUE,
+        .body = warc_body_mem(hts_span_of(req_hdr)),
+    };
+
+    if (warc_emit(w, &req, NULL) != 0)
+      return -1;
+  }
 
   /* Record this payload for later identical-payload-digest revisits. */
   if (!is_revisit && have_pdig && w->seen != NULL && target_uri != NULL) {
@@ -1820,14 +1865,21 @@ int warc_write_resource(warc_writer *w, const char *target_uri, const char *ip,
   int have_pdig = has_body ? payload_digest_b32(body, pdig) : 0;
   /* resource: the block is the raw payload, its own MIME is the record's
      Content-Type, and there is no HTTP request/response envelope. */
-  return warc_emit(w, "resource",
-                   (content_type != NULL && content_type[0] != '\0')
-                       ? content_type
-                       : "application/octet-stream",
-                   target_uri, ip, NULL, NULL, NULL, NULL,
-                   have_pdig ? pdig : NULL, warc_truncated_reason(truncated),
-                   NULL, content_type, 0, hts_span_at(NULL, 0), has_body, body,
-                   NULL);
+  const warc_record rec = {
+      .type = "resource",
+      .content_type = (content_type != NULL && content_type[0] != '\0')
+                          ? content_type
+                          : "application/octet-stream",
+      .target_uri = target_uri,
+      .ip = ip,
+      .payload_digest = have_pdig ? pdig : NULL,
+      .truncated = warc_truncated_reason(truncated),
+      .cdx_mime = content_type,
+      .has_body = has_body,
+      .body = body,
+  };
+
+  return warc_emit(w, &rec, NULL);
 }
 
 /* ---- engine emit hook ---- */
