@@ -4741,6 +4741,69 @@ static int st_spanlist(httrackp *opt, int argc, char **argv) {
   return failures != 0;
 }
 
+/* Check the C-string case-insensitive names against strfield and strfield2,
+   which they replace, and the empty strings where they differ by design. */
+static int st_cinames(httrackp *opt, int argc, char **argv) {
+  static const struct {
+    const char *a, *b;
+    hts_boolean eq, starts; /* hts_streq_ci(a, b), hts_starts_with_ci(a, b) */
+  } cases[] = {
+      {"", "", HTS_TRUE, HTS_TRUE},
+      {"a", "", HTS_FALSE, HTS_TRUE},
+      {"", "a", HTS_FALSE, HTS_FALSE},
+      {"get /", "GET ", HTS_FALSE, HTS_TRUE},
+      {"ge", "get ", HTS_FALSE, HTS_FALSE},
+      {"Host:", "host:", HTS_TRUE, HTS_TRUE},
+      {"ab", "abc", HTS_FALSE, HTS_FALSE},
+      {"abc", "abd", HTS_FALSE, HTS_FALSE},
+      {"[", "{", HTS_FALSE, HTS_FALSE},
+      {"@x", "`", HTS_FALSE, HTS_FALSE},
+      {"\xc9", "\xe9", HTS_FALSE, HTS_FALSE},
+      {"x\xe9y", "X\xe9", HTS_FALSE, HTS_TRUE},
+      {"\xe9", "\xe9", HTS_TRUE, HTS_TRUE},
+  };
+
+  size_t i, failures = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+    const size_t alen = strlen(cases[i].a);
+    /* an exact-size copy, so ASan sees a read past the subject */
+    char *a = malloct(alen + 1);
+    const char *rest;
+    hts_boolean skipped;
+    int bad;
+
+    assertf(a != NULL);
+    memcpy(a, cases[i].a, alen + 1);
+    rest = a;
+    skipped = hts_skip_prefix_ci(&rest, cases[i].b);
+    bad = hts_streq_ci(a, cases[i].b) != cases[i].eq ||
+          hts_starts_with_ci(a, cases[i].b) != cases[i].starts ||
+          skipped != cases[i].starts ||
+          rest != (skipped ? a + strlen(cases[i].b) : a);
+    /* strfield and strfield2 call "" no match, so agree only past that */
+    if (cases[i].b[0] != '\0')
+      bad |= (strfield(a, cases[i].b) != 0) != cases[i].starts ||
+             (strfield(a, cases[i].b) != 0 &&
+              a + strfield(a, cases[i].b) != rest) ||
+             (strfield2(a, cases[i].b) != 0) != cases[i].eq;
+    if (bad) {
+      printf("cinames: FAIL case %u (\"%s\", \"%s\")\n", (unsigned) i,
+             cases[i].a, cases[i].b);
+      failures++;
+    }
+    freet(a);
+  }
+  printf("cinames: %u cases, %u failures\n",
+         (unsigned) (sizeof(cases) / sizeof(cases[0])), (unsigned) failures);
+  if (failures == 0)
+    printf("cinames: OK\n");
+  return failures != 0;
+}
+
 /* Check the span finders on an empty span, a match at either end and none. */
 static int st_spanfind(httrackp *opt, int argc, char **argv) {
   static const struct {
@@ -6144,6 +6207,8 @@ const struct selftest_entry selftests_lib[] = {
     {"spanlist", "", "the token a span list holds", st_spanlist},
     {"spanfind", "", "the byte a span finder stops at, from either end",
      st_spanfind},
+    {"cinames", "", "hts_streq_ci and the prefix tests agree with strfield",
+     st_cinames},
     {"headerparse", "<file>",
      "the fields treathead_opt() reads from each response in a file",
      st_headerparse},

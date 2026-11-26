@@ -95,6 +95,31 @@ static HTS_INLINE HTS_UNUSED int hts_strcasecmp(const char *a, const char *b) {
   return hts_strncasecmp(a, b, (size_t) -1);
 }
 
+/* Are A and B equal with A-Z folded? Unlike strfield2, "" equals "". */
+static HTS_INLINE HTS_UNUSED HTS_CHECK_RESULT hts_boolean
+hts_streq_ci(const char *a, const char *b) {
+  return hts_strcasecmp(a, b) == 0;
+}
+
+/* Move *S past PREFIX and return TRUE if *S starts with it, A-Z folded, else
+   return FALSE and leave *S alone. Unlike strfield, "" is a prefix of all. */
+static HTS_INLINE HTS_UNUSED HTS_CHECK_RESULT hts_boolean
+hts_skip_prefix_ci(const char **s, const char *prefix) {
+  const char *p = *s;
+
+  for (; *prefix != '\0'; p++, prefix++)
+    if (hts_tolower((unsigned char) *p) != hts_tolower((unsigned char) *prefix))
+      return HTS_FALSE;
+  *s = p;
+  return HTS_TRUE;
+}
+
+/* Does S start with PREFIX, A-Z folded? "" is a prefix of every S. */
+static HTS_INLINE HTS_UNUSED HTS_CHECK_RESULT hts_boolean
+hts_starts_with_ci(const char *s, const char *prefix) {
+  return hts_skip_prefix_ci(&s, prefix);
+}
+
 /* Lower-case A-Z in s, in place. */
 static HTS_INLINE HTS_UNUSED void hts_lowcase(char *s) {
   for (; *s != '\0'; s++)

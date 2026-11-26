@@ -492,7 +492,7 @@ static void back_launch_cmd(void *pP) {
   return;
 }
 
-void webhttrack_main(char *cmd) {
+void webhttrack_main(const char *cmd) {
   char *copy;
 
   hts_init();

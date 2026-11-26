@@ -40,7 +40,7 @@ Please visit our Website: http://www.httrack.com
 #define MAX_LEN_INPROGRESS 40
 
 int main(int argc, char **argv);
-void webhttrack_main(char *cmd);
+void webhttrack_main(const char *cmd);
 void webhttrack_lock(void);
 void webhttrack_release(void);
 
