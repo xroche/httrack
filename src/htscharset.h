@@ -73,7 +73,8 @@ HTS_OWNED extern char *hts_convertStringUTF8ToIDNA(hts_span s);
  * Write the ASCII (IDNA) form of host into dst; dst may overlap host.
  * HTS_FALSE, dst untouched, if it has none or does not fit.
  **/
-extern hts_boolean hts_host_to_ascii(hts_buf dst, hts_span host);
+extern HTS_CHECK_RESULT hts_boolean hts_host_to_ascii(hts_buf dst,
+                                                      hts_span host);
 
 /**
  * Convert an IDNA (RFC 3492) string to an UTF-8 string.

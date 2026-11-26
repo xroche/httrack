@@ -41,15 +41,15 @@ hts_boolean cookie_is_host_only(const char *rec);
 
 /* Write the jar to name, or only a header if it is empty. Return 0 on
    success. */
-int cookie_write(t_cookie *cookie, const char *name);
+HTS_CHECK_RESULT int cookie_write(t_cookie *cookie, const char *name);
 
 /* Name in dst a temporary beside path that no other run or thread writes. */
 HTS_CHECK_RESULT hts_boolean cookie_tmpname(hts_buf dst, const char *path);
 
 /* Make bak hold what file holds, leaving file in place. */
-hts_boolean cookie_backup(const char *file, const char *bak);
+HTS_CHECK_RESULT hts_boolean cookie_backup(const char *file, const char *bak);
 
 /* Move tmp over file in one step. */
-hts_boolean cookie_replace(const char *tmp, const char *file);
+HTS_CHECK_RESULT hts_boolean cookie_replace(const char *tmp, const char *file);
 
 #endif

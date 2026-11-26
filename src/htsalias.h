@@ -52,14 +52,15 @@ extern const char *const hts_optalias[][4];
 int optalias_check(int argc, const char *const *argv, int n_arg,
                    int *return_argc, char **return_argv,
                    size_t return_argv_size, hts_buf return_error);
-int optalias_find(const char *token);
-const char *optalias_help(const char *token);
-int optreal_find(const char *token);
+HTS_CHECK_RESULT int optalias_find(const char *token);
+HTS_CHECK_RESULT const char *optalias_help(const char *token);
+HTS_CHECK_RESULT int optreal_find(const char *token);
 /* Steps *AT (start at 1) through the short-option cluster TOKEN (-qO1, -%vO)
    as htscoremain.c's cluster loop splits it, copying each option's name (-O,
    -%P for -&P) to NAME, at least 5 bytes. A glued digit comes back as an
    option of its own (-1), which names none. Returns HTS_FALSE past the end. */
-hts_boolean optcluster_next(const char *token, size_t *at, hts_buf name);
+HTS_CHECK_RESULT hts_boolean optcluster_next(const char *token, size_t *at,
+                                             hts_buf name);
 /* Reads the -%c rate at VAL. Returns the bytes it spans: the number, or the
    rest of the word when no usable rate is there, in which case *RATE is -1. */
 size_t optrate_read(const char *val, double *rate);
@@ -112,19 +113,20 @@ typedef struct {
 
 /* Prepare an empty command line with room for slots entries. HTS_FALSE if the
    slots cannot be allocated. */
-hts_boolean cmdl_init(cmdl_argv *cmd, int slots);
+HTS_CHECK_RESULT hts_boolean cmdl_init(cmdl_argv *cmd, int slots);
 
 /* Release cmd; the tokens its argv pointed at die with it. */
 void cmdl_free(cmdl_argv *cmd);
 
 /* Append token as the last entry. HTS_FALSE if it does not fit and neither the
    slots nor the arena can be grown. */
-hts_boolean cmdl_add(cmdl_argv *cmd, const char *token);
+HTS_CHECK_RESULT hts_boolean cmdl_add(cmdl_argv *cmd, const char *token);
 
 /* Insert token at 0 <= pos <= argc, shifting the entries above it up by one.
    HTS_FALSE if it does not fit and neither the slots nor the arena can be
    grown. */
-hts_boolean cmdl_ins(cmdl_argv *cmd, const char *token, int pos);
+HTS_CHECK_RESULT hts_boolean cmdl_ins(cmdl_argv *cmd, const char *token,
+                                      int pos);
 
 /* Mark slot pos as an option's parameter; see cmdl_argv::param. */
 void cmdl_mark_param(cmdl_argv *cmd, int pos);

@@ -63,7 +63,7 @@ hts_boolean hts_bundle_load_all(httrackp *opt, const char *jar_file,
                                 hts_buf err);
 
 /* The i-th url line of the loaded bundles, or NULL past the last one. */
-const char *hts_bundle_url(httrackp *opt, size_t i);
+HTS_CHECK_RESULT const char *hts_bundle_url(httrackp *opt, size_t i);
 
 /* Give req the UA and the headers of the first bundle whose scope holds adr's
    host, when that bundle has them. Its headers go over https alone when any URL
@@ -87,18 +87,20 @@ HTS_CHECK_RESULT hts_boolean cookie_url_host(const char *url, hts_buf dst);
 hts_span cookie_field(const char *line, int n);
 
 /* The record of s named cook_name for exactly domain and path, or NULL. */
-char *cookie_find_exact(char *s, const char *cook_name, const char *domain,
-                        const char *path);
+HTS_CHECK_RESULT char *cookie_find_exact(char *s, const char *cook_name,
+                                         const char *domain, const char *path);
 
 /* Copy url's host into host, set attr, and return the domain that cookies
    pasted for url bind to: its registrable domain, or the host. NULL if none. */
-const char *cookie_flat_bind(const char *url, hts_buf host, cookie_attr *attr);
+HTS_CHECK_RESULT const char *cookie_flat_bind(const char *url, hts_buf host,
+                                              cookie_attr *attr);
 
 /* Store the pair "name=value" at pair as a cookie of domain. HTS_FALSE when it
    is not stored, counted in *ignored. */
-hts_boolean cookie_flat_pair(httrackp *opt, t_cookie *cookie, char *pair,
-                             const char *domain, const cookie_attr *attr,
-                             const char *given, int *ignored);
+HTS_CHECK_RESULT hts_boolean cookie_flat_pair(httrackp *opt, t_cookie *cookie,
+                                              char *pair, const char *domain,
+                                              const cookie_attr *attr,
+                                              const char *given, int *ignored);
 
 /* Append the jar's records to out, as a cookies.txt file writes them. */
 void cookie_records_text(const t_cookie *cookie, String *out);
@@ -148,12 +150,13 @@ void cookie_load_stream(httrackp *opt, t_cookie *cookie, text_src *src,
 /* Write data to a temporary beside file, owner-only, then move it over file,
    so a symbolic link at file is replaced, never followed. Did it succeed? On
    failure file is unchanged and errno says why. */
-hts_boolean cookie_write_replace(const char *file, hts_span data);
+HTS_CHECK_RESULT hts_boolean cookie_write_replace(const char *file,
+                                                  hts_span data);
 
 /* Why can host, past any ASCII lowercasing, not take an ASCII form? IDNA
    needs strict UTF-8, and it encodes a capital outside ASCII as another host.
    NULL when it can. */
-const char *cookie_host_refusal(hts_span host);
+HTS_CHECK_RESULT const char *cookie_host_refusal(hts_span host);
 
 #endif
 

@@ -216,20 +216,22 @@ HTS_CHECK_RESULT hts_boolean cookie_domain_allowed(const char *domain,
 /** Read a Set-Cookie Max-Age VALUE received at NOW into *when, the absolute
     expiry, capped 400 days ahead and never below 1 (RFC 6265 5.2.2).
     HTS_FALSE when VALUE is not a whole number, so the attribute is ignored. */
-hts_boolean cookie_max_age_time(const char *value, int64_t now, int64_t *when);
+HTS_CHECK_RESULT hts_boolean cookie_max_age_time(const char *value, int64_t now,
+                                                 int64_t *when);
 
 /** Read a Set-Cookie Expires VALUE received at NOW into *when, bounded as
     cookie_max_age_time is (RFC 6265 5.2.1). HTS_FALSE when VALUE is not a
     date, so the attribute is ignored. */
-hts_boolean cookie_expires_time(const char *value, int64_t now, int64_t *when);
+HTS_CHECK_RESULT hts_boolean cookie_expires_time(const char *value, int64_t now,
+                                                 int64_t *when);
 
 /** Return the first jar record at or after s whose name, domain and path
     match, or NULL. An empty cook_name matches any name. The domain match folds
     case. It reaches a subdomain only when the record is not host-only. The
     record's own path must be a byte-exact prefix of path. The result points
     into s. */
-char *cookie_find(char *s, const char *cook_name, const char *domain,
-                  const char *path);
+HTS_CHECK_RESULT char *cookie_find(char *s, const char *cook_name,
+                                   const char *domain, const char *path);
 
 /** Start of the jar record after the one at a, or the trailing NUL when a
     holds the last one. */
@@ -249,7 +251,8 @@ HTS_CHECK_RESULT hts_boolean bauth_add(t_cookie *cookie, const char *adr,
     adr+fil, or NULL when none does or cookie is NULL. An https request also
     matches entries learned over http, never the reverse. The result points into
     the jar, so never free it, and bauth_free() invalidates it. */
-char *bauth_check(t_cookie *cookie, const char *adr, const char *fil);
+HTS_CHECK_RESULT char *bauth_check(t_cookie *cookie, const char *adr,
+                                   const char *fil);
 
 /** Drop every stored credential, leaving the jar's embedded head empty. Safe on
     a NULL jar and on a jar already freed; the jar itself is not released. */
@@ -259,7 +262,8 @@ void bauth_free(t_cookie *cookie);
    stripped, truncated at the last '/') from adr and fil into prefix; returns
    prefix, or NULL when adr+fil does not fit, since a clipped key would match
    URLs nobody authenticated. */
-char *bauth_prefix(char *prefix, size_t size, const char *adr, const char *fil);
+HTS_CHECK_RESULT char *bauth_prefix(char *prefix, size_t size, const char *adr,
+                                    const char *fil);
 
 #endif
 
