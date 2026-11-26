@@ -771,13 +771,20 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
   }
 }
 
+/* Where parse_fetch_meta's link was found. */
+typedef struct parse_fetch_flags {
+  hts_boolean redirect_stub; /* the page written in place of a redirect */
+  hts_boolean meta_refresh;
+  hts_boolean opaque; /* inside media, or of a type the parser forced */
+  hts_boolean inscript;
+  hts_boolean incss;
+  hts_boolean tagless_body;
+} parse_fetch_flags;
+
 /* How a browser fetches the link found while parsing link ptr. Links in a
    stylesheet or script file compare with the page that loaded that file. */
 static void parse_fetch_meta(httrackp *opt, int ptr, hts_fetch_meta *fm,
-                             hts_boolean redirect_stub,
-                             hts_boolean meta_refresh, hts_boolean opaque,
-                             hts_boolean inscript, hts_boolean incss,
-                             hts_boolean tagless_body, int link_frame,
+                             const parse_fetch_flags *flags, int link_frame,
                              hts_fetch_tag *tag_cache, const char *tag_name,
                              const char *attr, const char *fil) {
   const hts_fetch_meta *const page = &heap(ptr)->fetch;
@@ -790,21 +797,21 @@ static void parse_fetch_meta(httrackp *opt, int ptr, hts_fetch_meta *fm,
     return;
   }
   /* The page written in place of a redirect continues its chain. */
-  if (redirect_stub) {
+  if (flags->redirect_stub) {
     *fm = *page;
     hts_fetch_through(opt, fm, heap(ptr)->adr);
     return;
   }
   /* A refresh navigates whatever frame holds the page. */
-  if (meta_refresh)
+  if (flags->meta_refresh)
     fm->dest = (unsigned char) hts_fetch_same_frame(page->dest);
-  else if (!opaque && inscript && incss)
+  else if (!flags->opaque && flags->inscript && flags->incss)
     hts_fetch_classify(fm, tag_cache, NULL, attr, fil, HTS_FETCH_DEST_UNKNOWN);
   /* A script body names URLs for code a crawler never runs. */
-  else if (!opaque && !inscript && tag_name != NULL)
+  else if (!flags->opaque && !flags->inscript && tag_name != NULL)
     hts_fetch_classify(fm, tag_cache, tag_name, attr, fil, link_frame);
   /* A file no known page loaded leaves initiator 0, which sends none. */
-  fm->initiator = tagless_body ? page->initiator : ptr;
+  fm->initiator = flags->tagless_body ? page->initiator : ptr;
 }
 
 /* Is this raw data-src / data-srcset value a lazy-load placeholder rather
@@ -3059,11 +3066,19 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         hts_fetch_has_base_target(r->adr)
                             ? HTS_FETCH_DEST_UNKNOWN
                             : hts_fetch_same_frame(heap(ptr)->fetch.dest);
-                  parse_fetch_meta(
-                      opt, ptr, &link_fetch, HTTP_IS_REDIRECT(r->statuscode),
-                      p_searchMETAURL, in_media != NULL || p_type != 0,
-                      inscript, incss, sf_tagless_body, link_frame, &fetch_tag,
-                      sf_tag, tag_attr_start, afs.af.fil);
+                  {
+                    const parse_fetch_flags flags = {
+                        .redirect_stub = HTTP_IS_REDIRECT(r->statuscode),
+                        .meta_refresh = p_searchMETAURL,
+                        .opaque = in_media != NULL || p_type != 0,
+                        .inscript = inscript,
+                        .incss = incss,
+                        .tagless_body = sf_tagless_body};
+
+                    parse_fetch_meta(opt, ptr, &link_fetch, &flags, link_frame,
+                                     &fetch_tag, sf_tag, tag_attr_start,
+                                     afs.af.fil);
+                  }
                   /* Naming followed redirects whose hops it does not keep. */
                   if (former.adr[0] != '\0')
                     link_fetch.dest = HTS_FETCH_DEST_UNKNOWN;
