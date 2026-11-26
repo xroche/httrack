@@ -77,7 +77,12 @@ int lint_probe_deleg_cmp(int x) { return lint_probe_int(x) >= 0; }
 int lint_probe_deleg_clean(int x) { return lint_probe_clean(x); }
 int lint_probe_marked_int(int x) { if (x) return -1; return 0; }
 int lint_probe_clean(int x) { return x + 1; }
-void lint_probe_api(void) {}
+void lint_local_only(void) {}
+void lint_local_fuzzed(void) {}
+void lint_local_api(void) {}
+void lint_local_twice(void) {}
+void lint_local_hdr(void) {}
+void lint_local_calls(void) { lint_local_only(); lint_local_none(); }
 size_t lint_probe_span(hts_span tok, const hts_span *out, const char *z) {
   hts_span a, b = hts_span_of(z);
   hts_url_view v;
@@ -144,7 +149,13 @@ int lint_probe_deleg_cmp(int x);
 int lint_probe_deleg_clean(int x);
 HTS_CHECK_RESULT int lint_probe_marked_int(int x);
 int lint_probe_clean(int x);
-HTSEXT_API void lint_probe_api(void);
+void lint_local_only(void);
+void lint_local_fuzzed(void);
+HTSEXT_API void lint_local_api(void);
+void lint_local_twice(void);
+void lint_local_none(void);
+void lint_local_hdr(void);
+#define lint_local_macro() lint_local_hdr()
 void lint_sink(const void *p, size_t n);
 #define lint_cmt(x) ((x) + /* a note \
    that wraps */ (x))
@@ -162,7 +173,9 @@ H
 echo 'src/htslib.h: lint_dup: evaluates x twice' >>"${work}/baseline/macro.txt"
 mkdir "${work}/src/lintprobe"
 printf '%s\n' 'int lint_probe_sub(const char *s) { return isalpha(s[0]); }' \
-    'int lint_probe_user(void) { return lint_probe_clean(1); }' >"${work}/src/lintprobe/probe.c"
+    'int lint_probe_user(void) { return lint_probe_clean(1); }' \
+    'void lint_local_twice(void) {}' >"${work}/src/lintprobe/probe.c"
+echo 'void lint_fuzz_probe(void) { lint_local_fuzzed(); }' >"${work}/fuzz/lintprobe.c"
 
 out=$(run) && fail "planted violations passed"
 at() {
@@ -218,12 +231,20 @@ for want in "src/htslib.c:$(at "${c}" "lint_probe_ctype("): ctype: new violation
     "src/htslib.c:$(at "${c}" "lint_take(d, a.p"): pair: new violation: lint_take(a.p, a.len) splits a span" \
     "src/htslib.c:$(at "${c}" "lint_skip(a.p + 2"): pair: new violation: lint_skip(a.p+2, a.len-2) splits a span" \
     "src/htslib.c:$(at "${c}" "lint_skip(a.p+1"): pair: new violation: lint_skip(a.p+1, a.len-1) splits a span" \
+    "src/htslib.h:$(at "${h}" "lint_local_only("): local: new violation: lint_local_only is used only in src/htslib.c" \
     "src/htslib.h:$(at "${h}" "lint_probe_ptr("): local: new violation: lint_probe_ptr is used only in src/htslib.c" \
     "src/htslib.h:$(at "${h}" "lint_probe_extern("): local: new violation: lint_probe_extern is used only in src/htslib.c"; do
     grep -qF "${want}" <<<"${out}" || fail "missed ${want}: ${out}"
 done
-# 14 of the local lines are header probes: lint_probe_clean has an outside caller.
-test "$(wc -l <<<"${out}")" -eq 64 || fail "flagged a clean probe: ${out}"
+# Not file-local: called from fuzz/, exported, defined twice, never defined, used by a header macro.
+for name in fuzzed api twice none hdr; do
+    if grep -qF "local: new violation: lint_local_${name} " <<<"${out}"; then
+        fail "the local rule flagged lint_local_${name}: ${out}"
+    fi
+done
+# The local rule also flags 14 lint_probe_* prototypes: all of them except lint_probe_clean,
+# which src/lintprobe/probe.c calls. With lint_local_only, 15 of the 65 lines are local.
+test "$(wc -l <<<"${out}")" -eq 65 || fail "flagged a clean probe: ${out}"
 
 # Removing a known violation, or listing one that never was, leaves a stale entry.
 rm -r "${work}/src/lintprobe"

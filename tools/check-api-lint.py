@@ -13,7 +13,8 @@ or a URL view field, never through a pointer copy, another struct or a macro,
 and only the NUL_READERS functions and printf-style %s count, so a span handed
 to any other function goes unreported.
 The local rule counts names, so a function sharing its name with a field or a
-macro stays unreported.
+macro stays unreported. It never sees a function whose prototype is not in a
+header, nor one whose definition a macro builds.
 """
 
 import argparse
