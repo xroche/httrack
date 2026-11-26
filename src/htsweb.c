@@ -493,6 +493,8 @@ static void back_launch_cmd(void *pP) {
 }
 
 void webhttrack_main(char *cmd) {
+  char *copy;
+
   hts_init();
   /* The caller holds webhttrack_lock(). */
   global_opt = hts_create_opt();
@@ -500,9 +502,11 @@ void webhttrack_main(char *cmd) {
   /* a previous run's flags would stop this one, or show its result */
   commandEnd = commandReturn = commandReturnSet = commandEndRequested = 0;
   hts_store_release_int(&commandRunning, 1);
-  if (hts_newthread(back_launch_cmd, (void *) strdupt(cmd)) != 0) {
+  copy = strdupt(cmd);
+  if (copy == NULL || hts_newthread(back_launch_cmd, copy) != 0) {
     httrackp *const opt = global_opt;
 
+    freet(copy);
     /* back_launch_end() would retake the lock the caller holds */
     global_opt = NULL;
     hts_free_opt(opt);
