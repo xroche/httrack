@@ -3725,11 +3725,10 @@ static int st_cacheindex(httrackp *opt, int argc, char **argv) {
     char s[16];
     int adv;
 
-    (void) binput_line(buf, end, HTS_BUF(s), &adv);
-    if (adv != 3 || strcmp(s, "ab") != 0)
+    if (binput_line(buf, end, HTS_BUF(s), &adv) || adv != 3 ||
+        strcmp(s, "ab") != 0)
       fail = 1; /* normal read: "ab" then the '\n', 3 bytes consumed */
-    (void) binput_line(end, end, HTS_BUF(s), &adv);
-    if (adv != 0 || s[0] != '\0')
+    if (binput_line(end, end, HTS_BUF(s), &adv) || adv != 0 || s[0] != '\0')
       fail = 1;
   }
 

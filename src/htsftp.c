@@ -1244,7 +1244,7 @@ static int run_launch_ftp(FTPDownloadStruct *pStruct) {
             /* back_flush_output() stamps only r.is_write transfers, which FTP
                never is; a partial needs the remote's date too (#823). */
             if (strnotempty(back->r.lastmodified))
-              set_filetime_rfc822(back->url_sav, back->r.lastmodified);
+              hts_stamp_filetime(opt, back->url_sav, back->r.lastmodified);
           } else {
             ftp_fail(&back->r, "Unable to write file");
           }

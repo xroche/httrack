@@ -401,7 +401,7 @@ void hts_sitemap_seed(httrackp *opt, const char *starturl) {
     hts_link_set_self_parented(opt, 0, 0);
     /* Claim the host so the parser does not queue robots.txt a second time. */
     if (opt->robotsptr != NULL)
-      (void) checkrobots_set((robots_wizard *) opt->robotsptr, af.adr, "");
+      robots_claim(opt, (robots_wizard *) opt->robotsptr, af.adr);
   }
 }
 

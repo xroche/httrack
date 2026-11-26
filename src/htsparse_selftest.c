@@ -1774,6 +1774,29 @@ static int st_robots(httrackp *opt, int argc, char **argv) {
     checkrobots_free(&rb);
   }
 
+  {
+    /* a stored rule longer than checkrobots() reads: the cut Disallow still
+       blocks, and the cut Allow does not reopen it */
+    char *tok = malloct(2 * HTS_ROBOTS_LINE_SIZE + 16);
+    char *path = malloct(HTS_ROBOTS_LINE_SIZE + 16);
+    robots_wizard rb;
+
+    assertf(tok != NULL && path != NULL);
+    path[0] = '/';
+    memset(path + 1, 'a', HTS_ROBOTS_LINE_SIZE + 8);
+    path[HTS_ROBOTS_LINE_SIZE + 9] = '\0';
+    memset(&rb, 0, sizeof(rb));
+    snprintf(tok, 2 * HTS_ROBOTS_LINE_SIZE + 16, "D%s\n", path);
+    assertf(checkrobots_set(&rb, "h.test", tok));
+    assertf(checkrobots(&rb, "h.test", path) == -1);
+    snprintf(tok, 2 * HTS_ROBOTS_LINE_SIZE + 16, "D/\nA%s\n", path);
+    assertf(checkrobots_set(&rb, "h.test", tok));
+    assertf(checkrobots(&rb, "h.test", path) == -1);
+    checkrobots_free(&rb);
+    freet(tok);
+    freet(path);
+  }
+
   checkrobots_free(&robots);
   printf("robots self-test OK\n");
   return 0;

@@ -140,11 +140,13 @@ int checkrobots(const robots_wizard *robots, const char *adr, const char *fil) {
 
         while (ptr < (int) toklen) {
           int adv;
+          const hts_boolean cut = binput_line(
+              robots->token + ptr, robots->token + toklen, HTS_BUF(line), &adv);
 
-          (void) binput_line(robots->token + ptr, robots->token + toklen,
-                             HTS_BUF(line), &adv);
           ptr += adv;
-          if (line[0] != 'A' && line[0] != 'D')
+          /* fail closed: keep a cut Disallow, which only forbids more, and
+             skip a cut Allow, which would permit more */
+          if ((cut && line[0] == 'A') || (line[0] != 'A' && line[0] != 'D'))
             continue;
           {
             const hts_boolean is_allow =
@@ -294,41 +296,51 @@ void robots_parse(httrackp *opt, robots_wizard *robots, const char *adr,
                   "starting with '%s' (rules kept up to %d bytes, lines to %d)",
                   adr_nologin(opt, adr), ndropped, dropped,
                   (int) HTS_ROBOTS_MAX_TOKEN_SIZE, (int) HTS_ROBOTS_LINE_SIZE);
-  if (StringNotEmpty(blob))
-    checkrobots_set(robots, adr, StringBuff(blob));
+  if (StringNotEmpty(blob) && !checkrobots_set(robots, adr, StringBuff(blob)))
+    hts_log_print(opt, LOG_WARNING,
+                  "No memory to store robots.txt rules for %s",
+                  adr_nologin(opt, adr));
   StringFree(blob);
 }
 
-int checkrobots_set(robots_wizard *robots, const char *adr, const char *data) {
+hts_boolean checkrobots_set(robots_wizard *robots, const char *adr,
+                            const char *data) {
   while(robots) {
     if (robots->adr != NULL && strfield2(robots->adr, adr)) {
       char *const token = strdupt(data);
 
       if (token == NULL)
-        return 0;
+        return HTS_FALSE;
       freet(robots->token);
       robots->token = token;
-      return -1;
+      return HTS_TRUE;
     } else if (!robots->next) {
       robots_wizard *node = (robots_wizard *) calloct(1, sizeof(robots_wizard));
 
       if (node == NULL)
-        return 0;
+        return HTS_FALSE;
       node->adr = strdupt(adr);
       node->token = strdupt(data);
       if (node->adr == NULL || node->token == NULL) {
         freet(node->adr);
         freet(node->token);
         freet(node);
-        return 0;
+        return HTS_FALSE;
       }
       robots->next = node;
-      return -1;
+      return HTS_TRUE;
     }
     robots = robots->next;
   }
-  return 0;
+  return HTS_FALSE;
 }
+
+void robots_claim(httrackp *opt, robots_wizard *robots, const char *adr) {
+  if (!checkrobots_set(robots, adr, ""))
+    hts_log_print(opt, LOG_WARNING, "No memory to record robots.txt for %s",
+                  adr_nologin(opt, adr));
+}
+
 void checkrobots_free(robots_wizard * robots) {
   if (robots->next) {
     checkrobots_free(robots->next);

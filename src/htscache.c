@@ -804,7 +804,10 @@ static htsblk cache_readex_new(httrackp *opt, cache_back *cache,
                   // Do not recatch broken/erased files
                   else {
                     file_notify(opt, adr, fil, target_save, 1, 0, 0);
-                    filecreateempty(&opt->state.strc, target_save);
+                    if (!filecreateempty(&opt->state.strc, target_save))
+                      hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
+                                    "Unable to create empty file %s",
+                                    target_save);
                     //
                     r.statuscode = STATUSCODE_INVALID;
                     strcpybuff(r.msg, "File deleted by user not recaught");

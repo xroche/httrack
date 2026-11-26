@@ -1693,20 +1693,25 @@ static char *bauth_find(t_cookie *cookie, const char *key) {
 }
 
 /* déclarer un répertoire comme possédant une authentification propre */
-int bauth_add(t_cookie * cookie, const char *adr, const char *fil, const char *auth) {
+hts_boolean bauth_add(t_cookie *cookie, const char *adr, const char *fil,
+                      const char *auth) {
   char buffer[HTS_URLMAXSIZE * 2];
 
   if (cookie) {
     char *prefix = bauth_prefix(HTS_SIZED(buffer), adr, fil);
 
+    if (prefix == NULL)
+      return HTS_FALSE;
     /* exact scheme: an http entry must not hide an https login */
-    if (prefix != NULL && !bauth_find(cookie, prefix)) {
+    if (bauth_find(cookie, prefix))
+      return HTS_TRUE;
+    {
       bauth_chain *chain = &cookie->auth;
 
       /* A clipped prefix matches more URLs than were authenticated. */
       if (strlen(prefix) >= sizeof(chain->prefix) ||
           strlen(auth) >= sizeof(chain->auth)) {
-        return 0;
+        return HTS_FALSE;
       }
 
       /* fin de la chaine */
@@ -1718,11 +1723,11 @@ int bauth_add(t_cookie * cookie, const char *adr, const char *fil, const char *a
         chain->next = NULL;
         strcpybuff(chain->auth, auth);
         strcpybuff(chain->prefix, prefix);
-        return 1;
+        return HTS_TRUE;
       }
     }
   }
-  return 0;
+  return HTS_FALSE;
 }
 
 /* Release the heap tail of the list; the head node is embedded in the jar. */

@@ -464,8 +464,8 @@ static int st_addfilter(httrackp *opt, int argc, char **argv) {
     failed |= !ok;
   }
   /* two calls append in order */
-  hts_addfilter(opt, "-a*");
-  hts_addfilter(opt, "+b*");
+  assertf(hts_addfilter(opt, "-a*"));
+  assertf(hts_addfilter(opt, "+b*"));
   {
     char **const taken = hts_addfilter_take(opt);
     const hts_boolean ordered =
@@ -489,9 +489,9 @@ static int st_addfilter(httrackp *opt, int argc, char **argv) {
     printf("set with a bad rule: refused=%d\n", ok);
     failed |= !ok;
     /* a list supersedes rules added before it, not after */
-    hts_addfilter(opt, "-early*");
+    assertf(hts_addfilter(opt, "-early*"));
     ok = hts_setfilters(opt, good);
-    hts_addfilter(opt, "-late*");
+    assertf(hts_addfilter(opt, "-late*"));
     set = hts_setfilters_take(opt);
     adds = hts_addfilter_take(opt);
     ok = ok && set != NULL && set[0] != NULL && strcmp(set[0], "+*A") == 0 &&
@@ -589,7 +589,7 @@ static int st_addurl(httrackp *opt, int argc, char **argv) {
                    strcmp(taken[LONG_N], "a.com/1") == 0);
   hts_addurl_free(taken);
 
-  hts_addurl(opt, one);
+  assertf(hts_addurl(opt, one));
   hts_resetaddurl(opt);
   ADDURL_CHECK("reset", !hts_addurl(opt, NULL) && hts_addurl_take(opt) == NULL);
 #undef ADDURL_CHECK
@@ -755,8 +755,8 @@ static int st_filterlayout(httrackp *opt, int argc, char **argv) {
   filters_insert(opt, 2, "-ban*");
   opt->wizard_filters = 1;
   opt->user_filters = 1;
-  hts_setfilters(opt, set);
-  hts_addfilter(opt, "-a*");
+  assertf(hts_setfilters(opt, set));
+  assertf(hts_addfilter(opt, "-a*"));
   /* no link is queued past ptr, so no backing pool is needed */
   hts_apply_live_filters(opt, NULL, opt->lien_tot - 1);
   ok = filptr == 4 && strcmp(filters[0], "-wiz*") == 0 &&
@@ -802,19 +802,19 @@ static int st_filterkeep(httrackp *opt, int argc, char **argv) {
                           "", "", ""));
   assertf(hts_record_link(opt, "banned.example", "/b.html", "/p/b.html", "", "",
                           ""));
-  hts_addfilter(opt, "+*/keep/*");
+  assertf(hts_addfilter(opt, "+*/keep/*"));
   hts_apply_live_filters(opt, sback, -1);
   ok = opt->liens[0]->pass2 != -1 && opt->liens[1]->pass2 != -1 &&
        opt->liens[2]->pass2 != -1;
   printf("unrelated rule keeps all: ok=%d\n", ok);
   /* the box resent with one new rule */
-  hts_setfilters(opt, box);
+  assertf(hts_setfilters(opt, box));
   hts_apply_live_filters(opt, sback, -1);
   ok = opt->liens[0]->pass2 != -1 && opt->liens[1]->pass2 == -1 &&
        opt->liens[2]->pass2 != -1;
   printf("resent box drops only junk: ok=%d\n", ok);
   /* a new rule aimed at the link drops it, refused before or not */
-  hts_addfilter(opt, "-*s.gif");
+  assertf(hts_addfilter(opt, "-*s.gif"));
   hts_apply_live_filters(opt, sback, -1);
   ok = opt->liens[0]->pass2 == -1 && opt->liens[2]->pass2 != -1;
   printf("rule aimed at it drops it: ok=%d\n", ok);

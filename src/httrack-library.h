@@ -349,7 +349,7 @@ HTSEXT_API int hts_is_exiting(httrackp *opt);
     NULL or empty @p url adds nothing. @return nonzero if the URLs were queued,
     or, for NULL or empty, if a list is pending. Returns 0 on out-of-memory and
     leaves the list unchanged. */
-HTSEXT_API hts_boolean hts_addurl(httrackp *opt, char **url);
+HTS_CHECK_RESULT HTSEXT_API hts_boolean hts_addurl(httrackp *opt, char **url);
 
 /** Clear any pending add-URL list set by hts_addurl(). Always returns 0. */
 HTSEXT_API hts_boolean hts_resetaddurl(httrackp *opt);
@@ -361,7 +361,8 @@ HTSEXT_API hts_boolean hts_resetaddurl(httrackp *opt);
     matching links that are queued, or fetched and not yet saved. A "+" rule
     only affects links found from then on. @return nonzero if the rule was
     queued, zero if hts_filter_rule_ok() refuses it or memory ran out. */
-HTSEXT_API hts_boolean hts_addfilter(httrackp *opt, const char *rule);
+HTS_CHECK_RESULT HTSEXT_API hts_boolean hts_addfilter(httrackp *opt,
+                                                      const char *rule);
 
 /** Replace the user's scan rules of a running mirror with @p rules, a
     NULL-terminated list of single rules applied in the order given. Split
@@ -373,7 +374,8 @@ HTSEXT_API hts_boolean hts_addfilter(httrackp *opt, const char *rule);
     applying to links found from then on. @return nonzero if the list was
     queued, zero if hts_filter_rule_ok() refuses any rule in it or memory ran
     out, in which case nothing changes. */
-HTSEXT_API hts_boolean hts_setfilters(httrackp *opt, const char *const *rules);
+HTS_CHECK_RESULT HTSEXT_API hts_boolean
+hts_setfilters(httrackp *opt, const char *const *rules);
 
 /** Would hts_addfilter() accept @p rule? It must be a + or - sign and a
     pattern, within the filter length cap and free of control characters, so a
