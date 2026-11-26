@@ -131,8 +131,8 @@ static HTS_INLINE HTS_UNUSED size_t hts_span_find_any(hts_span s,
   return i;
 }
 
-/* Return the bytes of *REST before its first byte found in SET, and leave
- *REST starting at that byte, or empty at its end. */
+/* Return the bytes of *REST before its first byte found in SET, and move
+ *REST to start at that byte, or to its end when there is none. */
 static HTS_INLINE HTS_UNUSED hts_span hts_span_take_until(hts_span *rest,
                                                           const char *set) {
   const hts_span head = hts_span_at(rest->p, hts_span_find_any(*rest, set));

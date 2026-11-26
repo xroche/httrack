@@ -813,18 +813,15 @@ static hts_boolean data_attr_is_not_url(hts_span s) {
   static const char *const words[] = {
       "lazy",  "placeholder", "none",  "null",  "undefined",
       "false", "true",        "blank", "empty", NULL};
-  size_t i;
+  hts_span head;
 
-  while (s.len > 0 && (unsigned char) *s.p <= ' ')
+  while (!hts_span_empty(s) && hts_span_first(s) <= ' ')
     s = hts_span_skip(s, 1);
-  while (s.len > 0 && (unsigned char) s.p[s.len - 1] <= ' ')
+  while (!hts_span_empty(s) && hts_span_last(s) <= ' ')
     s.len--;
-  for (i = 0; i < s.len && s.p[i] != '?'; i++) { /* a query may carry JSON */
-    const char c = s.p[i];
-
-    if (c == '{' || c == '}' || c == '<' || c == '>' || c == '"')
-      return HTS_TRUE;
-  }
+  head = hts_span_at(s.p, hts_span_find(s, '?')); /* a query may carry JSON */
+  if (hts_span_find_any(head, "{}<>\"") < head.len)
+    return HTS_TRUE;
   return hts_span_index_ci(s, words) >= 0;
 }
 

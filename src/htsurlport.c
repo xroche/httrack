@@ -115,18 +115,16 @@ hts_boolean hts_parse_url_port(const char *a, int *port) {
 }
 
 hts_boolean hts_span_next_in(hts_span *rest, char sep, hts_span *field) {
-  const char *stop;
-
   if (hts_span_empty(*rest))
     return HTS_FALSE;
-  stop = memchr(rest->p, sep, rest->len);
-  *field = stop != NULL ? hts_span_between(rest->p, stop) : *rest;
-  *rest = hts_span_skip(*rest, field->len + (stop != NULL ? 1 : 0));
+  *field = hts_span_at(rest->p, hts_span_find(*rest, sep));
+  /* past the SEP, or to the end when there is none */
+  *rest = hts_span_skip(*rest, field->len + 1);
   return HTS_TRUE;
 }
 
 static hts_boolean span_in_set(const char *set, char c) {
-  return c != '\0' && strchr(set, c) != NULL;
+  return hts_span_find_any(hts_span_at(&c, 1), set) == 0;
 }
 
 hts_boolean hts_span_empty(hts_span s) {

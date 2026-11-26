@@ -4566,8 +4566,7 @@ static int st_spanlist(httrackp *opt, int argc, char **argv) {
   return failures != 0;
 }
 
-/* Check the span byte finders on an empty span, a match at either end and none.
- */
+/* Check the span finders on an empty span, a match at either end and none. */
 static int st_spanfind(httrackp *opt, int argc, char **argv) {
   static const struct {
     char fn; /* f find, a find_any, t take_until, < first, > last */
@@ -4597,9 +4596,15 @@ static int st_spanfind(httrackp *opt, int argc, char **argv) {
   (void) argc;
   (void) argv;
   for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
-    const hts_span s = hts_span_at(cases[i].s, cases[i].len);
-    hts_span rest = s;
+    /* an exact-size copy, so ASan sees a read past the span */
+    char *copy = cases[i].s != NULL ? malloct(cases[i].len) : NULL;
+    hts_span s, rest;
     long got;
+
+    assertf(cases[i].s == NULL || copy != NULL);
+    if (copy != NULL)
+      memcpy(copy, cases[i].s, cases[i].len);
+    s = rest = hts_span_at(copy, cases[i].len);
 
     switch (cases[i].fn) {
     case 'f':
@@ -4611,7 +4616,8 @@ static int st_spanfind(httrackp *opt, int argc, char **argv) {
     case 't':
       got = (long) hts_span_take_until(&rest, cases[i].arg).len;
       /* the rest starts at the byte that stopped the take */
-      if (rest.p != s.p + got || rest.len != s.len - (size_t) got)
+      if (rest.len != s.len - (size_t) got ||
+          (s.p != NULL ? rest.p != s.p + got : rest.p != NULL))
         got = -2;
       break;
     case '<':
@@ -4625,6 +4631,7 @@ static int st_spanfind(httrackp *opt, int argc, char **argv) {
       printf("spanfind: case %d gave %ld\n", (int) i, got);
       failures++;
     }
+    freet(copy);
   }
   printf("spanfind: %d cases, %d failures\n",
          (int) (sizeof(cases) / sizeof(cases[0])), (int) failures);

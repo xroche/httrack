@@ -99,9 +99,12 @@ static hts_boolean tag_attr_find(const char *tag_name, const char *name,
 static hts_boolean has_token(hts_span list, const char *token) {
   const hts_span want = hts_span_of(token);
 
-  while (!hts_span_empty(list = hts_span_trim(list, HTS_REALSPACES, "")))
+  list = hts_span_trim(list, HTS_REALSPACES, "");
+  while (!hts_span_empty(list)) {
     if (hts_span_eq_ci(hts_span_take_until(&list, HTS_REALSPACES), want))
       return HTS_TRUE;
+    list = hts_span_trim(list, HTS_REALSPACES, "");
+  }
   return HTS_FALSE;
 }
 

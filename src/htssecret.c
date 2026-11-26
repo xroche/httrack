@@ -353,7 +353,7 @@ static hts_boolean fprint_url_field(httrackp *opt, FILE *fp, hts_span buff) {
   const hts_span url = hts_span_trim(
       hts_span_skip(buff, hts_span_find(buff, ':') + 1), HTS_TABORSPACES, "");
 
-  return fprint_url_span(opt, fp, buff, buff.len - url.len, buff.len);
+  return fprint_url_span(opt, fp, buff, (size_t) (url.p - buff.p), buff.len);
 }
 
 /* Writes the request line buff with the login of its target masked, as a
@@ -361,9 +361,11 @@ static hts_boolean fprint_url_field(httrackp *opt, FILE *fp, hts_span buff) {
    buff is no "METHOD target HTTP/" line or out of memory. */
 static hts_boolean fprint_request_line(httrackp *opt, FILE *fp, hts_span buff) {
   const size_t target = hts_span_find(buff, ' ') + 1;
-  const size_t version =
-      target + hts_span_find(hts_span_skip(buff, target), ' ');
+  size_t version;
 
+  if (target > buff.len)
+    return HTS_FALSE;
+  version = target + hts_span_find(hts_span_skip(buff, target), ' ');
   if (!hts_span_starts_with(hts_span_skip(buff, version),
                             hts_span_of(" HTTP/")))
     return HTS_FALSE;
