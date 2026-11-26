@@ -89,7 +89,7 @@ Please visit our Website: http://www.httrack.com
 /* Based on linux/fs/umsdos/mangle.c */
 /* Hand-grouped rows; clang-format reflows the table into a blob. */
 /* clang-format off */
-static const char *hts_tbdev[] = {
+static const char *const hts_tbdev[] = {
   "prn", "con", "aux", "nul",
   "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9",
   "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9",
@@ -100,7 +100,7 @@ static const char *hts_tbdev[] = {
 /* clang-format on */
 
 /* A URL naming an engine directory would destroy the cache (#774). */
-static const char *hts_tbreserved[] = {"hts-cache", "hts-tmp", ""};
+static const char *const hts_tbreserved[] = {"hts-cache", "hts-tmp", ""};
 
 /* True once the component holds only what cleanEndingSpaceOrDot() strips. */
 static hts_boolean strippedToComponentEnd(const char *s) {
@@ -837,10 +837,17 @@ int url_savename(lien_adrfilsave *const afs,
 
   /*char BIGSTK normadr_[HTS_URLMAXSIZE*2]; */
   char BIGSTK normadr_[HTS_URLMAXSIZE * 2], normfil_[HTS_URLMAXSIZE * 2];
-  enum { PROTOCOL_HTTP, PROTOCOL_HTTPS, PROTOCOL_FTP, PROTOCOL_FILE,
-      PROTOCOL_UNKNOWN };
-  static const char *protocol_str[] =
-    { "http", "https", "ftp", "file", "unknown" };
+
+  enum {
+    PROTOCOL_HTTP,
+    PROTOCOL_HTTPS,
+    PROTOCOL_FTP,
+    PROTOCOL_FILE,
+    PROTOCOL_UNKNOWN
+  };
+
+  static const char *const protocol_str[] = {"http", "https", "ftp", "file",
+                                             "unknown"};
   int protocol = PROTOCOL_HTTP;
   const char *const adr = jump_identification_const(adr_complete);
   // copy of fil, used for lookups (see urlhack)

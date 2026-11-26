@@ -3,14 +3,17 @@
 macros, header functions that can fail without HTS_CHECK_RESULT, a span's
 .p handed to a function that reads up to a NUL or printed with %s, and a call
 passing x.p, x.len (or x.p + n, x.len - n) as two arguments where the callee
-could take the span.
+could take the span, and a file-scope or static array of pointers whose
+pointers are not const, which stays writable.
 Known cases live in tools/api-lint/, and --update rewrites those baselines.
 Known limits: a failure delegated through two calls, free names inside _Generic,
 and a function defined only in a later branch of an unbalanced #if group go
 unreported. A span is seen only as a local, a parameter or a URL view field,
 never through a pointer copy, another struct or a macro, and only the
 NUL_READERS functions and printf-style %s count, so a span handed to any other
-function goes unreported.
+function goes unreported. The table rule misses arrays of typedef'd or struct
+elements, function-pointer arrays, const char *const *x[], and heads starting
+with a macro, and it scans only src/.
 """
 
 import argparse
@@ -19,7 +22,7 @@ import os
 import re
 import sys
 
-RULES = ("ctype", "macro", "check-result", "span", "pair")
+RULES = ("ctype", "macro", "check-result", "span", "pair", "table")
 HEADER = "# Known %s violations. Regenerate: tools/check-api-lint.py --update\n"
 
 # Vendored trees follow their upstream's conventions.
@@ -709,6 +712,22 @@ def check_pair(code, sinks):
                     yield line_of(code, start + m.start()), call, msg
 
 
+# A file-scope or static array of pointers whose pointers are writable.
+TABLE = re.compile(
+    r"^(?:[ \t]*static[ \t]+|(?=[A-Za-z_]))(?!(?:typedef|extern|return)\b)"
+    r"(?:(?:const|volatile|static|unsigned|signed|struct|union|enum)\s+)*\w+"
+    r"(?:\s+const)?\s*\*+\s*([A-Za-z_]\w*)\s*\[[^;=]*\]\s*=",
+    re.M,
+)
+
+
+def check_table(code):
+    """Yield (line, key, message) for a pointer table missing its second const."""
+    for m in TABLE.finditer(code):
+        msg = "%s[] is a writable pointer table, make it *const" % m.group(1)
+        yield line_of(code, m.start()), m.group(1), msg
+
+
 def scan(root):
     """Map each rule to a list of (path, line, key, message)."""
     paths = []
@@ -743,6 +762,9 @@ def scan(root):
     for path, code in files.items():
         for line, key, msg in check_pair(code, sinks):
             found["pair"].append((path, line, key, msg))
+    for path, code in files.items():
+        for line, key, msg in check_table(code):
+            found["table"].append((path, line, key, msg))
     return found
 
 

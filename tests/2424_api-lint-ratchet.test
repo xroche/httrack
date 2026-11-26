@@ -32,6 +32,30 @@ out=$(run) || fail "an unchanged copy fails: ${out}"
 out=$(diff -r "${work}/fresh" "${srcdir}/tools/api-lint") ||
     fail "the committed baselines are not what --update writes: ${out}"
 
+# A pointer table fires unless its pointers are const, at file scope or static.
+cat >"${work}/src/linttable.c" <<'C'
+static const char *lint_t[] = {"a", NULL};
+static const char *const lint_ok[] = {"a", NULL};
+char *lint_v[][2] = {{"a", "b"}};
+const char *lint_w[][2] = {{"a", "b"}};
+extern const char *lint_ext[];
+void lint_probe_table(void) {
+  static const char *lint_x[] = {"a"};
+  static const char *const lint_y[] = {"a"};
+  const char *lint_stack[] = {"a"};
+  (void) lint_x; (void) lint_y; (void) lint_stack;
+}
+C
+out=$(run) && fail "writable pointer tables passed"
+for want in "linttable.c:1: table: new violation: lint_t[]" \
+    "linttable.c:3: table: new violation: lint_v[]" \
+    "linttable.c:4: table: new violation: lint_w[]" \
+    "linttable.c:7: table: new violation: lint_x[]"; do
+    grep -qF "${want}" <<<"${out}" || fail "missed ${want}: ${out}"
+done
+test "$(wc -l <<<"${out}")" -eq 4 || fail "flagged a const table: ${out}"
+rm "${work}/src/linttable.c"
+
 c="${work}/src/htslib.c"
 h="${work}/src/htslib.h"
 cat >>"${c}" <<'C'
