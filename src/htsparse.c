@@ -1412,10 +1412,11 @@ static void resolve_link_base(htsmoduleStruct *str,
   }
 }
 
-/* Write the index.html entry of the page, under its title when p > 0. */
+/* Write the index.html entry of the page, under its title if it has one. */
 static void makeindex_add_entry(htsmoduleStruct *str,
                                 htsmoduleStructExtended *stre, const char *html,
-                                const int p, int *detect_title) {
+                                const hts_boolean has_title,
+                                int *detect_title) {
   ENGINE_LOAD_CONTEXT();
 
   if (*stre->makeindex_fp_ == NULL) {
@@ -1446,7 +1447,7 @@ static void makeindex_add_entry(htsmoduleStruct *str,
     char *b = NULL;
 
     s[0] = '\0';
-    if (p > 0) {
+    if (has_title) {
       a = strchr(html, '>');
       if (a != NULL) {
         a++;
@@ -1464,7 +1465,7 @@ static void makeindex_add_entry(htsmoduleStruct *str,
       *detect_title = 1; // indexed for this page
       (*stre->makeindex_links_)++;
       strlcpybuff(makeindex_firstlink, tempo, HTS_URLMAXSIZE * 2);
-      /* Hack */
+      /* MHTML: the first link is the primary part */
       if (opt->mimehtml) {
         strlcpybuff(makeindex_firstlink, "cid:primary/primary",
                     HTS_URLMAXSIZE * 2);
@@ -1536,7 +1537,7 @@ static void makeindex_add_page(htsmoduleStruct *str,
           p = 0;
 
         if (p)
-          makeindex_add_entry(str, stre, html, p, detect_title);
+          makeindex_add_entry(str, stre, html, p > 0, detect_title);
       }
     }
 
@@ -1802,7 +1803,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
         if (html - r->adr >= r->size)
           break;
 
-        if (!*stre->makeindex_done_ && !detect_title) // page not indexed yet
+        // inline pre-test: the out-of-line helper would run on every byte
+        if (!*stre->makeindex_done_ && !detect_title &&
+            (opt->makeindex || heap(ptr)->depth < opt->depth))
           makeindex_add_page(str, stre, html, &detect_title, in_media);
 
         /* Parse */
