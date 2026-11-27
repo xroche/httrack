@@ -3697,11 +3697,10 @@ typedef struct back_wait_state {
   int nsockets;
   LLint max_read_bytes; // max bytes read per socket
   int do_wait;
-  int gestion_timeout;
-  int busy_recv;
-  int busy_state;
+  int check_timeouts;
+  int busy_recv;  // a socket delivered data in this pass
+  int busy_state; // a connect completed in this pass
   int dns_wait;   // a slot waits for its resolve
-  int dns_budget; // see back_dns_poll()
 } back_wait_state;
 
 /* Add every live socket to the select() sets, and resolve pending names. */
@@ -3709,13 +3708,14 @@ static void back_wait_register_sockets(back_wait_state *w, httrackp *opt,
                                        struct_back *sback, int start) {
   int i;
   int max_c;
+  int dns_budget = -1; // see back_dns_poll()
   lien_back *const back = sback->lnk;
 
   max_c = 1;
   BACK_FOR_EACH_BUSY_FROM(sback, start, i) {
     // before st, so a socket it opens is selected in this pass
     if (back_status(&back[i]) == STATUS_WAIT_DNS)
-      back_dns_poll(opt, sback, i, &w->dns_budget);
+      back_dns_poll(opt, sback, i, &dns_budget);
     // One status read serves every branch below.
     const int st = back_status(&back[i]);
 
@@ -3731,31 +3731,31 @@ static void back_wait_register_sockets(back_wait_state *w, httrackp *opt,
       } else if (back[i].r.soc != INVALID_SOCKET) {
         w->do_wait = 1;
 
-        // noter socket write
+        // watch for write
         FD_SET(back[i].r.soc, &w->fds_c);
 
-        // noter socket erreur
+        // watch for errors
         FD_SET(back[i].r.soc, &w->fds_e);
 
-        // calculer max
+        // track the highest socket
         if (max_c) {
           max_c = 0;
           w->nfds = back[i].r.soc;
         } else if (back[i].r.soc > w->nfds) {
-          // ID socket la plus élevée
+          // highest socket so far
           w->nfds = back[i].r.soc;
         }
       }
 
     } else
-      // poll pour la lecture sur les sockets
+      // poll the receiving sockets for reading
     if ((st > 0) && (st < 100)) {     // receiving http
 
-      // non local et non ftp
+      // not a local file and not ftp
       if (!back[i].r.is_file) {
         //## if (back[i].url_adr[0]!=lOCAL_CHAR) {
 
-        // vérification de sécurité
+        // safety check
         if (back[i].r.soc != INVALID_SOCKET && !hts_soc_selectable(back[i].r.soc)) {
           back_fail_unselectable(opt, sback, i);
         } else if (back[i].r.soc != INVALID_SOCKET) {        // hey, you never know..
@@ -3767,21 +3767,21 @@ static void back_wait_register_sockets(back_wait_state *w, httrackp *opt,
               st > 0 && st < 1000) {
             w->do_wait = 1;
 
-            // noter socket read
+            // watch for read
             FD_SET(back[i].r.soc, &w->fds);
 
-            // noter socket error
+            // watch for errors
             FD_SET(back[i].r.soc, &w->fds_e);
 
-            // incrémenter nombre de sockets
+            // count the socket
             w->nsockets++;
 
-            // calculer max
+            // track the highest socket
             if (max_c) {
               max_c = 0;
               w->nfds = back[i].r.soc;
             } else if (back[i].r.soc > w->nfds) {
-              // ID socket la plus élevée
+              // highest socket so far
               w->nfds = back[i].r.soc;
             }
           }
@@ -3803,7 +3803,7 @@ static void back_wait_register_sockets(back_wait_state *w, httrackp *opt,
   w->nfds++;
 }
 
-/* Wait for socket activity, for at most HTS_SOCK_SEC. */
+/* Wait up to 100 ms for socket activity, or 10 ms while a name resolves. */
 static void back_wait_select(back_wait_state *w) {
   struct timeval tv;
 
@@ -3892,9 +3892,9 @@ static void back_wait_connect(back_wait_state *w, httrackp *opt,
   }
 
   // vérifier l'existance de timeout-check
-  if (!w->gestion_timeout)
+  if (!w->check_timeouts)
     if (back[i].timeout > 0)
-      w->gestion_timeout = 1;
+      w->check_timeouts = 1;
 
   // connecté?
   dispo =
@@ -4053,9 +4053,9 @@ static void back_wait_ssl_handshake(back_wait_state *w, httrackp *opt,
   lien_back *const back = sback->lnk;
 
   // a peer that never speaks TLS must be reaped by --timeout too (#607)
-  if (!w->gestion_timeout)
+  if (!w->check_timeouts)
     if (back[i].timeout > 0)
-      w->gestion_timeout = 1;
+      w->check_timeouts = 1;
 
   /* SSL mode */
   if (back[i].r.ssl) {
@@ -4104,14 +4104,13 @@ static void back_wait_ssl_handshake(back_wait_state *w, httrackp *opt,
 /* Read what arrived on a slot, then parse its headers or body. */
 static void back_wait_receive(back_wait_state *w, httrackp *opt,
                               cache_back *cache, struct_back *sback, int i) {
-  char catbuff[CATBUFF_SIZE];
   lien_back *const back = sback->lnk;
   int dispo = 0;
 
   // vérifier l'existance de timeout-check
-  if (!w->gestion_timeout)
+  if (!w->check_timeouts)
     if (back[i].timeout > 0)
-      w->gestion_timeout = 1;
+      w->check_timeouts = 1;
 
   // données dispo?
   // ## if (back[i].url_adr[0]!=lOCAL_CHAR)
@@ -5105,6 +5104,8 @@ static void back_wait_receive(back_wait_state *w, httrackp *opt,
                      back[i].r.totalsize == back[i].r.crange_end - resume + 1);
 
                 if (sz >= 0 && range_ok) {
+                  char catbuff[CATBUFF_SIZE];
+
                   if (!is_hypertext_mime(opt, back[i].r.contenttype,
                                          back[i].url_sav)) { // pas HTML
                     if (opt->getmode & HTS_GETMODE_NONHTML) {
@@ -5379,7 +5380,7 @@ void back_wait(struct_back *sback, httrackp *opt, cache_back *cache,
   const int back_max = sback->count;
   int i;
   back_wait_state w;
-  int max_loop; // nombre de boucles max à parcourir..
+  int max_loop; // maximum passes over the slots
   int max_loop_chk = 0;
   const unsigned int mod_random =
       (unsigned int) (time_local() + hts_stat_recv_get());
@@ -5417,11 +5418,10 @@ void back_wait(struct_back *sback, httrackp *opt, cache_back *cache,
 
   // receive while data arrives, for at most max_loop passes
   w.do_wait = 0;
-  w.gestion_timeout = 0;
+  w.check_timeouts = 0;
   do {
     w.busy_state = w.busy_recv = 0;
     w.dns_wait = 0;
-    w.dns_budget = -1;
 
     FD_ZERO(&w.fds);
     FD_ZERO(&w.fds_c);
@@ -5459,14 +5459,14 @@ void back_wait(struct_back *sback, httrackp *opt, cache_back *cache,
       }
     }
 
-    if (w.gestion_timeout)
+    if (w.check_timeouts)
       back_wait_check_timeouts(opt, sback, start);
     max_loop--;
     max_loop_chk++;
   } while ((w.busy_state) && (w.busy_recv) && (max_loop > 0));
   if ((!w.busy_recv) && (!w.busy_state)) {
     if (max_loop_chk >= 1) {
-      Sleep(10);                // un tite pause pour éviter les lag..
+      Sleep(10); // a short pause, so an idle loop does not spin
     }
   }
 }
