@@ -74,9 +74,9 @@ static hts_boolean dirtylink_model(httrackp *opt, const char *str, char lastc,
   /* a string the source continues with '+' is an expression, so only an
      extension speaks for it */
   if (lastc != '+') {
-    if (strfield(cut, "http:") || strfield(cut, "ftp:")
+    if (hts_starts_with_ci(cut, "http:") || hts_starts_with_ci(cut, "ftp:")
 #if HTS_USEOPENSSL
-        || strfield(cut, "https:")
+        || hts_starts_with_ci(cut, "https:")
 #endif
     )
       return HTS_TRUE;
@@ -390,9 +390,9 @@ static hts_boolean jsscan_model(httrackp *opt, const char *cursor,
   prev = html_prevc(cursor, buffer);
 
   for (i = 0; i < sizeof(jsscan_words) / sizeof(jsscan_words[0]); i++) {
-    const int l = strfield(cursor, jsscan_words[i].word);
+    const char *after = cursor;
 
-    if (l == 0)
+    if (!hts_skip_prefix_ci(&after, jsscan_words[i].word))
       continue;
     switch (jsscan_words[i].guard) {
     case JSGUARD_TAG_QUOTE:
@@ -428,14 +428,14 @@ static hts_boolean jsscan_model(httrackp *opt, const char *cursor,
         continue;
       break;
     case JSGUARD_SPACE_AFTER:
-      if (!is_space(cursor[l]))
+      if (!is_space(*after))
         continue;
       break;
     default:
       break;
     }
     w = &jsscan_words[i];
-    a = cursor + l;
+    a = after;
     goto matched;
   }
   return HTS_FALSE;
@@ -482,9 +482,9 @@ matched:
 
   if (w->no_mime) {
     for (i = 0; hts_main_mime[i] != NULL && hts_main_mime[i][0] != '\0'; i++) {
-      const int l = strfield(a, hts_main_mime[i]);
+      const char *slash = a;
 
-      if (l && a[l] == '/')
+      if (hts_skip_prefix_ci(&slash, hts_main_mime[i]) && *slash == '/')
         return HTS_FALSE;
     }
   }
@@ -495,15 +495,16 @@ matched:
                                           "PATCH",  "TRACE", NULL};
 
     for (i = 0; methods[i] != NULL; i++) {
-      if (strlen(methods[i]) == (size_t) len && strfield(a, methods[i]) == len)
+      if (strlen(methods[i]) == (size_t) len &&
+          hts_starts_with_ci(a, methods[i]))
         return HTS_FALSE;
     }
   }
 
   /* A specifier is a URL when it is a path or carries a scheme. */
   if (w->url_only && strncmp(a, "/", 1) != 0 && strncmp(a, "./", 2) != 0 &&
-      strncmp(a, "../", 3) != 0 && strfield(a, "http:") == 0 &&
-      strfield(a, "https:") == 0 && strfield(a, "ftp:") == 0)
+      strncmp(a, "../", 3) != 0 && !hts_starts_with_ci(a, "http:") &&
+      !hts_starts_with_ci(a, "https:") && !hts_starts_with_ci(a, "ftp:"))
     return HTS_FALSE;
 
   /* a leading ',' or ';' says this is code, a quote or a control byte says the

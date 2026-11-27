@@ -252,17 +252,21 @@ const hts_attr *hts_attr_match(const char *html, hts_boolean scripts,
   return NULL;
 }
 
+/* Does s open with tag (A-Z folded), followed by a space? */
+static hts_boolean tag_opens_with_space(const char *s, const char *tag) {
+  return hts_skip_prefix_ci(&s, tag) && hts_isspace((unsigned char) *s);
+}
+
 /* Is the attribute name [name, nend) one whose value is never a link, a
    hts_nodetect word or an xmlns declaration? Returns the word, or NULL. */
 static const char *hts_dirty_attr_refused(const char *name, const char *nend) {
   int i;
   for (i = 0; strnotempty(hts_nodetect[i]); i++) {
-    const int l = strfield(name, hts_nodetect[i]);
-    if (l && name + l == nend)
+    const char *end = name;
+    if (hts_skip_prefix_ci(&end, hts_nodetect[i]) && end == nend)
       return hts_nodetect[i];
   }
-  i = strfield(name, "xmlns");
-  if (i && (name + i == nend || name[i] == ':'))
+  if (hts_skip_prefix_ci(&name, "xmlns") && (name == nend || *name == ':'))
     return "xmlns";
   return NULL;
 }
@@ -407,9 +411,9 @@ hts_boolean hts_dirty_link_is_url(httrackp *opt, hts_span str, char lastc,
   // a trailing '+' concatenates, so only an extension speaks for the string
   if (lastc != '+') {
     // "Comparisons of scheme names MUST be case-insensitive" (RFC2616)
-    if ((strfield(tempo, "http:")) || (strfield(tempo, "ftp:"))
+    if (hts_starts_with_ci(tempo, "http:") || hts_starts_with_ci(tempo, "ftp:")
 #if HTS_USEOPENSSL
-        || (strfield(tempo, "https:"))
+        || hts_starts_with_ci(tempo, "https:")
 #endif
     )
       url_ok = HTS_TRUE;
@@ -507,9 +511,8 @@ static hts_boolean js_specifier_is_url(const char *s) {
   if (s[0] == '.' && (s[1] == '/' || (s[1] == '.' && s[2] == '/')))
     return HTS_TRUE;
   /* an absolute URL is one too, the way a bare import already takes it */
-  return strfield(s, "http:") || strfield(s, "https:") || strfield(s, "ftp:")
-             ? HTS_TRUE
-             : HTS_FALSE;
+  return hts_starts_with_ci(s, "http:") || hts_starts_with_ci(s, "https:") ||
+         hts_starts_with_ci(s, "ftp:");
 }
 
 /* The quote an HTML entity at "s" stands for, or '\0'. Sets "*len", unless
@@ -554,8 +557,8 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
   int is_import = 0;
   // from "./mod.js": an ES module specifier, which must be a path
   int is_specifier = 0;
-  const char *a;
-  int nc;
+  const char *a = cursor;
+  hts_boolean nc;
 
   link->offset = 0;
   link->length = 0;
@@ -572,39 +575,39 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
     expected_end = ";\"\'"; // a href="javascript:doc.location='foo'" ends on
                             // the attribute's quote
 
-  nc = strfield(cursor, ".src"); // nom.src="image";
+  nc = hts_skip_prefix_ci(&a, ".src"); // nom.src="image";
   if (!nc && in_tag && tag_lastc == html_prevc(cursor, buffer))
-    nc = strfield(cursor, "src"); // onXXX='src="image";'
+    nc = hts_skip_prefix_ci(&a, "src"); // onXXX='src="image";'
   if (!nc)
-    nc = strfield(cursor, ".location"); // document.location="doc"
+    nc = hts_skip_prefix_ci(&a, ".location"); // document.location="doc"
   if (!nc)
-    nc = strfield(cursor, ":location"); // javascript:location="doc"
-  if (!nc) {                            // location="doc"
-    if ((nc = strfield(cursor, "location")) &&
-        !hts_isspace((unsigned char) html_prevc(cursor, buffer)))
-      nc = 0;
+    nc = hts_skip_prefix_ci(&a, ":location"); // javascript:location="doc"
+  if (!nc && (nc = hts_skip_prefix_ci(&a, "location")) && // location="doc"
+      !hts_isspace((unsigned char) html_prevc(cursor, buffer))) {
+    nc = HTS_FALSE;
+    a = cursor;
   }
   if (!nc)
-    nc = strfield(cursor, ".href"); // document.location="doc"
+    nc = hts_skip_prefix_ci(&a, ".href"); // document.location="doc"
   if (!nc)
-    if ((nc = strfield(cursor, ".open"))) { // window.open("doc",..
+    if ((nc = hts_skip_prefix_ci(&a, ".open"))) { // window.open("doc",..
       expected = '(';
       expected_end = "),";   // ends on a comma or the paren
       ensure_not_mime = 1;   // refuse a mime type
       ensure_not_method = 1; // xhr.open: don't grab method
     }
   if (!nc)
-    if ((nc = strfield(cursor, ".replace"))) { // window.replace("url")
+    if ((nc = hts_skip_prefix_ci(&a, ".replace"))) { // window.replace("url")
       expected = '(';
       expected_end = ")";
     }
   if (!nc)
-    if ((nc = strfield(cursor, ".link"))) { // window.link("url")
+    if ((nc = hts_skip_prefix_ci(&a, ".link"))) { // window.link("url")
       expected = '(';
       expected_end = ")";
     }
   if (!nc)
-    if ((nc = strfield(cursor, ".url"))) { // obj.url("doc")
+    if ((nc = hts_skip_prefix_ci(&a, ".url"))) { // obj.url("doc")
       expected = '(';
       expected_end = ")";
     }
@@ -613,7 +616,7 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
   if (!nc &&
       !(in_css ? css_glues_keyword(cursor, buffer)
                : js_glues_keyword(cursor, buffer)) &&
-      (nc = strfield(cursor, "url")) != 0) { // url(url)
+      (nc = hts_skip_prefix_ci(&a, "url"))) { // url(url)
     expected = '(';
     expected_end = ")";
     /* CSS writes url(foo.png) unquoted, but JavaScript's new URL(x) matches
@@ -623,12 +626,14 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
     quotes_replacement = ')';
   }
   if (!nc)
-    if ((nc = strfield(cursor, "import"))) { // import "url"
-      if (is_space(*(cursor + nc))) {
+    if ((nc = hts_skip_prefix_ci(&a, "import"))) { // import "url"
+      if (is_space(*a)) {
         expected = 0; // no char expected
         is_import = 1;
-      } else
-        nc = 0;
+      } else {
+        nc = HTS_FALSE;
+        a = cursor;
+      }
     }
   if (!nc) { // import x from "./mod.js"
     /* The guard has to gate the match: a name merely ending in "from" must
@@ -637,7 +642,7 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
     const char before = html_prevc(cursor, buffer);
 
     if (!js_glues_keyword(cursor, buffer) && before != '"' && before != '\'' &&
-        before != '`' && (nc = strfield(cursor, "from")) != 0) {
+        before != '`' && (nc = hts_skip_prefix_ci(&a, "from"))) {
       expected = 0;
       is_specifier = 1;
     }
@@ -645,7 +650,6 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
   if (!nc)
     return HTS_FALSE;
 
-  a = cursor + nc;
   while (is_realspace(*a))
     a++;
   if ((*a != expected) && expected)
@@ -713,9 +717,9 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
 
       while (a != NULL && hts_main_mime[i] != NULL &&
              hts_main_mime[i][0] != '\0') {
-        int p;
+        const char *slash = a;
 
-        if ((p = strfield(a, hts_main_mime[i])) && a[p] == '/') {
+        if (hts_skip_prefix_ci(&slash, hts_main_mime[i]) && *slash == '/') {
           a = NULL;
         }
         i++;
@@ -1047,9 +1051,9 @@ char *hts_parse_sink_selftest(const hts_boolean enabled, const int inscript,
 /* Default port for lien's scheme (case-insensitive), 80 if absent/unknown; so
    schemeless and protocol-relative //host links default to 80 (known gap). */
 static int scheme_default_port(const char *lien) {
-  if (strfield(lien, "https:"))
+  if (hts_starts_with_ci(lien, "https:"))
     return 443;
-  if (strfield(lien, "ftp:"))
+  if (hts_starts_with_ci(lien, "ftp:"))
     return 21;
   return 80;
 }
@@ -1344,14 +1348,14 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
               if (!in_media) {
                 if (opt->makeindex && (ptr > 0)) {
                   if (opt->getmode & HTS_GETMODE_HTML) {
-                    p = strfield(html, "title");
+                    p = hts_starts_with_ci(html, "title");
                     if (p) {
                       if (html_prevc(html, r->adr) == '/')
                         p = 0;  // /title
                     } else {
-                      if (strfield(html, "/html"))
+                      if (hts_starts_with_ci(html, "/html"))
                         p = -1; // noter, mais sans titre
-                      else if (strfield(html, "body"))
+                      else if (hts_starts_with_ci(html, "body"))
                         p = -1; // noter, mais sans titre
                       else if (html - r->adr >= r->size - 1)
                         p = -1; // noter, mais sans titre
@@ -1492,9 +1496,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
               int len = rech_endtoken(html + pos, &token);
 
               if (len > 0) {
-                if (strfield(token, "content-type")) {
+                if (hts_starts_with_ci(token, "content-type")) {
                   intag_ctype = 1;
-                } else if (strfield(token, "refresh")) {
+                } else if (hts_starts_with_ci(token, "refresh")) {
                   intag_ctype = 2;
                 }
               }
@@ -1508,26 +1512,20 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
               // We are looking for the first head so that we can declare the HTTP-headers charset early
               // Emit as soon as we see the first <head>, <meta>, or <body> tag.
               // FIXME: we currently emit the tag BEFORE the <head> tag, actually, which is not clean
-              if ((p = strfield(html, "<head>")) != 0 ||
-                  ((p = strfield(html, "<head")) != 0 &&
-                   hts_isspace((unsigned char) html[p])) ||
-                  (p = strfield(html, "<body>")) != 0 ||
-                  ((p = strfield(html, "<body")) != 0 &&
-                   hts_isspace((unsigned char) html[p])) ||
-                  ((p = strfield(html, "<meta")) != 0 &&
-                   hts_isspace((unsigned char) html[p]))) {
+              if (hts_starts_with_ci(html, "<head>") ||
+                  tag_opens_with_space(html, "<head") ||
+                  hts_starts_with_ci(html, "<body>") ||
+                  tag_opens_with_space(html, "<body") ||
+                  tag_opens_with_space(html, "<meta")) {
+                p = 1;
                 emited_footer++;
-              } else {
-                p = 0;
               }
               break;
             case 1:
               // And the closing comment info tag
-              if ((p = strfield(html, "</html")) != 0) {
+              p = hts_starts_with_ci(html, "</html");
+              if (p)
                 emited_footer++;
-              } else {
-                p = 0;
-              }
               break;
             default:
               p = 0;
@@ -1557,10 +1555,10 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   const char *const url_host =
                       jump_identification_const(urladr());
                   const char *const url_scheme =
-                      strstr(url_host, "://") != NULL  ? ""
-                      : strfield(urladr(), "https://") ? "https://"
-                      : strfield(urladr(), "ftp://")   ? "ftp://"
-                                                       : "http://";
+                      strstr(url_host, "://") != NULL            ? ""
+                      : hts_starts_with_ci(urladr(), "https://") ? "https://"
+                      : hts_starts_with_ci(urladr(), "ftp://")   ? "ftp://"
+                                                                 : "http://";
 
                   // {addr}/{path} are the escaped host and remote path; {url}
                   // prepends the scheme to them (credentials already stripped
@@ -1817,12 +1815,12 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   const char *a = NULL;
                   char check_this_fking_line = 0;       // parsing code javascript..
                   char must_be_terminated = 0;  // caractère obligatoire de terminaison!
-                  int token_size;
+                  const char *after = html;
 
-                  if (!(token_size = strfield(html, ".writeln")))        // détection ...objet.write[ln]("code html")...
-                    token_size = strfield(html, ".write");
-                  if (token_size) {
-                    a = html + token_size;
+                  // ...object.write[ln]("generated html")...
+                  if (hts_skip_prefix_ci(&after, ".writeln") ||
+                      hts_skip_prefix_ci(&after, ".write")) {
+                    a = after;
                     while(is_realspace(*a))
                       a++;      // sauter espaces
                     if (*a == '(') {    // début parenthèse
@@ -2084,14 +2082,12 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
                   /* Parse */
                   assertf(inscript_name != NULL);
-                  if (*html == '/'
-                      &&
-                      ((strfield(html, "/script")
-                        && strfield(inscript_name, "script"))
-                       || (strfield(html, "/style")
-                           && strfield(inscript_name, "style"))
-                      )
-                      && inscript_locked == 0) {
+                  if (*html == '/' &&
+                      ((hts_starts_with_ci(html, "/script") &&
+                        hts_starts_with_ci(inscript_name, "script")) ||
+                       (hts_starts_with_ci(html, "/style") &&
+                        hts_starts_with_ci(inscript_name, "style"))) &&
+                      inscript_locked == 0) {
                     const char *a = html;
 
                     while(is_realspace(*a))
@@ -2342,21 +2338,19 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
             if (p_searchMETAURL) {
               int l = 0;
 
-              while((html + l + 4 < r->adr + r->size)
-                    && (!strfield(html + l, "URL="))
-                    && (l < 128))
+              while ((html + l + 4 < r->adr + r->size) &&
+                     !hts_starts_with_ci(html + l, "URL=") && (l < 128))
                 l++;
-              if (!strfield(html + l, "URL="))
+              if (!hts_starts_with_ci(html + l, "URL="))
                 ok = -1;
               else
                 html += (l + 4);
             }
 
-            /* éviter les javascript:document.location=.. : les parser, plutôt */
+            /* parse javascript:document.location=.. as code, not as a link */
             if (ok != -1) {
-              if (strfield(html, "javascript:")
-                  && !inscript  /* we don't want to parse 'javascript:' inside document.write inside scripts */
-                ) {
+              // not inside a script, where document.write may hold it
+              if (hts_starts_with_ci(html, "javascript:") && !inscript) {
                 ok = -1;
                 /*
                    On est désormais dans du code javascript
@@ -2471,7 +2465,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                 }
               }
               // This is a dirty and horrible hack to avoid parsing an Adobe GoLive bogus tag
-              if (strfield(html, "(Empty Reference!)")) {
+              if (hts_starts_with_ci(html, "(Empty Reference!)")) {
                 ok = -1;        // No
               }
               // a lazy-load placeholder or template is no URL: leave it as is
@@ -2744,7 +2738,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   if (add_class) {
                     const char *const a = hts_path_ext_dot(lien, "/");
 
-                    if (a == NULL || !strfield2(a, ".class"))
+                    if (a == NULL || !hts_streq_ci(a, ".class"))
                       strcatbuff(lien, ".class");
                   }
                 }
@@ -2990,9 +2984,15 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   }
                 }
                 // calculer meme_adresse
-                meme_adresse =
-                  strfield2(jump_identification_const(afs.af.adr),
-                            jump_identification_const(urladr()));
+                {
+                  const char *const host =
+                      jump_identification_const(afs.af.adr);
+
+                  // two empty hosts are not the same address
+                  meme_adresse =
+                      *host != '\0' &&
+                      hts_streq_ci(host, jump_identification_const(urladr()));
+                }
 
                 // Début partie sauvegarde
 
@@ -3216,7 +3216,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                               // GIF, not a broken <img>.
                               if (get_httptype_sized(opt, mime, sizeof(mime),
                                                      afs.af.fil, 0) &&
-                                  strfield(mime, "image/")) {
+                                  hts_starts_with_ci(mime, "image/")) {
                                 cat_name = "external.gif";
                                 cat_nb = 1;
                                 cat_data = HTS_DATA_UNKNOWN_GIF;
@@ -3594,9 +3594,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
                           // DEBUT ROBOTS.TXT AJOUT
                           if (!just_test_it) {
-                            if ((!strfield(afs.af.adr, "ftp://"))      // non ftp
-                                && (!strfield(afs.af.adr, "file://"))
-                              ) {       // non file
+                            if (!hts_starts_with_ci(afs.af.adr, "ftp://") &&
+                                !hts_starts_with_ci(afs.af.adr, "file://")) {
                               if (opt->robots) {        // récupérer robots
                                 if (ishtml(opt, afs.af.fil) != 0) {    // pas la peine pour des fichiers isolés
                                   if (checkrobots(_ROBOTS, afs.af.adr, "") != -1) {    // robots.txt ?
