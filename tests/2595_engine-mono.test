@@ -18,11 +18,12 @@ top=$(cd "$top_srcdir" && pwd)
 tmp=$(mktemp -d) || exit 1
 cleanup_push rm -rf "$tmp"
 read -r -a cc <<<"${CC:-cc}"
-cc+=(-fsyntax-only -DHTS_INTERNAL_BUILD -I"$abs_top_builddir" -I"$top/src" -I"$top/src/coucal")
+cc+=(-fsyntax-only -DHTS_INTERNAL_BUILD -I"$abs_top_builddir" -I"$top/src")
 
-# probe EXPR: compiles a function returning EXPR from a reading t.
+# probe EXPR: compiles a function returning EXPR from a reading t. htsmono.h
+# needs no OpenSSL or other dependency include path.
 probe() {
-    printf '#include "htslib.h"\nhts_mono probe(hts_mono t);\nhts_mono probe(hts_mono t) { return %s; }\n' "$1" >"$tmp/probe.c"
+    printf '#include "htsmono.h"\nhts_mono probe(hts_mono t);\nhts_mono probe(hts_mono t) { return %s; }\n' "$1" >"$tmp/probe.c"
     "${cc[@]}" "$tmp/probe.c" >"$tmp/probe.log" 2>&1
 }
 
