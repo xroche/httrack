@@ -2853,7 +2853,7 @@ int ident_url_absolute(const char *url, lien_adrfil *adrfil) {
     // SECURITE:
     // simplifier url pour les ../
     fil_simplifie(adrfil->fil);
-  } else { // localhost adrfil->file://
+  } else { // a local file
     const char *p;
     size_t i;
     char *a;

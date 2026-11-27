@@ -278,11 +278,11 @@ static HTS_UNUSED int hts_cache_walk_index(unzFile zFile,
       comment[readSizeHeader] = '\0';
       (*entries)++;
       if (pos > 0) {
-        const char *const name =
-            filename + (hts_starts_with_ci(filename, "http://") ? 7 : 0);
+        const char *name = filename;
         const hts_boolean in_zip = hts_cache_header_says_data_in_zip(
             hts_span_at(comment, (size_t) readSizeHeader));
 
+        (void) !hts_skip_prefix_ci(&name, "http://");
         entry(arg, name, in_zip ? pos : -pos);
       } else {
         bad(arg, "Corrupted cache meta entry", *entries);
