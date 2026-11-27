@@ -592,7 +592,7 @@ static int back_index_fetch(httrackp * opt, struct_back * sback, const char *adr
 
   BACK_FOR_EACH_BUSY(sback, i) {
     if (hts_load_acquire_int(&back[i].status) >= 0 /* not free or alive */
-        && strfield2(back[i].url_adr, adr) &&
+        && adr[0] != '\0' && hts_streq_ci(back[i].url_adr, adr) &&
         strcmp(back[i].url_fil, fil) == 0) {
       if (index == -1)          /* first time we meet, store it */
         index = i;
@@ -2378,10 +2378,13 @@ int back_searchlive(httrackp *opt, struct_back *sback,
   lien_back *const back = sback->lnk;
   int i;
 
+  if (search_addr[0] == '\0')
+    return -1;
   /* search for a live socket */
   BACK_FOR_EACH_BUSY(sback, i) {
     if (back_status(&back[i]) == STATUS_ALIVE) {
-      if (strfield2(back[i].url_adr, search_addr)) {    /* same location (xxc: check also virtual hosts?) */
+      /* same location (xxc: check also virtual hosts?) */
+      if (hts_streq_ci(back[i].url_adr, search_addr)) {
 #if HTS_USEOPENSSL
         // opened before --check-cert was turned on, so never verified
         if (opt->check_cert == HTS_TRUE && back[i].r.ssl_con != NULL &&
@@ -3311,7 +3314,7 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
       back[p].r.req.nokeepalive = opt->nokeepalive;
 
       // mode ftp, court-circuit!
-      if (strfield(back[p].url_adr, "ftp://")) {
+      if (hts_starts_with_ci(back[p].url_adr, "ftp://")) {
         if (back[p].testmode) {
           hts_log_print(opt, LOG_DEBUG,
                         "error: forbidden test with ftp link for back_add");
@@ -3339,7 +3342,7 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
           launch_ftp(str);
           return 0;
         }
-      } else if (strfield(back[p].url_adr, "https://")) {
+      } else if (hts_starts_with_ci(back[p].url_adr, "https://")) {
 #if HTS_USEOPENSSL
         back[p].r.ssl = 1; // let's rock
         back[p].r.ssl_con = NULL;
@@ -4705,7 +4708,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                       if (cut) {
                         /* a length we cannot read whole is one we cannot
                            compare */
-                        if (strfield(rcvd, "Content-length:"))
+                        if (hts_starts_with_ci(rcvd, "Content-length:"))
                           length_conflict = HTS_TRUE;
                         /* A cut header could carry a truncated Location. */
                         hts_log_print(
@@ -4725,21 +4728,21 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                        */
 
                       {
-                        const int cl = strfield(rcvd, "Content-length:");
+                        const char *cl = rcvd;
 
-                        if (cl != 0 && !hts_content_length_agrees(
-                                           rcvd + cl, &content_length))
+                        if (hts_skip_prefix_ci(&cl, "Content-length:") &&
+                            !hts_content_length_agrees(cl, &content_length))
                           length_conflict = HTS_TRUE;
                       }
-                      if (strfield(rcvd, "Transfer-Encoding:"))
+                      if (hts_starts_with_ci(rcvd, "Transfer-Encoding:"))
                         has_te = HTS_TRUE;
                       if (strnotempty(rcvd))
                         treathead_opt(opt, opt->cookie, back[i].url_adr,
                                       back[i].url_fil, &back[i].r, rcvd);
 
-                      // parfois les serveurs buggés renvoient un content-range avec un 200
+                      // some buggy servers send a content-range with a 200
                       if (back[i].r.statuscode == HTTP_OK)      // 'OK'
-                        if (strfield(rcvd, "content-range:")) { // Avec un content-range: relisez les RFC..
+                        if (hts_starts_with_ci(rcvd, "content-range:")) {
                           // Fake range (the file is complete)
                           if (!
                               (back[i].r.crange_start == 0

@@ -1921,7 +1921,7 @@ void warc_write_backtransaction(httrackp *opt, lien_back *back) {
   if (w->failed || !statuscode_is_http(back->r.statuscode))
     return;
 
-  is_ftp = strfield(back->url_adr, "ftp://") != 0;
+  is_ftp = hts_starts_with_ci(back->url_adr, "ftp://");
   snprintf(uri, sizeof(uri), "%s%s%s",
            link_has_authority(back->url_adr) ? "" : "http://", back->url_adr,
            back->url_fil);

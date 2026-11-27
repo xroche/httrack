@@ -1724,7 +1724,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
                  corrupts an untyped binary (#1415). */
             } else if (((nspec > r.size / 100) && (nspec > 10)) ||
                        ((map[0] > r.size / 100) && (map[0] > 10) &&
-                        strfield2(r.contenttype, HTS_UNKNOWN_MIME))) {
+                        hts_streq_ci(r.contenttype, HTS_UNKNOWN_MIME))) {
               is_binary = 1;
               strcpybuff(r.contenttype, "application/octet-stream");
               hts_log_print(opt, LOG_WARNING,
@@ -2468,7 +2468,7 @@ void host_ban(httrackp * opt, int ptr,
     if (back_holds_transfer(&back[i]))
       /* host is a bare name and an FTP url_adr keeps its scheme, so no FTP slot
          matches here, and none may, because its worker is still writing it. */
-      if (strfield2(back[i].url_adr, host)) {
+      if (hts_streq_ci(back[i].url_adr, host)) {
         back[i].status = 0;     // terminé
         back_set_finished(opt, sback, i);
         if (back[i].r.soc != INVALID_SOCKET)
@@ -2483,7 +2483,7 @@ void host_ban(httrackp * opt, int ptr,
 
   // cancel the host's links, whatever their address length
   for (i = 0; i < opt->lien_tot; i++) {
-    if (strfield2(jump_identification_const(heap(i)->adr), host)) {
+    if (hts_streq_ci(jump_identification_const(heap(i)->adr), host)) {
       hts_log_print(opt, LOG_DEBUG, "Cancel: %s%s",
                     adr_nologin(opt, heap(i)->adr), heap(i)->fil);
       // keep the hash entry, so meeting the link again re-checks its save name
@@ -3519,7 +3519,7 @@ int ask_continue(httrackp * opt) {
   int go = 1;
 
   if (s != NULL && strnotempty(s) &&
-      ((strfield2(s, "N")) || (strfield2(s, "NO")) || (strfield2(s, "NON"))))
+      (hts_streq_ci(s, "N") || hts_streq_ci(s, "NO") || hts_streq_ci(s, "NON")))
     go = 0;
   if (HAS_CALLBACK(opt, query2)) /* nobody was asked otherwise */
     hts_log_print(opt, LOG_NOTICE, "(wizard) answer '%s' to \"%.*s\": %s",
@@ -4037,13 +4037,12 @@ int htsAddLink(htsmoduleStruct * str, char *link) {
         *(a + 1) = '\0';        // cut
     } else {
       // keep only the path of an absolute codebase
-      int scheme = strfield(codebase, "http://");
+      const char *host = codebase;
 
-      if (scheme == 0)
-        scheme = strfield(codebase, "https://");
-      if (scheme != 0) {
+      if (hts_skip_prefix_ci(&host, "http://") ||
+          hts_skip_prefix_ci(&host, "https://")) {
         char BIGSTK tempo[HTS_URLMAXSIZE * 2];
-        char *a = strchr(codebase + scheme, '/');
+        char *a = strchr(host, '/');
 
         if (a) {
           strcpybuff(tempo, a);
