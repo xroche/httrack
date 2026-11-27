@@ -570,6 +570,42 @@ static int st_backswap(httrackp *opt, int argc, char **argv) {
           fclose(cfp);
       }
     }
+
+    /* A headers size past the file's end is refused before it is allocated,
+       which only the ASan leg can tell from a failed read. */
+    if (whole_len > 0) {
+      const size_t want = sizeof(hdrs), huge = SIZE_MAX / 2;
+      lien_back *copy = NULL;
+      FILE *cfp = NULL;
+      long at;
+
+      for (at = 0; at + (long) sizeof(size_t) <= whole_len; at++)
+        if (memcmp(whole + at, &want, sizeof(want)) == 0 &&
+            memcmp(whole + at + sizeof(want), hdrs, sizeof(hdrs)) == 0)
+          break;
+      if (at + (long) sizeof(size_t) > whole_len) {
+        fprintf(stderr, "backswap: no headers size field in the record\n");
+        err = 1;
+      } else {
+        memcpy(whole + at, &huge, sizeof(huge));
+        cfp = tmpfile();
+        if (cfp == NULL ||
+            fwrite(whole, 1, (size_t) whole_len, cfp) != (size_t) whole_len ||
+            fseek(cfp, 0, SEEK_SET) != 0) {
+          fprintf(stderr, "backswap: could not stage a huge headers size\n");
+          err = 1;
+        } else if (back_unserialize(cfp, &copy) || copy != NULL) {
+          fprintf(stderr, "backswap: a huge headers size unserialized\n");
+          err = 1;
+        }
+      }
+      if (copy != NULL) {
+        back_clear_entry(copy);
+        freet(copy);
+      }
+      if (cfp != NULL)
+        fclose(cfp);
+    }
     if (whole != NULL)
       freet(whole);
     freet(back.r.adr);

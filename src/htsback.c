@@ -86,7 +86,8 @@ typedef struct back_sink {
   TypedArray(char) buf;
 } back_sink;
 
-/* Where a spool record is read from: a file, or a buffer when fp is NULL. */
+/* Where a spool record is read from: a file, or a buffer when fp is NULL.
+   len bounds both, so a size field cannot claim more than is left. */
 typedef struct back_source {
   FILE *fp;
   const char *buf;
@@ -1702,11 +1703,12 @@ static hts_boolean back_sink_put(back_sink *s, const void *data, size_t size) {
 }
 
 static hts_boolean back_source_get(back_source *s, void *dst, size_t size) {
-  if (s->fp != NULL)
-    return hts_fread_exact(dst, size, s->fp);
   if (size > s->len - s->pos)
     return HTS_FALSE;
-  if (size != 0)
+  if (s->fp != NULL) {
+    if (!hts_fread_exact(dst, size, s->fp))
+      return HTS_FALSE;
+  } else if (size != 0)
     memcpy(dst, s->buf + s->pos, size);
   s->pos += size;
   return HTS_TRUE;
@@ -1732,7 +1734,7 @@ static hts_boolean back_data_unserialize(back_source *s, void **str,
     if (*size == 0)             /* serialized NULL ptr */
       return HTS_TRUE;
     /* Untrusted, and the guard byte's extra byte must not wrap the size. */
-    if (*size > SIZE_MAX - 1 || (s->fp == NULL && *size > s->len - s->pos))
+    if (*size > SIZE_MAX - 1 || *size > s->len - s->pos)
       return HTS_FALSE;
     *str = malloct(*size + 1);
     if (*str == NULL)
@@ -1901,10 +1903,16 @@ static hts_boolean back_record_read(back_source *s, lien_back **dst) {
 }
 
 hts_boolean back_unserialize(FILE *fp, lien_back **dst) {
+  const LLint size = fpsize(fp);
+  const LLint pos = ftello(fp);
   back_source s;
 
   memset(&s, 0, sizeof(s));
   s.fp = fp;
+  s.len = size >= 0 && pos >= 0 && pos <= size &&
+                  (uint64_t) (size - pos) <= SIZE_MAX
+              ? (size_t) (size - pos)
+              : SIZE_MAX;
   return back_record_read(&s, dst);
 }
 
