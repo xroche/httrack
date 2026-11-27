@@ -322,7 +322,7 @@ static int append_cookie_header(buff_struct *bstr, t_cookie *cookie,
                                 const char *adr, const char *path,
                                 size_t reserve, int *skipped) {
   const size_t crlf_len = sizeof(H_CRLF) - 1;
-  const hts_boolean https = strfield(adr, "https://") != 0;
+  const hts_boolean https = hts_starts_with_ci(adr, "https://");
   const int64_t now = (int64_t) time(NULL);
   const char *domain;
   char host[COOKIE_MAX_DOMAIN];
@@ -589,7 +589,7 @@ const char *http_bundle_header_refusal(const char *headers, const char *line) {
     return why;
   if (header_name_in(line, engine))
     return "Host and Cookie are the engine's";
-  if (strfield(line, "Proxy-"))
+  if (hts_starts_with_ci(line, "Proxy-"))
     return "a proxy header is not for the site";
   return NULL;
 }
@@ -1464,7 +1464,7 @@ int hts_status_line_code(const char *line) {
 
   while (*a == ' ' || *a == '\t' || *a == '\r' || *a == '\n')
     a++;
-  if (!strfield(a, "HTTP/"))
+  if (!hts_starts_with_ci(a, "HTTP/"))
     return -1;
   while (*a != '\0' && *a != ' ' && *a != '\t' && *a != '\r' && *a != '\n')
     a++;
@@ -1483,7 +1483,7 @@ void treatfirstline(htsblk * retour, const char *rcvd) {
     // note: certains serveurs buggés renvoient HTTP/1.0\n200 OK ou " HTTP/1.0 200 OK"
     while((*a == ' ') || (*a == 10) || (*a == 13) || (*a == 9))
       a++;                      // épurer espaces au début
-    if (strfield(a, "HTTP/")) {
+    if (hts_starts_with_ci(a, "HTTP/")) {
       // sauter HTTP/1.x
       while((*a != ' ') && (*a != '\0') && (*a != 10) && (*a != 13)
             && (*a != 9))
@@ -1797,7 +1797,7 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
     while(is_space(*a))
       a++;
     if (*a) {
-      if (strfield(a, "trailers")) {
+      if (hts_starts_with_ci(a, "trailers")) {
         retour->keep_alive_trailers = 1;
       }
     }
@@ -1912,7 +1912,7 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
               // the first pair is the cookie, and "name=" may erase one
               strcpybuff(cook_name, name);
               strcpybuff(cook_value, value);
-            } else if (strfield2(name, "domain")) {
+            } else if (hts_streq_ci(name, "domain")) {
               if (v.len == 0 || strcmp(value, ".") == 0) {
                 // ignored, so the cookie stays on the host
               } else if (v.len < sizeof(domain) - 1) {
@@ -1922,7 +1922,7 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
                 cook_name[0] = 0;
                 break;
               }
-            } else if (strfield2(name, "path")) {
+            } else if (hts_streq_ci(name, "path")) {
               if (value[0] != '/') {
                 strcpybuff(path, defpath); // RFC 6265 5.2.4
               } else if (v.len < sizeof(path) - 1) {
@@ -1931,7 +1931,7 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
                 cook_name[0] = 0;
                 break;
               }
-            } else if (strfield2(name, "max-age")) {
+            } else if (hts_streq_ci(name, "max-age")) {
               int64_t when;
 
               // an invalid value is ignored, not a reset (5.3)
@@ -1939,16 +1939,16 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
                 has_max_age = HTS_TRUE;
                 max_age_when = when;
               }
-            } else if (strfield2(name, "expires")) {
+            } else if (hts_streq_ci(name, "expires")) {
               int64_t when;
 
               if (cookie_expires_time(value, now, &when)) {
                 has_expires = HTS_TRUE;
                 expires_when = when;
               }
-            } else if (strfield2(name, "secure")) {
+            } else if (hts_streq_ci(name, "secure")) {
               attr.secure = HTS_TRUE;
-            } else if (strfield2(name, "httponly")) {
+            } else if (hts_streq_ci(name, "httponly")) {
               attr.http_only = HTS_TRUE;
             }
             // RFC 6265 5.2 ignores any other attribute, SameSite for example
@@ -1975,7 +1975,7 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
             (adr != NULL && cookie_domain_allowed(domain, scoped))) {
           /* RFC 6265bis 5.6: plain http may neither set a Secure cookie nor
              shadow, replace or erase one */
-          if (adr != NULL && !strfield(adr, "https://") &&
+          if (adr != NULL && !hts_starts_with_ci(adr, "https://") &&
               (attr.secure ||
                cookie_is_secure_record(cookie, cook_name, domain, path))) {
             hts_log_print(
@@ -2789,7 +2789,7 @@ T_SOC newhttp_addrs(httrackp *opt, const char *_iadr, htsblk *retour, int port,
 // retour=-1 si erreur.
 // si file://... alors adresse=file:// (et coupe le ?query dans ce cas)
 int ident_url_absolute(const char *url, lien_adrfil *adrfil) {
-  int pos = 0;
+  const char *rest = url;
   int scheme = 0;
 
   // effacer adrfil->adr et adrfil->fil
@@ -2810,34 +2810,30 @@ int ident_url_absolute(const char *url, lien_adrfil *adrfil) {
   }
 
   // 1. optional scheme ":"
-  if ((pos = strfield(url, "file:"))) { // fichier local!! (pour les tests)
-    //!!p+=3;
+  if (hts_skip_prefix_ci(&rest, "file:")) { // local file, for the tests
     strcpybuff(adrfil->adr, "file://");
-  } else if ((pos = strfield(url, "http:"))) {  // HTTP
-    //!!p+=3;
-  } else if ((pos = strfield(url, "ftp:"))) {   // FTP
-    strcpybuff(adrfil->adr, "ftp://");  // FTP!!
-    //!!p+=3;
+  } else if (hts_skip_prefix_ci(&rest, "http:")) { // http leaves adr empty
+  } else if (hts_skip_prefix_ci(&rest, "ftp:")) {
+    strcpybuff(adrfil->adr, "ftp://");
 #if HTS_USEOPENSSL
-  } else if ((pos = strfield(url, "https:"))) {     // HTTPS
+  } else if (hts_skip_prefix_ci(&rest, "https:")) {
     strcpybuff(adrfil->adr, "https://");
 #endif
   } else if (scheme) {
-    return -1;                  // erreur non reconnu
-  } else
-    pos = 0;
+    return -1; // an unknown scheme
+  }
 
   // 2. optional "//" authority
-  if (strncmp(url + pos, "//", 2) == 0)
-    pos += 2;
+  if (strncmp(rest, "//", 2) == 0)
+    rest += 2;
 
-  // (url+pos) now points to the path (not net path)
+  // rest now points to the path (not net path)
 
   //## if (adrfil->adr[0]!=lOCAL_CHAR) {    // adrfil->adresse normale http
-  if (!strfield(adrfil->adr, "file:")) {        // PAS adrfil->file://
+  if (!hts_starts_with_ci(adrfil->adr, "file:")) { // not a local file
     const char *p, *q;
 
-    p = url + pos;
+    p = rest;
 
     // p pointe sur le début de l'adrfil->adresse, ex: www.truc.fr/sommaire/index.html
     q = hts_authority_end(jump_identification_const(p));
@@ -2857,12 +2853,12 @@ int ident_url_absolute(const char *url, lien_adrfil *adrfil) {
     // SECURITE:
     // simplifier url pour les ../
     fil_simplifie(adrfil->fil);
-  } else {                      // localhost adrfil->file://
+  } else { // a local file
     const char *p;
     size_t i;
     char *a;
 
-    p = url + pos;
+    p = rest;
     if (*p == '/' || *p == '\\') {      /* adrfil->file:///.. */
       strcatbuff(adrfil->fil, p);       // fichier local ; adrfil->adr="#"
     } else {
@@ -3492,7 +3488,7 @@ hts_boolean hts_header_is_read(const char *line) {
   size_t i;
 
   for (i = 0; i < sizeof(names) / sizeof(names[0]); i++)
-    if (strfield(line, names[i]))
+    if (hts_starts_with_ci(line, names[i]))
       return HTS_TRUE;
   return HTS_FALSE;
 }
@@ -3523,7 +3519,7 @@ hts_boolean binput_line(const char *buff, const char *end, hts_buf s,
 
 // case-insensitive strstr()
 const char *strstrcase(const char *s, const char *o) {
-  while(*s && strfield(s, o) == 0)
+  while (*s && !hts_starts_with_ci(s, o))
     s++;
   if (*s == '\0')
     return NULL;
@@ -3718,7 +3714,7 @@ const char *jump_normalized_const(const char *source) {
   if (strcmp(source, "file://") == 0)
     return source;
   source = jump_identification_const(source);
-  if (strfield(source, "www") && source[3] != '\0') {
+  if (hts_starts_with_ci(source, "www") && source[3] != '\0') {
     if (source[3] == '.') {     // www.foo.com -> foo.com
       source += 4;
     } else {                    // www-4.foo.com -> foo.com
@@ -4520,14 +4516,14 @@ hts_boolean hts_host_is_address(hts_span host) {
 hts_boolean hts_proxy_is_socks(const char *name) {
   if (name == NULL)
     return HTS_FALSE;
-  return (strfield(name, "socks5h:") || strfield(name, "socks5:")) ? HTS_TRUE
-                                                                   : HTS_FALSE;
+  return hts_starts_with_ci(name, "socks5h:") ||
+         hts_starts_with_ci(name, "socks5:");
 }
 
 hts_boolean hts_proxy_is_connect(const char *name) {
   if (name == NULL)
     return HTS_FALSE;
-  return strfield(name, "connect:") ? HTS_TRUE : HTS_FALSE;
+  return hts_starts_with_ci(name, "connect:");
 }
 
 // default proxy port for a -P argument, keyed on the scheme

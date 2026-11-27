@@ -34,8 +34,9 @@ Please visit our Website: http://www.httrack.com
 #define HTSCACHECODEC_DEFH
 
 /* No engine header here: proxytrack and the fuzzers build it without one. The
-   readers expand strfield2() and CACHE_ENTRYNAME_SIZE from the caller's. */
+   readers expand CACHE_ENTRYNAME_SIZE from the caller's. */
 #include "htsglobal.h"
+#include "htsctype.h"
 #include "htssafe.h"
 #include "htsbuf.h"
 #include "htsurlport.h"
@@ -115,7 +116,7 @@ hts_cache_store_field(const hts_cache_field *fields, size_t count,
                       const char *name, const char *value) {
   size_t i;
 
-  for (i = 0; i < count && !strfield2(name, fields[i].name); i++) {
+  for (i = 0; i < count && !hts_streq_ci(name, fields[i].name); i++) {
   }
   if (i == count) {
     return HTS_FALSE;
@@ -230,8 +231,8 @@ hts_cache_header_says_data_in_zip(hts_span block) {
     hts_boolean cut;
 
     p = hts_cache_line(p, end, HTS_BUF(line), &cut);
-    if (strfield(line, "X-In-Cache:")) {
-      return strfield2(line, "X-In-Cache: 1") ? HTS_TRUE : HTS_FALSE;
+    if (hts_starts_with_ci(line, "X-In-Cache:")) {
+      return hts_streq_ci(line, "X-In-Cache: 1");
     }
   }
   return HTS_FALSE;
@@ -277,11 +278,11 @@ static HTS_UNUSED int hts_cache_walk_index(unzFile zFile,
       comment[readSizeHeader] = '\0';
       (*entries)++;
       if (pos > 0) {
-        const char *const name =
-            filename + (strfield(filename, "http://") ? 7 : 0);
+        const char *name = filename;
         const hts_boolean in_zip = hts_cache_header_says_data_in_zip(
             hts_span_at(comment, (size_t) readSizeHeader));
 
+        (void) !hts_skip_prefix_ci(&name, "http://");
         entry(arg, name, in_zip ? pos : -pos);
       } else {
         bad(arg, "Corrupted cache meta entry", *entries);

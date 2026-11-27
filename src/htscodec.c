@@ -85,16 +85,17 @@ hts_boolean hts_codec_cap_binds(LLint in_size, LLint cap) {
 
 hts_codec hts_codec_parse(const char *encoding) {
   if (encoding == NULL || encoding[0] == '\0' ||
-      strfield2(encoding, "identity"))
+      hts_streq_ci(encoding, "identity"))
     return HTS_CODEC_IDENTITY;
-  if (strfield2(encoding, "gzip") || strfield2(encoding, "x-gzip") ||
-      strfield2(encoding, "deflate") || strfield2(encoding, "x-deflate"))
+  if (hts_streq_ci(encoding, "gzip") || hts_streq_ci(encoding, "x-gzip") ||
+      hts_streq_ci(encoding, "deflate") || hts_streq_ci(encoding, "x-deflate"))
     return HTS_CODEC_DEFLATE;
-  if (strfield2(encoding, "br"))
+  if (hts_streq_ci(encoding, "br"))
     return HTS_USEBROTLI ? HTS_CODEC_BROTLI : HTS_CODEC_UNSUPPORTED;
-  if (strfield2(encoding, "zstd"))
+  if (hts_streq_ci(encoding, "zstd"))
     return HTS_USEZSTD ? HTS_CODEC_ZSTD : HTS_CODEC_UNSUPPORTED;
-  if (strfield2(encoding, "compress") || strfield2(encoding, "x-compress"))
+  if (hts_streq_ci(encoding, "compress") ||
+      hts_streq_ci(encoding, "x-compress"))
     return HTS_CODEC_UNSUPPORTED; /* LZW: never advertised, no decoder here */
   /* Not a coding at all: broken servers put charsets and the like here, and
      the plain body they sent must survive it. */
