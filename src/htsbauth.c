@@ -1482,7 +1482,7 @@ int cookie_load_from(httrackp *opt, t_cookie *cookie, const char *fpath,
   {
     hts_cookies_verdict why;
 
-    /* keep, so that no save replaces a jar this could not name */
+    /* keep the jar: a save must not overwrite a file we could not open */
     if (!hts_fpath_join(HTS_BUF(catbuff), fpath, name)) {
       hts_log_print(opt, LOG_WARNING, "Cookies: the path %s%s is too long",
                     fpath, name);

@@ -1,8 +1,8 @@
 #!/bin/bash
 #
 # concat() and fconcat() drop the part that does not fit, so engine paths are
-# joined with hts_path_join(). Only the joins of a host and a URL path, or of a
-# rate and its unit, may still call them.
+# joined with hts_path_join(). Only these calls, which join a host and a URL
+# path or a rate and its unit, may stay.
 
 set -euo pipefail
 
@@ -12,30 +12,80 @@ set -euo pipefail
 src="${top_srcdir}/src"
 test -r "${src}/htsconcat.c" || skip "no source tree at ${src}"
 
-allowed='htsback.c:1 htscache.c:3 htslib.c:1 htsmirror.c:1'
+allowed='htsback.c: concat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), adr, fil)
+htscache.c: concat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), url_adr, url_fil)
+htscache.c: concat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), url_adr, url_fil)
+htscache.c: concat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), url_adr, url_fil)
+htslib.c: concat(strc->catbuff, sizeof(strc->catbuff), buff, "/s")
+htsmirror.c: concat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), afs->af.adr, afs->af.fil)'
 
-# Count the calls per file, leaving out the definitions and the self-tests.
+# Print every call in the C files under $1 as "file: call(args)", one line
+# each, leaving out the definitions, the self-tests and a bare "concat()".
 calls() {
-    local f n out=''
+    local f
     shopt -s nullglob
     for f in "$1"/*.c "$1"/*/*.c; do
         case $f in */htsconcat.c | *_selftest.c) continue ;; esac
-        n=$(LC_ALL=C command grep -cE '\bf?concat\(([^)]|$)' "$f" || true)
-        test "$n" -eq 0 || out="${out:+$out }${f##*/}:${n}"
+        LC_ALL=C awk '
+        function flush() {
+            gsub(/[[:space:]]+/, " ", buf)
+            print name ": " buf
+            buf = ""
+            depth = -1
+        }
+        BEGIN { depth = -1 }
+        {
+            line = $0
+            if (depth < 0) {
+                if (!match(line, /(^|[^A-Za-z0-9_])f?concat[[:space:]]*\(/))
+                    next
+                if (substr(line, RSTART, 1) !~ /[fc]/) {
+                    RSTART++
+                }
+                line = substr(line, RSTART)
+                if (line ~ /^f?concat[[:space:]]*\([[:space:]]*\)/)
+                    next
+                depth = 0
+                buf = ""
+                n = split(FILENAME, parts, "/")
+                name = parts[n]
+            }
+            for (i = 1; i <= length(line); i++) {
+                c = substr(line, i, 1)
+                buf = buf c
+                if (c == "(") {
+                    depth++
+                } else if (c == ")") {
+                    depth--
+                    if (depth == 0) {
+                        flush()
+                        break
+                    }
+                }
+            }
+            if (depth > 0)
+                buf = buf " "
+        }' "$f"
     done
-    echo "$out"
 }
 
 got=$(calls "$src")
 test "$got" = "$allowed" ||
-    fail "concat callers changed: got '${got}', want '${allowed}'"
+    fail "concat callers changed: got
+${got}"
 ok "only the non-path concat callers remain"
 
-# Control: a new path join through fconcat() must show.
+# Controls: a caller swapped within an allowed file, and a spaced call.
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_concat.XXXXXX")
 cleanup_push rm -rf "$tmp"
-cp "$src"/*.c "$tmp"/
-printf '%s\n' 'void f(void) { fconcat(buf, sizeof(buf), dir, "x"); }' \
-    >>"${tmp}/htsindex.c"
-test "$(calls "$tmp")" != "$allowed" || fail "the control join was not seen"
-ok "a planted fconcat() join is caught"
+mkdir "${tmp}/swap" "${tmp}/space"
+cp "$src"/*.c "${tmp}/swap"/
+cp "$src"/*.c "${tmp}/space"/
+sed 's/, buff, "\/s")/, dir, name)/' "${src}/htslib.c" >"${tmp}/swap/htslib.c"
+printf '%s\n' 'void f(void) { fconcat (buf, sizeof(buf), dir, "x"); }' \
+    >>"${tmp}/space/htsindex.c"
+for c in swap space; do
+    test "$(calls "${tmp}/${c}")" != "$allowed" ||
+        fail "the ${c} control was not seen"
+done
+ok "a swapped caller and a spaced fconcat () call are both caught"

@@ -850,12 +850,23 @@ static hts_boolean theme_in(const char *dir, const char *name) {
          hts_shared_fexist(file);
 }
 
+/* DIR + NAME in DST with native separators, as fconcat() wrote it; NULL when
+   it does not fit. */
+static const char *path_in(hts_buf dst, const char *dir, const char *name) {
+  char joined[CATBUFF_SIZE];
+
+  if (dst.size < sizeof(joined) ||
+      !hts_buf_printf(HTS_BUF(joined), "%s%s", dir, name))
+    return NULL;
+  return (fconv) (dst.p, dst.size, joined); /* a runtime size */
+}
+
 /* Is DIR + NAME a file? A path too long to build is not one. */
 static hts_boolean file_exists_in(const char *dir, const char *name) {
   char file[CATBUFF_SIZE];
+  const char *const path = path_in(HTS_BUF(file), dir, name);
 
-  return hts_buf_printf(HTS_BUF(file), "%s%s", dir, name) &&
-         hts_shared_fexist(file);
+  return path != NULL && hts_shared_fexist(path);
 }
 
 /* Is name a theme in the user's folder or the installed one? */
@@ -3019,7 +3030,7 @@ static hts_boolean htslang_load(hts_buf limit_to, const char *path) {
   /* Load master file (list of keys and internal keys) */
   if (hts_buf_is_none(limit_to)) {
     const char *mname = "lang.def";
-    FILE *fp = hts_buf_printf(HTS_BUF(catbuff), "%s%s", path, mname)
+    FILE *fp = path_in(HTS_BUF(catbuff), path, mname) != NULL
                    ? fopen(catbuff, "rb")
                    : NULL;
 
@@ -3087,7 +3098,7 @@ static hts_boolean htslang_load(hts_buf limit_to, const char *path) {
         lang_catalog_path(HTS_BUF(lbasename), hashname)) {
       FILE *fp;
 
-      fp = hts_buf_printf(HTS_BUF(catbuff), "%s%s", path, lbasename)
+      fp = path_in(HTS_BUF(catbuff), path, lbasename) != NULL
                ? fopen(catbuff, "rb")
                : NULL;
       if (fp != NULL) {
@@ -3131,7 +3142,7 @@ static hts_boolean htslang_load(hts_buf limit_to, const char *path) {
       if (!lang_catalog_path(HTS_BUF(lbasename), hashname)) {
         return HTS_FALSE;
       }
-      fp = hts_buf_printf(HTS_BUF(catbuff), "%s%s", path, lbasename)
+      fp = path_in(HTS_BUF(catbuff), path, lbasename) != NULL
                ? fopen(catbuff, "rb")
                : NULL;
       if (fp) {
