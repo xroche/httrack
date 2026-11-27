@@ -1433,12 +1433,12 @@ for psrun in "${psruns[@]}"; do
     cmp -s "$wdscript" "$leaky" && fail "the leaky mutant changed nothing, so it proves nothing"
     leg_at=$SECONDS
     : >"$legout"
-    backoff_leg "$(nativepath "$leaky")" >/dev/null || true
-    # Grade only an existing log, because the audit cannot fail on an empty one.
-    if test -s "$legout"; then
+    said=$(backoff_leg "$(nativepath "$leaky")") || true
+    # Grade only a log the widened catch wrote to, since the lines before it hold no token.
+    if grep -q 'status post failed' "$legout"; then
         token_free "$legout" && fail "the token audit cannot see a logged token"
     else
-        skipped+=("the leaky-token control: the leg left no log to audit")
+        skipped+=("the leaky-token control: no post failed in its window: $(firstline "$said")")
     fi
     pace $((SECONDS - leg_at))
 
