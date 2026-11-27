@@ -15,7 +15,8 @@ directory). Each line is "<path> <mode>...", path "*" matching everything:
   hold      never answer RETR, leaving the client's data connection idle
   sizecut   answer SIZE with half a line, then drop the control connection
   sizelate  answer SIZE only after LATE_SECONDS, past a 2s client timeout
-  sizelong  answer SIZE with a reply line far over the client's 1023-byte bound
+  long150   answer RETR with a 150 line far over the client's 1023-byte bound,
+            as a server echoing a long path does
 
 --require-pass answers USER with 331, the only way the client's PASS is sent.
 --mute accepts the control connection and never speaks, not even the greeting.
@@ -33,7 +34,7 @@ import time
 # the run under test.
 QUIET_SECONDS = 900
 
-LATE_SECONDS = 3
+LATE_SECONDS = 5
 
 TRICKLE_CHUNK = 8192
 TRICKLE_PAUSE = 0.2
@@ -143,7 +144,14 @@ class Session(threading.Thread):
         if "hold" in modes:
             time.sleep(QUIET_SECONDS)
             return
-        reply(self.conn, "150 opening binary mode")
+        if "long150" in modes:
+            reply(
+                self.conn,
+                "150 Opening BINARY mode data connection for /%s (%d bytes)."
+                % ("x" * 2000, len(body)),
+            )
+        else:
+            reply(self.conn, "150 opening binary mode")
         self.send_body(body[self.rest :], modes)
         self.rest = 0
 
@@ -191,9 +199,7 @@ class Session(threading.Thread):
                 return False
             if "sizelate" in modes:
                 time.sleep(LATE_SECONDS)
-            if "sizelong" in modes:
-                reply(conn, "213 " + "9" * 2000)
-            elif path and os.path.isfile(path):
+            if path and os.path.isfile(path):
                 reply(conn, "213 %d" % os.path.getsize(path))
             else:
                 reply(conn, "550 no such file")

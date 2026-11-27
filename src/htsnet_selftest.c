@@ -850,15 +850,19 @@ static int st_ftpline(httrackp *opt, int argc, char **argv) {
           HTS_FTP_LINE_ERROR);
   deletesoc(sv[0]);
 
-  // an over-long final line fails at the bound, without waiting for its CRLF
+  // an over-long final line, a long path echoed in a 150, is clipped and read
   assertf(st_socketpair(sv) == 0);
-  assertf(send(sv[1], "220 ", 4, 0) == 4);
+  assertf(send(sv[1], "150 ", 4, 0) == 4);
   assertf(send(sv[1], flood, (int) sizeof(flood), 0) == (int) sizeof(flood));
+  assertf(send(sv[1], "\r\n\0\0\0\r\n", 7, 0) == 7);
+  memset(line, '#', sizeof(line));
+  assertf(get_ftp_line(NULL, sv[0], HTS_BUF(line), 5, NULL) == HTS_FTP_LINE_OK);
+  assertf(strlen(line) == 1023 && line[1022] == 'x' && line[1024] == '#');
+  // a line of NUL bytes holds no reply code
   memset(line, '#', sizeof(line));
   assertf(get_ftp_line(NULL, sv[0], HTS_BUF(line), 5, NULL) ==
-          HTS_FTP_LINE_TOO_LONG);
+          HTS_FTP_LINE_ERROR);
   assertf(line[0] == '\0' && line[1] == '#');
-
   deletesoc(sv[1]);
   deletesoc(sv[0]);
 

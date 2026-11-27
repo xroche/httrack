@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# A failed FTP control reply (closed, late, over-long) fails the file with that
-# reason, rather than being read as a server reply; a real 500 still works.
+# A failed FTP control reply (closed, late) fails the file with that reason,
+# rather than being read as a server reply. A real 500 and an over-long 150 work.
 
 set -euo pipefail
 
@@ -21,7 +21,7 @@ for f in ok cut late long; do
     printf '%s body\n' "$f" >"${root}/${f}.txt"
 done
 # ok.txt gets a real "500 MDTM not understood", which must not fail it.
-printf '/ok.txt nomdtm\n/cut.txt sizecut\n/late.txt sizelate\n/long.txt sizelong\n' \
+printf '/ok.txt nomdtm\n/cut.txt sizecut\n/late.txt sizelate\n/long.txt long150\n' \
     >"${tmpdir}/modes"
 
 ftp_server_start --root "$root" --mode-file "$(nativepath "${tmpdir}/modes")" \
@@ -42,23 +42,28 @@ error_for() {
     local line
     line=$(grep -a "Error:.*/$1" "$log" || true)
     grep -q "$2" <<<"$line" ||
-        fail "$1 did not fail with '$2': ${line:-no error}"
+        fail "$1 did not fail with '$2': ${line:-no error}; console: $(<"${tmpdir}/console")"
 }
 
-got="${out}/127.0.0.1_${FTP_PORT}/ok.txt"
-grep -qs 'ok body' "$got" ||
-    fail "a real 500 reply to MDTM lost ok.txt: $(grep -a 'Error:' "$log" || true)"
-! grep -a 'Error:.*/ok\.txt' "$log" || fail "ok.txt was logged as an error"
+# fetched FILE WHY: FILE was mirrored intact and logged no error.
+fetched() {
+    grep -qs "$1 body" "${out}/127.0.0.1_${FTP_PORT}/$1.txt" ||
+        fail "$2 lost $1.txt: $(grep -a 'Error:' "$log" || true); console: $(<"${tmpdir}/console")"
+    ! grep -a "Error:.*/$1\\.txt" "$log" || fail "$1.txt was logged as an error"
+}
+
+fetched ok "a real 500 reply to MDTM"
 ok "a real 500 reply is still a reply"
+
+fetched long "a 150 reply line over 1023 bytes"
+ok "an over-long reply line is clipped and read, as a long path makes it"
 
 error_for cut.txt '"FTP read error"'
 ok "a reply cut by a close fails as a read error"
 
 error_for late.txt '"FTP read timeout (2)"'
 sent=$(<"$cmds")
+grep -q '^SIZE .*late\.txt' <<<"$sent" || fail "the server never saw SIZE for late.txt: ${sent}"
 ! grep -q '^RETR .*late\.txt' <<<"$sent" ||
     fail "after the SIZE timeout the client sent RETR, so it read the late reply as RETR's"
 ok "a SIZE reply past --timeout fails as a timeout, and RETR is never sent"
-
-error_for long.txt '"FTP reply line too long"'
-ok "an over-long reply line fails as too long"

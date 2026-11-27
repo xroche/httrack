@@ -87,13 +87,13 @@ int send_line(T_SOC soc, const char *data);
 
 /* What get_ftp_line() read: a reply, or why there is none. */
 typedef enum hts_ftp_line_status {
-  HTS_FTP_LINE_OK,
-  HTS_FTP_LINE_ERROR, /* socket error, or the peer closed */
-  HTS_FTP_LINE_TIMEOUT,
-  HTS_FTP_LINE_TOO_LONG /* the final line overran the 1023-byte bound */
+  HTS_FTP_LINE_OK = 0,
+  HTS_FTP_LINE_ERROR, /* socket error, the peer closed, or an empty reply */
+  HTS_FTP_LINE_TIMEOUT
 } hts_ftp_line_status;
 
-/* Read one control-channel reply into line, clipped. A size-0 line discards
+/* Read one control-channel reply into line, clipped at 1023 bytes as read and
+   again to the line's size. A size-0 line discards
    the reply. On failure line is left empty. Optional back ends the wait on a
    stop, opt clips it to --max-time. */
 HTS_CHECK_RESULT hts_ftp_line_status get_ftp_line(lien_back *back, T_SOC soc,

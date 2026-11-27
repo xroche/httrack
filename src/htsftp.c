@@ -466,9 +466,6 @@ static HTS_CHECK_RESULT hts_boolean ftp_reply(lien_back *back, T_SOC soc,
   case HTS_FTP_LINE_TIMEOUT:
     ftp_fail(&back->r, "FTP read timeout (%d)", timeout);
     break;
-  case HTS_FTP_LINE_TOO_LONG:
-    ftp_fail(&back->r, "FTP reply line too long");
-    break;
   default:
     ftp_fail(&back->r, "FTP read error");
     break;
@@ -1461,9 +1458,7 @@ hts_ftp_line_status get_ftp_line(lien_back *back, T_SOC soc, hts_buf line,
     hts_stat_recv_add(1); // count incoming bytes
     if ((b != 10) && (b != 13)) {
       if (i < (int) sizeof(data) - 1)
-        data[i++] = b;
-      else if (!ftp_line_continues(data, multiline))
-        return HTS_FTP_LINE_TOO_LONG; // a clipped reply would read as another
+        data[i++] = b; // a path echoed in a reply can run past the bound
     } else if (i > 0) {
       if (ftp_line_continues(data, multiline)) {
         data[3] = '\0';
@@ -1474,6 +1469,8 @@ hts_ftp_line_status get_ftp_line(lien_back *back, T_SOC soc, hts_buf line,
     }
   } while(!ok);
   data[i] = '\0';
+  if (data[0] == '\0') // only NUL bytes: no reply code to read
+    return HTS_FTP_LINE_ERROR;
 
   if (_DEBUG_HEAD) {
     if (ioinfo) {
