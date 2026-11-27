@@ -192,8 +192,8 @@ HTSEXT_API int hts_main(int argc, char **argv);
     its WARC archive is incomplete or missing, and -1 or 1 for a command line
     it refused before any mirror started; hts_errmsg() describes any non-zero
     return. A mirror the caller stopped itself (hts_request_stop(), a callback
-    returning 0, SIGINT on the command line) still returns 0: it ended as
-    asked. */
+    returning 0, SIGINT on the command line) still returns 0, because it ended
+    as asked, unless its WARC archive is incomplete. */
 HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt);
 
 /* Options handling */
