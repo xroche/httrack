@@ -1,0 +1,41 @@
+#!/bin/bash
+#
+# concat() and fconcat() drop the part that does not fit, so engine paths are
+# joined with hts_path_join(). Only the joins of a host and a URL path, or of a
+# rate and its unit, may still call them.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+src="${top_srcdir}/src"
+test -r "${src}/htsconcat.c" || skip "no source tree at ${src}"
+
+allowed='htsback.c:1 htscache.c:3 htslib.c:1 htsmirror.c:1'
+
+# Count the calls per file, leaving out the definitions and the self-tests.
+calls() {
+    local f n out=''
+    shopt -s nullglob
+    for f in "$1"/*.c "$1"/*/*.c; do
+        case $f in */htsconcat.c | *_selftest.c) continue ;; esac
+        n=$(LC_ALL=C command grep -cE '\bf?concat\(([^)]|$)' "$f" || true)
+        test "$n" -eq 0 || out="${out:+$out }${f##*/}:${n}"
+    done
+    echo "$out"
+}
+
+got=$(calls "$src")
+test "$got" = "$allowed" ||
+    fail "concat callers changed: got '${got}', want '${allowed}'"
+ok "only the non-path concat callers remain"
+
+# Control: a new path join through fconcat() must show.
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_concat.XXXXXX")
+cleanup_push rm -rf "$tmp"
+cp "$src"/*.c "$tmp"/
+printf '%s\n' 'void f(void) { fconcat(buf, sizeof(buf), dir, "x"); }' \
+    >>"${tmp}/htsindex.c"
+test "$(calls "$tmp")" != "$allowed" || fail "the control join was not seen"
+ok "a planted fconcat() join is caught"

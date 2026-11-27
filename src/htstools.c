@@ -1373,8 +1373,8 @@ HTSEXT_API hts_boolean hts_findnext(find_handle find) {
     memset(&(find->filestat), 0, sizeof(find->filestat));
     if ((find->dirp = readdir(find->hdir))) {
       /* a dangling link is listed as neither file nor dir, not ended on */
-      if (STAT(concat(catbuff, sizeof(catbuff), find->path, find->dirp->d_name),
-               &find->filestat) != 0) {
+      if (!hts_path_join(HTS_BUF(catbuff), find->path, find->dirp->d_name) ||
+          STAT(catbuff, &find->filestat) != 0) {
         memset(&(find->filestat), 0, sizeof(find->filestat));
         find->filestat.st_size = -1;
       }

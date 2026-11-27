@@ -1421,10 +1421,9 @@ int cookie_load_from(httrackp *opt, t_cookie *cookie, const char *fpath,
             // cFileName is UTF-16: convert to UTF-8 so the mirror path and
             // file wrappers stay UTF-8 (no CP_ACP mojibake).
             char *u = hts_convertUCS2StringToUTF8(find.cFileName, -1);
-            FILE *fp =
-                u != NULL
-                    ? FOPEN(fconcat(catbuff, sizeof(catbuff), fpath, u), "rb")
-                    : NULL;
+            FILE *fp = u != NULL && hts_fpath_join(HTS_BUF(catbuff), fpath, u)
+                           ? FOPEN(catbuff, "rb")
+                           : NULL;
 
             if (fp) {
               char cook_name[256];
@@ -1468,8 +1467,8 @@ int cookie_load_from(httrackp *opt, t_cookie *cookie, const char *fpath,
                 }
               }
               fclose(fp);
-              if (cookie_merged)
-                UNLINK(fconcat(catbuff, sizeof(catbuff), fpath, u));
+              if (cookie_merged) /* catbuff still holds the path read */
+                UNLINK(catbuff);
             }                   // if fp
             freet(u);
           }
@@ -1483,9 +1482,13 @@ int cookie_load_from(httrackp *opt, t_cookie *cookie, const char *fpath,
   {
     hts_cookies_verdict why;
 
-    return cookie_load_file(opt, cookie,
-                            fconcat(catbuff, sizeof(catbuff), fpath, name),
-                            start_url, &why);
+    /* keep, so that no save replaces a jar this could not name */
+    if (!hts_fpath_join(HTS_BUF(catbuff), fpath, name)) {
+      hts_log_print(opt, LOG_WARNING, "Cookies: the path %s%s is too long",
+                    fpath, name);
+      return COOKIE_LOAD_KEEP;
+    }
+    return cookie_load_file(opt, cookie, catbuff, start_url, &why);
   }
 }
 
@@ -1503,9 +1506,9 @@ HTSEXT_API hts_cookies_verdict hts_cookies_file_verdict(const char *path,
     *lost = 0;
   if (path == NULL || *path == '\0')
     return HTS_COOKIES_KEPT_UNREADABLE;
-  given = fconcat(catbuff, sizeof(catbuff), "", path);
-  if (*given == '\0')
+  if (!hts_fpath_join(HTS_BUF(catbuff), "", path))
     return HTS_COOKIES_KEPT_UNREADABLE;
+  given = catbuff;
   // a FIFO or a device would block the read or never end it
   if (hts_file_mtime(given, &when) && !when.is_plain_file)
     return HTS_COOKIES_KEPT_NOT_A_FILE;
