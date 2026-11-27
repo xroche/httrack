@@ -272,7 +272,7 @@ HTS_CHECK_RESULT hts_boolean hts_fpath_join(hts_buf b, const char *dir,
 
 /* concat */
 
-HTS_STATIC char *getHtsOptBuff_(httrackp *opt) {
+HTS_STATIC HTS_RING char *getHtsOptBuff_(httrackp *opt) {
   opt->state.concat.index = (opt->state.concat.index + 1) % 16;
   return opt->state.concat.buff[opt->state.concat.index];
 }

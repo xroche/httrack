@@ -937,12 +937,13 @@ def check_owned(files):
 
 
 # The rotating per-opt buffer that one thread at a time may use (#2328).
-RING_SOURCES = ("OPT_GET_BUFF", "OPT_GET_HTS_BUF", "getHtsOptBuff_")
+RING_SOURCES = ("OPT_GET_BUFF", "OPT_GET_HTS_BUF")
 SPAWN = re.compile(r"(?<![\w.>])hts_newthread(?:_checked|_tail)?\s*\(")
 # WebHTTrack's worker that runs the crawl itself.
 CRAWL_THREADS = frozenset(["back_launch_cmd"])
 # Threads beside the crawl that no hts_newthread call starts: the WebHTTrack server.
 OTHER_THREADS = frozenset(["smallserver"])
+RingFunction = collections.namedtuple("RingFunction", "path decl at body texts head")
 
 
 def ring_call(names):
@@ -961,10 +962,67 @@ def returned_texts(body):
     return texts
 
 
+def param_names(head, name):
+    """Return the parameter names of function NAME declared by HEAD."""
+    m = re.search(r"\b%s\s*\(" % re.escape(name), head)
+    inner = head[m.end() : matching(head, m.end() - 1) - 1]
+    names = []
+    for p in split_top(inner, ","):
+        fp = re.search(r"\(\s*\*\s*([A-Za-z_]\w*)\s*\)", p)
+        words = re.findall(r"[A-Za-z_]\w*", p)
+        names.append(fp.group(1) if fp else words[-1] if words else "")
+    return names
+
+
+def call_args(body, name):
+    """Yield the argument lists of each call to NAME in BODY."""
+    for m in re.finditer(r"(?<![\w.>])%s\s*\(" % re.escape(name), body):
+        yield [
+            a.strip()
+            for a in split_top(body[m.end() : matching(body, m.end() - 1) - 1], ",")
+        ]
+
+
+def thread_roots(funcs):
+    """Return the functions started as a thread body or tail, following a
+    function that passes its own parameter on to hts_newthread."""
+    roots = set(OTHER_THREADS)
+    todo = []
+    for name, found in funcs.items():
+        for f in found:
+            if "hts_newthread" not in f.body:
+                continue
+            params = param_names(f.head, name)
+            for m in SPAWN.finditer(f.body):
+                args = split_top(
+                    f.body[m.end() : matching(f.body, m.end() - 1) - 1], ","
+                )
+                # The thread body, then hts_newthread_tail's tail.
+                for a in (x.strip() for x in args[0:1] + args[2:3]):
+                    if a in params:
+                        todo.append((name, params.index(a)))
+                    roots.add(a)
+    seen = set(todo)
+    while todo:
+        callee, k = todo.pop()
+        for name, found in funcs.items():
+            for f in found:
+                if callee not in f.body:
+                    continue
+                params = param_names(f.head, name)
+                for args in call_args(f.body, callee):
+                    a = args[k] if k < len(args) else ""
+                    if a in params and (name, params.index(a)) not in seen:
+                        seen.add((name, params.index(a)))
+                        todo.append((name, params.index(a)))
+                    roots.add(a)
+    return roots
+
+
 def check_ring(files):
     """Yield (path, line, key, message) for a ring returner missing HTS_RING, and
     for a ring use in a function a thread other than the crawl's can reach."""
-    bodies = collections.defaultdict(list)
+    funcs = collections.defaultdict(list)
     marked = set()
     for path, code in files.items():
         for start, head, body in top_level(code):
@@ -974,49 +1032,52 @@ def check_ring(files):
             if "HTS_RING" in head:
                 marked.add(fh[0])
             if body is not None:
-                texts = returned_texts(body) if "*" in fh[1] else []
-                decl = start + len(head) - len(head.lstrip())
-                bodies[fh[0]].append((path, decl, start + len(head), body, texts))
+                funcs[fh[0]].append(
+                    RingFunction(
+                        path,
+                        start + len(head) - len(head.lstrip()),
+                        start + len(head),
+                        body,
+                        returned_texts(body) if "*" in fh[1] else [],
+                        head,
+                    )
+                )
     ring = set(RING_SOURCES) | marked
     grew = True
     while grew:
         grew = False
         call = ring_call(ring)
-        for name, found in bodies.items():
-            if name not in ring and any(call.search(t) for *_, ts in found for t in ts):
+        for name, found in funcs.items():
+            if name not in ring and any(call.search(t) for f in found for t in f.texts):
                 ring.add(name)
                 grew = True
     for name in sorted(ring - marked - set(RING_SOURCES)):
-        path, decl, *_ = bodies[name][0]
-        line = line_of(files[path], decl)
-        yield path, line, name, "%s returns a ring slot without HTS_RING" % name
+        f = funcs[name][0]
+        line = line_of(files[f.path], f.decl)
+        yield f.path, line, name, "%s returns a ring slot without HTS_RING" % name
 
-    roots = set(OTHER_THREADS)
-    for code in files.values():
-        for m in SPAWN.finditer(code) if "hts_newthread" in code else ():
-            args = split_top(code[m.end() : matching(code, m.end() - 1) - 1], ",")
-            roots.update(a.strip() for a in args[0:1] + args[2:3])
-    thread = {r: r for r in roots - CRAWL_THREADS if r in bodies}
+    roots = thread_roots(funcs) - CRAWL_THREADS
+    thread = {r: r for r in roots if r in funcs}
     todo = sorted(thread)
     while todo:
         name = todo.pop()
-        for *_, body, _ in bodies[name]:
-            for m in CALL.finditer(body):
+        for f in funcs[name]:
+            for m in CALL.finditer(f.body):
                 g = m.group(1)
-                if g in bodies and g not in thread and g not in ring:
+                if g in funcs and g not in thread and g not in ring:
                     thread[g] = thread[name]
                     todo.append(g)
     call = ring_call(ring)
     for name in sorted(thread):
-        for path, _, at, body, _ in bodies[name]:
-            for m in call.finditer(body):
-                line = line_of(files[path], at + m.start())
+        for f in funcs[name]:
+            for m in call.finditer(f.body):
+                line = line_of(files[f.path], f.at + m.start())
                 msg = "%s runs on the %s thread and takes a ring slot of opt via %s" % (
                     name,
                     thread[name],
                     m.group(1),
                 )
-                yield path, line, "%s: %s" % (name, m.group(1)), msg
+                yield f.path, line, "%s: %s" % (name, m.group(1)), msg
 
 
 def scan(root):

@@ -21,19 +21,28 @@ cp -R "${srcdir}/src" "${work}/src"
 cp -R "${srcdir}/tools/api-lint" "${work}/baseline"
 chmod -R u+w "${work}"
 
-# Worker, tail and helper run off the crawl thread; the crawl helper does not.
+# Worker, helper, inner and both tails run off the crawl thread, and the crawl helper does not.
 cat >"${work}/src/lintring.c" <<'C'
-static void lint_ring_helper(httrackp *opt) { (void) url_nologin(opt, "x"); }
+static void lint_ring_inner(httrackp *opt) { (void) url_nologin(opt, "x"); }
+static void lint_ring_helper(httrackp *opt) { lint_ring_inner(opt); }
 static void lint_ring_worker(void *a) { lint_ring_helper((httrackp *) a); }
-static void lint_ring_tail(void *a) { (void) OPT_GET_BUFF((httrackp *) a); }
-static void lint_ring_crawl(httrackp *opt) { (void) adr_nologin(opt, "x"); }
+static void lint_ring_tail(void *a) { (void) getHtsOptBuff_((httrackp *) a); }
+static void lint_ring_fwd_tail(void *a) { (void) OPT_GET_BUFF((httrackp *) a); }
+static void lint_ring_spawn_with(void (*tail)(void *), httrackp *opt) {
+  (void) hts_newthread_tail(lint_ring_worker, opt, tail);
+}
+static void lint_ring_crawl(httrackp *opt) {
+  (void) adr_nologin(opt, "x");
+}
 void lint_ring_server(httrackp *opt) { (void) hts_logpath(opt, "x"); }
 int lint_ring_spawn(httrackp *opt) {
   lint_ring_crawl(opt);
+  lint_ring_spawn_with(lint_ring_fwd_tail, opt);
   return hts_newthread_tail(lint_ring_worker, opt, lint_ring_tail);
 }
-static char *lint_ring_local(httrackp *opt) { const hts_buf b = OPT_GET_HTS_BUF(opt); return b.p; }
+static char *lint_ring_via2(httrackp *opt) { return lint_ring_via(opt); }
 static char *lint_ring_via(httrackp *opt) { return lint_ring_local(opt); }
+static char *lint_ring_local(httrackp *opt) { const hts_buf b = OPT_GET_HTS_BUF(opt); return b.p; }
 static HTS_RING char *lint_ring_ok(httrackp *opt) { return OPT_GET_BUFF(opt); }
 static size_t lint_ring_len(httrackp *opt) { return strlen(OPT_GET_BUFF(opt)); }
 C
@@ -47,15 +56,15 @@ sed 's/ HTS_RING char \*hts_logpath(/ char *hts_logpath(/' \
 
 out=$("${python}" "${lint}" --root "${work}" --baseline-dir "${work}/baseline") &&
     fail "planted ring uses passed"
-ring=$(grep ': ring: ' <<<"${out}" || true)
-for want in "lintring.c:1: ring: new violation: lint_ring_helper runs on the lint_ring_worker thread and takes a ring slot of opt via url_nologin" \
-    "lintring.c:3: ring: new violation: lint_ring_tail runs on the lint_ring_tail thread and takes a ring slot of opt via OPT_GET_BUFF" \
-    "lintring.c:5: ring: new violation: lint_ring_server runs on the smallserver thread and takes a ring slot of opt via hts_logpath" \
-    "lintring.c:10: ring: new violation: lint_ring_local returns a ring slot without HTS_RING" \
-    "lintring.c:11: ring: new violation: lint_ring_via returns a ring slot without HTS_RING" \
+for want in "lintring.c:1: ring: new violation: lint_ring_inner runs on the lint_ring_worker thread and takes a ring slot of opt via url_nologin" \
+    "lintring.c:4: ring: new violation: lint_ring_tail runs on the lint_ring_tail thread and takes a ring slot of opt via getHtsOptBuff_" \
+    "lintring.c:5: ring: new violation: lint_ring_fwd_tail runs on the lint_ring_fwd_tail thread and takes a ring slot of opt via OPT_GET_BUFF" \
+    "lintring.c:12: ring: new violation: lint_ring_server runs on the smallserver thread and takes a ring slot of opt via hts_logpath" \
+    "lintring.c:18: ring: new violation: lint_ring_via2 returns a ring slot without HTS_RING" \
+    "lintring.c:19: ring: new violation: lint_ring_via returns a ring slot without HTS_RING" \
+    "lintring.c:20: ring: new violation: lint_ring_local returns a ring slot without HTS_RING" \
     "src/htscore.h:$(grep -n ' char \*hts_logpath(' "${work}/src/htscore.h" | cut -d: -f1): ring: new violation: hts_logpath returns a ring slot without HTS_RING"; do
-    grep -qF "${want}" <<<"${ring}" || fail "missed ${want}: ${out}"
+    grep -qF "${want}" <<<"${out}" || fail "missed ${want}: ${out}"
 done
-# Nothing on the crawl thread, nor from WebHTTrack's crawl worker or a marked or non-pointer function.
-test "$(wc -l <<<"${ring}")" -eq 6 || fail "flagged a crawl-thread use: ${out}"
-test "$(wc -l <<<"${out}")" -eq 6 || fail "unexpected output: ${out}"
+# The lint must not flag the crawl helper, the crawl worker, a marked function or a non-pointer function.
+test "$(wc -l <<<"${out}")" -eq 8 || fail "unexpected output: ${out}"
