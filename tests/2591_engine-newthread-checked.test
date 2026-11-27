@@ -19,7 +19,7 @@ case "${refused}" in
     if test "$(uname -s)" = Linux && test "$(id -u)" != 0 && ! target_is_windows; then
         fail "a non-root Linux user could not provoke a refused spawn"
     fi
-    echo "refused spawn not provoked here"
+    echo "NOTE: not provoked on $(uname -s) as uid $(id -u), so only the granted spawn was checked"
     ;;
 *) fail "refused spawn: ${refused}" ;;
 esac

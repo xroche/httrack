@@ -231,7 +231,7 @@ static int st_bundlenames(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* The deprecated forms are what this compares, so silence them here only. */
+/* Calls the deprecated form on purpose. */
 #if defined(__GNUC__) || defined(__clang__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
@@ -239,14 +239,15 @@ static int st_bundlenames(httrackp *opt, int argc, char **argv) {
 #pragma warning(push)
 #pragma warning(disable : 4996)
 #endif
-/* Each form's result for paste under flags, "checked/legacy". */
+/* Each form's result for paste under flags, "checked/legacy", then the last
+   name or error. */
 static void bundlechecked_paste(const char *paste, unsigned int flags) {
   const hts_boolean dry = (flags & HTS_PASTE_DRY_RUN) != 0;
-  hts_paste_result res;
+  hts_paste_result res, prev;
+  hts_boolean ok = HTS_FALSE;
   int i;
 
   for (i = 0; i < 6; i++) {
-    hts_boolean ok;
 
     res.size = sizeof(res);
     switch (i) {
@@ -273,7 +274,14 @@ static void bundlechecked_paste(const char *paste, unsigned int flags) {
       break;
     }
     printf("%s%d", i % 2 == 0 ? " " : "/", ok);
+    if (i % 2 == 0)
+      prev = res;
+    else if (strcmp(res.name, prev.name) != 0 ||
+             strcmp(res.url, prev.url) != 0 ||
+             strcmp(res.error, prev.error) != 0 || res.cookies != prev.cookies)
+      printf("(result differs)");
   }
+  printf(" %s", ok ? res.name : res.error);
 }
 
 /* -#test=bundlechecked: each _checked form and its deprecated twin agree, on a

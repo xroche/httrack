@@ -2115,7 +2115,7 @@ static int st_threadwait(httrackp *opt, int argc, char **argv) {
   return st_verdict("threadwait self-test", err);
 }
 
-/* The deprecated form is what this compares, so silence it here only. */
+/* Calls the deprecated form on purpose. */
 #if defined(__GNUC__) || defined(__clang__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
@@ -2135,7 +2135,7 @@ static int st_newthread_legacy(void (*fun)(void *arg)) {
 #ifndef _WIN32
 static void *newthread_probe(void *arg) { return arg; }
 
-/* Can this process still start a thread? It answers apart from the engine. */
+/* Can this process still start a thread? */
 static hts_boolean newthread_probe_spawns(void) {
   pthread_t t;
 

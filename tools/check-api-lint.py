@@ -545,9 +545,9 @@ def delegates(body):
             yield m.group(1)
 
 
-def deprecated(head):
-    """Is HEAD deprecated? Its `_checked` replacement carries the mark."""
-    return re.search(r"\bHTS_DEPRECATED\b", head) is not None
+def replaced(name, head, marked):
+    """Is HEAD deprecated in favour of a marked NAME_checked?"""
+    return name + "_checked" in marked and re.search(r"\bHTS_DEPRECATED\b", head)
 
 
 def check_result(files):
@@ -584,7 +584,7 @@ def check_result(files):
             failing.add(name)
     for path, start, head, name, ret, body in decls:
         cls = return_class(ret)
-        if cls is None or name in marked or deprecated(head):
+        if cls is None or name in marked or replaced(name, head, marked):
             continue
         # One level of `return g(...);` where g can fail.
         calls = {g for b in bodies_of(name, body) for g in delegates(b)}
