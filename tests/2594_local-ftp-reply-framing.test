@@ -1,0 +1,80 @@
+#!/bin/bash
+#
+# FTP replies are framed as RFC 959 says: a malformed line is an error, a
+# multiline reply ends on its opener's code, and a drip-fed reply times out.
+# Real multiline banners, a long 150, a 550 and a 500 MDTM still work.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+require_httrack
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ftpframe.XXXXXX")
+cleanup_push rm -rf "$tmpdir"
+
+root="${tmpdir}/root"
+mkdir -p "$root"
+for f in ok long multi short drip; do
+    printf '%s body\n' "$f" >"${root}/${f}.txt"
+done
+cat >"${tmpdir}/modes" <<'MODES'
+* banner
+/ok.txt nomdtm
+/long.txt long150
+/multi.txt sizemulti
+/short.txt sizeshort
+/drip.txt sizedrip
+MODES
+
+ftp_server_start --root "$root" --mode-file "$(nativepath "${tmpdir}/modes")"
+base="ftp://127.0.0.1:${FTP_PORT}"
+
+# crawl TAG CAP URL...: one crawl into out.TAG, failing only on the cap or a signal.
+crawl() {
+    local tag=$1 cap=$2 rc=0
+    shift 2
+    run_with_timeout "$cap" httrack "$@" -O "${tmpdir}/out.${tag}" --quiet \
+        --disable-security-limits --robots=0 --timeout=2 --retries=0 -c1 \
+        >"${tmpdir}/console.${tag}" 2>&1 || rc=$?
+    test "$rc" -ne 124 || fail "the ${tag} crawl was still going at ${cap}s"
+    test "$rc" -lt 128 || fail "the ${tag} crawl died on signal $((rc - 128))"
+}
+
+crawl main 120 "${base}/ok.txt" "${base}/long.txt" "${base}/multi.txt" \
+    "${base}/short.txt" "${base}/missing.txt"
+log="${tmpdir}/out.main/hts-log.txt"
+
+# fetched FILE WHY: FILE was mirrored intact and logged no error.
+fetched() {
+    grep -qs "$1 body" "${tmpdir}/out.main/127.0.0.1_${FTP_PORT}/$1.txt" ||
+        fail "$2 lost $1.txt: $(grep -a 'Error:' "$log" || true); console: $(<"${tmpdir}/console.main")"
+    ! grep -a "Error:.*/$1\\.txt" "$log" || fail "$1.txt was logged as an error"
+}
+# error_for LOG FILE MESSAGE: LOG names MESSAGE as the reason FILE failed.
+error_for() {
+    local line
+    line=$(grep -a "Error:.*/$2" "$1" || true)
+    grep -q "$3" <<<"$line" || fail "$2 did not fail with '$3': ${line:-no error}"
+}
+
+fetched ok "multiline 220 and 230 banners with a 500 MDTM"
+fetched long "a 150 reply over 1023 bytes"
+ok "multiline banners, a long 150 and a 500 MDTM are still replies"
+
+fetched multi "a multiline SIZE reply holding a 456 line"
+ok "a multiline reply ends on its opener's code, not on another code"
+
+error_for "$log" short.txt '"FTP read error"'
+ok "a reply line too short for a code is an error"
+
+error_for "$log" missing.txt 'no such file'
+ok "a real 550 reply still names the server's reason"
+
+start=$SECONDS
+crawl drip 60 "${base}/drip.txt"
+took=$((SECONDS - start))
+error_for "${tmpdir}/out.drip/hts-log.txt" drip.txt '"FTP read timeout (2)"'
+test "$took" -lt 20 || fail "a drip-fed reply held a 2s timeout for ${took}s"
+ok "a drip-fed reply times out in ${took}s"

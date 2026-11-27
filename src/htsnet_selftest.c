@@ -866,6 +866,38 @@ static int st_ftpline(httrackp *opt, int argc, char **argv) {
   deletesoc(sv[1]);
   deletesoc(sv[0]);
 
+  // RFC 959 framing: a multiline reply ends on its opener's code
+  assertf(st_socketpair(sv) == 0);
+  {
+    static const char replies[] = "123-x\r\n456 not the end\r\n123-more\r\n"
+                                  "123 done\r\n200\r\n22\r\n";
+    assertf(send(sv[1], replies, (int) sizeof(replies) - 1, 0) ==
+            (int) sizeof(replies) - 1);
+  }
+  assertf(get_ftp_line(NULL, sv[0], HTS_BUF(line), 5, NULL) == HTS_FTP_LINE_OK);
+  assertf(strcmp(line, "123 done") == 0);
+  assertf(get_ftp_line(NULL, sv[0], HTS_BUF(line), 5, NULL) == HTS_FTP_LINE_OK);
+  assertf(strcmp(line, "200") == 0); // a bare code is still a code
+  assertf(get_ftp_line(NULL, sv[0], HTS_BUF(line), 5, NULL) ==
+          HTS_FTP_LINE_ERROR);
+  deletesoc(sv[1]);
+  deletesoc(sv[0]);
+  {
+    static const char *const bad[] = {"1\r\n", "abc text\r\n", "2200 x\r\n",
+                                      "22a ok\r\n", "220_ok\r\n"};
+    size_t k;
+
+    for (k = 0; k < sizeof(bad) / sizeof(bad[0]); k++) {
+      assertf(st_socketpair(sv) == 0);
+      assertf(send(sv[1], bad[k], (int) strlen(bad[k]), 0) ==
+              (int) strlen(bad[k]));
+      assertf(get_ftp_line(NULL, sv[0], HTS_BUF(line), 5, NULL) ==
+              HTS_FTP_LINE_ERROR);
+      deletesoc(sv[1]);
+      deletesoc(sv[0]);
+    }
+  }
+
   // a silent peer times out; sv[1] stays open, so this is not a close
   assertf(st_socketpair(sv) == 0);
   assertf(send(sv[1], "220 par", 7, 0) == 7);
