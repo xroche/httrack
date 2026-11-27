@@ -1408,13 +1408,14 @@ static int st_pubheaders(httrackp *opt, int argc, char **argv) {
    bytes it moves past. A span also gives hts_span_is_digits(), and is
    followed by a '7' neither may read. */
 static int st_intparse(httrackp *opt, int argc, char **argv) {
-  const char *end = argv[1];
+  const char *end;
   LLint min, max, value = -1;
 
   if (argc != 4) {
     fprintf(stderr, "int-parse: needs parse|scan|span <text> <min> <max>\n");
     return 1;
   }
+  end = argv[1];
   min = (LLint) strtoll(argv[2], NULL, 10);
   max = (LLint) strtoll(argv[3], NULL, 10);
   if (strcmp(argv[0], "span") == 0) {

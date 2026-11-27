@@ -67,4 +67,10 @@ selftest_queue 'keep_alive=0 timeout=15 max=0' int-parse-diff keep-alive \
 selftest_queue 'int-parse-diff: 6499 compared, 8906 intended changes, 0 failures' \
     int-parse-diff
 
+# With no arguments it prints its usage, and reads nothing past argv.
+rc=0
+out=$(httrack -O /dev/null "-#test=int-parse" 2>&1) || rc=$?
+test "$rc" -eq 1 || fail "int-parse with no arguments exited $rc: $out"
+grep -q 'int-parse: needs' <<<"$out" || fail "int-parse with no arguments: $out"
+
 selftest_run_queued
