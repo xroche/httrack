@@ -1548,31 +1548,36 @@ static void makeindex_add_page(htsmoduleStruct *str,
   }
 }
 
-/* Does this meta tag ask robots not to follow the links of the page? Logs
-   it when it does. */
+/* Does the meta tag at TAG_START, whose name attribute is at NAME_ATTR, ask
+   robots not to follow its links? Logs it when it does. */
 static hts_boolean meta_robots_nofollow(htsmoduleStruct *str,
-                                        const char *html) {
+                                        const char *tag_start,
+                                        const char *name_attr) {
   ENGINE_LOAD_CONTEXT_BASE();
   char tempo[1100];
   const char *a;
+  const char *name;
+  const int name_len =
+      rech_endtoken(name_attr + rech_tageq(name_attr, "name"), &name);
+  hts_span value = hts_span_at(name, name_len);
 
+  value.len = hts_span_find(value, '>'); // an unquoted value runs past the tag
+  if (!hts_span_eq_ci(hts_span_trim(value, "", HTS_REALSPACES "/"),
+                      hts_span_of("robots")))
+    return HTS_FALSE;
+  a = tag_close_within(name_attr, 999);
+  if (a == NULL)
+    return HTS_FALSE;
+  if (a - tag_start >= (ptrdiff_t) sizeof(tempo)) // too long: from name only
+    tag_start = name_attr;
   tempo[0] = '\0';
-  a = tag_close_within(html, 999);
-  if (a) {
-    if (a - html < 999) {
-      strncatbuff(tempo, html, a - html);
-      if (strstrcase(tempo, "content")) {
-        if (strstrcase(tempo, "robots")) {
-          if (strstrcase(tempo, "nofollow")) {
-            hts_log_print(opt, LOG_WARNING,
-                          "Link %s%s not scanned "
-                          "(follow robots meta tag)",
-                          adr_nologin(opt, urladr()), urlfil());
-            return HTS_TRUE;
-          }
-        }
-      }
-    }
+  strncatbuff(tempo, tag_start, a - tag_start); // content may precede name
+  if (strstrcase(tempo, "content") && strstrcase(tempo, "nofollow")) {
+    hts_log_print(opt, LOG_WARNING,
+                  "Link %s%s not scanned "
+                  "(follow robots meta tag)",
+                  adr_nologin(opt, urladr()), urlfil());
+    return HTS_TRUE;
   }
   return HTS_FALSE;
 }
@@ -2381,8 +2386,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       if (opt->robots) {
                         if ((intag_start_valid)
                             && check_tag(intag_start, "meta")) {
-                          if (rech_tageq(html, "name") && // name=robots
-                              meta_robots_nofollow(str, html))
+                          if (rech_tageq(html, "name") &&
+                              meta_robots_nofollow(str, intag_start, html))
                             nofollow = 1; // follow no link of this page
                         }
                       }
