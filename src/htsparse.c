@@ -2347,7 +2347,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                 html += (l + 4);
             }
 
-            /* parse javascript:document.location=.. as code rather than as a link */
+            /* parse javascript:document.location=.. as code, not as a link */
             if (ok != -1) {
               // not inside a script, where document.write may hold it
               if (hts_starts_with_ci(html, "javascript:") && !inscript) {
