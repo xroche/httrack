@@ -4101,18 +4101,1094 @@ static void back_wait_ssl_handshake(back_wait_state *w, httrackp *opt,
 }
 #endif
 
+#if HTS_DIRECTDISK
+/* Store a non-HTML body straight on disk, sparing memory. A locked slot
+   keeps its body in memory, a pinned one need not. */
+static void back_wait_direct_disk(httrackp *opt, struct_back *sback, int i) {
+  lien_back *const back = sback->lnk;
+
+  if (back_status(&back[i]) &&
+      (back[i].locked == 0 || back[i].locked == BACK_PINNED)) {
+    if (back[i].r.is_write == 0) { // in memory
+      if (back[i].r.adr == NULL) { // nothing written yet
+        if (!back[i].testmode) {   // not test mode
+          if (strnotempty(back[i].url_sav)) {
+            if (strcmp(back[i].url_fil, "/robots.txt")) {
+              if (back[i].r.statuscode == HTTP_OK) { // 'OK'
+                if (!is_hypertext_mime(opt, back[i].r.contenttype,
+                                       back[i].url_fil)) { // not HTML
+                  if (opt->getmode & HTS_GETMODE_NONHTML) {
+                    int fcheck = 0;
+                    int last_errno = 0;
+                    /* a .gz/.br/.zst saved under its own coding stays
+                       packed on disk */
+                    const hts_boolean packed = hts_codec_is_archive_ext(
+                        hts_codec_parse(back[i].r.contentencoding),
+                        hts_fil_ext(back[i].url_sav));
+
+                    /* HTS_TE_UNREADABLE failed at the header, so
+                       any coding here is one to undo */
+                    const hts_boolean te =
+                        back[i].r.transfer_coding != HTS_TE_NONE;
+
+                    back[i].r.is_write = 1; // to disk
+                    /* leave the .gz packed: back_finalize undoes only
+                       the transfer layer */
+                    if (packed && te)
+                      back[i].r.contentencoding[0] = '\0';
+                    if (back[i].r.compressed && (!packed || te)) {
+                      if (create_back_tmpfile(opt, &back[i], "z") == 0) {
+                        assertf(back[i].tmpfile != NULL);
+                        /* note: tmpfile is utf-8 */
+                        if ((back[i].r.out = FOPEN(back[i].tmpfile, "wb")) ==
+                            NULL) {
+                          last_errno = errno;
+                        }
+                      }
+                    } else {
+                      file_notify(opt, back[i].url_adr, back[i].url_fil,
+                                  back[i].url_sav, 1, 1, back[i].r.notmodified);
+                      back[i].r.compressed = 0;
+                      back_refetch_backup(opt, &back[i]);
+                      if ((back[i].r.out = filecreate(
+                               &opt->state.strc, back[i].url_sav)) == NULL) {
+                        last_errno = errno;
+                      }
+                    }
+                    if (back[i].r.out == NULL) {
+                      errno = last_errno;
+                      if ((fcheck = check_fatal_io_errno())) {
+                        hts_io_fatal_abort(opt);
+                      }
+                    }
+                    hts_log_print(
+                        opt, LOG_DEBUG, "File received from net to disk: %s%s",
+                        adr_nologin(opt, back[i].url_adr), back[i].url_fil);
+
+                    if (back[i].r.out == NULL) {
+                      hts_log_print(opt, LOG_ERROR | LOG_ERRNO,
+                                    "Unable to save file %s", back[i].url_sav);
+                      if (fcheck) {
+                        hts_log_print(opt, LOG_ERROR,
+                                      "* * Fatal write error, giving up");
+                      }
+                      back[i].r.is_write = 0; // error, give up
+                      back_set_finished(opt, sback, i);
+                      if (back[i].r.soc != INVALID_SOCKET) {
+                        deletehttp(&back[i].r);
+                      }
+                    } else {
+#ifndef _WIN32
+                      chmod(back[i].url_sav, HTS_ACCESS_FILE);
+#endif
+                      /* create a temporary reference file in case of broken
+                       * mirror */
+                      if (back[i].r.out != NULL && opt->cache != 0) {
+                        if (back_serialize_ref(opt, &back[i]) != 0) {
+                          hts_log_print(opt, LOG_WARNING,
+                                        "Could not create temporary "
+                                        "reference file for %s%s",
+                                        adr_nologin(opt, back[i].url_adr),
+                                        back[i].url_fil);
+                        }
+                      }
+                    }
+                  } else { // drop it
+                    hts_log_print(
+                        opt, LOG_DEBUG, "File cancelled (non HTML): %s%s",
+                        adr_nologin(opt, back[i].url_adr), back[i].url_fil);
+                    if (back[i].r.soc != INVALID_SOCKET) {
+                      deletehttp(&back[i].r);
+                    }
+                    back_slot_fail(opt, sback, i,
+                                   back[i].testmode ? STATUSCODE_TEST_OK
+                                                    : STATUSCODE_INVALID,
+                                   NULL);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+#endif
+
+/* The read ended: close the slot, then check the received length. */
+static void back_wait_end_transfer(httrackp *opt, cache_back *cache,
+                                   struct_back *sback, int i,
+                                   LLint retour_fread) {
+  lien_back *const back = sback->lnk;
+
+  back_set_finished(opt, sback, i);
+  /*KA back[i].r.soc=INVALID_SOCKET; */
+  if (retour_fread < 0 && retour_fread != READ_EOF) {
+    if (statuscode_is_write_error(back[i].r.statuscode)) {
+      /* keep the write error rather than blame the transfer */
+      hts_log_print(opt, LOG_ERROR, "Unable to write file %s", back[i].url_sav);
+      if (back[i].r.statuscode == STATUSCODE_IO_FATAL) {
+        /* A retry cannot write to a full disk. */
+        hts_io_fatal_abort(opt);
+      }
+    } else {
+      if (back[i].r.size > 0)
+        strcpybuff(back[i].r.msg, "Interrupted transfer");
+      else
+        strcpybuff(back[i].r.msg, "No data (connection closed)");
+      back[i].r.statuscode = STATUSCODE_CONNERROR;
+    }
+  } else if (!statuscode_is_http(back[i].r.statuscode) &&
+             (strnotempty(back[i].r.msg) == 0)) {
+    if (back[i].r.size > 0)
+      strcpybuff(back[i].r.msg, "Interrupted transfer");
+    else
+      strcpybuff(back[i].r.msg, "No data (connection closed)");
+    back[i].r.statuscode = STATUSCODE_CONNERROR;
+  }
+  // Close socket
+  if (back[i].r.soc != INVALID_SOCKET) {
+    /*KA deletehttp(&back[i].r); */
+    back_maydeletehttp(opt, cache, sback, i);
+  }
+  // finalize transfer
+  if (statuscode_is_http(back[i].r.statuscode) &&
+      !IS_DELAYED_EXT(back[i].url_sav)) {
+    hts_log_print(opt, LOG_TRACE, "finalizing regular file");
+    back_finalize(opt, cache, sback, i);
+  }
+
+  /* Same for an unterminated chunked stream. */
+  if (statuscode_is_http(back[i].r.statuscode) &&
+      back_chunked_unterminated(&back[i])) {
+    if (!opt->tolerant) {
+      deleteaddr(&back[i].r);
+      back[i].r.statuscode = STATUSCODE_CONNERROR; // recatch
+      htsblk_failf(&back[i].r,
+                   "Truncated chunked transfer (" LLintP
+                   " Bytes, terminating chunk missing)",
+                   (LLint) back[i].r.size);
+    } else {
+      hts_log_print(opt, LOG_WARNING,
+                    "Truncated chunked transfer (" LLintP
+                    " Bytes, terminating chunk missing) for %s%s",
+                    (LLint) back[i].r.size, adr_nologin(opt, back[i].url_adr),
+                    back[i].url_fil);
+    }
+  }
+
+  /* A body cut by a failed write keeps its write-failure class. */
+  if (back[i].r.totalsize >= 0 &&
+      !statuscode_is_write_error(back[i].r.statuscode)) {
+    if (back[i].r.totalsize != back[i].r.size) { // mismatch
+      if (!opt->tolerant) {
+        deleteaddr(&back[i].r);
+        if (back[i].r.size < back[i].r.totalsize)
+          back[i].r.statuscode = STATUSCODE_CONNERROR; // recatch
+        htsblk_failf(&back[i].r,
+                     "Incorrect length (" LLintP " Bytes, " LLintP " expected)",
+                     (LLint) back[i].r.size, (LLint) back[i].r.totalsize);
+      } else {
+        // a warning is enough
+        hts_log_print(opt, LOG_WARNING,
+                      "Incorrect length (" LLintP "!=" LLintP
+                      " expected) for %s%s",
+                      (LLint) back[i].r.size, (LLint) back[i].r.totalsize,
+                      adr_nologin(opt, back[i].url_adr), back[i].url_fil);
+      }
+    }
+  }
+}
+
+/* Parse a chunk-size line, the CRLF after a chunk, or the trailers. */
+static void back_wait_chunk_line(httrackp *opt, cache_back *cache,
+                                 struct_back *sback, int i) {
+  lien_back *const back = sback->lnk;
+
+  const hts_boolean in_trailers = back_in_chunk_trailers(&back[i]);
+
+  /* The reader drops every CR, so a blank line is two LFs. */
+  if (back[i].chunk_size > 0 &&
+      back[i].chunk_adr[back[i].chunk_size - 1] == 10 &&
+      (!in_trailers || back[i].chunk_size == 1 ||
+       back[i].chunk_adr[back[i].chunk_size - 2] == 10)) {
+    int chunk_size = -1;
+    char chunk_data[64];
+
+    if (in_trailers) {
+      chunk_size = 0; /* fields discarded, the blank line ends the body */
+    } else if (back[i].chunk_size < 32) { // not too big
+      char *chstrip = back[i].chunk_adr;
+
+      back[i].chunk_adr[back[i].chunk_size - 1] = '\0';
+      // skip leading spaces or cr
+      while (hts_isspace((unsigned char) *chstrip))
+        chstrip++;
+      chunk_data[0] = '\0';
+      strncatbuff(chunk_data, chstrip, sizeof(chunk_data) - 2);
+      // strip chunk-extension
+      while ((chstrip = strchr(chunk_data, ';')))
+        *chstrip = '\0';
+      while ((chstrip = strchr(chunk_data, ' ')))
+        *chstrip = '\0';
+      while ((chstrip = strchr(chunk_data, '\r')))
+        *chstrip = '\0';
+      if (back[i].r.totalsize < 0)
+        back[i].r.totalsize = 0; // -1 == unknown
+      if (back_status(&back[i]) == STATUS_CHUNK_WAIT) {
+        /* Parse the hostile chunk size wide, because sscanf "%x"
+           maps 80000000 to INT_MIN. */
+        char *chunk_end = NULL;
+        const unsigned long long chunk_value =
+            strtoull(chunk_data, &chunk_end, 16);
+
+        if (chunk_end != chunk_data && *chunk_end == '\0' &&
+            chunk_value <= (unsigned long long) INT32_MAX) {
+          chunk_size = (int) chunk_value;
+          if (chunk_size > 0)
+            back[i].chunk_blocksize =
+                chunk_size; /* the data block chunk size */
+          /* Only 0 ends the stream (#840). */
+          else if (chunk_size == 0)
+            back[i].chunk_blocksize = -1; /* ending */
+          back[i].r.totalsize += chunk_size;
+          /* Re-check -m per chunk, because the header carried
+             no length (#1708). istoobig() alone, because
+             back_checksize()'s wizard pass costs a filter match
+             per chunk. */
+          if (istoobig(opt, back[i].r.totalsize, back[i].maxfile_html,
+                       back[i].maxfile_nonhtml, back[i].r.contenttype)) {
+            back_set_too_big(opt, sback, i);
+            /* Drop the partial bytes; a backup, where one was
+               taken, is restored over them by back_finalize(). */
+            if (back[i].r.is_write && back[i].tmpfile == NULL &&
+                back[i].url_sav[0] != '\0') {
+              (void) !url_savename_refname_remove(opt, back[i].url_adr,
+                                                  back[i].url_fil);
+              (void) UNLINK(back[i].url_sav);
+            }
+            chunk_size = -1;
+          } else if (back[i].r.adr != NULL ||
+                     !back[i].r.is_write) { // Not to disk
+            /* Refuse here what the next read would refuse, to avoid
+               the realloc. */
+            if (!hts_inmem_size_fits(back[i].r.totalsize)) {
+              hts_log_print(opt, LOG_WARNING,
+                            "Chunked resource too large for %s%s",
+                            adr_nologin(opt, back[i].url_adr), back[i].url_fil);
+              chunk_size = -1;
+            } else {
+              char *const grown = (char *) realloct(
+                  back[i].r.adr, (size_t) back[i].r.totalsize + 1);
+
+              if (grown != NULL) {
+                back[i].r.adr = grown;
+              } else {
+                /* r.totalsize already counts this chunk, so
+                   dropping the buffer would have the next read
+                   write past it. */
+                hts_log_print(
+                    opt, LOG_ERROR, "not enough memory (" LLintP ") for %s%s",
+                    (LLint) back[i].r.totalsize,
+                    adr_nologin(opt, back[i].url_adr), back[i].url_fil);
+                chunk_size = -1;
+              }
+            }
+          }
+        } else {
+          hts_log_print(opt, LOG_WARNING, "Illegal chunk (%s) for %s%s",
+                        back[i].chunk_adr, adr_nologin(opt, back[i].url_adr),
+                        back[i].url_fil);
+        }
+      } else { /* STATUS_CHUNK_CR: the CRLF after the data */
+        if (chunk_data[0] == '\0') {
+          if (back[i].chunk_blocksize > 0)
+            chunk_size =
+                (int) back[i].chunk_blocksize; /* recent data chunk size */
+          else if (back[i].chunk_blocksize == -1)
+            chunk_size = 0; /* ending chunk */
+          else
+            chunk_size = 1; /* fake positive size for 1st chunk history */
+        } else {
+          hts_log_print(opt, LOG_WARNING, "illegal chunk CRLF (%s) for %s%s",
+                        back[i].chunk_adr, adr_nologin(opt, back[i].url_adr),
+                        back[i].url_fil);
+        }
+      }
+    } else {
+      hts_log_print(opt, LOG_WARNING, "chunk too big (" LLintP ") for %s%s",
+                    (LLint) back[i].chunk_size,
+                    adr_nologin(opt, back[i].url_adr), back[i].url_fil);
+    }
+
+    // a non-empty chunk continues (or starts) the body
+    if (back_status(&back[i]) == STATUS_CHUNK_CR && chunk_size > 0) {
+      /* waiting for the next chunk */
+      back[i].status = STATUS_CHUNK_WAIT;
+    } else if (back_status(&back[i]) == STATUS_CHUNK_WAIT &&
+               chunk_size == 0) {       /* final chunk */
+      back[i].status = STATUS_CHUNK_CR; /* final CRLF */
+    } else if (back_status(&back[i]) == STATUS_CHUNK_WAIT &&
+               chunk_size >= 0) { /* will fetch data now */
+      back[i].status = 1;         // fetch the body
+    } else {                      /* zero-size-chunk-CRLF (end) or error */
+      /* End */
+      back_set_finished(opt, sback, i);
+
+      // finalize transfer if not temporary
+      if (!IS_DELAYED_EXT(back[i].url_sav)) {
+        hts_log_print(opt, LOG_TRACE, "finalizing at chunk end");
+        back_finalize(opt, cache, sback, i);
+      } else {
+        if (back[i].r.statuscode == HTTP_OK) {
+          hts_log_print(opt, LOG_WARNING,
+                        "unexpected incomplete type with 200 code at %s%s",
+                        adr_nologin(opt, back[i].url_adr), back[i].url_fil);
+        }
+      }
+      if (back[i].r.soc != INVALID_SOCKET) {
+        /* Error */
+        if (chunk_size < 0) {
+          deletehttp(&back[i].r);
+          deleteaddr(&back[i].r);
+          back[i].r.statuscode = STATUSCODE_INVALID;
+          strcpybuff(back[i].r.msg, "Invalid chunk");
+        } else { /* if chunk_size == 0 */
+
+          /* check the length once the chunks end */
+          if ((back[i].r.totalsize >= 0)) {
+            if (back[i].r.totalsize != back[i].r.size) { // mismatch
+              if (!opt->tolerant) {
+                deleteaddr(&back[i].r);
+                back[i].r.statuscode = STATUSCODE_INVALID;
+                strcpybuff(back[i].r.msg, "Incorrect length");
+              } else {
+                // a warning is enough
+                hts_log_print(
+                    opt, LOG_WARNING,
+                    "Incorrect length (" LLintP "!=" LLintP
+                    " expected) for %s%s",
+                    (LLint) back[i].r.size, (LLint) back[i].r.totalsize,
+                    adr_nologin(opt, back[i].url_adr), back[i].url_fil);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // free the chunk line buffer
+    if (back[i].chunk_adr != NULL) {
+      freet(back[i].chunk_adr);
+      back[i].chunk_adr = NULL;
+      back[i].chunk_size = 0;
+      // NO! xxback[i].chunk_blocksize = 0;
+    }
+
+  } // chunk buffer holds a complete line
+  //
+}
+
+/* Parse the response headers once they are complete. Return HTS_FALSE
+   on a Status 100, whose headers are followed by the real ones. */
+static hts_boolean back_wait_headers(httrackp *opt, cache_back *cache,
+                                     struct_back *sback, int i) {
+  lien_back *const back = sback->lnk;
+
+  //
+  if (back[i].r.size >= 2) {
+    // double LF
+    if (((back[i].r.adr[back[i].r.size - 1] == 10) &&
+         (back[i].r.adr[back[i].r.size - 2] == 10)) ||
+        (back[i].r.adr[0] == '<') /* bogus server */
+    ) {
+      char rcvd[2048];
+      int ptr = 0;
+      int adv = 0;
+      int noFreebuff = 0;
+      LLint content_length = -1;
+      hts_boolean length_conflict = HTS_FALSE;
+      hts_boolean has_te = HTS_FALSE;
+      hts_boolean te_unreadable = HTS_FALSE;
+      /* binput_line stops at a NUL, hiding the fields after it */
+      const hts_boolean has_nul =
+          back[i].r.adr[0] != '<' &&
+          memchr(back[i].r.adr, '\0', (size_t) back[i].r.size) != NULL;
+
+      if (has_nul) {
+        hts_log_print(opt, LOG_WARNING,
+                      "NUL byte in response header, response "
+                      "dropped: %s%s",
+                      adr_nologin(opt, back[i].url_adr), back[i].url_fil);
+        back_slot_close_fail(opt, sback, i, STATUSCODE_INVALID,
+                             "NUL byte in response header");
+      } else if (back_status(&back[i]) != STATUS_READY &&
+                 back[i].r.adr[0] != '<') {
+        /* Hack for zero-length headers */
+        // ----------------------------------------
+        /* parse the header, status line first */
+        const hts_boolean blind =
+            back_read_status_line(back[i].r.adr, back[i].r.adr + back[i].r.size,
+                                  HTS_BUF_N(rcvd, 2000), &ptr);
+
+        treatfirstline(&back[i].r, rcvd);
+        /* refuse a status line cut before anything but blanks */
+        if (blind) {
+          back[i].r.statuscode = STATUSCODE_INVALID;
+          strcpybuff(back[i].r.msg, "Status line too long");
+        }
+
+        if (_DEBUG_HEAD) {
+          if (ioinfo) {
+            hts_secret_fprintf(
+                opt, ioinfo, "[%d] response for %s%s:\r\ncode=%d\r\n",
+                back[i].r.debugid, jump_identification_const(back[i].url_adr),
+                back[i].url_fil, back[i].r.statuscode);
+            fprintfio(ioinfo, back[i].r.adr, ">>> ", opt);
+            fprintf(ioinfo, "\r\n");
+            fflush(ioinfo);
+          } // _DEBUG_HEAD
+        }
+        // header fields (HTTP/0.9 is not supported)
+        do {
+          const hts_boolean cut =
+              binput_line(back[i].r.adr + ptr, back[i].r.adr + back[i].r.size,
+                          HTS_BUF_N(rcvd, 2000), &adv);
+
+          ptr += adv;
+          if (cut) {
+            /* a length we cannot read whole is one we cannot
+               compare */
+            if (hts_starts_with_ci(rcvd, "Content-length:"))
+              length_conflict = HTS_TRUE;
+            /* A cut header could carry a truncated Location. */
+            hts_log_print(opt,
+                          hts_header_is_read(rcvd) ? LOG_WARNING : LOG_DEBUG,
+                          "Over-long header dropped for %s%s",
+                          adr_nologin(opt, back[i].url_adr), back[i].url_fil);
+            continue;
+          }
+          /*
+             if (_DEBUG_HEAD) {
+             if (ioinfo) {
+             fprintf(ioinfo,"(buffer)>%s\r\n",rcvd);
+             fflush(ioinfo);
+             }
+             }
+           */
+
+          {
+            const char *cl = rcvd;
+
+            if (hts_skip_prefix_ci(&cl, "Content-length:") &&
+                !hts_content_length_agrees(cl, &content_length))
+              length_conflict = HTS_TRUE;
+          }
+          if (hts_starts_with_ci(rcvd, "Transfer-Encoding:"))
+            has_te = HTS_TRUE;
+          if (strnotempty(rcvd))
+            treathead_opt(opt, opt->cookie, back[i].url_adr, back[i].url_fil,
+                          &back[i].r, rcvd);
+
+          // some buggy servers send a content-range with a 200
+          if (back[i].r.statuscode == HTTP_OK) // 'OK'
+            if (hts_starts_with_ci(rcvd, "content-range:")) {
+              // Fake range (the file is complete)
+              if (!(back[i].r.crange_start == 0 &&
+                    back[i].r.crange_end == back[i].r.crange - 1)) {
+                back[i].r.statuscode = HTTP_PARTIAL_CONTENT; // force 206
+              }
+            }
+
+        } while (strnotempty(rcvd));
+        /* RFC 9112 6.3: a coding list not ending in chunked runs
+           to close, whatever Content-Length says, except on the
+           statuses that never carry a body */
+        if (has_te && back[i].r.statuscode / 100 != 1 &&
+            back[i].r.statuscode != HTTP_NO_CONTENT &&
+            back[i].r.statuscode != HTTP_NOT_MODIFIED) {
+          if (!back[i].r.is_chunk) {
+            back[i].r.totalsize = -1;
+            back[i].r.empty = 0;
+            back[i].r.keep_alive = 0;
+          }
+          te_unreadable = back[i].r.transfer_coding == HTS_TE_UNREADABLE &&
+                          !back[i].head_request;
+        }
+        // ----------------------------------------
+
+      } else {
+        // assume text/html, OK
+        treatfirstline(&back[i].r, back[i].r.adr);
+        noFreebuff = 1;
+      }
+
+      /* RFC 9112 6.3: lengths that disagree leave the body's end
+         unknown, so the response and its connection are dropped.
+         An interim 100 has no body to frame. */
+      if (length_conflict && back[i].r.statuscode != HTTP_CONTINUE) {
+        hts_log_print(opt, LOG_WARNING,
+                      "Conflicting Content-Length, response "
+                      "dropped: %s%s",
+                      adr_nologin(opt, back[i].url_adr), back[i].url_fil);
+        back_slot_close_fail(opt, sback, i, STATUSCODE_INVALID,
+                             "Conflicting Content-Length");
+      } else if (te_unreadable) {
+        /* saving the coded bytes would pass them off as the page */
+        back_slot_close_fail(opt, sback, i, STATUSCODE_INVALID,
+                             "Unsupported Transfer-Encoding");
+      } else if (!has_nul) {
+        /* a plugin must not see the header of a dropped response */
+        int test_head = RUN_CALLBACK6(
+            opt, receivehead, back[i].r.adr, back[i].url_adr, back[i].url_fil,
+            back[i].referer_adr, back[i].referer_fil, &back[i].r);
+        if (test_head != 1) {
+          hts_log_print(opt, LOG_WARNING,
+                        "External wrapper aborted transfer, "
+                        "breaking connection: %s%s",
+                        adr_nologin(opt, back[i].url_adr), back[i].url_fil);
+          back_slot_close_fail(opt, sback, i, STATUSCODE_INVALID,
+                               "External wrapper aborted transfer");
+        }
+      }
+
+      // Free headers memory now
+      // Actually, save them for informational purpose
+      if (!noFreebuff) {
+        char *block = back[i].r.adr;
+
+        back[i].r.adr = NULL;
+        deleteaddr(&back[i].r);
+        back[i].r.headers = block;
+      }
+      // Stash the raw response headers for WARC (deleteaddr frees
+      // r.headers on the next response, before back_finalize)
+      if (StringNotEmpty(opt->warc_file))
+        warc_stash_response(&back[i].r, back[i].r.headers);
+
+      /* Say a bot challenge caused the 4xx (#1732). */
+      if (!sback->bot_challenge_noted && HTTP_IS_ERROR(back[i].r.statuscode) &&
+          http_headers_have_field(back[i].r.headers, "cf-mitigated")) {
+        sback->bot_challenge_noted = HTS_TRUE;
+        hts_log_print(opt, LOG_WARNING,
+                      "Bot protection challenge at %s%s: the "
+                      "server refused the request (cf-mitigated "
+                      "header) rather than failing it",
+                      adr_nologin(opt, back[i].url_adr), back[i].url_fil);
+        hts_log_print(opt, LOG_WARNING,
+                      "Solve the challenge in a browser, then pass "
+                      "its cookies with --cookies-file and its "
+                      "exact User-Agent with --user-agent. The "
+                      "clearance expires, and is tied to that "
+                      "browser's address and User-Agent.");
+      }
+
+      /*
+         Status code and header-response hacks
+       */
+
+      // Check response : 203 == 200
+      if (back[i].r.statuscode == HTTP_NON_AUTHORITATIVE_INFORMATION) {
+        back[i].r.statuscode = HTTP_OK; // force "OK"
+      } else if (back[i].r.statuscode == HTTP_CONTINUE) {
+        back[i].status = STATUS_WAIT_HEADERS;
+        back[i].r.size = 0;
+        back[i].r.totalsize = -1;
+        back[i].chunk_size = 0;
+        back[i].r.statuscode = STATUSCODE_INVALID;
+        back[i].r.msg[0] = '\0';
+        /* the interim block is not the final response's headers */
+        freet(back[i].r.headers);
+        hts_log_print(opt, LOG_DEBUG,
+                      "Status 100 detected for %s%s, continuing headers",
+                      adr_nologin(opt, back[i].url_adr), back[i].url_fil);
+        return HTS_FALSE;
+      }
+
+      // The *-hacks below force 304 only on a complete file.
+      const hts_boolean server_sent_304 =
+          (back[i].r.statuscode == HTTP_NOT_MODIFIED);
+
+      /*
+         Solve "false" 416 problems
+       */
+      if (back[i].r.statuscode ==
+          HTTP_REQUESTED_RANGE_NOT_SATISFIABLE) { // 'Requested Range Not
+                                                  // Satisfiable'
+        // Example:
+        // Range: bytes=2830-
+        // ->
+        // Content-Range: bytes */2830
+        if (back[i].range_req_size == back[i].r.crange) {
+          back_keep_existing(opt, sback, i, back[i].range_req_size,
+                             "matching size and timestamp");
+        }
+      }
+      // transform 406 into 200 ; we'll catch embedded links inside the
+      // choice page
+      if (back[i].r.statuscode == 406) { // 'Not Acceptable'
+        back[i].r.statuscode = HTTP_OK;
+      }
+      // On update, keep the good copy on error (mask as 304); skip
+      // resume paths so a stale-partial 416 still re-fetches.
+      if (HTTP_IS_ERROR(back[i].r.statuscode) && back[i].is_update &&
+          !back[i].testmode && back[i].range_req_size == 0 &&
+          back[i].url_sav[0] && fexist_utf8(back[i].url_sav)) {
+        hts_log_print(opt, LOG_NOTICE,
+                      "Kept existing file %s after error %d (%s) "
+                      "on update: %s%s",
+                      back[i].url_sav, back[i].r.statuscode, back[i].r.msg,
+                      adr_nologin(opt, back[i].url_adr), back[i].url_fil);
+        back[i].r.statuscode = HTTP_NOT_MODIFIED;
+        deletehttp(&back[i].r);
+      }
+      // Various hacks to limit re-transfers when updating a mirror
+      // Force update if same size detected
+      if (opt->sizehack) {
+        // We already have the file
+        // and ask the remote server for an update
+        // Some servers, especially dynamic pages severs, always
+        // answer that the page has been modified since last visit
+        // And answer with a 200 (OK) response, and the same page
+        // If the size is the same, and the option has been set, we assume
+        // that the file is identical - and therefore let's break the
+        // connection
+        if (back[i].is_update) { // update
+          // only a file stored verbatim, as in the two blocks below
+          if (back[i].r.statuscode == HTTP_OK && !back[i].testmode &&
+              !is_hypertext_mime(opt, back[i].r.contenttype, back[i].url_fil) &&
+              strnotempty(back[i].url_sav)) {
+            htsblk r =
+                cache_read(opt, cache, back[i].url_adr, back[i].url_fil, NULL,
+                           hts_buf_none()); // read the cache entry
+
+            if (r.statuscode == HTTP_OK) { // cache read OK
+              LLint len1, len2;
+              const LLint ondisk = fsize_utf8(back[i].url_sav);
+
+              len1 = r.totalsize;
+              len2 = back[i].r.totalsize;
+              if (r.size > 0)
+                len1 = r.size;
+              if (len1 >= 0) {
+                // the cache size records a past fetch, so the
+                // copy on disk has to still agree with it
+                if (len1 == len2 && ondisk == len2) {
+                  back[i].r.statuscode =
+                      HTTP_NOT_MODIFIED; // force NOT MODIFIED
+                  deletehttp(&back[i].r);
+                  hts_log_print(opt, LOG_NOTICE,
+                                "Kept existing file %s (" LLintP
+                                " bytes), matching the cached size: %s%s",
+                                back[i].url_sav, (LLint) len1,
+                                adr_nologin(opt, back[i].url_adr),
+                                back[i].url_fil);
+                }
+              }
+            } else {
+              hts_log_print(opt, LOG_WARNING,
+                            "File seems complete (same size), but there was "
+                            "a cache read error (%u): %s%s",
+                            r.statuscode, adr_nologin(opt, back[i].url_adr),
+                            back[i].url_fil);
+            }
+            if (r.adr) {
+              freet(r.adr);
+              r.adr = NULL;
+            }
+          }
+        }
+      }
+      // Various hacks to limit re-transfers when updating a mirror
+      // Detect already downloaded file (with another browser, for
+      // example)
+      if (opt->sizehack) {
+        if (!back[i].is_update) { // not an update
+          if (back[i].r.statuscode == HTTP_OK && !back[i].testmode) { // 'OK'
+            if (!is_hypertext_mime(opt, back[i].r.contenttype,
+                                   back[i].url_fil)) { // not HTML
+              if (strnotempty(back[i].url_sav)) {      // target found
+                LLint size = fsize_utf8(back[i].url_sav);
+
+                if (size >= 0) {
+                  if (back[i].r.totalsize == size) { // same size!
+                    back_keep_existing(opt, sback, i, size,
+                                       "matching the announced size");
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      // Various hacks to limit re-transfers when updating a mirror
+      // Detect bad range: header
+      if (opt->sizehack) {
+        // We have request for a partial file (with a 'Range: NNN-'
+        // header) and received a complete file notification (200), with
+        // 'Content-length: NNN' it might be possible that we had the
+        // complete file this is the case in *most* cases, so break the
+        // connection
+        if (back[i].r.is_write == 0) { // in memory
+          if (back[i].r.adr == NULL) { // nothing written yet
+            if (!back[i].testmode) {   // not test mode
+              if (strnotempty(back[i].url_sav)) {
+                if (strcmp(back[i].url_fil, "/robots.txt")) {
+                  if (back[i].r.statuscode == HTTP_OK) { // 'OK'
+                    if (!is_hypertext_mime(opt, back[i].r.contenttype,
+                                           back[i].url_fil)) { // not HTML
+                      if (back[i].r.statuscode == HTTP_OK) {   // "OK"
+                        if (back[i].range_req_size >
+                            0) { // but Range: requested
+                          if (back[i].range_req_size ==
+                              back[i].r.totalsize) { // And same size
+                            back_keep_existing(opt, sback, i,
+                                               back[i].range_req_size,
+                                               "matching the announced size, "
+                                               "range ignored");
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      // END - Various hacks to limit re-transfers when updating a mirror
+
+      /*
+         End of status code and header-response hacks
+       */
+
+      /* size refused by the wizard? */
+      if (back[i].r.soc != INVALID_SOCKET) {
+        if (!back_checksize(opt, &back[i], 1)) {
+          back_set_too_big(opt, sback, i);
+        }
+      }
+
+      // Out-of-protocol 304 to a Range resume: the file is still
+      // partial, so drop it and refetch instead of trusting it.
+      if (server_sent_304 && back[i].range_req_size > 0) {
+        (void) !url_savename_refname_remove(opt, back[i].url_adr,
+                                            back[i].url_fil);
+        UNLINK(back[i].url_sav);
+        deletehttp(&back[i].r);
+        back[i].r.statuscode = STATUSCODE_NON_FATAL;
+        back[i].r.refetch_wholefile = HTS_TRUE; // retry whole, no Range (#581)
+        strcpybuff(back[i].r.msg, "Bogus 304 on resume, restarting");
+        back_set_finished(opt, sback, i);
+      }
+
+      // HEAD request: done
+      if (back[i].head_request) {
+        hts_log_print(opt, LOG_DEBUG, "Tested file: %s%s",
+                      adr_nologin(opt, back[i].url_adr), back[i].url_fil);
+        // close the connection
+        if (!back[i].http11) { /* NO KA */
+          deletehttp(&back[i].r);
+        }
+        back_set_finished(opt, sback, i);
+      }
+      // a 304: the cached copy is current
+      else if (back[i].r.statuscode == HTTP_NOT_MODIFIED) {
+        // read it from the cache
+        // NOTE: no size check here
+        /* clear everything but connection: switch, close, and
+         * reswitch */
+        {
+          htsblk tmp;
+
+          memset(&tmp, 0, sizeof(tmp));
+          back_connxfr(&back[i].r, &tmp);
+          /* Only a server-sent 304 has revisit headers (#826). */
+          if (server_sent_304)
+            warc_move_request(&back[i].r, &tmp);
+          /* the cache entry overwrites the whole struct, so drop
+             what the 304 response still owns first (#782) */
+          back_free_response(&back[i].r);
+          back[i].r =
+              cache_read(opt, cache, back[i].url_adr, back[i].url_fil,
+                         back[i].url_sav, HTS_BUF(back[i].location_buffer));
+          back[i].r.location = back[i].location_buffer;
+          back_connxfr(&tmp, &back[i].r);
+          warc_move_request(&tmp, &back[i].r);
+        }
+
+        // hack:
+        // In case of 'if-unmodified-since' hack, a 304 status can be sent
+        // then, force 'ok' status
+        if (back[i].r.statuscode == STATUSCODE_INVALID) {
+          if (fexist_utf8(back[i].url_sav)) {
+            back[i].r.statuscode = HTTP_OK; // OK
+            strcpybuff(back[i].r.msg, "OK (cached)");
+            back[i].r.is_file = 1;
+            back[i].r.totalsize = back[i].r.size = fsize_utf8(back[i].url_sav);
+            get_httptype_sized(opt, back[i].r.contenttype,
+                               sizeof(back[i].r.contenttype), back[i].url_sav,
+                               1);
+            hts_log_print(opt, LOG_DEBUG,
+                          "Not-modified status without cache guessed: %s%s",
+                          adr_nologin(opt, back[i].url_adr), back[i].url_fil);
+          }
+        }
+        // Status is okay?
+        if (back[i].r.statuscode != -1) { // read OK
+          back_set_finished(opt, sback, i);
+          back[i].r.notmodified = 1; // not modified
+          // WARC must not claim a 304 the server never sent (#839)
+          back[i].r.warc_forced_notmodified =
+              server_sent_304 ? HTS_FALSE : HTS_TRUE;
+          hts_log_print(opt, LOG_DEBUG,
+                        "File loaded after test from cache: %s%s",
+                        adr_nologin(opt, back[i].url_adr), back[i].url_fil);
+
+          // finalize
+          if (statuscode_is_http(back[i].r.statuscode)) {
+            hts_log_print(opt, LOG_TRACE, "finalizing after cache load");
+            back_finalize(opt, cache, sback, i);
+          }
+
+        } else { // error
+          back_set_finished(opt, sback, i);
+        }
+
+      }
+      // MIME type excluded by a -mime: filter: abort, don't fetch
+      // the body (#58)
+      else if (HTTP_IS_OK(back[i].r.statuscode) && !back[i].testmode &&
+               strnotempty(back[i].r.contenttype) &&
+               hts_acceptmime(opt, 0, back[i].url_adr, back[i].url_fil,
+                              back[i].r.contenttype) == 1) {
+        back_slot_close_fail(opt, sback, i, STATUSCODE_EXCLUDED,
+                             "Excluded by MIME type filter");
+        hts_log_print(opt, LOG_NOTICE,
+                      "File excluded by MIME type filter (%s): %s%s",
+                      back[i].r.contenttype, adr_nologin(opt, back[i].url_adr),
+                      back[i].url_fil);
+      } else { // fetch it
+
+        // free the request buffer
+        if (!noFreebuff) {
+          deleteaddr(&back[i].r);
+          back[i].r.size = 0;
+        }
+        // handle 206 (partial content)
+        // xxc: does this work when chunked?
+        if (back[i].r.statuscode ==
+            206) { // the tail, because the start is on disk
+          LLint sz = fsize_utf8(back[i].url_sav);
+          /* Resume at the server's Content-Range start, which
+             may be earlier than asked (#198). */
+          const LLint resume = back[i].r.crange_start;
+          /* a coded tail can not be appended to the plain prefix */
+          const hts_boolean range_ok =
+              !back[i].r.compressed && back[i].r.crange > 0 && resume >= 0 &&
+              resume <= (LLint) sz &&
+              back[i].r.crange_end == back[i].r.crange - 1 &&
+              (back[i].r.totalsize < 0 ||
+               back[i].r.totalsize == back[i].r.crange_end - resume + 1);
+
+          if (sz >= 0 && range_ok) {
+            char catbuff[CATBUFF_SIZE];
+
+            if (!is_hypertext_mime(opt, back[i].r.contenttype,
+                                   back[i].url_sav)) { // not HTML
+              if (opt->getmode & HTS_GETMODE_NONHTML) {
+                filenote(&opt->state.strc, back[i].url_sav,
+                         NULL); // mark the file as known
+                file_notify(opt, back[i].url_adr, back[i].url_fil,
+                            back[i].url_sav, 0, 1, back[i].r.notmodified);
+                back[i].r.out =
+                    FOPEN(fconv(catbuff, sizeof(catbuff), back[i].url_sav),
+                          "r+b"); // resume in place
+                if (back[i].r.out && opt->cache != 0) {
+                  back[i].r.is_write = 1;
+                  back[i].r.size = resume;        // bytes already on disk
+                  back[i].r.statuscode = HTTP_OK; // force 'OK'
+                  if (back[i].r.totalsize >= 0)
+                    back[i].r.totalsize += resume; // -> full size
+                  // on error, refetch the whole file
+                  /* (off_t) is 32-bit on MSVC and wraps past 2GB */
+                  if (HTS_FTRUNCATE(back[i].r.out, resume) != 0) {
+                    fclose(back[i].r.out);
+                    back[i].r.out = NULL;
+                    (void) !url_savename_refname_remove(opt, back[i].url_adr,
+                                                        back[i].url_fil);
+                    UNLINK(back[i].url_sav);
+                    back_set_finished(opt, sback, i);
+                    strcpybuff(back[i].r.msg, "Can not truncate partial file, "
+                                              "restarting");
+                  } else {
+                    /* not (off_t): 32-bit on MSVC, truncating a
+                       resume past 2GB */
+                    fseeko(back[i].r.out, resume, SEEK_SET);
+                    /* create a temporary reference file in case of
+                     * broken mirror */
+                    if (back_serialize_ref(opt, &back[i]) != 0) {
+                      hts_log_print(opt, LOG_WARNING,
+                                    "Could not create temporary "
+                                    "reference file for %s%s",
+                                    adr_nologin(opt, back[i].url_adr),
+                                    back[i].url_fil);
+                    }
+                  }
+                } else { // cannot resume
+                  back_set_finished(opt, sback, i);
+                  strcpybuff(back[i].r.msg, "Can not open partial file");
+                }
+              }
+            } else { // in memory
+              FILE *fp =
+                  FOPEN(fconv(catbuff, sizeof(catbuff), back[i].url_sav), "rb");
+              if (fp) {
+                LLint alloc_mem = resume + 1;
+
+                // Refetch when a hostile Content-Length would
+                // overflow the 32-bit in-memory buffer.
+                if (back[i].r.totalsize > INT32_MAX - alloc_mem) {
+                  /* Windows refuses to unlink a file still open */
+                  fclose(fp);
+                  fp = NULL;
+                  (void) !url_savename_refname_remove(opt, back[i].url_adr,
+                                                      back[i].url_fil);
+                  UNLINK(back[i].url_sav);
+                  alloc_mem = -1;
+                } else if (back[i].r.totalsize >= 0)
+                  alloc_mem += back[i].r.totalsize; // add the remainder
+                if (alloc_mem >= 0 && deleteaddr(&back[i].r) &&
+                    (back[i].r.adr = (char *) malloct((size_t) alloc_mem))) {
+                  back[i].r.size = resume;
+                  if (back[i].r.totalsize >= 0)
+                    back[i].r.totalsize += resume; // -> full size
+                  if (!hts_fread_exact(back[i].r.adr, (size_t) resume, fp)) {
+                    back_set_finished(opt, sback, i);
+                    strcpybuff(back[i].r.msg, "Can not read partial file");
+                  } else {
+                    back[i].r.statuscode = HTTP_OK; // force 'OK'
+                  }
+                } else {
+                  back_set_finished(opt, sback, i);
+                  strcpybuff(back[i].r.msg, "No memory for partial file");
+                }
+                if (fp != NULL)
+                  fclose(fp);
+              } else { // open failed
+                back_set_finished(opt, sback, i);
+                strcpybuff(back[i].r.msg, "Can not open partial file");
+              }
+            }
+          } else if (sz >= 0) { // unusable range -> restart whole file
+            hts_log_print(opt, LOG_WARNING,
+                          "Unusable partial-content range for %s%s "
+                          "(have " LLintP " bytes, got " LLintP "-" LLintP
+                          "/" LLintP "), restarting",
+                          adr_nologin(opt, back[i].url_adr), back[i].url_fil,
+                          (LLint) sz, back[i].r.crange_start,
+                          back[i].r.crange_end, back[i].r.crange);
+            (void) !url_savename_refname_remove(opt, back[i].url_adr,
+                                                back[i].url_fil);
+            UNLINK(back[i].url_sav);
+            back_set_finished(opt, sback, i);
+            strcpybuff(back[i].r.msg, "Unusable partial content, restarting");
+          } else { // partial not found
+            back_set_finished(opt, sback, i);
+            strcpybuff(back[i].r.msg, "Can not find partial file");
+          }
+          // error?
+          if (back_status(&back[i]) == STATUS_READY) {
+            if (back[i].r.soc != INVALID_SOCKET) {
+              deletehttp(&back[i].r);
+            }
+            back[i].r.soc = INVALID_SOCKET;
+            back[i].r.statuscode = STATUSCODE_NON_FATAL;
+            // the resume was rejected: the retry must GET the whole
+            // file, never re-Range a surviving partial/ref (#581)
+            back[i].r.refetch_wholefile = HTS_TRUE;
+            if (strnotempty(back[i].r.msg))
+              strcpybuff(back[i].r.msg,
+                         "Error attempting to solve status 206 (partial file)");
+          }
+        }
+
+        // not finished, so an error
+        if (back_status(&back[i]) != STATUS_READY) {
+          if (!back[i].testmode) { // regular file
+
+            if (back[i]
+                    .r
+                    .empty /* ?? && back[i].r.statuscode==HTTP_OK */) { // empty
+                                                                        // response
+              // close the connection
+              back_maydeletehttp(opt, cache, sback, i);
+              /* KA deletehttp(&back[i].r);
+               * back[i].r.soc=INVALID_SOCKET; */
+              back_set_finished(opt, sback, i);
+              if (deleteaddr(&back[i].r) &&
+                  (back[i].r.adr = (char *) malloct(2))) {
+                back[i].r.adr[0] = 0;
+              }
+              /* locked or pinned = name pending; the waiter
+                 finalizes after patching url_sav (else: cached as
+                 .delayed, #5) */
+              if (!back[i].locked) {
+                hts_log_print(opt, LOG_TRACE, "finalizing empty");
+                back_finalize(opt, cache, sback, i);
+              }
+            } else if (!back[i].r.is_chunk) { // not chunked
+              back[i].is_chunk = 0;
+              back[i].status = 1; // start body
+            } else {
+              back[i].is_chunk = 1;
+              back[i].chunk_adr = NULL;
+              back[i].chunk_size = 0;
+              back[i].chunk_blocksize = 0;
+              back[i].status = STATUS_CHUNK_WAIT; // start body wait chunk
+              back[i].r.totalsize = -1;           /* devalidate size! (rfc) */
+            }
+            if (back[i].rateout > 0) {
+              back[i].rateout_time = time_local(); // for the transfer rate
+            }
+          } else { // test mode: never start the body
+            back_set_finished(opt, sback, i);
+            deletehttp(&back[i].r);
+            if (back[i].r.statuscode == HTTP_OK) {
+              strcpybuff(back[i].r.msg, "Test: OK");
+              back[i].r.statuscode = STATUSCODE_TEST_OK; // test passed
+            } else { // test failed: keep the error, for information
+              char tempo[1000];
+
+              strcpybuff(tempo, back[i].r.msg);
+              strcpybuff(back[i].r.msg, "Test: ");
+              strcatbuff(back[i].r.msg, tempo);
+            }
+          }
+        }
+      }
+
+      /*} */
+
+    } // double LF
+  } // r.size>=2
+  return HTS_TRUE;
+}
+
 /* Read what arrived on a slot, then parse its headers or body. */
 static void back_wait_receive(back_wait_state *w, httrackp *opt,
                               cache_back *cache, struct_back *sback, int i) {
   lien_back *const back = sback->lnk;
   int dispo = 0;
 
-  // vérifier l'existance de timeout-check
+  // does a slot need the timeout check?
   if (!w->check_timeouts)
     if (back[i].timeout > 0)
       w->check_timeouts = 1;
 
-  // données dispo?
+  // data available?
   // ## if (back[i].url_adr[0]!=lOCAL_CHAR)
   if (back[i].r.is_file)
     dispo = 1;
@@ -4127,135 +5203,24 @@ static void back_wait_receive(back_wait_state *w, httrackp *opt,
   if (!w->max_read_bytes)
     dispo = 0; // limit transfer rate
 
-  if (dispo) { // données dispo
+  if (dispo) { // data available
     LLint retour_fread;
 
-    w->busy_recv = 1; // on récupère encore
+    w->busy_recv = 1; // still receiving
 
     // range size hack old location
 
 #if HTS_DIRECTDISK
-    // Shortcut: store the file directly on disk when possible,
-    // sparing memory
-    // (a locked slot keeps its body in memory, a pinned one need not)
-    if (back_status(&back[i]) &&
-        (back[i].locked == 0 || back[i].locked == BACK_PINNED)) {
-      if (back[i].r.is_write == 0) { // mode mémoire
-        if (back[i].r.adr == NULL) { // rien n'a été écrit
-          if (!back[i].testmode) {   // pas mode test
-            if (strnotempty(back[i].url_sav)) {
-              if (strcmp(back[i].url_fil, "/robots.txt")) {
-                if (back[i].r.statuscode == HTTP_OK) { // 'OK'
-                  if (!is_hypertext_mime(opt, back[i].r.contenttype,
-                                         back[i].url_fil)) { // pas HTML
-                    if (opt->getmode & HTS_GETMODE_NONHTML) {
-                      int fcheck = 0;
-                      int last_errno = 0;
-                      /* a .gz/.br/.zst saved under its own coding stays
-                         packed on disk */
-                      const hts_boolean packed = hts_codec_is_archive_ext(
-                          hts_codec_parse(back[i].r.contentencoding),
-                          hts_fil_ext(back[i].url_sav));
-
-                      /* HTS_TE_UNREADABLE failed at the header, so
-                         any coding here is one to undo */
-                      const hts_boolean te =
-                          back[i].r.transfer_coding != HTS_TE_NONE;
-
-                      back[i].r.is_write = 1; // to disk
-                      /* leave the .gz packed: back_finalize undoes only
-                         the transfer layer */
-                      if (packed && te)
-                        back[i].r.contentencoding[0] = '\0';
-                      if (back[i].r.compressed && (!packed || te)) {
-                        if (create_back_tmpfile(opt, &back[i], "z") == 0) {
-                          assertf(back[i].tmpfile != NULL);
-                          /* note: tmpfile is utf-8 */
-                          if ((back[i].r.out = FOPEN(back[i].tmpfile, "wb")) ==
-                              NULL) {
-                            last_errno = errno;
-                          }
-                        }
-                      } else {
-                        file_notify(opt, back[i].url_adr, back[i].url_fil,
-                                    back[i].url_sav, 1, 1,
-                                    back[i].r.notmodified);
-                        back[i].r.compressed = 0;
-                        back_refetch_backup(opt, &back[i]);
-                        if ((back[i].r.out = filecreate(
-                                 &opt->state.strc, back[i].url_sav)) == NULL) {
-                          last_errno = errno;
-                        }
-                      }
-                      if (back[i].r.out == NULL) {
-                        errno = last_errno;
-                        if ((fcheck = check_fatal_io_errno())) {
-                          hts_io_fatal_abort(opt);
-                        }
-                      }
-                      hts_log_print(opt, LOG_DEBUG,
-                                    "File received from net to disk: %s%s",
-                                    adr_nologin(opt, back[i].url_adr),
-                                    back[i].url_fil);
-
-                      if (back[i].r.out == NULL) {
-                        hts_log_print(opt, LOG_ERROR | LOG_ERRNO,
-                                      "Unable to save file %s",
-                                      back[i].url_sav);
-                        if (fcheck) {
-                          hts_log_print(opt, LOG_ERROR,
-                                        "* * Fatal write error, giving up");
-                        }
-                        back[i].r.is_write = 0; // erreur, abandonner
-                        back_set_finished(opt, sback, i);
-                        if (back[i].r.soc != INVALID_SOCKET) {
-                          deletehttp(&back[i].r);
-                        }
-                      } else {
-#ifndef _WIN32
-                        chmod(back[i].url_sav, HTS_ACCESS_FILE);
-#endif
-                        /* create a temporary reference file in case of broken
-                         * mirror */
-                        if (back[i].r.out != NULL && opt->cache != 0) {
-                          if (back_serialize_ref(opt, &back[i]) != 0) {
-                            hts_log_print(opt, LOG_WARNING,
-                                          "Could not create temporary "
-                                          "reference file for %s%s",
-                                          adr_nologin(opt, back[i].url_adr),
-                                          back[i].url_fil);
-                          }
-                        }
-                      }
-                    } else { // on coupe tout!
-                      hts_log_print(
-                          opt, LOG_DEBUG, "File cancelled (non HTML): %s%s",
-                          adr_nologin(opt, back[i].url_adr), back[i].url_fil);
-                      if (back[i].r.soc != INVALID_SOCKET) {
-                        deletehttp(&back[i].r);
-                      }
-                      back_slot_fail(opt, sback, i,
-                                     back[i].testmode ? STATUSCODE_TEST_OK
-                                                      : STATUSCODE_INVALID,
-                                     NULL);
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
+    back_wait_direct_disk(opt, sback, i);
 #endif
 
-    // réception de données depuis socket ou fichier
+    // read from the socket or the file
     if (back_status(&back[i])) {
       if (back_status(&back[i]) == STATUS_WAIT_HEADERS)
         retour_fread = http_xfread1(&(back[i].r), HTS_XFREAD_LINE_BLOCK);
       else if (back_status(&back[i]) == STATUS_CHUNK_WAIT ||
                back_status(&back[i]) == STATUS_CHUNK_CR) {
-        // backuper pour lire dans le buffer chunk
+        // save r, then read into the chunk buffer
         htsblk r;
         /* Block mode bounds the trailer section, which declares no length
            of its own, by HTS_LINE_BLOCK_SIZE. */
@@ -4264,20 +5229,20 @@ static void back_wait_receive(back_wait_state *w, httrackp *opt,
                                         : HTS_XFREAD_LINE;
 
         memcpy(&r, &(back[i].r), sizeof(htsblk));
-        back[i].r.is_write = 0;              // mémoire
-        back[i].r.adr = back[i].chunk_adr;   // adresse
-        back[i].r.size = back[i].chunk_size; // taille taille chunk
-        back[i].r.totalsize = -1;            // total inconnu
+        back[i].r.is_write = 0; // in memory
+        back[i].r.adr = back[i].chunk_adr;
+        back[i].r.size = back[i].chunk_size;
+        back[i].r.totalsize = -1; // total unknown
         back[i].r.out = NULL;
         back[i].r.is_file = 0;
         //
         // one line, or the whole trailer block
         retour_fread = http_xfread1(&(back[i].r), chunk_read_mode);
-        // modifier et restaurer
-        back[i].chunk_adr = back[i].r.adr;        // adresse
-        back[i].chunk_size = back[i].r.size;      // taille taille chunk
-        memcpy(&(back[i].r), &r, sizeof(htsblk)); // restaurer véritable r
-      } else if (back[i].is_chunk) {              // chunked: cap the read size
+        // keep the chunk buffer, then restore r
+        back[i].chunk_adr = back[i].r.adr;
+        back[i].chunk_size = back[i].r.size;
+        memcpy(&(back[i].r), &r, sizeof(htsblk));
+      } else if (back[i].is_chunk) { // chunked: cap the read size
         retour_fread = (int) http_xfread1(
             &(back[i].r),
             (int) hts_min_i64(back[i].r.totalsize - back[i].r.size,
@@ -4286,1016 +5251,47 @@ static void back_wait_receive(back_wait_state *w, httrackp *opt,
         retour_fread =
             (int) http_xfread1(&(back[i].r), (int) w->max_read_bytes);
     } else
-      retour_fread = READ_EOF; // interruption ou annulation interne (peut ne
-                               // pas être une erreur)
+      retour_fread =
+          READ_EOF; // interrupted or cancelled internally (maybe no error)
 
-    // Si réception chunk, tester si on est pas à la fin!
+    // in a chunk, check whether it ended
     /* Skipped on a write error: these completion tests read r.size,
        which counts bytes read, and would relaunder the error into EOF. */
     if (back_status(&back[i]) == STATUS_TRANSFER &&
         !statuscode_is_write_error(back[i].r.statuscode)) {
-      if (back[i].is_chunk) {                        // attendre prochain chunk
-        if (back[i].r.size == back[i].r.totalsize) { // fin chunk!
+      if (back[i].is_chunk) {                        // wait for the next chunk
+        if (back[i].r.size == back[i].r.totalsize) { // end of chunk
           back[i].status = STATUS_CHUNK_CR;          /* fetch ending CRLF */
           if (back[i].chunk_adr != NULL) {
             freet(back[i].chunk_adr);
             back[i].chunk_adr = NULL;
           }
           back[i].chunk_size = 0;
-          retour_fread = 0; // pas d'erreur
+          retour_fread = 0; // no error
         }
       } else if (back[i].r.keep_alive) {
-        if (back[i].r.size == back[i].r.totalsize) { // fin!
-          retour_fread = READ_EOF;                   // end
+        if (back[i].r.size == back[i].r.totalsize) {
+          retour_fread = READ_EOF; // end
         }
       }
     }
 
-    if (retour_fread < 0) { // fin réception
-      back_set_finished(opt, sback, i);
-      /*KA back[i].r.soc=INVALID_SOCKET; */
-      if (retour_fread < 0 && retour_fread != READ_EOF) {
-        if (statuscode_is_write_error(back[i].r.statuscode)) {
-          /* keep the write error rather than blame the transfer */
-          hts_log_print(opt, LOG_ERROR, "Unable to write file %s",
-                        back[i].url_sav);
-          if (back[i].r.statuscode == STATUSCODE_IO_FATAL) {
-            /* A retry cannot write to a full disk. */
-            hts_io_fatal_abort(opt);
-          }
-        } else {
-          if (back[i].r.size > 0)
-            strcpybuff(back[i].r.msg, "Interrupted transfer");
-          else
-            strcpybuff(back[i].r.msg, "No data (connection closed)");
-          back[i].r.statuscode = STATUSCODE_CONNERROR;
-        }
-      } else if (!statuscode_is_http(back[i].r.statuscode) &&
-                 (strnotempty(back[i].r.msg) == 0)) {
-        if (back[i].r.size > 0)
-          strcpybuff(back[i].r.msg, "Interrupted transfer");
-        else
-          strcpybuff(back[i].r.msg, "No data (connection closed)");
-        back[i].r.statuscode = STATUSCODE_CONNERROR;
-      }
-      // Close socket
-      if (back[i].r.soc != INVALID_SOCKET) {
-        /*KA deletehttp(&back[i].r); */
-        back_maydeletehttp(opt, cache, sback, i);
-      }
-      // finalize transfer
-      if (statuscode_is_http(back[i].r.statuscode) &&
-          !IS_DELAYED_EXT(back[i].url_sav)) {
-        hts_log_print(opt, LOG_TRACE, "finalizing regular file");
-        back_finalize(opt, cache, sback, i);
-      }
-
-      /* Same for an unterminated chunked stream. */
-      if (statuscode_is_http(back[i].r.statuscode) &&
-          back_chunked_unterminated(&back[i])) {
-        if (!opt->tolerant) {
-          deleteaddr(&back[i].r);
-          back[i].r.statuscode = STATUSCODE_CONNERROR; // recatch
-          htsblk_failf(&back[i].r,
-                       "Truncated chunked transfer (" LLintP
-                       " Bytes, terminating chunk missing)",
-                       (LLint) back[i].r.size);
-        } else {
-          hts_log_print(opt, LOG_WARNING,
-                        "Truncated chunked transfer (" LLintP
-                        " Bytes, terminating chunk missing) for %s%s",
-                        (LLint) back[i].r.size,
-                        adr_nologin(opt, back[i].url_adr), back[i].url_fil);
-        }
-      }
-
-      /* A body cut by a failed write keeps its write-failure class. */
-      if (back[i].r.totalsize >= 0 &&
-          !statuscode_is_write_error(back[i].r.statuscode)) {
-        if (back[i].r.totalsize != back[i].r.size) { // pas la même!
-          if (!opt->tolerant) {
-            deleteaddr(&back[i].r);
-            if (back[i].r.size < back[i].r.totalsize)
-              back[i].r.statuscode = STATUSCODE_CONNERROR; // recatch
-            htsblk_failf(&back[i].r,
-                         "Incorrect length (" LLintP " Bytes, " LLintP
-                         " expected)",
-                         (LLint) back[i].r.size, (LLint) back[i].r.totalsize);
-          } else {
-            // Un warning suffira..
-            hts_log_print(opt, LOG_WARNING,
-                          "Incorrect length (" LLintP "!=" LLintP
-                          " expected) for %s%s",
-                          (LLint) back[i].r.size, (LLint) back[i].r.totalsize,
-                          adr_nologin(opt, back[i].url_adr), back[i].url_fil);
-          }
-        }
-      }
-    } else if (retour_fread > 0) { // pas d'erreur de réception et data
+    if (retour_fread < 0) { // end of reception
+      back_wait_end_transfer(opt, cache, sback, i, retour_fread);
+    } else if (retour_fread > 0) { // data and no error
       if (back[i].timeout > 0) {
         back_timeout_refresh(sback, i);
       }
-      // Traitement des en têtes chunks ou en têtes
+      // chunk lines or response headers
       if (back_status(&back[i]) == STATUS_CHUNK_WAIT ||
           back_status(&back[i]) == STATUS_CHUNK_CR) {
-        const hts_boolean in_trailers = back_in_chunk_trailers(&back[i]);
-
-        /* The reader drops every CR, so a blank line is two LFs. */
-        if (back[i].chunk_size > 0 &&
-            back[i].chunk_adr[back[i].chunk_size - 1] == 10 &&
-            (!in_trailers || back[i].chunk_size == 1 ||
-             back[i].chunk_adr[back[i].chunk_size - 2] == 10)) {
-          int chunk_size = -1;
-          char chunk_data[64];
-
-          if (in_trailers) {
-            chunk_size = 0; /* fields discarded, the blank line ends the body */
-          } else if (back[i].chunk_size < 32) { // not too big
-            char *chstrip = back[i].chunk_adr;
-
-            back[i].chunk_adr[back[i].chunk_size - 1] = '\0'; // octet nul
-            // skip leading spaces or cr
-            while (hts_isspace((unsigned char) *chstrip))
-              chstrip++;
-            chunk_data[0] = '\0';
-            strncatbuff(chunk_data, chstrip, sizeof(chunk_data) - 2);
-            // strip chunk-extension
-            while ((chstrip = strchr(chunk_data, ';')))
-              *chstrip = '\0';
-            while ((chstrip = strchr(chunk_data, ' ')))
-              *chstrip = '\0';
-            while ((chstrip = strchr(chunk_data, '\r')))
-              *chstrip = '\0';
-            if (back[i].r.totalsize < 0)
-              back[i].r.totalsize = 0; // initialiser à 0 (-1 == unknown)
-            if (back_status(&back[i]) == STATUS_CHUNK_WAIT) {
-              /* Parse the hostile chunk size wide, because sscanf "%x"
-                 maps 80000000 to INT_MIN. */
-              char *chunk_end = NULL;
-              const unsigned long long chunk_value =
-                  strtoull(chunk_data, &chunk_end, 16);
-
-              if (chunk_end != chunk_data && *chunk_end == '\0' &&
-                  chunk_value <= (unsigned long long) INT32_MAX) {
-                chunk_size = (int) chunk_value;
-                if (chunk_size > 0)
-                  back[i].chunk_blocksize =
-                      chunk_size; /* the data block chunk size */
-                /* Only 0 ends the stream (#840). */
-                else if (chunk_size == 0)
-                  back[i].chunk_blocksize = -1;    /* ending */
-                back[i].r.totalsize += chunk_size; // noter taille
-                /* Re-check -m per chunk, because the header carried
-                   no length (#1708). istoobig() alone, because
-                   back_checksize()'s wizard pass costs a filter match
-                   per chunk. */
-                if (istoobig(opt, back[i].r.totalsize, back[i].maxfile_html,
-                             back[i].maxfile_nonhtml, back[i].r.contenttype)) {
-                  back_set_too_big(opt, sback, i);
-                  /* Drop the partial bytes; a backup, where one was
-                     taken, is restored over them by back_finalize(). */
-                  if (back[i].r.is_write && back[i].tmpfile == NULL &&
-                      back[i].url_sav[0] != '\0') {
-                    (void) !url_savename_refname_remove(opt, back[i].url_adr,
-                                                        back[i].url_fil);
-                    (void) UNLINK(back[i].url_sav);
-                  }
-                  chunk_size = -1;
-                } else if (back[i].r.adr != NULL ||
-                           !back[i].r.is_write) { // Not to disk
-                  /* Refuse here what the next read would refuse, to avoid
-                     the realloc. */
-                  if (!hts_inmem_size_fits(back[i].r.totalsize)) {
-                    hts_log_print(
-                        opt, LOG_WARNING, "Chunked resource too large for %s%s",
-                        adr_nologin(opt, back[i].url_adr), back[i].url_fil);
-                    chunk_size = -1;
-                  } else {
-                    char *const grown = (char *) realloct(
-                        back[i].r.adr, (size_t) back[i].r.totalsize + 1);
-
-                    if (grown != NULL) {
-                      back[i].r.adr = grown;
-                    } else {
-                      /* r.totalsize already counts this chunk, so
-                         dropping the buffer would have the next read
-                         write past it. */
-                      hts_log_print(opt, LOG_ERROR,
-                                    "not enough memory (" LLintP ") for %s%s",
-                                    (LLint) back[i].r.totalsize,
-                                    adr_nologin(opt, back[i].url_adr),
-                                    back[i].url_fil);
-                      chunk_size = -1;
-                    }
-                  }
-                }
-              } else {
-                hts_log_print(opt, LOG_WARNING, "Illegal chunk (%s) for %s%s",
-                              back[i].chunk_adr,
-                              adr_nologin(opt, back[i].url_adr),
-                              back[i].url_fil);
-              }
-            } else { /* STATUS_CHUNK_CR: the CRLF after the data */
-              if (chunk_data[0] == '\0') {
-                if (back[i].chunk_blocksize > 0)
-                  chunk_size =
-                      (int) back[i]
-                          .chunk_blocksize; /* recent data chunk size */
-                else if (back[i].chunk_blocksize == -1)
-                  chunk_size = 0; /* ending chunk */
-                else
-                  chunk_size = 1; /* fake positive size for 1st chunk history */
-              } else {
-                hts_log_print(
-                    opt, LOG_WARNING, "illegal chunk CRLF (%s) for %s%s",
-                    back[i].chunk_adr, adr_nologin(opt, back[i].url_adr),
-                    back[i].url_fil);
-              }
-            }
-          } else {
-            hts_log_print(opt, LOG_WARNING,
-                          "chunk too big (" LLintP ") for %s%s",
-                          (LLint) back[i].chunk_size,
-                          adr_nologin(opt, back[i].url_adr), back[i].url_fil);
-          }
-
-          // ok, continuer sur le body
-
-          // si chunk non nul continuer (ou commencer)
-          if (back_status(&back[i]) == STATUS_CHUNK_CR && chunk_size > 0) {
-            /* waiting for the next chunk */
-            back[i].status = STATUS_CHUNK_WAIT;
-          } else if (back_status(&back[i]) == STATUS_CHUNK_WAIT &&
-                     chunk_size == 0) {       /* final chunk */
-            back[i].status = STATUS_CHUNK_CR; /* final CRLF */
-          } else if (back_status(&back[i]) == STATUS_CHUNK_WAIT &&
-                     chunk_size >= 0) { /* will fetch data now */
-            back[i].status = 1;         // continuer body
-          } else { /* zero-size-chunk-CRLF (end) or error */
-            /* End */
-            back_set_finished(opt, sback, i);
-
-            // finalize transfer if not temporary
-            if (!IS_DELAYED_EXT(back[i].url_sav)) {
-              hts_log_print(opt, LOG_TRACE, "finalizing at chunk end");
-              back_finalize(opt, cache, sback, i);
-            } else {
-              if (back[i].r.statuscode == HTTP_OK) {
-                hts_log_print(
-                    opt, LOG_WARNING,
-                    "unexpected incomplete type with 200 code at %s%s",
-                    adr_nologin(opt, back[i].url_adr), back[i].url_fil);
-              }
-            }
-            if (back[i].r.soc != INVALID_SOCKET) {
-              /* Error */
-              if (chunk_size < 0) {
-                deletehttp(&back[i].r);
-                deleteaddr(&back[i].r);
-                back[i].r.statuscode = STATUSCODE_INVALID;
-                strcpybuff(back[i].r.msg, "Invalid chunk");
-              } else { /* if chunk_size == 0 */
-
-                /* Tester totalsize en fin de chunk */
-                if ((back[i].r.totalsize >= 0)) { // tester totalsize
-                  if (back[i].r.totalsize != back[i].r.size) { // pas la même!
-                    if (!opt->tolerant) {
-                      deleteaddr(&back[i].r);
-                      back[i].r.statuscode = STATUSCODE_INVALID;
-                      strcpybuff(back[i].r.msg, "Incorrect length");
-                    } else {
-                      // Un warning suffira..
-                      hts_log_print(
-                          opt, LOG_WARNING,
-                          "Incorrect length (" LLintP "!=" LLintP
-                          " expected) for %s%s",
-                          (LLint) back[i].r.size, (LLint) back[i].r.totalsize,
-                          adr_nologin(opt, back[i].url_adr), back[i].url_fil);
-                    }
-                  }
-                }
-              }
-            }
-          }
-
-          // effacer buffer (chunk en tete)
-          if (back[i].chunk_adr != NULL) {
-            freet(back[i].chunk_adr);
-            back[i].chunk_adr = NULL;
-            back[i].chunk_size = 0;
-            // NO! xxback[i].chunk_blocksize = 0;
-          }
-
-        } // chunk buffer holds a complete line
-        //
+        back_wait_chunk_line(opt, cache, sback, i);
       } else if (back_status(&back[i]) == STATUS_WAIT_HEADERS) {
-        //
-        if (back[i].r.size >= 2) {
-          // double LF
-          if (((back[i].r.adr[back[i].r.size - 1] == 10) &&
-               (back[i].r.adr[back[i].r.size - 2] == 10)) ||
-              (back[i].r.adr[0] == '<') /* bogus server */
-          ) {
-            char rcvd[2048];
-            int ptr = 0;
-            int adv = 0;
-            int noFreebuff = 0;
-            LLint content_length = -1;
-            hts_boolean length_conflict = HTS_FALSE;
-            hts_boolean has_te = HTS_FALSE;
-            hts_boolean te_unreadable = HTS_FALSE;
-            /* binput_line stops at a NUL, hiding the fields after it */
-            const hts_boolean has_nul =
-                back[i].r.adr[0] != '<' &&
-                memchr(back[i].r.adr, '\0', (size_t) back[i].r.size) != NULL;
-
-            if (has_nul) {
-              hts_log_print(opt, LOG_WARNING,
-                            "NUL byte in response header, response "
-                            "dropped: %s%s",
-                            adr_nologin(opt, back[i].url_adr), back[i].url_fil);
-              back_slot_close_fail(opt, sback, i, STATUSCODE_INVALID,
-                                   "NUL byte in response header");
-            } else if (back_status(&back[i]) != STATUS_READY &&
-                       back[i].r.adr[0] != '<') {
-              /* Hack for zero-length headers */
-              // ----------------------------------------
-              /* parse the header, status line first */
-              const hts_boolean blind = back_read_status_line(
-                  back[i].r.adr, back[i].r.adr + back[i].r.size,
-                  HTS_BUF_N(rcvd, 2000), &ptr);
-
-              treatfirstline(&back[i].r, rcvd);
-              /* refuse a status line cut before anything but blanks */
-              if (blind) {
-                back[i].r.statuscode = STATUSCODE_INVALID;
-                strcpybuff(back[i].r.msg, "Status line too long");
-              }
-
-              if (_DEBUG_HEAD) {
-                if (ioinfo) {
-                  hts_secret_fprintf(opt, ioinfo,
-                                     "[%d] response for %s%s:\r\ncode=%d\r\n",
-                                     back[i].r.debugid,
-                                     jump_identification_const(back[i].url_adr),
-                                     back[i].url_fil, back[i].r.statuscode);
-                  fprintfio(ioinfo, back[i].r.adr, ">>> ", opt);
-                  fprintf(ioinfo, "\r\n");
-                  fflush(ioinfo);
-                } // en-tête
-              }
-              // header // ** !attention! HTTP/0.9 non supporté
-              do {
-                const hts_boolean cut = binput_line(
-                    back[i].r.adr + ptr, back[i].r.adr + back[i].r.size,
-                    HTS_BUF_N(rcvd, 2000), &adv);
-
-                ptr += adv;
-                if (cut) {
-                  /* a length we cannot read whole is one we cannot
-                     compare */
-                  if (hts_starts_with_ci(rcvd, "Content-length:"))
-                    length_conflict = HTS_TRUE;
-                  /* A cut header could carry a truncated Location. */
-                  hts_log_print(
-                      opt, hts_header_is_read(rcvd) ? LOG_WARNING : LOG_DEBUG,
-                      "Over-long header dropped for %s%s",
-                      adr_nologin(opt, back[i].url_adr), back[i].url_fil);
-                  continue;
-                }
-                /*
-                   if (_DEBUG_HEAD) {
-                   if (ioinfo) {
-                   fprintf(ioinfo,"(buffer)>%s\r\n",rcvd);
-                   fflush(ioinfo);
-                   }
-                   }
-                 */
-
-                {
-                  const char *cl = rcvd;
-
-                  if (hts_skip_prefix_ci(&cl, "Content-length:") &&
-                      !hts_content_length_agrees(cl, &content_length))
-                    length_conflict = HTS_TRUE;
-                }
-                if (hts_starts_with_ci(rcvd, "Transfer-Encoding:"))
-                  has_te = HTS_TRUE;
-                if (strnotempty(rcvd))
-                  treathead_opt(opt, opt->cookie, back[i].url_adr,
-                                back[i].url_fil, &back[i].r, rcvd);
-
-                // some buggy servers send a content-range with a 200
-                if (back[i].r.statuscode == HTTP_OK) // 'OK'
-                  if (hts_starts_with_ci(rcvd, "content-range:")) {
-                    // Fake range (the file is complete)
-                    if (!(back[i].r.crange_start == 0 &&
-                          back[i].r.crange_end == back[i].r.crange - 1)) {
-                      back[i].r.statuscode =
-                          HTTP_PARTIAL_CONTENT; // FORCER A 206 !!!!!
-                    }
-                  }
-
-              } while (strnotempty(rcvd));
-              /* RFC 9112 6.3: a coding list not ending in chunked runs
-                 to close, whatever Content-Length says, except on the
-                 statuses that never carry a body */
-              if (has_te && back[i].r.statuscode / 100 != 1 &&
-                  back[i].r.statuscode != HTTP_NO_CONTENT &&
-                  back[i].r.statuscode != HTTP_NOT_MODIFIED) {
-                if (!back[i].r.is_chunk) {
-                  back[i].r.totalsize = -1;
-                  back[i].r.empty = 0;
-                  back[i].r.keep_alive = 0;
-                }
-                te_unreadable =
-                    back[i].r.transfer_coding == HTS_TE_UNREADABLE &&
-                    !back[i].head_request;
-              }
-              // ----------------------------------------
-
-            } else {
-              // assume text/html, OK
-              treatfirstline(&back[i].r, back[i].r.adr);
-              noFreebuff = 1;
-            }
-
-            /* RFC 9112 6.3: lengths that disagree leave the body's end
-               unknown, so the response and its connection are dropped.
-               An interim 100 has no body to frame. */
-            if (length_conflict && back[i].r.statuscode != HTTP_CONTINUE) {
-              hts_log_print(opt, LOG_WARNING,
-                            "Conflicting Content-Length, response "
-                            "dropped: %s%s",
-                            adr_nologin(opt, back[i].url_adr), back[i].url_fil);
-              back_slot_close_fail(opt, sback, i, STATUSCODE_INVALID,
-                                   "Conflicting Content-Length");
-            } else if (te_unreadable) {
-              /* saving the coded bytes would pass them off as the page */
-              back_slot_close_fail(opt, sback, i, STATUSCODE_INVALID,
-                                   "Unsupported Transfer-Encoding");
-            } else if (!has_nul) {
-              /* a plugin must not see the header of a dropped response */
-              int test_head = RUN_CALLBACK6(opt, receivehead, back[i].r.adr,
-                                            back[i].url_adr, back[i].url_fil,
-                                            back[i].referer_adr,
-                                            back[i].referer_fil, &back[i].r);
-              if (test_head != 1) {
-                hts_log_print(opt, LOG_WARNING,
-                              "External wrapper aborted transfer, "
-                              "breaking connection: %s%s",
-                              adr_nologin(opt, back[i].url_adr),
-                              back[i].url_fil);
-                back_slot_close_fail(opt, sback, i, STATUSCODE_INVALID,
-                                     "External wrapper aborted transfer");
-              }
-            }
-
-            // Free headers memory now
-            // Actually, save them for informational purpose
-            if (!noFreebuff) {
-              char *block = back[i].r.adr;
-
-              back[i].r.adr = NULL;
-              deleteaddr(&back[i].r);
-              back[i].r.headers = block;
-            }
-            // Stash the raw response headers for WARC (deleteaddr frees
-            // r.headers on the next response, before back_finalize)
-            if (StringNotEmpty(opt->warc_file))
-              warc_stash_response(&back[i].r, back[i].r.headers);
-
-            /* Say a bot challenge caused the 4xx (#1732). */
-            if (!sback->bot_challenge_noted &&
-                HTTP_IS_ERROR(back[i].r.statuscode) &&
-                http_headers_have_field(back[i].r.headers, "cf-mitigated")) {
-              sback->bot_challenge_noted = HTS_TRUE;
-              hts_log_print(opt, LOG_WARNING,
-                            "Bot protection challenge at %s%s: the "
-                            "server refused the request (cf-mitigated "
-                            "header) rather than failing it",
-                            adr_nologin(opt, back[i].url_adr), back[i].url_fil);
-              hts_log_print(opt, LOG_WARNING,
-                            "Solve the challenge in a browser, then pass "
-                            "its cookies with --cookies-file and its "
-                            "exact User-Agent with --user-agent. The "
-                            "clearance expires, and is tied to that "
-                            "browser's address and User-Agent.");
-            }
-
-            /*
-               Status code and header-response hacks
-             */
-
-            // Check response : 203 == 200
-            if (back[i].r.statuscode == HTTP_NON_AUTHORITATIVE_INFORMATION) {
-              back[i].r.statuscode = HTTP_OK; // forcer "OK"
-            } else if (back[i].r.statuscode == HTTP_CONTINUE) {
-              back[i].status = STATUS_WAIT_HEADERS;
-              back[i].r.size = 0;
-              back[i].r.totalsize = -1;
-              back[i].chunk_size = 0;
-              back[i].r.statuscode = STATUSCODE_INVALID;
-              back[i].r.msg[0] = '\0';
-              /* the interim block is not the final response's headers */
-              freet(back[i].r.headers);
-              hts_log_print(opt, LOG_DEBUG,
-                            "Status 100 detected for %s%s, continuing headers",
-                            adr_nologin(opt, back[i].url_adr), back[i].url_fil);
-              return;
-            }
-
-            // The *-hacks below force 304 only on a complete file.
-            const hts_boolean server_sent_304 =
-                (back[i].r.statuscode == HTTP_NOT_MODIFIED);
-
-            /*
-               Solve "false" 416 problems
-             */
-            if (back[i].r.statuscode ==
-                HTTP_REQUESTED_RANGE_NOT_SATISFIABLE) { // 'Requested Range Not
-                                                        // Satisfiable'
-              // Example:
-              // Range: bytes=2830-
-              // ->
-              // Content-Range: bytes */2830
-              if (back[i].range_req_size == back[i].r.crange) {
-                back_keep_existing(opt, sback, i, back[i].range_req_size,
-                                   "matching size and timestamp");
-              }
-            }
-            // transform 406 into 200 ; we'll catch embedded links inside the
-            // choice page
-            if (back[i].r.statuscode == 406) { // 'Not Acceptable'
-              back[i].r.statuscode = HTTP_OK;
-            }
-            // On update, keep the good copy on error (mask as 304); skip
-            // resume paths so a stale-partial 416 still re-fetches.
-            if (HTTP_IS_ERROR(back[i].r.statuscode) && back[i].is_update &&
-                !back[i].testmode && back[i].range_req_size == 0 &&
-                back[i].url_sav[0] && fexist_utf8(back[i].url_sav)) {
-              hts_log_print(opt, LOG_NOTICE,
-                            "Kept existing file %s after error %d (%s) "
-                            "on update: %s%s",
-                            back[i].url_sav, back[i].r.statuscode,
-                            back[i].r.msg, adr_nologin(opt, back[i].url_adr),
-                            back[i].url_fil);
-              back[i].r.statuscode = HTTP_NOT_MODIFIED;
-              deletehttp(&back[i].r);
-            }
-            // Various hacks to limit re-transfers when updating a mirror
-            // Force update if same size detected
-            if (opt->sizehack) {
-              // We already have the file
-              // and ask the remote server for an update
-              // Some servers, especially dynamic pages severs, always
-              // answer that the page has been modified since last visit
-              // And answer with a 200 (OK) response, and the same page
-              // If the size is the same, and the option has been set, we assume
-              // that the file is identical - and therefore let's break the
-              // connection
-              if (back[i].is_update) { // mise à jour
-                // only a file stored verbatim, as in the two blocks below
-                if (back[i].r.statuscode == HTTP_OK && !back[i].testmode &&
-                    !is_hypertext_mime(opt, back[i].r.contenttype,
-                                       back[i].url_fil) &&
-                    strnotempty(back[i].url_sav)) {
-                  htsblk r = cache_read(opt, cache, back[i].url_adr,
-                                        back[i].url_fil, NULL,
-                                        hts_buf_none()); // read the cache entry
-
-                  if (r.statuscode == HTTP_OK) { // OK pas d'erreur cache
-                    LLint len1, len2;
-                    const LLint ondisk = fsize_utf8(back[i].url_sav);
-
-                    len1 = r.totalsize;
-                    len2 = back[i].r.totalsize;
-                    if (r.size > 0)
-                      len1 = r.size;
-                    if (len1 >= 0) {
-                      // the cache size records a past fetch, so the
-                      // copy on disk has to still agree with it
-                      if (len1 == len2 && ondisk == len2) {
-                        back[i].r.statuscode =
-                            HTTP_NOT_MODIFIED; // forcer NOT MODIFIED
-                        deletehttp(&back[i].r);
-                        hts_log_print(opt, LOG_NOTICE,
-                                      "Kept existing file %s (" LLintP
-                                      " bytes), matching the cached size: %s%s",
-                                      back[i].url_sav, (LLint) len1,
-                                      adr_nologin(opt, back[i].url_adr),
-                                      back[i].url_fil);
-                      }
-                    }
-                  } else {
-                    hts_log_print(
-                        opt, LOG_WARNING,
-                        "File seems complete (same size), but there was "
-                        "a cache read error (%u): %s%s",
-                        r.statuscode, adr_nologin(opt, back[i].url_adr),
-                        back[i].url_fil);
-                  }
-                  if (r.adr) {
-                    freet(r.adr);
-                    r.adr = NULL;
-                  }
-                }
-              }
-            }
-            // Various hacks to limit re-transfers when updating a mirror
-            // Detect already downloaded file (with another browser, for
-            // example)
-            if (opt->sizehack) {
-              if (!back[i].is_update) { // mise à jour
-                if (back[i].r.statuscode == HTTP_OK &&
-                    !back[i].testmode) { // 'OK'
-                  if (!is_hypertext_mime(opt, back[i].r.contenttype,
-                                         back[i].url_fil)) { // not HTML
-                    if (strnotempty(back[i].url_sav)) {      // target found
-                      LLint size = fsize_utf8(back[i].url_sav);
-
-                      if (size >= 0) {
-                        if (back[i].r.totalsize == size) { // same size!
-                          back_keep_existing(opt, sback, i, size,
-                                             "matching the announced size");
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-            // Various hacks to limit re-transfers when updating a mirror
-            // Detect bad range: header
-            if (opt->sizehack) {
-              // We have request for a partial file (with a 'Range: NNN-'
-              // header) and received a complete file notification (200), with
-              // 'Content-length: NNN' it might be possible that we had the
-              // complete file this is the case in *most* cases, so break the
-              // connection
-              if (back[i].r.is_write == 0) { // mode mémoire
-                if (back[i].r.adr == NULL) { // rien n'a été écrit
-                  if (!back[i].testmode) {   // pas mode test
-                    if (strnotempty(back[i].url_sav)) {
-                      if (strcmp(back[i].url_fil, "/robots.txt")) {
-                        if (back[i].r.statuscode == HTTP_OK) { // 'OK'
-                          if (!is_hypertext_mime(opt, back[i].r.contenttype,
-                                                 back[i].url_fil)) { // pas HTML
-                            if (back[i].r.statuscode == HTTP_OK) {   // "OK"
-                              if (back[i].range_req_size >
-                                  0) { // but Range: requested
-                                if (back[i].range_req_size ==
-                                    back[i].r.totalsize) { // And same size
-                                  back_keep_existing(
-                                      opt, sback, i, back[i].range_req_size,
-                                      "matching the announced size, "
-                                      "range ignored");
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-            // END - Various hacks to limit re-transfers when updating a mirror
-
-            /*
-               End of status code and header-response hacks
-             */
-
-            /* Interdiction taille par le wizard? */
-            if (back[i].r.soc != INVALID_SOCKET) {
-              if (!back_checksize(opt, &back[i], 1)) {
-                back_set_too_big(opt, sback, i);
-              }
-            }
-
-            // Out-of-protocol 304 to a Range resume: the file is still
-            // partial, so drop it and refetch instead of trusting it.
-            if (server_sent_304 && back[i].range_req_size > 0) {
-              (void) !url_savename_refname_remove(opt, back[i].url_adr,
-                                                  back[i].url_fil);
-              UNLINK(back[i].url_sav);
-              deletehttp(&back[i].r);
-              back[i].r.statuscode = STATUSCODE_NON_FATAL;
-              back[i].r.refetch_wholefile =
-                  HTS_TRUE; // retry whole, no Range (#581)
-              strcpybuff(back[i].r.msg, "Bogus 304 on resume, restarting");
-              back_set_finished(opt, sback, i);
-            }
-
-            /* sinon, continuer */
-            /* if (back[i].r.soc!=INVALID_SOCKET) {   // ok récupérer body? */
-            // head: terminé
-            if (back[i].head_request) {
-              hts_log_print(opt, LOG_DEBUG, "Tested file: %s%s",
-                            adr_nologin(opt, back[i].url_adr), back[i].url_fil);
-              // Couper connexion
-              if (!back[i].http11) { /* NO KA */
-                deletehttp(&back[i].r);
-              }
-              back_set_finished(opt, sback, i);
-            }
-            // traiter une éventuelle erreur 304 (cache à jour utilisable)
-            else if (back[i].r.statuscode ==
-                     HTTP_NOT_MODIFIED) { // document à jour dans le cache
-              // lire dans le cache
-              // ** NOTE: pas de vérif de la taille ici!!
-              /* clear everything but connection: switch, close, and
-               * reswitch */
-              {
-                htsblk tmp;
-
-                memset(&tmp, 0, sizeof(tmp));
-                back_connxfr(&back[i].r, &tmp);
-                /* Only a server-sent 304 has revisit headers (#826). */
-                if (server_sent_304)
-                  warc_move_request(&back[i].r, &tmp);
-                /* the cache entry overwrites the whole struct, so drop
-                   what the 304 response still owns first (#782) */
-                back_free_response(&back[i].r);
-                back[i].r = cache_read(opt, cache, back[i].url_adr,
-                                       back[i].url_fil, back[i].url_sav,
-                                       HTS_BUF(back[i].location_buffer));
-                back[i].r.location = back[i].location_buffer;
-                back_connxfr(&tmp, &back[i].r);
-                warc_move_request(&tmp, &back[i].r);
-              }
-
-              // hack:
-              // In case of 'if-unmodified-since' hack, a 304 status can be sent
-              // then, force 'ok' status
-              if (back[i].r.statuscode == STATUSCODE_INVALID) {
-                if (fexist_utf8(back[i].url_sav)) {
-                  back[i].r.statuscode = HTTP_OK; // OK
-                  strcpybuff(back[i].r.msg, "OK (cached)");
-                  back[i].r.is_file = 1;
-                  back[i].r.totalsize = back[i].r.size =
-                      fsize_utf8(back[i].url_sav);
-                  get_httptype_sized(opt, back[i].r.contenttype,
-                                     sizeof(back[i].r.contenttype),
-                                     back[i].url_sav, 1);
-                  hts_log_print(
-                      opt, LOG_DEBUG,
-                      "Not-modified status without cache guessed: %s%s",
-                      adr_nologin(opt, back[i].url_adr), back[i].url_fil);
-                }
-              }
-              // Status is okay?
-              if (back[i].r.statuscode != -1) { // pas d'erreur de lecture
-                back_set_finished(opt, sback, i);
-                back[i].r.notmodified = 1; // NON modifié!
-                // WARC must not claim a 304 the server never sent (#839)
-                back[i].r.warc_forced_notmodified =
-                    server_sent_304 ? HTS_FALSE : HTS_TRUE;
-                hts_log_print(
-                    opt, LOG_DEBUG, "File loaded after test from cache: %s%s",
-                    adr_nologin(opt, back[i].url_adr), back[i].url_fil);
-
-                // finalize
-                if (statuscode_is_http(back[i].r.statuscode)) {
-                  hts_log_print(opt, LOG_TRACE, "finalizing after cache load");
-                  back_finalize(opt, cache, sback, i);
-                }
-
-              } else { // erreur
-                back_set_finished(opt, sback, i);
-              }
-
-            }
-            // MIME type excluded by a -mime: filter: abort, don't fetch
-            // the body (#58)
-            else if (HTTP_IS_OK(back[i].r.statuscode) && !back[i].testmode &&
-                     strnotempty(back[i].r.contenttype) &&
-                     hts_acceptmime(opt, 0, back[i].url_adr, back[i].url_fil,
-                                    back[i].r.contenttype) == 1) {
-              back_slot_close_fail(opt, sback, i, STATUSCODE_EXCLUDED,
-                                   "Excluded by MIME type filter");
-              hts_log_print(opt, LOG_NOTICE,
-                            "File excluded by MIME type filter (%s): %s%s",
-                            back[i].r.contenttype,
-                            adr_nologin(opt, back[i].url_adr), back[i].url_fil);
-            } else { // il faut aller le chercher
-
-              // effacer buffer (requète)
-              if (!noFreebuff) {
-                deleteaddr(&back[i].r);
-                back[i].r.size = 0;
-              }
-              // traiter 206 (partial content)
-              // xxc SI CHUNK VERIFIER QUE CA MARCHE??
-              if (back[i].r.statuscode ==
-                  206) { // on nous envoie un morceau (la fin) coz une partie
-                         // sur disque!
-                LLint sz = fsize_utf8(back[i].url_sav);
-                /* Resume at the server's Content-Range start, which
-                   may be earlier than asked (#198). */
-                const LLint resume = back[i].r.crange_start;
-                /* a coded tail can not be appended to the plain prefix */
-                const hts_boolean range_ok =
-                    !back[i].r.compressed && back[i].r.crange > 0 &&
-                    resume >= 0 && resume <= (LLint) sz &&
-                    back[i].r.crange_end == back[i].r.crange - 1 &&
-                    (back[i].r.totalsize < 0 ||
-                     back[i].r.totalsize == back[i].r.crange_end - resume + 1);
-
-                if (sz >= 0 && range_ok) {
-                  char catbuff[CATBUFF_SIZE];
-
-                  if (!is_hypertext_mime(opt, back[i].r.contenttype,
-                                         back[i].url_sav)) { // pas HTML
-                    if (opt->getmode & HTS_GETMODE_NONHTML) {
-                      filenote(&opt->state.strc, back[i].url_sav,
-                               NULL); // noter fichier comme connu
-                      file_notify(opt, back[i].url_adr, back[i].url_fil,
-                                  back[i].url_sav, 0, 1, back[i].r.notmodified);
-                      back[i].r.out = FOPEN(
-                          fconv(catbuff, sizeof(catbuff), back[i].url_sav),
-                          "r+b"); // resume in place
-                      if (back[i].r.out && opt->cache != 0) {
-                        back[i].r.is_write = 1;
-                        back[i].r.size = resume;        // bytes already on disk
-                        back[i].r.statuscode = HTTP_OK; // force 'OK'
-                        if (back[i].r.totalsize >= 0)
-                          back[i].r.totalsize += resume; // -> full size
-                        // on error, refetch the whole file
-                        /* (off_t) is 32-bit on MSVC and wraps past 2GB */
-                        if (HTS_FTRUNCATE(back[i].r.out, resume) != 0) {
-                          fclose(back[i].r.out);
-                          back[i].r.out = NULL;
-                          (void) !url_savename_refname_remove(
-                              opt, back[i].url_adr, back[i].url_fil);
-                          UNLINK(back[i].url_sav);
-                          back_set_finished(opt, sback, i);
-                          strcpybuff(back[i].r.msg,
-                                     "Can not truncate partial file, "
-                                     "restarting");
-                        } else {
-                          /* not (off_t): 32-bit on MSVC, truncating a
-                             resume past 2GB */
-                          fseeko(back[i].r.out, resume, SEEK_SET);
-                          /* create a temporary reference file in case of
-                           * broken mirror */
-                          if (back_serialize_ref(opt, &back[i]) != 0) {
-                            hts_log_print(opt, LOG_WARNING,
-                                          "Could not create temporary "
-                                          "reference file for %s%s",
-                                          adr_nologin(opt, back[i].url_adr),
-                                          back[i].url_fil);
-                          }
-                        }
-                      } else { // On est dans la m**
-                        back_set_finished(opt, sback, i);
-                        strcpybuff(back[i].r.msg, "Can not open partial file");
-                      }
-                    }
-                  } else { // mémoire
-                    FILE *fp = FOPEN(
-                        fconv(catbuff, sizeof(catbuff), back[i].url_sav), "rb");
-                    if (fp) {
-                      LLint alloc_mem = resume + 1;
-
-                      // Refetch when a hostile Content-Length would
-                      // overflow the 32-bit in-memory buffer.
-                      if (back[i].r.totalsize > INT32_MAX - alloc_mem) {
-                        /* Windows refuses to unlink a file still open */
-                        fclose(fp);
-                        fp = NULL;
-                        (void) !url_savename_refname_remove(
-                            opt, back[i].url_adr, back[i].url_fil);
-                        UNLINK(back[i].url_sav);
-                        alloc_mem = -1;
-                      } else if (back[i].r.totalsize >= 0)
-                        alloc_mem += back[i].r.totalsize; // AJOUTER RESTANT!
-                      if (alloc_mem >= 0 && deleteaddr(&back[i].r) &&
-                          (back[i].r.adr =
-                               (char *) malloct((size_t) alloc_mem))) {
-                        back[i].r.size = resume;
-                        if (back[i].r.totalsize >= 0)
-                          back[i].r.totalsize += resume; // -> full size
-                        if (!hts_fread_exact(back[i].r.adr, (size_t) resume,
-                                             fp)) {
-                          back_set_finished(opt, sback, i);
-                          strcpybuff(back[i].r.msg,
-                                     "Can not read partial file");
-                        } else {
-                          back[i].r.statuscode = HTTP_OK; // Forcer 'OK'
-                        }
-                      } else {
-                        back_set_finished(opt, sback, i);
-                        strcpybuff(back[i].r.msg, "No memory for partial file");
-                      }
-                      if (fp != NULL)
-                        fclose(fp);
-                    } else { // open failed
-                      back_set_finished(opt, sback, i);
-                      strcpybuff(back[i].r.msg, "Can not open partial file");
-                    }
-                  }
-                } else if (sz >= 0) { // unusable range -> restart whole file
-                  hts_log_print(opt, LOG_WARNING,
-                                "Unusable partial-content range for %s%s "
-                                "(have " LLintP " bytes, got " LLintP "-" LLintP
-                                "/" LLintP "), restarting",
-                                adr_nologin(opt, back[i].url_adr),
-                                back[i].url_fil, (LLint) sz,
-                                back[i].r.crange_start, back[i].r.crange_end,
-                                back[i].r.crange);
-                  (void) !url_savename_refname_remove(opt, back[i].url_adr,
-                                                      back[i].url_fil);
-                  UNLINK(back[i].url_sav);
-                  back_set_finished(opt, sback, i);
-                  strcpybuff(back[i].r.msg,
-                             "Unusable partial content, restarting");
-                } else { // partial not found
-                  back_set_finished(opt, sback, i);
-                  strcpybuff(back[i].r.msg, "Can not find partial file");
-                }
-                // Erreur?
-                if (back_status(&back[i]) == STATUS_READY) {
-                  if (back[i].r.soc != INVALID_SOCKET) {
-                    deletehttp(&back[i].r);
-                  }
-                  back[i].r.soc = INVALID_SOCKET;
-                  back[i].r.statuscode = STATUSCODE_NON_FATAL;
-                  // the resume was rejected: the retry must GET the whole
-                  // file, never re-Range a surviving partial/ref (#581)
-                  back[i].r.refetch_wholefile = HTS_TRUE;
-                  if (strnotempty(back[i].r.msg))
-                    strcpybuff(
-                        back[i].r.msg,
-                        "Error attempting to solve status 206 (partial file)");
-                }
-              }
-
-              // not finished, so an error
-              if (back_status(&back[i]) != STATUS_READY) {
-                if (!back[i].testmode) { // fichier normal
-
-                  if (back[i]
-                          .r
-                          .empty /* ?? && back[i].r.statuscode==HTTP_OK */) { // empty response
-                    // Couper connexion
-                    back_maydeletehttp(opt, cache, sback, i);
-                    /* KA deletehttp(&back[i].r);
-                     * back[i].r.soc=INVALID_SOCKET; */
-                    back_set_finished(opt, sback, i);
-                    if (deleteaddr(&back[i].r) &&
-                        (back[i].r.adr = (char *) malloct(2))) {
-                      back[i].r.adr[0] = 0;
-                    }
-                    /* locked or pinned = name pending; the waiter
-                       finalizes after patching url_sav (else: cached as
-                       .delayed, #5) */
-                    if (!back[i].locked) {
-                      hts_log_print(opt, LOG_TRACE, "finalizing empty");
-                      back_finalize(opt, cache, sback, i);
-                    }
-                  } else if (!back[i].r.is_chunk) { // pas de chunk
-                    back[i].is_chunk = 0;
-                    back[i].status = 1; // start body
-                  } else {
-                    back[i].is_chunk = 1;
-                    back[i].chunk_adr = NULL;
-                    back[i].chunk_size = 0;
-                    back[i].chunk_blocksize = 0;
-                    back[i].status = STATUS_CHUNK_WAIT; // start body wait chunk
-                    back[i].r.totalsize = -1; /* devalidate size! (rfc) */
-                  }
-                  if (back[i].rateout > 0) {
-                    back[i].rateout_time =
-                        time_local(); // refresh pour transfer rate
-                  }
-                } else { // mode test, ne pas passer en 1!!
-                  back_set_finished(opt, sback, i);
-                  deletehttp(&back[i].r);
-                  if (back[i].r.statuscode == HTTP_OK) {
-                    strcpybuff(back[i].r.msg, "Test: OK");
-                    back[i].r.statuscode = STATUSCODE_TEST_OK; // test réussi
-                  } else { // test a échoué, on ne change rien sauf que l'erreur
-                           // est à titre indicatif
-                    char tempo[1000];
-
-                    strcpybuff(tempo, back[i].r.msg);
-                    strcpybuff(back[i].r.msg, "Test: ");
-                    strcatbuff(back[i].r.msg, tempo);
-                  }
-                }
-              }
-            }
-
-            /*} */
-
-          } // si LF
-        } // r.size>2
+        if (!back_wait_headers(opt, cache, sback, i))
+          return; // Status 100: more headers follow
       } // status 99
-
-    } // si pas d'erreurs
-  } // données dispo
+    } // data and no error
+  } // data available
 
   /* funny log for commandline users */
   if (opt->verbosedisplay == HTS_VERBOSE_SIMPLE) {
