@@ -58,7 +58,7 @@ extern "C" {
 #define WARC_TRUNC_DISCONNECT 3 /* connection dropped mid-body */
 
 /* WARC-Truncated token for a warc_truncated code, or NULL for none. */
-const char *warc_truncated_reason(int code);
+HTS_CHECK_RESULT const char *warc_truncated_reason(int code);
 
 /* Copy the media type of header NAME, up to a ';' or a space, from the raw
    block HDR into OUT, which is "" when the header is absent. OUT is clipped to
@@ -119,7 +119,7 @@ void warc_abort_opt(httrackp *opt);
 /* Create the archive at path (auto-named when path is WARC_AUTONAME), writing
    the warcinfo record. .warc.gz => one gzip member per record; .warc => raw.
    Returns NULL on failure. */
-warc_writer *warc_open(httrackp *opt, const char *path);
+HTS_CHECK_RESULT warc_writer *warc_open(httrackp *opt, const char *path);
 
 /* Flush, close and free the writer (NULL-safe). */
 void warc_close(warc_writer *w);

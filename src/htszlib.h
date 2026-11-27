@@ -55,7 +55,7 @@ extern int hts_zunpack_max(const char *filename, const char *newfile,
                            LLint cap);
 /* Inflate the head of a gzip/zlib stream into OUT; 0 if undecodable */
 extern size_t hts_zhead(hts_span in, hts_buf out);
-extern hts_boolean hts_extract_meta(const char *path);
+extern HTS_CHECK_RESULT hts_boolean hts_extract_meta(const char *path);
 /* The message for a minizip error code. BUF (HTS_STRERROR_SIZE) backs the
    UNZ_ERRNO case, where the text comes from errno; the rest are literals. */
 extern const char *hts_get_zerror(int err, hts_buf buf);

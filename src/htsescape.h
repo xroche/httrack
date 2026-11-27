@@ -58,10 +58,12 @@ typedef struct hts_query_field {
    ends at the first '='. *cur then moves to the next field, and becomes NULL
    after the last one. Returns HTS_FALSE, leaving *field alone, once *cur is
    NULL. */
-extern hts_boolean hts_query_next(const char **cur, hts_query_field *field);
+extern HTS_CHECK_RESULT hts_boolean hts_query_next(const char **cur,
+                                                   hts_query_field *field);
 
 /* Finds the first field of query with an '=' whose key is exactly name. */
-extern hts_boolean hts_query_find(const char *query, const char *name,
-                                  hts_query_field *field);
+extern HTS_CHECK_RESULT hts_boolean hts_query_find(const char *query,
+                                                   const char *name,
+                                                   hts_query_field *field);
 
 #endif

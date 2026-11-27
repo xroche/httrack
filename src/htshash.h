@@ -68,8 +68,8 @@ hts_boolean hash_url_equals_in(hash_struct *hash, const char *adra,
    it only feeds the hash, never a comparison. */
 const char *hash_url_key(hash_struct *hash, const char *adr, const char *fil,
                          hts_buf dst);
-int hash_read(const hash_struct * hash, const char *nom1, const char *nom2,
-              hash_struct_type type);
+HTS_CHECK_RESULT int hash_read(const hash_struct *hash, const char *nom1,
+                               const char *nom2, hash_struct_type type);
 void hash_write(hash_struct * hash, size_t lpos);
 /* Return the suffix the collision walk from taken save-name NAME reached,
    every name between being taken, or 0 if unknown. KIND is the naming mode. */

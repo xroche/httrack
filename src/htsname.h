@@ -107,7 +107,8 @@ void standard_name(hts_buf b, const char *dot_pos, const char *nom_pos,
                    const char *fil_complete, int short_ver);
 /* Does url's query have a field with an '=' whose key is exactly name? Its
    value, clipped to fit, goes to dst, of size >= 1. */
-hts_boolean url_query_value(const char *url, const char *name, hts_buf dst);
+HTS_CHECK_RESULT hts_boolean url_query_value(const char *url, const char *name,
+                                             hts_buf dst);
 /* Append s to d (mapping '\' to '/'), clipped to d.size bytes including the
    NUL. Clips rather than aborts, because s comes from a crawled page. */
 void url_savename_addstr(hts_buf d, const char *s);

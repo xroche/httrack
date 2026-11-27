@@ -74,7 +74,7 @@ void hts_bundle_identity(httrackp *opt, const char *adr, htsrequest *req);
 void hts_bundle_free(httrackp *opt);
 
 /* Does s hold a control byte other than TAB? */
-hts_boolean hts_bundle_has_control(hts_span s);
+HTS_CHECK_RESULT hts_boolean hts_bundle_has_control(hts_span s);
 
 /* The bundles share these htsbauth.c internals. */
 

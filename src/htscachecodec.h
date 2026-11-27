@@ -147,7 +147,7 @@ typedef void (*hts_cache_field_other)(void *arg, const char *name,
    shorter buffer truncates it into a valid-looking wrong target. */
 #define HTS_CACHE_LINE_SIZE (HTS_LOCATION_SIZE + 32)
 
-static HTS_UNUSED hts_boolean
+static HTS_UNUSED HTS_CHECK_RESULT hts_boolean
 hts_cache_read_fields(hts_span block, const hts_cache_field *fields,
                       size_t count, hts_cache_field_other other, void *arg) {
   const char *p = block.p;

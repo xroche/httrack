@@ -133,8 +133,10 @@ int cookie_add(t_cookie *cookie, const char *cook_name, const char *cook_value,
 /** Does the jar hold a Secure record of cook_name that a cookie for this
     domain and path would shadow (RFC 6265bis 5.6)? Either domain may be the
     parent, and the record's path must cover path on a "/" boundary. */
-hts_boolean cookie_is_secure_record(t_cookie *cookie, const char *cook_name,
-                                    const char *domain, const char *path);
+HTS_CHECK_RESULT hts_boolean cookie_is_secure_record(t_cookie *cookie,
+                                                     const char *cook_name,
+                                                     const char *domain,
+                                                     const char *path);
 
 /** Erase the record of cook_name with exactly this domain and path, with
     domain normalised by cookie_host as cookie_set does. Always 0: a domain
@@ -144,7 +146,8 @@ int cookie_remove(t_cookie *cookie, const char *cook_name, const char *domain,
 
 /** Is the record at rec sendable at NOW, over https when https is HTS_TRUE?
     An expired record never is. A Secure one needs https. */
-hts_boolean cookie_sendable(const char *rec, hts_boolean https, int64_t now);
+HTS_CHECK_RESULT hts_boolean cookie_sendable(const char *rec, hts_boolean https,
+                                             int64_t now);
 
 /** Load the Netscape jar <path>/<name> into cookie (plus the copied IE jars in
     <path> on Windows). Each line a rewrite would lose is skipped, counted and
@@ -204,7 +207,8 @@ const char *cookie_get(char *buffer, size_t buffer_size,
     HOST and HOST is not an address literal. A leading dot on JAR_DOM, the
     Netscape jar form, names the same domain. Case folds on both sides, but
     nothing is normalised here, so pass HOST through cookie_host first. */
-hts_boolean cookie_domain_match(const char *jar_dom, const char *host);
+HTS_CHECK_RESULT hts_boolean cookie_domain_match(const char *jar_dom,
+                                                 const char *host);
 
 /** May a Set-Cookie from HOST, normalised by cookie_host, carry the Domain
     attribute DOMAIN? RFC 6265 5.3 says yes when DOMAIN is HOST itself, or a

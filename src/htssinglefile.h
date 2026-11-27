@@ -90,11 +90,11 @@ void singlefile_free(httrackp *opt);
 
 /* "#!<secret>" for this run, or NULL if no CSPRNG was available (in which case
    nothing may be marked). Draws the secret on first use. */
-const char *singlefile_intro(httrackp *opt);
+HTS_CHECK_RESULT const char *singlefile_intro(httrackp *opt);
 
 /* HTS_FALSE if [body,len) already holds this run's intro, so the document
    must not be marked. Only a 2^-64 coincidence trips this. */
-hts_boolean singlefile_may_mark(httrackp *opt, hts_span body);
+HTS_CHECK_RESULT hts_boolean singlefile_may_mark(httrackp *opt, hts_span body);
 
 /* Write the mark for a reference of reflen bytes into buf; returns buf, left
    empty for a reflen the pass could not read back. */
@@ -126,8 +126,9 @@ hts_boolean singlefile_rewrite_html(httrackp *opt, const char *root,
 
 /* singlefile_rewrite_html() over the file at page_path, rewritten in place.
    Returns HTS_TRUE if the file changed. */
-hts_boolean singlefile_rewrite_file(httrackp *opt, const char *root,
-                                    const char *page_path);
+HTS_CHECK_RESULT hts_boolean singlefile_rewrite_file(httrackp *opt,
+                                                     const char *root,
+                                                     const char *page_path);
 
 #ifdef __cplusplus
 }

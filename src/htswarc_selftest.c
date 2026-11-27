@@ -2265,7 +2265,8 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
     fconcat(wide, sizeof(wide), root, "wide.html");
     before = readfile_utf8(wide);
     assertf(before != NULL);
-    (void) singlefile_rewrite_file(opt, root, wide);
+    sf_check(!singlefile_rewrite_file(opt, root, wide),
+             "an over-wide tag reported a rewrite");
     after = readfile_utf8(wide);
     sf_check(after != NULL && strcmp(before, after) == 0,
              "an over-wide tag was rewritten");

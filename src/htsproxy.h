@@ -52,8 +52,8 @@ typedef struct htsblk htsblk;
    reads the proxy's status line, so the caller's TLS handshake then runs
    end-to-end with the origin. Blocks up to `timeout` seconds. Returns HTS_TRUE
    on a 2xx tunnel, HTS_FALSE on failure (retour->msg/statuscode set). */
-hts_boolean http_proxy_tunnel(httrackp *opt, htsblk *retour, const char *adr,
-                              int timeout);
+HTS_CHECK_RESULT hts_boolean http_proxy_tunnel(httrackp *opt, htsblk *retour,
+                                               const char *adr, int timeout);
 
 /* SOCKS5 (RFC 1928, RFC 1929 auth) handshake on the raw proxy socket, before
    any TLS: `retour->soc` must be TCP-connected to the proxy and `adr` is the
@@ -61,8 +61,8 @@ hts_boolean http_proxy_tunnel(httrackp *opt, htsblk *retour, const char *adr,
    proxy resolves it; a bracketed IPv6 literal origin is rejected. Blocks up to
    `timeout` seconds. Returns HTS_TRUE with the stream positioned on the first
    origin byte, HTS_FALSE on failure (retour->msg set). */
-hts_boolean socks5_handshake(httrackp *opt, htsblk *retour, const char *adr,
-                             int timeout);
+HTS_CHECK_RESULT hts_boolean socks5_handshake(httrackp *opt, htsblk *retour,
+                                              const char *adr, int timeout);
 
 /* Self-test hook (-#test=socks5): run the handshake against `reply`, a scripted
    server byte stream, instead of a socket. `sent` captures the client frames,

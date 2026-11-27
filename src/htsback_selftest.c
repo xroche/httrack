@@ -3496,8 +3496,8 @@ static int st_reqstrings(httrackp *opt, int argc, char **argv) {
     copy_htsopt(from, opt);
     CHECK(strcmp(StringBuff(opt->user_agent), big) == 0);
 
-    (void) http_sendhead(opt, NULL, 0, NULL, "example.com", "/ua.png", NULL,
-                         NULL, NULL, r);
+    CHECK(http_sendhead(opt, NULL, 0, NULL, "example.com", "/ua.png", NULL,
+                        NULL, NULL, r) == 0);
     CHECK(strcmp(r->req.user_agent, "Old/1.0") == 0);
     CHECK(strcmp(r->req.accept, "old/accept") == 0);
     CHECK(strcmp(r->req.lang_iso, "xx") == 0);
@@ -3591,8 +3591,11 @@ static int st_postfilewire(httrackp *opt, int argc, char **argv) {
     (void) setsockopt(sv[1], SOL_SOCKET, SO_RCVBUF, &sz, sizeof(sz));
     memset(&r, 0, sizeof(r));
     r.soc = sv[0];
-    (void) http_sendhead(opt, NULL, 0, NULL, "example.com", fil, NULL, NULL,
-                         NULL, &r);
+    if (http_sendhead(opt, NULL, 0, NULL, "example.com", fil, NULL, NULL, NULL,
+                      &r) != 0) {
+      printf("postfilewire: body %u refused\n", (unsigned) cases[k].body);
+      err = 1;
+    }
     n = recv(sv[1], wire, sizeof(wire), MSG_DONTWAIT);
     if (n != (ssize_t) cases[k].wire) {
       printf("postfilewire: body %u put %d bytes on the wire, want %u\n",
