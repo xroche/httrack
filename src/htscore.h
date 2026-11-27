@@ -325,8 +325,8 @@ HTS_OWNED char *hts_cancel_file_pop(httrackp *opt);
 
 /* Native path DIR/NAME in the rotating concat buffer. DIR is our own
    configured path, so a path too long for the buffer aborts. */
-static HTS_INLINE HTS_UNUSED char *hts_optpath(httrackp *opt, const char *dir,
-                                               const char *name) {
+static HTS_INLINE HTS_UNUSED HTS_RING char *
+hts_optpath(httrackp *opt, const char *dir, const char *name) {
   const hts_buf b = OPT_GET_HTS_BUF(opt);
 
   if (!hts_fpath_join(b, dir, name))
@@ -335,8 +335,8 @@ static HTS_INLINE HTS_UNUSED char *hts_optpath(httrackp *opt, const char *dir,
 }
 
 /* Path of NAME inside the mirror log dir, in the rotating concat buffer. */
-static HTS_INLINE HTS_UNUSED char *hts_logpath(httrackp *opt,
-                                               const char *name) {
+static HTS_INLINE HTS_UNUSED HTS_RING char *hts_logpath(httrackp *opt,
+                                                        const char *name) {
   return hts_optpath(opt, StringBuff(opt->path_log), name);
 }
 

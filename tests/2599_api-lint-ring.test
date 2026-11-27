@@ -1,0 +1,70 @@
+#!/bin/bash
+#
+# The ring rule of check-api-lint.py: only the crawl thread may take a slot of
+# the rotating buffer of opt (#2328), and a function returning one needs HTS_RING.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+srcdir="${abs_top_srcdir:?not run under make check}"
+lint="${srcdir}/tools/check-api-lint.py"
+python=$(find_python) || skip "python3 not found"
+test -r "${lint}" || fail "missing ${lint}"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/apiring.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "${work}"
+cp -R "${srcdir}/src" "${work}/src"
+(cd "${srcdir}" && find fuzz libtest tests tools -name '*.c' | tar -cf - -T -) |
+    tar -xf - -C "${work}"
+cp -R "${srcdir}/tools/api-lint" "${work}/baseline"
+chmod -R u+w "${work}"
+
+# Worker, helper, inner and both tails run off the crawl thread, and the crawl helper does not.
+cat >"${work}/src/lintring.c" <<'C'
+static void lint_ring_inner(httrackp *opt) { (void) url_nologin(opt, "x"); }
+static void lint_ring_helper(httrackp *opt) { lint_ring_inner(opt); }
+static void lint_ring_worker(void *a) { lint_ring_helper((httrackp *) a); }
+static void lint_ring_tail(void *a) { (void) getHtsOptBuff_((httrackp *) a); }
+static void lint_ring_fwd_tail(void *a) { (void) OPT_GET_BUFF((httrackp *) a); }
+static void lint_ring_spawn_with(void (*tail)(void *), httrackp *opt) {
+  (void) hts_newthread_tail(lint_ring_worker, opt, tail);
+}
+static void lint_ring_crawl(httrackp *opt) {
+  (void) adr_nologin(opt, "x");
+}
+void lint_ring_server(httrackp *opt) { (void) hts_logpath(opt, "x"); }
+int lint_ring_spawn(httrackp *opt) {
+  lint_ring_crawl(opt);
+  lint_ring_spawn_with(lint_ring_fwd_tail, opt);
+  return hts_newthread_tail(lint_ring_worker, opt, lint_ring_tail);
+}
+static char *lint_ring_via2(httrackp *opt) { return lint_ring_via(opt); }
+static char *lint_ring_via(httrackp *opt) { return lint_ring_local(opt); }
+static char *lint_ring_local(httrackp *opt) { const hts_buf b = OPT_GET_HTS_BUF(opt); return b.p; }
+static HTS_RING char *lint_ring_ok(httrackp *opt) { return OPT_GET_BUFF(opt); }
+static size_t lint_ring_len(httrackp *opt) { return strlen(OPT_GET_BUFF(opt)); }
+C
+# The WebHTTrack server loop runs beside the crawl.
+head='int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {'
+grep -qxF "${head}" "${work}/src/htsserver.c" || fail "smallserver moved"
+awk -v h="${head}" '{ print } $0 == h { print "  lint_ring_server(global_opt);" }' \
+    "${srcdir}/src/htsserver.c" >"${work}/src/htsserver.c"
+sed 's/ HTS_RING char \*hts_logpath(/ char *hts_logpath(/' \
+    "${srcdir}/src/htscore.h" >"${work}/src/htscore.h"
+
+out=$("${python}" "${lint}" --root "${work}" --baseline-dir "${work}/baseline") &&
+    fail "planted ring uses passed"
+for want in "lintring.c:1: ring: new violation: lint_ring_inner runs on the lint_ring_worker thread and takes a ring slot of opt via url_nologin" \
+    "lintring.c:4: ring: new violation: lint_ring_tail runs on the lint_ring_tail thread and takes a ring slot of opt via getHtsOptBuff_" \
+    "lintring.c:5: ring: new violation: lint_ring_fwd_tail runs on the lint_ring_fwd_tail thread and takes a ring slot of opt via OPT_GET_BUFF" \
+    "lintring.c:12: ring: new violation: lint_ring_server runs on the smallserver thread and takes a ring slot of opt via hts_logpath" \
+    "lintring.c:18: ring: new violation: lint_ring_via2 returns a ring slot without HTS_RING" \
+    "lintring.c:19: ring: new violation: lint_ring_via returns a ring slot without HTS_RING" \
+    "lintring.c:20: ring: new violation: lint_ring_local returns a ring slot without HTS_RING" \
+    "src/htscore.h:$(grep -n ' char \*hts_logpath(' "${work}/src/htscore.h" | cut -d: -f1): ring: new violation: hts_logpath returns a ring slot without HTS_RING"; do
+    grep -qF "${want}" <<<"${out}" || fail "missed ${want}: ${out}"
+done
+# The lint must not flag the crawl helper, the crawl worker, a marked function or a non-pointer function.
+test "$(wc -l <<<"${out}")" -eq 8 || fail "unexpected output: ${out}"

@@ -131,6 +131,12 @@ Please visit our Website: http://www.httrack.com
 #define HTS_OWNED HTS_OWNED_BY(free)
 #endif
 
+/* HTS_RING: the result is a slot of the rotating buffer of opt, so only the
+   crawl thread may call it. tools/check-api-lint.py checks this. */
+#ifndef HTS_RING
+#define HTS_RING
+#endif
+
 /* Marks a printf-style format parameter so MSVC /analyze checks callers. */
 #ifndef HTS_FORMAT_STRING
 #ifdef _MSC_VER
