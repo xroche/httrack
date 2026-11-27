@@ -1,15 +1,11 @@
 # Known check-result violations. Regenerate: tools/check-api-lint.py --update
-src/htsback.h: back_delayed_rename
-src/htscache.h: cache_header
 src/htscachecodec.h: hts_cache_header_says_data_in_zip
 src/htscachecodec.h: hts_cache_status_line
 src/htscachecodec.h: hts_cache_store_field
-src/htscore.h: back_fillmax
 src/htscore.h: check_fatal_io_errno
 src/htscore.h: check_stdin
 src/htscore.h: filesave
 src/htscore.h: filters_grow
-src/htscore.h: fspc
 src/htscore.h: htsAddLink
 src/htscore.h: hts_wait_available_socket
 src/htscoremain.h: hts_self_path
@@ -25,7 +21,6 @@ src/htslib.h: fpsize
 src/htslib.h: fsize
 src/htslib.h: fsize_utf8
 src/htslib.h: getFunctionPtr
-src/htslib.h: get_userhttptype
 src/htslib.h: hts_basic_auth_value
 src/htslib.h: hts_body_missing_unexpectedly
 src/htslib.h: hts_client_hints_of
@@ -35,7 +30,6 @@ src/htslib.h: hts_file_backdate
 src/htslib.h: hts_file_mtime
 src/htslib.h: hts_header_is_read
 src/htslib.h: hts_host_alias_looping
-src/htslib.h: hts_host_alias_resolve
 src/htslib.h: hts_host_is_ipv4
 src/htslib.h: hts_host_same_alias
 src/htslib.h: hts_libhandles_add
@@ -59,7 +53,6 @@ src/htslib.h: readdir
 src/htslib.h: sendc
 src/htslib.h: socket_set_nonblocking
 src/htslib.h: strstrcase
-src/htsmirror.h: hts_poll_abort_request
 src/htsmirror.h: hts_take_lock_request
 src/htsmirror.h: hts_wait_delayed
 src/htsname.h: url_savename_refname_remove
@@ -112,7 +105,6 @@ src/httrack-library.h: hts_resetaddurl
 src/httrack-library.h: hts_rootdir
 src/httrack-library.h: hts_rule_would_be_read_as_opt
 src/httrack-library.h: hts_wizard_host_scope
-src/proxy/proxytrack.h: set_filetime_time_t
 src/proxy/store.h: PT_AddIndex
 src/proxy/store.h: PT_Enumerate
 src/proxy/store.h: PT_LookupIndex

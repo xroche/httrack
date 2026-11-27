@@ -689,7 +689,7 @@ void hts_mirror_process_user_interaction(htsmoduleStruct *str,
       if (!hts_run_is_ending(opt)) {
         FILE *fp = FOPEN(hts_logpath(opt, "hts-paused.lock"), "wb");
         if (fp) {
-          fspc(NULL, fp, "info"); // timestamp
+          fspc(fp, "info"); // timestamp
           fprintf(fp,
                   "Pause" LF "HTTrack is paused after retreiving " LLintP
                   " bytes" LF "Delete this file to continue the mirror->.." LF
@@ -812,10 +812,9 @@ void hts_mirror_process_user_interaction(htsmoduleStruct *str,
       }
       /* Read here as well, or a mirror down to its last socket sees no stop
          request until the transfer it waits on has ended. */
-      (void) hts_poll_abort_request(opt);
       /* Same omission as the wait for the current link: with every slot busy
          the mirror parks here instead, and the exit never lands (#1096). */
-      if (hts_load_acquire_int(stre->exit_xh_)) {
+      if (hts_poll_abort_request(opt) || hts_load_acquire_int(stre->exit_xh_)) {
         return;
       }
       /* skip the pause once back_wait() has freed a socket */
@@ -936,7 +935,7 @@ hts_next_file hts_mirror_wait_for_next_file(htsmoduleStruct *str,
           if (makestat_fp != NULL) {
             const LLint recv = hts_stat_recv_get();
 
-            fspc(NULL, makestat_fp, "info");
+            fspc(makestat_fp, "info");
             fprintf(
                 makestat_fp, "Rate= %d (/" LLintP ") \11NewLinks= %d (/%d)" LF,
                 (int) ((recv - *stre->makestat_total_) / (l - makestat_time)),
@@ -949,7 +948,7 @@ hts_next_file hts_mirror_wait_for_next_file(htsmoduleStruct *str,
           if (stre->maketrack_fp != NULL) {
             int i;
 
-            fspc(NULL, stre->maketrack_fp, "info");
+            fspc(stre->maketrack_fp, "info");
             fprintf(stre->maketrack_fp, LF);
             for (i = 0; i < back_max; i++) {
               back_info(sback, i, 3, stre->maketrack_fp);
@@ -1539,7 +1538,8 @@ int hts_wait_delayed(htsmoduleStruct *str, lien_adrfilsave *afs,
           if (b >= 0) {
             /* move a still-writing placeholder before the url_sav patch
                blinds every cleanup to it (#483) */
-            back_delayed_rename(opt, &back[b], afs->save);
+            /* a failure is logged and leaves the slot in error */
+            (void) !back_delayed_rename(opt, &back[b], afs->save);
             /* patch url_sav BEFORE finalize: it records/caches under this name
              */
             strcpybuff(back[b].url_sav, afs->save);

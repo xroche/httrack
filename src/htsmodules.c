@@ -37,8 +37,6 @@ Please visit our Website: http://www.httrack.com
 #include "htsbasenet.h"
 #include "htslib.h"
 
-extern int fspc(httrackp * opt, FILE * fp, const char *type);
-
 #ifndef _WIN32
 #if HTS_DLOPEN
 #include <dlfcn.h>

@@ -723,7 +723,8 @@ int ishtml_ext(hts_span ext);
 /* Write fil's --assume type into s; too long a value is clipped, not fatal.
    True if a rule matched, s then holding its value, which "--assume cgi="
    leaves empty. */
-hts_boolean get_userhttptype(httrackp *opt, hts_buf s, const char *fil);
+HTS_CHECK_RESULT hts_boolean get_userhttptype(httrackp *opt, hts_buf s,
+                                              const char *fil);
 int give_mimext(hts_buf s, const char *st);
 
 int may_unknown2(httrackp * opt, const char *mime, const char *filename);
@@ -1336,9 +1337,11 @@ const char *hts_host_alias(const char *rules, const char *adr,
 /* Resolve like hts_host_alias, and set *SETTLED, when SETTLED is not NULL, to
    whether the chain ended within the hop limit. Exposed for the -#test=spandiff
    test. */
-const char *hts_host_alias_resolve(const char *rules, const char *adr,
-                                   hts_boolean collapse_www, hts_buf dest,
-                                   hts_boolean *settled);
+HTS_CHECK_RESULT const char *hts_host_alias_resolve(const char *rules,
+                                                    const char *adr,
+                                                    hts_boolean collapse_www,
+                                                    hts_buf dest,
+                                                    hts_boolean *settled);
 
 /* HTS_TRUE when OPT's url hacks collapse www.host onto host. */
 hts_boolean hts_host_alias_collapse_www(httrackp *opt);

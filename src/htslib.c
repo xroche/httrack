@@ -4233,8 +4233,9 @@ const char *hts_host_alias_looping(const char *rules, hts_boolean collapse_www,
     if (!hts_span_split(line, '=', &aliases, &target) ||
         hts_span_empty(target) || !hts_span_copy(target, HTS_SIZED(canon)))
       continue;
-    (void) hts_host_alias_resolve(rules, canon, collapse_www, HTS_BUF(tmp),
-                                  &settled);
+    /* only whether the chain settles matters here */
+    (void) !hts_host_alias_resolve(rules, canon, collapse_www, HTS_BUF(tmp),
+                                   &settled);
     if (!settled) {
       if (strlen(canon) >= dest.size)
         continue; /* Skip a name that does not fit. */
@@ -5427,7 +5428,7 @@ HTSEXT_API hts_boolean hts_log(httrackp *opt, const char *prefix,
                                const char *msg) {
   if (opt->log != NULL) {
     fspc_count(opt, prefix);
-    fspc(opt, opt->log, prefix);
+    fspc(opt->log, prefix);
     fprintf(opt->log, "%s" LF, msg);
     return 0;
   }
@@ -5491,7 +5492,7 @@ void hts_log_vprint(httrackp *opt, int type,
     fspc_count(opt, s_type);
 
     if (opt->log != NULL) {
-      fspc(opt, opt->log, s_type);
+      fspc(opt->log, s_type);
       secret_vfprintf(opt, opt->log, format, args);
       if ((type & LOG_ERRNO) != 0) {
         char errbuf[HTS_STRERROR_SIZE];
@@ -5920,9 +5921,9 @@ const hts_stat_struct* hts_get_stats(httrackp * opt) {
 
   hts_stat_recv_publish();
   HTS_STAT.stat_nsocket = 0;
-  HTS_STAT.stat_errors = fspc(opt, NULL, "error");
-  HTS_STAT.stat_warnings = fspc(opt, NULL, "warning");
-  HTS_STAT.stat_infos = fspc(opt, NULL, "info");
+  HTS_STAT.stat_errors = fspc_get(opt, "error");
+  HTS_STAT.stat_warnings = fspc_get(opt, "warning");
+  HTS_STAT.stat_infos = fspc_get(opt, "info");
   HTS_STAT.stat_transport_failures = opt->transport_failures;
   HTS_STAT.stat_mptcp_connections = opt->mptcp_connections;
   HTS_STAT.stat_mptcp_fallbacks = opt->mptcp_fallbacks;

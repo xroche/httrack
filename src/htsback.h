@@ -180,8 +180,8 @@ hts_boolean back_delayed_settled_empty(const lien_back *back);
 /* Move back's .delayed placeholder (and open stream) to newname, or remove
    one an earlier run may have left; HTS_FALSE = file lost, slot flagged in
    error. */
-hts_boolean back_delayed_rename(httrackp *opt, lien_back *back,
-                                const char *newname);
+HTS_CHECK_RESULT hts_boolean back_delayed_rename(httrackp *opt, lien_back *back,
+                                                 const char *newname);
 /* Release back's socket, buffers and temporary file, and mark it free. NULL
    does nothing. */
 void back_clear_entry(lien_back *back);

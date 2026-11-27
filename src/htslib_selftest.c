@@ -3809,8 +3809,8 @@ static const char *legacy_hts_host_alias_looping(const char *rules,
         continue;
       memcpy(canon, eq + 1, len);
       canon[len] = '\0';
-      (void) hts_host_alias_resolve(rules, canon, collapse_www, HTS_BUF(tmp),
-                                    &settled);
+      (void) !hts_host_alias_resolve(rules, canon, collapse_www, HTS_BUF(tmp),
+                                     &settled);
       if (!settled) {
         if (strlen(canon) >= dest.size)
           continue;

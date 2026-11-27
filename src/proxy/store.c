@@ -692,7 +692,8 @@ int PT_SaveCache(PT_Indexes indexes, const char *filename) {
       int ret = _IndexFuncts[type].PT_SaveCache(indexes, filename);
 
       if (ret == 0) {
-        (void) set_filetime_time_t(filename, PT_GetTimeIndex(indexes));
+        /* a failure only dates the saved cache as new */
+        (void) !set_filetime_time_t(filename, PT_GetTimeIndex(indexes));
         return 0;
       }
     }
