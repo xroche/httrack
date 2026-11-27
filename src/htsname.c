@@ -1512,7 +1512,7 @@ int url_savename(lien_adrfilsave *const afs,
             if (!short_ver)
               TMPL_CATN(nom_pos, (int) (dot_pos - nom_pos));
             else
-              TMPL_CATN(nom_pos, min((int) (dot_pos - nom_pos), 8));
+              TMPL_CATN(nom_pos, hts_min_int((int) (dot_pos - nom_pos), 8));
           } else {
             if (!short_ver)
               TMPL_CAT(nom_pos);
@@ -2131,7 +2131,7 @@ void standard_name(hts_buf b, const char *dot_pos, const char *nom_pos,
   /* the "." plus the extension, or 0 once the extension is dropped */
   ext_tail = dot_pos != NULL ? 1 + ext_len : 0;
   if (dot_pos != NULL)
-    name_len = short_ver ? (size_t) min(dot_pos - nom_pos, 8)
+    name_len = short_ver ? (size_t) hts_min_i64(dot_pos - nom_pos, 8)
                          : (size_t) (dot_pos - nom_pos);
   else
     name_len = short_ver ? strnlen(nom_pos, 8) : strlen(nom_pos);
@@ -2139,11 +2139,12 @@ void standard_name(hts_buf b, const char *dot_pos, const char *nom_pos,
   if (md5_len + ext_tail > room || name_len > room - (md5_len + ext_tail)) {
     const size_t min_name = name_len > 0 ? 1 : 0;
 
-    if (ext_tail > room - min(room, min_name + md5_len))
+    if (ext_tail > room - hts_min_size(room, min_name + md5_len))
       ext_tail = 0;
-    if (md5_len + ext_tail > room - min(room, min_name))
+    if (md5_len + ext_tail > room - hts_min_size(room, min_name))
       md5_len = 0;
-    name_len = min(name_len, room - min(room, md5_len + ext_tail));
+    name_len =
+        hts_min_size(name_len, room - hts_min_size(room, md5_len + ext_tail));
   }
   if (name_len + md5_len + ext_tail == 0 && dot_pos != NULL) {
     /* a bare ".ext" name: keep its bytes, never a new dotfile */

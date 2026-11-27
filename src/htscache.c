@@ -814,8 +814,9 @@ static htsblk cache_readex_new(httrackp *opt, cache_back *cache,
                     int nl;
 
                     do {
-                      nl = unzReadCurrentFile((unzFile) cache->zipInput, buff,
-                                              (unsigned) minimum(size, 32768));
+                      nl = unzReadCurrentFile(
+                          (unzFile) cache->zipInput, buff,
+                          (unsigned) hts_min_i64(size, 32768));
                       if (nl < 0) { /* a zlib error code, not a length */
                         r.statuscode = STATUSCODE_INVALID;
                         strcpybuff(r.msg, "Cache Read Error : Read Data");

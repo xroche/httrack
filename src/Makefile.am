@@ -117,7 +117,7 @@ libhttrack_la_LDFLAGS = $(AM_LDFLAGS) -version-info $(VERSION_INFO)
 # --disable-selftests leaves these out and defines HTS_NO_SELFTEST.
 if SELFTESTS
 libhttrack_la_SOURCES += htsselftest.c htsselftest_util.c \
-	htsback_selftest.c htscache_selftest.c htsckd_selftest.c htscharset_selftest.c \
+	htsback_selftest.c htsbase_selftest.c htscache_selftest.c htsckd_selftest.c htscharset_selftest.c \
 	htscmdline_selftest.c \
 	htscookie_selftest.c htsdns_selftest.c htsfetch_selftest.c htspsl_selftest.c \
 	htsindex_selftest.c \

@@ -231,7 +231,7 @@ static int legacy_srv_linput_trim(FILE *fp, hts_buf b) {
         legacy_linput(fp, hts_buf_at(ls, (size_t) max),
                       HTS_LINE_DROP_TAB | HTS_LINE_DROP_FF | HTS_LINE_DROP_NUL);
     if (rlen) {
-      while ((rlen > 0) && is_realspace(ls[max(rlen - 1, 0)]))
+      while ((rlen > 0) && is_realspace(ls[hts_max_int(rlen - 1, 0)]))
         ls[--rlen] = '\0';
       a = ls;
       while ((rlen > 0) && ((*a == ' ') || (*a == '\t'))) {
@@ -264,7 +264,7 @@ static int legacy_srv_linput_cpp(FILE *fp, hts_buf b) {
     ret = legacy_srv_linput_trim(fp, hts_buf_skip(b, (size_t) rlen));
     if (ret > 0)
       rlen += ret;
-  } while ((s[max(rlen - 1, 0)] == '\\') && (rlen < max));
+  } while ((s[hts_max_int(rlen - 1, 0)] == '\\') && (rlen < max));
   return rlen;
 }
 
