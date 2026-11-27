@@ -1818,7 +1818,7 @@ static int st_gmtime(httrackp *opt, int argc, char **argv) {
 
   for (i = 0; i < GMTIME_THREADS; i++) {
     idx[i] = i % GMTIME_REFS;
-    if (hts_newthread(gmtime_thread, &idx[i]) != 0) {
+    if (hts_newthread_checked(gmtime_thread, &idx[i]) != 0) {
       fprintf(stderr, "gmtime: cannot spawn\n");
       return 1;
     }
@@ -2369,7 +2369,7 @@ static int st_localtime(httrackp *opt, int argc, char **argv) {
 
   for (i = 0; i < LOCALTIME_THREADS; i++) {
     idx[i] = i % LOCALTIME_REFS;
-    if (hts_newthread(localtime_thread, &idx[i]) != 0) {
+    if (hts_newthread_checked(localtime_thread, &idx[i]) != 0) {
       fprintf(stderr, "localtime: cannot spawn\n");
       return 1;
     }
@@ -2851,7 +2851,7 @@ static int st_uninit(httrackp *opt, int argc, char **argv) {
   int i;
 
   hts_init();
-  if (hts_newthread(uninit_worker, NULL) != 0)
+  if (hts_newthread_checked(uninit_worker, NULL) != 0)
     return 1;
   htsthread_wait();
   printf("worker:%s", uninit_worker_kept ? "kept" : "freed");
@@ -2861,7 +2861,7 @@ static int st_uninit(httrackp *opt, int argc, char **argv) {
     uninit_report(" uninit");
   }
   hts_init();
-  if (hts_newthread(uninit_worker_noop, NULL) != 0)
+  if (hts_newthread_checked(uninit_worker_noop, NULL) != 0)
     return 1;
   htsthread_wait();
   uninit_report(" rejoin");
@@ -3362,7 +3362,7 @@ static int st_statrecv(httrackp *opt, int argc, char **argv) {
 
   hts_stat_recv_set(0);
   for (i = 0; i < STATRECV_THREADS; i++) {
-    if (hts_newthread(statrecv_thread, NULL) != 0) {
+    if (hts_newthread_checked(statrecv_thread, NULL) != 0) {
       fprintf(stderr, "statrecv: cannot spawn\n");
       htsthread_wait(); /* a spawned worker would else add to the total below */
       hts_stat_recv_set(recv_was);

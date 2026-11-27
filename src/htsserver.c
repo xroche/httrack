@@ -700,7 +700,7 @@ static hts_boolean browserlogin_paste(const browserlogin_post *login,
                                       const String *folder, const String *url,
                                       hts_boolean dry_run,
                                       hts_paste_result *res) {
-  return hts_bundle_from_paste(
+  return hts_bundle_from_paste_checked(
       StringNotEmpty(login->paste) ? StringBuff(login->paste) : "",
       StringNotEmpty(*folder) ? StringBuff(*folder) : NULL,
       StringBuff(login->agent), StringNotEmpty(*url) ? StringBuff(*url) : NULL,

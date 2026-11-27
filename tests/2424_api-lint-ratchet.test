@@ -139,6 +139,7 @@ int lint_probe_deleg_cmp(int x) { return lint_probe_int(x) >= 0; }
 int lint_probe_deleg_clean(int x) { return lint_probe_clean(x); }
 int lint_probe_marked_int(int x) { if (x) return -1; return 0; }
 int lint_probe_clean(int x) { return x + 1; }
+int lint_probe_old(int x) { if (x) return -1; return 0; }
 void lint_local_only(void) {}
 void lint_local_fuzzed(void) {}
 void lint_local_api(void) {}
@@ -223,6 +224,8 @@ int lint_probe_deleg_cmp(int x);
 int lint_probe_deleg_clean(int x);
 HTS_CHECK_RESULT int lint_probe_marked_int(int x);
 int lint_probe_clean(int x);
+HTS_DEPRECATED("use a checked probe")
+HTSEXT_API int lint_probe_old(int x);
 void lint_local_only(void);
 void lint_local_fuzzed(void);
 HTSEXT_API void lint_local_api(void);
@@ -325,6 +328,10 @@ for name in fuzzed api twice none hdr; do
         fail "the local rule flagged lint_local_${name}: ${out}"
     fi
 done
+# A deprecated name keeps its old contract, so only its replacement is marked.
+if grep -qF "lint_probe_old" <<<"${out}"; then
+    fail "the check-result rule flagged a deprecated declaration: ${out}"
+fi
 # The local rule also flags 14 lint_probe_* prototypes: all of them except lint_probe_clean,
 # which src/lintprobe/probe.c calls. With lint_local_only, 15 of the 71 lines are local.
 test "$(wc -l <<<"${out}")" -eq 71 || fail "flagged a clean probe: ${out}"

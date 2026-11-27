@@ -187,9 +187,13 @@ static void *hts_entry_point(void *tharg)
 #endif
 }
 
-/* create a thread */
-HTSEXT_API int hts_newthread(void (*fun) (void *arg), void *arg) {
+/* See httrack-library.h. */
+HTSEXT_API int hts_newthread_checked(void (*fun)(void *arg), void *arg) {
   return hts_newthread_tail(fun, arg, NULL);
+}
+
+HTSEXT_API int hts_newthread(void (*fun)(void *arg), void *arg) {
+  return hts_newthread_checked(fun, arg);
 }
 
 int hts_newthread_tail(void (*fun)(void *arg), void *arg,

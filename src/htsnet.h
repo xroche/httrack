@@ -402,7 +402,7 @@ hts_boolean SOCaddr_inetntoa_port_(char *namebuf, size_t namebuflen,
 
 #ifdef _WIN32
 /** Start WinSock 1.1, or print why not on stderr and return HTS_FALSE. */
-HTSNET_API hts_boolean hts_winsock_start(void);
+HTS_CHECK_RESULT HTSNET_API hts_boolean hts_winsock_start(void);
 #endif
 
 /** FTP address-family number of ss, the one EPRT carries: '1' for IPv4, '2'

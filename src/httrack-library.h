@@ -816,7 +816,13 @@ typedef void (*hts_thread_runner)(void (*fun)(void *arg), void *arg);
     does not make the mirror resumable. */
 HTSEXT_API hts_thread_runner hts_set_thread_runner(hts_thread_runner runner);
 
-/** Spawn a worker running 'fun(arg)'. Returns 0 on success. */
+/** Spawn a worker running 'fun(arg)'. Returns 0 on success, or -1 when the
+    thread could not be created, and then 'fun' never runs. */
+HTS_CHECK_RESULT HTSEXT_API int hts_newthread_checked(void (*fun)(void *arg),
+                                                      void *arg);
+
+/** @deprecated Use hts_newthread_checked(), whose result must be read. */
+HTS_DEPRECATED("use hts_newthread_checked(fun, arg)")
 HTSEXT_API int hts_newthread(void (*fun)(void *arg), void *arg);
 
 /** Extends per-thread state to the workers: 'enter' runs at each one's start,
@@ -915,6 +921,14 @@ HTSEXT_API hts_boolean hts_bundle_cookie_in_scope(const char *const *urls,
     logs that), or when the crawl would refuse an address. It refuses an
     option, a quoted or too long word in urls, and an invalid bundle name.
     error, when not NULL, gets the reason in error_size bytes. */
+HTS_CHECK_RESULT HTSEXT_API int
+hts_bundle_names_in_use_checked(const char *urls, const char *list_file,
+                                char ***names, char *error, size_t error_size);
+
+/** @deprecated Use hts_bundle_names_in_use_checked(), whose result must be
+    read. */
+HTS_DEPRECATED("use hts_bundle_names_in_use_checked(urls, list_file, names, "
+               "error, error_size)")
 HTSEXT_API int hts_bundle_names_in_use(const char *urls, const char *list_file,
                                        char ***names, char *error,
                                        size_t error_size);
@@ -961,27 +975,43 @@ typedef struct hts_paste_result {
     HTS_FALSE when refused, with the reason in result->error, or with result
     untouched when result->size is smaller than
     offsetof(hts_paste_result, dropped). Call it after hts_init(). */
+HTS_CHECK_RESULT HTSEXT_API hts_boolean hts_bundle_from_paste_checked(
+    const char *paste, const char *folder, const char *agent, const char *url,
+    hts_boolean dry_run, hts_paste_result *result);
+
+/** @deprecated Use hts_bundle_from_paste_checked(), whose result must be read.
+ */
+HTS_DEPRECATED("use hts_bundle_from_paste_checked(paste, folder, agent, url, "
+               "dry_run, result)")
 HTSEXT_API hts_boolean hts_bundle_from_paste(const char *paste,
                                              const char *folder,
                                              const char *agent, const char *url,
                                              hts_boolean dry_run,
                                              hts_paste_result *result);
 
-/* The flags of hts_bundle_from_paste_flags. DRY_RUN writes nothing.
+/* The flags of hts_bundle_from_paste_flags_checked. DRY_RUN writes nothing.
    KEEP_EMPTY keeps a bundle with no cookie, such as a browser login that
    returned none, rather than refuse it, and paste may then be NULL. Check
    result->cookies to tell a mistaken paste from an empty login. */
 #define HTS_PASTE_DRY_RUN 1u
 #define HTS_PASTE_KEEP_EMPTY 2u
 
-/** Do what hts_bundle_from_paste does, with dry_run and the other choices as
-    HTS_PASTE_* bits in flags. An unknown bit is refused. A bundle with no
-    cookie has no cookies line. */
+/** Do what hts_bundle_from_paste_checked does, with dry_run and the other
+    choices as HTS_PASTE_* bits in flags. An unknown bit is refused. A bundle
+    with no cookie has no cookies line. */
+HTS_CHECK_RESULT HTSEXT_API hts_boolean hts_bundle_from_paste_flags_checked(
+    const char *paste, const char *folder, const char *agent, const char *url,
+    unsigned int flags, hts_paste_result *result);
+
+/** @deprecated Use hts_bundle_from_paste_flags_checked(), whose result must be
+    read. */
+HTS_DEPRECATED("use hts_bundle_from_paste_flags_checked(paste, folder, agent, "
+               "url, flags, result)")
 HTSEXT_API hts_boolean hts_bundle_from_paste_flags(
     const char *paste, const char *folder, const char *agent, const char *url,
     unsigned int flags, hts_paste_result *result);
 
-/** Do what hts_bundle_from_paste_flags does, and keep the cookies.txt
+/** Do what hts_bundle_from_paste_flags_checked does, and keep the cookies.txt
     records of hosts, a comma-separated list such as the hosts a browser login
     went through, or NULL. Each host gets a scope line for its registrable
     domain, and never becomes a start URL. A host that cannot have a scope
@@ -990,6 +1020,14 @@ HTSEXT_API hts_boolean hts_bundle_from_paste_flags(
     have a scope line, such as "intranet". The address's own records come
     first, and result->dropped counts the records of hosts left out. A cURL
     paste ignores hosts. */
+HTS_CHECK_RESULT HTSEXT_API hts_boolean hts_bundle_from_paste_hosts_checked(
+    const char *paste, const char *folder, const char *agent, const char *url,
+    const char *hosts, unsigned int flags, hts_paste_result *result);
+
+/** @deprecated Use hts_bundle_from_paste_hosts_checked(), whose result must be
+    read. */
+HTS_DEPRECATED("use hts_bundle_from_paste_hosts_checked(paste, folder, agent, "
+               "url, hosts, flags, result)")
 HTSEXT_API hts_boolean hts_bundle_from_paste_hosts(
     const char *paste, const char *folder, const char *agent, const char *url,
     const char *hosts, unsigned int flags, hts_paste_result *result);

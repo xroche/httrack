@@ -412,7 +412,8 @@ int main(int argc, char *argv[]) {
 
   /* pinger */
   if (parentPid > 0) {
-    if (hts_newthread(client_ping, (void *) (uintptr_t) parentPid) == 0) {
+    if (hts_newthread_checked(client_ping, (void *) (uintptr_t) parentPid) ==
+        0) {
       nonjoinable_threads++; /* client_ping() only ever leaves through exit() */
     }
     smallserver_setpinghandler(pingHandler, NULL);
@@ -503,7 +504,7 @@ void webhttrack_main(const char *cmd) {
   commandEnd = commandReturn = commandReturnSet = commandEndRequested = 0;
   hts_store_release_int(&commandRunning, 1);
   copy = strdupt(cmd);
-  if (copy == NULL || hts_newthread(back_launch_cmd, copy) != 0) {
+  if (copy == NULL || hts_newthread_checked(back_launch_cmd, copy) != 0) {
     httrackp *const opt = global_opt;
 
     freet(copy);

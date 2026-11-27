@@ -545,6 +545,11 @@ def delegates(body):
             yield m.group(1)
 
 
+def deprecated(head):
+    """Is HEAD deprecated? Its `_checked` replacement carries the mark."""
+    return re.search(r"\bHTS_DEPRECATED\b", head) is not None
+
+
 def check_result(files):
     """Yield (path, line, key, message) for header functions that can fail unmarked."""
     bodies = collections.defaultdict(list)
@@ -579,7 +584,7 @@ def check_result(files):
             failing.add(name)
     for path, start, head, name, ret, body in decls:
         cls = return_class(ret)
-        if cls is None or name in marked:
+        if cls is None or name in marked or deprecated(head):
             continue
         # One level of `return g(...);` where g can fail.
         calls = {g for b in bodies_of(name, body) for g in delegates(b)}

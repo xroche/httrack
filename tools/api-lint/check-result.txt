@@ -4,16 +4,11 @@ src/htslib.h: closedir
 src/htsname.h: url_savename_refname_remove
 src/htsnet.h: SOCaddr_inetntoa_port_
 src/htsnet.h: SOCaddr_sinport_
-src/htsnet.h: hts_winsock_start
 src/htssafe.h: hts_striplastchar
-src/htsselftest.h: hts_selftest
 src/htsweb.h: main
 src/httrack-library.h: get_httptype_sized
 src/httrack-library.h: hts_accept_preset
 src/httrack-library.h: hts_bundle_cookie_in_scope
-src/httrack-library.h: hts_bundle_from_paste_flags
-src/httrack-library.h: hts_bundle_from_paste_hosts
-src/httrack-library.h: hts_bundle_names_in_use
 src/httrack-library.h: hts_file_is_newer
 src/httrack-library.h: hts_findgetname
 src/httrack-library.h: hts_findgetsize64
@@ -25,7 +20,6 @@ src/httrack-library.h: hts_get_stats
 src/httrack-library.h: hts_host_alias_rule_ok
 src/httrack-library.h: hts_is_parsing
 src/httrack-library.h: hts_log
-src/httrack-library.h: hts_newthread
 src/httrack-library.h: hts_registrable_domain
 src/httrack-library.h: hts_resetaddurl
 src/httrack-library.h: hts_rootdir

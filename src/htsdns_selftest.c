@@ -710,7 +710,7 @@ static int dns_timeout_selftests(httrackp *opt) {
      instead. */
   memset(&probe, 0, sizeof(probe));
   probe.opt = opt;
-  CHECK(hts_newthread(lock_probe_thread, &probe) == 0);
+  CHECK(hts_newthread_checked(lock_probe_thread, &probe) == 0);
   count = resolve_count(opt, "slow.test", 0, &probe.got_lock);
   CHECK(count == 0);
   {

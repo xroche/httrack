@@ -215,8 +215,8 @@ static int st_bundlenames(httrackp *opt, int argc, char **argv) {
   /* so a failure must reset them */
   names = stale;
   strcpybuff(error, "stale");
-  n = hts_bundle_names_in_use(argv[0], argc == 2 ? argv[1] : NULL, &names,
-                              error, sizeof(error));
+  n = hts_bundle_names_in_use_checked(argv[0], argc == 2 ? argv[1] : NULL,
+                                      &names, error, sizeof(error));
   if (n < 0) {
     assertf(names == NULL);
     printf("refused: %s\n", error);
@@ -230,6 +230,80 @@ static int st_bundlenames(httrackp *opt, int argc, char **argv) {
   hts_bundle_names_free(names);
   return 0;
 }
+
+/* The deprecated forms are what this compares, so silence them here only. */
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#elif defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4996)
+#endif
+/* Each form's result for paste under flags, "checked/legacy". */
+static void bundlechecked_paste(const char *paste, unsigned int flags) {
+  const hts_boolean dry = (flags & HTS_PASTE_DRY_RUN) != 0;
+  hts_paste_result res;
+  int i;
+
+  for (i = 0; i < 6; i++) {
+    hts_boolean ok;
+
+    res.size = sizeof(res);
+    switch (i) {
+    case 0:
+      ok = hts_bundle_from_paste_checked(paste, NULL, NULL, NULL, dry, &res);
+      break;
+    case 1:
+      ok = hts_bundle_from_paste(paste, NULL, NULL, NULL, dry, &res);
+      break;
+    case 2:
+      ok = hts_bundle_from_paste_flags_checked(paste, NULL, NULL, NULL, flags,
+                                               &res);
+      break;
+    case 3:
+      ok = hts_bundle_from_paste_flags(paste, NULL, NULL, NULL, flags, &res);
+      break;
+    case 4:
+      ok = hts_bundle_from_paste_hosts_checked(paste, NULL, NULL, NULL, NULL,
+                                               flags, &res);
+      break;
+    default:
+      ok = hts_bundle_from_paste_hosts(paste, NULL, NULL, NULL, NULL, flags,
+                                       &res);
+      break;
+    }
+    printf("%s%d", i % 2 == 0 ? " " : "/", ok);
+  }
+}
+
+/* -#test=bundlechecked: each _checked form and its deprecated twin agree, on a
+   refusal and on an accepted dry run. */
+static int st_bundlechecked(httrackp *opt, int argc, char **argv) {
+  static const char paste[] = "curl 'https://www.shop.example/' -b 'SID=1'";
+  char **names = NULL;
+  int n;
+
+  printf("refused:");
+  bundlechecked_paste("", HTS_PASTE_DRY_RUN);
+  printf("\naccepted:");
+  bundlechecked_paste(paste, HTS_PASTE_DRY_RUN);
+  printf("\nnames:");
+  n = hts_bundle_names_in_use_checked("-V", NULL, &names, NULL, 0);
+  printf(" %d/%d", n, hts_bundle_names_in_use("-V", NULL, &names, NULL, 0));
+  n = hts_bundle_names_in_use_checked("http://a/#httrack-bundle=shop", NULL,
+                                      &names, NULL, 0);
+  hts_bundle_names_free(names);
+  printf(" %d/%d\n", n,
+         hts_bundle_names_in_use("http://a/#httrack-bundle=shop", NULL, &names,
+                                 NULL, 0));
+  hts_bundle_names_free(names);
+  return 0;
+}
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#elif defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 
 /* -#test=bundlename <name>: "ok", or why the name is refused. */
 static int st_bundlename(httrackp *opt, int argc, char **argv) {
@@ -288,13 +362,14 @@ static int st_paste(httrackp *opt, int argc, char **argv) {
   flags = (keep ? HTS_PASTE_KEEP_EMPTY : 0) | (dry ? HTS_PASTE_DRY_RUN : 0);
   if (strlen(StringBuff(paste)) != StringLength(paste)) {
     printf("refused: the file holds a NUL\n");
-  } else if (!(hosts != NULL
-                   ? hts_bundle_from_paste_hosts(StringBuff(paste), argv[0],
-                                                 agent, url, hosts, flags, res)
-               : keep ? hts_bundle_from_paste_flags(StringBuff(paste), argv[0],
-                                                    agent, url, flags, res)
-                      : hts_bundle_from_paste(StringBuff(paste), argv[0], agent,
-                                              url, dry, res))) {
+  } else if (!(hosts != NULL ? hts_bundle_from_paste_hosts_checked(
+                                   StringBuff(paste), argv[0], agent, url,
+                                   hosts, flags, res)
+               : keep
+                   ? hts_bundle_from_paste_flags_checked(
+                         StringBuff(paste), argv[0], agent, url, flags, res)
+                   : hts_bundle_from_paste_checked(StringBuff(paste), argv[0],
+                                                   agent, url, dry, res))) {
     assertf(res->name[0] == '\0' && res->url[0] == '\0' &&
             res->agent[0] == '\0' && res->hosts[0] == '\0' &&
             res->cookies == 0 && res->error[0] != '\0');
@@ -325,8 +400,9 @@ static void paste_race_worker(void *arg) {
 
   for (i = 0; i < race->rounds; i++) {
     res.size = sizeof(res);
-    if (!hts_bundle_from_paste("curl 'https://race.test/' -b a=1", race->dir,
-                               NULL, NULL, HTS_FALSE, &res) &&
+    if (!hts_bundle_from_paste_checked("curl 'https://race.test/' -b a=1",
+                                       race->dir, NULL, NULL, HTS_FALSE,
+                                       &res) &&
         hts_increment_int(&race->failed) == 1)
       strcpybuff(race->why, res.error);
   }
@@ -340,8 +416,8 @@ static int st_pasterace(httrackp *opt, int argc, char **argv) {
   race.rounds = atoi(argv[1]);
   race.failed = 0;
   race.why[0] = '\0';
-  if (hts_newthread(paste_race_worker, &race) != 0 ||
-      hts_newthread(paste_race_worker, &race) != 0) {
+  if (hts_newthread_checked(paste_race_worker, &race) != 0 ||
+      hts_newthread_checked(paste_race_worker, &race) != 0) {
     fprintf(stderr, "pasterace: cannot start a thread\n");
     return 1;
   }
@@ -366,6 +442,9 @@ const struct selftest_entry selftests_bundle[] = {
      st_bundlescope},
     {"bundlenames", "<urls> [<list file>]",
      "the login bundle names the start addresses use", st_bundlenames},
+    {"bundlechecked", "",
+     "each _checked bundle form and its deprecated twin agree",
+     st_bundlechecked},
     {"paste",
      "<dir> <file> [agent:<ua>] [url:<url>] [hosts:<list>] [dry] [keep]",
      "turn a pasted cURL command or cookies.txt into a login bundle", st_paste},
