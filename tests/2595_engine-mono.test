@@ -1,0 +1,37 @@
+#!/bin/bash
+#
+# Runs the monotonic clock self-test, then proves that adding a plain number
+# to an hts_mono reading does not compile.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+require_httrack
+
+assert_selftest ok mono
+
+top=$(cd "$top_srcdir" && pwd)
+# htsfeatures.h is generated, so a hand run outside make check has none.
+[ -n "${abs_top_builddir:-}" ] || skip "abs_top_builddir unset, no automake environment"
+tmp=$(mktemp -d) || exit 1
+cleanup_push rm -rf "$tmp"
+read -r -a cc <<<"${CC:-cc}"
+cc+=(-fsyntax-only -DHTS_INTERNAL_BUILD -I"$abs_top_builddir" -I"$top/src" -I"$top/src/coucal")
+
+# probe EXPR: compiles a function returning EXPR from a reading t.
+probe() {
+    printf '#include "htslib.h"\nhts_mono probe(hts_mono t);\nhts_mono probe(hts_mono t) { return %s; }\n' "$1" >"$tmp/probe.c"
+    "${cc[@]}" "$tmp/probe.c" >"$tmp/probe.log" 2>&1
+}
+
+probe 'hts_mono_add_s(t, 5)' || {
+    cat "$tmp/probe.log"
+    fail "the control does not compile"
+}
+for bad in 't + 5' 't + 5000' 'hts_mono_add_s(t + 5, 0)' '(hts_mono) 5000' 'hts_mono_add_s(t, t)'; do
+    if probe "$bad"; then
+        fail "compiled, but must not: $bad"
+    fi
+done

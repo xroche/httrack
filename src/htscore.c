@@ -572,16 +572,16 @@ static int look_like_xml(const char *s) {
     ;
 }
 
-/* --max-time counts from this mtime_monotonic() reading. */
-static TStamp mirror_start_ms;
+/* --max-time counts from this reading. */
+static hts_mono mirror_start;
 
 void hts_mirror_clock_start(void) {
   HTS_STAT.stat_timestart = time_local();
-  mirror_start_ms = mtime_monotonic();
+  mirror_start = hts_mono_now();
 }
 
 TStamp hts_mirror_elapsed_ms(void) {
-  return mtime_monotonic() - mirror_start_ms;
+  return hts_mono_diff_ms(hts_mono_now(), mirror_start);
 }
 
 /* Seconds since local midnight, or 0 if the local time is unavailable. */

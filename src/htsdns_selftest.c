@@ -373,6 +373,13 @@ static int resolve_count(httrackp *opt, const char *host, int timeout,
   return res.count;
 }
 
+/* back_connect_fallback_due() after elapsed_ms of connecting. */
+static int fallback_due(int addr_index, int addr_count, TStamp elapsed_ms,
+                        int timeout) {
+  return back_connect_fallback_due(addr_index, addr_count, hts_mono_from_ms(0),
+                                   hts_mono_from_ms(elapsed_ms), timeout);
+}
+
 /* Drive the DNS resolver and cache through a scripted (mock) getaddrinfo,
    asserting address family, single-address selection, negative caching, the
    IPv4/IPv6 family filter, and that a cached host is resolved only once.
@@ -631,26 +638,19 @@ static int dns_selftests(httrackp *opt) {
      stuck connect should abandon the current address for the next one. */
   {
     /* no fallback for the last/only candidate, whatever the elapsed time */
-    CHECK(back_connect_fallback_due(0, 1, 9999000, 120) == 0);
-    CHECK(back_connect_fallback_due(1, 2, 9999000, 120) == 0);
-    CHECK(back_connect_fallback_due(3, 4, 9999000, 120) == 0);
+    CHECK(fallback_due(0, 1, 9999000, 120) == 0);
+    CHECK(fallback_due(1, 2, 9999000, 120) == 0);
+    CHECK(fallback_due(3, 4, 9999000, 120) == 0);
     /* fallback available: wait the per-candidate deadline (cap 10s here) */
-    CHECK(back_connect_fallback_due(0, 2, 9999, 120) == 0);
-    CHECK(back_connect_fallback_due(0, 2, 10000, 120) == 1);
-    CHECK(back_connect_fallback_due(2, 4, 10000, 120) == 1);
+    CHECK(fallback_due(0, 2, 9999, 120) == 0);
+    CHECK(fallback_due(0, 2, 10000, 120) == 1);
+    CHECK(fallback_due(2, 4, 10000, 120) == 1);
     /* a shorter slot timeout shortens the deadline (min(timeout, cap)) */
-    CHECK(back_connect_fallback_due(0, 2, 4999, 5) == 0);
-    CHECK(back_connect_fallback_due(0, 2, 5000, 5) == 1);
+    CHECK(fallback_due(0, 2, 4999, 5) == 0);
+    CHECK(fallback_due(0, 2, 5000, 5) == 1);
     /* no timeout management: never force a fallback */
-    CHECK(back_connect_fallback_due(0, 2, 9999000, 0) == 0);
+    CHECK(fallback_due(0, 2, 9999000, 0) == 0);
   }
-
-  /* A slot timeout counts milliseconds: crossing a second boundary is not a
-     second. */
-  CHECK(!hts_timeout_elapsed(5999, 6001, 1));
-  CHECK(!hts_timeout_elapsed(5000, 5999, 1));
-  CHECK(hts_timeout_elapsed(5000, 6000, 1));
-  CHECK(hts_timeout_elapsed(5000, 5000, 0));
 
   hts_dns_set_resolver_backend(NULL);
   return failures;

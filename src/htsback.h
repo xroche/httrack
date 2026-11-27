@@ -35,6 +35,7 @@ Please visit our Website: http://www.httrack.com
 #define HTSBACK_DEFH
 
 #include "htsglobal.h"
+#include "htsmono.h"
 
 #include "htsopt.h"
 #include "htsthread.h"
@@ -245,9 +246,9 @@ void back_check_worker_fault(httrackp *opt);
 /* True if a connecting slot should give up on the current address and try the
    next one: a fallback address remains (addr_index+1 < addr_count) and the
    candidate has been connecting for at least its deadline, min(timeout, an
-   internal cap). elapsed_ms in milliseconds, timeout in seconds. Exposed for
+   internal cap) between since and now. timeout is in seconds. Exposed for
    the -#D self-test. */
-int back_connect_fallback_due(int addr_index, int addr_count, TStamp elapsed_ms,
-                              int timeout);
+int back_connect_fallback_due(int addr_index, int addr_count, hts_mono since,
+                              hts_mono now, int timeout);
 
 #endif

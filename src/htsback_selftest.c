@@ -2999,7 +2999,7 @@ static int st_busyslots(httrackp *opt, int argc, char **argv) {
       slot->status = STATUS_CONNECTING;
       slot->timeout = probe[k] == SLOTS - 1 ? 1 : -1;
       sback->connect_fallback[probe[k]].timeout_since =
-          mtime_monotonic() - 10000;
+          hts_mono_add_ms(hts_mono_now(), -10000);
     }
     back_wait(sback, opt, &cache, 0);
     for (k = 0; k < nprobe; k++) {
