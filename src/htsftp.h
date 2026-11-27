@@ -84,11 +84,21 @@ int ftp_handoff_selftests(httrackp *opt);
 int ftp_scratch_selftests(httrackp *opt);
 
 int send_line(T_SOC soc, const char *data);
-/* Read one control-channel reply into line, clipped. A size-0 line discards
-   the reply. Returns HTS_FALSE on error. Optional back ends the wait on a
+
+/* What get_ftp_line() read: a reply, or why there is none. */
+typedef enum hts_ftp_line_status {
+  HTS_FTP_LINE_OK = 0,
+  HTS_FTP_LINE_ERROR, /* socket error, the peer closed, or an empty reply */
+  HTS_FTP_LINE_TIMEOUT
+} hts_ftp_line_status;
+
+/* Read one control-channel reply into line, clipped at 1023 bytes as read and
+   again to the line's size. A size-0 line discards
+   the reply. On failure line is left empty. Optional back ends the wait on a
    stop, opt clips it to --max-time. */
-hts_boolean get_ftp_line(lien_back *back, T_SOC soc, hts_buf line, int timeout,
-                         const httrackp *opt);
+HTS_CHECK_RESULT hts_ftp_line_status get_ftp_line(lien_back *back, T_SOC soc,
+                                                  hts_buf line, int timeout,
+                                                  const httrackp *opt);
 /* Start of the authority in a URL address: the scheme and its slashes skipped.
    Bracket-aware, unlike a hand-rolled split on the first ':'. */
 char *ftp_jump_authority(char *url_adr);
