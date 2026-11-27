@@ -32,6 +32,7 @@ Please visit our Website: http://www.httrack.com
 /* ------------------------------------------------------------ */
 
 #include <limits.h> /* INT_MAX, the backing count back_new() must refuse */
+#include <stdint.h> /* SIZE_MAX */
 
 #include "htsselftest_int.h"
 #include "htsstats.h"
@@ -568,6 +569,61 @@ static int st_backswap(httrackp *opt, int argc, char **argv) {
         }
         if (cfp != NULL)
           fclose(cfp);
+      }
+    }
+
+    /* A size field past the file's end is refused before it is allocated:
+       a failed malloc would leave ENOMEM, which the caller logs. */
+    if (whole_len > 0) {
+      const struct {
+        const char *data;
+        size_t len;
+      } fields[] = {{hdrs, sizeof(hdrs)}, {body, sizeof(body) - 1}};
+
+      const size_t huge = SIZE_MAX / 2;
+      size_t f;
+
+      for (f = 0; f < sizeof(fields) / sizeof(fields[0]); f++) {
+        const size_t need = sizeof(size_t) + fields[f].len;
+        char *bad = malloct((size_t) whole_len);
+        lien_back *copy = NULL;
+        FILE *cfp = NULL;
+        size_t at;
+
+        for (at = 0; bad != NULL && need <= (size_t) whole_len - at; at++)
+          if (memcmp(whole + at, &fields[f].len, sizeof(size_t)) == 0 &&
+              memcmp(whole + at + sizeof(size_t), fields[f].data,
+                     fields[f].len) == 0)
+            break;
+        if (bad == NULL || need > (size_t) whole_len - at) {
+          fprintf(stderr, "backswap: no size field for field %lu\n",
+                  (unsigned long) f);
+          err = 1;
+        } else {
+          memcpy(bad, whole, (size_t) whole_len);
+          memcpy(bad + at, &huge, sizeof(huge));
+          cfp = tmpfile();
+          if (cfp == NULL ||
+              fwrite(bad, 1, (size_t) whole_len, cfp) != (size_t) whole_len ||
+              fseek(cfp, 0, SEEK_SET) != 0) {
+            fprintf(stderr, "backswap: could not stage a huge size\n");
+            err = 1;
+          } else if (back_unserialize(cfp, &copy) || copy != NULL ||
+                     errno == ENOMEM) {
+            fprintf(stderr,
+                    "backswap: a huge size in field %lu was not "
+                    "refused before its allocation\n",
+                    (unsigned long) f);
+            err = 1;
+          }
+        }
+        if (copy != NULL) {
+          back_clear_entry(copy);
+          freet(copy);
+        }
+        if (cfp != NULL)
+          fclose(cfp);
+        freet(bad);
       }
     }
     if (whole != NULL)
