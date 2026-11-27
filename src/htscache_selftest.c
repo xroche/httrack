@@ -4748,7 +4748,7 @@ static int st_changes_race(httrackp *opt, int argc, char **argv) {
   changes_race_started = 0;
   hts_mutexrelease(&changes_race_lock);
   for (i = 0; i < 4; i++) {
-    if (hts_newthread(changes_race_thread, opt) != 0) {
+    if (hts_newthread_checked(changes_race_thread, opt) != 0) {
       fprintf(stderr, "changes-race: cannot spawn a notifier thread\n");
       return 1;
     }

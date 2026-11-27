@@ -208,7 +208,7 @@ static void exit_wait_thread(void *arg) {
 static hts_boolean exit_wait_threads(const httrackp *opt) {
   TStamp left, deadline;
 
-  if (opt->maxtime <= 0 || hts_newthread(exit_wait_thread, NULL) != 0) {
+  if (opt->maxtime <= 0 || hts_newthread_checked(exit_wait_thread, NULL) != 0) {
     htsthread_wait();
     return HTS_TRUE;
   }

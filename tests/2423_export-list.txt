@@ -28,11 +28,15 @@ hts_addurl
 hts_buildtopindex
 hts_bundle_cookie_in_scope
 hts_bundle_from_paste
+hts_bundle_from_paste_checked
 hts_bundle_from_paste_flags
+hts_bundle_from_paste_flags_checked
 hts_bundle_from_paste_hosts
+hts_bundle_from_paste_hosts_checked
 hts_bundle_name_refusal
 hts_bundle_names_free
 hts_bundle_names_in_use
+hts_bundle_names_in_use_checked
 hts_cancel_file_push
 hts_cancel_parsing
 hts_cancel_test
@@ -77,6 +81,7 @@ hts_mutexinit
 hts_mutexlock
 hts_mutexrelease
 hts_newthread
+hts_newthread_checked
 hts_realloc
 hts_registrable_domain
 hts_request_stop

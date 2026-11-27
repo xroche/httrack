@@ -1017,6 +1017,14 @@ static const char *names_note_file(strlist *names, const char *path,
 HTSEXT_API int hts_bundle_names_in_use(const char *urls, const char *list_file,
                                        char ***names, char *error,
                                        size_t error_size) {
+  return hts_bundle_names_in_use_checked(urls, list_file, names, error,
+                                         error_size);
+}
+
+HTSEXT_API int hts_bundle_names_in_use_checked(const char *urls,
+                                               const char *list_file,
+                                               char ***names, char *error,
+                                               size_t error_size) {
   strlist list = EMPTY_TYPED_ARRAY;
   char errbuf[HTS_STRERROR_SIZE];
   const char *why = NULL;
@@ -1744,25 +1752,46 @@ static const char *paste_agent(const char **ua,
 }
 
 /* See httrack-library.h. */
+HTSEXT_API hts_boolean hts_bundle_from_paste_checked(
+    const char *paste, const char *folder, const char *agent, const char *url,
+    hts_boolean dry_run, hts_paste_result *result) {
+  return hts_bundle_from_paste_flags_checked(
+      paste, folder, agent, url, dry_run ? HTS_PASTE_DRY_RUN : 0, result);
+}
+
 HTSEXT_API hts_boolean hts_bundle_from_paste(const char *paste,
                                              const char *folder,
                                              const char *agent, const char *url,
                                              hts_boolean dry_run,
                                              hts_paste_result *result) {
-  return hts_bundle_from_paste_flags(paste, folder, agent, url,
-                                     dry_run ? HTS_PASTE_DRY_RUN : 0, result);
+  return hts_bundle_from_paste_checked(paste, folder, agent, url, dry_run,
+                                       result);
 }
 
 /* See httrack-library.h. */
+HTSEXT_API hts_boolean hts_bundle_from_paste_flags_checked(
+    const char *paste, const char *folder, const char *agent, const char *url,
+    unsigned int flags, hts_paste_result *result) {
+  return hts_bundle_from_paste_hosts_checked(paste, folder, agent, url, NULL,
+                                             flags, result);
+}
+
 HTSEXT_API hts_boolean hts_bundle_from_paste_flags(
     const char *paste, const char *folder, const char *agent, const char *url,
     unsigned int flags, hts_paste_result *result) {
-  return hts_bundle_from_paste_hosts(paste, folder, agent, url, NULL, flags,
-                                     result);
+  return hts_bundle_from_paste_flags_checked(paste, folder, agent, url, flags,
+                                             result);
+}
+
+HTSEXT_API hts_boolean hts_bundle_from_paste_hosts(
+    const char *paste, const char *folder, const char *agent, const char *url,
+    const char *hosts, unsigned int flags, hts_paste_result *result) {
+  return hts_bundle_from_paste_hosts_checked(paste, folder, agent, url, hosts,
+                                             flags, result);
 }
 
 /* See httrack-library.h. */
-HTSEXT_API hts_boolean hts_bundle_from_paste_hosts(
+HTSEXT_API hts_boolean hts_bundle_from_paste_hosts_checked(
     const char *paste, const char *folder, const char *agent, const char *url,
     const char *hosts, unsigned int flags, hts_paste_result *result) {
   const hts_boolean dry_run = (flags & HTS_PASTE_DRY_RUN) != 0;

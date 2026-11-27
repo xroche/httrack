@@ -421,7 +421,8 @@ HTSEXT_API int copy_htsopt(const httrackp *from, httrackp *to);
    alias side may glob; neither side may carry a path or a control byte, and the
     canonical scheme must be one the engine speaks. @return HTS_TRUE if valid.
  */
-HTSEXT_API hts_boolean hts_host_alias_rule_ok(const char *rule);
+HTS_CHECK_RESULT HTSEXT_API hts_boolean
+hts_host_alias_rule_ok(const char *rule);
 
 /** Whether @p name is a field the -%F footer expands as "{name}", so a front
     end can validate a template against the engine's own list. Matching is
@@ -432,7 +433,8 @@ HTSEXT_API hts_boolean hts_footer_field_ok(const char *name);
    rule? A '-' token is a rule when it holds a '/', a '*', or a '.' with no '%'
     anywhere in it, so a front end can tell which "-..." it is about to emit.
     @return HTS_FALSE for NULL or a token not starting with '-'. */
-HTSEXT_API hts_boolean hts_rule_would_be_read_as_opt(const char *arg);
+HTS_CHECK_RESULT HTSEXT_API hts_boolean
+hts_rule_would_be_read_as_opt(const char *arg);
 
 /** An --accept value, its KIND= prefix aside, must be shorter than this. */
 #define HTS_ACCEPT_MAXSIZE 256
@@ -446,7 +448,8 @@ HTSEXT_API const char *const *hts_accept_kinds(void);
     "chrome", "firefox" or "legacy" (the old httrack value). @p kind is one of
     hts_accept_kinds(), or NULL or empty for the default row. @return NULL
     when that browser has no value for it, or either name is unknown. */
-HTSEXT_API const char *hts_accept_preset(const char *browser, const char *kind);
+HTS_CHECK_RESULT HTSEXT_API const char *hts_accept_preset(const char *browser,
+                                                          const char *kind);
 
 /** What the engine does with a custom header line (-%X). Values are ABI. */
 typedef enum hts_header_verdict {
@@ -629,8 +632,8 @@ HTSEXT_API const char *jump_identification_const(const char *);
     dst is emptied on every failure, and HTS_URLMAXSIZE bytes always suffice. A
     shorter dst also returns HTS_FALSE, which the loop cannot tell from the end
     of the list. */
-HTSEXT_API hts_boolean hts_wizard_host_scope(const char *question, int k,
-                                             char *dst, size_t dstsize);
+HTS_CHECK_RESULT HTSEXT_API hts_boolean
+hts_wizard_host_scope(const char *question, int k, char *dst, size_t dstsize);
 
 /** Like jump_identification() and also strip a leading "www." or "www-4."-style
     host prefix, returning a pointer into the input to the normalized host. */
@@ -766,18 +769,18 @@ HTSEXT_API find_handle hts_findfirst(char *path);
 /** Advance to the next directory entry. Returns 1 if an entry is available, 0
    at end of directory. An entry that cannot be stat()ed is still returned, as
    neither file nor directory, with size -1. */
-HTSEXT_API hts_boolean hts_findnext(find_handle find);
+HTS_CHECK_RESULT HTSEXT_API hts_boolean hts_findnext(find_handle find);
 
 /** Close the iteration and free @p find. Always returns 0; NULL is accepted. */
 HTSEXT_API int hts_findclose(find_handle find);
 
 /** Name of the current entry, or NULL. Points into the handle's storage; valid
     only until the next hts_findnext()/hts_findclose(). */
-HTSEXT_API char *hts_findgetname(find_handle find);
+HTS_CHECK_RESULT HTSEXT_API char *hts_findgetname(find_handle find);
 
 /** Size in bytes of the current entry, or -1 when there is none or it cannot
     be stat()ed. */
-HTSEXT_API LLint hts_findgetsize64(find_handle find);
+HTS_CHECK_RESULT HTSEXT_API LLint hts_findgetsize64(find_handle find);
 
 /** @deprecated Use hts_findgetsize64(). An int cannot carry a size past 2 GB,
    so this form reports -1 for anything above INT_MAX rather than handing back
@@ -787,16 +790,16 @@ HTSEXT_API int hts_findgetsize(find_handle find);
 
 /** 1 if the current entry is a directory, else 0 (a system/special entry, see
     hts_findissystem(), reports 0). */
-HTSEXT_API hts_boolean hts_findisdir(find_handle find);
+HTS_CHECK_RESULT HTSEXT_API hts_boolean hts_findisdir(find_handle find);
 
 /** 1 if the current entry is a regular file, else 0 (a system/special entry,
    see hts_findissystem(), reports 0). */
-HTSEXT_API hts_boolean hts_findisfile(find_handle find);
+HTS_CHECK_RESULT HTSEXT_API hts_boolean hts_findisfile(find_handle find);
 
 /** 1 if the current entry is a special/system entry to skip: "." or "..", on
     POSIX also device/fifo/socket nodes, on Windows also system, hidden or
     temporary entries. Else 0. */
-HTSEXT_API hts_boolean hts_findissystem(find_handle find);
+HTS_CHECK_RESULT HTSEXT_API hts_boolean hts_findissystem(find_handle find);
 
 /* Worker threads */
 #ifndef HTS_DEF_FWTYPE_hts_thread_runner
@@ -816,7 +819,13 @@ typedef void (*hts_thread_runner)(void (*fun)(void *arg), void *arg);
     does not make the mirror resumable. */
 HTSEXT_API hts_thread_runner hts_set_thread_runner(hts_thread_runner runner);
 
-/** Spawn a worker running 'fun(arg)'. Returns 0 on success. */
+/** Spawn a worker running 'fun(arg)'. Returns 0 on success, or -1 when the
+    thread could not be created, and then 'fun' never runs. */
+HTS_CHECK_RESULT HTSEXT_API int hts_newthread_checked(void (*fun)(void *arg),
+                                                      void *arg);
+
+/** @deprecated Use hts_newthread_checked(). */
+HTS_DEPRECATED("use hts_newthread_checked(fun, arg)")
 HTSEXT_API int hts_newthread(void (*fun)(void *arg), void *arg);
 
 /** Extends per-thread state to the workers: 'enter' runs at each one's start,
@@ -882,15 +891,17 @@ HTSEXT_API void hts_argv_utf8(int *pargc, char ***pargv);
 /** Is A a plain file stamped strictly later than B? False unless both can be
     read. Both paths are UTF-8, and the resolution is sub-second where the
     platform gives it. */
-HTSEXT_API hts_boolean hts_file_is_newer(const char *a, const char *b);
+HTS_CHECK_RESULT HTSEXT_API hts_boolean hts_file_is_newer(const char *a,
+                                                          const char *b);
 
 /* Login bundles */
 
 /** Copy into out, of size bytes, the registrable domain of host through the
     engine's public suffix list. HTS_FALSE, with out empty, when host has none
     (a public suffix, a single label or an IP address) or out is too small. */
-HTSEXT_API hts_boolean hts_registrable_domain(const char *host, char *out,
-                                              size_t size);
+HTS_CHECK_RESULT HTSEXT_API hts_boolean hts_registrable_domain(const char *host,
+                                                               char *out,
+                                                               size_t size);
 
 /** NULL when name may follow "#httrack-bundle=" in a start URL, or a short
     English reason why it may not. */
@@ -901,9 +912,8 @@ HTSEXT_API const char *hts_bundle_name_refusal(const char *name);
     URLs alone. This is the default scope, with no scope lines, and url lines
     widen it as start URLs do. HTS_FALSE as well when a URL is NULL, too long,
     has no host or names an invalid bundle. The bundle file is not checked. */
-HTSEXT_API hts_boolean hts_bundle_cookie_in_scope(const char *const *urls,
-                                                  size_t nurls,
-                                                  const char *cookie_domain);
+HTS_CHECK_RESULT HTSEXT_API hts_boolean hts_bundle_cookie_in_scope(
+    const char *const *urls, size_t nurls, const char *cookie_domain);
 
 /** Set *names to the login bundle names the start addresses use, each once,
     in the order the crawl meets them. urls is split at spaces as a command
@@ -915,6 +925,13 @@ HTSEXT_API hts_boolean hts_bundle_cookie_in_scope(const char *const *urls,
     logs that), or when the crawl would refuse an address. It refuses an
     option, a quoted or too long word in urls, and an invalid bundle name.
     error, when not NULL, gets the reason in error_size bytes. */
+HTS_CHECK_RESULT HTSEXT_API int
+hts_bundle_names_in_use_checked(const char *urls, const char *list_file,
+                                char ***names, char *error, size_t error_size);
+
+/** @deprecated Use hts_bundle_names_in_use_checked(). */
+HTS_DEPRECATED("use hts_bundle_names_in_use_checked(urls, list_file, names, "
+               "error, error_size)")
 HTSEXT_API int hts_bundle_names_in_use(const char *urls, const char *list_file,
                                        char ***names, char *error,
                                        size_t error_size);
@@ -961,6 +978,13 @@ typedef struct hts_paste_result {
     HTS_FALSE when refused, with the reason in result->error, or with result
     untouched when result->size is smaller than
     offsetof(hts_paste_result, dropped). Call it after hts_init(). */
+HTS_CHECK_RESULT HTSEXT_API hts_boolean hts_bundle_from_paste_checked(
+    const char *paste, const char *folder, const char *agent, const char *url,
+    hts_boolean dry_run, hts_paste_result *result);
+
+/** @deprecated Use hts_bundle_from_paste_checked(). */
+HTS_DEPRECATED("use hts_bundle_from_paste_checked(paste, folder, agent, url, "
+               "dry_run, result)")
 HTSEXT_API hts_boolean hts_bundle_from_paste(const char *paste,
                                              const char *folder,
                                              const char *agent, const char *url,
@@ -974,14 +998,21 @@ HTSEXT_API hts_boolean hts_bundle_from_paste(const char *paste,
 #define HTS_PASTE_DRY_RUN 1u
 #define HTS_PASTE_KEEP_EMPTY 2u
 
-/** Do what hts_bundle_from_paste does, with dry_run and the other choices as
-    HTS_PASTE_* bits in flags. An unknown bit is refused. A bundle with no
-    cookie has no cookies line. */
+/** Do what hts_bundle_from_paste_checked does, with dry_run and the other
+    choices as HTS_PASTE_* bits in flags. An unknown bit is refused. A bundle
+    with no cookie has no cookies line. */
+HTS_CHECK_RESULT HTSEXT_API hts_boolean hts_bundle_from_paste_flags_checked(
+    const char *paste, const char *folder, const char *agent, const char *url,
+    unsigned int flags, hts_paste_result *result);
+
+/** @deprecated Use hts_bundle_from_paste_flags_checked(). */
+HTS_DEPRECATED("use hts_bundle_from_paste_flags_checked(paste, folder, agent, "
+               "url, flags, result)")
 HTSEXT_API hts_boolean hts_bundle_from_paste_flags(
     const char *paste, const char *folder, const char *agent, const char *url,
     unsigned int flags, hts_paste_result *result);
 
-/** Do what hts_bundle_from_paste_flags does, and keep the cookies.txt
+/** Do what hts_bundle_from_paste_flags_checked does, and keep the cookies.txt
     records of hosts, a comma-separated list such as the hosts a browser login
     went through, or NULL. Each host gets a scope line for its registrable
     domain, and never becomes a start URL. A host that cannot have a scope
@@ -990,6 +1021,13 @@ HTSEXT_API hts_boolean hts_bundle_from_paste_flags(
     have a scope line, such as "intranet". The address's own records come
     first, and result->dropped counts the records of hosts left out. A cURL
     paste ignores hosts. */
+HTS_CHECK_RESULT HTSEXT_API hts_boolean hts_bundle_from_paste_hosts_checked(
+    const char *paste, const char *folder, const char *agent, const char *url,
+    const char *hosts, unsigned int flags, hts_paste_result *result);
+
+/** @deprecated Use hts_bundle_from_paste_hosts_checked(). */
+HTS_DEPRECATED("use hts_bundle_from_paste_hosts_checked(paste, folder, agent, "
+               "url, hosts, flags, result)")
 HTSEXT_API hts_boolean hts_bundle_from_paste_hosts(
     const char *paste, const char *folder, const char *agent, const char *url,
     const char *hosts, unsigned int flags, hts_paste_result *result);
