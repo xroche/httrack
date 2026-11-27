@@ -1651,8 +1651,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
   }
   assertf(r->adr != NULL); // for the analyzer: the caller always holds a page
   if (RUN_CALLBACK4(opt, check_html, r->adr, (int) r->size, urladr(), urlfil())) {
-    FILE *fp = NULL;                     // fichier écrit localement
-    hts_boolean sf_may_mark = HTS_FALSE; // --single-file: mark this one?
+    FILE *fp = NULL; // file written locally
+    hts_boolean sf_may_mark = HTS_FALSE;
 
     hts_log_print(opt, LOG_DEBUG, "scanning file %s%s (%s)..",
                   adr_nologin(opt, urladr()), urlfil(), savename());
@@ -2019,8 +2019,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                 ps->script.inscript = 1;
                 ps->script.inscript_state_pos = INSCRIPT_START;
                 ps->tag.intag = 1; // as after a <script> tag
-                ps->tag.intag_start_valid =
-                    0; // yes: this is code, not a real tag
+                // yes: this is code, not a real tag
+                ps->tag.intag_start_valid = 0;
                 if (opt->parsedebug) {
                   HT_ADD("<@@ inscript @@>");
                 }
@@ -2162,10 +2162,10 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
               // osons les obj.write et les obj.href=.. ! osons!
               // note: inscript==1 donc on sautera après les \"
               if (ps->script.inscript) {
-                if (ps->script
-                        .inscriptgen) { // already in a write("...") string
-                  if (*ps->html ==
-                      ps->script.scriptgen_q) {    // its closing quote
+                // already in a write("...") string
+                if (ps->script.inscriptgen) {
+                  // its closing quote
+                  if (*ps->html == ps->script.scriptgen_q) {
                     if (*(ps->html - 1) != '\\') { // unescaped
                       ps->script.inscriptgen = 0;  // the generated string ends
                     }
@@ -2325,8 +2325,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       }
                       /* OK, événement repéré */
                       if (p) {
-                        ps->script.inscript_tag_lastc =
-                            *(ps->html + p);   /* the quote that ends it */
+                        /* the quote that ends it */
+                        ps->script.inscript_tag_lastc = *(ps->html + p);
                         ps->html += p /*+ 1*/; /* skip */
                         /*
                            On est désormais dans du code javascript
@@ -2346,9 +2346,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     if (p == 0) {
                       p = rech_tageq(ps->html, "code");
                       if (p) {
+                        // inside an <applet>
                         if ((ps->tag.intag_start_valid) &&
-                            check_tag(ps->tag.intag_start,
-                                      "applet")) { // inside an <applet>
+                            check_tag(ps->tag.intag_start, "applet")) {
                           // the codebase is written before it
                           p_type = HTS_LINK_APPLET_CODE;
                           add_class = 1; // add .class if missing
@@ -2385,8 +2385,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                 if (strlen(tempo) == (size_t) (b - ps->html)) {
                                   // overwrites the tag in place, so no NUL
                                   memcpy(modify, tempo, strlen(tempo));
-                                  ps->page.fetch_tag.name =
-                                      NULL; /* the tag changed */
+                                  /* the tag changed */
+                                  ps->page.fetch_tag.name = NULL;
                                   p = 0; // the link moved, so drop it
                                   p_type = HTS_LINK_PLAIN;
                                   add_class = 0;
@@ -2401,9 +2401,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     if (p == 0) {       // note: si non chargé (ex: ignorer .class) patché tout de même
                       p = rech_tageq(ps->html, "codebase");
                       if (p) {
+                        // inside an <applet>
                         if ((ps->tag.intag_start_valid) &&
-                            check_tag(ps->tag.intag_start,
-                                      "applet")) { // inside an <applet>
+                            check_tag(ps->tag.intag_start, "applet")) {
                           p_type = HTS_LINK_CODEBASE;
                         } else
                           p = -1;       // ne plus chercher
@@ -2418,8 +2418,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                           if (rech_tageq(ps->html, "name") &&
                               meta_robots_nofollow(str, ps->tag.intag_start,
                                                    ps->html))
-                            ps->page.nofollow =
-                                1; // follow no link of this page
+                            // follow no link of this page
+                            ps->page.nofollow = 1;
                         }
                       }
                     }
@@ -2492,8 +2492,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
             }
 
           } else if (hts_isspace((unsigned char) *ps->html)) {
-            ps->tag.intag_startattr =
-                ps->html + 1; // attribute in tag (for dirty parsing)
+            // attribute in tag (for dirty parsing)
+            ps->tag.intag_startattr = ps->html + 1;
           }
 
           // ------------------------------------------------------------
@@ -2525,11 +2525,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     // scanner les chaines
                     if ((*ps->html == '\"') ||
                         (*ps->html == '\'')) { // "xx.gif" 'xx.gif'
-                      if (strchr(
-                              "=(,",
-                              ps->page.parseall_lastc)) { // for example
-                                                          // a="img.gif..
-                                                          // (handles comments)
+                      // for example a="img.gif.. (handles comments)
+                      if (strchr("=(,", ps->page.parseall_lastc)) {
                         const char *a = ps->html;
                         char stop = *ps->html; // " or '
                         int count = 0;
@@ -2624,8 +2621,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
               // plus dans un commentaire
               if (ps->script.inscript_state_pos == INSCRIPT_START &&
                   inscript_state_pos_prev == INSCRIPT_START) {
-                ps->page.parseall_lastc =
-                    *ps->html; // the byte before the next one
+                // last byte seen by the parseall scan
+                ps->page.parseall_lastc = *ps->html;
               }
 
             } // if realspace
@@ -2730,8 +2727,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                 ps->script.incss = 0;
                 ps->script.inscript_tag = ps->script.inscript = 1;
                 ps->script.inscript_state_pos = INSCRIPT_START;
-                ps->script.inscript_tag_lastc =
-                    quote; /* the quote that ends it */
+                /* the quote that ends it */
+                ps->script.inscript_tag_lastc = quote;
                 if (opt->parsedebug) {
                   HT_ADD("<@@ inscript @@>");
                 }
@@ -2762,9 +2759,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
               do {
                 if (*eadr == '\0') // end of the parsed buffer
                   ok = 0;
-                if (eadr - ps->html >
-                    HTS_URLMAXSIZE) // too long: HTS_URLMAXSIZE more is kept for
-                                    // the path
+                // too long: HTS_URLMAXSIZE more is kept for the path
+                if (eadr - ps->html > HTS_URLMAXSIZE)
                   ok = -1;      // ne pas traiter ce lien
 
                 if (ok > 0) {
@@ -2829,8 +2825,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
               if (eadr - ps->html <= 1) { // link empty
                 ok = -1;        // No
                 if (*ps->html != '#') { // Not empty+unique #
-                  if (eadr - ps->html ==
-                      1) { // 1=link empty with delim (end_adr-start_adr)
+                  // 1=link empty with delim (end_adr-start_adr)
+                  if (eadr - ps->html == 1) {
                     // "#" would land before an unflushed base's name
                     if (quote && !link_role_is_base(p_type)) {
                       HT_ADD("#"); // We add this for a <href="">
@@ -3254,8 +3250,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       // -K strips a scheme word from an adr with no "//"
                       sink_add_absolute_url(&ps->sink, afs.af.adr, afs.af.fil,
                                             opt->passprivacy, HTS_FALSE);
-                      ps->lastsaved =
-                          eadr - 1; // the caller's ++ skips the quote
+                      // the caller's ++ skips the quote
+                      ps->lastsaved = eadr - 1;
                       /* */
                     } else if (opt->urlmode == HTS_URLMODE_KEEP_ORIGINAL) {
                       /* */
@@ -3425,9 +3421,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       HT_ADD("cid:");
                       make_content_id(afs.af.adr, afs.af.fil, HTS_BUF(cid));
                       HT_ADD_HTMLESCAPED(cid);
-                      ps->lastsaved =
-                          eadr -
-                          1; // last written + 1, before the ++ that follows
+                      // last written + 1, before the ++ that follows
+                      ps->lastsaved = eadr - 1;
                     } else if (opt->urlmode == HTS_URLMODE_ABSOLUTE_URI) {
                       HT_ADD_URL_HTMLESCAPED(afs.af.fil);
                       ps->lastsaved =
@@ -3479,9 +3474,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         // write it
                         HT_ADD_URL_HTMLESCAPED(tempo);
                       }
-                      ps->lastsaved =
-                          eadr -
-                          1; // last written + 1, before the ++ that follows
+                      // last written + 1, before the ++ that follows
+                      ps->lastsaved = eadr - 1;
                     } else if (opt->urlmode == HTS_URLMODE_RELATIVE) {
                       char BIGSTK tempo[HTS_URLMAXSIZE * 2];
 
@@ -3608,9 +3602,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                 TypedArraySize(ps->sink.buf) - sf_start));
                           }
                         }
-                        ps->lastsaved =
-                            eadr -
-                            1; // last written + 1, before the ++ that follows
+                        // last written + 1, before the ++ that follows
+                        ps->lastsaved = eadr - 1;
                       } else {
                         hts_log_print(opt, LOG_WARNING,
                                       "Error building relative link %s and %s",
