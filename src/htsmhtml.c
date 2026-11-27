@@ -72,11 +72,10 @@ static void mimehtml_create(httrackp *opt, const char *startcid) {
   FILE *const held = opt->state.mimefp;
   char BIGSTK heldname[HTS_URLMAXSIZE * 2];
 
-  strcpybuff(heldname, fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                               StringBuff(opt->path_html), "~index.mht.part"));
-  opt->state.mimefp = FOPEN(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                                    StringBuff(opt->path_html), "index.mht"),
-                            "wb");
+  strcpybuff(heldname,
+             hts_optpath(opt, StringBuff(opt->path_html), "~index.mht.part"));
+  opt->state.mimefp =
+      FOPEN(hts_optpath(opt, StringBuff(opt->path_html), "index.mht"), "wb");
   if (opt->state.mimefp == NULL) {
     if (held != NULL) {
       fclose(held);
@@ -86,12 +85,10 @@ static void mimehtml_create(httrackp *opt, const char *startcid) {
     hts_log_print(opt, LOG_ERROR, "unable to create index.mht");
     return;
   }
-  (void) UNLINK(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                        StringBuff(opt->path_html), "index.eml"));
+  (void) UNLINK(hts_optpath(opt, StringBuff(opt->path_html), "index.eml"));
 #ifndef _WIN32
-  if (symlink("index.mht", fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                                   StringBuff(opt->path_html), "index.eml")) !=
-      0) {
+  if (symlink("index.mht",
+              hts_optpath(opt, StringBuff(opt->path_html), "index.eml")) != 0) {
     if (errno != EPERM) {
       hts_log_print(
           opt, LOG_WARNING | LOG_ERRNO,
@@ -159,10 +156,9 @@ void mimehtml_add_file(httrackp *opt, const char *save, const char *adr,
           } else {
             /* Hold it aside until a page turns up to be the root. A saved
                name never carries a '~', so no mirrored file lands here. */
-            opt->state.mimefp =
-                FOPEN(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                              StringBuff(opt->path_html), "~index.mht.part"),
-                      "w+b");
+            opt->state.mimefp = FOPEN(
+                hts_optpath(opt, StringBuff(opt->path_html), "~index.mht.part"),
+                "w+b");
             if (opt->state.mimefp == NULL) {
               opt->state.mimehtml_created = MIMEHTML_FAILED;
               hts_log_print(opt, LOG_ERROR, "unable to create index.mht");

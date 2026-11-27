@@ -254,6 +254,16 @@ HTS_CHECK_RESULT hts_boolean may_unknown(httrackp *opt, const char *st);
 /** Copy @p a into @p dst, converting every '\\' to '/' on all platforms. */
 char *fslash(hts_buf dst, const char *a);
 
+/** Write @p dir then @p name into @p b, with one '/' between them unless
+    either is empty or has one there. FALSE, with @p b emptied, unless it all
+    fits, so a part is never dropped. */
+HTS_CHECK_RESULT hts_boolean hts_path_join(hts_buf b, const char *dir,
+                                           const char *name);
+
+/** hts_path_join(), then '/' to the platform separator, as fconcat(). */
+HTS_CHECK_RESULT hts_boolean hts_fpath_join(hts_buf b, const char *dir,
+                                            const char *name);
+
 #define READ_ERROR (-1)
 #define READ_EOF (-2)
 #define READ_TIMEOUT (-3)

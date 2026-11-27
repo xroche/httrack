@@ -1,0 +1,52 @@
+#!/bin/bash
+#
+# hts_path_join() refuses a path that does not fit rather than drop a part, so
+# a WARC name too long for the output directory is refused, not written as a
+# stray file in that directory.
+
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+# The count is exact, so a shrinking table shows.
+selftest_queue_lines "pathjoin: 19 cases, 0 failures
+pathjoin: OK" pathjoin
+selftest_run_queued
+
+require_httrack
+# MAX_PATH sits far under the output-path cap there, so only the self-test runs.
+if target_is_windows; then
+    echo "no long-path crawl on Windows"
+    exit 0
+fi
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_pathjoin.XXXXXX")
+cleanup_push rm -rf "$tmpdir"
+
+# An argument is capped under 1024 bytes, but ~ expands to a $HOME of any length.
+home="${tmpdir}/h"
+while test ${#home} -lt 1700; do
+    home="${home}/$(printf 'd%.0s' {1..199})"
+done
+home="${home}/$(printf 'e%.0s' $(seq 1 $((1899 - ${#home}))))"
+{ mkdir -p "${home}/o" && : >"${home}/o/probe"; } 2>/dev/null ||
+    skip "cannot create a file under a ${#home}-byte directory"
+rm -f "${home}/o/probe"
+name=$(printf 'w%.0s' {1..300})
+
+local_server_start --log "${tmpdir}/server.log"
+
+# Rotation names segments after the archive, so a dropped name left a
+# "-00000.warc" in the output directory.
+rc=0
+# shellcheck disable=SC2088 # httrack expands the ~ itself
+HOME="$home" local_crawl --log "${tmpdir}/crawl.log" --quiet --robots=0 \
+    -O "~/o" --warc-file "$name" --warc-max-size 1000000 \
+    "${BASEURL}/mini304/index.html" || rc=$?
+log=$(<"${home}/o/hts-log.txt")
+grep -q 'WARC archive path too long' <<<"$log" ||
+    fail "the long WARC path was not refused (exit ${rc})"
+stray=$(find "${home}/o" -maxdepth 1 -name '*.warc*' | wc -l)
+test "$stray" -eq 0 || fail "a WARC file landed in the output directory"
+ok "a WARC path too long for its directory is refused"

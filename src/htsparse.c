@@ -1381,15 +1381,15 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   if (p) {      // ok center                            
                     if (makeindex_fp == NULL) {
                       file_notify(opt, "", "",
-                                  fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), 
-                                          StringBuff(opt->path_html_utf8),
-                                          "index.html"), 1, 1, 0);
+                                  hts_optpath(opt,
+                                              StringBuff(opt->path_html_utf8),
+                                              "index.html"),
+                                  1, 1, 0);
                       verif_backblue(opt, StringBuff(opt->path_html_utf8));     // générer gif
-                      makeindex_fp =
-                        filecreate(&opt->state.strc,
-                                   fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), 
-                                           StringBuff(opt->path_html_utf8),
-                                           "index.html"));
+                      makeindex_fp = filecreate(
+                          &opt->state.strc,
+                          hts_optpath(opt, StringBuff(opt->path_html_utf8),
+                                      "index.html"));
                       if (makeindex_fp != NULL) {
 
                         // Header
@@ -1417,11 +1417,14 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                           b = strchr(a, '<');   // prochain tag
                         }
                       }
+                      const hts_buf index_path = OPT_GET_HTS_BUF(opt);
+
+                      /* the output path is capped well under the buffer */
+                      assertf(hts_path_join(index_path,
+                                            StringBuff(opt->path_html_utf8),
+                                            "index.html"));
                       if (lienrelatif(HTS_BUF(tempo), heap(ptr)->sav,
-                                      concat(OPT_GET_BUFF(opt),
-                                             OPT_GET_BUFF_SIZE(opt),
-                                             StringBuff(opt->path_html_utf8),
-                                             "index.html")) == 0) {
+                                      index_path.p) == 0) {
                         detect_title = 1;       // ok détecté pour cette page!
                         makeindex_links++;      // un de plus
                         strlcpybuff(makeindex_firstlink, tempo,
@@ -3262,10 +3265,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                             if (verif_external(opt, cat_nb)) {
                               FILE *fp = filecreate(
                                   &opt->state.strc,
-                                  fconcat(OPT_GET_BUFF(opt),
-                                          OPT_GET_BUFF_SIZE(opt),
-                                          StringBuff(opt->path_html_utf8),
-                                          cat_name));
+                                  hts_optpath(opt,
+                                              StringBuff(opt->path_html_utf8),
+                                              cat_name));
                               if (fp) {
                                 if (cat_data_len == 0) { // texte
                                   verif_backblue(
@@ -3282,10 +3284,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                 fclose(fp);
                                 usercommand(
                                     opt, 0, NULL,
-                                    fconcat(OPT_GET_BUFF(opt),
-                                            OPT_GET_BUFF_SIZE(opt),
-                                            StringBuff(opt->path_html_utf8),
-                                            cat_name),
+                                    hts_optpath(opt,
+                                                StringBuff(opt->path_html_utf8),
+                                                cat_name),
                                     "", "");
                               }
                             }

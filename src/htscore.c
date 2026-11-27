@@ -144,9 +144,7 @@ RUN_CALLBACK0(opt, end); \
         cookie_save_replacing(opt, opt->cookie,                                \
                               StringBuff(opt->cookies_file));                  \
     } else if (opt->accept_cookie && cookies_file_refused != COOKIE_LOAD_KEEP) \
-      cookie_save(opt, opt->cookie,                                            \
-                  fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),           \
-                          StringBuff(opt->path_log), "cookies.txt"));          \
+      cookie_save(opt, opt->cookie, hts_logpath(opt, "cookies.txt"));          \
     bauth_free(&cookie);                                                       \
     if (makeindex_fp) {                                                        \
       fclose(makeindex_fp);                                                    \
@@ -402,10 +400,10 @@ void hts_finish_makeindex(httrackp *opt, int *makeindex_done,
       fflush(*makeindex_fp);
       fclose(*makeindex_fp);
       *makeindex_fp = NULL;
-      usercommand(opt, 0, NULL,
-                  fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                          StringBuff(opt->path_html_utf8), "index.html"),
-                  adr, fil);
+      usercommand(
+          opt, 0, NULL,
+          hts_optpath(opt, StringBuff(opt->path_html_utf8), "index.html"), adr,
+          fil);
     }
   }
   *makeindex_done = 1;
@@ -752,7 +750,10 @@ static const char *bundle_jar_file(httrackp *opt, char buff[CATBUFF_SIZE]) {
     return NULL;
   if (strnotempty(StringBuff(opt->cookies_file)))
     return StringBuff(opt->cookies_file);
-  return fconcat(buff, CATBUFF_SIZE, StringBuff(opt->path_log), "cookies.txt");
+  if (!hts_fpath_join(hts_buf_at(buff, CATBUFF_SIZE), StringBuff(opt->path_log),
+                      "cookies.txt"))
+    abortLog("cookie jar path too long");
+  return buff;
 }
 
 /* Does a start URL lack a scheme? "//host" counts too, so it still becomes
@@ -1308,8 +1309,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
     if (!hts_record_link(
             opt, "primary", "/primary",
             fslash(OPT_GET_HTS_BUF(opt),
-                   fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                           StringBuff(opt->path_html_utf8), "index.html")),
+                   hts_optpath(opt, StringBuff(opt->path_html_utf8),
+                               "index.html")),
             "", "", NULL)) {
       freet(primary);
       XH_extuninit;             // désallocation mémoire & buffers

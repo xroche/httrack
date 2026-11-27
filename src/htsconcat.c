@@ -79,6 +79,37 @@ HTSEXT_API char *fconv(char *catbuff, size_t size, const char *a) {
   return __fconv(concat(catbuff, size, a, ""));
 }
 
+static hts_boolean is_path_sep(char c) {
+  return c == '/' || (HTS_DOSNAME && c == '\\');
+}
+
+hts_boolean hts_path_join(hts_buf b, const char *dir, const char *name) {
+  const size_t dlen = strlen(dir);
+  const size_t nlen = strlen(name);
+  const size_t slash = dlen != 0 && nlen != 0 && !is_path_sep(dir[dlen - 1]) &&
+                       !is_path_sep(name[0]);
+
+  if (b.size == 0)
+    return HTS_FALSE;
+  /* b.size - dlen - slash is at least 0 once dlen < b.size */
+  if (dlen >= b.size || nlen >= b.size - dlen - slash) {
+    b.p[0] = '\0';
+    return HTS_FALSE;
+  }
+  memcpy(b.p, dir, dlen);
+  if (slash)
+    b.p[dlen] = '/';
+  memcpy(b.p + dlen + slash, name, nlen + 1);
+  return HTS_TRUE;
+}
+
+hts_boolean hts_fpath_join(hts_buf b, const char *dir, const char *name) {
+  if (!hts_path_join(b, dir, name))
+    return HTS_FALSE;
+  __fconv(b.p);
+  return HTS_TRUE;
+}
+
 /* / et \\ en / */
 static char *__fslash(char *a) {
   int i;

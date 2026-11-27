@@ -4797,6 +4797,65 @@ static int st_cinames(httrackp *opt, int argc, char **argv) {
   return failures != 0;
 }
 
+/* Check that hts_path_join() puts one '/' between two parts and refuses,
+   leaving an empty string, any path that does not fit. */
+static int st_pathjoin(httrackp *opt, int argc, char **argv) {
+  static const struct {
+    const char *dir, *name;
+    size_t size;
+    const char *want; /* NULL: does not fit */
+  } cases[] = {
+      {"a/", "b", 8, "a/b"},     {"a", "b", 8, "a/b"},
+      {"a", "/b", 8, "a/b"},     {"a/", "/b", 8, "a//b"},
+      {"", "b", 8, "b"},         {"a", "", 8, "a"},
+      {"a/", "", 8, "a/"},       {"", "", 1, ""},
+      {"ab", "cd", 6, "ab/cd"},  {"ab", "cd", 5, NULL},
+      {"ab/", "cd", 6, "ab/cd"}, {"ab/", "cd", 5, NULL},
+      {"abcd", "", 5, "abcd"},   {"abcd", "e", 5, NULL},
+      {"abcde", "", 5, NULL},    {"abcdef", "x", 4, NULL},
+      {"a", "bcdefg", 4, NULL},  {"a", "b", 0, NULL},
+  };
+
+  size_t i, failures = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+    /* poisoned, with a canary just past the size the join is given */
+    char buf[16];
+    const size_t size = cases[i].size;
+    hts_boolean fit;
+
+    memset(buf, 'Q', sizeof(buf));
+    fit = hts_path_join(hts_buf_at(buf, size), cases[i].dir, cases[i].name);
+    if (fit != (cases[i].want != NULL) || buf[size] != 'Q' ||
+        (size != 0 && strcmp(buf, fit ? cases[i].want : "") != 0)) {
+      printf("pathjoin: FAIL case %u (\"%s\", \"%s\", %u)\n", (unsigned) i,
+             cases[i].dir, cases[i].name, (unsigned) size);
+      failures++;
+    }
+  }
+  /* the native form converts the separator it inserted, and the others */
+  {
+    char buf[16];
+    const hts_boolean fit = hts_fpath_join(HTS_BUF(buf), "a/b", "c");
+
+    if (!fit || strcmp(buf, HTS_DOSNAME ? "a\\b\\c" : "a/b/c") != 0 ||
+        hts_fpath_join(HTS_BUF(buf), "abcdefgh", "ijklmnop") ||
+        buf[0] != '\0') {
+      printf("pathjoin: FAIL native form\n");
+      failures++;
+    }
+  }
+  printf("pathjoin: %u cases, %u failures\n",
+         (unsigned) (sizeof(cases) / sizeof(cases[0]) + 1),
+         (unsigned) failures);
+  if (failures == 0)
+    printf("pathjoin: OK\n");
+  return failures != 0;
+}
+
 /* Check the span finders on an empty span, a match at either end and none. */
 static int st_spanfind(httrackp *opt, int argc, char **argv) {
   static const struct {
@@ -6202,6 +6261,8 @@ const struct selftest_entry selftests_lib[] = {
      st_spanfind},
     {"cinames", "", "hts_streq_ci and the prefix tests fold only A-Z",
      st_cinames},
+    {"pathjoin", "", "hts_path_join() inserts one '/' and refuses a long path",
+     st_pathjoin},
     {"headerparse", "<file>",
      "the fields treathead_opt() reads from each response in a file",
      st_headerparse},
