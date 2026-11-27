@@ -8,10 +8,6 @@ set -euo pipefail
 
 # Removing a ref reports whether one remains: removed, never there, or kept.
 
-if test "$(id -u)" -eq 0; then
-    skip "root can unlink under a read-only directory"
-fi
-
 dir=$(mktemp -d)
 cleanup_push rm -rf "$dir"
 cleanup_push chmod -R u+w "$dir"
