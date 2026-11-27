@@ -4636,7 +4636,7 @@ static void back_wait_read_fields(httrackp *opt, struct_back *sback, int i,
   scan->te_unreadable = te_unreadable;
 }
 
-/* Adjust the status before it is acted on (416, 406, update errors, size hacks). */
+/* Adjust the status before use: 416, 406, update errors, size hacks. */
 static void back_wait_status_hacks(httrackp *opt, cache_back *cache,
                                    struct_back *sback, int i) {
   lien_back *const back = sback->lnk;
