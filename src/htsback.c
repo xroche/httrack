@@ -87,7 +87,8 @@ typedef struct back_sink {
 } back_sink;
 
 /* Where a spool record is read from: a file, or a buffer when fp is NULL.
-   len bounds both, so a size field cannot claim more than is left. */
+   len bounds both, so a size field cannot claim more than is left, and the
+   guard byte's extra byte cannot wrap. */
 typedef struct back_source {
   FILE *fp;
   const char *buf;
@@ -1733,8 +1734,7 @@ static hts_boolean back_data_unserialize(back_source *s, void **str,
   if (back_source_get(s, size, sizeof(*size))) {
     if (*size == 0)             /* serialized NULL ptr */
       return HTS_TRUE;
-    /* Untrusted, and the guard byte's extra byte must not wrap the size. */
-    if (*size > SIZE_MAX - 1 || *size > s->len - s->pos)
+    if (*size > s->len - s->pos)
       return HTS_FALSE;
     *str = malloct(*size + 1);
     if (*str == NULL)
@@ -1912,7 +1912,7 @@ hts_boolean back_unserialize(FILE *fp, lien_back **dst) {
   s.len = size >= 0 && pos >= 0 && pos <= size &&
                   (uint64_t) (size - pos) <= SIZE_MAX
               ? (size_t) (size - pos)
-              : SIZE_MAX;
+              : 0;
   return back_record_read(&s, dst);
 }
 
