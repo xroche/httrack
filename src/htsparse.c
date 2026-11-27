@@ -1123,6 +1123,295 @@ void maxlinks_give_up(httrackp *opt, volatile int *exit_xh) {
   hts_store_release_int(exit_xh, -1);
 }
 
+/* Decode the escapes and entities of a link, convert its path to UTF-8 and
+   re-escape its query. Sets *stre->error_ when the link no longer fits. */
+static void decode_link_escapes(htsmoduleStruct *str,
+                                htsmoduleStructExtended *stre, hts_buf link,
+                                hts_buf catbuff) {
+  ENGINE_LOAD_CONTEXT();
+  char *const lien = link.p;
+
+  // NULL when UTF-8 conversion is off (-%T0)
+  hts_boolean declared;
+  const char *const charset = page_charset(str, &declared);
+  const int hasCharset = charset != NULL;
+  char BIGSTK query[HTS_URLMAXSIZE * 2];
+
+  // cut query string
+  {
+    char *const a = strchr(lien, '?');
+    if (a != NULL) {
+      strcpybuff(query, a);
+      *a = '\0';
+    } else {
+      query[0] = '\0';
+    }
+  }
+
+  // Unescape %XX, but not yet high-chars (supposedly encoded with UTF-8)
+  hts_buf_cpy(link,
+              unescape_http_unharm(catbuff.p, catbuff.size, lien,
+                                   1 | 2)); /* note: '%' is still escaped */
+
+  // Percent-encode the control bytes as a browser does (#982);
+  // a byte grows to three, so a link that outgrows the buffer
+  // is dropped rather than clipped to a URL nobody wrote.
+  {
+    char BIGSTK tempo[HTS_URLMAXSIZE * 2];
+
+    if (escape_control_url(lien, HTS_BUF(tempo)) <
+        sizeof(tempo) - HTS_LINK_TAIL_ROOM) {
+      hts_buf_cpy(link, tempo);
+    } else {
+      *stre->error_ = 1;
+      hts_log_print(opt, LOG_DEBUG,
+                    "link rejected (control bytes do not fit) %s",
+                    url_nologin(opt, lien));
+    }
+  }
+
+  // charset conversion for the URI filename (not the query
+  // string), unless the bytes already are valid UTF-8:
+  // converting those would double-encode them (#180)
+  if (hasCharset && !hts_isCharsetUTF8(charset) &&
+      !hts_isStringUTF8(hts_span_of(lien))) {
+    char *s = hts_convertStringToUTF8(lien, strlen(lien), charset);
+    if (s != NULL) {
+      hts_log_print(opt, LOG_DEBUG,
+                    "engine: save-name: '%s' charset "
+                    "conversion from '%s' to '%s'",
+                    charset, url_nologin(opt, lien), url_nologin(opt, s));
+      /* One byte can become three, and a clipped URL names
+         another resource, so drop the link instead. */
+      if (strlen(s) < link.size - HTS_LINK_TAIL_ROOM) {
+        hts_buf_cpy(link, s);
+      } else {
+        *stre->error_ = 1;
+        hts_log_print(opt, LOG_WARNING,
+                      "Link is too long after charset conversion: %s",
+                      url_nologin(opt, lien));
+      }
+      freet(s);
+    }
+  }
+
+  // decode URI entities with UTF-8 charset
+  if (hts_unescapeEntities(lien, link) != 0) {
+    hts_log_print(opt, LOG_WARNING, "could not decode URI '%s' as UTF-8",
+                  url_nologin(opt, lien));
+  }
+
+  // decode query entities with the page charset, out-of-place
+  // because the escape grows it (#854)
+  if (hasCharset) {
+    char BIGSTK decoded[sizeof(query)];
+
+    if (hts_unescapeEntitiesWithCharsetSpecial(query, HTS_BUF(decoded), charset,
+                                               UNESCAPE_ENTITIES_URL_QUERY) ==
+        0) {
+      strcpybuff(query, decoded);
+    } else {
+      hts_log_print(opt, LOG_WARNING,
+                    "could not decode query string '%s' with "
+                    "charset '%s'",
+                    query, charset);
+    }
+  }
+
+  // Decode remaining %XX high characters with UTF-8
+  // but only when this leads to valid UTF-8.
+  // Otherwise, leave them unescaped.
+  if (hts_unescapeUrlSpecial(lien, catbuff, UNESCAPE_URL_NO_ASCII) == 0) {
+    hts_buf_cpy(link, catbuff.p);
+  } else {
+    hts_log_print(opt, LOG_WARNING, "could not URL-decode string '%s'",
+                  url_nologin(opt, lien));
+  }
+
+  // we need to encode query string non-ascii chars,
+  // leaving the encoding as-is (unlike the file part)
+  // and copy back query
+  {
+    const size_t cap = link.size - HTS_LINK_TAIL_ROOM;
+    const size_t used = strlen(lien);
+
+    // the append grows the query too, and clips silently on
+    // overflow: drop, or we fetch a query nobody wrote (#982)
+    if (used >= cap ||
+        append_escape_check_url(query, hts_buf_at(lien, cap)) >= cap - used) {
+      *stre->error_ = 1;
+      hts_log_print(opt, LOG_DEBUG, "link rejected (query does not fit) %s",
+                    url_nologin(opt, lien));
+    }
+  }
+}
+
+/* Store a base or codebase link, or prefix another link with the base that
+   applies. */
+static void resolve_link_base(htsmoduleStruct *str,
+                              htsmoduleStructExtended *stre, hts_buf link,
+                              hts_link_role p_type, hts_boolean p_xmlbase) {
+  ENGINE_LOAD_CONTEXT();
+  char *const lien = link.p;
+
+  hts_log_print(opt, LOG_DEBUG, "position link check %s",
+                url_nologin(opt, lien));
+
+  if (link_role_is_base(p_type)) {
+    // a codebase names a directory
+    if (p_type == HTS_LINK_CODEBASE) {
+      if (strnotempty(lien)) {
+        if (hts_lastchar(lien) != '/') {
+          hts_buf_cat(link, "/");
+        }
+      }
+    }
+
+    /* A base with no authority is relative per RFC 3986 5.2,
+       except the hostname shape legacy markup writes. */
+    if (p_type == HTS_LINK_BASE && !link_has_authority(lien) &&
+        link_base_is_hostname(lien)) {
+      char BIGSTK tmp[HTS_URLMAXSIZE * 2];
+
+      strcpybuff(tmp, "http://");
+      strcatbuff(tmp, lien);
+      hts_buf_cpy(link, tmp);
+    }
+
+    /* only one ending / (bug on some pages) */
+    if (strlen(lien) > 2) {
+      size_t len = strlen(lien);
+
+      while (len > 1 && lien[len - 1] == '/' &&
+             lien[len - 2] == '/') /* double // (bug) */
+        lien[--len] = '\0';
+    }
+    // resolve a relative base against the page
+    if (!link_has_authority(lien)) {
+      lien_adrfil af2;
+
+      if (ident_url_relatif(lien, urladr(), urlfil(), &af2) < 0) {
+        *stre->error_ = 1;
+      } else if (strlen(af2.adr) + strlen(af2.fil) >=
+                 link.size - HTS_LINK_TAIL_ROOM - sizeof("http:///")) {
+        /* the rebuild below is unbounded in the two of them */
+        *stre->error_ = 1;
+        hts_log_print(opt, LOG_WARNING, "Link is too long once resolved: %s",
+                      url_nologin(opt, lien));
+      } else {
+        hts_buf_cpy(link, "http://");
+        hts_buf_cat(link, af2.adr);
+        if (*af2.fil != '/')
+          hts_buf_cat(link, "/");
+        hts_buf_cat(link, af2.fil);
+        {
+          char *a;
+
+          a = hts_lastcharptr(lien);
+          while ((*a) && (*a != '/') && (a > lien))
+            a--;
+          if (*a == '/') {
+            *(a + 1) = '\0';
+          }
+        }
+      }
+    }
+
+    if (!*stre->error_) {
+      if (p_type == HTS_LINK_BASE) {
+        char *a = hts_lastcharptr(lien);
+        char *start_of_filename = jump_identification(lien);
+
+        if (start_of_filename != NULL &&
+            (start_of_filename = strchr(start_of_filename, '/')) != NULL)
+          start_of_filename++;
+        if (start_of_filename == NULL)
+          hts_buf_cat(link, "/");
+        while ((a > lien) && (*a) && (*a != '/'))
+          a--;
+        if (*a == '/') {
+          if (start_of_filename != NULL && a + 1 >= start_of_filename) {
+            *(a + 1) = '\0'; // keep the directory
+          }
+        } else {
+          *lien = '\0';
+          *stre->error_ = 1;
+        }
+      }
+      // remember the base or the codebase
+      if (p_type == HTS_LINK_BASE) {
+        // browsers ignore xml:base in HTML
+        if (!p_xmlbase || !is_html_mime_type(r->contenttype))
+          strlcpybuff(base, lien, HTS_URLMAXSIZE * 2);
+      } else {
+        strlcpybuff(codebase, lien, HTS_URLMAXSIZE * 2);
+      }
+
+      hts_log_print(opt, LOG_DEBUG, "code/codebase link %s base %s",
+                    url_nologin(opt, lien), url_nologin(opt, base));
+    }
+
+  } else {
+    char *_base;
+
+    if (p_type == HTS_LINK_APPLET_CODE)
+      _base = codebase;
+    else
+      _base = base;
+
+    // prefix the base href
+    if (strnotempty(_base)) {
+      if (!link_has_authority(lien)) {
+        if (*lien != '/') { // relative to the directory
+          if ((strlen(_base) + strlen(lien)) < HTS_URLMAXSIZE) {
+            lien_adrfil af;
+
+            // mailto: and co: do NOT add base
+            if (ident_url_relatif(lien, urladr(), urlfil(), &af) >= 0) {
+              char BIGSTK tempo[HTS_URLMAXSIZE * 2];
+
+              strcpybuff(tempo, _base);
+              strcatbuff(tempo, lien + ((*lien == '/') ? 1 : 0));
+              hts_buf_cpy(link, tempo);
+
+              hts_log_print(opt, LOG_DEBUG,
+                            "link modified with code/codebase %s",
+                            url_nologin(opt, lien));
+            }
+          } else {
+            *stre->error_ = 1;
+            hts_log_print(opt, LOG_ERROR, "Link %s too long with base href",
+                          url_nologin(opt, lien));
+          }
+        } else {
+          lien_adrfil baseaf;
+          if (ident_url_absolute(_base, &baseaf) >= 0) {
+            if ((strlen(baseaf.adr) + strlen(lien)) < HTS_URLMAXSIZE) {
+              char BIGSTK tempo[HTS_URLMAXSIZE * 2];
+
+              tempo[0] = '\0';
+              if (!link_has_authority(baseaf.adr)) {
+                strcatbuff(tempo, "http://");
+              }
+              strcatbuff(tempo, baseaf.adr);
+              strcatbuff(tempo, lien);
+              hts_buf_cpy(link, tempo);
+
+              hts_log_print(opt, LOG_DEBUG,
+                            "link modified with code/codebase %s",
+                            url_nologin(opt, lien));
+            } else {
+              *stre->error_ = 1;
+              hts_log_print(opt, LOG_ERROR, "Link %s too long with base href",
+                            url_nologin(opt, lien));
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
 int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
   char catbuff[CATBUFF_SIZE];
 
@@ -2585,130 +2874,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   }
                 }
 
-                /* Unescape/escape %20 and other &nbsp; */
-                {
-                  // NULL when UTF-8 conversion is off (-%T0)
-                  hts_boolean declared;
-                  const char *const charset = page_charset(str, &declared);
-                  const int hasCharset = charset != NULL;
-                  char BIGSTK query[HTS_URLMAXSIZE * 2];
-
-                  // cut query string
-                  {
-                    char *const a = strchr(lien, '?');
-                    if (a != NULL) {
-                      strcpybuff(query, a);
-                      *a = '\0';
-                    } else {
-                      query[0] = '\0';
-                    }
-                  }
-
-                  // Unescape %XX, but not yet high-chars (supposedly encoded with UTF-8)
-                  strcpybuff(lien, 
-                    unescape_http_unharm(catbuff, sizeof(catbuff), lien, 1 | 2));     /* note: '%' is still escaped */
-
-                  // Percent-encode the control bytes as a browser does (#982);
-                  // a byte grows to three, so a link that outgrows the buffer
-                  // is dropped rather than clipped to a URL nobody wrote.
-                  {
-                    char BIGSTK tempo[sizeof(lien)];
-
-                    if (escape_control_url(lien, HTS_BUF(tempo)) <
-                        sizeof(tempo) - HTS_LINK_TAIL_ROOM) {
-                      strcpybuff(lien, tempo);
-                    } else {
-                      *stre->error_ = 1;
-                      hts_log_print(
-                          opt, LOG_DEBUG,
-                          "link rejected (control bytes do not fit) %s",
-                          url_nologin(opt, lien));
-                    }
-                  }
-
-                  // charset conversion for the URI filename (not the query
-                  // string), unless the bytes already are valid UTF-8:
-                  // converting those would double-encode them (#180)
-                  if (hasCharset && !hts_isCharsetUTF8(charset) &&
-                      !hts_isStringUTF8(hts_span_of(lien))) {
-                    char *s =
-                        hts_convertStringToUTF8(lien, strlen(lien), charset);
-                    if (s != NULL) {
-                      hts_log_print(opt, LOG_DEBUG,
-                                    "engine: save-name: '%s' charset "
-                                    "conversion from '%s' to '%s'",
-                                    charset, url_nologin(opt, lien),
-                                    url_nologin(opt, s));
-                      /* One byte can become three, and a clipped URL names
-                         another resource, so drop the link instead. */
-                      if (strlen(s) < sizeof(lien) - HTS_LINK_TAIL_ROOM) {
-                        strcpybuff(lien, s);
-                      } else {
-                        *stre->error_ = 1;
-                        hts_log_print(
-                            opt, LOG_WARNING,
-                            "Link is too long after charset conversion: %s",
-                            url_nologin(opt, lien));
-                      }
-                      freet(s);
-                    }
-                  }
-
-                  // decode URI entities with UTF-8 charset
-                  if (hts_unescapeEntities(lien, HTS_BUF(lien)) != 0) {
-                    hts_log_print(opt, LOG_WARNING,
-                                  "could not decode URI '%s' as UTF-8",
-                                  url_nologin(opt, lien));
-                  }
-
-                  // decode query entities with the page charset, out-of-place
-                  // because the escape grows it (#854)
-                  if (hasCharset) {
-                    char BIGSTK decoded[sizeof(query)];
-
-                    if (hts_unescapeEntitiesWithCharsetSpecial(
-                            query, HTS_BUF(decoded), charset,
-                            UNESCAPE_ENTITIES_URL_QUERY) == 0) {
-                      strcpybuff(query, decoded);
-                    } else {
-                      hts_log_print(opt, LOG_WARNING,
-                                    "could not decode query string '%s' with "
-                                    "charset '%s'",
-                                    query, charset);
-                    }
-                  }
-
-                  // Decode remaining %XX high characters with UTF-8 
-                  // but only when this leads to valid UTF-8.
-                  // Otherwise, leave them unescaped.
-                  if (hts_unescapeUrlSpecial(lien, HTS_BUF(catbuff),
-                                             UNESCAPE_URL_NO_ASCII) == 0) {
-                    strcpybuff(lien, catbuff);
-                  } else {
-                    hts_log_print(opt, LOG_WARNING,
-                                  "could not URL-decode string '%s'",
-                                  url_nologin(opt, lien));
-                  }
-
-                  // we need to encode query string non-ascii chars,
-                  // leaving the encoding as-is (unlike the file part)
-                  // and copy back query
-                  {
-                    const size_t cap = sizeof(lien) - HTS_LINK_TAIL_ROOM;
-                    const size_t used = strlen(lien);
-
-                    // the append grows the query too, and clips silently on
-                    // overflow: drop, or we fetch a query nobody wrote (#982)
-                    if (used >= cap ||
-                        append_escape_check_url(query, hts_buf_at(lien, cap)) >=
-                            cap - used) {
-                      *stre->error_ = 1;
-                      hts_log_print(opt, LOG_DEBUG,
-                                    "link rejected (query does not fit) %s",
-                                    url_nologin(opt, lien));
-                    }
-                  }
-                }
+                decode_link_escapes(str, stre, HTS_BUF(lien), HTS_BUF(catbuff));
 
                 // convertir les éventuels \ en des / pour éviter des problèmes de reconnaissance!
                 {
@@ -2763,175 +2929,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       strcatbuff(lien, ".class");
                   }
                 }
-                // si c'est un chemin, alors vérifier (toto/toto.html -> http://www/toto/)
                 if (!*stre->error_) {
-                  hts_log_print(opt, LOG_DEBUG, "position link check %s",
-                                url_nologin(opt, lien));
-
-                  if (link_role_is_base(p_type)) {
-                    // a codebase names a directory
-                    if (p_type == HTS_LINK_CODEBASE) {
-                      if (strnotempty(lien)) {
-                        if (hts_lastchar(lien) != '/') { // pas répertoire
-                          strcatbuff(lien, "/");
-                        }
-                      }
-                    }
-
-                    /* A base with no authority is relative per RFC 3986 5.2,
-                       except the hostname shape legacy markup writes. */
-                    if (p_type == HTS_LINK_BASE && !link_has_authority(lien) &&
-                        link_base_is_hostname(lien)) {
-                      char BIGSTK tmp[HTS_URLMAXSIZE * 2];
-
-                      strcpybuff(tmp, "http://");
-                      strcatbuff(tmp, lien);
-                      strcpybuff(lien, tmp);
-                    }
-
-                    /* only one ending / (bug on some pages) */
-                    if (strlen(lien) > 2) {
-                      size_t len = strlen(lien);
-
-                      while(len > 1 && lien[len - 1] == '/' && lien[len - 2] == '/')    /* double // (bug) */
-                        lien[--len] = '\0';
-                    }
-                    // copier nom host si besoin est
-                    if (!link_has_authority(lien)) {    // pas de http://
-                      lien_adrfil af2;   // ** euh ident_url_relatif??
-
-                      if (ident_url_relatif(lien, urladr(), urlfil(), &af2) < 0) {
-                        *stre->error_ = 1;
-                      } else if (strlen(af2.adr) + strlen(af2.fil) >=
-                                 sizeof(lien) - HTS_LINK_TAIL_ROOM -
-                                     sizeof("http:///")) {
-                        /* the rebuild below is unbounded in the two of them */
-                        *stre->error_ = 1;
-                        hts_log_print(opt, LOG_WARNING,
-                                      "Link is too long once resolved: %s",
-                                      url_nologin(opt, lien));
-                      } else {
-                        strcpybuff(lien, "http://");
-                        strcatbuff(lien, af2.adr);
-                        if (*af2.fil != '/')
-                          strcatbuff(lien, "/");
-                        strcatbuff(lien, af2.fil);
-                        {
-                          char *a;
-
-                          a = hts_lastcharptr(lien);
-                          while((*a) && (*a != '/') && (a > lien))
-                            a--;
-                          if (*a == '/') {
-                            *(a + 1) = '\0';
-                          }
-                        }
-                      }
-                    }
-
-                    if (!*stre->error_) {
-                      if (p_type == HTS_LINK_BASE) {
-                        char *a = hts_lastcharptr(lien);
-                        char *start_of_filename = jump_identification(lien);
-
-                        if (start_of_filename != NULL
-                            && (start_of_filename =
-                                strchr(start_of_filename, '/')) != NULL)
-                          start_of_filename++;
-                        if (start_of_filename == NULL)
-                          strcatbuff(lien, "/");
-                        while((a > lien) && (*a) && (*a != '/'))
-                          a--;
-                        if (*a == '/') {        // ok on a repéré le dernier /
-                          if (start_of_filename != NULL
-                              && a + 1 >= start_of_filename) {
-                            *(a + 1) = '\0';    // couper
-                          }
-                        } else {
-                          *lien = '\0'; // éliminer
-                          *stre->error_ = 1;
-                        }
-                      }
-                      // remember the base or the codebase
-                      if (p_type == HTS_LINK_BASE) {
-                        // browsers ignore xml:base in HTML
-                        if (!p_xmlbase || !is_html_mime_type(r->contenttype))
-                          strlcpybuff(base, lien, HTS_URLMAXSIZE * 2);
-                      } else {
-                        strlcpybuff(codebase, lien, HTS_URLMAXSIZE * 2);
-                      }
-
-                      hts_log_print(
-                          opt, LOG_DEBUG, "code/codebase link %s base %s",
-                          url_nologin(opt, lien), url_nologin(opt, base));
-                    }
-
-                  } else {
-                    char *_base;
-
-                    if (p_type == HTS_LINK_APPLET_CODE)
-                      _base = codebase;
-                    else
-                      _base = base;
-
-                    // ajouter chemin de base href..
-                    if (strnotempty(_base)) {   // considérer base
-                      if (!link_has_authority(lien)) {  // non absolue
-                        if (*lien != '/') {     // non absolu sur le site (/)
-                          if ((strlen(_base) + strlen(lien)) < HTS_URLMAXSIZE) {
-                            // mailto: and co: do NOT add base
-                            if (ident_url_relatif
-                                (lien, urladr(), urlfil(), &afs.af) >= 0) {
-                              char BIGSTK tempo[HTS_URLMAXSIZE * 2];
-
-                              // base est absolue
-                              strcpybuff(tempo, _base);
-                              strcatbuff(tempo,
-                                         lien + ((*lien == '/') ? 1 : 0));
-                              strcpybuff(lien, tempo);  // patcher en considérant base
-                              // ** vérifier que ../ fonctionne (ne doit pas arriver mais bon..)
-
-                              hts_log_print(
-                                  opt, LOG_DEBUG,
-                                  "link modified with code/codebase %s",
-                                  url_nologin(opt, lien));
-                            }
-                          } else {
-                            *stre->error_ = 1;
-                            hts_log_print(opt, LOG_ERROR,
-                                          "Link %s too long with base href",
-                                          url_nologin(opt, lien));
-                          }
-                        } else {
-                          lien_adrfil baseaf;
-                          if (ident_url_absolute(_base, &baseaf) >= 0) {
-                            if ((strlen(baseaf.adr) + strlen(lien)) < HTS_URLMAXSIZE) {
-                              char BIGSTK tempo[HTS_URLMAXSIZE * 2];
-
-                              // base est absolue
-                              tempo[0] = '\0';
-                              if (!link_has_authority(baseaf.adr)) {
-                                strcatbuff(tempo, "http://");
-                              }
-                              strcatbuff(tempo, baseaf.adr);
-                              strcatbuff(tempo, lien);
-                              strcpybuff(lien, tempo);  // patcher en considérant base
-
-                              hts_log_print(
-                                  opt, LOG_DEBUG,
-                                  "link modified with code/codebase %s",
-                                  url_nologin(opt, lien));
-                            } else {
-                              *stre->error_ = 1;
-                              hts_log_print(opt, LOG_ERROR,
-                                            "Link %s too long with base href",
-                                            url_nologin(opt, lien));
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
+                  resolve_link_base(str, stre, HTS_BUF(lien), p_type,
+                                    p_xmlbase);
                 }
                 // transformer lien quelconque (http, relatif, etc) en une adresse
                 // et un chemin+fichier (adr,fil)
