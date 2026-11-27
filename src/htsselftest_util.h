@@ -75,11 +75,12 @@ HTS_OWNED char *st_slurp_ansi(const char *path, size_t *len);
 
 /* Set *dest to the Sec-Fetch-Dest named name, "empty" being UNKNOWN. Return
    HTS_FALSE, after complaining, when name is no destination. */
-hts_boolean st_dest_of(const char *name, int *dest);
+HTS_CHECK_RESULT hts_boolean st_dest_of(const char *name, int *dest);
 
 /* Set *family to the browser family named name ("none", "chrome" or
    "firefox"). Return HTS_FALSE, after complaining, for any other name. */
-hts_boolean st_family_of(const char *name, hts_browser_family *family);
+HTS_CHECK_RESULT hts_boolean st_family_of(const char *name,
+                                          hts_browser_family *family);
 
 /* Return the name st_family_of() reads for family. */
 const char *st_family_name(hts_browser_family family);
@@ -104,7 +105,8 @@ void st_mirror_wiring_free(httrackp *opt, cache_back *cache,
 void st_cache_close(httrackp *opt, cache_back *cache);
 
 /* mkdir `path`, tolerating one that exists; HTS_FALSE after complaining. */
-hts_boolean st_mkdir_at(const char *path, size_t n, const char *who);
+HTS_CHECK_RESULT hts_boolean st_mkdir_at(const char *path, size_t n,
+                                         const char *who);
 
 /* Print "<label>: FAIL" if err is non-zero, else "<label>: OK", and return err
    as the self-test exit code. */

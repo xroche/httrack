@@ -77,15 +77,17 @@ typedef pthread_mutex_t PT_Mutex;
 PT_Indexes PT_New(void);
 void PT_Delete(PT_Indexes index);
 PT_Element PT_ReadIndex(PT_Indexes indexes, const char *url, int flags);
-hts_boolean PT_LookupIndex(PT_Indexes indexes, const char *url);
-int PT_AddIndex(PT_Indexes index, const char *path);
+HTS_CHECK_RESULT hts_boolean PT_LookupIndex(PT_Indexes indexes,
+                                            const char *url);
+HTS_CHECK_RESULT int PT_AddIndex(PT_Indexes index, const char *path);
 PT_Index PT_GetIndex(PT_Indexes indexes, int indexId);
 
 /* Indexes list */
 PT_Element PT_Index_HTML_BuildRootInfo(PT_Indexes indexes);
-char **PT_Enumerate(PT_Indexes indexes, const char *url, int subtree);
+HTS_CHECK_RESULT char **PT_Enumerate(PT_Indexes indexes, const char *url,
+                                     int subtree);
 void PT_Enumerate_Delete(char ***plist);
-int PT_SaveCache(PT_Indexes indexes, const char *filename);
+HTS_CHECK_RESULT int PT_SaveCache(PT_Indexes indexes, const char *filename);
 
 /* Index */
 time_t PT_Index_Timestamp(PT_Index index);

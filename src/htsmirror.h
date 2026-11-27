@@ -50,7 +50,8 @@ int hts_mirror_check_moved(htsmoduleStruct *str, htsmoduleStructExtended *stre);
   the output directory and delete it. Return true only for a deletable request
   newer than this run's hts-in_progress.lock.
 */
-hts_boolean hts_take_lock_request(httrackp *opt, const char *name);
+HTS_CHECK_RESULT hts_boolean hts_take_lock_request(httrackp *opt,
+                                                   const char *name);
 
 /* Take a pending abort request, log it and set exit_xh. Was there one? */
 HTS_CHECK_RESULT hts_boolean hts_poll_abort_request(httrackp *opt);
@@ -82,8 +83,10 @@ hts_next_file hts_mirror_wait_for_next_file(htsmoduleStruct *str,
   value
 */
 /* When fetch is not NULL, each redirect hop followed is merged into it. */
-int hts_wait_delayed(htsmoduleStruct *str, lien_adrfilsave *afs,
-                     char *parent_adr, char *parent_fil, lien_adrfil *former,
-                     int *forbidden_url, hts_fetch_meta *fetch);
+HTS_CHECK_RESULT int hts_wait_delayed(htsmoduleStruct *str,
+                                      lien_adrfilsave *afs, char *parent_adr,
+                                      char *parent_fil, lien_adrfil *former,
+                                      int *forbidden_url,
+                                      hts_fetch_meta *fetch);
 
 #endif

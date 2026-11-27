@@ -111,7 +111,7 @@ typedef struct hts_cache_field {
 
 /* Store value into the field called name, matched case-insensitively.
    HTS_FALSE when no field has that name. */
-static HTS_UNUSED hts_boolean
+static HTS_UNUSED HTS_CHECK_RESULT hts_boolean
 hts_cache_store_field(const hts_cache_field *fields, size_t count,
                       const char *name, const char *value) {
   size_t i;
@@ -186,7 +186,7 @@ hts_cache_read_fields(hts_span block, const hts_cache_field *fields,
 /* Append an entry's first line to headers at *used. A message too long for
    it points at X-StatusMessage instead. Returns HTS_FALSE when the line does
    not fit. */
-static HTS_INLINE HTS_UNUSED hts_boolean hts_cache_status_line(
+static HTS_INLINE HTS_UNUSED HTS_CHECK_RESULT hts_boolean hts_cache_status_line(
     hts_buf headers, size_t *used, int statuscode, const char *msg) {
   const char *const message = strlen(msg) < 32 ? msg : "(See X-StatusMessage)";
 
@@ -220,7 +220,7 @@ typedef void (*hts_cache_index_entry)(void *arg, const char *name, long pos);
 typedef void (*hts_cache_index_bad)(void *arg, const char *what, int entry);
 
 /* Is "X-In-Cache: 1" among the first two lines? A NUL ends the scan. */
-static HTS_UNUSED hts_boolean
+static HTS_UNUSED HTS_CHECK_RESULT hts_boolean
 hts_cache_header_says_data_in_zip(hts_span block) {
   const char *p = block.p;
   const char *const end = block.p + block.len;

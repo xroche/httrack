@@ -43,8 +43,8 @@ Please visit our Website: http://www.httrack.com
 
 /* Add the words of the page HTML, of type MIME, saved as FILENAME. 1 when
    indexed, 0 when skipped. */
-int index_keyword(hts_span html, const char *mime, const char *filename,
-                  const char *indexpath);
+HTS_CHECK_RESULT int index_keyword(hts_span html, const char *mime,
+                                   const char *filename, const char *indexpath);
 void index_init(const char *indexpath);
 void index_finish(const char *indexpath, hts_kindex mode);
 #endif

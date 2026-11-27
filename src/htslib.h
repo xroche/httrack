@@ -108,7 +108,8 @@ HTS_CHECK_RESULT hts_boolean hts_location_is_safe(const char *location);
     success the handle is recorded in opt and unloaded by hts_free_opt().
     @return 1 if loaded and hts_plug succeeded; 0 if loaded but hts_plug was
     missing or refused; -1 if the library could not be loaded. */
-int plug_wrapper(httrackp *opt, const char *moduleName, const char *argv);
+HTS_CHECK_RESULT int plug_wrapper(httrackp *opt, const char *moduleName,
+                                  const char *argv);
 
 /** va_list form of hts_log_print(). @p opt may be NULL (only the callback
    runs). Preserves errno. @p format must be non-NULL. */
@@ -144,7 +145,7 @@ T_SOC catch_url_init(int *port, char *adr, size_t adr_size);
 /** Whether the directory containing @p path exists. The basename is stripped
     first, so passing a file path tests its parent directory. @return 1 if it is
     a directory, 0 otherwise. */
-hts_boolean dir_exists(const char *path);
+HTS_CHECK_RESULT hts_boolean dir_exists(const char *path);
 
 /** Return the static reason-phrase string for @p statuscode, or NULL if
    unknown. The pointer is a string literal; do not free it. */
@@ -248,7 +249,7 @@ hts_boolean is_dyntype(hts_span ext);
 
 /** 1 if MIME type @p st must not be reclassified or renamed (hypertext types
    and a built-in keep-list of commonly mislabeled types), else 0. */
-hts_boolean may_unknown(httrackp *opt, const char *st);
+HTS_CHECK_RESULT hts_boolean may_unknown(httrackp *opt, const char *st);
 
 /** Copy @p a into @p dst, converting every '\\' to '/' on all platforms. */
 char *fslash(hts_buf dst, const char *a);
@@ -342,24 +343,25 @@ typedef struct hts_filetime_t {
 
 /* Read FILE's modification time into WHEN. False if it can not be read, and
    WHEN is then untouched. */
-hts_boolean hts_file_mtime(const char *file, hts_filetime_t *when);
+HTS_CHECK_RESULT hts_boolean hts_file_mtime(const char *file,
+                                            hts_filetime_t *when);
 
 /* Move FILE's modification time SECONDS back, keeping the fraction, which the
    utimes fallback rounds down to the microsecond. False if the stamp could not
    be read or written, and FILE then keeps the time it had. */
-hts_boolean hts_file_backdate(const char *file, int seconds);
+HTS_CHECK_RESULT hts_boolean hts_file_backdate(const char *file, int seconds);
 
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
 
 /* Is path certainly missing? Any doubt answers HTS_FALSE. Utf-8; trailing
    separators are ignored. */
-hts_boolean hts_path_absent(const char *path);
+HTS_CHECK_RESULT hts_boolean hts_path_absent(const char *path);
 
 /* Record a loaded module in opt->libHandles, copying its name. HTS_FALSE when
    out of memory, and opt->libHandles is then unchanged. */
-hts_boolean hts_libhandles_add(httrackp *opt, void *handle,
-                               const char *moduleName);
+HTS_CHECK_RESULT hts_boolean hts_libhandles_add(httrackp *opt, void *handle,
+                                                const char *moduleName);
 
 /** An opt that hts_log_vprint drops every message for. Never dereferenced. */
 extern char hts_log_quiet_tag;
@@ -370,7 +372,7 @@ void hts_init_htsblk(htsblk * r);
 
 /* How many seconds should we wait, given a Retry-After value? -1 when it names
    no usable delay. `now` dates the HTTP-date form, and the caller caps. */
-int hts_parse_retry_after(const char *value, time_t now);
+HTS_CHECK_RESULT int hts_parse_retry_after(const char *value, time_t now);
 
 /* Read the HTTP date S as Unix seconds, with a two-digit year up to PIVOT in
    20xx (see convert_time_rfc822_pivot). -1 when S is not a date. */
@@ -399,7 +401,8 @@ typedef struct hts_client_hints {
 /* Fill ch with the hints the browser named by user_agent sends. Returns
    HTS_FALSE when that browser sends none: anything but Chrome or Edge from
    M108. */
-hts_boolean hts_client_hints_of(const char *user_agent, hts_client_hints *ch);
+HTS_CHECK_RESULT hts_boolean hts_client_hints_of(const char *user_agent,
+                                                 hts_client_hints *ch);
 
 /* Return the browser family whose request headers user_agent names: Chrome
    and Edge as hts_client_hints_of() tells them, or Firefox. */
@@ -440,7 +443,7 @@ hts_boolean http_headers_have_field(const char *headers,
 
 /* True when the response stored no body and no status excuses it: a redirect to
    follow, or the 412/416 whose stale resume partial the parser re-gets. */
-hts_boolean hts_body_missing_unexpectedly(const htsblk *r);
+HTS_CHECK_RESULT hts_boolean hts_body_missing_unexpectedly(const htsblk *r);
 
 /* Return the body of R as a span, empty when it has none or a negative size.
    Its pointer stays R->adr, so it may be NULL. */
@@ -448,11 +451,13 @@ hts_span hts_blk_body(const htsblk *r);
 
 /* Returns the warning to print for a -%X line, or NULL when it goes out as
    typed. headers is the block so far. */
-const char *http_custom_header_warning(const char *headers, const char *line);
+HTS_CHECK_RESULT const char *http_custom_header_warning(const char *headers,
+                                                        const char *line);
 
 /* Why a bundle header line is refused, or NULL when allowed. headers is the
    block so far. */
-const char *http_bundle_header_refusal(const char *headers, const char *line);
+HTS_CHECK_RESULT const char *http_bundle_header_refusal(const char *headers,
+                                                        const char *line);
 
 /* Append the custom header block to dst, dropping any line whose field dst
    carries, a malformed or framing line, an earlier copy of Host, Cookie or
@@ -469,13 +474,14 @@ size_t http_postfile_body(hts_buf buffer, size_t pos, FILE *fp);
 
 /* Switch soc between blocking and non-blocking mode; false on failure, with
    errno (WSAGetLastError() on Windows) set. */
-hts_boolean socket_set_nonblocking(T_SOC soc, hts_boolean nonblocking);
+HTS_CHECK_RESULT hts_boolean socket_set_nonblocking(T_SOC soc,
+                                                    hts_boolean nonblocking);
 /* Pending-connect result for a non-blocking socket reported ready by select():
    0 = connected, >0 = the connect errno (refused, unreachable, ...), -1 if the
    probe itself failed. A failed connect is reported ready as well (writable on
    posix, exception set on winsock), so this is how success is told from failure
    without blocking. */
-int connect_socket_error(T_SOC soc);
+HTS_CHECK_RESULT int connect_socket_error(T_SOC soc);
 
 /* Start a non-blocking connect to iadr; port -1 takes it from iadr or the
    scheme default. */
@@ -514,13 +520,14 @@ HTS_CHECK_RESULT hts_boolean hts_is_control_free(const char *str);
 
 /* TRUE if HOST is an IPv4 literal: digits and dots, at least one dot. Such a
    host has no domain structure to reverse or to widen into. */
-hts_boolean hts_host_is_ipv4(hts_span host);
+HTS_CHECK_RESULT hts_boolean hts_host_is_ipv4(hts_span host);
 
 /* Base-64 "user:pass" of the userinfo in a URL or proxy name, for a Basic
    Authorization header, into OUT (at least 1100 bytes). Returns 1 when filled,
    0 when there is no userinfo, -1 when it is too long (765 bytes max, as a
    clipped credential would authenticate as somebody else). */
-int hts_basic_auth_value(httrackp *opt, const char *url, hts_buf out);
+HTS_CHECK_RESULT int hts_basic_auth_value(httrackp *opt, const char *url,
+                                          hts_buf out);
 
 /* Copy the bare host name of a URL address into out for the TLS SNI
    extension: no scheme, userinfo or port. FALSE with out emptied when there is
@@ -539,10 +546,10 @@ HTS_CHECK_RESULT hts_boolean hts_ssl_check_cert(SSL *ssl, const char *url_adr);
 hts_boolean hts_host_is_address(hts_span host);
 
 /* TRUE if this -P proxy name (which keeps its scheme) is a SOCKS5 proxy. */
-hts_boolean hts_proxy_is_socks(const char *name);
+HTS_CHECK_RESULT hts_boolean hts_proxy_is_socks(const char *name);
 
 /* TRUE if this -P proxy name is a "connect://" CONNECT-only proxy (#564). */
-hts_boolean hts_proxy_is_connect(const char *name);
+HTS_CHECK_RESULT hts_boolean hts_proxy_is_connect(const char *name);
 
 void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * retour,
                char *rcvd);
@@ -555,10 +562,11 @@ void treatfirstline(htsblk * retour, const char *rcvd);
    with *seen, the length an earlier field gave (-1 if none)? Stores the length
    in *seen, or -2 for a signed or oversized one. Text that is no number is
    skipped. */
-hts_boolean hts_content_length_agrees(const char *s, LLint *seen);
+HTS_CHECK_RESULT hts_boolean hts_content_length_agrees(const char *s,
+                                                       LLint *seen);
 
 /* The status code of an "HTTP/x.y NNN reason" line, or -1. */
-int hts_status_line_code(const char *line);
+HTS_CHECK_RESULT int hts_status_line_code(const char *line);
 
 // sous-fonctions
 /* Buffer http_xfread1() fills in its line modes, and so the ceiling on any
@@ -638,7 +646,8 @@ void hts_dns_job_release(hts_dns_job *job);
    answer. Must hold no lock. */
 int hts_dns_poll(httrackp *opt, hts_dns_job *job, hts_dns_result *res);
 /* Returns the index of addr in list[0..count-1], port included, or -1. */
-int hts_dns_addr_index(const SOCaddr *list, int count, const SOCaddr *addr);
+HTS_CHECK_RESULT int hts_dns_addr_index(const SOCaddr *list, int count,
+                                        const SOCaddr *addr);
 /* Index in iadr's cached list of the address to try first, 0 by default. */
 int hts_dns_preferred(httrackp *opt, const char *iadr);
 /* Make addr, if it is in iadr's cached list, the one new connects try first.
@@ -698,7 +707,7 @@ HTS_CHECK_RESULT int get_filetime_rfc822(const char *file, hts_buf date);
 /* Writes A as an RFC 822 GMT date, clipped to size bytes. */
 HTS_INLINE void time_rfc822(hts_buf s, struct tm *A);
 
-HTS_INLINE int sendc(htsblk * r, const char *s);
+HTS_INLINE HTS_CHECK_RESULT int sendc(htsblk *r, const char *s);
 /* Returns the advance past the line's terminator. */
 int binput(const char *buff, hts_buf s);
 /* Read one line from a buffer up to "end", consuming it whole even when it
@@ -708,15 +717,15 @@ int binput(const char *buff, hts_buf s);
 HTS_CHECK_RESULT hts_boolean binput_line(const char *buff, const char *end,
                                          hts_buf s, int *offset);
 /* Does treathead() read the header that "line" starts with? Keep in step. */
-hts_boolean hts_header_is_read(const char *line);
-const char *strstrcase(const char *s, const char *o);
-int ident_url_absolute(const char *url, lien_adrfil *adrfil);
+HTS_CHECK_RESULT hts_boolean hts_header_is_read(const char *line);
+HTS_CHECK_RESULT const char *strstrcase(const char *s, const char *o);
+HTS_CHECK_RESULT int ident_url_absolute(const char *url, lien_adrfil *adrfil);
 /* Collapse "./" and "../" segments of @p f in place. An empty path becomes
    "./", so @p f needs at least 3 bytes. */
 void fil_simplifie(char *f);
 /* Count each byte value of S into map[256]. */
 void map_characters(hts_span s, unsigned int *map);
-int ishtml(httrackp * opt, const char *urlfil);
+HTS_CHECK_RESULT int ishtml(httrackp *opt, const char *urlfil);
 /* Return 1 if EXT is an HTML extension such as "htm", else -1. */
 int ishtml_ext(hts_span ext);
 
@@ -912,7 +921,7 @@ hts_boolean hts_socket_connect_started(T_SOC soc, const SOCaddr *server,
                                        hts_boolean *pending);
 
 /* Did Multipath TCP survive this established connection's handshake? */
-hts_boolean hts_socket_is_mptcp(T_SOC soc);
+HTS_CHECK_RESULT hts_boolean hts_socket_is_mptcp(T_SOC soc);
 
 /* Count an established connection as MPTCP or as fallen back to TCP. Counts
    nothing when this run did not ask for MPTCP, and covers the HTTP backend
@@ -999,22 +1008,22 @@ static HTS_INLINE HTS_UNUSED int hts_send_nosignal(T_SOC soc, const char *s,
 #endif
 }
 
-int fexist(const char *s);
-int fexist_utf8(const char *s);
+HTS_CHECK_RESULT int fexist(const char *s);
+HTS_CHECK_RESULT int fexist_utf8(const char *s);
 
 /* File size in bytes, -1 if absent or not a regular file. LLint, not off_t:
    the latter is a 32-bit long on MSVC, truncating any file of 2GB or more. */
-LLint fpsize(FILE *fp);
-LLint fsize(const char *s);
-LLint fsize_utf8(const char *s);
+HTS_CHECK_RESULT LLint fpsize(FILE *fp);
+HTS_CHECK_RESULT LLint fsize(const char *s);
+HTS_CHECK_RESULT LLint fsize_utf8(const char *s);
 
 /* variables globales */
 extern int _DEBUG_HEAD;
 extern FILE *ioinfo;
 
 // htsmodule.c definitions
-extern void *openFunctionLib(const char *file_);
-extern void *getFunctionPtr(void *handle, const char *fncname);
+extern HTS_CHECK_RESULT void *openFunctionLib(const char *file_);
+extern HTS_CHECK_RESULT void *getFunctionPtr(void *handle, const char *fncname);
 extern void closeFunctionLib(void *handle);
 
 int hts_set_callback(t_hts_htmlcheck_callbacks * callbacks,
@@ -1268,8 +1277,9 @@ struct DIR {
   struct dirent entry;
   char *name;
 };
-DIR *opendir(const char *name);
-struct dirent *readdir(DIR * dir);
+
+HTS_CHECK_RESULT DIR *opendir(const char *name);
+HTS_CHECK_RESULT struct dirent *readdir(DIR *dir);
 int closedir(DIR * dir);
 #endif
 
@@ -1286,12 +1296,15 @@ char *fil_normalized_filtered_ex(const char *source, char *dest,
 /* For URL ADR/FIL, return (in DEST) the comma keylist to strip from the
    '\n'-separated "[pattern=]keys" RULES (patterns matched on host/path via
    strjoker, last wins); NULL if none match. Feeds fil_normalized_filtered(). */
-const char *hts_query_strip_keys(const char *rules, const char *adr,
-                                 const char *fil, hts_buf dest);
+HTS_CHECK_RESULT const char *hts_query_strip_keys(const char *rules,
+                                                  const char *adr,
+                                                  const char *fil,
+                                                  hts_buf dest);
 
 /* Is KEY in the comma list STRIP? Tokens are space-trimmed and
    case-sensitive, and "*" matches any key. */
-hts_boolean hts_query_key_stripped(hts_span key, const char *strip);
+HTS_CHECK_RESULT hts_boolean hts_query_key_stripped(hts_span key,
+                                                    const char *strip);
 
 /* Return the canonical host (length *CANONLEN) of the last RULES entry whose
    aliases match HOST or FULL ("scheme://host"), or NULL. COLLAPSE_WWW ignores
@@ -1333,13 +1346,16 @@ hts_boolean hts_host_alias_collapse_www(httrackp *opt);
 const char *hts_host_alias_fold(httrackp *opt, lien_adrfil *af);
 
 /* HTS_TRUE if ADRA and ADRB name the same host once RULES are applied. */
-hts_boolean hts_host_same_alias(const char *rules, const char *adra,
-                                const char *adrb, hts_boolean collapse_www);
+HTS_CHECK_RESULT hts_boolean hts_host_same_alias(const char *rules,
+                                                 const char *adra,
+                                                 const char *adrb,
+                                                 hts_boolean collapse_www);
 
 /* First canonical host in RULES whose chain never ends ("a=b" plus "b=a"),
    copied into DEST, or NULL if every chain settles. Those hosts are left
    unaliased, so the engine reports them rather than picking a hop. */
-const char *hts_host_alias_looping(const char *rules, hts_boolean collapse_www,
-                                   hts_buf dest);
+HTS_CHECK_RESULT const char *hts_host_alias_looping(const char *rules,
+                                                    hts_boolean collapse_www,
+                                                    hts_buf dest);
 
 #endif

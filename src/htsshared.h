@@ -58,22 +58,23 @@ int hts_shared_linput(FILE *fp, hts_buf s, int flags);
 hts_boolean hts_shared_fexist(const char *s);
 
 /* Does the link carry an authority ("//host"), after an optional scheme? */
-hts_boolean hts_shared_link_has_authority(const char *lien);
+HTS_CHECK_RESULT hts_boolean hts_shared_link_has_authority(const char *lien);
 
 /* Wait until soc is readable or deadline passes; a deadline of 0 never
    passes. */
-hts_boolean hts_shared_readable(T_SOC soc, time_t deadline);
+HTS_CHECK_RESULT hts_boolean hts_shared_readable(T_SOC soc, time_t deadline);
 
 /* Read one line off soc into s (1 byte or more, NUL included) and return its
    length, or -1 when no byte came before deadline (0: none). CR, TAB and form
    feed are dropped. A line longer than s is drained to its newline and sets
    *cut, so its tail is never read as a line of its own. */
-int hts_shared_linputsoc(T_SOC soc, hts_buf s, time_t deadline,
-                         hts_boolean *cut);
+HTS_CHECK_RESULT int hts_shared_linputsoc(T_SOC soc, hts_buf s, time_t deadline,
+                                          hts_boolean *cut);
 
 /* Store the first address of hostname in *server. Return HTS_FALSE when
    hostname is NULL, empty or does not resolve. */
-hts_boolean hts_shared_gethost(const char *hostname, SOCaddr *server);
+HTS_CHECK_RESULT hts_boolean hts_shared_gethost(const char *hostname,
+                                                SOCaddr *server);
 
 /* Open a socktype socket bound to *addr, and listen with backlog unless it is
    SOCK_DGRAM. bound, when not NULL, gets getsockname() before listen(). On
