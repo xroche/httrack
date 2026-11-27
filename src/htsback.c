@@ -4101,7 +4101,6 @@ static void back_wait_ssl_handshake(back_wait_state *w, httrackp *opt,
 }
 #endif
 
-/* Read what arrived on a slot, then parse its headers or body. */
 #if HTS_DIRECTDISK
 /* Store a non-HTML body straight on disk, sparing memory. A locked slot
    keeps its body in memory, a pinned one need not. */
@@ -5174,10 +5173,11 @@ static hts_boolean back_wait_headers(httrackp *opt, cache_back *cache,
       /*} */
 
     } // double LF
-  } // r.size>2
+  } // r.size>=2
   return HTS_TRUE;
 }
 
+/* Read what arrived on a slot, then parse its headers or body. */
 static void back_wait_receive(back_wait_state *w, httrackp *opt,
                               cache_back *cache, struct_back *sback, int i) {
   lien_back *const back = sback->lnk;
