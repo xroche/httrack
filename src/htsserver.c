@@ -850,6 +850,25 @@ static hts_boolean theme_in(const char *dir, const char *name) {
          hts_shared_fexist(file);
 }
 
+/* DIR + NAME in DST with native separators, as fconcat() wrote it; NULL when
+   it does not fit. */
+static const char *path_in(hts_buf dst, const char *dir, const char *name) {
+  char joined[CATBUFF_SIZE];
+
+  if (dst.size < sizeof(joined) ||
+      !hts_buf_printf(HTS_BUF(joined), "%s%s", dir, name))
+    return NULL;
+  return (fconv) (dst.p, dst.size, joined); /* a runtime size */
+}
+
+/* Is DIR + NAME a file? A path too long to build is not one. */
+static hts_boolean file_exists_in(const char *dir, const char *name) {
+  char file[CATBUFF_SIZE];
+  const char *const path = path_in(HTS_BUF(file), dir, name);
+
+  return path != NULL && hts_shared_fexist(path);
+}
+
 /* Is name a theme in the user's folder or the installed one? */
 static hts_boolean theme_exists(const char *path, const char *name) {
   char dir[1024];
@@ -1404,7 +1423,6 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
   /* /website/ serves only from this project directory, kept across requests. */
   String website = STRING_EMPTY;
   hts_boolean path_from_cmdline;
-  char catbuff[CATBUFF_SIZE];
 
   /* Not at bind time: the launcher prints the URL the moment smallserver_init
      returns, and a stalled resolver would hold that line back. */
@@ -2293,8 +2311,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                       if (pos2 != NULL) {
                         *pos2 = '\0';
                         if (strstr(name, "..") == NULL) {
-                          if (hts_shared_fexist(fconcat(
-                                  catbuff, sizeof(catbuff), path, name))) {
+                          if (file_exists_in(path, name)) {
                             langstr = pos2 + 1;
                           }
                         }
@@ -2324,23 +2341,19 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                         }
                       } else if (strcmp(name, "if-file-exists") == 0) {
                         if (strstr(pos2, "..") == NULL) {
-                          if (!hts_shared_fexist(fconcat(
-                                  catbuff, sizeof(catbuff), path, pos2))) {
+                          if (!file_exists_in(path, pos2)) {
                             outputmode = -1;
                           }
                         }
                       } else if (strcmp(name, "if-project-file-exists") == 0) {
                         if (strstr(pos2, "..") == NULL) {
-                          if (!hts_shared_fexist(
-                                  fconcat(catbuff, sizeof(catbuff),
-                                          StringBuff(fspath), pos2))) {
+                          if (!file_exists_in(StringBuff(fspath), pos2)) {
                             outputmode = -1;
                           }
                         }
                       } else if (strcmp(name, "if-file-do-not-exists") == 0) {
                         if (strstr(pos2, "..") == NULL) {
-                          if (hts_shared_fexist(fconcat(
-                                  catbuff, sizeof(catbuff), path, pos2))) {
+                          if (file_exists_in(path, pos2)) {
                             outputmode = -1;
                           }
                         }
@@ -3017,7 +3030,9 @@ static hts_boolean htslang_load(hts_buf limit_to, const char *path) {
   /* Load master file (list of keys and internal keys) */
   if (hts_buf_is_none(limit_to)) {
     const char *mname = "lang.def";
-    FILE *fp = fopen(fconcat(catbuff, sizeof(catbuff), path, mname), "rb");
+    FILE *fp = path_in(HTS_BUF(catbuff), path, mname) != NULL
+                   ? fopen(catbuff, "rb")
+                   : NULL;
 
     if (fp) {
       char intkey[8192];
@@ -3083,7 +3098,9 @@ static hts_boolean htslang_load(hts_buf limit_to, const char *path) {
         lang_catalog_path(HTS_BUF(lbasename), hashname)) {
       FILE *fp;
 
-      fp = fopen(fconcat(catbuff, sizeof(catbuff), path, lbasename), "rb");
+      fp = path_in(HTS_BUF(catbuff), path, lbasename) != NULL
+               ? fopen(catbuff, "rb")
+               : NULL;
       if (fp != NULL) {
         char extkey[8192];
         char value[8192];
@@ -3125,7 +3142,9 @@ static hts_boolean htslang_load(hts_buf limit_to, const char *path) {
       if (!lang_catalog_path(HTS_BUF(lbasename), hashname)) {
         return HTS_FALSE;
       }
-      fp = fopen(fconcat(catbuff, sizeof(catbuff), path, lbasename), "rb");
+      fp = path_in(HTS_BUF(catbuff), path, lbasename) != NULL
+               ? fopen(catbuff, "rb")
+               : NULL;
       if (fp) {
         /* Symbols go first so that a repeated text skips their slots. */
         lang_load_catalog(fp, loops > 0, HTS_TRUE);
