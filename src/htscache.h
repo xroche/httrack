@@ -90,8 +90,10 @@ htsblk cache_read_including_broken(httrackp *opt, cache_back *cache,
 htsblk cache_readex(httrackp *opt, cache_back *cache, const char *adr,
                     const char *fil, const char *save, hts_buf location,
                     hts_buf return_save, int readonly);
-htsblk *cache_header(httrackp * opt, cache_back * cache, const char *adr,
-                     const char *fil, htsblk * r);
+/* Read the cache entry of adr/fil into r, saving nothing. Was it there? */
+HTS_CHECK_RESULT hts_boolean cache_header(httrackp *opt, cache_back *cache,
+                                          const char *adr, const char *fil,
+                                          htsblk *r);
 void cache_init(cache_back * cache, httrackp * opt);
 
 /* Recover the damaged cache at name into hts-cache/repair.zip and move it over

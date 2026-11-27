@@ -3108,8 +3108,7 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
 
         } else if (cache->type == 2) {  // si en cache, demander de tester If-Modified-Since
           htsblk r;
-
-          cache_header(opt, cache, adr, fil, &r);
+          const hts_boolean cached = cache_header(opt, cache, adr, fil, &r);
 
           /* Interdiction taille par le wizard? */
           {
@@ -3125,7 +3124,7 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
             back[p].r.totalsize = save_totalsize;
           }
 
-          if (r.statuscode != -1) {
+          if (cached) {
             if (r.statuscode == HTTP_OK) {      // uniquement des 200 (OK)
               if (strnotempty(r.etag)) {        // ETag (RFC2616)
                 /*

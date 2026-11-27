@@ -171,7 +171,9 @@ HTS_UNUSED static int set_filetime(const char *file, struct tm *tm_time) {
   tim.actime = tim.modtime = hts_time_clip(hts_utc_seconds(tm_time));
   return utime(file, &tim);
 }
-HTS_UNUSED static int set_filetime_time_t(const char *file, time_t t) {
+
+HTS_UNUSED static HTS_CHECK_RESULT int set_filetime_time_t(const char *file,
+                                                           time_t t) {
   if (t != (time_t) 0 && t != (time_t) - 1) {
     struct tm tm = PT_GetTime(t);
 

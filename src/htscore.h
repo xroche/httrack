@@ -561,7 +561,10 @@ int filters_match_url(char **filters, int nfil, const char *adr,
    alone reads the filters. */
 void hts_apply_live_filters(httrackp *opt, struct_back *sback, int ptr);
 
-int fspc(httrackp * opt, FILE * fp, const char *type);
+/* Write the time and TYPE (capitalized) that start a log line to FP. */
+void fspc(FILE *fp, const char *type);
+/* The count of TYPE ("error", "warning" or "info") events, or 0. */
+HTS_CHECK_RESULT int fspc_get(httrackp *opt, const char *type);
 /* Count one log event into opt's counters that hts_get_stats() publishes,
    whether or not a log file is open. "panic" counts as an error. */
 void fspc_count(httrackp *opt, const char *type);
@@ -596,10 +599,10 @@ int hts_pause_target_ms(TStamp seed, int min_ms, int max_ms);
    A hold already running further out is kept. */
 void back_set_retry_after(struct_back *sback, httrackp *opt, int seconds);
 
-/* Fill free slots from the heap, or return -1 when in-memory buffered data
-   already exceeds opt->maxcache. */
-int back_fillmax(struct_back * sback, httrackp * opt, cache_back * cache,
-                 int ptr, int numero_passe);
+/* Fill free slots from the heap, unless the run is stopping or in-memory
+   buffered data already exceeds opt->maxcache. */
+void back_fillmax(struct_back *sback, httrackp *opt, cache_back *cache, int ptr,
+                  int numero_passe);
 
 /* Interactive prompt: continue an interrupted mirror? Returns nonzero to go on.
  */

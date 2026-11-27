@@ -798,7 +798,8 @@ static hts_boolean user_mime_ext(httrackp *opt, const char *fil, hts_buf ext) {
   char BIGSTK mime[1024];
 
   mime[0] = ext.p[0] = '\0';
-  get_userhttptype(opt, HTS_BUF(mime), fil);
+  /* mime stays empty unless a rule gives a type */
+  (void) !get_userhttptype(opt, HTS_BUF(mime), fil);
   return strnotempty(mime) && give_mimext(ext, mime) ? HTS_TRUE : HTS_FALSE;
 }
 
@@ -1178,7 +1179,8 @@ int url_savename(lien_adrfilsave *const afs,
                   if (ptr >= 0) {
                     back_fillmax(sback, opt, cache, ptr, numero_passe);
                   }
-                  (void) hts_poll_abort_request(opt);
+                  /* hts_is_exiting() below acts on a request */
+                  (void) !hts_poll_abort_request(opt);
                   if (!hts_loop_tick(sback, opt, b, ptr)) {
                     back_delete(opt, cache, sback, b);
                     opt->state._hts_in_html_parsing = hihp;

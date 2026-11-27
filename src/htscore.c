@@ -72,10 +72,9 @@ Please visit our Website: http://www.httrack.com
 #include "htsarena.h"
 #include "htscmdline.h"
 
-/* Schedule more links from the heap into free slots. Returns the number queued,
-   or <=0 if none could be added (no free slot / paused / stopped). */
-static int back_fill(struct_back *sback, httrackp *opt, cache_back *cache,
-                     int ptr, int numero_passe);
+/* Schedule more links from the heap into free slots. */
+static void back_fill(struct_back *sback, httrackp *opt, cache_back *cache,
+                      int ptr, int numero_passe);
 
 /* END specific definitions */
 
@@ -2237,9 +2236,9 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
   if (opt->log != NULL) {
     char BIGSTK finalInfo[8192];
     size_t finalUsed = 0;
-    int error = fspc(opt, NULL, "error");
-    int warning = fspc(opt, NULL, "warning");
-    int info = fspc(opt, NULL, "info");
+    int error = fspc_get(opt, "error");
+    int warning = fspc_get(opt, "warning");
+    int info = fspc_get(opt, "info");
     char BIGSTK htstime[256];
     char BIGSTK infoupdated[256];
 
@@ -3194,37 +3193,34 @@ void fspc_count(httrackp *opt, const char *type) {
     hts_increment_int(&strc->info);
 }
 
-// écrire n espaces dans fp
-int fspc(httrackp * opt, FILE * fp, const char *type) {
+void fspc(FILE *fp, const char *type) {
+  char s[256];
+  time_t tt;
+  struct tm tmv;
+
+  tt = time(NULL);
+  if (!hts_localtime(tt, &tmv)) {
+    int localtime_returned_null = 0;
+
+    assertf(localtime_returned_null);
+  }
+  strftime(s, 250, "%H:%M:%S", &tmv);
+  if (strnotempty(type))
+    fprintf(fp, "%s\t%c%s: \t", s, hichar(*type), type + 1);
+  else
+    fprintf(fp, "%s\t \t", s);
+}
+
+int fspc_get(httrackp *opt, const char *type) {
   fspc_strc *const strc = (opt != NULL) ? &opt->state.fspc : NULL;
 
-  if (fp != NULL) {
-    char s[256];
-    time_t tt;
-    struct tm tmv;
-
-    tt = time(NULL);
-    if (!hts_localtime(tt, &tmv)) {
-      int localtime_returned_null = 0;
-
-      assertf(localtime_returned_null);
-    }
-    strftime(s, 250, "%H:%M:%S", &tmv);
-    if (strnotempty(type))
-      fprintf(fp, "%s\t%c%s: \t", s, hichar(*type), type + 1);
-    else
-      fprintf(fp, "%s\t \t", s);
-  } else if (strc == NULL) {
+  if (strc == NULL || type == NULL)
     return 0;
-  } else if (!type) {
-    hts_store_release_int(&strc->error, 0);
-    hts_store_release_int(&strc->warning, 0);
-    hts_store_release_int(&strc->info, 0);
-  } else if (strcmp(type, "warning") == 0)
+  if (strcmp(type, "warning") == 0)
     return hts_load_acquire_int(&strc->warning);
-  else if (strcmp(type, "error") == 0)
+  if (strcmp(type, "error") == 0)
     return hts_load_acquire_int(&strc->error);
-  else if (strcmp(type, "info") == 0)
+  if (strcmp(type, "info") == 0)
     return hts_load_acquire_int(&strc->info);
   return 0;
 }
@@ -3243,16 +3239,11 @@ static int backlinks_done(const struct_back *sback, lien_url **liens,
   return n;
 }
 
-// remplir backing si moins de max_bytes en mémoire
-HTS_INLINE int back_fillmax(struct_back * sback, httrackp * opt,
-                            cache_back * cache, int ptr,
-                            int numero_passe) {
-  if (!hts_load_acquire_int(&opt->state.stop)) {
-    if (back_incache(sback) < opt->maxcache) {  // pas trop en mémoire?
-      return back_fill(sback, opt, cache, ptr, numero_passe);
-    }
-  }
-  return -1;                    /* plus de place */
+HTS_INLINE void back_fillmax(struct_back *sback, httrackp *opt,
+                             cache_back *cache, int ptr, int numero_passe) {
+  if (!hts_load_acquire_int(&opt->state.stop) &&
+      back_incache(sback) < opt->maxcache)
+    back_fill(sback, opt, cache, ptr, numero_passe);
 }
 
 /* The seed keeps the target stable within a gap and new per launch, because a
@@ -3347,9 +3338,9 @@ int back_pluggable_sockets_strict(struct_back *sback, httrackp *opt) {
 hts_boolean hts_loop_tick(struct_back *sback, httrackp *opt, int b, int ptr) {
   engine_stats();
   HTS_STAT.stat_nsocket = back_nsoc(sback);
-  HTS_STAT.stat_errors = fspc(opt, NULL, "error");
-  HTS_STAT.stat_warnings = fspc(opt, NULL, "warning");
-  HTS_STAT.stat_infos = fspc(opt, NULL, "info");
+  HTS_STAT.stat_errors = fspc_get(opt, "error");
+  HTS_STAT.stat_warnings = fspc_get(opt, "warning");
+  HTS_STAT.stat_infos = fspc_get(opt, "info");
   HTS_STAT.stat_transport_failures = opt->transport_failures;
   HTS_STAT.stat_mptcp_connections = opt->mptcp_connections;
   HTS_STAT.stat_mptcp_fallbacks = opt->mptcp_fallbacks;
@@ -3399,14 +3390,13 @@ static int back_pluggable_sockets(struct_back *sback, httrackp *opt) {
   return n;
 }
 
-// remplir backing
-static int back_fill(struct_back *sback, httrackp *opt, cache_back *cache,
-                     int ptr, int numero_passe) {
+static void back_fill(struct_back *sback, httrackp *opt, cache_back *cache,
+                      int ptr, int numero_passe) {
   int n = back_pluggable_sockets(sback, opt);
 
   if (opt->savename_delayed == HTS_SAVENAME_DELAYED_HARD &&
       !opt->delayed_cached) /* cancel (always delayed) */
-    return 0;
+    return;
   if (n > 0) {
     int p;
 
@@ -3458,7 +3448,6 @@ static int back_fill(struct_back *sback, httrackp *opt, cache_back *cache,
     cache->ptr_ant = p;
     cache->ptr_last = ptr;
   }
-  return 0;
 }
 
 // ---

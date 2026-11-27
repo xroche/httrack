@@ -1053,15 +1053,10 @@ void hts_cache_reconcile(httrackp *opt, hts_cache_reconcile_mode mode) {
   }
 }
 
-// renvoyer uniquement en tête, ou NULL si erreur
-// return NULL upon error, and set -1 to r.statuscode
-htsblk *cache_header(httrackp * opt, cache_back * cache, const char *adr,
-                     const char *fil, htsblk * r) {
+hts_boolean cache_header(httrackp *opt, cache_back *cache, const char *adr,
+                         const char *fil, htsblk *r) {
   *r = cache_read(opt, cache, adr, fil, NULL, hts_buf_none()); // test only
-  if (r->statuscode != -1)
-    return r;
-  else
-    return NULL;
+  return r->statuscode != -1;
 }
 
 const char *cache_repair(httrackp *opt, const char *name,
