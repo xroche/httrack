@@ -1,0 +1,15 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# Removing a ref reports whether one remains: removed, never there, or kept.
+
+dir=$(mktemp -d)
+cleanup_push rm -rf "$dir"
+cleanup_push chmod -R u+w "$dir"
+
+assert_selftest 'refname-remove: OK' refname-remove "$dir"

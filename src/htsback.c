@@ -1051,7 +1051,8 @@ hts_boolean back_finalize_backup(httrackp *opt, lien_back *const back,
       back_tmpdir_drop(back->tmpfile);
       /* The restore replaced the partial, so its byte ranges now describe a
          file that is gone (#1595). */
-      url_savename_refname_remove(opt, back->url_adr, back->url_fil);
+      // best-effort here and below: each caller cleans up either way
+      (void) !url_savename_refname_remove(opt, back->url_adr, back->url_fil);
     }
   }
   back->tmpfile = NULL;
@@ -1393,7 +1394,8 @@ void back_finalize(httrackp *opt, cache_back *cache, struct_back *sback,
 
         /* remove reference file, if any */
         if (back[p].r.is_write) {
-          url_savename_refname_remove(opt, back[p].url_adr, back[p].url_fil);
+          (void) !url_savename_refname_remove(opt, back[p].url_adr,
+                                              back[p].url_fil);
         }
 
         /* ************************************************************************
@@ -2640,7 +2642,7 @@ void back_delayed_discard(httrackp *opt, lien_back *back) {
   }
   back->r.is_write = 0;
   if (opt != NULL)
-    url_savename_refname_remove(opt, back->url_adr, back->url_fil);
+    (void) !url_savename_refname_remove(opt, back->url_adr, back->url_fil);
   (void) UNLINK(back->url_sav);
 }
 
@@ -2906,7 +2908,7 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
     /* Forced whole refetch (#581): drop the stale temp-ref and skip the resume
        branches below, so a surviving partial can't Range-loop. */
     if (refetch_whole) {
-      url_savename_refname_remove(opt, adr, fil);
+      (void) !url_savename_refname_remove(opt, adr, fil);
     }
 
     /* Stop requested - abort backing */
@@ -3190,7 +3192,7 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
           back[p].is_update = 1; /* this is an update of a file */
         } else {
           /* broken ; remove */
-          url_savename_refname_remove(opt, adr, fil);
+          (void) !url_savename_refname_remove(opt, adr, fil);
         }
         /* cleanup */
         back_clear_entry(itemback);     /* delete entry content */
@@ -4503,8 +4505,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                            taken, is restored over them by back_finalize(). */
                         if (back[i].r.is_write && back[i].tmpfile == NULL &&
                             back[i].url_sav[0] != '\0') {
-                          url_savename_refname_remove(opt, back[i].url_adr,
-                                                      back[i].url_fil);
+                          (void) !url_savename_refname_remove(
+                              opt, back[i].url_adr, back[i].url_fil);
                           (void) UNLINK(back[i].url_sav);
                         }
                         chunk_size = -1;
@@ -5037,8 +5039,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                   // Out-of-protocol 304 to a Range resume: the file is still
                   // partial, so drop it and refetch instead of trusting it.
                   if (server_sent_304 && back[i].range_req_size > 0) {
-                    url_savename_refname_remove(opt, back[i].url_adr,
-                                                back[i].url_fil);
+                    (void) !url_savename_refname_remove(opt, back[i].url_adr,
+                                                        back[i].url_fil);
                     UNLINK(back[i].url_sav);
                     deletehttp(&back[i].r);
                     back[i].r.statuscode = STATUSCODE_NON_FATAL;
@@ -5189,7 +5191,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                               if (HTS_FTRUNCATE(back[i].r.out, resume) != 0) {
                                 fclose(back[i].r.out);
                                 back[i].r.out = NULL;
-                                url_savename_refname_remove(
+                                (void) !url_savename_refname_remove(
                                     opt, back[i].url_adr, back[i].url_fil);
                                 UNLINK(back[i].url_sav);
                                 back_set_finished(opt, sback, i);
@@ -5229,8 +5231,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                               /* Windows refuses to unlink a file still open */
                               fclose(fp);
                               fp = NULL;
-                              url_savename_refname_remove(opt, back[i].url_adr,
-                                                          back[i].url_fil);
+                              (void) !url_savename_refname_remove(
+                                  opt, back[i].url_adr, back[i].url_fil);
                               UNLINK(back[i].url_sav);
                               alloc_mem = -1;
                             } else if (back[i].r.totalsize >= 0)
@@ -5272,8 +5274,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                       back[i].url_fil, (LLint) sz,
                                       back[i].r.crange_start,
                                       back[i].r.crange_end, back[i].r.crange);
-                        url_savename_refname_remove(opt, back[i].url_adr,
-                                                    back[i].url_fil);
+                        (void) !url_savename_refname_remove(
+                            opt, back[i].url_adr, back[i].url_fil);
                         UNLINK(back[i].url_sav);
                         back_set_finished(opt, sback, i);
                         strcpybuff(back[i].r.msg,
