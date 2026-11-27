@@ -1548,25 +1548,30 @@ static void makeindex_add_page(htsmoduleStruct *str,
   }
 }
 
-/* Does the meta tag opening at TAG, whose name attribute starts at HTML, ask
-   robots not to follow the links of the page? Logs it when it does. */
-static hts_boolean meta_robots_nofollow(htsmoduleStruct *str, const char *tag,
-                                        const char *html) {
+/* Does the meta tag at TAG_START, whose name attribute is at NAME_ATTR, ask
+   robots not to follow its links? Logs it when it does. */
+static hts_boolean meta_robots_nofollow(htsmoduleStruct *str,
+                                        const char *tag_start,
+                                        const char *name_attr) {
   ENGINE_LOAD_CONTEXT_BASE();
   char tempo[1100];
   const char *a;
   const char *name;
-  const int name_len = rech_endtoken(html + rech_tageq(html, "name"), &name);
+  const int name_len =
+      rech_endtoken(name_attr + rech_tageq(name_attr, "name"), &name);
+  hts_span value = hts_span_at(name, name_len);
 
-  if (!hts_span_eq_ci(
-          hts_span_trim(hts_span_at(name, name_len), "", HTS_REALSPACES),
-          hts_span_of("robots")))
+  value.len = hts_span_find(value, '>'); // an unquoted value runs past the tag
+  if (!hts_span_eq_ci(hts_span_trim(value, "", HTS_REALSPACES "/"),
+                      hts_span_of("robots")))
     return HTS_FALSE;
-  a = tag_close_within(html, 999);
-  if (a == NULL || a - tag >= (ptrdiff_t) sizeof(tempo))
+  a = tag_close_within(name_attr, 999);
+  if (a == NULL)
     return HTS_FALSE;
+  if (a - tag_start >= (ptrdiff_t) sizeof(tempo)) // too long: from name only
+    tag_start = name_attr;
   tempo[0] = '\0';
-  strncatbuff(tempo, tag, a - tag); // content may come before name
+  strncatbuff(tempo, tag_start, a - tag_start); // content may precede name
   if (strstrcase(tempo, "content") && strstrcase(tempo, "nofollow")) {
     hts_log_print(opt, LOG_WARNING,
                   "Link %s%s not scanned "
