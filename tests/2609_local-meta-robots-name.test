@@ -1,0 +1,38 @@
+#!/bin/bash
+# A meta tag stops link scanning only when its name is "robots", wherever its
+# content sits, and not when another meta's content says "robots nofollow".
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_metarobots.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmp"
+
+meta_page() { # meta_page NAME META_TAG TARGET
+    printf '<!DOCTYPE html>\n<html><head>%s</head>\n<body><a href="%s">x</a></body></html>\n' \
+        "$2" "$3" >"$tmp/$1.html"
+    printf '<!DOCTYPE html>\n<html><body>target</body></html>\n' >"$tmp/$3"
+}
+
+meta_page desc '<meta name="description" content="robots nofollow">' desc-t.html
+meta_page keys '<meta name="keywords" content="robots, nofollow">' keys-t.html
+meta_page robots '<meta name="robots" content="noindex, nofollow">' robots-t.html
+meta_page bare '<meta name=ROBOTS content=nofollow>' bare-t.html
+meta_page padded '<meta name=" Robots " content="nofollow">' padded-t.html
+meta_page first '<meta content="nofollow" name="robots">' first-t.html
+cat >"$tmp/index.html" <<'EOF2'
+<!DOCTYPE html>
+<html><body>
+<a href="desc.html">1</a> <a href="keys.html">2</a> <a href="robots.html">3</a>
+<a href="bare.html">4</a> <a href="padded.html">5</a> <a href="first.html">6</a>
+</body></html>
+EOF2
+
+# The harness passes --robots=0, so the crawl turns robots back on.
+bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$tmp")" \
+    --errors 0 \
+    --found desc-t.html --found keys-t.html \
+    --not-found robots-t.html --not-found bare-t.html --not-found padded-t.html \
+    --not-found first-t.html \
+    httrack 'BASEURL/index.html' -r3 --robots=2

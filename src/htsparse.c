@@ -1548,31 +1548,31 @@ static void makeindex_add_page(htsmoduleStruct *str,
   }
 }
 
-/* Does this meta tag ask robots not to follow the links of the page? Logs
-   it when it does. */
-static hts_boolean meta_robots_nofollow(htsmoduleStruct *str,
+/* Does the meta tag opening at TAG, whose name attribute starts at HTML, ask
+   robots not to follow the links of the page? Logs it when it does. */
+static hts_boolean meta_robots_nofollow(htsmoduleStruct *str, const char *tag,
                                         const char *html) {
   ENGINE_LOAD_CONTEXT_BASE();
   char tempo[1100];
   const char *a;
+  const char *name;
+  const int name_len = rech_endtoken(html + rech_tageq(html, "name"), &name);
 
-  tempo[0] = '\0';
+  if (!hts_span_eq_ci(
+          hts_span_trim(hts_span_at(name, name_len), "", HTS_REALSPACES),
+          hts_span_of("robots")))
+    return HTS_FALSE;
   a = tag_close_within(html, 999);
-  if (a) {
-    if (a - html < 999) {
-      strncatbuff(tempo, html, a - html);
-      if (strstrcase(tempo, "content")) {
-        if (strstrcase(tempo, "robots")) {
-          if (strstrcase(tempo, "nofollow")) {
-            hts_log_print(opt, LOG_WARNING,
-                          "Link %s%s not scanned "
-                          "(follow robots meta tag)",
-                          adr_nologin(opt, urladr()), urlfil());
-            return HTS_TRUE;
-          }
-        }
-      }
-    }
+  if (a == NULL || a - tag >= (ptrdiff_t) sizeof(tempo))
+    return HTS_FALSE;
+  tempo[0] = '\0';
+  strncatbuff(tempo, tag, a - tag); // content may come before name
+  if (strstrcase(tempo, "content") && strstrcase(tempo, "nofollow")) {
+    hts_log_print(opt, LOG_WARNING,
+                  "Link %s%s not scanned "
+                  "(follow robots meta tag)",
+                  adr_nologin(opt, urladr()), urlfil());
+    return HTS_TRUE;
   }
   return HTS_FALSE;
 }
@@ -2381,8 +2381,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       if (opt->robots) {
                         if ((intag_start_valid)
                             && check_tag(intag_start, "meta")) {
-                          if (rech_tageq(html, "name") && // name=robots
-                              meta_robots_nofollow(str, html))
+                          if (rech_tageq(html, "name") &&
+                              meta_robots_nofollow(str, intag_start, html))
                             nofollow = 1; // follow no link of this page
                         }
                       }
