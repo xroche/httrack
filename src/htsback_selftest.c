@@ -32,6 +32,7 @@ Please visit our Website: http://www.httrack.com
 /* ------------------------------------------------------------ */
 
 #include <limits.h> /* INT_MAX, the backing count back_new() must refuse */
+#include <stdint.h> /* SIZE_MAX */
 
 #include "htsselftest_int.h"
 #include "htsstats.h"
