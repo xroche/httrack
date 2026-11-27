@@ -68,9 +68,9 @@ static int st_indexfd(httrackp *opt, int argc, char **argv) {
   }
   index_init("");
   index_init("");
-  index_finish("", 1);
+  index_finish("", HTS_KINDEX_TEXT);
   index_init("");
-  index_finish("", 1);
+  index_finish("", HTS_KINDEX_TEXT);
   after = open_fd_count();
   if (after != before) {
     fprintf(stderr, "indexfd: %d descriptors before, %d after\n", before,
@@ -122,7 +122,7 @@ static int st_indexkw(httrackp *opt, int argc, char **argv) {
   UNLINK("index.txt"); /* a skipped page writes none */
   index_init("");
   ok = st_index_guarded(body, n, argv[0]);
-  index_finish("", 1);
+  index_finish("", HTS_KINDEX_TEXT);
   printf("indexkw %d\n", ok);
   out = st_slurp("index.txt", &len);
   if (out != NULL) {

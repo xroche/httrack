@@ -150,7 +150,7 @@ fsize 'verdict=allowed size_flag=0' -1 a.gif '-*.gif' '+*.gif'
 # a failed size test sets size_flag but leaves the rule unmatched
 fsize 'verdict=unknown size_flag=1' 5 foo.jpg '-*.jpg*[>10]'
 
-# mime filters (-#test=filtermime = fa_strjoker type=1): only mime: rules
+# mime filters (-#test=filtermime = fa_strjoker HTS_JOKER_MIME): only mime: rules
 # apply to a mime type, and mime: rules never apply to a URL
 fmime() {
     local want=$1

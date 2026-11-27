@@ -38,6 +38,7 @@ Please visit our Website: http://www.httrack.com
 #ifdef HTS_INTERNAL_BYTECODE
 
 #include "htsglobal.h"
+#include "htsopt.h"
 #include "htsurlport.h"
 
 /* Add the words of the page HTML, of type MIME, saved as FILENAME. 1 when
@@ -45,7 +46,7 @@ Please visit our Website: http://www.httrack.com
 int index_keyword(hts_span html, const char *mime, const char *filename,
                   const char *indexpath);
 void index_init(const char *indexpath);
-void index_finish(const char *indexpath, int mode);
+void index_finish(const char *indexpath, hts_kindex mode);
 #endif
 
 #endif

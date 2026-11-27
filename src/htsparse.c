@@ -330,6 +330,19 @@ static const char *text_excerpt(httrackp *opt, hts_buf buf, hts_span s,
   return buf.p;
 }
 
+/* What the link a tag attribute holds stands for. */
+typedef enum hts_link_role {
+  HTS_LINK_PLAIN = 0,        /* a link to fetch */
+  HTS_LINK_APPLET_CODE = -1, /* applet code=, a class name */
+  HTS_LINK_BASE = 2,         /* base href= or xml:base= */
+  HTS_LINK_CODEBASE = -2     /* applet codebase= */
+} hts_link_role;
+
+/* Does the link set the base later links resolve against? */
+static hts_boolean link_role_is_base(const hts_link_role role) {
+  return role == HTS_LINK_BASE || role == HTS_LINK_CODEBASE;
+}
+
 /* Return the first '>' in the first max bytes of s, or NULL. The bound stops a
    tag with no '>' from being rescanned to the page end once per attribute. */
 static const char *tag_close_within(const char *s, size_t max) {
@@ -1157,7 +1170,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
     }
 
     // Indexing!
-    if (opt->kindex) {
+    if (opt->kindex != HTS_KINDEX_OFF) {
       if (index_keyword(hts_span_at(r->adr, (size_t) r->size), r->contenttype,
                         savename(), StringBuff(opt->path_html_utf8))) {
         hts_log_print(opt, LOG_DEBUG, "indexing file..done");
@@ -1703,8 +1716,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
         } else if (intag || inscript ||
                    in_media) { // nous sommes dans un tag/commentaire, tester si
                                // on recoit un tag
-          int p_type = 0;
-          hts_boolean p_xmlbase = HTS_FALSE; // p_type 2 came from xml:base=
+          hts_link_role p_type = HTS_LINK_PLAIN;
+          hts_boolean p_xmlbase = HTS_FALSE; // the base came from xml:base=
           int p_nocatch = 0;
           int p_searchMETAURL = 0;      // chercher ..URL=<url>
           int add_class = 0;    // ajouter .class
@@ -1892,12 +1905,12 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     if (p) {    // href.. tester si c'est une bas href!
                       if ((intag_start_valid) && check_tag(intag_start, "base")) {      // oui!
                         // ** note: base href et codebase ne font pas bon ménage..
-                        p_type = 2;     // c'est un chemin
+                        p_type = HTS_LINK_BASE;
                       }
                     }
                     // XML Base, document-wide: later elements inherit it
                     if (p == 0 && (p = rech_tageq(html, "xml:base")) != 0) {
-                      p_type = 2;
+                      p_type = HTS_LINK_BASE;
                       p_xmlbase = HTS_TRUE;
                     }
 
@@ -1982,8 +1995,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       p = rech_tageq(html, "code");
                       if (p) {
                         if ((intag_start_valid) && check_tag(intag_start, "applet")) {  // dans un <applet !
-                          p_type =
-                              -1; // the bare file name, written before codebase
+                          // the codebase is written before it
+                          p_type = HTS_LINK_APPLET_CODE;
                           add_class = 1; // add .class if missing
 
                           // A codebase= after code= is swapped before it.
@@ -2020,7 +2033,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                   memcpy(modify, tempo, strlen(tempo));
                                   fetch_tag.name = NULL; /* the tag changed */
                                   p = 0; // the link moved, so drop it
-                                  p_type = 0;
+                                  p_type = HTS_LINK_PLAIN;
                                   add_class = 0;
                                 }
                               }
@@ -2035,7 +2048,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       p = rech_tageq(html, "codebase");
                       if (p) {
                         if ((intag_start_valid) && check_tag(intag_start, "applet")) {  // dans un <applet !
-                          p_type = -2;
+                          p_type = HTS_LINK_CODEBASE;
                         } else
                           p = -1;       // ne plus chercher
                       }
@@ -2296,7 +2309,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
               p_nocatch = 1;
 
             // écrire codebase avant, flusher avant code
-            if ((p_type == -1) || (p_type == -2)) {
+            if (p_type == HTS_LINK_APPLET_CODE || p_type == HTS_LINK_CODEBASE) {
               HT_add_adr;       // refresh
               lastsaved = html; // one past the last byte written
             }
@@ -2379,12 +2392,12 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
             eadr = html;
 
             // ne pas flusher après code si on doit écrire le codebase avant!
-            if ((p_type != -1) && (p_type != 2) && (p_type != -2)) {
+            if (p_type != HTS_LINK_APPLET_CODE && !link_role_is_base(p_type)) {
               HT_add_adr;       // refresh
               lastsaved = html; // one past the last byte written
               // après on écrira soit les données initiales,
               // soir une URL/lien modifié!
-            } else if (p_type == -1)
+            } else if (p_type == HTS_LINK_APPLET_CODE)
               p_flush = html;    // flusher jusqu'à adr ensuite
 
             if (ok != -1) {     // continuer
@@ -2458,7 +2471,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                 if (*html != '#') {      // Not empty+unique #
                   if (eadr - html == 1) {    // 1=link empty with delim (end_adr-start_adr)
                     // "#" would land before an unflushed base's name
-                    if (quote && p_type != 2 && p_type != -2) {
+                    if (quote && !link_role_is_base(p_type)) {
                       HT_ADD("#"); // We add this for a <href="">
                     }
                   }
@@ -2715,7 +2728,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                 // yes, this is dirty
                 // but I'm so lazzy..
                 // and besides the java "code" convention is really a pain in html code
-                if (p_type == -1) {
+                if (p_type == HTS_LINK_APPLET_CODE) {
                   char *a = strrchr(lien, '.');
 
                   add_class_dots_to_patch = 0;
@@ -2747,9 +2760,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   hts_log_print(opt, LOG_DEBUG, "position link check %s",
                                 url_nologin(opt, lien));
 
-                  if ((p_type == 2) || (p_type == -2)) {        // code ou codebase                        
-                    // Vérifier les codebase=applet (au lieu de applet/)
-                    if (p_type == -2) { // codebase
+                  if (link_role_is_base(p_type)) {
+                    // a codebase names a directory
+                    if (p_type == HTS_LINK_CODEBASE) {
                       if (strnotempty(lien)) {
                         if (hts_lastchar(lien) != '/') { // pas répertoire
                           strcatbuff(lien, "/");
@@ -2759,7 +2772,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
                     /* A base with no authority is relative per RFC 3986 5.2,
                        except the hostname shape legacy markup writes. */
-                    if (p_type == 2 && !link_has_authority(lien) &&
+                    if (p_type == HTS_LINK_BASE && !link_has_authority(lien) &&
                         link_base_is_hostname(lien)) {
                       char BIGSTK tmp[HTS_URLMAXSIZE * 2];
 
@@ -2809,7 +2822,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     }
 
                     if (!error) {       // pas d'erreur?
-                      if (p_type == 2) { // code ET PAS codebase
+                      if (p_type == HTS_LINK_BASE) {
                         char *a = hts_lastcharptr(lien);
                         char *start_of_filename = jump_identification(lien);
 
@@ -2831,16 +2844,13 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                           error = 1;    // erreur, ne pas poursuivre
                         }
                       }
-                      // stocker base ou codebase?
-                      switch (p_type) {
-                      case 2: {
+                      // remember the base or the codebase
+                      if (p_type == HTS_LINK_BASE) {
                         // browsers ignore xml:base in HTML
                         if (!p_xmlbase || !is_html_mime_type(r->contenttype))
                           strlcpybuff(base, lien, HTS_URLMAXSIZE * 2);
-                      } break; // base
-                      case -2: {
+                      } else {
                         strlcpybuff(codebase, lien, HTS_URLMAXSIZE * 2);
-                      } break; // base
                       }
 
                       hts_log_print(
@@ -2851,7 +2861,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   } else {
                     char *_base;
 
-                    if (p_type == -1)   // code (applet)
+                    if (p_type == HTS_LINK_APPLET_CODE)
                       _base = codebase;
                     else
                       _base = base;
@@ -2913,7 +2923,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         }
                       }
                     }
-
                   }
                 }
                 // transformer lien quelconque (http, relatif, etc) en une adresse
@@ -2966,7 +2975,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                 // Tester si un lien doit être accepté ou refusé (wizard)
                 // forbidden_url=1 : lien refusé
                 // forbidden_url=0 : lien accepté
-                if ((p_type != 2) && (p_type != -2)) {  // tester autorisations?
+                if (!link_role_is_base(p_type)) { // check the filters
                   if (!p_nocatch) {
                     if (afs.af.adr[0] != '\0') {
                       hts_log_print(opt, LOG_DEBUG,
@@ -3016,7 +3025,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   // dans ce cas on aura une référence directe au lieu des traditionnels
                   // moved en cascade (impossible à reproduire à priori en local, lorsque des fichiers
                   // gif sont impliqués par exemple)
-                  if ((p_type != 2) && (p_type != -2)) {        // pas base href ou codebase
+                  if (!link_role_is_base(p_type)) {
                     if (forbidden_url != 1) {
                       char BIGSTK last_adr[HTS_URLMAXSIZE * 2];
 
@@ -3035,7 +3044,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         // Tester si un lien doit être accepté ou refusé (wizard)
                         // forbidden_url=1 : lien refusé
                         // forbidden_url=0 : lien accepté
-                        if ((ptr > 0) && (p_type != 2) && (p_type != -2)) {     // tester autorisations?
+                        if ((ptr > 0) &&
+                            !link_role_is_base(p_type)) { // check the filters
                           if (!p_nocatch) {
                             if (afs.af.adr[0] != '\0') {
                               hts_log_print(
@@ -3070,7 +3080,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     const parse_fetch_flags flags = {
                         .redirect_stub = HTTP_IS_REDIRECT(r->statuscode),
                         .meta_refresh = p_searchMETAURL,
-                        .opaque = in_media != NULL || p_type != 0,
+                        .opaque = in_media != NULL || p_type != HTS_LINK_PLAIN,
                         .inscript = inscript,
                         .incss = incss,
                         .tagless_body = sf_tagless_body};
@@ -3083,9 +3093,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   if (former.adr[0] != '\0')
                     link_fetch.dest = HTS_FETCH_DEST_UNKNOWN;
                   // resolve unresolved type
-                  if (r_sv != -1 && p_type != 2 && p_type != -2
-                      && forbidden_url == 0 && IS_DELAYED_EXT(afs.save)
-                    ) {
+                  if (r_sv != -1 && !link_role_is_base(p_type) &&
+                      forbidden_url == 0 && IS_DELAYED_EXT(afs.save)) {
                     time_t t;
 
                     // pas d'erreur, on continue
@@ -3110,7 +3119,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     /* log */
                     if ((opt->debug > 1) && (opt->log != NULL)) {
                       if (forbidden_url != 1) { // le lien va être chargé
-                        if ((p_type == 2) || (p_type == -2)) {  // base href ou codebase, pas un lien
+                        if (link_role_is_base(p_type)) { // not a link to fetch
                           hts_log_print(opt, LOG_DEBUG, "Code/Codebase: %s%s",
                                         adr_nologin(opt, afs.af.adr),
                                         afs.af.fil);
@@ -3137,12 +3146,12 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     /* FIN log */
 
                     // écrire lien
-                    if ((p_type == 2) || (p_type == -2)) {      // base href ou codebase, sauter
+                    if (link_role_is_base(p_type)) { // skip it
                       /* An emptied base href leaves <base >, which means "no
                          base" and stops a framework that requires one (Angular
                          throws). An empty href keeps the document itself as the
                          base, so every reference resolves as it did. */
-                      if (p_type == 2)
+                      if (p_type == HTS_LINK_BASE)
                         HT_ADD(p_xmlbase ? "xml:base=\"\"" : "href=\"\"");
                       // resume at the attribute's end, not at a '#' inside it
                       {
@@ -3184,7 +3193,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                     // externe!
                       /* Not only output: also writes external.html or .gif. */
                       if (sink.enabled) {
-                        if (p_type != -1) { // a link, not a java class name
+                        if (p_type != HTS_LINK_APPLET_CODE) { // not a class
                           if (!opt->external) {
                             sink_add_absolute_url(&sink, afs.af.adr, afs.af.fil,
                                                   opt->passprivacy, HTS_TRUE);
@@ -3420,7 +3429,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                             relativesavename(), tempo);
 
                         // lien applet (code) - il faut placer un codebase avant
-                        if (p_type == -1) {     // que le nom de fichier
+                        if (p_type == HTS_LINK_APPLET_CODE) {
 
                           if (p_flush) {
                             char BIGSTK tempo_pat[HTS_URLMAXSIZE * 2];
@@ -3480,7 +3489,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                              we cannot name must not reach the classifier. */
                           const char sf_class =
                               (opt->single_file && sf_may_mark && !in_media &&
-                               p_type == 0 && !p_searchMETAURL &&
+                               p_type == HTS_LINK_PLAIN && !p_searchMETAURL &&
                                (sf_tag != NULL || sf_tagless_body))
                                   ? singlefile_ref_class(sf_tag, tag_attr_start,
                                                          r->adr)
@@ -3535,8 +3544,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                     afs.save);
                     }
 
-                    if ((afs.af.adr[0] != '\0') && (p_type != 2) &&
-                        (p_type != -2) &&
+                    if ((afs.af.adr[0] != '\0') && !link_role_is_base(p_type) &&
                         (forbidden_url !=
                          1)) { // if the file does not exist, add it to the list
                       /* A front end's hts_addurl() can fill the cap after the

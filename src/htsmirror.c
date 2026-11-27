@@ -832,8 +832,8 @@ void hts_mirror_process_user_interaction(htsmoduleStruct *str,
 Wait for next file and
 check 301, 302, .. statuscodes (moved)
 */
-int hts_mirror_wait_for_next_file(htsmoduleStruct *str,
-                                  htsmoduleStructExtended *stre) {
+hts_next_file hts_mirror_wait_for_next_file(htsmoduleStruct *str,
+                                            htsmoduleStructExtended *stre) {
   /* Load engine variables */
   ENGINE_DEFINE_CONTEXT();
   int b;
@@ -857,7 +857,7 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct *str,
     hts_log_print(opt, LOG_DEBUG, "Link is now ready %s%s",
                   adr_nologin(opt, urladr()), urlfil());
     // We are ready
-    return 2; // goto jump_if_done;
+    return HTS_NEXT_FILE_DONE;
   }
   // si le fichier n'est pas en backing, le mettre..
   if (!back_exist(str->sback, str->opt, urladr(), urlfil(), savename())) {
@@ -912,12 +912,12 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct *str,
       if (!back_checkmirror(opt)) {
         hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
         hts_store_release_int(stre->exit_xh_, 1); // exit requested
-        return 0;
+        return HTS_NEXT_FILE_CONTINUE;
       }
       /* An exit asked of the engine must leave this wait too: only teardown
          stops a live FTP worker, so waiting on its slot never ends (#1096). */
       if (hts_load_acquire_int(stre->exit_xh_)) {
-        return 0;
+        return HTS_NEXT_FILE_CONTINUE;
       }
       // And fill the backing stack
       if (hts_load_acquire_int(&back[b].status) > 0)
@@ -1006,7 +1006,7 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct *str,
         if (!hts_loop_tick(sback, opt, b, ptr)) {
           hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
           hts_store_release_int(stre->exit_xh_, 1); // exit requested
-          return 0;
+          return HTS_NEXT_FILE_CONTINUE;
         }
       }
 
@@ -1102,7 +1102,7 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct *str,
                     "link #%d is ready, no more on the stack, skipping: %s%s..",
                     ptr, adr_nologin(opt, urladr()), urlfil());
 
-      return 2; // goto jump_if_done;
+      return HTS_NEXT_FILE_DONE;
     }
 
     if (!opt->verbosedisplay) {
@@ -1148,7 +1148,7 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct *str,
   }
 
   ENGINE_SAVE_CONTEXT();
-  return 0;
+  return HTS_NEXT_FILE_CONTINUE;
 }
 
 /* Recheck a link against its known MIME type; true when filters forbid it. */

@@ -302,26 +302,26 @@ int index_keyword(hts_span html, const char *mime, const char *filename,
 }
 
 /* Close a word's block: its total, or "ignored" over it if it is too common. */
-static void index_close_word(FILE *fp, int mode, LLint total_hit,
+static void index_close_word(FILE *fp, hts_kindex mode, LLint total_hit,
                              LLint total_line, int index, long last_pos) {
-  if (mode == 1) // TEXT
+  if (mode == HTS_KINDEX_TEXT)
     fprintf(fp, "\t=%lld\r\n", (long long) total_hit);
   if ((((total_hit * 1000) / indexer.words) >= KEYW_USELESS1K) ||
       (((total_line * 1000) / index) >= KEYW_USELESS1KPG)) {
     fseek(fp, last_pos, SEEK_SET);
-    if (mode == 1) // TEXT
+    if (mode == HTS_KINDEX_TEXT)
       fprintf(fp, "\tignored (%d)\r\n",
               (int) ((total_hit * 1000) / indexer.words));
     else
       fprintf(fp, "(ignored) [%lld hits]<br>\r\n", (long long) total_hit);
   } else {
-    if (mode == 1) // TEXT
+    if (mode == HTS_KINDEX_TEXT)
       fprintf(fp, "\t(%d)\r\n", (int) ((total_hit * 1000) / indexer.words));
   }
 }
 
 /* Write the HTML or text index of the sorted lines tab[0..index-1]. */
-static void index_write(FILE *fp, int mode, char **tab, int index) {
+static void index_write(FILE *fp, hts_kindex mode, char **tab, int index) {
   char current_word[KEYW_LEN + 32];
   char word[KEYW_LEN + 32];
   int hit;
@@ -334,7 +334,7 @@ static void index_write(FILE *fp, int mode, char **tab, int index) {
   HTS_STATIC_ASSERT(sizeof(word) == 82, keyw_scan_width_matches);
   current_word[0] = '\0';
 
-  if (mode == 2) { // HTML
+  if (mode == HTS_KINDEX_HTML) {
     for (i = 0; i < index; i++) {
       if (word0 != tab[i][0]) {
         word0 = tab[i][0];
@@ -362,7 +362,7 @@ static void index_write(FILE *fp, int mode, char **tab, int index) {
     if (strcmp(word, current_word)) { /* New word */
       if (total_hit)
         index_close_word(fp, mode, total_hit, total_line, index, last_pos);
-      if (mode == 1) // TEXT
+      if (mode == HTS_KINDEX_TEXT)
         fprintf(fp, "%s\r\n", word);
       else { // HTML
         fprintf(fp, "</td></tr>\r\n");
@@ -380,14 +380,14 @@ static void index_write(FILE *fp, int mode, char **tab, int index) {
     }
     total_hit += hit;
     total_line++;
-    if (mode == 1) // TEXT
+    if (mode == HTS_KINDEX_TEXT)
       fprintf(fp, "\t%d %s\r\n", hit, a);
     else // HTML
       fprintf(fp, "<a href=\"%s\">%s</a> [%d hits]<br>\r\n", a, a, hit);
   }
   if (total_hit)
     index_close_word(fp, mode, total_hit, total_line, index, last_pos);
-  if (mode == 2) // HTML
+  if (mode == HTS_KINDEX_HTML)
     fprintf(fp, "</td></tr>\r\n</table>\r\n");
   /* an "ignored" rewind can leave old bytes past the end */
   if (fflush(fp) == 0 && ftell(fp) >= 0)
@@ -399,7 +399,7 @@ static void index_write(FILE *fp, int mode, char **tab, int index) {
   Sort index!
 */
 /* Note: NOT utf-8 */
-void index_finish(const char *indexpath, int mode) {
+void index_finish(const char *indexpath, hts_kindex mode) {
   char catbuff[CATBUFF_SIZE];
   char **tab = NULL;
   char *blk = NULL;
@@ -435,7 +435,7 @@ void index_finish(const char *indexpath, int mode) {
   indexer.tmp = NULL;
 
   fp = FOPEN(concat(catbuff, sizeof(catbuff), indexpath,
-                    mode == 1 ? "index.txt" : "sindex.html"),
+                    mode == HTS_KINDEX_TEXT ? "index.txt" : "sindex.html"),
              "wb");
   if (fp) {
     index_write(fp, mode, tab, index);

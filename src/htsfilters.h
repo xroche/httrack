@@ -44,13 +44,17 @@ Please visit our Website: http://www.httrack.com
    longer rule could only be stored dead (#1270). */
 #define STRJOKER_MAXLEN (HTS_URLMAXSIZE * 2)
 
-int fa_strjoker(int type, char **filters, int nfil, const char *nom, LLint * size,
-                int *size_flag, int *depth);
+/* Which filters fa_strjoker() applies: the URL ones, or the +mime: ones. */
+typedef enum hts_joker_kind { HTS_JOKER_URL, HTS_JOKER_MIME } hts_joker_kind;
+
+int fa_strjoker(hts_joker_kind type, char **filters, int nfil, const char *nom,
+                LLint *size, int *size_flag, int *depth);
 /* fa_strjoker() on both URL forms the engine builds (nom1 full, nom2 without
    scheme); the match latest in the list wins, a "don't know" verdict defers.
    Returns the merged verdict; the out-params carry the winner's values. */
-int fa_strjoker_dual(int type, char **filters, int nfil, const char *nom1,
-                     const char *nom2, LLint *size, int *size_flag, int *depth);
+int fa_strjoker_dual(hts_joker_kind type, char **filters, int nfil,
+                     const char *nom1, const char *nom2, LLint *size,
+                     int *size_flag, int *depth);
 HTS_INLINE const char *strjoker(const char *chaine, const char *joker, LLint * size,
                           int *size_flag);
 /* strjoker() without the failure memo (exponential worst case); test-only
