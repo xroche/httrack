@@ -255,8 +255,8 @@ HTS_CHECK_RESULT hts_boolean may_unknown(httrackp *opt, const char *st);
 char *fslash(hts_buf dst, const char *a);
 
 /** Write @p dir then @p name into @p b, with one '/' between them unless
-    either is empty or has one there. FALSE, with @p b emptied, unless it all
-    fits, so a part is never dropped. */
+    either is empty or has one there. NULL reads as "", as in concat(). FALSE,
+    with @p b emptied, unless it all fits, so a part is never dropped. */
 HTS_CHECK_RESULT hts_boolean hts_path_join(hts_buf b, const char *dir,
                                            const char *name);
 

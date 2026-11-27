@@ -10,14 +10,14 @@ set -euo pipefail
 . "${0%"${0##*/}"}./crawllib.sh"
 
 # The count is exact, so a shrinking table shows.
-selftest_queue_lines "pathjoin: 19 cases, 0 failures
+selftest_queue_lines "pathjoin: 28 cases, 0 failures
 pathjoin: OK" pathjoin
 selftest_run_queued
 
 require_httrack
-# MAX_PATH sits far under the output-path cap there, so only the self-test runs.
+# Windows runs the self-test alone, so this exits rather than skips.
 if target_is_windows; then
-    echo "no long-path crawl on Windows"
+    echo "SKIP: the long-path crawl, as MAX_PATH sits under the output cap"
     exit 0
 fi
 
@@ -36,6 +36,14 @@ rm -f "${home}/o/probe"
 name=$(printf 'w%.0s' {1..300})
 
 local_server_start --log "${tmpdir}/server.log"
+
+# Control: a short name still gets its segment, so refusing every name fails.
+local_crawl --log "${tmpdir}/short.log" --quiet --robots=0 -O "${tmpdir}/short" \
+    --warc-file short --warc-max-size 1000000 \
+    "${BASEURL}/mini304/index.html" || fail "the short-name crawl exited $?"
+test -s "${tmpdir}/short/short-00000.warc.gz" ||
+    fail "a short WARC name produced no archive"
+ok "a short WARC name produces its archive"
 
 # Rotation names segments after the archive, so a dropped name left a
 # "-00000.warc" in the output directory.
