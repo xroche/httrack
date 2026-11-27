@@ -1,0 +1,44 @@
+#!/bin/bash
+#
+# A redirect whose target finds the -#L link table full cancels the link, so
+# the redirect's own body never lands under the image's name.
+
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+require_httrack
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ctxcap.XXXXXX") || exit 1
+cleanup() { rm -rf "$tmpdir"; }
+cleanup_push cleanup
+
+local_server_start --log "${tmpdir}/server.log"
+
+# -%N0 leaves the redirect to the mirror loop rather than the type probe.
+crawl() { # crawl NAME CAP
+    local_crawl --log "${tmpdir}/out-$1" --quiet --robots=0 -c1 --timeout=20 \
+        "-%N0" -O "${tmpdir}/$1" "${BASEURL}/ctxcap/index.html" "-#L$2"
+    site="${tmpdir}/$1/127.0.0.1_${SRV_PORT}/ctxcap"
+}
+
+target='GIF89a-CTXCAP-TARGET'
+
+# --- control: with room for every redirect, each image is its target -------
+crawl room 0
+for n in a b c; do
+    assert_eq "$target" "$(<"${site}/${n}.gif")" "${n}.gif without a cap"
+done
+ok "with room, each redirected image holds its target"
+
+# --- 6 slots: the page and three images, then two of the three redirects ----
+crawl cap 6
+grep -q "/ctxcap/c\.gif[[:space:]]" "${tmpdir}/cap/hts-cache/new.txt" ||
+    fail "the capped crawl never fetched c.gif, so nothing here is about it"
+assert_eq "$target" "$(<"${site}/a.gif")" "a.gif, whose redirect fitted"
+for n in b c; do
+    test ! -e "${site}/${n}.gif" ||
+        fail "${n}.gif was written although its redirect was cancelled: $(<"${site}/${n}.gif")"
+done
+ok "a redirect that cannot be recorded leaves no file behind"

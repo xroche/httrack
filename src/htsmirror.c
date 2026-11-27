@@ -131,7 +131,7 @@ int hts_mirror_check_moved(htsmoduleStruct *str,
 
   // DEBUT rattrapage des 301,302,307..
   // ------------------------------------------------------------
-  if (!error) {
+  if (!*stre->error_) {
 
     // ------------------------------------------------------------
     // Rattrapage des 301,302,307 (moved) et 412,416 - les 304 le sont dans le
@@ -174,7 +174,7 @@ int hts_mirror_check_moved(htsmoduleStruct *str,
           if (hts_streq_ci(moved->adr, urladr()) &&
               hts_streq_ci(moved->fil, urlfil())) {
             if (strcmp(moved->fil, urlfil()) == 0) {
-              error = 1;
+              *stre->error_ = 1;
               get_it = -1; // do nothing
               hts_log_print(opt, LOG_WARNING,
                             "Can not bear crazy server (%s) for %s%s", r->msg,
@@ -219,7 +219,7 @@ int hts_mirror_check_moved(htsmoduleStruct *str,
                           adr_nologin(opt, urladr()), urlfil(),
                           adr_nologin(opt, moved->adr), moved->fil);
             // canceller lien actuel
-            error = 1;
+            *stre->error_ = 1;
             hts_invalidate_link(opt, ptr); // invalidate hashtable entry
             // noter NOUVEAU lien
             {
@@ -365,7 +365,7 @@ int hts_mirror_check_moved(htsmoduleStruct *str,
           heap_top()->fetch = heap(ptr)->fetch;
           heap_top()->premier = heap(ptr)->premier;
           heap_top()->precedent = heap(ptr)->precedent;
-          error = 1;
+          *stre->error_ = 1;
           hts_invalidate_link(opt, ptr); // invalidate hashtable entry
         } else {                         // out of memory
           return 0;
@@ -374,11 +374,11 @@ int hts_mirror_check_moved(htsmoduleStruct *str,
         hts_log_print(opt, LOG_WARNING,
                       "Giving up on partial reget (%s) for %s%s", r->msg,
                       adr_nologin(opt, urladr()), urlfil());
-        error = 1;
+        *stre->error_ = 1;
       }
 
       // Error ?
-      if (error) {
+      if (*stre->error_) {
         if (!opt->errpage) {
           if (r->adr) { // désalloc
             freet(r->adr);
@@ -491,7 +491,7 @@ int hts_mirror_check_moved(htsmoduleStruct *str,
           if (heap(ptr)->precedent != 0) {
             // ici on teste si on doit enregistrer la page tout de même
             if (opt->errpage) {
-              store_errpage = 1;
+              *stre->store_errpage_ = 1;
             }
           } else {
             if (strcmp(urlfil(), "/robots.txt") != 0) {
@@ -569,12 +569,12 @@ int hts_mirror_check_moved(htsmoduleStruct *str,
         hts_log_print(opt, LOG_DEBUG, "Info: no robots.txt at %s%s",
                       adr_nologin(opt, urladr()), urlfil());
       }
-      if (!store_errpage) {
+      if (!*stre->store_errpage_) {
         if (r->adr) { // désalloc
           freet(r->adr);
           r->adr = NULL;
         }
-        error = 1; // erreur!
+        *stre->error_ = 1;
       }
       // otherwise, consider this is not an error
     }
@@ -582,9 +582,6 @@ int hts_mirror_check_moved(htsmoduleStruct *str,
     // ------------------------------------------------------------
 
   } // if !error
-
-  /* Apply changes */
-  ENGINE_SAVE_CONTEXT();
 
   return 0;
 }
@@ -662,7 +659,7 @@ void hts_mirror_process_user_interaction(htsmoduleStruct *str,
     }
     // after receving N bytes, pause
     if (opt->fragment > 0) {
-      if ((HTS_STAT.stat_bytes - stat_fragment) > opt->fragment) {
+      if ((HTS_STAT.stat_bytes - *stre->stat_fragment_) > opt->fragment) {
         do_pause = 1;
       }
     }
@@ -696,7 +693,7 @@ void hts_mirror_process_user_interaction(htsmoduleStruct *str,
                   (LLint) HTS_STAT.stat_bytes);
           fclose(fp);
         }
-        stat_fragment = HTS_STAT.stat_bytes;
+        *stre->stat_fragment_ = HTS_STAT.stat_bytes;
         /* Info for wrappers */
         hts_log_print(opt, LOG_INFO, "engine: pause: %s",
                       hts_logpath(opt, "hts-paused.lock"));
@@ -823,7 +820,6 @@ void hts_mirror_process_user_interaction(htsmoduleStruct *str,
     }
     opt->state._hts_in_html_parsing = prev;
   }
-  ENGINE_SAVE_CONTEXT();
   return;
 }
 
@@ -834,7 +830,7 @@ check 301, 302, .. statuscodes (moved)
 hts_next_file hts_mirror_wait_for_next_file(htsmoduleStruct *str,
                                             htsmoduleStructExtended *stre) {
   /* Load engine variables */
-  ENGINE_DEFINE_CONTEXT();
+  ENGINE_LOAD_CONTEXT();
   int b;
   int n;
 
@@ -845,11 +841,7 @@ hts_next_file hts_mirror_wait_for_next_file(htsmoduleStruct *str,
   }
 
   /* User interaction */
-  ENGINE_SAVE_CONTEXT();
-  {
-    hts_mirror_process_user_interaction(str, stre);
-  }
-  ENGINE_SET_CONTEXT();
+  hts_mirror_process_user_interaction(str, stre);
 
   /* Done while processing user interactions ? */
   if (heap(ptr)->pass2 == -1) {
@@ -886,11 +878,7 @@ hts_next_file hts_mirror_wait_for_next_file(htsmoduleStruct *str,
     // attendre que le fichier actuel soit prêt - BOUCLE D'ATTENTE
     do {
       /* User interaction */
-      ENGINE_SAVE_CONTEXT();
-      {
-        hts_mirror_process_user_interaction(str, stre);
-      }
-      ENGINE_SET_CONTEXT();
+      hts_mirror_process_user_interaction(str, stre);
 
       // index du lien actuel
       b = back_index(opt, sback, urladr(), urlfil(), savename());
@@ -931,16 +919,17 @@ hts_next_file hts_mirror_wait_for_next_file(htsmoduleStruct *str,
       if ((opt->makestat) || (opt->maketrack)) {
         TStamp l = time_local();
 
-        if ((int) (l - makestat_time) >= 60) {
+        if ((int) (l - *stre->makestat_time_) >= 60) {
           if (makestat_fp != NULL) {
             const LLint recv = hts_stat_recv_get();
 
             fspc(makestat_fp, "info");
-            fprintf(
-                makestat_fp, "Rate= %d (/" LLintP ") \11NewLinks= %d (/%d)" LF,
-                (int) ((recv - *stre->makestat_total_) / (l - makestat_time)),
-                (LLint) recv, (int) opt->lien_tot - *stre->makestat_lnk_,
-                (int) opt->lien_tot);
+            fprintf(makestat_fp,
+                    "Rate= %d (/" LLintP ") \11NewLinks= %d (/%d)" LF,
+                    (int) ((recv - *stre->makestat_total_) /
+                           (l - *stre->makestat_time_)),
+                    (LLint) recv, (int) opt->lien_tot - *stre->makestat_lnk_,
+                    (int) opt->lien_tot);
             fflush(makestat_fp);
             *stre->makestat_total_ = recv;
             *stre->makestat_lnk_ = heap_top_index();
@@ -956,7 +945,7 @@ hts_next_file hts_mirror_wait_for_next_file(htsmoduleStruct *str,
             fprintf(stre->maketrack_fp, LF);
             fflush(stre->maketrack_fp);
           }
-          makestat_time = l;
+          *stre->makestat_time_ = l;
         }
       }
 
@@ -1146,7 +1135,6 @@ hts_next_file hts_mirror_wait_for_next_file(htsmoduleStruct *str,
     }
   }
 
-  ENGINE_SAVE_CONTEXT();
   return HTS_NEXT_FILE_CONTINUE;
 }
 
@@ -1601,8 +1589,6 @@ int hts_wait_delayed(htsmoduleStruct *str, lien_adrfilsave *afs,
     }
 
   } // delayed type check ?
-
-  ENGINE_SAVE_CONTEXT_BASE();
 
   return 0;
 }

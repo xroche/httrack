@@ -1734,6 +1734,24 @@ class Handler(SimpleHTTPRequestHandler):
     def route_redirfail_gone(self):
         self.send_raw(b"<html><body><p>REDIRFAIL-GONE</p></body></html>", "text/html")
 
+    # --- redirects that arrive once the -#L link table is full -------------
+    # Each image moves to another name, so recording its target needs a slot.
+    def route_ctxcap_index(self):
+        self.send_html("".join('<img src="%s.gif">\n' % n for n in "abc"))
+
+    def route_ctxcap_image(self):
+        name = urlsplit(self.path).path.rsplit("/", 1)[1]
+        body = b"<html><body>CTXCAP-MOVED-BODY</body></html>"
+        self.send_response(301, "Moved Permanently")
+        self.send_header("Location", "/ctxcap/moved/" + name)
+        self.send_header("Content-Type", "text/html")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def route_ctxcap_moved(self):
+        self.send_raw(b"GIF89a-CTXCAP-TARGET", "image/gif")
+
     # --- a hub failing on two consecutive updates (#1395) ------------------
     # Crawl 2 holds the purge on the cached page from crawl 1 and writes no
     # entry of its own, leaving crawl 3 nothing in the cache to key on.
@@ -3740,6 +3758,22 @@ class Handler(SimpleHTTPRequestHandler):
         time.sleep(self.LATENCY_SECONDS)
         self.send_html("late page")
 
+    # A crawl that outlasts the one-minute -#Z statistics period (test 2601).
+    STATPERIOD_SECONDS = 1.0
+    STATPERIOD_PAGES = 64
+
+    def route_statperiod(self):
+        if self.path.split("?")[0] == "/statperiod/index.html":
+            self.send_html(
+                "".join(
+                    '<a href="p%d.html">p%d</a>\n' % (i, i)
+                    for i in range(self.STATPERIOD_PAGES)
+                )
+            )
+            return
+        time.sleep(self.STATPERIOD_SECONDS)
+        self.send_html("slow page")
+
     # Repeated Content-Length fields: each file sends DUPCL_BODY under the
     # header values listed. Values that disagree must drop the response.
     DUPCL_BODY = b"0123456789abcdef"
@@ -4664,6 +4698,13 @@ class Handler(SimpleHTTPRequestHandler):
         "/redirfail/rtarget.html": route_redirfail_target,
         "/redirfail/rchild.html": route_redirfail_child,
         "/redirfail/rgone.html": route_redirfail_gone,
+        "/ctxcap/index.html": route_ctxcap_index,
+        "/ctxcap/a.gif": route_ctxcap_image,
+        "/ctxcap/b.gif": route_ctxcap_image,
+        "/ctxcap/c.gif": route_ctxcap_image,
+        "/ctxcap/moved/a.gif": route_ctxcap_moved,
+        "/ctxcap/moved/b.gif": route_ctxcap_moved,
+        "/ctxcap/moved/c.gif": route_ctxcap_moved,
         "/twicefail/index.html": route_twicefail_index,
         "/twicefail/thub.html": route_twicefail_hub,
         "/twicefail/talt.html": route_twicefail_alt,
@@ -5159,6 +5200,9 @@ class Handler(SimpleHTTPRequestHandler):
             return True
         if path.startswith("/latency/"):
             self.route_latency()
+            return True
+        if path.startswith("/statperiod/"):
+            self.route_statperiod()
             return True
         if path.startswith("/charset/"):
             self.route_charset()
