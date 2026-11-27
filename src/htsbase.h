@@ -64,12 +64,30 @@ extern "C" {
 #endif
 #include <assert.h>
 
-/* min/max evaluate their arguments twice; pass side-effect-free expressions. */
-#undef min
-#undef max
-#define min(a,b) ((a)>(b)?(b):(a))
+/* Typed min/max: each argument is evaluated once, at the named type. */
+static HTS_INLINE HTS_UNUSED int hts_min_int(int a, int b) {
+  return a < b ? a : b;
+}
 
-#define max(a,b) ((a)>(b)?(a):(b))
+static HTS_INLINE HTS_UNUSED int hts_max_int(int a, int b) {
+  return a > b ? a : b;
+}
+
+static HTS_INLINE HTS_UNUSED size_t hts_min_size(size_t a, size_t b) {
+  return a < b ? a : b;
+}
+
+static HTS_INLINE HTS_UNUSED size_t hts_max_size(size_t a, size_t b) {
+  return a > b ? a : b;
+}
+
+static HTS_INLINE HTS_UNUSED int64_t hts_min_i64(int64_t a, int64_t b) {
+  return a < b ? a : b;
+}
+
+static HTS_INLINE HTS_UNUSED int64_t hts_max_i64(int64_t a, int64_t b) {
+  return a > b ? a : b;
+}
 
 #ifndef _WIN32
 #undef Sleep

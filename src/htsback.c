@@ -821,7 +821,7 @@ static LLint back_slot_incache(const lien_back *back) {
   const LLint size = hts_load_relaxed_llint(&back->r.size);
   const LLint total = hts_load_relaxed_llint(&back->r.totalsize);
 
-  return max(size, total);
+  return hts_max_i64(size, total);
 }
 
 /* Estimated bytes of the pages and files held in memory. */
@@ -4322,10 +4322,10 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               back[i].chunk_size = back[i].r.size;      // taille taille chunk
               memcpy(&(back[i].r), &r, sizeof(htsblk)); // restaurer véritable r
             } else if (back[i].is_chunk) { // chunked: cap the read size
-              retour_fread =
-                (int) http_xfread1(&(back[i].r),
-                                   (int) min(back[i].r.totalsize -
-                                             back[i].r.size, max_read_bytes));
+              retour_fread = (int) http_xfread1(
+                  &(back[i].r),
+                  (int) hts_min_i64(back[i].r.totalsize - back[i].r.size,
+                                    max_read_bytes));
             } else
               retour_fread =
                 (int) http_xfread1(&(back[i].r), (int) max_read_bytes);
@@ -5451,7 +5451,7 @@ static int back_checksize(httrackp *opt, lien_back *eback,
   if (check_only_totalsize)
     size_to_test = eback->r.totalsize;
   else
-    size_to_test = max(eback->r.totalsize, eback->r.size);
+    size_to_test = hts_max_i64(eback->r.totalsize, eback->r.size);
   if (size_to_test >= 0) {
 
     /* Interdiction taille par le wizard? */
@@ -5472,7 +5472,7 @@ static int back_checksize(httrackp *opt, lien_back *eback,
 
 /* Grace left to the smooth stop before in-flight transfers are aborted. */
 static int back_maxtime_grace(const int maxtime) {
-  return maximum(5, minimum(30, maxtime / 10));
+  return hts_max_int(5, hts_min_int(30, maxtime / 10));
 }
 
 /* Bytes the smooth stop may overrun before in-flight transfers are aborted. */

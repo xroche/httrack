@@ -3561,7 +3561,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                           if (!ishtml(opt, afs.af.fil))
                             pass_fix = 1;       // priorité inférieure (traiter après)
                           else
-                            pass_fix = max(0, numero_passe);    // priorité normale
+                            pass_fix =
+                                hts_max_int(0, numero_passe); // normal priority
                         }
 
                         /* If the file seems to be an html file, get depth-1 */
@@ -3586,8 +3587,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                     heap(i)->fil);
                               }
                             }
-                            heap(i)->depth =
-                              maximum(heap(i)->depth, heap(ptr)->depth - 1);
+                            heap(i)->depth = hts_max_int(heap(i)->depth,
+                                                         heap(ptr)->depth - 1);
                             dejafait = 1;
                           }
                         }
@@ -3621,7 +3622,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                       heap_top()->premier = heap_top_index();
                                       heap_top()->precedent = ptr;
                                       heap_top()->depth = 0;
-                                      heap_top()->pass2 = max(0, numero_passe);
+                                      heap_top()->pass2 =
+                                          hts_max_int(0, numero_passe);
                                       heap_top()->retry = 0;
                                       hts_log_print(
                                           opt, LOG_DEBUG,
@@ -3668,7 +3670,10 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                           if (!set_prio_to)
                             heap_top()->depth = heap(ptr)->depth - 1;
                           else
-                            heap_top()->depth = max(0, min(heap(ptr)->depth - 1, set_prio_to - 1));       // PRIORITE NULLE (catch page)
+                            /* lowest priority (catch page) */
+                            heap_top()->depth =
+                                hts_max_int(0, hts_min_int(heap(ptr)->depth - 1,
+                                                           set_prio_to - 1));
                           // noter pass
                           heap_top()->pass2 = pass_fix;
                           heap_top()->retry = opt->retry;

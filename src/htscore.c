@@ -1018,7 +1018,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
   cache.kept = cache_kept;
 
   // effacer filters
-  opt->maxfilter = maximum(opt->maxfilter, 128);
+  opt->maxfilter = hts_max_int(opt->maxfilter, 128);
   if (filters_init(&filters, opt->maxfilter, 0) == 0) {
     printf("PANIC! : Not enough memory [%d]\n", __LINE__);
     XH_extuninit;
@@ -2243,7 +2243,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
     char BIGSTK infoupdated[256];
 
     const LLint recv = hts_stat_recv_get();
-    LLint n = (LLint) (recv / (max(1, time_local() - HTS_STAT.stat_timestart)));
+    LLint n = recv / hts_max_i64(1, time_local() - HTS_STAT.stat_timestart);
 
     sec2str(HTS_BUF(htstime), time_local() - HTS_STAT.stat_timestart);
     infoupdated[0] = '\0';
@@ -2742,7 +2742,7 @@ void filters_remove(httrackp *opt, int pos, int n) {
 
 int filters_init(char ***ptrfilters, int maxfilter, int filterinc) {
   char **filters = *ptrfilters;
-  int filter_max = maximum(maxfilter, 128);
+  int filter_max = hts_max_int(maxfilter, 128);
   int i;
 
   if (filters == NULL) {
@@ -3298,7 +3298,7 @@ int hts_connect_pace(httrackp *opt, int n, hts_boolean may_wait) {
     } else if (minLap != 0) {
       int nMax = (int) (lap / minLap);
 
-      n = min(n, nMax);
+      n = hts_min_int(n, nMax);
     }
   }
 
@@ -3381,7 +3381,7 @@ static int back_pluggable_sockets(struct_back *sback, httrackp *opt) {
   n = back_pluggable_sockets_strict(sback, opt);
 
   // vérifier qu'il restera assez de place pour les tests ensuite (en théorie, 1 entrée libre restante suffirait)
-  n = min(n, back_available(sback) - 8);
+  n = hts_min_int(n, back_available(sback) - 8);
 
   // no space left on backing stack - do not back anymore
   if (back_available(sback) <= 2)
@@ -3610,7 +3610,7 @@ HTSEXT_API int hts_is_parsing(httrackp * opt, int flag) {
   if (opt->state._hts_in_html_parsing) {        // parsing?
     if (flag >= 0)
       opt->state._hts_in_html_poll = 1; // faudrait un tit refresh
-    return max(opt->state._hts_in_html_done, 1);        // % effectués
+    return hts_max_int(opt->state._hts_in_html_done, 1); // % effectués
   } else {
     return 0;                   // non
   }
@@ -4010,8 +4010,8 @@ int htsAddLink(htsmoduleStruct * str, char *link) {
     }
     // adr = c'est la même
     // fil et save: save2 et fil2
-    prio_fix = maximum(heap(ptr)->depth - 1, 0);
-    pass_fix = max(heap(ptr)->pass2, numero_passe);
+    prio_fix = hts_max_int(heap(ptr)->depth - 1, 0);
+    pass_fix = hts_max_int(heap(ptr)->pass2, numero_passe);
     if (heap(ptr)->cod)
       strcpybuff(codebase, heap(ptr)->cod);    // codebase valable pour tt les classes descendantes
     if (strnotempty(codebase) == 0) {   // pas de codebase, construire
@@ -4143,7 +4143,7 @@ int htsAddLink(htsmoduleStruct * str, char *link) {
               int i = hash_read(hashptr, afs.save, NULL, HASH_STRUCT_FILENAME );    // lecture type 0 (sav)
 
               if (i >= 0) {
-                heap(i)->depth = maximum(heap(i)->depth, prio_fix);
+                heap(i)->depth = hts_max_int(heap(i)->depth, prio_fix);
                 dejafait = 1;
               }
             }
@@ -4170,8 +4170,10 @@ int htsAddLink(htsmoduleStruct * str, char *link) {
               if (!set_prio_to)
                 heap_top()->depth = prio_fix;
               else
-                heap_top()->depth = max(0, min(heap(ptr)->depth - 1, set_prio_to - 1));   // PRIORITE NULLE (catch page)
-              heap_top()->pass2 = max(pass_fix, numero_passe);
+                /* lowest priority (catch page) */
+                heap_top()->depth = hts_max_int(
+                    0, hts_min_int(heap(ptr)->depth - 1, set_prio_to - 1));
+              heap_top()->pass2 = hts_max_int(pass_fix, numero_passe);
               heap_top()->retry = opt->retry;
 
               hts_log_print(opt, LOG_DEBUG, "(module): OK, NOTE: %s%s -> %s",

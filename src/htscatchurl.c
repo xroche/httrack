@@ -237,8 +237,9 @@ catch_url_status catch_url_capture(T_SOC soc, hts_buf url, hts_buf method,
                 int pos = (int) strlen(data.p);
                 /* the headers already took part of data[], so bound the body by
                    the room they left rather than by a constant */
-                int len = (int) min(blkretour.totalsize,
-                                    (LLint) (data.size - 1 - (size_t) pos));
+                int len =
+                    (int) hts_min_i64(blkretour.totalsize,
+                                      (LLint) (data.size - 1 - (size_t) pos));
 
                 // Copier le reste (post éventuel)
                 while ((len > 0) &&
