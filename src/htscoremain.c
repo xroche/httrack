@@ -1146,7 +1146,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
             //
           } else if (hts_streq_ci(argv[i] + 2, "catchurl")) {
             /* capture a URL through a temporary proxy */
-            argv_url = 1;       // forcer a passer les parametres
+            argv_url = 1; // the URL arguments must still be passed on
             /* argv[i] is "--catchurl"; "#P" fits after its first char */
             strlcpybuff(argv[i] + 1, "#P", strlen(argv[i] + 1) + 1);
             //

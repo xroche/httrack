@@ -2378,12 +2378,13 @@ int back_searchlive(httrackp *opt, struct_back *sback,
   lien_back *const back = sback->lnk;
   int i;
 
+  if (search_addr[0] == '\0')
+    return -1;
   /* search for a live socket */
   BACK_FOR_EACH_BUSY(sback, i) {
     if (back_status(&back[i]) == STATUS_ALIVE) {
       /* same location (xxc: check also virtual hosts?) */
-      if (search_addr[0] != '\0' &&
-          hts_streq_ci(back[i].url_adr, search_addr)) {
+      if (hts_streq_ci(back[i].url_adr, search_addr)) {
 #if HTS_USEOPENSSL
         // opened before --check-cert was turned on, so never verified
         if (opt->check_cert == HTS_TRUE && back[i].r.ssl_con != NULL &&

@@ -920,7 +920,6 @@ int url_savename(lien_adrfilsave *const afs,
       normfil = fil_normalized_filtered_ex(fil_complete, normfil_, strip, 0, 0);
   }
 
-  // à afficher sans ftp://
   if (hts_starts_with_ci(adr_complete, "https:")) {
     protocol = PROTOCOL_HTTPS;
   } else if (hts_starts_with_ci(adr_complete, "ftp:")) {
@@ -1365,7 +1364,7 @@ int url_savename(lien_adrfilsave *const afs,
 
   // - - - DEBUT NOMMAGE - - -
 
-  // Donner nom par défaut?
+  // a directory URL gets a default file name
   if (hts_lastchar(fil) == '/') {
     if (!hts_starts_with_ci(adr_complete, "ftp://")) {
       save_append_tail(HTS_BUF(fil), DEFAULT_HTML);
