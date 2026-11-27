@@ -1,0 +1,31 @@
+#!/bin/bash
+#
+# -#Z keeps its statistics timer across links, so it writes no line per link.
+
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+require_httrack
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_statperiod.XXXXXX") || exit 1
+cleanup() { rm -rf "$tmpdir"; }
+cleanup_push cleanup
+
+local_server_start --log "${tmpdir}/server.log"
+
+# The pages answer after a second each, so the crawl outlasts one period.
+SECONDS=0
+local_crawl --log "${tmpdir}/out" --quiet --robots=0 -c1 --timeout=20 "-#Z" \
+    -O "${tmpdir}/m" "${BASEURL}/statperiod/index.html"
+elapsed=$SECONDS
+
+stats=$(<"${tmpdir}/m/hts-stats.txt")
+lines=$(grep -c 'Rate=' <<<"$stats" || true)
+test "$elapsed" -ge 61 ||
+    fail "the crawl took ${elapsed}s, under one period, so it proves nothing"
+test "$lines" -ge 1 || fail "no statistics line in ${elapsed}s: ${stats}"
+test "$lines" -le $((elapsed / 60)) ||
+    fail "${lines} statistics lines in ${elapsed}s: ${stats}"
+ok "hts-stats.txt got ${lines} line(s) in ${elapsed}s, not one per link"

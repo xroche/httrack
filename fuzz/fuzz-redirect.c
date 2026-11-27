@@ -121,6 +121,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   FILE *makeindex_fp = NULL;
   char makeindex_firstlink[HTS_URLMAXSIZE * 2] = "";
   LLint stat_fragment = 0, makestat_total = 0;
+  TStamp makestat_time = 0;
   int makestat_lnk = 0;
   char base[HTS_URLMAXSIZE * 2] = "";
   char codebase[HTS_URLMAXSIZE * 2] = "";
@@ -243,7 +244,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   stre.makeindex_links_ = &makeindex_links;
   stre.makeindex_firstlink_ = makeindex_firstlink;
   stre.stat_fragment_ = &stat_fragment;
-  stre.makestat_time = 0;
+  stre.makestat_time_ = &makestat_time;
   stre.makestat_fp = NULL;
   stre.makestat_total_ = &makestat_total;
   stre.makestat_lnk_ = &makestat_lnk;

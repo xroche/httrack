@@ -215,40 +215,25 @@ src/htsparse.c: HT_ADD_HTMLESCAPED_FULL: uses free name sink
 src/htsparse.c: HT_ADD_N: uses free name sink
 src/htsparse.c: HT_ADD_URL_HTMLESCAPED: uses free name sink
 src/htsparse.c: HT_SET_SIZE: uses free name sink
-src/htsparse.h: ENGINE_DEFINE_CONTEXT: holds statements outside do { } while (0)
-src/htsparse.h: ENGINE_DEFINE_CONTEXT: uses free name base
-src/htsparse.h: ENGINE_DEFINE_CONTEXT: uses free name codebase
-src/htsparse.h: ENGINE_DEFINE_CONTEXT: uses free name hash
-src/htsparse.h: ENGINE_DEFINE_CONTEXT: uses free name r
-src/htsparse.h: ENGINE_DEFINE_CONTEXT: uses free name stre
-src/htsparse.h: ENGINE_DEFINE_CONTEXT: uses free name template_body
-src/htsparse.h: ENGINE_DEFINE_CONTEXT: uses free name template_footer
-src/htsparse.h: ENGINE_DEFINE_CONTEXT: uses free name template_header
-src/htsparse.h: ENGINE_DEFINE_CONTEXT_BASE: holds statements outside do { } while (0)
-src/htsparse.h: ENGINE_DEFINE_CONTEXT_BASE: uses free name back
-src/htsparse.h: ENGINE_DEFINE_CONTEXT_BASE: uses free name back_max
-src/htsparse.h: ENGINE_DEFINE_CONTEXT_BASE: uses free name cache
-src/htsparse.h: ENGINE_DEFINE_CONTEXT_BASE: uses free name hashptr
-src/htsparse.h: ENGINE_DEFINE_CONTEXT_BASE: uses free name numero_passe
-src/htsparse.h: ENGINE_DEFINE_CONTEXT_BASE: uses free name opt
-src/htsparse.h: ENGINE_DEFINE_CONTEXT_BASE: uses free name sback
-src/htsparse.h: ENGINE_DEFINE_CONTEXT_BASE: uses free name str
-src/htsparse.h: ENGINE_FIELD_DECLARE: holds statements outside do { } while (0)
-src/htsparse.h: ENGINE_FIELD_LOAD: holds statements outside do { } while (0)
-src/htsparse.h: ENGINE_FIELD_STORE: holds statements outside do { } while (0)
-src/htsparse.h: ENGINE_MUTABLE_FIELDS: uses free name error
-src/htsparse.h: ENGINE_MUTABLE_FIELDS: uses free name makeindex_done
-src/htsparse.h: ENGINE_MUTABLE_FIELDS: uses free name makeindex_fp
-src/htsparse.h: ENGINE_MUTABLE_FIELDS: uses free name makeindex_links
-src/htsparse.h: ENGINE_MUTABLE_FIELDS: uses free name stat_fragment
-src/htsparse.h: ENGINE_MUTABLE_FIELDS: uses free name store_errpage
-src/htsparse.h: ENGINE_MUTABLE_FIELDS: uses free name stre
-src/htsparse.h: ENGINE_SAVE_CONTEXT: holds statements outside do { } while (0)
-src/htsparse.h: ENGINE_SAVE_CONTEXT_BASE: uses free name ptr
-src/htsparse.h: ENGINE_SAVE_CONTEXT_BASE: uses free name str
-src/htsparse.h: ENGINE_SET_CONTEXT: holds statements outside do { } while (0)
-src/htsparse.h: ENGINE_SET_CONTEXT_BASE: uses free name ptr
-src/htsparse.h: ENGINE_SET_CONTEXT_BASE: uses free name str
+src/htsparse.h: ENGINE_LOAD_CONTEXT: holds statements outside do { } while (0)
+src/htsparse.h: ENGINE_LOAD_CONTEXT: uses free name base
+src/htsparse.h: ENGINE_LOAD_CONTEXT: uses free name codebase
+src/htsparse.h: ENGINE_LOAD_CONTEXT: uses free name hash
+src/htsparse.h: ENGINE_LOAD_CONTEXT: uses free name r
+src/htsparse.h: ENGINE_LOAD_CONTEXT: uses free name stre
+src/htsparse.h: ENGINE_LOAD_CONTEXT: uses free name template_body
+src/htsparse.h: ENGINE_LOAD_CONTEXT: uses free name template_footer
+src/htsparse.h: ENGINE_LOAD_CONTEXT: uses free name template_header
+src/htsparse.h: ENGINE_LOAD_CONTEXT_BASE: holds statements outside do { } while (0)
+src/htsparse.h: ENGINE_LOAD_CONTEXT_BASE: uses free name back
+src/htsparse.h: ENGINE_LOAD_CONTEXT_BASE: uses free name back_max
+src/htsparse.h: ENGINE_LOAD_CONTEXT_BASE: uses free name cache
+src/htsparse.h: ENGINE_LOAD_CONTEXT_BASE: uses free name hashptr
+src/htsparse.h: ENGINE_LOAD_CONTEXT_BASE: uses free name numero_passe
+src/htsparse.h: ENGINE_LOAD_CONTEXT_BASE: uses free name opt
+src/htsparse.h: ENGINE_LOAD_CONTEXT_BASE: uses free name ptr
+src/htsparse.h: ENGINE_LOAD_CONTEXT_BASE: uses free name sback
+src/htsparse.h: ENGINE_LOAD_CONTEXT_BASE: uses free name str
 src/htssafe.h: freet: evaluates A twice
 src/htssafe.h: hts_lastcharptr: evaluates S twice
 src/htssafe.h: htsbuff_array: evaluates ARR twice

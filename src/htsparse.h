@@ -89,7 +89,7 @@ struct htsmoduleStructExtended {
 
   /* Specific to downloads */
   LLint *stat_fragment_;
-  TStamp makestat_time;
+  TStamp *makestat_time_;
   FILE *makestat_fp;
   LLint *makestat_total_;
   int *makestat_lnk_;
@@ -268,70 +268,28 @@ HTS_CHECK_RESULT hts_boolean hts_postprocess_reply_ok(const char *html, int len,
 */
 void maxlinks_give_up(httrackp *opt, volatile int *exit_xh);
 
-/* Context state */
+/* Copies of what a call never changes; the mutable state stays in stre. */
+#define ENGINE_LOAD_CONTEXT_BASE()                                             \
+  httrackp *const opt HTS_UNUSED = (httrackp *) str->opt;                      \
+  struct_back *const sback HTS_UNUSED = (struct_back *) str->sback;            \
+  lien_back *const back HTS_UNUSED = sback->lnk;                               \
+  const int back_max HTS_UNUSED = sback->count;                                \
+  cache_back *const cache HTS_UNUSED = (cache_back *) str->cache;              \
+  hash_struct *const hashptr HTS_UNUSED = (hash_struct *) str->hashptr;        \
+  const int numero_passe HTS_UNUSED = str->numero_passe;                       \
+  const int ptr HTS_UNUSED = *str->ptr_
 
-#define ENGINE_DEFINE_CONTEXT_BASE() \
-  httrackp* const opt HTS_UNUSED = (httrackp*) str->opt; \
-  struct_back* const sback HTS_UNUSED = (struct_back*) str->sback; \
-  lien_back* const back HTS_UNUSED = sback->lnk; \
-  const int back_max HTS_UNUSED = sback->count; \
-  cache_back* const cache HTS_UNUSED = (cache_back*) str->cache; \
-  hash_struct* const hashptr HTS_UNUSED = (hash_struct*) str->hashptr; \
-  const int numero_passe HTS_UNUSED = str->numero_passe; \
-  /* variable */ \
-  int ptr = *str->ptr_
-
-#define ENGINE_SET_CONTEXT_BASE() \
-  ptr = *str->ptr_
-
-#define ENGINE_LOAD_CONTEXT_BASE() \
-  ENGINE_DEFINE_CONTEXT_BASE()
-
-#define ENGINE_SAVE_CONTEXT_BASE() \
-  /* Apply changes */ \
-  * str->ptr_ = ptr
-
-/* Mutable extended-context fields: one source of truth so the DEFINE/SET/SAVE
-   load and store lists can't drift apart. */
-/* clang-format off */
-#define ENGINE_MUTABLE_FIELDS(X) \
-  X(int, error, stre->error_) \
-  X(int, store_errpage, stre->store_errpage_) \
-  X(int, makeindex_done, stre->makeindex_done_) \
-  X(FILE *, makeindex_fp, stre->makeindex_fp_) \
-  X(int, makeindex_links, stre->makeindex_links_) \
-  X(LLint, stat_fragment, stre->stat_fragment_)
-
-#define ENGINE_FIELD_DECLARE(type, name, src) type name = *(src);
-#define ENGINE_FIELD_LOAD(type, name, src) name = *(src);
-#define ENGINE_FIELD_STORE(type, name, src) *(src) = name;
-
-#define ENGINE_DEFINE_CONTEXT() \
-  ENGINE_DEFINE_CONTEXT_BASE(); \
-  htsblk* const r HTS_UNUSED = stre->r_; \
-  hash_struct* const hash HTS_UNUSED = stre->hash_; \
-  char* const codebase HTS_UNUSED = stre->codebase; \
-  char* const base HTS_UNUSED = stre->base; \
-  const char * const template_header HTS_UNUSED = stre->template_header_; \
-  const char * const template_body HTS_UNUSED = stre->template_body_; \
-  const char * const template_footer HTS_UNUSED = stre->template_footer_; \
-  HTS_UNUSED char* const makeindex_firstlink = stre->makeindex_firstlink_; \
-  ENGINE_MUTABLE_FIELDS(ENGINE_FIELD_DECLARE) \
-  /* load-once (kept out of SET/SAVE): re-reading would reset the throttle */ \
-  HTS_UNUSED TStamp makestat_time = stre->makestat_time; \
-  HTS_UNUSED FILE* makestat_fp = stre->makestat_fp
-
-#define ENGINE_SET_CONTEXT() \
-  ENGINE_SET_CONTEXT_BASE(); \
-  ENGINE_MUTABLE_FIELDS(ENGINE_FIELD_LOAD)
-
-#define ENGINE_LOAD_CONTEXT() \
-  ENGINE_DEFINE_CONTEXT()
-
-#define ENGINE_SAVE_CONTEXT() \
-  ENGINE_SAVE_CONTEXT_BASE(); \
-  ENGINE_MUTABLE_FIELDS(ENGINE_FIELD_STORE)
-/* clang-format on */
+#define ENGINE_LOAD_CONTEXT()                                                  \
+  ENGINE_LOAD_CONTEXT_BASE();                                                  \
+  htsblk *const r HTS_UNUSED = stre->r_;                                       \
+  hash_struct *const hash HTS_UNUSED = stre->hash_;                            \
+  char *const codebase HTS_UNUSED = stre->codebase;                            \
+  char *const base HTS_UNUSED = stre->base;                                    \
+  const char *const template_header HTS_UNUSED = stre->template_header_;       \
+  const char *const template_body HTS_UNUSED = stre->template_body_;           \
+  const char *const template_footer HTS_UNUSED = stre->template_footer_;       \
+  HTS_UNUSED char *const makeindex_firstlink = stre->makeindex_firstlink_;     \
+  HTS_UNUSED FILE *const makestat_fp = stre->makestat_fp
 
 #endif
 

@@ -1180,7 +1180,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
     }
 
     // Now, parsing
-    if (!error) {
+    if (!*stre->error_) {
       // output HTML
       parse_sink sink = {EMPTY_TYPED_ARRAY, HTS_FALSE, HTS_FALSE, NULL, NULL};
 
@@ -1343,7 +1343,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
         int unquoted_script = 0;
         INSCRIPT inscript_state_pos_prev = inscript_state_pos;
 
-        error = 0;
+        *stre->error_ = 0;
 
         /* Break if we are done yet */
         if (html - r->adr >= r->size)
@@ -1355,7 +1355,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
         // Construction index.html (sommaire)
         // Avant de tester les a href,
         // Ici on teste si l'on doit construire l'index vers le(s) site(s) miroir(s)
-        if (!makeindex_done) {  // autoriation d'écrire un index
+        if (!*stre->makeindex_done_) { // index not finished yet
           if (!detect_title) {
             if (opt->depth == heap(ptr)->depth) {      // on note toujours les premiers liens
               if (!in_media) {
@@ -1378,30 +1378,33 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   } else
                     p = 0;
 
-                  if (p) {      // ok center                            
-                    if (makeindex_fp == NULL) {
+                  if (p) { // ok center
+                    if (*stre->makeindex_fp_ == NULL) {
                       file_notify(opt, "", "",
                                   hts_optpath(opt,
                                               StringBuff(opt->path_html_utf8),
                                               "index.html"),
                                   1, 1, 0);
                       verif_backblue(opt, StringBuff(opt->path_html_utf8));     // générer gif
-                      makeindex_fp = filecreate(
+                      *stre->makeindex_fp_ = filecreate(
                           &opt->state.strc,
                           hts_optpath(opt, StringBuff(opt->path_html_utf8),
                                       "index.html"));
-                      if (makeindex_fp != NULL) {
+                      if (*stre->makeindex_fp_ != NULL) {
 
                         // Header
-                        hts_template_format(makeindex_fp, template_header,
-                                "<!-- Mirror and index made by HTTrack Website Copier/"
-                                HTTRACK_VERSION " " HTTRACK_AFF_AUTHORS " -->", /* EOF */ NULL);
+                        hts_template_format(
+                            *stre->makeindex_fp_, template_header,
+                            "<!-- Mirror and index made by HTTrack Website "
+                            "Copier/" HTTRACK_VERSION " " HTTRACK_AFF_AUTHORS
+                            " -->",
+                            /* EOF */ NULL);
 
                       } else
-                        makeindex_done = -1;    // fait, erreur
+                        *stre->makeindex_done_ = -1; // failed, give up
                     }
 
-                    if (makeindex_fp != NULL) {
+                    if (*stre->makeindex_fp_ != NULL) {
                       char BIGSTK tempo[HTS_URLMAXSIZE * 2];
                       char BIGSTK s[HTS_URLMAXSIZE * 2];
                       char *a = NULL;
@@ -1426,7 +1429,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       if (lienrelatif(HTS_BUF(tempo), heap(ptr)->sav,
                                       index_path.p) == 0) {
                         detect_title = 1;       // ok détecté pour cette page!
-                        makeindex_links++;      // un de plus
+                        (*stre->makeindex_links_)++;
                         strlcpybuff(makeindex_firstlink, tempo,
                                     HTS_URLMAXSIZE * 2);
                         //
@@ -1470,7 +1473,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
                         // Body
                         inplace_escape_uri_utf(HTS_SIZED(tempo));
-                        hts_template_format(makeindex_fp, template_body, tempo, s, /* EOF */ NULL);
+                        hts_template_format(*stre->makeindex_fp_, template_body,
+                                            tempo, s, /* EOF */ NULL);
                       }
                     }
                   }
@@ -1478,9 +1482,10 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
               }
 
             } else if (heap(ptr)->depth < opt->depth) {        // on a sauté level1+1 et level1
-              hts_finish_makeindex(opt, &makeindex_done, &makeindex_fp,
-                                   makeindex_links, makeindex_firstlink,
-                                   template_footer, "primary", "primary");
+              hts_finish_makeindex(opt, stre->makeindex_done_,
+                                   stre->makeindex_fp_, *stre->makeindex_links_,
+                                   makeindex_firstlink, template_footer,
+                                   "primary", "primary");
             }
           }                     // if (opt->makeindex)
         }
@@ -2538,7 +2543,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                 // external check
                 if (!RUN_CALLBACK1(opt, linkdetected, lien)
                     || !RUN_CALLBACK2(opt, linkdetected2, lien, intag_start)) {
-                  error = 1;    // erreur
+                  *stre->error_ = 1;
                   hts_log_print(opt, LOG_ERROR,
                                 "Link %s refused by external wrapper",
                                 url_nologin(opt, lien));
@@ -2573,7 +2578,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                 // commas are forbidden
                 if (archivetag_p) {
                   if (strchr(lien, ',')) {
-                    error = 1;  // erreur
+                    *stre->error_ = 1;
                     hts_log_print(opt, LOG_DEBUG,
                                   "link rejected (multiple-archive) %s",
                                   url_nologin(opt, lien));
@@ -2613,7 +2618,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         sizeof(tempo) - HTS_LINK_TAIL_ROOM) {
                       strcpybuff(lien, tempo);
                     } else {
-                      error = 1;
+                      *stre->error_ = 1;
                       hts_log_print(
                           opt, LOG_DEBUG,
                           "link rejected (control bytes do not fit) %s",
@@ -2639,7 +2644,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       if (strlen(s) < sizeof(lien) - HTS_LINK_TAIL_ROOM) {
                         strcpybuff(lien, s);
                       } else {
-                        error = 1;
+                        *stre->error_ = 1;
                         hts_log_print(
                             opt, LOG_WARNING,
                             "Link is too long after charset conversion: %s",
@@ -2697,7 +2702,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     if (used >= cap ||
                         append_escape_check_url(query, hts_buf_at(lien, cap)) >=
                             cap - used) {
-                      error = 1;
+                      *stre->error_ = 1;
                       hts_log_print(opt, LOG_DEBUG,
                                     "link rejected (query does not fit) %s",
                                     url_nologin(opt, lien));
@@ -2750,7 +2755,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                 // drop a default :80 port from the authority
                 hts_strip_default_port(HTS_BUF(lien));
                 // vérifier que l'on ne doit pas ajouter de .class
-                if (!error) {
+                if (!*stre->error_) {
                   if (add_class) {
                     const char *const a = hts_path_ext_dot(lien, "/");
 
@@ -2759,7 +2764,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   }
                 }
                 // si c'est un chemin, alors vérifier (toto/toto.html -> http://www/toto/)
-                if (!error) {
+                if (!*stre->error_) {
                   hts_log_print(opt, LOG_DEBUG, "position link check %s",
                                 url_nologin(opt, lien));
 
@@ -2796,12 +2801,12 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       lien_adrfil af2;   // ** euh ident_url_relatif??
 
                       if (ident_url_relatif(lien, urladr(), urlfil(), &af2) < 0) {
-                        error = 1;
+                        *stre->error_ = 1;
                       } else if (strlen(af2.adr) + strlen(af2.fil) >=
                                  sizeof(lien) - HTS_LINK_TAIL_ROOM -
                                      sizeof("http:///")) {
                         /* the rebuild below is unbounded in the two of them */
-                        error = 1;
+                        *stre->error_ = 1;
                         hts_log_print(opt, LOG_WARNING,
                                       "Link is too long once resolved: %s",
                                       url_nologin(opt, lien));
@@ -2824,7 +2829,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       }
                     }
 
-                    if (!error) {       // pas d'erreur?
+                    if (!*stre->error_) {
                       if (p_type == HTS_LINK_BASE) {
                         char *a = hts_lastcharptr(lien);
                         char *start_of_filename = jump_identification(lien);
@@ -2844,7 +2849,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                           }
                         } else {
                           *lien = '\0'; // éliminer
-                          error = 1;    // erreur, ne pas poursuivre
+                          *stre->error_ = 1;
                         }
                       }
                       // remember the base or the codebase
@@ -2892,7 +2897,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                   url_nologin(opt, lien));
                             }
                           } else {
-                            error = 1;  // erreur
+                            *stre->error_ = 1;
                             hts_log_print(opt, LOG_ERROR,
                                           "Link %s too long with base href",
                                           url_nologin(opt, lien));
@@ -2917,7 +2922,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                   "link modified with code/codebase %s",
                                   url_nologin(opt, lien));
                             } else {
-                              error = 1;        // erreur
+                              *stre->error_ = 1;
                               hts_log_print(opt, LOG_ERROR,
                                             "Link %s too long with base href",
                                             url_nologin(opt, lien));
@@ -2930,7 +2935,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                 }
                 // transformer lien quelconque (http, relatif, etc) en une adresse
                 // et un chemin+fichier (adr,fil)
-                if (!error) {
+                if (!*stre->error_) {
                   int reponse;
 
                   hts_log_print(
@@ -3110,11 +3115,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     if (user_interact_timestamp == 0
                         || t - user_interact_timestamp > 0) {
                       user_interact_timestamp = t;
-                      ENGINE_SAVE_CONTEXT();
-                      {
-                        hts_mirror_process_user_interaction(str, stre);
-                      }
-                      ENGINE_SET_CONTEXT();
+                      hts_mirror_process_user_interaction(str, stre);
                     }
                   }
                   // record!
@@ -3861,7 +3862,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                             "bytes for %s%s, page skipped",
                             cSize, adr_nologin(opt, urladr()), urlfil());
               HT_SET_SIZE(0);
-              error = 1;
+              *stre->error_ = 1;
             } else if (hts_postprocess_reply_inplace(
                            cAddr, TypedArrayElts(sink.buf),
                            TypedArrayCapa(sink.buf))) {
@@ -3879,7 +3880,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
           hts_log_print(opt, LOG_ERROR,
                         "Not enough memory to rewrite %s%s, page skipped",
                         adr_nologin(opt, urladr()), urlfil());
-          error = 1;
+          *stre->error_ = 1;
         } else if (TypedArraySize(sink.buf) != 0) {
           hts_finish_html_file(
               opt, cache, r, &fp,
@@ -3892,12 +3893,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
       //
       //
       //
-    }                           // if !error
+    } // if !error
 
   }                             // analyse OK
-
-  /* Apply changes */
-  ENGINE_SAVE_CONTEXT();
 
   return 0;
 }

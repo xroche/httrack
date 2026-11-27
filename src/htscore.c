@@ -1467,7 +1467,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
   stre_base.template_body_ = template_body;
   stre_base.template_footer_ = template_footer;
   stre_base.stat_fragment_ = &stat_fragment;
-  stre_base.makestat_time = makestat_time;
+  stre_base.makestat_time_ = &makestat_time;
   stre_base.makestat_fp = makestat_fp;
   stre_base.makestat_total_ = &makestat_total;
   stre_base.makestat_lnk_ = &makestat_lnk;
@@ -4185,9 +4185,6 @@ int htsAddLink(htsmoduleStruct * str, char *link) {
         }
       }
     }
-
-    /* Apply changes */
-    ENGINE_SAVE_CONTEXT_BASE();
 
     return (forbidden_url == 0);
   }
