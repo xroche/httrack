@@ -325,15 +325,13 @@ int hts_mirror_check_moved(htsmoduleStruct *str,
       // 412/416: the resume partial is stale; re-get the whole file (#206)
       lien_back *itemback = NULL;
       int had_partial = 0;
-      int ref_existed = 0;
-      int ref_gone;
+      hts_boolean ref_gone;
 
       // Drop the temp-ref, its partial, and heap->sav so the re-get carries no
       // Range; else back_add rebuilds the same Range and loops.
       if (back_unserialize_ref(opt, heap(ptr)->adr, heap(ptr)->fil,
                                &itemback) == 0) {
         had_partial = 1;
-        ref_existed = 1;
         // best-effort: an orphaned partial cannot re-Range once the ref is gone
         if (fexist_utf8(itemback->url_sav))
           (void) UNLINK(fconv(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
@@ -343,8 +341,7 @@ int hts_mirror_check_moved(htsmoduleStruct *str,
       }
       // don't re-record if the ref survived (it would re-Range and loop)
       ref_gone =
-          url_savename_refname_remove(opt, heap(ptr)->adr, heap(ptr)->fil) ||
-          !ref_existed;
+          url_savename_refname_remove(opt, heap(ptr)->adr, heap(ptr)->fil);
       if (fexist_utf8(heap(ptr)->sav)) {
         had_partial = 1;
         UNLINK(heap(ptr)->sav);

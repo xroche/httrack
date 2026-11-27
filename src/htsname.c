@@ -2215,12 +2215,11 @@ char *url_savename_refname_fullpath(httrackp * opt, const char *adr,
   return hts_logpath(opt, digest_filename);
 }
 
-/* Remove any refname, and say if one was removed. */
 hts_boolean url_savename_refname_remove(httrackp *opt, const char *adr,
                                         const char *fil) {
   char *filename = url_savename_refname_fullpath(opt, adr, fil);
 
-  if (UNLINK(filename) != 0)
+  if (UNLINK(filename) != 0 && errno != ENOENT)
     return HTS_FALSE;
   if (opt->refs_written != NULL)
     (void) coucal_remove((coucal) opt->refs_written, filename);
