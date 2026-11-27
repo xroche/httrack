@@ -164,8 +164,6 @@ src/htslib.h: is_retorsep: evaluates c twice
 src/htslib.h: is_space: evaluates c twice
 src/htslib.h: is_taborspace: evaluates c twice
 src/htslib.h: may_be_hypertext_mime__: evaluates a twice
-src/htslib.h: strfield2: evaluates f twice
-src/htslib.h: strfield2: evaluates s twice
 src/htslib_selftest.c: CHAIN_PREV: uses free name carg
 src/htslib_selftest.c: CHAIN_PREV: uses free name chain_hits
 src/htslib_selftest.c: CHECK: uses free name err

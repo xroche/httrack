@@ -4741,8 +4741,7 @@ static int st_spanlist(httrackp *opt, int argc, char **argv) {
   return failures != 0;
 }
 
-/* Check the C-string case-insensitive names against strfield and strfield2,
-   which they replace, and the empty strings where they differ by design. */
+/* Check the C-string case-insensitive names, empty strings included. */
 static int st_cinames(httrackp *opt, int argc, char **argv) {
   static const struct {
     const char *a, *b;
@@ -4784,12 +4783,6 @@ static int st_cinames(httrackp *opt, int argc, char **argv) {
           hts_starts_with_ci(a, cases[i].b) != cases[i].starts ||
           skipped != cases[i].starts ||
           rest != (skipped ? a + strlen(cases[i].b) : a);
-    /* strfield and strfield2 call "" no match, so agree only past that */
-    if (cases[i].b[0] != '\0')
-      bad |= (strfield(a, cases[i].b) != 0) != cases[i].starts ||
-             (strfield(a, cases[i].b) != 0 &&
-              a + strfield(a, cases[i].b) != rest) ||
-             (strfield2(a, cases[i].b) != 0) != cases[i].eq;
     if (bad) {
       printf("cinames: FAIL case %u (\"%s\", \"%s\")\n", (unsigned) i,
              cases[i].a, cases[i].b);
@@ -6207,7 +6200,7 @@ const struct selftest_entry selftests_lib[] = {
     {"spanlist", "", "the token a span list holds", st_spanlist},
     {"spanfind", "", "the byte a span finder stops at, from either end",
      st_spanfind},
-    {"cinames", "", "hts_streq_ci and the prefix tests agree with strfield",
+    {"cinames", "", "hts_streq_ci and the prefix tests fold only A-Z",
      st_cinames},
     {"headerparse", "<file>",
      "the fields treathead_opt() reads from each response in a file",

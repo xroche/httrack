@@ -35,7 +35,7 @@ tok 10 'stylesheet' 'stylesheet" href=x>'
 # A quote left open runs to the end of the document.
 tok 21 'stylesheet href=x.css' '"stylesheet href=x.css'
 tok 10 'stylesheet' '"stylesheet"'
-# What the <meta http-equiv="..."> caller reads. strfield() matches a prefix and
+# What the <meta http-equiv="..."> caller reads. The caller matches a prefix and
 # drops the length, so a padded pragma must still arrive trimmed.
 tok 12 'Content-Type' '"Content-Type" content="text/html">'
 tok 12 'content-type' '" content-type" x'

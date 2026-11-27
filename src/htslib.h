@@ -1076,22 +1076,6 @@ void *hts_get_callback(t_hts_htmlcheck_callbacks * callbacks,
 #define HTTP_IS_OK(code) ( ( (code) / 100 ) == 2 )
 #define HTTP_IS_ERROR(code) ( !HTTP_IS_OK(code) && !HTTP_IS_REDIRECT(code) && !HTTP_IS_NOTMODIFIED(code) )
 
-// 0 when f does not start with s, else the index in f just past the match.
-// Compares without regard to case.
-HTS_STATIC int strfield(const char *f, const char *s) {
-  int r = 0;
-
-  while(streql(*f, *s) && ((*f) != 0) && ((*s) != 0)) {
-    f++;
-    s++;
-    r++;
-  }
-  if (*s == 0)
-    return r;
-  else
-    return 0;
-}
-
 /* clang-format on */
 
 /* Did a server answer? HTTP codes are positive, and HTTrack's own
@@ -1112,8 +1096,6 @@ static HTS_INLINE HTS_UNUSED hts_boolean statuscode_is_internal(int code) {
 #define fseeko _fseeki64
 #define ftello _ftelli64
 #endif
-
-#define strfield2(f,s) ( (strlen(f)!=strlen(s)) ? 0 : (strfield(f,s)) )
 
 // is this MIME an hypertext MIME (text/html), html/js-style or other script/text type?
 #define HTS_HYPERTEXT_DEFAULT_MIME "text/html"

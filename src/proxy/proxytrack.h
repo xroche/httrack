@@ -116,18 +116,11 @@ static void proxytrack_print_log(const char *severity, const char *format,
 	"<!-- End Disable IE Friendly HTTP Error Messages -->\r\n"
 
 HTS_UNUSED static const char *jump_protocol(const char *source) {
-  int p;
-
-  // scheme
-  // "Comparisons of scheme names MUST be case-insensitive" (RFC2616)
-  if ((p = strfield(source, "http:")))
-    source += p;
-  else if ((p = strfield(source, "ftp:")))
-    source += p;
-  else if ((p = strfield(source, "https:")))
-    source += p;
-  else if ((p = strfield(source, "file:")))
-    source += p;
+  /* RFC 2616: scheme names compare case-insensitively */
+  (void) !(hts_skip_prefix_ci(&source, "http:") ||
+           hts_skip_prefix_ci(&source, "ftp:") ||
+           hts_skip_prefix_ci(&source, "https:") ||
+           hts_skip_prefix_ci(&source, "file:"));
   // net_path
   if (strncmp(source, "//", 2) == 0)
     source += 2;

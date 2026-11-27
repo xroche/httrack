@@ -597,7 +597,7 @@ NUL_READERS = frozenset(
     strtoul strtoll strtoull strtod atoi atol atoll atof sscanf fputs puts fopen
     getaddrinfo hts_strcasecmp hts_strncasecmp hts_strdup hts_strtod_c
     hts_stringLengthUTF8 strdupt strcpybuff strcatbuff strlcpybuff strlcatbuff
-    strclipbuff strncatbuff strlncatbuff strfield strfield2 streql strstrcase
+    strclipbuff strncatbuff strlncatbuff streql strstrcase
     strnotempty strjoker str_begins strrchr_limit hts_authority_end hts_span_of
     hts_parse_url_port hts_header_param strjokerfind strtoimax strtoumax
     strendwith_ structcheck strlist_add
