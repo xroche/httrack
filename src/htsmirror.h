@@ -63,8 +63,8 @@ void hts_mirror_process_user_interaction(htsmoduleStruct *str,
 
 /* What hts_mirror_wait_for_next_file() tells its caller to do with the link. */
 typedef enum hts_next_file {
-  HTS_NEXT_FILE_CONTINUE = 0, /**< go on with it (also when an exit is asked) */
-  HTS_NEXT_FILE_DONE = 2      /**< already done: skip it */
+  HTS_NEXT_FILE_CONTINUE, /**< go on with it (also when an exit is asked) */
+  HTS_NEXT_FILE_DONE      /**< already done: skip it */
 } hts_next_file;
 
 /*

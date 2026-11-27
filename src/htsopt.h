@@ -454,7 +454,7 @@ struct httrackp {
                                    hts-paused.lock file is deleted (-GN) */
   hts_tristate nearlink;      /**< also get off-site files a page needs (-n) */
   hts_boolean makeindex;      /**< build a top-level index.html (-I) */
-  int kindex;                 /**< keyword index, from hts_kindex (-%IN) */
+  hts_kindex kindex;          /**< keyword index to build (-%IN) */
   hts_tristate delete_old;    /**< delete obsolete local files (-X) */
   int timeout;                /**< connection timeout in seconds (-TN) */
   int rateout;                /**< give up below this rate, bytes/s (-JN) */

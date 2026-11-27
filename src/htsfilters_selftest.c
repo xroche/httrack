@@ -840,7 +840,7 @@ const struct selftest_entry selftests_filters[] = {
      "size-aware filter verdict (negative size = unknown/scan time)",
      st_filtersize},
     {"filtermime", "<mime> <filter>...",
-     "mime-type filter verdict (fa_strjoker type=1)", st_filtermime},
+     "mime-type filter verdict (fa_strjoker HTS_JOKER_MIME)", st_filtermime},
     {"filtermemo", "[iterations]",
      "memoized vs unmemoized matcher differential", st_filtermemo},
     {"filterdual", "<string1> <string2> <filter>...",

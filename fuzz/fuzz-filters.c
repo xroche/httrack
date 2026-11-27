@@ -55,7 +55,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     filter[0] = '-';
     memcpy(filter + 1, joker, strlen(joker) + 1);
     filters[0] = filter;
-    (void) fa_strjoker(0, filters, 1, nom, &sz, &size_flag, &depth);
+    (void) fa_strjoker(HTS_JOKER_URL, filters, 1, nom, &sz, &size_flag, &depth);
     freet(filter);
   }
 

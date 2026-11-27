@@ -1689,7 +1689,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
               case 'I':
                 opt->kindex = HTS_KINDEX_TEXT;
                 if (hts_isdigit((unsigned char) *(com + 1))) {
-                  readGluedInt(opt->kindex, HTS_KINDEX_HTML);
+                  readGluedEnum(opt->kindex, HTS_KINDEX_HTML);
                 }
                 break;          // Keyword Index
               case 'c': {
