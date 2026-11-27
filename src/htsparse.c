@@ -1247,11 +1247,10 @@ static void decode_link_escapes(htsmoduleStruct *str,
 }
 
 /* Store a base or codebase link, or prefix another link with the base that
-   applies. Fills af when that prefixing resolved the link. */
+   applies. */
 static void resolve_link_base(htsmoduleStruct *str,
                               htsmoduleStructExtended *stre, hts_buf link,
-                              hts_link_role p_type, hts_boolean p_xmlbase,
-                              lien_adrfil *af) {
+                              hts_link_role p_type, hts_boolean p_xmlbase) {
   ENGINE_LOAD_CONTEXT();
   char *const lien = link.p;
 
@@ -1365,8 +1364,10 @@ static void resolve_link_base(htsmoduleStruct *str,
       if (!link_has_authority(lien)) {
         if (*lien != '/') { // relative to the directory
           if ((strlen(_base) + strlen(lien)) < HTS_URLMAXSIZE) {
+            lien_adrfil af;
+
             // mailto: and co: do NOT add base
-            if (ident_url_relatif(lien, urladr(), urlfil(), af) >= 0) {
+            if (ident_url_relatif(lien, urladr(), urlfil(), &af) >= 0) {
               char BIGSTK tempo[HTS_URLMAXSIZE * 2];
 
               strcpybuff(tempo, _base);
@@ -2929,8 +2930,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   }
                 }
                 if (!*stre->error_) {
-                  resolve_link_base(str, stre, HTS_BUF(lien), p_type, p_xmlbase,
-                                    &afs.af);
+                  resolve_link_base(str, stre, HTS_BUF(lien), p_type,
+                                    p_xmlbase);
                 }
                 // transformer lien quelconque (http, relatif, etc) en une adresse
                 // et un chemin+fichier (adr,fil)
