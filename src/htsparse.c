@@ -1412,6 +1412,171 @@ static void resolve_link_base(htsmoduleStruct *str,
   }
 }
 
+/* Write the index.html entry of the page, under its title if it has one. */
+static void makeindex_add_entry(htsmoduleStruct *str,
+                                htsmoduleStructExtended *stre, const char *html,
+                                const hts_boolean has_title,
+                                int *detect_title) {
+  ENGINE_LOAD_CONTEXT();
+
+  if (*stre->makeindex_fp_ == NULL) {
+    file_notify(opt, "", "",
+                hts_optpath(opt, StringBuff(opt->path_html_utf8), "index.html"),
+                1, 1, 0);
+    verif_backblue(opt, StringBuff(opt->path_html_utf8));
+    *stre->makeindex_fp_ = filecreate(
+        &opt->state.strc,
+        hts_optpath(opt, StringBuff(opt->path_html_utf8), "index.html"));
+    if (*stre->makeindex_fp_ != NULL) {
+
+      // Header
+      hts_template_format(*stre->makeindex_fp_, template_header,
+                          "<!-- Mirror and index made by HTTrack Website "
+                          "Copier/" HTTRACK_VERSION " " HTTRACK_AFF_AUTHORS
+                          " -->",
+                          /* EOF */ NULL);
+
+    } else
+      *stre->makeindex_done_ = -1; // failed, give up
+  }
+
+  if (*stre->makeindex_fp_ != NULL) {
+    char BIGSTK tempo[HTS_URLMAXSIZE * 2];
+    char BIGSTK s[HTS_URLMAXSIZE * 2];
+    char *a = NULL;
+    char *b = NULL;
+
+    s[0] = '\0';
+    if (has_title) {
+      a = strchr(html, '>');
+      if (a != NULL) {
+        a++;
+        while (is_space(*a))
+          a++;
+        b = strchr(a, '<'); // next tag
+      }
+    }
+    const hts_buf index_path = OPT_GET_HTS_BUF(opt);
+
+    /* the output path is capped well under the buffer */
+    assertf(hts_path_join(index_path, StringBuff(opt->path_html_utf8),
+                          "index.html"));
+    if (lienrelatif(HTS_BUF(tempo), heap(ptr)->sav, index_path.p) == 0) {
+      *detect_title = 1; // indexed for this page
+      (*stre->makeindex_links_)++;
+      strlcpybuff(makeindex_firstlink, tempo, HTS_URLMAXSIZE * 2);
+      /* MHTML: the first link is the primary part */
+      if (opt->mimehtml) {
+        strlcpybuff(makeindex_firstlink, "cid:primary/primary",
+                    HTS_URLMAXSIZE * 2);
+      }
+
+      if ((b == a) || (a == NULL) || (b == NULL)) { // no title
+        strcpybuff(s, tempo);
+      } else if ((b - a) < 256) {
+        b--;
+        while (is_space(*b))
+          b--;
+        strncpy(s, a, b - a + 1);
+        *(s + (b - a) + 1) = '\0';
+      }
+
+      // Decode title with encoding
+      {
+        hts_boolean declared;
+        const char *const charset = page_charset(str, &declared);
+
+        // Guessed charset: never re-encode valid UTF-8 (#833)
+        if (charset != NULL && !hts_isCharsetUTF8(charset) &&
+            (declared || !hts_isStringUTF8(hts_span_of(s)))) {
+          char *sUtf = hts_convertStringToUTF8(s, strlen(s), charset);
+
+          if (sUtf != NULL) {
+            /* UTF-8 can expand past s[]; truncate to fit */
+            snprintf(s, sizeof(s), "%s", sUtf);
+            freet(sUtf);
+          }
+        }
+      }
+
+      // Body
+      inplace_escape_uri_utf(HTS_SIZED(tempo));
+      hts_template_format(*stre->makeindex_fp_, template_body, tempo, s,
+                          /* EOF */ NULL);
+    }
+  }
+}
+
+/* Add a first-level page to the top index.html, and close the index once a
+   deeper page comes. */
+static void makeindex_add_page(htsmoduleStruct *str,
+                               htsmoduleStructExtended *stre, const char *html,
+                               int *detect_title, const char *in_media) {
+  ENGINE_LOAD_CONTEXT();
+  int p = 0; // > 0: a title tag at html, -1: index the page with no title
+
+  if (opt->depth == heap(ptr)->depth) { // always index the first-level pages
+    if (!in_media) {
+      if (opt->makeindex && (ptr > 0)) {
+        if (opt->getmode & HTS_GETMODE_HTML) {
+          p = hts_starts_with_ci(html, "title");
+          if (p) {
+            if (html_prevc(html, r->adr) == '/')
+              p = 0; // </title>
+          } else {
+            if (hts_starts_with_ci(html, "/html"))
+              p = -1;
+            else if (hts_starts_with_ci(html, "body"))
+              p = -1;
+            else if (html - r->adr >= r->size - 1)
+              p = -1;
+            else if (html - r->adr >= r->size - 2) // we got to hurry
+              p = -1;
+          }
+        } else
+          p = 0;
+
+        if (p)
+          makeindex_add_entry(str, stre, html, p > 0, detect_title);
+      }
+    }
+
+  } else if (heap(ptr)->depth < opt->depth) { // deeper page: close the index
+    hts_finish_makeindex(opt, stre->makeindex_done_, stre->makeindex_fp_,
+                         *stre->makeindex_links_, makeindex_firstlink,
+                         template_footer, "primary", "primary");
+  }
+}
+
+/* Does this meta tag ask robots not to follow the links of the page? Logs
+   it when it does. */
+static hts_boolean meta_robots_nofollow(htsmoduleStruct *str,
+                                        const char *html) {
+  ENGINE_LOAD_CONTEXT_BASE();
+  char tempo[1100];
+  const char *a;
+
+  tempo[0] = '\0';
+  a = tag_close_within(html, 999);
+  if (a) {
+    if (a - html < 999) {
+      strncatbuff(tempo, html, a - html);
+      if (strstrcase(tempo, "content")) {
+        if (strstrcase(tempo, "robots")) {
+          if (strstrcase(tempo, "nofollow")) {
+            hts_log_print(opt, LOG_WARNING,
+                          "Link %s%s not scanned "
+                          "(follow robots meta tag)",
+                          adr_nologin(opt, urladr()), urlfil());
+            return HTS_TRUE;
+          }
+        }
+      }
+    }
+  }
+  return HTS_FALSE;
+}
+
 int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
   char catbuff[CATBUFF_SIZE];
 
@@ -1638,150 +1803,10 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
         if (html - r->adr >= r->size)
           break;
 
-        /*
-           index.html built here
-         */
-        // Construction index.html (sommaire)
-        // Avant de tester les a href,
-        // Ici on teste si l'on doit construire l'index vers le(s) site(s) miroir(s)
-        if (!*stre->makeindex_done_) { // index not finished yet
-          if (!detect_title) {
-            if (opt->depth == heap(ptr)->depth) {      // on note toujours les premiers liens
-              if (!in_media) {
-                if (opt->makeindex && (ptr > 0)) {
-                  if (opt->getmode & HTS_GETMODE_HTML) {
-                    p = hts_starts_with_ci(html, "title");
-                    if (p) {
-                      if (html_prevc(html, r->adr) == '/')
-                        p = 0;  // /title
-                    } else {
-                      if (hts_starts_with_ci(html, "/html"))
-                        p = -1; // noter, mais sans titre
-                      else if (hts_starts_with_ci(html, "body"))
-                        p = -1; // noter, mais sans titre
-                      else if (html - r->adr >= r->size - 1)
-                        p = -1; // noter, mais sans titre
-                      else if (html - r->adr >= r->size - 2)     // we got to hurry
-                        p = -1; // xxc xxc xxc
-                    }
-                  } else
-                    p = 0;
-
-                  if (p) { // ok center
-                    if (*stre->makeindex_fp_ == NULL) {
-                      file_notify(opt, "", "",
-                                  hts_optpath(opt,
-                                              StringBuff(opt->path_html_utf8),
-                                              "index.html"),
-                                  1, 1, 0);
-                      verif_backblue(opt, StringBuff(opt->path_html_utf8));     // générer gif
-                      *stre->makeindex_fp_ = filecreate(
-                          &opt->state.strc,
-                          hts_optpath(opt, StringBuff(opt->path_html_utf8),
-                                      "index.html"));
-                      if (*stre->makeindex_fp_ != NULL) {
-
-                        // Header
-                        hts_template_format(
-                            *stre->makeindex_fp_, template_header,
-                            "<!-- Mirror and index made by HTTrack Website "
-                            "Copier/" HTTRACK_VERSION " " HTTRACK_AFF_AUTHORS
-                            " -->",
-                            /* EOF */ NULL);
-
-                      } else
-                        *stre->makeindex_done_ = -1; // failed, give up
-                    }
-
-                    if (*stre->makeindex_fp_ != NULL) {
-                      char BIGSTK tempo[HTS_URLMAXSIZE * 2];
-                      char BIGSTK s[HTS_URLMAXSIZE * 2];
-                      char *a = NULL;
-                      char *b = NULL;
-
-                      s[0] = '\0';
-                      if (p > 0) {
-                        a = strchr(html, '>');
-                        if (a != NULL) {
-                          a++;
-                          while(is_space(*a))
-                            a++;        // sauter espaces & co
-                          b = strchr(a, '<');   // prochain tag
-                        }
-                      }
-                      const hts_buf index_path = OPT_GET_HTS_BUF(opt);
-
-                      /* the output path is capped well under the buffer */
-                      assertf(hts_path_join(index_path,
-                                            StringBuff(opt->path_html_utf8),
-                                            "index.html"));
-                      if (lienrelatif(HTS_BUF(tempo), heap(ptr)->sav,
-                                      index_path.p) == 0) {
-                        detect_title = 1;       // ok détecté pour cette page!
-                        (*stre->makeindex_links_)++;
-                        strlcpybuff(makeindex_firstlink, tempo,
-                                    HTS_URLMAXSIZE * 2);
-                        //
-
-                        /* Hack */
-                        if (opt->mimehtml) {
-                          strlcpybuff(makeindex_firstlink,
-                                      "cid:primary/primary",
-                                      HTS_URLMAXSIZE * 2);
-                        }
-
-                        if ((b == a) || (a == NULL) || (b == NULL)) {   // pas de titre
-                          strcpybuff(s, tempo);
-                        } else if ((b - a) < 256) {
-                          b--;
-                          while(is_space(*b))
-                            b--;
-                          strncpy(s, a, b - a + 1);
-                          *(s + (b - a) + 1) = '\0';
-                        }
-
-                        // Decode title with encoding
-                        {
-                          hts_boolean declared;
-                          const char *const charset =
-                              page_charset(str, &declared);
-
-                          // Guessed charset: never re-encode valid UTF-8 (#833)
-                          if (charset != NULL && !hts_isCharsetUTF8(charset) &&
-                              (declared || !hts_isStringUTF8(hts_span_of(s)))) {
-                            char *sUtf =
-                                hts_convertStringToUTF8(s, strlen(s), charset);
-
-                            if (sUtf != NULL) {
-                              /* UTF-8 can expand past s[]; truncate to fit */
-                              snprintf(s, sizeof(s), "%s", sUtf);
-                              freet(sUtf);
-                            }
-                          }
-                        }
-
-                        // Body
-                        inplace_escape_uri_utf(HTS_SIZED(tempo));
-                        hts_template_format(*stre->makeindex_fp_, template_body,
-                                            tempo, s, /* EOF */ NULL);
-                      }
-                    }
-                  }
-                }
-              }
-
-            } else if (heap(ptr)->depth < opt->depth) {        // on a sauté level1+1 et level1
-              hts_finish_makeindex(opt, stre->makeindex_done_,
-                                   stre->makeindex_fp_, *stre->makeindex_links_,
-                                   makeindex_firstlink, template_footer,
-                                   "primary", "primary");
-            }
-          }                     // if (opt->makeindex)
-        }
-        // FIN Construction index.html (sommaire)
-        /*
-           end -- index.html built here
-         */
+        // inline pre-test: the out-of-line helper would run on every byte
+        if (!*stre->makeindex_done_ && !detect_title &&
+            (opt->makeindex || heap(ptr)->depth < opt->depth))
+          makeindex_add_page(str, stre, html, &detect_title, in_media);
 
         /* Parse */
         if ((*html == '<')       /* No starting tag */
@@ -2356,30 +2381,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       if (opt->robots) {
                         if ((intag_start_valid)
                             && check_tag(intag_start, "meta")) {
-                          if (rech_tageq(html, "name")) {        // name=robots.txt
-                            char tempo[1100];
-                            const char *a;
-
-                            tempo[0] = '\0';
-                            a = tag_close_within(html, 999);
-                            if (a) {
-                              if (a - html < 999) {
-                                strncatbuff(tempo, html, a - html);
-                                if (strstrcase(tempo, "content")) {
-                                  if (strstrcase(tempo, "robots")) {
-                                    if (strstrcase(tempo, "nofollow")) {
-                                      nofollow = 1;     // NE PLUS suivre liens dans cette page
-                                      hts_log_print(opt, LOG_WARNING,
-                                                    "Link %s%s not scanned "
-                                                    "(follow robots meta tag)",
-                                                    adr_nologin(opt, urladr()),
-                                                    urlfil());
-                                    }
-                                  }
-                                }
-                              }
-                            }
-                          }
+                          if (rech_tageq(html, "name") && // name=robots
+                              meta_robots_nofollow(str, html))
+                            nofollow = 1; // follow no link of this page
                         }
                       }
                     }
