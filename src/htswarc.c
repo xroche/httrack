@@ -1384,6 +1384,13 @@ void warc_adopt_rawspool(htsblk *r, const char *tmpfile_path) {
 
 /* ---- open / close ---- */
 
+/* Refuse an archive name that does not fit under the output directory. */
+static warc_writer *warc_path_too_long(httrackp *opt, const char *name) {
+  hts_log_print(opt, LOG_ERROR, "WARC archive path too long: %s%s",
+                StringBuff(opt->path_html), name);
+  return NULL;
+}
+
 warc_writer *warc_open(httrackp *opt, const char *path) {
   warc_writer *w;
   char namebuf[HTS_URLMAXSIZE * 2];
@@ -1405,8 +1412,9 @@ warc_writer *warc_open(httrackp *opt, const char *path) {
       memset(&tmv, 0, sizeof(tmv));
     strftime(ts, sizeof(ts), "%Y%m%d%H%M%S", &tmv);
     snprintf(catbuff, sizeof(catbuff), "httrack-%s.warc.gz", ts);
-    path =
-        fconcat(namebuf, sizeof(namebuf), StringBuff(opt->path_html), catbuff);
+    if (!hts_fpath_join(HTS_BUF(namebuf), StringBuff(opt->path_html), catbuff))
+      return warc_path_too_long(opt, catbuff);
+    path = namebuf;
   } else {
     /* --warc-file NAME: append .warc.gz unless already a .warc/.warc.gz name;
        place bare basenames under the output directory (like the auto name). */
@@ -1419,8 +1427,9 @@ warc_writer *warc_open(httrackp *opt, const char *path) {
     else
       snprintf(named, sizeof(named), "%s.warc.gz", path);
     if (strchr(named, '/') == NULL && strchr(named, '\\') == NULL) {
-      path =
-          fconcat(namebuf, sizeof(namebuf), StringBuff(opt->path_html), named);
+      if (!hts_fpath_join(HTS_BUF(namebuf), StringBuff(opt->path_html), named))
+        return warc_path_too_long(opt, named);
+      path = namebuf;
     } else {
       strlcpybuff(namebuf, named, sizeof(namebuf));
       path = namebuf;

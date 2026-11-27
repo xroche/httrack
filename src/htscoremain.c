@@ -97,8 +97,8 @@ static int datadir_has_templates(const char *dir) {
   char catbuff[CATBUFF_SIZE];
 
   return dir != NULL && *dir != '\0' &&
-         fexist(fconcat(catbuff, sizeof(catbuff), dir,
-                        "templates/index-header.html"));
+         hts_fpath_join(HTS_BUF(catbuff), dir, "templates/index-header.html") &&
+         fexist(catbuff);
 }
 
 /* htsbacktrace.c copies the Linux branch: it is program-side and cannot reach
@@ -402,8 +402,7 @@ static hts_boolean write_progress_lock(httrackp *opt, const char *path,
 
 /* Deletes dir + name when it exists. */
 static void unlink_if_exists(httrackp *opt, const char *dir, const char *name) {
-  const char *const path =
-      fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), dir, name);
+  const char *const path = hts_optpath(opt, dir, name);
 
   if (fexist_utf8(path))
     UNLINK(path);
@@ -1007,16 +1006,16 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
             ((!fexist_utf8(hts_logpath(opt, "hts-cache/doit.log"))) ||
              (argv_url > 0))) {
           /* first rc file that exists wins */
+          const hts_buf rcbuf = OPT_GET_HTS_BUF(opt);
           cmdl_file_result res =
               optinclude_file(hts_logpath(opt, HTS_HTTRACKRC), x_cmd);
 
           if (res == CMDL_FILE_MISSING)
             res = optinclude_file(HTS_HTTRACKRC, x_cmd);
-          if (res == CMDL_FILE_MISSING)
-            res = optinclude_file(fconcat(OPT_GET_BUFF(opt),
-                                          OPT_GET_BUFF_SIZE(opt), hts_gethome(),
-                                          "/" HTS_HTTRACKRC),
-                                  x_cmd);
+          /* $HOME is not ours to bound, so a long one skips this rc */
+          if (res == CMDL_FILE_MISSING &&
+              hts_fpath_join(rcbuf, hts_gethome(), "/" HTS_HTTRACKRC))
+            res = optinclude_file(rcbuf.p, x_cmd);
 #ifdef HTS_HTTRACKCNF
           if (res == CMDL_FILE_MISSING)
             res = optinclude_file(HTS_HTTRACKCNF, x_cmd);
@@ -1317,8 +1316,8 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
           }
         }
       }
-    } else if (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                                   StringBuff(opt->path_html), "index.html"))) {
+    } else if (fexist_utf8(hts_optpath(opt, StringBuff(opt->path_html),
+                                       "index.html"))) {
       opt->cache = HTS_CACHE_TEST_UPDATE;
       if (opt->quiet == 0) {
         if ((fexist_utf8(hts_logpath(opt, "hts-cache/new.zip"))) ||
@@ -1496,7 +1495,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
           case 'c':
             if (hts_isdigit((unsigned char) *(com + 1))) {
               readGluedInt(opt->maxsoc, INT_MAX);
-              opt->maxsoc = max(opt->maxsoc, 1); // At least one socket.
+              opt->maxsoc = hts_max_int(opt->maxsoc, 1); // At least one socket.
             } else
               opt->maxsoc = 4;
 
@@ -2869,8 +2868,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
 
       // vérifier existence de la structure (path_html/path_log are UTF-8, use
       // the UTF-8 mkdir path)
-      structcheck_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                               StringBuff(opt->path_html), "/"));
+      structcheck_utf8(hts_optpath(opt, StringBuff(opt->path_html), "/"));
       structcheck_utf8(hts_logpath(opt, "/"));
 
       // reprise/update

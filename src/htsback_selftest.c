@@ -2031,7 +2031,7 @@ static int st_relaxedcounter(httrackp *opt, int argc, char **argv) {
   int err = 0;
 
   hts_store_relaxed_llint(&relaxed_counter, 0);
-  if (hts_newthread(relaxed_writer, NULL) != 0) {
+  if (hts_newthread_checked(relaxed_writer, NULL) != 0) {
     fprintf(stderr, "relaxedcounter: cannot spawn\n");
     return 1;
   }
@@ -2073,7 +2073,7 @@ static int st_threadwait(httrackp *opt, int argc, char **argv) {
     hts_mutexlock(&threadwait_lock);
     threadwait_done = 0;
     hts_mutexrelease(&threadwait_lock);
-    if (hts_newthread(threadwait_thread, NULL) != 0) {
+    if (hts_newthread_checked(threadwait_thread, NULL) != 0) {
       fprintf(stderr, "threadwait: cannot spawn\n");
       return 1;
     }
@@ -2091,7 +2091,7 @@ static int st_threadwait(httrackp *opt, int argc, char **argv) {
   threadwait_gated = HTS_TRUE;
   hts_mutexrelease(&threadwait_lock);
   for (i = 0; i < THREADWAIT_N; i++) {
-    if (hts_newthread(threadwait_gated_thread, NULL) != 0) {
+    if (hts_newthread_checked(threadwait_gated_thread, NULL) != 0) {
       fprintf(stderr, "threadwait: cannot spawn a gated thread\n");
       return 1;
     }
@@ -2113,6 +2113,79 @@ static int st_threadwait(httrackp *opt, int argc, char **argv) {
   }
 
   return st_verdict("threadwait self-test", err);
+}
+
+/* Calls the deprecated form on purpose. */
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#elif defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4996)
+#endif
+static int st_newthread_legacy(void (*fun)(void *arg)) {
+  return hts_newthread(fun, NULL);
+}
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#elif defined(_MSC_VER)
+#pragma warning(pop)
+#endif
+
+#ifndef _WIN32
+static void *newthread_probe(void *arg) { return arg; }
+
+/* Can this process still start a thread? */
+static hts_boolean newthread_probe_spawns(void) {
+  pthread_t t;
+
+  if (pthread_create(&t, NULL, newthread_probe, NULL) != 0)
+    return HTS_FALSE;
+  pthread_join(t, NULL);
+  return HTS_TRUE;
+}
+#endif
+
+/* -#test=newthread: both spawn forms run fun, and report a refused spawn as
+   -1 without running fun, which RLIMIT_NPROC provokes for a non-root user. */
+static int st_newthread(httrackp *opt, int argc, char **argv) {
+  hts_mutexlock(&threadwait_lock);
+  threadwait_done = 0;
+  hts_mutexrelease(&threadwait_lock);
+  if (hts_newthread_checked(threadwait_thread, NULL) != 0 ||
+      st_newthread_legacy(threadwait_thread) != 0) {
+    printf("newthread: cannot spawn\n");
+    return 1;
+  }
+  htsthread_wait();
+  printf("granted: ran %d\n", threadwait_count());
+#ifndef _WIN32
+  {
+    struct rlimit saved, none;
+    int checked, legacy;
+
+    if (getrlimit(RLIMIT_NPROC, &saved) != 0) {
+      printf("refused: not provoked\n");
+      return 0;
+    }
+    none = saved;
+    none.rlim_cur = 0;
+    if (setrlimit(RLIMIT_NPROC, &none) != 0 || newthread_probe_spawns()) {
+      (void) setrlimit(RLIMIT_NPROC, &saved);
+      printf("refused: not provoked\n");
+      return 0;
+    }
+    checked = hts_newthread_checked(threadwait_thread, NULL);
+    legacy = st_newthread_legacy(threadwait_thread);
+    (void) setrlimit(RLIMIT_NPROC, &saved);
+    htsthread_wait();
+    printf("refused: checked=%d legacy=%d ran %d\n", checked, legacy,
+           threadwait_count());
+  }
+#else
+  printf("refused: not provoked\n");
+#endif
+  return 0;
 }
 
 /* Confirms the runner encloses the body once, on the worker. */
@@ -2542,7 +2615,7 @@ static int st_strerror(httrackp *opt, int argc, char **argv) {
 #endif
   for (i = 0; i < STRERROR_THREADS; i++) {
     idx[i] = i;
-    if (hts_newthread(strerror_thread, &idx[i]) != 0) {
+    if (hts_newthread_checked(strerror_thread, &idx[i]) != 0) {
       fprintf(stderr, "strerror: cannot spawn\n");
       return 1;
     }
@@ -2590,7 +2663,7 @@ static int st_mutexlazyinit(httrackp *opt, int argc, char **argv) {
   int i;
 
   for (i = 0; i < MUTEXLAZY_THREADS; i++) {
-    if (hts_newthread(mutexlazy_thread, NULL) != 0) {
+    if (hts_newthread_checked(mutexlazy_thread, NULL) != 0) {
       fprintf(stderr, "mutexlazyinit: cannot spawn\n");
       return 1;
     }
@@ -3704,6 +3777,8 @@ const struct selftest_entry selftests_back[] = {
      st_transportfailures},
     {"threadwait", "", "htsthread_wait() joins threads spawned just before it",
      st_threadwait},
+    {"newthread", "", "both spawn forms run fun or report a refused spawn",
+     st_newthread},
     {"relaxedcounter", "",
      "a 64-bit counter another thread writes reads back whole and in order",
      st_relaxedcounter},

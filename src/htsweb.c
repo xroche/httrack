@@ -114,7 +114,7 @@ static int nonjoinable_threads = 0;
 static int pingTimeout = 120;
 /* Once the last window leaves, only a page navigation can bring one back, and
    that takes a fraction of a second over the loopback. */
-#define LEAVE_GRACE max(2, min(5, pingTimeout / 4))
+#define LEAVE_GRACE hts_max_int(2, hts_min_int(5, pingTimeout / 4))
 /* Windows tracked at once. A full table refuses newcomers rather than evicting:
    dropping a live window is what would let a flood of ids end the session. */
 #define MAX_WINDOWS 16
@@ -412,7 +412,8 @@ int main(int argc, char *argv[]) {
 
   /* pinger */
   if (parentPid > 0) {
-    if (hts_newthread(client_ping, (void *) (uintptr_t) parentPid) == 0) {
+    if (hts_newthread_checked(client_ping, (void *) (uintptr_t) parentPid) ==
+        0) {
       nonjoinable_threads++; /* client_ping() only ever leaves through exit() */
     }
     smallserver_setpinghandler(pingHandler, NULL);
@@ -503,7 +504,7 @@ void webhttrack_main(const char *cmd) {
   commandEnd = commandReturn = commandReturnSet = commandEndRequested = 0;
   hts_store_release_int(&commandRunning, 1);
   copy = strdupt(cmd);
-  if (copy == NULL || hts_newthread(back_launch_cmd, copy) != 0) {
+  if (copy == NULL || hts_newthread_checked(back_launch_cmd, copy) != 0) {
     httrackp *const opt = global_opt;
 
     freet(copy);

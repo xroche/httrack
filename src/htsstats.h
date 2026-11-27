@@ -103,7 +103,7 @@ HTS_STATIC int stats_collect_rows(httrackp *opt, const lien_back *back,
     for (j = 0; j < 3 && index < nrows; j++) {
       int n;
 
-      for (n = k; n < max(back_max * k, 1) && index < nrows; n++) {
+      for (n = k; n < hts_max_int(back_max * k, 1) && index < nrows; n++) {
         const int slot = (back_index + n) % back_max;
         const lien_back *const b = &back[slot];
         const int slot_status = hts_load_acquire_int(&b->status);

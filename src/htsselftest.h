@@ -36,6 +36,8 @@ Please visit our Website: http://www.httrack.com
 
 #ifdef HTS_INTERNAL_BYTECODE
 
+#include "htsglobal.h"
+
 #ifndef HTS_DEF_FWSTRUCT_httrackp
 #define HTS_DEF_FWSTRUCT_httrackp
 typedef struct httrackp httrackp;
@@ -57,7 +59,8 @@ struct selftest_entry {
    the available tests when name is NULL, empty, or "list". Prints the result;
    returns the process exit code (0 == success). The caller owns option cleanup.
    Reached through the hidden `httrack -#test[=NAME ...]` subcommand. */
-int hts_selftest(httrackp *opt, const char *name, int argc, char **argv);
+HTS_CHECK_RESULT int hts_selftest(httrackp *opt, const char *name, int argc,
+                                  char **argv);
 
 #endif
 

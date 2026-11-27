@@ -136,9 +136,10 @@ HTS_CHECK_RESULT hts_boolean url_savename_refname(const char *adr,
                                                   hts_buf filename);
 char *url_savename_refname_fullpath(httrackp * opt, const char *adr,
                                     const char *fil);
-/* Remove the temp-ref for (adr,fil); HTS_TRUE if it was removed. */
-hts_boolean url_savename_refname_remove(httrackp *opt, const char *adr,
-                                        const char *fil);
+/* Remove the temp ref for (adr, fil): HTS_TRUE when no ref remains. */
+HTS_CHECK_RESULT hts_boolean url_savename_refname_remove(httrackp *opt,
+                                                         const char *adr,
+                                                         const char *fil);
 /* Note that this mirror wrote the ref at filename. Engine thread. */
 void url_savename_refname_written(httrackp *opt, const char *filename);
 /* Could the ref at filename exist? False only when hts-cache/ref was absent at

@@ -523,23 +523,18 @@ int verif_backblue(httrackp *opt, const char *base) {
     return 0;
   }
   if (opt->state.verif_backblue_done &&
-      fsize_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), base,
-                         gifs[0].name)) == HTS_DATA_BACK_GIF_LEN)
+      fsize_utf8(hts_optpath(opt, base, gifs[0].name)) == HTS_DATA_BACK_GIF_LEN)
     return 0;
   opt->state.verif_backblue_done = 1;
   for (i = 0; i < sizeof(gifs) / sizeof(gifs[0]); i++) {
-    const char *const path =
-        fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), base, gifs[i].name);
+    const char *const path = hts_optpath(opt, base, gifs[i].name);
     FILE *const fp = filecreate(&opt->state.strc, path);
 
     if (fp) {
       if (!hts_fwrite_exact(gifs[i].data, gifs[i].size, fp))
         ret = 1;
       fclose(fp);
-      usercommand(opt, 0, NULL,
-                  fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), base,
-                          gifs[i].name),
-                  "", "");
+      usercommand(opt, 0, NULL, hts_optpath(opt, base, gifs[i].name), "", "");
     } else
       ret = 1;
   }
@@ -938,6 +933,16 @@ static hts_boolean topindex_commit(httrackp *opt, const char *tmp,
 /* Test hook: the Nth project row of the next top index fails to allocate. */
 int topindex_failrow = 0;
 
+/* Template NAME under BINPATH, or a copy of DEF when it cannot be read. */
+static char *read_template(const char *binpath, const char *name,
+                           const char *def) {
+  char catbuff[CATBUFF_SIZE];
+
+  /* a path too long reads as a missing template */
+  return readfile_or(
+      hts_fpath_join(HTS_BUF(catbuff), binpath, name) ? catbuff : "", def);
+}
+
 HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
                                  const char *binpath) {
   FILE *fpo;
@@ -947,19 +952,14 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
     NULL, *toptemplate_footer = NULL, *toptemplate_bodycat = NULL;
   char catbuff[CATBUFF_SIZE];
 
-  // et templates html
-  toptemplate_header = readfile_or(fconcat(catbuff, sizeof(catbuff), binpath,
-                                           "templates/topindex-header.html"),
-                                   HTS_TOPINDEX_HEADER);
-  toptemplate_body = readfile_or(fconcat(catbuff, sizeof(catbuff), binpath,
-                                         "templates/topindex-body.html"),
-                                 HTS_TOPINDEX_BODY);
-  toptemplate_bodycat = readfile_or(fconcat(catbuff, sizeof(catbuff), binpath,
-                                            "templates/topindex-bodycat.html"),
-                                    HTS_TOPINDEX_BODYCAT);
-  toptemplate_footer = readfile_or(fconcat(catbuff, sizeof(catbuff), binpath,
-                                           "templates/topindex-footer.html"),
-                                   HTS_TOPINDEX_FOOTER);
+  toptemplate_header = read_template(binpath, "templates/topindex-header.html",
+                                     HTS_TOPINDEX_HEADER);
+  toptemplate_body =
+      read_template(binpath, "templates/topindex-body.html", HTS_TOPINDEX_BODY);
+  toptemplate_bodycat = read_template(
+      binpath, "templates/topindex-bodycat.html", HTS_TOPINDEX_BODYCAT);
+  toptemplate_footer = read_template(binpath, "templates/topindex-footer.html",
+                                     HTS_TOPINDEX_FOOTER);
 
   if (toptemplate_header && toptemplate_body && toptemplate_footer
       && toptemplate_bodycat) {
@@ -987,14 +987,14 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
       // dir (#217). Elsewhere the system charset is already utf-8.
 #ifdef _WIN32
       {
-        const char *const base = concat(catbuff, sizeof(catbuff), rpath, "/");
+        const char *const base = hts_optpath(opt, rpath, "/");
         char *base_utf8 = hts_convertStringSystemToUTF8(base, strlen(base));
 
         verif_backblue(opt, base_utf8 != NULL ? base_utf8 : base);
         freet(base_utf8);
       }
 #else
-      verif_backblue(opt, concat(catbuff, sizeof(catbuff), rpath, "/"));
+      verif_backblue(opt, hts_optpath(opt, rpath, "/"));
 #endif
       // Header
       hts_template_format(fpo, toptemplate_header,

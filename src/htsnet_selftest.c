@@ -703,7 +703,7 @@ static int st_socwait(httrackp *opt, int argc, char **argv) {
   assertf(check_readinput_t(sv[1], 1) == 0);
   dt = mtime_local() - t0;
   assertf(dt >= 900 && dt < 5000);
-  assertf(hts_newthread(socwait_delayed_send, &sv[0]) == 0);
+  assertf(hts_newthread_checked(socwait_delayed_send, &sv[0]) == 0);
   t0 = mtime_local();
   assertf(check_readinput_t(sv[1], 10) == 1);
   dt = mtime_local() - t0;
@@ -1386,7 +1386,7 @@ static int st_catchurl(httrackp *opt, int argc, char **argv) {
   /* the largest block data[] holds: it comes back filled to the last byte */
   arg.tail = fits;
   url[0] = method[0] = data[0] = '\0';
-  assertf(hts_newthread(st_catchurl_client, &arg) == 0);
+  assertf(hts_newthread_checked(st_catchurl_client, &arg) == 0);
   assertf(catch_url_capture(srv, HTS_BUF(url), HTS_BUF(method),
                             hts_buf_at(data, CATCH_URL_DATA_SIZE)) ==
           CATCH_URL_OK);
@@ -1399,7 +1399,7 @@ static int st_catchurl(httrackp *opt, int argc, char **argv) {
   /* one byte more: refused on the block, and no prefix handed back */
   arg.tail = fits + 1;
   url[0] = method[0] = data[0] = '\0';
-  assertf(hts_newthread(st_catchurl_client, &arg) == 0);
+  assertf(hts_newthread_checked(st_catchurl_client, &arg) == 0);
   assertf(catch_url_capture(srv, HTS_BUF(url), HTS_BUF(method),
                             hts_buf_at(data, CATCH_URL_DATA_SIZE)) ==
           CATCH_URL_ERR_BLOCK);
@@ -1471,7 +1471,7 @@ static int st_catchurl_overlong(httrackp *opt, int argc, char **argv) {
 
   /* one over-long line, far under any block bound: refused, nothing kept */
   url[0] = method[0] = data[0] = '\0';
-  assertf(hts_newthread(st_catchurl_over_client, &arg) == 0);
+  assertf(hts_newthread_checked(st_catchurl_over_client, &arg) == 0);
   assertf(catch_url_capture(srv, HTS_BUF(url), HTS_BUF(method),
                             hts_buf_at(data, CATCH_URL_DATA_SIZE)) ==
           CATCH_URL_ERR_HEADER);
@@ -1480,7 +1480,7 @@ static int st_catchurl_overlong(httrackp *opt, int argc, char **argv) {
 
   /* nothing but over-long lines: the capture ends on the first one */
   url[0] = method[0] = data[0] = '\0';
-  assertf(hts_newthread(st_catchurl_flood_client, &arg) == 0);
+  assertf(hts_newthread_checked(st_catchurl_flood_client, &arg) == 0);
   assertf(catch_url_capture(srv, HTS_BUF(url), HTS_BUF(method),
                             hts_buf_at(data, CATCH_URL_DATA_SIZE)) ==
           CATCH_URL_ERR_HEADER);
@@ -1544,7 +1544,7 @@ static void st_catchurl_check_bind(T_SOC srv, int port, const char *adr,
   arg.pads = 0;
   arg.tail = 7;
   url[0] = method[0] = data[0] = '\0';
-  assertf(hts_newthread(st_catchurl_client, &arg) == 0);
+  assertf(hts_newthread_checked(st_catchurl_client, &arg) == 0);
   if (legacy)
     assertf(st_catchurl_legacy(srv, url, method, data));
   else
@@ -1907,7 +1907,7 @@ static catch_url_status st_catchurl_sized_run(const char *req, hts_buf url,
   catch_url_status status;
 
   arg.req = req;
-  assertf(hts_newthread(st_catchurl_sized_client, &arg) == 0);
+  assertf(hts_newthread_checked(st_catchurl_sized_client, &arg) == 0);
   status = catch_url_capture(srv, url, method, data);
   htsthread_wait();
   deletesoc(srv);
@@ -2068,7 +2068,7 @@ static int st_catchurl_sized(httrackp *opt, int argc, char **argv) {
     hts_boolean ok;
 
     arg.req = get;
-    assertf(hts_newthread(st_catchurl_sized_client, &arg) == 0);
+    assertf(hts_newthread_checked(st_catchurl_sized_client, &arg) == 0);
     ok = catch_url_sized(srv, url, cases[i].url, HTS_SIZED(method),
                          HTS_SIZED(data));
     htsthread_wait();

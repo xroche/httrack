@@ -242,11 +242,13 @@ int hts_mirror_check_moved(htsmoduleStruct *str,
                     if (!set_prio_to)
                       heap_top()->depth = heap(ptr)->depth;
                     else
-                      heap_top()->depth = max(
+                      heap_top()->depth = hts_max_int(
                           0,
-                          min(set_prio_to - 1,
+                          hts_min_int(
+                              set_prio_to - 1,
                               heap(ptr)->depth)); // PRIORITE NULLE (catch page)
-                    heap_top()->pass2 = max(heap(ptr)->pass2, numero_passe);
+                    heap_top()->pass2 =
+                        hts_max_int(heap(ptr)->pass2, numero_passe);
                     heap_top()->retry = heap(ptr)->retry;
                     // same transfer under another name: carry the restart latch
                     // too, else a 206/alias alternation restarts for free
@@ -325,15 +327,13 @@ int hts_mirror_check_moved(htsmoduleStruct *str,
       // 412/416: the resume partial is stale; re-get the whole file (#206)
       lien_back *itemback = NULL;
       int had_partial = 0;
-      int ref_existed = 0;
-      int ref_gone;
+      hts_boolean ref_gone;
 
       // Drop the temp-ref, its partial, and heap->sav so the re-get carries no
       // Range; else back_add rebuilds the same Range and loops.
       if (back_unserialize_ref(opt, heap(ptr)->adr, heap(ptr)->fil,
                                &itemback) == 0) {
         had_partial = 1;
-        ref_existed = 1;
         // best-effort: an orphaned partial cannot re-Range once the ref is gone
         if (fexist_utf8(itemback->url_sav))
           (void) UNLINK(fconv(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
@@ -343,8 +343,7 @@ int hts_mirror_check_moved(htsmoduleStruct *str,
       }
       // don't re-record if the ref survived (it would re-Range and loop)
       ref_gone =
-          url_savename_refname_remove(opt, heap(ptr)->adr, heap(ptr)->fil) ||
-          !ref_existed;
+          url_savename_refname_remove(opt, heap(ptr)->adr, heap(ptr)->fil);
       if (fexist_utf8(heap(ptr)->sav)) {
         had_partial = 1;
         UNLINK(heap(ptr)->sav);
@@ -360,7 +359,7 @@ int hts_mirror_check_moved(htsmoduleStruct *str,
           heap_top()->testmode = heap(ptr)->testmode;
           heap_top()->link_import = 0;
           heap_top()->depth = heap(ptr)->depth;
-          heap_top()->pass2 = max(heap(ptr)->pass2, numero_passe);
+          heap_top()->pass2 = hts_max_int(heap(ptr)->pass2, numero_passe);
           heap_top()->retry = heap(ptr)->retry;
           heap_top()->refetch_whole = heap(ptr)->refetch_whole;
           heap_top()->fetch = heap(ptr)->fetch;
@@ -554,7 +553,7 @@ int hts_mirror_check_moved(htsmoduleStruct *str,
             heap_top()->testmode = heap(ptr)->testmode; // mode test?
             heap_top()->link_import = 0;                // pas mode import
             heap_top()->depth = heap(ptr)->depth;
-            heap_top()->pass2 = max(heap(ptr)->pass2, numero_passe);
+            heap_top()->pass2 = hts_max_int(heap(ptr)->pass2, numero_passe);
             heap_top()->retry =
                 restart_whole ? heap(ptr)->retry : heap(ptr)->retry - 1;
             heap_top()->fetch = heap(ptr)->fetch;
@@ -760,7 +759,8 @@ void hts_mirror_process_user_interaction(htsmoduleStruct *str,
             // record the link
             if (hts_record_link(opt, add.af.adr, add.af.fil, add.save,
                                 former.adr, former.fil, NULL)) {
-              hts_link_set_self_parented(opt, opt->depth, max(0, numero_passe));
+              hts_link_set_self_parented(opt, opt->depth,
+                                         hts_max_int(0, numero_passe));
               //
               hts_log_print(opt, LOG_INFO, "Link added by user: %s%s",
                             adr_nologin(opt, add.af.adr), add.af.fil);
@@ -1063,7 +1063,7 @@ hts_next_file hts_mirror_wait_for_next_file(htsmoduleStruct *str,
               /* divisor non-zero only via htscore.c's last_info_shell seed */
               fprintf(fp, "RATE %d" LF,
                       (int) (hts_stat_recv_get() /
-                             max(1, tl - HTS_STAT.stat_timestart)));
+                             hts_max_i64(1, tl - HTS_STAT.stat_timestart)));
               fprintf(fp, "SOCKET %d" LF, back_nsoc(sback));
               fprintf(fp, "LINK %d" LF, opt->lien_tot);
               {
@@ -1092,7 +1092,7 @@ hts_next_file hts_mirror_wait_for_next_file(htsmoduleStruct *str,
       } // si shell ou keyboard (option)
       //
 #endif
-    } while ((b >= 0) && (back_status(&back[max(b, 0)]) > 0));
+    } while ((b >= 0) && (back_status(&back[hts_max_int(b, 0)]) > 0));
 
     // If link not found on the stack, it's because it has already been
     // downloaded in background Then, skip it and go to the next one

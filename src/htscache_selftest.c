@@ -4595,6 +4595,51 @@ static int refwritten_selftest(httrackp *opt, const char *dir) {
   return fail + refwritten_longpath(opt, dir);
 }
 
+/* Removing a ref says whether one remains: gone, never there, or kept. */
+static int refname_remove_selftest(httrackp *opt, const char *dir) {
+  int fail = 0;
+  char path[HTS_URLMAXSIZE * 2];
+  const hts_span body = hts_span_of("ref");
+
+  selftest_tag = "refname-remove";
+  selftest_setup_dir(opt, dir);
+  (void) MKDIR(reconcile_st_path(opt, "hts-cache"));
+  url_savename_refnames_start(opt);
+  (void) MKDIR(reconcile_st_path(opt, CACHE_REFNAME));
+  ref_st_refpath(opt, HTS_BUF(path));
+  st_put_file(path, body);
+  if (!url_savename_refname_remove(opt, REF_ST_ADR, REF_ST_FIL) ||
+      fexist(path)) {
+    fprintf(stderr, "%s: a removed ref was not reported gone\n", selftest_tag);
+    fail++;
+  }
+  url_savename_refname_written(opt, path);
+  if (!url_savename_refname_remove(opt, REF_ST_ADR, REF_ST_FIL) ||
+      url_savename_refname_may_exist(opt, path)) {
+    fprintf(stderr, "%s: an absent ref was reported kept\n", selftest_tag);
+    fail++;
+  }
+#ifndef _WIN32
+  st_put_file(path, body);
+  /* root can unlink here anyway */
+  if (geteuid() != 0 &&
+      (chmod(reconcile_st_path(opt, CACHE_REFNAME), 0555) != 0 ||
+       url_savename_refname_remove(opt, REF_ST_ADR, REF_ST_FIL) ||
+       !fexist(path))) {
+    fprintf(stderr, "%s: a ref that stayed was reported gone\n", selftest_tag);
+    fail++;
+  }
+  (void) chmod(reconcile_st_path(opt, CACHE_REFNAME), 0755);
+#endif
+  (void) UNLINK(path);
+  url_savename_refnames_free(opt);
+  return fail;
+}
+
+static int st_refname_remove(httrackp *opt, int argc, char **argv) {
+  return st_verdict("refname-remove", refname_remove_selftest(opt, argv[0]));
+}
+
 static int st_ref_written(httrackp *opt, int argc, char **argv) {
   int err;
 
@@ -4748,7 +4793,7 @@ static int st_changes_race(httrackp *opt, int argc, char **argv) {
   changes_race_started = 0;
   hts_mutexrelease(&changes_race_lock);
   for (i = 0; i < 4; i++) {
-    if (hts_newthread(changes_race_thread, opt) != 0) {
+    if (hts_newthread_checked(changes_race_thread, opt) != 0) {
       fprintf(stderr, "changes-race: cannot spawn a notifier thread\n");
       return 1;
     }
@@ -5220,6 +5265,8 @@ const struct selftest_entry selftests_cache[] = {
     {"ref-written", "<dir>",
      "a mirror that started with no ref directory opens only its own refs",
      st_ref_written},
+    {"refname-remove", "<dir>", "removing a ref reports whether one remains",
+     st_refname_remove},
     {"cache-corrupt", "<dir>", "cache read-side corruption self-test",
      st_cache_corrupt},
     {"cache-readfail", "<dir>",

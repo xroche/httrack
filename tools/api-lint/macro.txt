@@ -36,10 +36,6 @@ src/htsback_selftest.c: ST_FIELD: holds statements outside do { } while (0)
 src/htsback_selftest.c: ST_FIELD: uses free name back
 src/htsbase.h: Sleep: evaluates a twice
 src/htsbase.h: Sleep: holds statements outside do { } while (0)
-src/htsbase.h: max: evaluates a twice
-src/htsbase.h: max: evaluates b twice
-src/htsbase.h: min: evaluates a twice
-src/htsbase.h: min: evaluates b twice
 src/htsbundle.c: BUNDLE_FAIL: uses free name err
 src/htsbundle.c: PASTE_FAIL: uses free name done
 src/htsbundle.c: PASTE_FAIL: uses free name ok
