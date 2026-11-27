@@ -322,11 +322,21 @@ HTS_STATIC int cache_readable(cache_back * cache) {
 
 HTS_OWNED char *hts_cancel_file_pop(httrackp *opt);
 
+/* Native path DIR/NAME in the rotating concat buffer. DIR is our own
+   configured path, so a path too long for the buffer aborts. */
+static HTS_INLINE HTS_UNUSED char *hts_optpath(httrackp *opt, const char *dir,
+                                               const char *name) {
+  const hts_buf b = OPT_GET_HTS_BUF(opt);
+
+  if (!hts_fpath_join(b, dir, name))
+    abortLog("path too long for the concat buffer");
+  return b.p;
+}
+
 /* Path of NAME inside the mirror log dir, in the rotating concat buffer. */
 static HTS_INLINE HTS_UNUSED char *hts_logpath(httrackp *opt,
                                                const char *name) {
-  return fconcat(OPT_GET_BUFF(opt), sizeof(opt->state.concat.buff[0]),
-                 StringBuff(opt->path_log), name);
+  return hts_optpath(opt, StringBuff(opt->path_log), name);
 }
 
 /* Detach the pending hts_addurl() list and give the caller ownership; NULL

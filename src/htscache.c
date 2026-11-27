@@ -1406,8 +1406,8 @@ char *readfile_or(const char *fil, const char *defaultdata) {
   char *ret;
   char catbuff[CATBUFF_SIZE];
 
-  if (!fexist(fil))
-    realfile = fconcat(catbuff, sizeof(catbuff), hts_rootdir(NULL), fil);
+  if (!fexist(fil) && hts_fpath_join(HTS_BUF(catbuff), hts_rootdir(NULL), fil))
+    realfile = catbuff;
   ret = readfile(realfile);
   if (ret)
     return ret;

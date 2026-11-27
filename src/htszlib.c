@@ -228,10 +228,13 @@ size_t hts_zhead(hts_span in, hts_buf out) {
 
 hts_boolean hts_extract_meta(const char *path) {
   char catbuff[CATBUFF_SIZE];
-  unzFile zFile = hts_unzOpen_utf8(
-      fconcat(catbuff, sizeof(catbuff), path, "hts-cache/new.zip"));
-  zipFile zFileOut = hts_zipOpen_utf8(
-      fconcat(catbuff, sizeof(catbuff), path, "hts-cache/meta.zip"), 0);
+  unzFile zFile = hts_fpath_join(HTS_BUF(catbuff), path, "hts-cache/new.zip")
+                      ? hts_unzOpen_utf8(catbuff)
+                      : NULL;
+  zipFile zFileOut =
+      hts_fpath_join(HTS_BUF(catbuff), path, "hts-cache/meta.zip")
+          ? hts_zipOpen_utf8(catbuff, 0)
+          : NULL;
 
   if (zFile != NULL && zFileOut != NULL) {
     if (unzGoToFirstFile(zFile) == Z_OK) {

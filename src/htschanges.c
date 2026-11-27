@@ -416,8 +416,11 @@ static void changes_resolve(hts_changes *changes, httrackp *opt) {
     /* The previous index decides what existed, because a failed attempt's
        partial is on disk but was never mirrored. */
     entry->existed = changes->old_index ? entry->listed_prev : entry->on_disk;
-    path = fconcat(catbuff, sizeof(catbuff), StringBuff(opt->path_html),
-                   entry->file);
+    /* a saved name too long to join reads as missing */
+    path = hts_fpath_join(HTS_BUF(catbuff), StringBuff(opt->path_html),
+                          entry->file)
+               ? catbuff
+               : "";
     entry->size = fsize_utf8(path);
     if (entry->rewritten && entry->existed) {
       /* The size shortcut holds only for on-disk digests, because a parsed
@@ -560,8 +563,11 @@ void hts_changes_close_opt(httrackp *opt) {
   }
   hts_mutexrelease(&changes_mutex);
 
-  path = fconcat(catbuff, sizeof(catbuff), StringBuff(opt->path_log),
-                 HTS_CHANGES_FILE);
+  /* too long a path fails the open below, which reports it */
+  path = hts_fpath_join(HTS_BUF(catbuff), StringBuff(opt->path_log),
+                        HTS_CHANGES_FILE)
+             ? catbuff
+             : "";
   fp = FOPEN(path, "wb");
   if (fp != NULL) {
     const size_t len = StringLength(report);

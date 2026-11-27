@@ -93,7 +93,6 @@ static struct {
   Init index 
 */
 void index_init(const char *indexpath) {
-  /* remove(concat(indexpath,"index.txt")); */
   indexer.first_page = HTS_TRUE;
   indexer.lines = 0;
   indexer.words = 0;
@@ -164,8 +163,10 @@ int index_keyword(hts_span html, const char *mime, const char *filename,
 
   // Init ?
   if (indexer.first_page) {
-    UNLINK(concat(catbuff, sizeof(catbuff), indexpath, "index.txt"));
-    UNLINK(concat(catbuff, sizeof(catbuff), indexpath, "sindex.html"));
+    if (hts_path_join(HTS_BUF(catbuff), indexpath, "index.txt"))
+      UNLINK(catbuff);
+    if (hts_path_join(HTS_BUF(catbuff), indexpath, "sindex.html"))
+      UNLINK(catbuff);
     indexer.first_page = HTS_FALSE;
   }
   // Check MIME type
@@ -434,9 +435,10 @@ void index_finish(const char *indexpath, hts_kindex mode) {
   fclose(indexer.tmp);
   indexer.tmp = NULL;
 
-  fp = FOPEN(concat(catbuff, sizeof(catbuff), indexpath,
-                    mode == HTS_KINDEX_TEXT ? "index.txt" : "sindex.html"),
-             "wb");
+  fp = hts_path_join(HTS_BUF(catbuff), indexpath,
+                     mode == HTS_KINDEX_TEXT ? "index.txt" : "sindex.html")
+           ? FOPEN(catbuff, "wb")
+           : NULL;
   if (fp) {
     index_write(fp, mode, tab, index);
     fclose(fp);
