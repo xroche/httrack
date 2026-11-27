@@ -711,7 +711,7 @@ static int ftp_wait_left(const httrackp *opt, int timeout) {
    connect() to a black hole sits for the kernel's own two minutes (#1059). */
 static hts_boolean ftp_connect(lien_back *back, T_SOC soc, SOCaddr *server,
                                int timeout, const httrackp *opt) {
-  const TStamp started = mtime_monotonic();
+  const hts_mono started = hts_mono_now();
   hts_boolean pending;
 
   timeout = ftp_wait_left(opt, timeout);
@@ -727,7 +727,7 @@ static hts_boolean ftp_connect(lien_back *back, T_SOC soc, SOCaddr *server,
     while ((ready = check_socket_connect(soc)) == HTS_POLL_NONE) {
       if (hts_load_acquire_int(&back->stop_ftp) ||
           (opt != NULL && hts_load_acquire_int(&opt->state.stop)) ||
-          hts_timeout_elapsed(started, mtime_monotonic(), timeout))
+          hts_timeout_elapsed(started, hts_mono_now(), timeout))
         return HTS_FALSE;
       Sleep(100);
     }
@@ -745,7 +745,7 @@ static hts_poll_result check_socket(T_SOC soc);
    connection the server may never make (#1074). */
 static T_SOC ftp_accept(lien_back *back, T_SOC soc, int timeout,
                         const httrackp *opt) {
-  const TStamp started = mtime_monotonic();
+  const hts_mono started = hts_mono_now();
   T_SOC soc_dat;
 
   timeout = ftp_wait_left(opt, timeout);
@@ -755,7 +755,7 @@ static T_SOC ftp_accept(lien_back *back, T_SOC soc, int timeout,
   while (check_socket(soc) == HTS_POLL_NONE) {
     if (hts_load_acquire_int(&back->stop_ftp) ||
         (opt != NULL && hts_load_acquire_int(&opt->state.stop)) ||
-        hts_timeout_elapsed(started, mtime_monotonic(), timeout))
+        hts_timeout_elapsed(started, hts_mono_now(), timeout))
       return INVALID_SOCKET;
     Sleep(100);
   }
@@ -1547,7 +1547,7 @@ hts_poll_result check_socket_connect(T_SOC soc) {
 
 static hts_poll_result wait_socket_receive(lien_back *back, T_SOC soc,
                                            int timeout, const httrackp *opt) {
-  const TStamp ltime = mtime_monotonic();
+  const hts_mono ltime = hts_mono_now();
   hts_poll_result r;
 
   timeout = ftp_wait_left(opt, timeout);
@@ -1560,7 +1560,7 @@ static hts_poll_result wait_socket_receive(lien_back *back, T_SOC soc,
      after the full timeout, so teardown does not sit on a silent server. */
   while ((r = check_socket(soc)) == HTS_POLL_NONE &&
          (back == NULL || !hts_load_acquire_int(&back->stop_ftp)) &&
-         !hts_timeout_elapsed(ltime, mtime_monotonic(), timeout)) {
+         !hts_timeout_elapsed(ltime, hts_mono_now(), timeout)) {
     Sleep(100);
 #if FTP_DEBUG
     printf(".");

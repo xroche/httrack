@@ -439,8 +439,8 @@ void back_free(struct_back ** sback) {
 /* Milliseconds between two looks at a pending resolve. */
 #define HTS_DNS_POLL_MS 10
 
-int back_connect_fallback_due(int addr_index, int addr_count, TStamp elapsed_ms,
-                              int timeout) {
+int back_connect_fallback_due(int addr_index, int addr_count, hts_mono since,
+                              hts_mono now, int timeout) {
   int deadline;
 
   if (addr_index + 1 >= addr_count) // last (or only) candidate: no fallback
@@ -450,14 +450,14 @@ int back_connect_fallback_due(int addr_index, int addr_count, TStamp elapsed_ms,
   deadline = (timeout < HTS_CONNECT_FALLBACK_TIMEOUT)
                  ? timeout
                  : HTS_CONNECT_FALLBACK_TIMEOUT;
-  return hts_timeout_elapsed(0, elapsed_ms, deadline);
+  return hts_timeout_elapsed(since, now, deadline);
 }
 
 /* Restart slot i's timeout window. timeout_refresh keeps the wall clock for
    library readers; the timeout itself runs on the monotonic copy. */
 static void back_timeout_refresh(struct_back *sback, int i) {
   sback->lnk[i].timeout_refresh = time_local();
-  sback->connect_fallback[i].timeout_since = mtime_monotonic();
+  sback->connect_fallback[i].timeout_since = hts_mono_now();
 }
 
 /* Log the outcome of a stored link. */
@@ -2773,7 +2773,8 @@ static hts_boolean back_dns_defer(httrackp *opt, struct_back *sback,
     return HTS_FALSE;
   sback->connect_fallback[p].dns_job = job;
   sback->connect_fallback[p].dns_deadline =
-      opt->timeout > 0 ? mtime_monotonic() + (TStamp) opt->timeout * 1000 : 0;
+      opt->timeout > 0 ? hts_mono_add_s(hts_mono_now(), opt->timeout)
+                       : hts_mono_never();
   back[p].status = STATUS_WAIT_DNS;
   return HTS_TRUE;
 }
@@ -2814,7 +2815,7 @@ static void back_dns_poll(httrackp *opt, struct_back *sback, const int p,
     return;
   }
   if (count == HTS_DNS_PENDING &&
-      (cf->dns_deadline == 0 || mtime_monotonic() < cf->dns_deadline))
+      hts_mono_before(hts_mono_now(), cf->dns_deadline))
     return;
   if (count == HTS_DNS_PENDING) {
     memset(&dns, 0, sizeof(dns));
@@ -5382,7 +5383,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
     // vérifier timeouts
     if (gestion_timeout) {
       const TStamp act = time_local(); // the rate check counts seconds
-      const TStamp act_ms = mtime_monotonic();
+      const hts_mono act_mono = hts_mono_now();
       BACK_FOR_EACH_BUSY_FROM(sback, start, i) {
         // back_dns_poll() times out STATUS_WAIT_DNS
         if (back_is_live(back_status(&back[i])) &&
@@ -5395,7 +5396,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                   &sback->connect_fallback[i];
 
               if (back_connect_fallback_due(cf->addr_index, cf->addr_count,
-                                            act_ms - cf->timeout_since,
+                                            cf->timeout_since, act_mono,
                                             back[i].timeout)) {
                 if (!back_connect_next(opt, sback, i, HTS_TRUE)) {
                   back_slot_close_fail(opt, sback, i, STATUSCODE_CONNERROR,
@@ -5405,7 +5406,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               }
             }
             if (hts_timeout_elapsed(sback->connect_fallback[i].timeout_since,
-                                    act_ms, back[i].timeout)) {
+                                    act_mono, back[i].timeout)) {
               const int slot_status = back_status(&back[i]);
 
               hts_log_print(opt, LOG_DEBUG, "connection timed out for %s%s",

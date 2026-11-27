@@ -3060,10 +3060,6 @@ TStamp mtime_monotonic(void) {
 #endif
 }
 
-hts_boolean hts_timeout_elapsed(TStamp since_ms, TStamp now_ms, int timeout_s) {
-  return now_ms - since_ms >= (TStamp) timeout_s * 1000;
-}
-
 /* Writes t seconds as days, hours, minutes and seconds, dropping the empty
    leading units, clipped to ST. */
 static void duration_str(hts_buf st, TStamp t, hts_boolean quick) {

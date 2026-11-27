@@ -588,7 +588,7 @@ static hts_boolean hts_dns_resolve_nocache_list_bounded(
     const char *hostname, hts_dns_result *const res, const int timeout,
     const volatile hts_boolean *cancel) {
   dns_resolve_job *job;
-  TStamp deadline;
+  hts_mono deadline;
   hts_boolean answered = HTS_FALSE;
   int poll_ms = 1;
 
@@ -605,7 +605,8 @@ static hts_boolean hts_dns_resolve_nocache_list_bounded(
   }
 
   /* timeout <= 0 got here only for a cancellable resolve: no deadline then */
-  deadline = timeout > 0 ? mtime_monotonic() + (TStamp) timeout * 1000 : 0;
+  deadline =
+      timeout > 0 ? hts_mono_add_s(hts_mono_now(), timeout) : hts_mono_never();
   for (;;) {
     hts_boolean done;
 
@@ -624,7 +625,7 @@ static hts_boolean hts_dns_resolve_nocache_list_bounded(
       dns_result_fail(res, HTS_DNS_CANCELLED, 0);
       break;
     }
-    if (deadline != 0 && mtime_monotonic() >= deadline) {
+    if (!hts_mono_before(hts_mono_now(), deadline)) {
       dns_result_fail(res, HTS_DNS_TIMEOUT, 0);
       break;
     }

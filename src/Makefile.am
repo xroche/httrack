@@ -102,7 +102,7 @@ libhttrack_la_SOURCES =  htscore.c htsusercmd.c htsmhtml.c htsparse.c htsmirror.
 	htsmodules.h htsname.h htsnet.h htsshared.h htssniff.h \
 	htsopt.h htsrobots.h htsthread.h htswin32.h  \
 	htscrashtest.h htstools.h htsrandom.h htswizard.h htswrap.h htscodec.h htswarc.h htschanges.h htssinglefile.h htsfetch.h htspsl.h htssitemap.h htsproxy.h htszlib.h  \
-	htsstrings.h htsarrays.h htsarena.h htsckd.h httrack-library.h \
+	htsstrings.h htsarrays.h htsarena.h htsckd.h htsmono.h httrack-library.h \
 	htscharset.h punycode.h htsencoding.h htsescape.h \
 	htsentities.h htsentities.sh htsbasiccharsets.sh htscodepages.h \
 	winprofile-keys.h \

@@ -65,6 +65,7 @@ typedef struct lien_adrfilsave lien_adrfilsave;
 #include "htsdate.h"
 #include "htsurlport.h"
 #include "htsbuf.h"
+#include "htsmono.h"
 
 /* basic net definitions */
 #include "htsbase.h"
@@ -679,15 +680,6 @@ void hts_dns_set_negative_ttl_ms(int ms);
 /* Consecutive failed resolves recorded for host, 0 if it is not cached or
    resolves. Test-only: nothing in the engine reads it back. */
 int hts_dns_negative_failures(httrackp *opt, const char *host);
-/* Milliseconds off a clock NTP cannot step, for an elapsed time or a
-   deadline. Its zero is arbitrary, so it measures an interval and never names
-   a date; anything stored or sent still needs mtime_local(). */
-TStamp mtime_monotonic(void);
-/* Has a timeout of timeout_s seconds run out between the readings
-   since_ms and now_ms? Both must come from mtime_monotonic(). A timeout_s <= 0
-   has always run out. */
-hts_boolean hts_timeout_elapsed(TStamp since_ms, TStamp now_ms, int timeout_s);
-
 /* Test-only: move one cached negative record's stamps by ms, so a self-test
    outlasts a wait (positive) or steps behind them (negative), no sleeps. */
 void hts_dns_test_move_clock(httrackp *opt, const char *host, TStamp ms);

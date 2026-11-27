@@ -25,7 +25,7 @@ test "$out" = "dns-timeout-selftest: OK" || {
 body=$(awk '/^static hts_boolean hts_dns_resolve_nocache_list_bounded\(/,/^}/' \
     "$top_srcdir/src/htsdns.c")
 case "$body" in
-*mtime_monotonic*) ;;
+*hts_mono_now*) ;;
 *)
     echo "FAIL: the bounded resolve no longer arms its deadline here"
     exit 1

@@ -37,6 +37,7 @@ Please visit our Website: http://www.httrack.com
 #define HTS_CORE_DEFH
 
 #include "htsglobal.h"
+#include "htsmono.h"
 
 /* specific definitions */
 #include "htsbase.h"
@@ -161,8 +162,8 @@ typedef struct hts_connect_fallback {
   int addr_count;       /**< resolved addresses; -1 = not yet probed */
   int addr_first;       /**< list index of the first attempt */
   struct dns_resolve_job *dns_job; /**< resolve under STATUS_WAIT_DNS */
-  TStamp dns_deadline; /**< mtime_monotonic() past which it fails; 0 = none */
-  TStamp timeout_since; /**< mtime_monotonic() the slot timeout counts from */
+  hts_mono dns_deadline;  /**< past which the resolve fails, or never */
+  hts_mono timeout_since; /**< the slot timeout counts from it */
 } hts_connect_fallback;
 
 /** A slot's own copies of the request strings copy_htsopt() may rewrite. */

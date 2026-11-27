@@ -46,6 +46,58 @@ Please visit our Website: http://www.httrack.com
 #include <sys/wait.h> /* the forking sigterm self-test reaps its children */
 #endif
 
+/* Prints and counts a failed check at the self-test's line. */
+static int mono_fail(int line, hts_boolean ok) {
+  if (ok)
+    return 0;
+  printf("FAIL line %d\n", line);
+  return 1;
+}
+
+/* -#test=mono: the monotonic clock's units, its never deadline and timeouts. */
+static int st_mono(httrackp *opt, int argc, char **argv) {
+  const hts_mono t = hts_mono_from_ms(5000);
+  const hts_mono now = hts_mono_now();
+  int errors = 0;
+
+  errors +=
+      mono_fail(__LINE__, hts_mono_diff_ms(hts_mono_add_s(t, 2), t) == 2000);
+  errors +=
+      mono_fail(__LINE__, hts_mono_diff_ms(hts_mono_add_ms(t, 2), t) == 2);
+  errors += mono_fail(__LINE__,
+                      hts_mono_diff_ms(hts_mono_add_ms(t, -7000), t) == -7000);
+  errors +=
+      mono_fail(__LINE__, hts_mono_diff_ms(t, hts_mono_add_s(t, 1)) == -1000);
+  /* seconds widen before the multiply, so INT_MAX does not wrap */
+  errors += mono_fail(__LINE__, hts_mono_diff_ms(hts_mono_add_s(t, INT_MAX),
+                                                 t) == (TStamp) INT_MAX * 1000);
+  errors += mono_fail(__LINE__, hts_mono_before(t, hts_mono_add_ms(t, 1)));
+  errors += mono_fail(__LINE__, !hts_mono_before(t, t));
+  errors += mono_fail(__LINE__, !hts_mono_before(hts_mono_add_ms(t, 1), t));
+  errors += mono_fail(__LINE__, hts_mono_before(now, hts_mono_never()));
+  errors += mono_fail(__LINE__, hts_mono_before(hts_mono_add_s(now, INT_MAX),
+                                                hts_mono_never()));
+  errors += mono_fail(__LINE__, !hts_mono_before(hts_mono_never(), now));
+  errors += mono_fail(__LINE__, !hts_mono_before(hts_mono_now(), now));
+  /* a timeout counts milliseconds, so a crossed second boundary is not one */
+  errors +=
+      mono_fail(__LINE__, !hts_timeout_elapsed(hts_mono_add_ms(t, 999),
+                                               hts_mono_add_ms(t, 1001), 1));
+  errors +=
+      mono_fail(__LINE__, !hts_timeout_elapsed(t, hts_mono_add_ms(t, 999), 1));
+  errors +=
+      mono_fail(__LINE__, hts_timeout_elapsed(t, hts_mono_add_ms(t, 1000), 1));
+  errors +=
+      mono_fail(__LINE__, !hts_timeout_elapsed(t, hts_mono_add_s(t, 29), 30));
+  errors +=
+      mono_fail(__LINE__, hts_timeout_elapsed(t, hts_mono_add_s(t, 30), 30));
+  errors += mono_fail(__LINE__, hts_timeout_elapsed(t, t, 0));
+  errors +=
+      mono_fail(__LINE__, hts_timeout_elapsed(t, hts_mono_add_ms(t, -1), -1));
+  printf("%s\n", errors == 0 ? "ok" : "FAIL");
+  return errors == 0 ? 0 : 1;
+}
+
 /* Prints the long and the short rendering of a duration. */
 static int st_duration(httrackp *opt, int argc, char **argv) {
   char lng[256], shrt[256];
@@ -6233,6 +6285,8 @@ const struct selftest_entry selftests_lib[] = {
      "bounded string-op self-test", st_strsafe},
     {"duration", "<seconds>", "a duration as long and as short text",
      st_duration},
+    {"mono", "", "the monotonic clock's units, never deadline and timeouts",
+     st_mono},
     {"base64", "<hex:..|string> [repeat] [crlf] [size]",
      "base-64 of a repeated string, with a CRLF every 76 characters",
      st_base64},
