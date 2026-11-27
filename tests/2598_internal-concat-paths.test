@@ -81,6 +81,7 @@ cleanup_push rm -rf "$tmp"
 mkdir "${tmp}/swap" "${tmp}/space"
 cp "$src"/*.c "${tmp}/swap"/
 cp "$src"/*.c "${tmp}/space"/
+chmod -R u+w "$tmp" # distcheck sources are read-only
 sed 's/, buff, "\/s")/, dir, name)/' "${src}/htslib.c" >"${tmp}/swap/htslib.c"
 printf '%s\n' 'void f(void) { fconcat (buf, sizeof(buf), dir, "x"); }' \
     >>"${tmp}/space/htsindex.c"
