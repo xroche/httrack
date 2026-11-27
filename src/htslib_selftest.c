@@ -4805,15 +4805,41 @@ static int st_pathjoin(httrackp *opt, int argc, char **argv) {
     size_t size;
     const char *want; /* NULL: does not fit */
   } cases[] = {
-      {"a/", "b", 8, "a/b"},     {"a", "b", 8, "a/b"},
-      {"a", "/b", 8, "a/b"},     {"a/", "/b", 8, "a//b"},
-      {"", "b", 8, "b"},         {"a", "", 8, "a"},
-      {"a/", "", 8, "a/"},       {"", "", 1, ""},
-      {"ab", "cd", 6, "ab/cd"},  {"ab", "cd", 5, NULL},
-      {"ab/", "cd", 6, "ab/cd"}, {"ab/", "cd", 5, NULL},
-      {"abcd", "", 5, "abcd"},   {"abcd", "e", 5, NULL},
-      {"abcde", "", 5, NULL},    {"abcdef", "x", 4, NULL},
-      {"a", "bcdefg", 4, NULL},  {"a", "b", 0, NULL},
+      {"a/", "b", 8, "a/b"},
+      {"a", "b", 8, "a/b"},
+      {"a", "/b", 8, "a/b"},
+      {"a/", "/b", 8, "a//b"},
+      {"", "b", 8, "b"},
+      {"a", "", 8, "a"},
+      {"a/", "", 8, "a/"},
+      {"", "", 1, ""},
+      {"ab", "cd", 6, "ab/cd"},
+      {"ab", "cd", 5, NULL},
+      {"ab/", "cd", 6, "ab/cd"},
+      {"ab/", "cd", 5, NULL},
+      {"abcd", "", 5, "abcd"},
+      {"abcd", "e", 5, NULL},
+      {"abcde", "", 5, NULL},
+      {"abcdef", "x", 4, NULL},
+      {"a", "bcdefg", 4, NULL},
+      {"a", "b", 0, NULL},
+      {NULL, "b", 8, "b"},
+      {"a", NULL, 8, "a"},
+      {NULL, NULL, 1, ""},
+      {"", "/b", 8, "/b"},
+      /* '\\' separates only on DOS-style platforms */
+      {"a\\", "b", 8, HTS_DOSNAME ? "a\\b" : "a\\/b"},
+      {"a", "\\b", 8, HTS_DOSNAME ? "a\\b" : "a/\\b"},
+  };
+
+  static const struct {
+    const char *dir, *name;
+    const char *want, *dos; /* want NULL: does not fit in 16 bytes */
+  } native[] = {
+      {"a/b", "c", "a/b/c", "a\\b\\c"},
+      {"a/", "/c", "a//c", "a\\\\c"},
+      {"", "a/b", "a/b", "a\\b"},
+      {"abcdefgh", "ijklmnop", NULL, NULL},
   };
 
   size_t i, failures = 0;
@@ -4832,24 +4858,29 @@ static int st_pathjoin(httrackp *opt, int argc, char **argv) {
     if (fit != (cases[i].want != NULL) || buf[size] != 'Q' ||
         (size != 0 && strcmp(buf, fit ? cases[i].want : "") != 0)) {
       printf("pathjoin: FAIL case %u (\"%s\", \"%s\", %u)\n", (unsigned) i,
-             cases[i].dir, cases[i].name, (unsigned) size);
+             cases[i].dir != NULL ? cases[i].dir : "(null)",
+             cases[i].name != NULL ? cases[i].name : "(null)", (unsigned) size);
       failures++;
     }
   }
-  /* the native form converts the separator it inserted, and the others */
-  {
+  /* the native form converts every '/', the inserted one included */
+  for (i = 0; i < sizeof(native) / sizeof(native[0]); i++) {
     char buf[16];
-    const hts_boolean fit = hts_fpath_join(HTS_BUF(buf), "a/b", "c");
+    const hts_boolean fit =
+        hts_fpath_join(HTS_BUF(buf), native[i].dir, native[i].name);
+    const char *const want = native[i].want == NULL ? ""
+                             : HTS_DOSNAME          ? native[i].dos
+                                                    : native[i].want;
 
-    if (!fit || strcmp(buf, HTS_DOSNAME ? "a\\b\\c" : "a/b/c") != 0 ||
-        hts_fpath_join(HTS_BUF(buf), "abcdefgh", "ijklmnop") ||
-        buf[0] != '\0') {
-      printf("pathjoin: FAIL native form\n");
+    if (fit != (native[i].want != NULL) || strcmp(buf, want) != 0) {
+      printf("pathjoin: FAIL native case %u (\"%s\", \"%s\")\n", (unsigned) i,
+             native[i].dir, native[i].name);
       failures++;
     }
   }
   printf("pathjoin: %u cases, %u failures\n",
-         (unsigned) (sizeof(cases) / sizeof(cases[0]) + 1),
+         (unsigned) (sizeof(cases) / sizeof(cases[0]) +
+                     sizeof(native) / sizeof(native[0])),
          (unsigned) failures);
   if (failures == 0)
     printf("pathjoin: OK\n");

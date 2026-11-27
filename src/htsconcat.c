@@ -83,7 +83,7 @@ static hts_boolean is_path_sep(char c) {
   return c == '/' || (HTS_DOSNAME && c == '\\');
 }
 
-hts_boolean hts_path_join(hts_buf b, const char *dir, const char *name) {
+static hts_boolean path_join_(hts_buf b, const char *dir, const char *name) {
   const size_t dlen = strlen(dir);
   const size_t nlen = strlen(name);
   const size_t slash = dlen != 0 && nlen != 0 && !is_path_sep(dir[dlen - 1]) &&
@@ -101,6 +101,10 @@ hts_boolean hts_path_join(hts_buf b, const char *dir, const char *name) {
     b.p[dlen] = '/';
   memcpy(b.p + dlen + slash, name, nlen + 1);
   return HTS_TRUE;
+}
+
+hts_boolean hts_path_join(hts_buf b, const char *dir, const char *name) {
+  return path_join_(b, dir != NULL ? dir : "", name != NULL ? name : "");
 }
 
 hts_boolean hts_fpath_join(hts_buf b, const char *dir, const char *name) {
