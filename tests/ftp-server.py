@@ -13,6 +13,9 @@ directory). Each line is "<path> <mode>...", path "*" matching everything:
   norest    answer REST with 500, so the client re-fetches from scratch
   nomdtm    answer MDTM with 500, like a server predating RFC 3659
   hold      never answer RETR, leaving the client's data connection idle
+  sizecut   answer SIZE with half a line, then drop the control connection
+  sizelate  answer SIZE only after LATE_SECONDS, past a 2s client timeout
+  sizelong  answer SIZE with a reply line far over the client's 1023-byte bound
 
 --require-pass answers USER with 331, the only way the client's PASS is sent.
 --mute accepts the control connection and never speaks, not even the greeting.
@@ -29,6 +32,8 @@ import time
 # Longer than any bound a test asserts, so going quiet can never be what ends
 # the run under test.
 QUIET_SECONDS = 900
+
+LATE_SECONDS = 3
 
 TRICKLE_CHUNK = 8192
 TRICKLE_PAUSE = 0.2
@@ -180,7 +185,15 @@ class Session(threading.Thread):
             reply(conn, "500 not supported")
         elif verb == "SIZE":
             path = self.resolve(arg)
-            if path and os.path.isfile(path):
+            modes = self.modes()
+            if "sizecut" in modes:
+                conn.sendall(b"213 1")
+                return False
+            if "sizelate" in modes:
+                time.sleep(LATE_SECONDS)
+            if "sizelong" in modes:
+                reply(conn, "213 " + "9" * 2000)
+            elif path and os.path.isfile(path):
                 reply(conn, "213 %d" % os.path.getsize(path))
             else:
                 reply(conn, "550 no such file")

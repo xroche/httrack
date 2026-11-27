@@ -820,8 +820,8 @@ static int st_sigpipe(httrackp *opt, int argc, char **argv) {
 }
 #endif
 
-/* get_ftp_line must bound a hostile, CRLF-less reply into its 1024-byte
-   buffer, then clip it into the caller's. ASan aborts on an overflow. */
+/* get_ftp_line must bound a hostile reply into its 1024-byte buffer, clip it
+   into the caller's, and report each failure as a status, never as a reply. */
 static int st_ftpline(httrackp *opt, int argc, char **argv) {
   T_SOC sv[2];
   char line[2048];
@@ -829,19 +829,47 @@ static int st_ftpline(httrackp *opt, int argc, char **argv) {
 
   memset(flood, 'x', sizeof(flood));
   assertf(st_socketpair(sv) == 0);
-  // the 4102-byte reply fits the loopback send buffer, so no reader is needed
-  assertf(send(sv[1], "220 ", 4, 0) == 4); // valid 3-digit code
+  // the 4136-byte replies fit the loopback send buffer, so no reader is needed
+  assertf(send(sv[1], "220-", 4, 0) == 4); // a continuation line is discarded
   assertf(send(sv[1], flood, (int) sizeof(flood), 0) == (int) sizeof(flood));
-  assertf(send(sv[1], "\r\n", 2, 0) == 2); // end the line so we return
-  assertf(send(sv[1], "220 short reply\r\n221 bye\r\n", 26, 0) == 26);
+  assertf(send(sv[1], "\r\n220 short reply\r\n221 goodbye\r\n", 32, 0) == 32);
+  assertf(send(sv[1], "250 cut", 7, 0) == 7);
   deletesoc(sv[1]);
-  line[0] = '\0';
-  assertf(get_ftp_line(NULL, sv[0], HTS_BUF(line), 5, NULL));
-  assertf(strlen(line) == 1023 && line[1022] == 'x');
+  assertf(get_ftp_line(NULL, sv[0], HTS_BUF(line), 5, NULL) == HTS_FTP_LINE_OK);
+  assertf(strcmp(line, "220 short reply") == 0);
   memset(line, '#', sizeof(line)); // a zero canary would hide a stray NUL
-  assertf(get_ftp_line(NULL, sv[0], HTS_BUF_N(line, 8), 5, NULL));
-  assertf(strcmp(line, "220 sho") == 0 && line[8] == '#' && line[63] == '#');
-  assertf(get_ftp_line(NULL, sv[0], hts_buf_none(), 5, NULL));
+  assertf(get_ftp_line(NULL, sv[0], HTS_BUF_N(line, 8), 5, NULL) ==
+          HTS_FTP_LINE_OK);
+  assertf(strcmp(line, "221 goo") == 0 && line[8] == '#' && line[63] == '#');
+  // the peer closed mid-reply: an error, and no text a parser could read
+  memset(line, '#', sizeof(line));
+  assertf(get_ftp_line(NULL, sv[0], HTS_BUF(line), 5, NULL) ==
+          HTS_FTP_LINE_ERROR);
+  assertf(line[0] == '\0' && line[1] == '#');
+  assertf(get_ftp_line(NULL, sv[0], hts_buf_none(), 5, NULL) ==
+          HTS_FTP_LINE_ERROR);
+  deletesoc(sv[0]);
+
+  // an over-long final line fails at the bound, without waiting for its CRLF
+  assertf(st_socketpair(sv) == 0);
+  assertf(send(sv[1], "220 ", 4, 0) == 4);
+  assertf(send(sv[1], flood, (int) sizeof(flood), 0) == (int) sizeof(flood));
+  memset(line, '#', sizeof(line));
+  assertf(get_ftp_line(NULL, sv[0], HTS_BUF(line), 5, NULL) ==
+          HTS_FTP_LINE_TOO_LONG);
+  assertf(line[0] == '\0' && line[1] == '#');
+
+  deletesoc(sv[1]);
+  deletesoc(sv[0]);
+
+  // a silent peer times out; sv[1] stays open, so this is not a close
+  assertf(st_socketpair(sv) == 0);
+  assertf(send(sv[1], "220 par", 7, 0) == 7);
+  memset(line, '#', sizeof(line));
+  assertf(get_ftp_line(NULL, sv[0], HTS_BUF(line), 1, NULL) ==
+          HTS_FTP_LINE_TIMEOUT);
+  assertf(line[0] == '\0' && line[1] == '#');
+  deletesoc(sv[1]);
   deletesoc(sv[0]);
   printf("ftp-line self-test OK (bounded %d-byte reply)\n",
          (int) sizeof(flood));

@@ -452,6 +452,30 @@ void launch_ftp(FTPDownloadStruct * params) {
     (R)->statuscode = STATUSCODE_INVALID;                                      \
   } while (0)
 
+/* Read a reply. A read failure fails the transfer, never reaching a parser. */
+static HTS_CHECK_RESULT hts_boolean ftp_reply(lien_back *back, T_SOC soc,
+                                              hts_buf line, int timeout,
+                                              const httrackp *opt) {
+  const hts_ftp_line_status st = get_ftp_line(back, soc, line, timeout, opt);
+
+  if (st == HTS_FTP_LINE_OK)
+    return HTS_TRUE;
+  if (stop_ftp(back)) // the stop, not the wait it cut short, is the reason
+    return HTS_FALSE;
+  switch (st) {
+  case HTS_FTP_LINE_TIMEOUT:
+    ftp_fail(&back->r, "FTP read timeout (%d)", timeout);
+    break;
+  case HTS_FTP_LINE_TOO_LONG:
+    ftp_fail(&back->r, "FTP reply line too long");
+    break;
+  default:
+    ftp_fail(&back->r, "FTP read error");
+    break;
+  }
+  return HTS_FALSE;
+}
+
 /* Start of the authority in a URL address (see htsftp.h). */
 char *ftp_jump_authority(char *url_adr) {
   char *a = jump_protocol(url_adr);
@@ -914,16 +938,16 @@ static void run_launch_ftp(FTPDownloadStruct *pStruct) {
       // envoi du login
 
       // --USER--
-      get_ftp_line(back, soc_ctl, HTS_BUF(line), timeout, opt); // en tête
-      if (stop_ftp(back))
+      if (!ftp_reply(back, soc_ctl, HTS_BUF(line), timeout, opt) ||
+          stop_ftp(back))
         goto done;
 
       if (line[0] == '2') {     // ok, connecté
         strcpybuff(back->info, "login: user");
         snprintf(line, sizeof(line), "USER %s", user);
         send_line(soc_ctl, line);
-        get_ftp_line(back, soc_ctl, HTS_BUF(line), timeout, opt);
-        if (stop_ftp(back))
+        if (!ftp_reply(back, soc_ctl, HTS_BUF(line), timeout, opt) ||
+            stop_ftp(back))
           goto done;
         if ((line[0] == '3') || (line[0] == '2')) {
           // --PASS--
@@ -931,14 +955,14 @@ static void run_launch_ftp(FTPDownloadStruct *pStruct) {
             strcpybuff(back->info, "login: pass");
             snprintf(line, sizeof(line), "PASS %s", pass);
             send_line(soc_ctl, line);
-            get_ftp_line(back, soc_ctl, HTS_BUF(line), timeout, opt);
-            if (stop_ftp(back))
+            if (!ftp_reply(back, soc_ctl, HTS_BUF(line), timeout, opt) ||
+                stop_ftp(back))
               goto done;
           }
           if (line[0] == '2') { // ok
             send_line(soc_ctl, "TYPE I");
-            get_ftp_line(back, soc_ctl, HTS_BUF(line), timeout, opt);
-            if (stop_ftp(back))
+            if (!ftp_reply(back, soc_ctl, HTS_BUF(line), timeout, opt) ||
+                stop_ftp(back))
               goto done;
             if (line[0] == '2') {
               // ok
@@ -967,7 +991,8 @@ static void run_launch_ftp(FTPDownloadStruct *pStruct) {
           strcpybuff(back->info, "pasv");
           snprintf(line, sizeof(line), "PASV");
           send_line(soc_ctl, line);
-          get_ftp_line(back, soc_ctl, HTS_BUF(line), timeout, opt);
+          if (!ftp_reply(back, soc_ctl, HTS_BUF(line), timeout, opt))
+            goto done;
         } else {                /* ipv6 */
           line[0] = '\0';
         }
@@ -987,8 +1012,8 @@ static void run_launch_ftp(FTPDownloadStruct *pStruct) {
           strcpybuff(back->info, "pasv");
           snprintf(line, sizeof(line), "EPSV");
           send_line(soc_ctl, line);
-          get_ftp_line(back, soc_ctl, HTS_BUF(line), timeout, opt);
-          if (stop_ftp(back))
+          if (!ftp_reply(back, soc_ctl, HTS_BUF(line), timeout, opt) ||
+              stop_ftp(back))
             goto done;
           if (line[0] == '2') { /* got it */
             // e.g. 229 Entering Extended Passive Mode (|||6446|)
@@ -1013,8 +1038,8 @@ static void run_launch_ftp(FTPDownloadStruct *pStruct) {
               // SIZE?
               strcpybuff(back->info, "size");
               send_line(soc_ctl, line);
-              get_ftp_line(back, soc_ctl, HTS_BUF(line), timeout, opt);
-              if (stop_ftp(back))
+              if (!ftp_reply(back, soc_ctl, HTS_BUF(line), timeout, opt) ||
+                  stop_ftp(back))
                 goto done;
               if (line[0] == '2') {     // SIZE compris, ALORS tester REST (sinon pas tester: cf probleme des txt.gz decompresses a la volee)
                 LLint size;
@@ -1029,8 +1054,8 @@ static void run_launch_ftp(FTPDownloadStruct *pStruct) {
                 if (ftp_command_line(line, "MDTM", ftp_path)) {
                   strcpybuff(back->info, "mdtm");
                   send_line(soc_ctl, line);
-                  get_ftp_line(back, soc_ctl, HTS_BUF(line), timeout, opt);
-                  if (stop_ftp(back))
+                  if (!ftp_reply(back, soc_ctl, HTS_BUF(line), timeout, opt) ||
+                      stop_ftp(back))
                     goto done;
                   if (ftp_parse_mdtm(line, &remote_tm)) {
                     char date[256];
@@ -1057,8 +1082,8 @@ static void run_launch_ftp(FTPDownloadStruct *pStruct) {
                   snprintf(line, sizeof(line), "REST " LLintP,
                            (LLint) back->range_req_size);
                   send_line(soc_ctl, line);
-                  get_ftp_line(back, soc_ctl, HTS_BUF(line), timeout, opt);
-                  if (stop_ftp(back))
+                  if (!ftp_reply(back, soc_ctl, HTS_BUF(line), timeout, opt) ||
+                      stop_ftp(back))
                     goto done;
                   if ((line[0] == '3') || (line[0] == '2')) {   // ok
                     rest_understood = 1;
@@ -1100,8 +1125,8 @@ static void run_launch_ftp(FTPDownloadStruct *pStruct) {
               // clip, never abort: this line is built from a crawled URL
               strclipbuff(line, sizeof(line), line_retr);
               send_line(soc_ctl, line);
-              get_ftp_line(back, soc_ctl, HTS_BUF(line), timeout, opt);
-              if (stop_ftp(back))
+              if (!ftp_reply(back, soc_ctl, HTS_BUF(line), timeout, opt) ||
+                  stop_ftp(back))
                 goto done;
               if (line[0] == '1') {
                 // OK
@@ -1133,16 +1158,16 @@ static void run_launch_ftp(FTPDownloadStruct *pStruct) {
           if (stop_ftp(back))
             goto done;
           send_line(soc_ctl, line);     // envoi du RETR
-          get_ftp_line(back, soc_ctl, HTS_BUF(line), timeout, opt);
-          if (stop_ftp(back))
+          if (!ftp_reply(back, soc_ctl, HTS_BUF(line), timeout, opt) ||
+              stop_ftp(back))
             goto done;
           if (line[0] == '2') { // ok
             strcpybuff(back->info, "retr");
             // clip, never abort: this line is built from a crawled URL
             strclipbuff(line, sizeof(line), line_retr);
             send_line(soc_ctl, line);
-            get_ftp_line(back, soc_ctl, HTS_BUF(line), timeout, opt);
-            if (stop_ftp(back))
+            if (!ftp_reply(back, soc_ctl, HTS_BUF(line), timeout, opt) ||
+                stop_ftp(back))
               goto done;
             if (line[0] == '1') {
               if ((soc_dat = ftp_accept(back, soc_servdat, timeout, opt)) ==
@@ -1259,7 +1284,8 @@ static void run_launch_ftp(FTPDownloadStruct *pStruct) {
             if (wait_socket_receive(back, soc_ctl, timeout_onfly, opt) ==
                 HTS_POLL_READY) {
               // récupérer 226 transfer complete
-              get_ftp_line(back, soc_ctl, HTS_BUF(line), timeout, opt);
+              if (!ftp_reply(back, soc_ctl, HTS_BUF(line), timeout, opt))
+                goto done;
               if (line[0] == '2') {     // OK
                 strcpybuff(back->r.msg, "OK");
                 back->r.statuscode = HTTP_OK;
@@ -1283,8 +1309,10 @@ static void run_launch_ftp(FTPDownloadStruct *pStruct) {
     send_line(soc_ctl, "QUIT"); // bye bye
     /* A stopped mirror skips the second --timeout window this courtesy reply
        costs on a silent server; its text is discarded anyway (#1096). */
-    if (!hts_load_acquire_int(&opt->state.stop))
-      get_ftp_line(back, soc_ctl, hts_buf_none(), timeout, opt);
+    if (!hts_load_acquire_int(&opt->state.stop) &&
+        get_ftp_line(back, soc_ctl, hts_buf_none(), timeout, opt) !=
+            HTS_FTP_LINE_OK)
+      hts_log_print(opt, LOG_DEBUG, "FTP: no reply to QUIT");
   }
 
   if (back->r.statuscode != -1) {
@@ -1393,66 +1421,59 @@ int send_line(T_SOC soc, const char *data) {
 #endif
 }
 
-hts_boolean get_ftp_line(lien_back *back, T_SOC soc, hts_buf line, int timeout,
-                         const httrackp *opt) {
+/* Is this line of a reply a continuation, so that its text is discarded? */
+static hts_boolean ftp_line_continues(const char *data, hts_boolean multiline) {
+  return data[3] == '-' || (multiline && !hts_isdigit((unsigned char) data[0]));
+}
+
+hts_ftp_line_status get_ftp_line(lien_back *back, T_SOC soc, hts_buf line,
+                                 int timeout, const httrackp *opt) {
   char BIGSTK data[1024];
-  int i, ok, multiline;
+  int i = 0;
+  hts_boolean ok = HTS_FALSE, multiline = HTS_FALSE;
 
 #if FTP_DEBUG
   if (dd == NULL)
     dd = fopen("toto.txt", "w");
 #endif
 
+  if (line.size != 0)
+    line.p[0] = '\0';
   data[0] = '\0';
-  i = ok = multiline = 0;
   data[3] = '\0';
   // wait_socket_receive() refuses it too, but the analyzer does not follow it
-  if (!hts_soc_selectable(soc)) {
-    if (line.size != 0)
-      hts_buf_printf_clip(line, "500 *read error");
-    return HTS_FALSE;
-  }
+  if (!hts_soc_selectable(soc))
+    return HTS_FTP_LINE_ERROR;
   do {
     char b;
 
     switch (wait_socket_receive(back, soc, timeout, opt)) {
     case HTS_POLL_ERROR:
-      if (line.size != 0)
-        hts_buf_printf_clip(line, "500 *read error");
-      return HTS_FALSE;
-      break;
+      return HTS_FTP_LINE_ERROR;
     case HTS_POLL_NONE:
-      if (line.size != 0)
-        hts_buf_printf_clip(line, "500 *read timeout (%d)", timeout);
-      return HTS_FALSE;
-      break;
+      return HTS_FTP_LINE_TIMEOUT;
     case HTS_POLL_READY:
       break;
     }
 
-    switch (recv(soc, &b, 1, 0)) {
-    case 1:
-      hts_stat_recv_add(1); // compter flux entrant
-      if ((b != 10) && (b != 13) && (i < (int) sizeof(data) - 1))
-        data[i++] = b; // truncate hostile over-long reply lines
-      break;
-    default:
-      if (line.size != 0)
-        hts_buf_printf_clip(line, "500 *read error");
-      return HTS_FALSE; // error
-      break;
-    }
-    if (((b == 13) || (b == 10)) && (i > 0)) {  // CR/LF
-      if ((data[3] == '-') ||
-          ((multiline) && (!hts_isdigit((unsigned char) data[0])))) {
+    if (recv(soc, &b, 1, 0) != 1)
+      return HTS_FTP_LINE_ERROR;
+    hts_stat_recv_add(1); // count incoming bytes
+    if ((b != 10) && (b != 13)) {
+      if (i < (int) sizeof(data) - 1)
+        data[i++] = b;
+      else if (!ftp_line_continues(data, multiline))
+        return HTS_FTP_LINE_TOO_LONG; // a clipped reply would read as another
+    } else if (i > 0) {
+      if (ftp_line_continues(data, multiline)) {
         data[3] = '\0';
         i = 0;
-        multiline = 1;
+        multiline = HTS_TRUE;
       } else
-        ok = 1;                 // sortir
+        ok = HTS_TRUE;
     }
   } while(!ok);
-  data[i++] = '\0';
+  data[i] = '\0';
 
   if (_DEBUG_HEAD) {
     if (ioinfo) {
@@ -1467,7 +1488,7 @@ hts_boolean get_ftp_line(lien_back *back, T_SOC soc, hts_buf line, int timeout,
 #endif
   if (line.size != 0)
     hts_buf_printf_clip(line, "%s", data);
-  return (strnotempty(data));
+  return HTS_FTP_LINE_OK;
 }
 
 // sauter NNN

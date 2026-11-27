@@ -1,0 +1,64 @@
+#!/bin/bash
+#
+# A failed FTP control reply (closed, late, over-long) fails the file with that
+# reason, rather than being read as a server reply; a real 500 still works.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+require_httrack
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ftpreply.XXXXXX")
+cleanup_push rm -rf "$tmpdir"
+
+root="${tmpdir}/root"
+out="${tmpdir}/out"
+cmds="${tmpdir}/cmds"
+mkdir -p "$root" "$out"
+for f in ok cut late long; do
+    printf '%s body\n' "$f" >"${root}/${f}.txt"
+done
+# ok.txt gets a real "500 MDTM not understood", which must not fail it.
+printf '/ok.txt nomdtm\n/cut.txt sizecut\n/late.txt sizelate\n/long.txt sizelong\n' \
+    >"${tmpdir}/modes"
+
+ftp_server_start --root "$root" --mode-file "$(nativepath "${tmpdir}/modes")" \
+    --log "$(nativepath "$cmds")"
+base="ftp://127.0.0.1:${FTP_PORT}"
+
+rc=0
+run_with_timeout 120 httrack "${base}/ok.txt" "${base}/cut.txt" \
+    "${base}/late.txt" "${base}/long.txt" -O "$out" --quiet \
+    --disable-security-limits --robots=0 --timeout=2 --retries=0 -c1 \
+    >"${tmpdir}/console" 2>&1 || rc=$?
+test "$rc" -ne 124 || fail "the crawl was still going at 120s"
+test "$rc" -lt 128 || fail "the crawl died on signal $((rc - 128))"
+
+log="${out}/hts-log.txt"
+# error_for FILE MESSAGE: the log names MESSAGE as the reason FILE failed.
+error_for() {
+    local line
+    line=$(grep -a "Error:.*/$1" "$log" || true)
+    grep -q "$2" <<<"$line" ||
+        fail "$1 did not fail with '$2': ${line:-no error}"
+}
+
+got="${out}/127.0.0.1_${FTP_PORT}/ok.txt"
+grep -qs 'ok body' "$got" ||
+    fail "a real 500 reply to MDTM lost ok.txt: $(grep -a 'Error:' "$log" || true)"
+! grep -a 'Error:.*/ok\.txt' "$log" || fail "ok.txt was logged as an error"
+ok "a real 500 reply is still a reply"
+
+error_for cut.txt '"FTP read error"'
+ok "a reply cut by a close fails as a read error"
+
+error_for late.txt '"FTP read timeout (2)"'
+sent=$(<"$cmds")
+! grep -q '^RETR .*late\.txt' <<<"$sent" ||
+    fail "after the SIZE timeout the client sent RETR, so it read the late reply as RETR's"
+ok "a SIZE reply past --timeout fails as a timeout, and RETR is never sent"
+
+error_for long.txt '"FTP reply line too long"'
+ok "an over-long reply line fails as too long"

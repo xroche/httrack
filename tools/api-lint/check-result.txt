@@ -1,5 +1,4 @@
 # Known check-result violations. Regenerate: tools/check-api-lint.py --update
-src/htsftp.h: get_ftp_line
 src/htslib.h: closedir
 src/htsname.h: url_savename_refname_remove
 src/htsnet.h: SOCaddr_inetntoa_port_
