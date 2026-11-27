@@ -352,7 +352,7 @@ static const char *bundle_note_url(bundle *b, const char *url) {
   const char *reg;
   const char *why;
 
-  if (strfield(url, "https:"))
+  if (hts_starts_with_ci(url, "https:"))
     b->https_only = HTS_TRUE;
   if (!cookie_url_host(url, HTS_BUF(host)))
     return b->scope_given ? NULL : "cannot work out the bundle's scope";
@@ -861,7 +861,7 @@ void hts_bundle_identity(httrackp *opt, const char *adr, htsrequest *req) {
         req->user_agent_send = HTS_TRUE;
       }
       if (StringNotEmpty(b->headers) &&
-          (!b->https_only || strfield(adr, "https://")))
+          (!b->https_only || hts_starts_with_ci(adr, "https://")))
         req->headers = StringBuff(b->headers);
       return;
     }
@@ -1249,12 +1249,14 @@ static void curl_header(paste_curl *c, const char *h) {
     return; // "Name;" sends an empty header, which carries nothing here
   value++;
   value += strspn(value, " \t");
-  if (nlen == strlen("Cookie") && strfield(h, "Cookie")) {
+  if (nlen == strlen("Cookie") && hts_starts_with_ci(h, "Cookie")) {
     StringCat(c->cookies, value);
     StringCat(c->cookies, ";");
-  } else if (nlen == strlen("User-Agent") && strfield(h, "User-Agent")) {
+  } else if (nlen == strlen("User-Agent") &&
+             hts_starts_with_ci(h, "User-Agent")) {
     c->ua = value;
-  } else if (nlen == strlen("Authorization") && strfield(h, "Authorization")) {
+  } else if (nlen == strlen("Authorization") &&
+             hts_starts_with_ci(h, "Authorization")) {
     c->auth = *value != '\0' ? h : NULL;
   }
 }
@@ -1834,7 +1836,8 @@ HTSEXT_API hts_boolean hts_bundle_from_paste_hosts(
 
   // the fragment is cut, because a sign-in can return a token there
   len = strcspn(url, "#");
-  if (!strfield(url, "http://") && !strfield(url, "https://"))
+  if (!hts_starts_with_ci(url, "http://") &&
+      !hts_starts_with_ci(url, "https://"))
     PASTE_FAIL("the address is not an http or https URL");
   if (!hts_buf_put_span(HTS_BUF(base), hts_span_at(url, len)) ||
       hts_bundle_has_control(hts_span_at(url, len)))

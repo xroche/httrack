@@ -174,10 +174,11 @@ int index_keyword(hts_span html, const char *mime, const char *filename,
   }
   // FIXME - temporary fix for image/svg+xml (svg)
   // "IN XML" (html like, in fact :) )
-  else if ((strfield2(mime, "image/svg+xml"))
-           || (strfield2(mime, "image/svg-xml"))) {
+  else if ((hts_streq_ci(mime, "image/svg+xml")) ||
+           (hts_streq_ci(mime, "image/svg-xml"))) {
     inscript = 0;
-  } else if (is_javascript_mime_type(mime) || (strfield2(mime, "text/css"))) {
+  } else if (is_javascript_mime_type(mime) ||
+             (hts_streq_ci(mime, "text/css"))) {
     inscript = 1;
   } else
     return 0;

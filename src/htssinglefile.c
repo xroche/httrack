@@ -408,13 +408,14 @@ static int sf_mime_class(httrackp *opt, const char *path, hts_buf out) {
   out.p[0] = '\0';
   if (!guess_httptype_sized(opt, out.p, out.size, path) || mime[0] == '\0')
     return 0;
-  if (strfield(mime, "image/") != 0)
+  if (hts_starts_with_ci(mime, "image/"))
     return SF_C_IMAGE;
-  if (strfield(mime, "font/") != 0 || strfield(mime, "application/font") != 0 ||
-      strfield(mime, "application/x-font") != 0 ||
-      strfield2(mime, "application/vnd.ms-fontobject") != 0)
+  if (hts_starts_with_ci(mime, "font/") ||
+      hts_starts_with_ci(mime, "application/font") ||
+      hts_starts_with_ci(mime, "application/x-font") ||
+      hts_streq_ci(mime, "application/vnd.ms-fontobject"))
     return SF_C_FONT;
-  if (strfield2(mime, "text/css") != 0)
+  if (hts_streq_ci(mime, "text/css"))
     return SF_C_CSS;
   if (is_javascript_mime_type(mime))
     return SF_C_JS;

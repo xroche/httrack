@@ -939,7 +939,7 @@ static const char *save_find_host(const char *save, const char *host) {
   const char *p;
 
   for (p = save; *p != '\0'; p++) {
-    if (strfield(p, host)) {
+    if (hts_starts_with_ci(p, host)) {
       return p;
     }
   }

@@ -287,13 +287,13 @@ void help_wizard(httrackp * opt) {
       printf("To see the option list, type help\n");
       printf("Additional options (return=none) :");
       linput(stdin, HTS_BUF_N(str, 250));
-      if (strfield2(str, "help")) {
+      if (hts_streq_ci(str, "help")) {
         help("httrack", 2);
       } else if (strnotempty(str)) {
         strcatbuff(stropt2, str);
         strcatbuff(stropt2, " ");
       }
-    } while(strfield2(str, "help"));
+    } while (hts_streq_ci(str, "help"));
 
     {
       int argc = 1;

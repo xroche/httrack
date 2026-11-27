@@ -77,7 +77,8 @@ typedef struct hts_sitemap_state hts_sitemap_state;
 static hts_boolean sitemap_url_ok(const char *url) {
   const char *p;
 
-  if (!strfield(url, "http://") && !strfield(url, "https://"))
+  if (!hts_starts_with_ci(url, "http://") &&
+      !hts_starts_with_ci(url, "https://"))
     return HTS_FALSE;
   for (p = url; *p != '\0'; p++) {
     if ((unsigned char) *p <= ' ' || (unsigned char) *p == 0x7f)
@@ -262,7 +263,7 @@ static sitemap_doc *sitemap_find(httrackp *opt, const char *adr,
   if (st == NULL)
     return NULL;
   for (d = st->docs; d != NULL; d = d->next) {
-    if (strfield2(d->adr, adr) && strcmp(d->fil, fil) == 0)
+    if (hts_streq_ci(d->adr, adr) && strcmp(d->fil, fil) == 0)
       return d;
   }
   return NULL;
@@ -408,7 +409,7 @@ void hts_sitemap_robots(httrackp *opt, const char *adr, const char *sitemaps) {
   int queued = 0;
 
   if (st == NULL || !opt->sitemap || st->probe_done ||
-      !strfield2(st->anchor_adr, adr))
+      !hts_streq_ci(st->anchor_adr, adr))
     return;
   st->probe_done = HTS_TRUE;
   if (sitemaps != NULL) {
@@ -423,7 +424,7 @@ void hts_sitemap_robots(httrackp *opt, const char *adr, const char *sitemaps) {
       if (len > 0 && hts_buf_put_span(HTS_BUF(line), hts_span_at(p, len))) {
         /* Same host: a Sitemap: line must not aim the fetcher elsewhere. */
         if (sitemap_url_ok(line) && ident_url_absolute(line, &af) >= 0 &&
-            strfield2(af.adr, adr) &&
+            hts_streq_ci(af.adr, adr) &&
             sitemap_queue(opt, af.adr, af.fil, 0, HTS_SITEMAP_SRC_DECLARED))
           queued++;
       }
@@ -495,7 +496,7 @@ static hts_boolean sitemap_seed_child(void *arg, const char *url) {
     return HTS_TRUE;
   if (ident_url_absolute(buff, &af) < 0)
     return HTS_TRUE;
-  if (!strfield2(af.adr, c->adr)) {
+  if (!hts_streq_ci(af.adr, c->adr)) {
     hts_log_print(c->opt, LOG_WARNING,
                   "Sitemap: ignoring off-host child sitemap %s%s",
                   adr_nologin(c->opt, af.adr), af.fil);
