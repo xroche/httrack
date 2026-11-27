@@ -1,0 +1,46 @@
+#!/bin/bash
+# A meta tag stops link scanning only when its name is "robots", wherever its
+# content sits, and not when another meta's content says "robots nofollow".
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_metarobots.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmp"
+
+meta_page() { # meta_page NAME META_TAG TARGET
+    printf '<!DOCTYPE html>\n<html><head>%s</head>\n<body><a href="%s">x</a></body></html>\n' \
+        "$2" "$3" >"$tmp/$1.html"
+    printf '<!DOCTYPE html>\n<html><body>target</body></html>\n' >"$tmp/$3"
+}
+
+meta_page desc '<meta name="description" content="robots nofollow">' desc-t.html
+meta_page follow '<meta name="robots" content="index,follow">' follow-t.html
+meta_page prefix '<meta name="robots-x" content="nofollow">' prefix-t.html
+meta_page robots '<meta name="robots" content="noindex, nofollow">' robots-t.html
+meta_page bare '<meta name=ROBOTS content=nofollow>' bare-t.html
+meta_page padded '<meta name=" Robots " content="nofollow">' padded-t.html
+meta_page first '<meta content="nofollow" name="robots">' first-t.html
+meta_page last '<meta content=nofollow name=robots>' last-t.html
+pad=$(printf '%01100d' 0)
+meta_page long "<meta title=\"$pad\" name=\"robots\" content=\"nofollow\">" long-t.html
+cat >"$tmp/index.html" <<'EOF2'
+<!DOCTYPE html>
+<html><body>
+<a href="desc.html">1</a> <a href="follow.html">2</a> <a href="prefix.html">3</a>
+<a href="robots.html">4</a> <a href="bare.html">5</a> <a href="padded.html">6</a>
+<a href="first.html">7</a> <a href="last.html">8</a> <a href="long.html">9</a>
+</body></html>
+EOF2
+
+# The harness passes --robots=0, so the crawl turns robots back on.
+bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$tmp")" \
+    --errors 0 \
+    --found desc.html --found follow.html --found prefix.html \
+    --found robots.html --found bare.html --found padded.html \
+    --found first.html --found last.html --found long.html \
+    --found desc-t.html --found follow-t.html --found prefix-t.html \
+    --not-found robots-t.html --not-found bare-t.html --not-found padded-t.html \
+    --not-found first-t.html --not-found last-t.html --not-found long-t.html \
+    httrack 'BASEURL/index.html' -r3 --robots=2
