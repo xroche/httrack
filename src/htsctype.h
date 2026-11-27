@@ -95,14 +95,14 @@ static HTS_INLINE HTS_UNUSED int hts_strcasecmp(const char *a, const char *b) {
   return hts_strncasecmp(a, b, (size_t) -1);
 }
 
-/* Are A and B equal with A-Z folded? Unlike strfield2, "" equals "". */
+/* Are A and B equal with A-Z folded? "" equals "". */
 static HTS_INLINE HTS_UNUSED HTS_CHECK_RESULT hts_boolean
 hts_streq_ci(const char *a, const char *b) {
   return hts_strcasecmp(a, b) == 0;
 }
 
 /* Move *S past PREFIX and return TRUE if *S starts with it, A-Z folded, else
-   return FALSE and leave *S alone. Unlike strfield, "" is a prefix of all. */
+   return FALSE and leave *S alone. "" is a prefix of every string. */
 static HTS_INLINE HTS_UNUSED HTS_CHECK_RESULT hts_boolean
 hts_skip_prefix_ci(const char **s, const char *prefix) {
   const char *p = *s;

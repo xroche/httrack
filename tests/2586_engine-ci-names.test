@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # hts_streq_ci, hts_starts_with_ci and hts_skip_prefix_ci fold only A-Z, and
-# agree with strfield and strfield2 except on an empty prefix.
+# treat "" as equal to "" and as a prefix of every string.
 
 set -euo pipefail
 
