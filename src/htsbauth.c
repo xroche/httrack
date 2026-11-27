@@ -946,11 +946,12 @@ static const char cookie_bom[] = "\xEF\xBB\xBF";
 /* Return where the pairs of a document.cookie line start, past blanks and a
    pasted "Cookie:" header name. */
 static char *cookie_flat_start(char *line) {
+  const char *rest;
+
   line += strspn(line, " \t");
-  if (hts_starts_with_ci(line, "Cookie:")) {
-    line += strlen("Cookie:");
-    line += strspn(line, " \t");
-  }
+  rest = line;
+  if (hts_skip_prefix_ci(&rest, "Cookie:"))
+    line += (rest - line) + strspn(rest, " \t");
   return line;
 }
 

@@ -2020,6 +2020,7 @@ static void legacy_ctype(const char *in, hts_buf out) {
   char line[1024], tempo[1100];
   char contenttype[HTS_MIMETYPE_SIZE] = "", charset[HTS_MIMETYPE_SIZE] = "";
   char *a;
+  const char *rest;
 
   strclipbuff(line, sizeof(line), in);
   a = strchr(line, ';');
@@ -2028,8 +2029,9 @@ static void legacy_ctype(const char *in, hts_buf out) {
     a++;
     while (is_space(*a))
       a++;
-    if (hts_starts_with_ci(a, "charset")) {
-      a += 7;
+    rest = a;
+    if (hts_skip_prefix_ci(&rest, "charset")) {
+      a += rest - a;
       while (is_space(*a))
         a++;
       if (*a == '=') {

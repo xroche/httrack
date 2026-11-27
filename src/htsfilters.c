@@ -316,8 +316,8 @@ static const char *strjoker_impl(strjoker_memo *memo, const char *chaine,
       strjoker_charge(memo, sizeof(pass));
 
       // noms réservés
-      if ((hts_starts_with_ci(joker + 2, "file")) ||
-          (hts_starts_with_ci(joker + 2, "name"))) {
+      if (hts_starts_with_ci(joker + 2, "file") ||
+          hts_starts_with_ci(joker + 2, "name")) {
         for(i = 0; i < 256; i++)
           pass[i] = 1;
         pass[(int) '?'] = 0;
