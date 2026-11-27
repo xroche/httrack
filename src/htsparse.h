@@ -109,7 +109,8 @@ struct htsmoduleStructExtended {
   Main parser, attempt to scan links inside the html/css/js file
   Parameters: The public module structure, and the private module variables
 */
-int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre);
+HTS_CHECK_RESULT int htsparse(htsmoduleStruct *str,
+                              htsmoduleStructExtended *stre);
 
 /* Strip a default ":80" (any spelling) from an absolute link's authority, in
    place. */
@@ -135,8 +136,9 @@ HTS_OWNED char *hts_parse_sink_selftest(const hts_boolean enabled,
   leaves, so "/#top" is judged as "/". A string of HTS_URLMAXSIZE bytes or more
   is refused, a length the parser never offers.
 */
-hts_boolean hts_dirty_link_is_url(httrackp *opt, hts_span str, char lastc,
-                                  hts_boolean inscript);
+HTS_CHECK_RESULT hts_boolean hts_dirty_link_is_url(httrackp *opt, hts_span str,
+                                                   char lastc,
+                                                   hts_boolean inscript);
 
 /* A link the script scanner found, as an offset and a length from the cursor
    it was given. "unquoted_end" is the byte an unquoted CSS url() operand stops
@@ -164,7 +166,8 @@ typedef struct hts_js_link {
   comment automaton is what keeps the dirty scan out of a line or block
   comment, so this is never asked there.
 */
-hts_boolean hts_js_quote_is_import_arg(const char *quote, const char *buffer);
+HTS_CHECK_RESULT hts_boolean hts_js_quote_is_import_arg(const char *quote,
+                                                        const char *buffer);
 
 /* What the parser does with the value of a known attribute. */
 typedef enum hts_attr_kind {
@@ -196,8 +199,8 @@ extern const hts_attr hts_attrs[];
   "scripts". Returns the row and sets *value to the offset just past the '=',
   or returns NULL and sets *value to 0.
 */
-const hts_attr *hts_attr_match(const char *html, hts_boolean scripts,
-                               int *value);
+HTS_CHECK_RESULT const hts_attr *
+hts_attr_match(const char *html, hts_boolean scripts, int *value);
 
 /*
   Does the script or CSS at "cursor" hand a URL to .src, .location, .href,
@@ -208,10 +211,9 @@ const hts_attr *hts_attr_match(const char *html, hts_boolean scripts,
   "in_css" lets url() take an unquoted operand. Fills "link" and answers true
   when a URL was found.
 */
-hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
-                             const char *buffer, hts_boolean in_tag,
-                             char tag_lastc, hts_boolean in_css,
-                             hts_js_link *link);
+HTS_CHECK_RESULT hts_boolean hts_js_scan_link(
+    httrackp *opt, const char *cursor, const char *buffer, hts_boolean in_tag,
+    char tag_lastc, hts_boolean in_css, hts_js_link *link);
 
 /*
   May the dirty parser take the in-tag quoted value at "quote" for a link?
@@ -226,18 +228,20 @@ hts_boolean hts_dirty_attr_detectable(const char *quote, const char *tag_start);
   starting at "tag_start", spanning [name, *nend). Returns NULL when the quote
   is not an attribute value, and leaves *nend unspecified when it does.
 */
-const char *hts_dirty_attr_name(const char *quote, const char *tag_start,
-                                const char **nend);
+HTS_CHECK_RESULT const char *hts_dirty_attr_name(const char *quote,
+                                                 const char *tag_start,
+                                                 const char **nend);
 
 /*
   Non-zero if a redirect (cur_adr,cur_fil)->(moved_adr,moved_fil) saves to the
   same local file, where a "moved" stub would point at itself (#159).
   hash_url_equals folds www and splits http/https, so it cannot replace this.
 */
-hts_boolean hts_redirect_same_savefile(httrackp *opt, const char *cur_adr,
-                                       const char *cur_fil,
-                                       const char *moved_adr,
-                                       const char *moved_fil);
+HTS_CHECK_RESULT hts_boolean hts_redirect_same_savefile(httrackp *opt,
+                                                        const char *cur_adr,
+                                                        const char *cur_fil,
+                                                        const char *moved_adr,
+                                                        const char *moved_fil);
 
 /*
   Did a postprocess-html callback's reply come out of the engine's own storage
@@ -254,9 +258,9 @@ hts_boolean hts_postprocess_reply_inplace(const char *html, const char *buffer,
   carrying its own buffer is bounded by that buffer instead. Neither may report
   a negative count, which an int "len" allows.
 */
-hts_boolean hts_postprocess_reply_ok(const char *html, int len,
-                                     const char *buffer, size_t size,
-                                     size_t capa);
+HTS_CHECK_RESULT hts_boolean hts_postprocess_reply_ok(const char *html, int len,
+                                                      const char *buffer,
+                                                      size_t size, size_t capa);
 
 /*
   Say once that the -#L link cap is full and record the abort. Callable

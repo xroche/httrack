@@ -419,10 +419,11 @@ int http_header_slot_count(void);
  */
 T_SOC http_xfopen(httrackp *opt, const char *adr, const char *fil,
                   htsblk *retour);
-int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
-                  const char *adr, const char *fil, const char *referer_adr,
-                  const char *referer_fil, const hts_fetch_meta *fetch,
-                  htsblk *retour);
+HTS_CHECK_RESULT int http_sendhead(httrackp *opt, t_cookie *cookie, int mode,
+                                   const char *xsend, const char *adr,
+                                   const char *fil, const char *referer_adr,
+                                   const char *referer_fil,
+                                   const hts_fetch_meta *fetch, htsblk *retour);
 /* Build the request "Cookie:" header line for stored cookies matching
    adr/path into dst (NUL-terminated), wrapping the logic http_sendhead()
    uses. adr may carry its scheme, and only "https://" gets Secure cookies. A

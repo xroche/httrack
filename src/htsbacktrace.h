@@ -45,7 +45,7 @@ void hts_backtrace_init(void);
    already installed is left alone, whoever owns it. Returns the mapping to hand
    back when the thread ends, NULL if nothing was installed, the handler then
    running on the faulting stack as it used to. */
-void *hts_backtrace_altstack(void);
+HTS_CHECK_RESULT void *hts_backtrace_altstack(void);
 
 /* Unmap what hts_backtrace_altstack() returned, from that same thread: one
    alternate stack per worker adds up over a crawl. */

@@ -196,10 +196,9 @@ static hts_boolean legacy_unquote(char *arg) {
     char tempo[HTS_CDLMAXSIZE];
 
     strcpybuff(tempo, arg + 1);
-    if (hts_lastchar(tempo) != '"') {
+    if (!hts_striplastchar(tempo, '"')) {
       return HTS_FALSE;
     }
-    hts_choplastchar(tempo);
     strlcpybuff(arg, tempo, strlen(arg) + 1);
   }
   return HTS_TRUE;

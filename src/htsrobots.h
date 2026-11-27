@@ -63,7 +63,8 @@ struct robots_wizard {
 #include "htsbuf.h"
 
 /* -1 if `fil` disallowed for `adr` (RFC 9309); empty: -1 if rules exist. */
-int checkrobots(const robots_wizard *robots, const char *adr, const char *fil);
+HTS_CHECK_RESULT int checkrobots(const robots_wizard *robots, const char *adr,
+                                 const char *fil);
 /* Free every node's strings, plus every node below `robots` but not `robots`.
  */
 void checkrobots_free(robots_wizard * robots);

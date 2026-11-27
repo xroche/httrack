@@ -681,7 +681,8 @@ static HTS_INLINE HTS_UNUSED hts_boolean hts_striplastchar(char *s, char c) {
 
 /** Drop the last character of s whatever it is. HTS_TRUE if s was not
     empty. */
-static HTS_INLINE HTS_UNUSED hts_boolean hts_choplastchar(char *s) {
+static HTS_INLINE HTS_UNUSED HTS_CHECK_RESULT hts_boolean
+hts_choplastchar(char *s) {
   const size_t len = strlen(s);
 
   if (len != 0) {

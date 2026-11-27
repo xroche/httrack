@@ -84,7 +84,7 @@ HTS_OWNED extern char *hts_convertStringIDNAToUTF8(hts_span s);
 /**
  * Has the given string any IDNA segments ?
  **/
-extern hts_boolean hts_isStringIDNA(hts_span s);
+extern HTS_CHECK_RESULT hts_boolean hts_isStringIDNA(hts_span s);
 
 /**
  * Extract the <meta> charset from the HTML in page (HTML5 charset= or legacy
@@ -95,13 +95,13 @@ HTS_OWNED extern char *hts_getCharsetFromMeta(hts_span page);
 /**
  * Is the given string an ASCII string ?
  **/
-extern hts_boolean hts_isStringAscii(hts_span s);
+extern HTS_CHECK_RESULT hts_boolean hts_isStringAscii(hts_span s);
 
 /**
  * Is the given string valid UTF-8 ? Strict RFC 3629: overlong forms,
  * surrogates, codepoints above U+10FFFF and 5/6-byte sequences are rejected.
  **/
-extern hts_boolean hts_isStringUTF8(hts_span s);
+extern HTS_CHECK_RESULT hts_boolean hts_isStringUTF8(hts_span s);
 
 /**
  * Is the given charset the UTF-8 charset ?

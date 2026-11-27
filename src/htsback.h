@@ -90,7 +90,7 @@ static HTS_INLINE HTS_UNUSED hts_boolean back_is_live(const int status) {
 // create/destroy
 /* Slots for maxsoc connections, clamped to what back_new() can size. */
 int back_max_slots(int maxsoc);
-struct_back *back_new(httrackp *opt, int back_max);
+HTS_CHECK_RESULT struct_back *back_new(httrackp *opt, int back_max);
 void back_free(struct_back ** sback);
 
 // backing
@@ -109,20 +109,26 @@ HTS_INLINE int back_exist(struct_back * sback, httrackp * opt, const char *adr,
                           const char *fil, const char *sav);
 int back_nsoc(const struct_back *sback);
 /* refetch_whole forces a whole-file GET and spends the free restart (#581). */
-int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
-             const char *adr, const char *fil, const char *save,
-             const char *referer_adr, const char *referer_fil, int test,
-             hts_boolean refetch_whole, const hts_fetch_meta *fetch);
-int back_add_if_not_exists(struct_back *sback, httrackp *opt, cache_back *cache,
-                           const char *adr, const char *fil, const char *save,
-                           const char *referer_adr, const char *referer_fil,
-                           int test, const hts_fetch_meta *fetch);
-int back_search_quick(struct_back * sback);
+HTS_CHECK_RESULT int back_add(struct_back *sback, httrackp *opt,
+                              cache_back *cache, const char *adr,
+                              const char *fil, const char *save,
+                              const char *referer_adr, const char *referer_fil,
+                              int test, hts_boolean refetch_whole,
+                              const hts_fetch_meta *fetch);
+HTS_CHECK_RESULT int back_add_if_not_exists(struct_back *sback, httrackp *opt,
+                                            cache_back *cache, const char *adr,
+                                            const char *fil, const char *save,
+                                            const char *referer_adr,
+                                            const char *referer_fil, int test,
+                                            const hts_fetch_meta *fetch);
+HTS_CHECK_RESULT int back_search_quick(struct_back *sback);
 /* Does the busy bitmap cover every slot not STATUS_FREE? With exact, does it
    also hold no free slot (true right after back_clean())? */
-hts_boolean back_busy_consistent(const struct_back *sback, hts_boolean exact);
+HTS_CHECK_RESULT hts_boolean back_busy_consistent(const struct_back *sback,
+                                                  hts_boolean exact);
 /* Finds a live keep-alive slot for search_addr, or returns -1. */
-int back_searchlive(httrackp *opt, struct_back *sback, const char *search_addr);
+HTS_CHECK_RESULT int back_searchlive(httrackp *opt, struct_back *sback,
+                                     const char *search_addr);
 void back_clean(httrackp *opt, cache_back *cache, struct_back *sback);
 void back_wait(struct_back *sback, httrackp *opt, cache_back *cache,
                TStamp stat_timestart);
@@ -141,8 +147,8 @@ hts_boolean back_serialize(FILE *fp, const lien_back *src);
 hts_boolean back_unserialize(FILE *fp, lien_back **dst);
 /* The resume state outlives the run, so its format is portable. */
 int back_serialize_ref(httrackp * opt, const lien_back * src);
-int back_unserialize_ref(httrackp * opt, const char *adr, const char *fil,
-                         lien_back ** dst);
+HTS_CHECK_RESULT int back_unserialize_ref(httrackp *opt, const char *adr,
+                                          const char *fil, lien_back **dst);
 void back_set_finished(httrackp *opt, struct_back *sback, const int p);
 /* Make slot p a live slot in state status, reading r's open socket as if
    back_add() had connected it, with no timeout. For back_wait() drivers with no
@@ -189,10 +195,10 @@ void back_finalize(httrackp *opt, cache_back *cache, struct_back *sback,
 /* Did the fetch fail to produce a response, as opposed to the engine
    deliberately passing the resource over? Only the latter may be purged, so
    this also decides whether the previous copy survives the update (#746). */
-hts_boolean back_transfer_failed(const int statuscode);
+HTS_CHECK_RESULT hts_boolean back_transfer_failed(const int statuscode);
 /* Commit a decoded body size onto r, refusing in memory what http_xfread1()
    refuses. A refusal drops the coded body and returns HTS_FALSE. */
-hts_boolean back_set_decoded_size(htsblk *r, LLint size);
+HTS_CHECK_RESULT hts_boolean back_set_decoded_size(htsblk *r, LLint size);
 /* Back up url_sav to tmpfile for back_finalize() to restore on failure. Call
    right before truncating url_sav. */
 void back_refetch_backup(httrackp *opt, lien_back *const back);
@@ -222,7 +228,7 @@ int back_cleanup_background(httrackp *opt, cache_back *cache,
    run spools anything. */
 void back_spool_sweep(httrackp *opt);
 /* Can this slot be swapped out to disk? Hidden, shared with the self-test. */
-hts_boolean slot_can_be_cached_on_disk(const lien_back *back);
+HTS_CHECK_RESULT hts_boolean slot_can_be_cached_on_disk(const lien_back *back);
 void back_info(struct_back * sback, int i, int j, FILE * fp);
 void back_infostr(struct_back *sback, int i, int j, hts_buf s);
 LLint back_transferred(LLint add, struct_back * sback);

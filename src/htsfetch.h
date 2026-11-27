@@ -98,7 +98,7 @@ int hts_fetch_same_frame(int page_dest);
 
 /* Does the NUL-terminated page html have a <base target>, which sends its
    links with no target to a frame we cannot tell? */
-hts_boolean hts_fetch_has_base_target(const char *html);
+HTS_CHECK_RESULT hts_boolean hts_fetch_has_base_target(const char *html);
 
 /* Return how the URL at to_adr relates to the origin at from_adr: SAME_ORIGIN,
    SAME_SITE or CROSS_SITE. Same-site compares registrable domains from the
@@ -111,7 +111,7 @@ void hts_fetch_through(httrackp *opt, hts_fetch_meta *fm, const char *adr);
 
 /* Is adr potentially trustworthy (https, or a loopback host), the only URLs a
    browser sends Sec-Fetch-* to? */
-hts_boolean hts_fetch_trustworthy(const char *adr);
+HTS_CHECK_RESULT hts_boolean hts_fetch_trustworthy(const char *adr);
 
 /* Is dest a navigation (Sec-Fetch-Mode: navigate)? */
 hts_boolean hts_fetch_is_navigation(int dest);

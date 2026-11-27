@@ -2047,7 +2047,8 @@ static const struct {
 
 /* Returns the code point of the entity whose name hashes to hash and is len
    bytes long, or -1. */
-static int decode_entity(const uint64_t hash, const size_t len) {
+static HTS_CHECK_RESULT int decode_entity(const uint64_t hash,
+                                          const size_t len) {
   size_t lo = 0, hi = sizeof(entity_table) / sizeof(entity_table[0]);
 
   while (lo < hi) {

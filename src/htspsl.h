@@ -57,7 +57,8 @@ void hts_psl_init_from(const char *path);
 /* Replace the list with the rules in the file at path. Return HTS_FALSE, and
    keep the old list, when the file cannot be read or holds fewer than
    min_rules rules. */
-hts_boolean hts_psl_load_file(const char *path, size_t min_rules);
+HTS_CHECK_RESULT hts_boolean hts_psl_load_file(const char *path,
+                                               size_t min_rules);
 
 /* Is a list loaded? */
 hts_boolean hts_psl_loaded(void);
@@ -68,7 +69,7 @@ const char *hts_psl_version(void);
 /* Return where the registrable domain starts in host, which is lowercase with
    no trailing dot. Return NULL when host is itself a public suffix, has an
    empty label (a trailing dot counts), or no list is loaded. */
-const char *hts_psl_registrable_domain(const char *host);
+HTS_CHECK_RESULT const char *hts_psl_registrable_domain(const char *host);
 
 #endif
 

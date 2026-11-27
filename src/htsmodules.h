@@ -137,7 +137,7 @@ extern void htspe_init(void);
     @return 1 when a module parsed it, 0 when the module that claimed it failed
     and left the reason in err_msg, and -1 when none claimed it or -%w
     blacklists the one that did. */
-extern int hts_parse_externals(htsmoduleStruct *str);
+extern HTS_CHECK_RESULT int hts_parse_externals(htsmoduleStruct *str);
 
 /** The HTS_INET6 value the library itself was built with. */
 extern int V6_is_available;

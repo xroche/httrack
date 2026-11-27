@@ -41,10 +41,11 @@ Please visit our Website: http://www.httrack.com
 #define HTS_SNIFF_LEN 512
 
 /* Can a magic rule ever confirm this MIME? (whether sniffing is worth it) */
-hts_boolean hts_sniff_mime_known(const char *mime);
+HTS_CHECK_RESULT hts_boolean hts_sniff_mime_known(const char *mime);
 
 /* TRUE when the leading BODY bytes are consistent with the claimed MIME;
    FALSE on unknown MIME, unknown magic, or too-short data (fail-safe). */
-hts_boolean hts_sniff_mime_consistent(hts_span body, const char *mime);
+HTS_CHECK_RESULT hts_boolean hts_sniff_mime_consistent(hts_span body,
+                                                       const char *mime);
 
 #endif

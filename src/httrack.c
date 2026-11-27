@@ -759,7 +759,8 @@ static void install_fatal_handler(int code) {
 
 static void signal_handlers(void) {
   hts_backtrace_init();
-  (void) hts_backtrace_altstack();
+  // the main thread keeps its alternate stack until exit
+  (void) !hts_backtrace_altstack();
   /* The crawl recurses in the engine's workers, so they need one too (#969). */
   hts_set_thread_hooks(hts_backtrace_altstack, hts_backtrace_altstack_release);
 #ifdef _WIN32

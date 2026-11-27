@@ -67,8 +67,9 @@ typedef hts_boolean (*hts_sitemap_handler)(void *arg, const char *url);
    the handler refuses. `is_index` (optional) reports a <sitemapindex>, whose
    URLs are child sitemaps rather than pages. Returns the number of URLs handed
    out, or -1 when the document could not be decompressed within the caps. */
-int hts_sitemap_scan(hts_span body, int maxurls, hts_boolean *is_index,
-                     hts_sitemap_handler handler, void *arg);
+HTS_CHECK_RESULT int hts_sitemap_scan(hts_span body, int maxurls,
+                                      hts_boolean *is_index,
+                                      hts_sitemap_handler handler, void *arg);
 
 /* --- Engine glue (needs a live httrackp). --- */
 

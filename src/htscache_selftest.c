@@ -5120,9 +5120,9 @@ static size_t fields_etag_kept(size_t len, size_t crs) {
   for (i = strlen("Etag: "); i < len; i++)
     StringAddchar(block, 'e');
   StringCat(block, "\r\nX-Size: 1\r\n");
-  (void) hts_cache_read_fields(
-      hts_span_at(StringBuff(block), StringLength(block)), fields, 1, NULL,
-      NULL);
+  assertf(
+      hts_cache_read_fields(hts_span_at(StringBuff(block), StringLength(block)),
+                            fields, 1, NULL, NULL));
   StringFree(block);
   return strlen(etag);
 }

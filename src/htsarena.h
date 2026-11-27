@@ -73,7 +73,8 @@ HTS_STATIC_ASSERT(!(HTS_ARENA_ALIGN & (HTS_ARENA_ALIGN - 1)), arena_align_pow2);
    ~(size_t) (HTS_ARENA_ALIGN - 1))
 
 /** Take a chunk with room for NEED bytes; ARENA is unchanged on failure. **/
-static HTS_UNUSED hts_boolean hts_arena_grow_(hts_arena *arena, size_t need) {
+static HTS_UNUSED HTS_CHECK_RESULT hts_boolean hts_arena_grow_(hts_arena *arena,
+                                                               size_t need) {
   size_t size = arena->size < HTS_ARENA_MAX / 2 ? arena->size * 2
                                                 : (size_t) HTS_ARENA_MAX;
   hts_arena_chunk *chunk;
@@ -99,8 +100,8 @@ HTS_STATIC_ASSERT(HTS_ARENA_HDR % HTS_ARENA_ALIGN == 0, arena_hdr_aligned);
 /** SIZE bytes from ARENA, starting on an ALIGN boundary (a power of two), or
     NULL when out of memory. Padding is charged where it is needed rather than
     to every size, so a run of strings stays packed. **/
-static HTS_UNUSED void *hts_arena_take_(hts_arena *arena, size_t size,
-                                        size_t align) {
+static HTS_UNUSED HTS_CHECK_RESULT void *
+hts_arena_take_(hts_arena *arena, size_t size, size_t align) {
   if (arena->chunks != NULL) {
     /* used never passes size, so the room below can not go negative */
     const size_t room = arena->size - arena->used;
@@ -124,7 +125,8 @@ static HTS_UNUSED void *hts_arena_take_(hts_arena *arena, size_t size,
 
 /** SIZE bytes from ARENA, aligned for any type, or NULL when out of memory.
     The address stays valid until hts_arena_free(). **/
-static HTS_UNUSED void *hts_arena_alloc(hts_arena *arena, size_t size) {
+static HTS_UNUSED HTS_CHECK_RESULT void *hts_arena_alloc(hts_arena *arena,
+                                                         size_t size) {
   return hts_arena_take_(arena, size, HTS_ARENA_ALIGN);
 }
 
