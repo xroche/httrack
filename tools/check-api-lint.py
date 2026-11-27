@@ -6,8 +6,10 @@ passing x.p, x.len (or x.p + n, x.len - n) as two arguments where the callee
 could take the span, raw strcpy, strcat, strncpy, strncat, sprintf or
 vsprintf calls outside the htssafe.h wrappers, a file-scope or static array of
 pointers whose pointers are not const, which stays writable, a header
-prototype of a function that only its defining file uses, and a header
-function returning a fresh char or void pointer without HTS_OWNED.
+prototype of a function that only its defining file uses, a header
+function returning a fresh char or void pointer without HTS_OWNED, and a slot
+of the rotating buffer of opt returned without HTS_RING or taken off the crawl
+thread.
 Known cases live in tools/api-lint/, and --update rewrites those baselines.
 Known limits: a failure delegated through two calls or to a static function,
 free names inside _Generic, and a function defined only in a later branch of an
@@ -25,12 +27,16 @@ header, nor one whose definition a macro builds.
 The owned rule follows a return only into a call, or into a local whose every
 assignment is a call or NULL, so a buffer a macro or a String builds goes
 unreported.
+The ring rule sees a thread only when its entry is named in an hts_newthread
+call or in OTHER_THREADS, and a call only by name, so a call through a function
+pointer or a macro other than the RING_SOURCES goes unreported.
 Even when it asks, never mark a block also stored elsewhere before it is
 returned, nor a void * grow helper over a block of pointers.
 """
 
 import argparse
 import collections
+import functools
 import os
 import re
 import sys
@@ -45,6 +51,7 @@ RULES = (
     "table",
     "local",
     "owned",
+    "ring",
 )
 HEADER = "# Known %s violations. Regenerate: tools/check-api-lint.py --update\n"
 
@@ -492,6 +499,7 @@ def top_level_scan(code):
         k += 1
 
 
+@functools.lru_cache(maxsize=None)
 def function_head(head):
     """(name, return text) of a function declaration head, else None."""
     if re.search(r"\b(typedef)\b|=", head):
@@ -928,6 +936,89 @@ def check_owned(files):
         yield path, line, name, "%s returns a fresh pointer without HTS_OWNED" % name
 
 
+# The rotating per-opt buffer that one thread at a time may use (#2328).
+RING_SOURCES = ("OPT_GET_BUFF", "OPT_GET_HTS_BUF", "getHtsOptBuff_")
+SPAWN = re.compile(r"(?<![\w.>])hts_newthread(?:_checked|_tail)?\s*\(")
+# WebHTTrack's worker that runs the crawl itself.
+CRAWL_THREADS = frozenset(["back_launch_cmd"])
+# Threads beside the crawl that no hts_newthread call starts: the WebHTTrack server.
+OTHER_THREADS = frozenset(["smallserver"])
+
+
+def ring_call(names):
+    return re.compile(r"(?<![\w.>])(%s)\s*\(" % "|".join(sorted(names)))
+
+
+def returned_texts(body):
+    """Return what BODY returns, plus what it assigns to a local it returns."""
+    texts = []
+    for v in re.findall(r"\breturn\b\s*([^;]*);", body):
+        texts.append(v)
+        var = re.fullmatch(r"\(?\s*([A-Za-z_]\w*)(?:\.p)?\s*\)?", squash(v).strip())
+        if var:
+            name = re.escape(var.group(1))
+            texts += re.findall(r"(?<![\w.>])%s\s*=(?!=)([^;]*)" % name, body)
+    return texts
+
+
+def check_ring(files):
+    """Yield (path, line, key, message) for a ring returner missing HTS_RING, and
+    for a ring use in a function a thread other than the crawl's can reach."""
+    bodies = collections.defaultdict(list)
+    marked = set()
+    for path, code in files.items():
+        for start, head, body in top_level(code):
+            fh = function_head(head)
+            if not fh:
+                continue
+            if "HTS_RING" in head:
+                marked.add(fh[0])
+            if body is not None:
+                texts = returned_texts(body) if "*" in fh[1] else []
+                decl = start + len(head) - len(head.lstrip())
+                bodies[fh[0]].append((path, decl, start + len(head), body, texts))
+    ring = set(RING_SOURCES) | marked
+    grew = True
+    while grew:
+        grew = False
+        call = ring_call(ring)
+        for name, found in bodies.items():
+            if name not in ring and any(call.search(t) for *_, ts in found for t in ts):
+                ring.add(name)
+                grew = True
+    for name in sorted(ring - marked - set(RING_SOURCES)):
+        path, decl, *_ = bodies[name][0]
+        line = line_of(files[path], decl)
+        yield path, line, name, "%s returns a ring slot without HTS_RING" % name
+
+    roots = set(OTHER_THREADS)
+    for code in files.values():
+        for m in SPAWN.finditer(code) if "hts_newthread" in code else ():
+            args = split_top(code[m.end() : matching(code, m.end() - 1) - 1], ",")
+            roots.update(a.strip() for a in args[0:1] + args[2:3])
+    thread = {r: r for r in roots - CRAWL_THREADS if r in bodies}
+    todo = sorted(thread)
+    while todo:
+        name = todo.pop()
+        for *_, body, _ in bodies[name]:
+            for m in CALL.finditer(body):
+                g = m.group(1)
+                if g in bodies and g not in thread and g not in ring:
+                    thread[g] = thread[name]
+                    todo.append(g)
+    call = ring_call(ring)
+    for name in sorted(thread):
+        for path, _, at, body, _ in bodies[name]:
+            for m in call.finditer(body):
+                line = line_of(files[path], at + m.start())
+                msg = "%s runs on the %s thread and takes a ring slot of opt via %s" % (
+                    name,
+                    thread[name],
+                    m.group(1),
+                )
+                yield path, line, "%s: %s" % (name, m.group(1)), msg
+
+
 def scan(root):
     """Map each rule to a list of (path, line, key, message)."""
     paths = []
@@ -966,6 +1057,7 @@ def scan(root):
                         others[os.path.join(top, f)] = strip_comments(fh.read())
     found["local"] = list(check_local(files, others))
     found["owned"] = list(check_owned(files))
+    found["ring"] = list(check_ring(files))
     for path, code in files.items():
         for line, key, msg in check_span(path, raws[path], code):
             found["span"].append((path, line, key, msg))

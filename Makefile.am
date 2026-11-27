@@ -27,6 +27,7 @@ EXTRA_DIST = INSTALL.Linux \
 		tools/api-lint/libc.txt \
 		tools/api-lint/table.txt \
 		tools/api-lint/owned.txt \
+		tools/api-lint/ring.txt \
 		tools/ci-sanitizer-report.sh \
 		tools/ci-test-log.sh \
 		tools/tsan-suppressions.txt \

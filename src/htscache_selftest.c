@@ -1111,7 +1111,7 @@ static const char *const reconcile_files[] = {
     "hts-cache/damaged.lst", "hts-cache/damaged.txt", "hts-cache/repair.zip",
     "hts-cache/repair.tmp"};
 
-static char *reconcile_st_path(httrackp *opt, const char *name) {
+static HTS_RING char *reconcile_st_path(httrackp *opt, const char *name) {
   return hts_logpath(opt, name);
 }
 

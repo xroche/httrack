@@ -134,8 +134,8 @@ char *url_md5(hts_buf digest, const char *fil_complete);
 HTS_CHECK_RESULT hts_boolean url_savename_refname(const char *adr,
                                                   const char *fil,
                                                   hts_buf filename);
-char *url_savename_refname_fullpath(httrackp * opt, const char *adr,
-                                    const char *fil);
+HTS_RING char *url_savename_refname_fullpath(httrackp *opt, const char *adr,
+                                             const char *fil);
 /* Remove the temp ref for (adr, fil): HTS_TRUE when no ref remains. */
 HTS_CHECK_RESULT hts_boolean url_savename_refname_remove(httrackp *opt,
                                                          const char *adr,

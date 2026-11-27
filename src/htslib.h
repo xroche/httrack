@@ -867,8 +867,8 @@ const char *url_nologin_r(hts_buf buf, const char *url);
 /* adr_nologin_r() and url_nologin_r() into a rotating buffer of opt, which
    they take only when there is a login. A NULL opt drops the login, and a
    NULL adr returns "". */
-const char *adr_nologin(httrackp *opt, const char *adr);
-const char *url_nologin(httrackp *opt, const char *url);
+HTS_RING const char *adr_nologin(httrackp *opt, const char *adr);
+HTS_RING const char *url_nologin(httrackp *opt, const char *url);
 
 /* Writes the marker that stands for a hidden secret of len bytes. */
 void fprint_redacted(FILE *fp, size_t len);
