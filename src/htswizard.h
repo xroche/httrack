@@ -54,9 +54,10 @@ typedef struct lien_url lien_url;
 /* The engine's robots.txt verdict for (adr,fil): HTS_TRUE when the fetch is
    forbidden. `filters_decided`/`filters_refused` carry the filter outcome,
    which overrides a ban under -s1 (HTS_ROBOTS_SOMETIMES). */
-hts_boolean hts_robots_forbids(httrackp *opt, const char *adr, const char *fil,
-                               hts_boolean filters_decided,
-                               hts_boolean filters_refused);
+HTS_CHECK_RESULT hts_boolean hts_robots_forbids(httrackp *opt, const char *adr,
+                                                const char *fil,
+                                                hts_boolean filters_decided,
+                                                hts_boolean filters_refused);
 
 /* Most filters one wizard answer can add. Slots must stay contiguous: the
    caller stops at the first empty one. */
@@ -78,7 +79,7 @@ void hts_wizard_prompt_url(hts_buf dst, const char *adr, const char *fil);
 /* Returns the answer code in the front end's reply `s`: 0 for NULL or empty,
    the number for a leading digit run (trailing text is ignored), -1 for `*`,
    and -999 for `!`, any other first byte, or a number above INT_MAX. */
-int hts_wizard_parse_reply(const char *s);
+HTS_CHECK_RESULT int hts_wizard_parse_reply(const char *s);
 
 /* Records the filters answer `n` leaves behind for the link (adr,fil), on top
    of the wizard's block at the low indices of opt->filters. The last match
@@ -116,12 +117,12 @@ hts_boolean hts_cmp_tag_token(const char *tag, const char *cmp);
 
 /* HTS_TRUE when link `ptr` was taken for an asset on a host foreign to its
    referer: its URL does not look like hypertext, and the hosts differ. */
-hts_boolean hts_link_is_foreign_asset(httrackp *opt, int ptr);
+HTS_CHECK_RESULT hts_boolean hts_link_is_foreign_asset(httrackp *opt, int ptr);
 
 /* Writes into `dst` the end-of-mirror note that links above the start
    directory were refused, and what lifts the refusal. Returns HTS_FALSE with
    `dst` empty when no such link was refused. */
-hts_boolean hts_upper_links_note(httrackp *opt, hts_buf dst);
+HTS_CHECK_RESULT hts_boolean hts_upper_links_note(httrackp *opt, hts_buf dst);
 
 /* `tag` and `attribute` name the markup the link came from, or are NULL where
    there is none. `in_css_file` says it came from a stylesheet, where url() has
@@ -130,7 +131,8 @@ int hts_acceptlink(httrackp *opt, int ptr, const char *adr, const char *fil,
                    const char *tag, const char *attribute,
                    hts_boolean in_css_file, int *set_prio_to_0,
                    int *just_test_it);
-int hts_testlinksize(httrackp * opt, const char *adr, const char *fil, LLint size);
+HTS_CHECK_RESULT int hts_testlinksize(httrackp *opt, const char *adr,
+                                      const char *fil, LLint size);
 int hts_acceptmime(httrackp * opt, int ptr,
                    const char *adr, const char *fil, const char *mime);
 #endif

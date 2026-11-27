@@ -405,11 +405,11 @@ TStamp hts_mirror_elapsed_ms(void);
 
 /* Write body to local path s. url_adr/url_fil (may be NULL) name the source
    URL for logging/notification. */
-int filesave(httrackp *opt, hts_span body, const char *s,
-             const char *url_adr /* = NULL */,
-             const char *url_fil /* = NULL */);
+HTS_CHECK_RESULT int filesave(httrackp *opt, hts_span body, const char *s,
+                              const char *url_adr /* = NULL */,
+                              const char *url_fil /* = NULL */);
 
-int check_fatal_io_errno(void);
+HTS_CHECK_RESULT int check_fatal_io_errno(void);
 
 /* Log a disk-full abort and stop the mirror. */
 void hts_io_fatal_abort(httrackp *opt);
@@ -541,7 +541,7 @@ hts_boolean filters_may_grow(int maxfilter);
 /* Makes room for n more rules. Returns HTS_FALSE, having logged it, only when
    memory runs out. At the HTS_FILTERS_MAX cap it returns HTS_TRUE and
    filters_insert() drops what does not fit. */
-hts_boolean filters_grow(httrackp *opt, int n);
+HTS_CHECK_RESULT hts_boolean filters_grow(httrackp *opt, int n);
 
 /* Same as filters_grow(), but aborts when memory runs out. */
 void filters_make_room(httrackp *opt, int n);
@@ -585,8 +585,10 @@ hts_boolean hts_loop_tick(struct_back *sback, httrackp *opt, int b, int ptr);
 
 /* Wait until a test socket can be plugged, pumping transfers, stats and the
    loop callback; gives up past the -E deadline. HTS_FALSE = callback abort. */
-hts_boolean hts_wait_available_socket(struct_back *sback, httrackp *opt,
-                                      cache_back *cache, int ptr);
+HTS_CHECK_RESULT hts_boolean hts_wait_available_socket(struct_back *sback,
+                                                       httrackp *opt,
+                                                       cache_back *cache,
+                                                       int ptr);
 
 /* Is this run stopping (^C, a cap, hts_request_stop) or exiting (a signal)? */
 hts_boolean hts_run_is_ending(httrackp *opt);
@@ -614,13 +616,13 @@ int nombre_digit(int n);
 // Polling
 #if HTS_POLL
 
-int check_stdin(void);
+HTS_CHECK_RESULT int check_stdin(void);
 #endif
 /* Nonzero if the socket has a pending error. */
 int check_sockerror(T_SOC s);
 
 /* external modules: register a link discovered by a parser plugin. */
-int htsAddLink(htsmoduleStruct * str, char *link);
+HTS_CHECK_RESULT int htsAddLink(htsmoduleStruct *str, char *link);
 
 /* Worst-case byte expansion HT_ADD_HTMLESCAPED* must reserve per escaper. */
 #define HTS_HTMLESCAPE_MAXEXP 5      /* escape_for_html_print: '&'->"&amp;" */

@@ -55,19 +55,19 @@ typedef struct lien_adrfilsave lien_adrfilsave;
 
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
-int ident_url_relatif(const char *lien, const char *origin_adr,
-                      const char *origin_fil,
-                      lien_adrfil* const adrfil);
+HTS_CHECK_RESULT int ident_url_relatif(const char *lien, const char *origin_adr,
+                                       const char *origin_fil,
+                                       lien_adrfil *const adrfil);
 /* Bounded substring search over data that may hold NUL bytes; NULL if absent.
  */
-const char *hts_memstr(hts_span hay, hts_span needle);
+HTS_CHECK_RESULT const char *hts_memstr(hts_span hay, hts_span needle);
 
-int lienrelatif(hts_buf s, const char *link, const char *curr);
-int link_has_authority(const char *lien);
+HTS_CHECK_RESULT int lienrelatif(hts_buf s, const char *link, const char *curr);
+HTS_CHECK_RESULT int link_has_authority(const char *lien);
 /* Does a base href with no authority name a host rather than the relative
    reference RFC 3986 5.2 makes it? True only when its first segment holds a
    dot or a colon, so a dotless "sub/" stays relative. */
-hts_boolean link_base_is_hostname(const char *lien);
+HTS_CHECK_RESULT hts_boolean link_base_is_hostname(const char *lien);
 /* Does a string hold a path of more than one segment? A script string ending
    in a slash is no evidence alone, because "/", "image/" and "$&/" all end
    that way too. A second slash is. */
@@ -76,7 +76,7 @@ hts_boolean link_dir_is_multisegment(const char *lien);
    "/#top" and "img/#x". False for "page.html#x", for "////#x" which has no
    name, and for "//&num;/#x" where an entity hides an earlier marker. Pass
    the source bytes, because unescape_amp forges a '#' out of "&#35;". */
-hts_boolean link_dir_has_fragment_or_query(const char *lien);
+HTS_CHECK_RESULT hts_boolean link_dir_has_fragment_or_query(const char *lien);
 int link_has_authorization(const char *lien);
 void long_to_83(int mode, hts_buf n83, char *save);
 void longfile_to_83(int mode, hts_buf n83, char *save);
@@ -120,8 +120,9 @@ const char *hts_footer_field_list(hts_buf buffer);
 // literal brace, an unknown "{...}" is left verbatim). A NULL slot expands
 // empty. Values must already be escaped for the target context by the caller.
 // Returns <0 on overflow.
-int hts_footer_format(hts_buf buffer, const char *footer,
-                      const char *const values[HTS_FOOTER_FIELD_COUNT]);
+HTS_CHECK_RESULT int
+hts_footer_format(hts_buf buffer, const char *footer,
+                  const char *const values[HTS_FOOTER_FIELD_COUNT]);
 
 /* prevc is the byte before adr, normally from html_prevc. */
 #define rech_tageq_at(adr, prevc, s)                                           \
@@ -151,7 +152,8 @@ int istoobig(httrackp *opt, LLint size, LLint maxhtml, LLint maxnhtml,
 /* Move src onto dst, replacing an existing dst; HTS_TRUE on success. Both paths
    are fconv()'d. A failure leaves the old content at dst or under a logged
    sibling name, and a crash between the two renames leaves only the sibling. */
-hts_boolean hts_rename_over(httrackp *opt, const char *src, const char *dst);
+HTS_CHECK_RESULT hts_boolean hts_rename_over(httrackp *opt, const char *src,
+                                             const char *dst);
 
 /* Selftest hook: run the aside fallback directly, on a platform whose rename()
    never reaches it. Both paths are fconv()'d. */

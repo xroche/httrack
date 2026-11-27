@@ -67,7 +67,8 @@ const char *strjoker_nomemo(const char *chaine, const char *joker, LLint *size,
 const char *strjoker_bounds(const char *chaine, const char *joker,
                             size_t *nsteps_out, size_t *maxsteps_out,
                             size_t *depth_out, size_t *maxdepth_out);
-const char *strjokerfind(const char *chaine, const char *joker);
+HTS_CHECK_RESULT const char *strjokerfind(const char *chaine,
+                                          const char *joker);
 #endif
 
 #endif
