@@ -18,8 +18,8 @@ directory). Each line is "<path> <mode>...", path "*" matching everything:
   sizeshort answer SIZE with "21", too short for a reply code
   sizemulti answer SIZE with a multiline reply holding a line of another code
   sizedrip  answer SIZE with a multiline reply that drips one byte at a time
-  banner    greet and log in with multiline 220 and 230 replies whose text
-            lines start with digits, as real banners do
+  banner    greet and log in with multiline 220 and 230 replies holding text
+            lines that start with another reply code, which are not the end
   long150   answer RETR with a 150 line far over the client's 1023-byte bound,
             as a server echoing a long path does
 
@@ -42,8 +42,8 @@ QUIET_SECONDS = 900
 LATE_SECONDS = 5
 DRIP_PAUSE = 0.5
 
-BANNER_220 = "220-Welcome\r\n220-123 users max\r\n 42 is the answer\r\n220 ready"
-BANNER_230 = "230-Hello\r\n230-200 MB quota\r\nplain text\r\n230 Login successful"
+BANNER_220 = "220-Welcome\r\n123 users online\r\n 42 is the answer\r\n220 ready"
+BANNER_230 = "230-Hello\r\n200 MB quota\r\nplain text\r\n230 Login successful"
 
 TRICKLE_CHUNK = 8192
 TRICKLE_PAUSE = 0.2

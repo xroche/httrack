@@ -1,8 +1,6 @@
 #!/bin/bash
 #
-# FTP replies are framed as RFC 959 says: a malformed line is an error, a
-# multiline reply ends on its opener's code, and a drip-fed reply times out.
-# Real multiline banners, a long 150, a 550 and a 500 MDTM still work.
+# FTP replies are framed as RFC 959 says, and real replies still work.
 
 set -euo pipefail
 
@@ -76,5 +74,5 @@ start=$SECONDS
 crawl drip 60 "${base}/drip.txt"
 took=$((SECONDS - start))
 error_for "${tmpdir}/out.drip/hts-log.txt" drip.txt '"FTP read timeout (2)"'
-test "$took" -lt 20 || fail "a drip-fed reply held a 2s timeout for ${took}s"
+test "$took" -lt 10 || fail "a drip-fed reply held a 2s timeout for ${took}s"
 ok "a drip-fed reply times out in ${took}s"

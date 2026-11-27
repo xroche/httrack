@@ -870,12 +870,15 @@ static int st_ftpline(httrackp *opt, int argc, char **argv) {
   assertf(st_socketpair(sv) == 0);
   {
     static const char replies[] = "123-x\r\n456 not the end\r\n123-more\r\n"
-                                  "123 done\r\n200\r\n22\r\n";
+                                  "123done\r\n1234\r\n123 done\r\n"
+                                  "124-x\r\n124\r\n200\r\n22\r\n";
     assertf(send(sv[1], replies, (int) sizeof(replies) - 1, 0) ==
             (int) sizeof(replies) - 1);
   }
   assertf(get_ftp_line(NULL, sv[0], HTS_BUF(line), 5, NULL) == HTS_FTP_LINE_OK);
   assertf(strcmp(line, "123 done") == 0);
+  assertf(get_ftp_line(NULL, sv[0], HTS_BUF(line), 5, NULL) == HTS_FTP_LINE_OK);
+  assertf(strcmp(line, "124") == 0); // a bare code closes a multiline reply
   assertf(get_ftp_line(NULL, sv[0], HTS_BUF(line), 5, NULL) == HTS_FTP_LINE_OK);
   assertf(strcmp(line, "200") == 0); // a bare code is still a code
   assertf(get_ftp_line(NULL, sv[0], HTS_BUF(line), 5, NULL) ==

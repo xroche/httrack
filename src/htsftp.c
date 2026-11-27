@@ -1433,7 +1433,7 @@ static hts_boolean ftp_reply_code(const char *data, int len) {
 hts_ftp_line_status get_ftp_line(lien_back *back, T_SOC soc, hts_buf line,
                                  int timeout, const httrackp *opt) {
   char BIGSTK data[1024];
-  char code[3] = {0, 0, 0}; // the multiline opener's, its final line repeats it
+  char code[3] = {0, 0, 0}; // the multiline opener's code
   int i = 0;
   hts_boolean ok = HTS_FALSE, multiline = HTS_FALSE;
   const TStamp start = mtime_monotonic();
@@ -1459,7 +1459,7 @@ hts_ftp_line_status get_ftp_line(lien_back *back, T_SOC soc, hts_buf line,
 
       if (spent >= budget)
         return HTS_FTP_LINE_TIMEOUT;
-      left = (budget - spent + 999) / 1000; // rounded up, as ftp_wait_left
+      left = (budget - spent + 999) / 1000; // rounded up
       if (left < (TStamp) wait)
         wait = (int) left;
     }
