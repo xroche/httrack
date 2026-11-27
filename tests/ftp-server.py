@@ -15,6 +15,11 @@ directory). Each line is "<path> <mode>...", path "*" matching everything:
   hold      never answer RETR, leaving the client's data connection idle
   sizecut   answer SIZE with half a line, then drop the control connection
   sizelate  answer SIZE only after LATE_SECONDS, past a 2s client timeout
+  sizeshort answer SIZE with "21", too short for a reply code
+  sizemulti answer SIZE with a multiline reply holding a line of another code
+  sizedrip  answer SIZE with a multiline reply that drips one byte at a time
+  banner    greet and log in with multiline 220 and 230 replies holding text
+            lines that start with another reply code, which are not the end
   long150   answer RETR with a 150 line far over the client's 1023-byte bound,
             as a server echoing a long path does
 
@@ -35,6 +40,10 @@ import time
 QUIET_SECONDS = 900
 
 LATE_SECONDS = 5
+DRIP_PAUSE = 0.5
+
+BANNER_220 = "220-Welcome\r\n123 users online\r\n 42 is the answer\r\n220 ready"
+BANNER_230 = "230-Hello\r\n200 MB quota\r\nplain text\r\n230 Login successful"
 
 TRICKLE_CHUNK = 8192
 TRICKLE_PAUSE = 0.2
@@ -179,6 +188,8 @@ class Session(threading.Thread):
         conn = self.conn
         if verb == "USER" and self.require_pass:
             reply(conn, "331 password required")  # the client sends PASS only on a 3xx
+        elif verb in ("USER", "PASS") and "banner" in self.modes():
+            reply(conn, BANNER_230)
         elif verb in ("USER", "PASS", "TYPE", "NOOP"):
             reply(conn, "200 ok")
         elif verb == "SYST":
@@ -196,6 +207,17 @@ class Session(threading.Thread):
             modes = self.modes()
             if "sizecut" in modes:
                 conn.sendall(b"213 1")
+                return False
+            if "sizeshort" in modes:
+                reply(conn, "21")
+                return True
+            if "sizemulti" in modes:
+                conn.sendall(b"213-size follows\r\n456 not the end\r\n")
+            if "sizedrip" in modes:
+                conn.sendall(b"213-")
+                for _ in range(int(QUIET_SECONDS / DRIP_PAUSE)):
+                    time.sleep(DRIP_PAUSE)
+                    conn.sendall(b"x")
                 return False
             if "sizelate" in modes:
                 time.sleep(LATE_SECONDS)
@@ -239,7 +261,10 @@ class Session(threading.Thread):
             if self.mute:
                 time.sleep(QUIET_SECONDS)  # connected, but not even a greeting
                 return
-            reply(conn, "220 httrack test ftp")
+            if "banner" in self.modes():
+                reply(conn, BANNER_220)
+            else:
+                reply(conn, "220 httrack test ftp")
             while True:
                 while b"\r\n" not in buf:
                     chunk = conn.recv(4096)

@@ -1418,16 +1418,26 @@ int send_line(T_SOC soc, const char *data) {
 #endif
 }
 
-/* Is this line of a reply a continuation, so that its text is discarded? */
-static hts_boolean ftp_line_continues(const char *data, hts_boolean multiline) {
-  return data[3] == '-' || (multiline && !hts_isdigit((unsigned char) data[0]));
+/* Does this line start with a reply code, 3 digits then a space, a '-' or the
+   end of the line (RFC 959)? */
+static hts_boolean ftp_reply_code(const char *data, int len) {
+  return len >= 3 && hts_isdigit((unsigned char) data[0]) &&
+         hts_isdigit((unsigned char) data[1]) &&
+         hts_isdigit((unsigned char) data[2]) &&
+         (len == 3 || data[3] == ' ' || data[3] == '-');
 }
+
+/* One reply may take this many --timeout periods, so a drip feed ends. */
+#define FTP_REPLY_TIMEOUTS 2
 
 hts_ftp_line_status get_ftp_line(lien_back *back, T_SOC soc, hts_buf line,
                                  int timeout, const httrackp *opt) {
   char BIGSTK data[1024];
+  char code[3] = {0, 0, 0}; // the multiline opener's code
   int i = 0;
   hts_boolean ok = HTS_FALSE, multiline = HTS_FALSE;
+  const TStamp start = mtime_monotonic();
+  const TStamp budget = (TStamp) timeout * FTP_REPLY_TIMEOUTS * 1000;
 
 #if FTP_DEBUG
   if (dd == NULL)
@@ -1436,15 +1446,24 @@ hts_ftp_line_status get_ftp_line(lien_back *back, T_SOC soc, hts_buf line,
 
   if (line.size != 0)
     line.p[0] = '\0';
-  data[0] = '\0';
-  data[3] = '\0';
   // wait_socket_receive() refuses it too, but the analyzer does not follow it
   if (!hts_soc_selectable(soc))
     return HTS_FTP_LINE_ERROR;
   do {
     char b;
+    int wait = timeout;
 
-    switch (wait_socket_receive(back, soc, timeout, opt)) {
+    if (timeout > 0) {
+      const TStamp spent = mtime_monotonic() - start;
+      TStamp left;
+
+      if (spent >= budget)
+        return HTS_FTP_LINE_TIMEOUT;
+      left = (budget - spent + 999) / 1000; // rounded up
+      if (left < (TStamp) wait)
+        wait = (int) left;
+    }
+    switch (wait_socket_receive(back, soc, wait, opt)) {
     case HTS_POLL_ERROR:
       return HTS_FTP_LINE_ERROR;
     case HTS_POLL_NONE:
@@ -1460,17 +1479,22 @@ hts_ftp_line_status get_ftp_line(lien_back *back, T_SOC soc, hts_buf line,
       if (i < (int) sizeof(data) - 1)
         data[i++] = b; // a path echoed in a reply can run past the bound
     } else if (i > 0) {
-      if (ftp_line_continues(data, multiline)) {
-        data[3] = '\0';
+      if (!multiline) {
+        if (!ftp_reply_code(data, i)) // out of step with the commands
+          return HTS_FTP_LINE_ERROR;
+        if (i > 3 && data[3] == '-') {
+          memcpy(code, data, sizeof(code));
+          multiline = HTS_TRUE;
+        } else
+          ok = HTS_TRUE;
+      } else if (i >= 3 && memcmp(data, code, sizeof(code)) == 0 &&
+                 (i == 3 || data[3] == ' '))
+        ok = HTS_TRUE; // any other line of a multiline reply is text
+      if (!ok)
         i = 0;
-        multiline = HTS_TRUE;
-      } else
-        ok = HTS_TRUE;
     }
   } while(!ok);
   data[i] = '\0';
-  if (data[0] == '\0') // only NUL bytes: no reply code to read
-    return HTS_FTP_LINE_ERROR;
 
   if (_DEBUG_HEAD) {
     if (ioinfo) {
