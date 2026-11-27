@@ -4621,7 +4621,7 @@ static int refname_remove_selftest(httrackp *opt, const char *dir) {
   }
 #ifndef _WIN32
   st_put_file(path, body);
-  /* the .test skips root, who can unlink here anyway */
+  /* root can unlink here anyway */
   if (geteuid() != 0 &&
       (chmod(reconcile_st_path(opt, CACHE_REFNAME), 0555) != 0 ||
        url_savename_refname_remove(opt, REF_ST_ADR, REF_ST_FIL) ||
