@@ -1,0 +1,25 @@
+#!/bin/bash
+#
+# hts_newthread_checked() and the deprecated hts_newthread() run their worker,
+# and both report a refused spawn as -1 without running it.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+out=$(httrack -O /dev/null "-#test=newthread") || fail "newthread exited $?: ${out}"
+out=${out//$'\r'/}
+granted=${out%%$'\n'*}
+refused=${out#*$'\n'}
+assert_eq "granted: ran 2" "${granted}" "granted spawn"
+case "${refused}" in
+"refused: checked=-1 legacy=-1 ran 2") ;;
+"refused: not provoked")
+    # RLIMIT_NPROC binds threads only on Linux, and never for root.
+    if test "$(uname -s)" = Linux && test "$(id -u)" != 0 && ! target_is_windows; then
+        fail "a non-root Linux user could not provoke a refused spawn"
+    fi
+    echo "NOTE: not provoked on $(uname -s) as uid $(id -u), so only the granted spawn was checked"
+    ;;
+*) fail "refused spawn: ${refused}" ;;
+esac

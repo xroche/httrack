@@ -139,7 +139,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   memset(&robots, 0, sizeof(robots)); /* list head: no host, no rules */
   opt->robotsptr = &robots;
 
-  opt->maxfilter = maximum(opt->maxfilter, 128);
+  opt->maxfilter = hts_max_int(opt->maxfilter, 128);
   filters_init(&filters, opt->maxfilter, 0);
   opt->filters.filters = &filters;
   opt->filters.filptr = &filptr;

@@ -1495,7 +1495,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
           case 'c':
             if (hts_isdigit((unsigned char) *(com + 1))) {
               readGluedInt(opt->maxsoc, INT_MAX);
-              opt->maxsoc = max(opt->maxsoc, 1); // At least one socket.
+              opt->maxsoc = hts_max_int(opt->maxsoc, 1); // At least one socket.
             } else
               opt->maxsoc = 4;
 

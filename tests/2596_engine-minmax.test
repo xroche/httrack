@@ -1,0 +1,12 @@
+#!/bin/bash
+#
+# Runs the typed min/max self-test.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+require_httrack
+
+assert_selftest ok minmax

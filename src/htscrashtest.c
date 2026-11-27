@@ -150,7 +150,7 @@ static void crash_worker_thread(void *arg) {
 static void crash_on_worker(crash_fn fn) {
   /* Aborting on a spawn failure keeps the caller's exit status a crash, so the
      test reads "no worker started" rather than "the handler never ran". */
-  if (hts_newthread(crash_worker_thread, &fn) != 0)
+  if (hts_newthread_checked(crash_worker_thread, &fn) != 0)
     abortLog("crash test: cannot spawn a worker thread");
   htsthread_wait_n(0); /* the worker takes the process down from there */
 }

@@ -139,6 +139,9 @@ int lint_probe_deleg_cmp(int x) { return lint_probe_int(x) >= 0; }
 int lint_probe_deleg_clean(int x) { return lint_probe_clean(x); }
 int lint_probe_marked_int(int x) { if (x) return -1; return 0; }
 int lint_probe_clean(int x) { return x + 1; }
+int lint_probe_old(int x) { if (x) return -1; return 0; }
+int lint_probe_old_checked(int x) { return lint_probe_old(x); }
+int lint_probe_stale(int x) { if (x) return -1; return 0; }
 void lint_local_only(void) {}
 void lint_local_fuzzed(void) {}
 void lint_local_api(void) {}
@@ -223,6 +226,11 @@ int lint_probe_deleg_cmp(int x);
 int lint_probe_deleg_clean(int x);
 HTS_CHECK_RESULT int lint_probe_marked_int(int x);
 int lint_probe_clean(int x);
+HTS_DEPRECATED("use a checked probe")
+HTSEXT_API int lint_probe_old(int x);
+HTS_CHECK_RESULT HTSEXT_API int lint_probe_old_checked(int x);
+HTS_DEPRECATED("has no twin")
+HTSEXT_API int lint_probe_stale(int x);
 void lint_local_only(void);
 void lint_local_fuzzed(void);
 HTSEXT_API void lint_local_api(void);
@@ -284,6 +292,7 @@ for want in "src/htslib.c:$(at "${c}" "lint_probe_ctype("): ctype: new violation
     "src/htslib.h:$(at "${h}" "lint_probe_bool("): check-result: new violation: lint_probe_bool returns failure (hts_boolean)" \
     "src/htslib.h:$(at "${h}" "lint_probe_twin("): check-result: new violation: lint_probe_twin returns failure" \
     "src/htslib.h:$(at "${h}" "lint_probe_extern("): check-result: new violation: lint_probe_extern returns failure" \
+    "src/htslib.h:$(at "${h}" "has no twin"): check-result: new violation: lint_probe_stale returns failure" \
     "src/htslib.c:$(at "${c}" "printf(\"%s %.*s"): span: new violation: printf(a.p) prints a span with %s" \
     "src/htslib.c:$(at "${c}" "printf(\"%s %.*s"): span: new violation: printf(tok.p) prints a span with %s" \
     "src/htslib.c:$(at "${c}" "return strlen(tok.p)"): span: new violation: strlen(tok.p) reads a span up to a NUL" \
@@ -325,16 +334,20 @@ for name in fuzzed api twice none hdr; do
         fail "the local rule flagged lint_local_${name}: ${out}"
     fi
 done
+# A deprecated name with a marked _checked twin is skipped, and one without is not.
+if grep -qF "lint_probe_old" <<<"${out}"; then
+    fail "the check-result rule flagged a deprecated declaration: ${out}"
+fi
 # The local rule also flags 14 lint_probe_* prototypes: all of them except lint_probe_clean,
-# which src/lintprobe/probe.c calls. With lint_local_only, 15 of the 71 lines are local.
-test "$(wc -l <<<"${out}")" -eq 71 || fail "flagged a clean probe: ${out}"
+# which src/lintprobe/probe.c calls. With lint_local_only, 15 of the 72 lines are local.
+test "$(wc -l <<<"${out}")" -eq 72 || fail "flagged a clean probe: ${out}"
 
 # Removing a known violation, or listing one that never was, leaves a stale entry; dropping a live entry flags it.
 rm -r "${work}/src/lintprobe"
 cp "${srcdir}/src/htslib.c" "${srcdir}/src/htslib.h" "${work}/src/"
 cp "${srcdir}/tools/api-lint/macro.txt" "${work}/baseline/"
 sed 's/^#define heap(N).*/#define heap(N) (N)/' "${srcdir}/src/htscore.h" >"${work}/src/htscore.h"
-sed 's/^hts_boolean url_savename_refname_remove(/HTS_CHECK_RESULT &/' "${srcdir}/src/htsname.h" >"${work}/src/htsname.h"
+echo 'src/htsname.h: url_savename_refname_remove' >>"${work}/baseline/check-result.txt"
 echo 'src/htslib.c: isdigit(gone)' >>"${work}/baseline/ctype.txt"
 echo 'src/htslib.c: gone: strcpy(x)' >>"${work}/baseline/libc.txt"
 known='src/htscache_selftest.c: cache_selftests: sprintf(save)'

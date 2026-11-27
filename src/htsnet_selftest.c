@@ -703,7 +703,7 @@ static int st_socwait(httrackp *opt, int argc, char **argv) {
   assertf(check_readinput_t(sv[1], 1) == 0);
   dt = mtime_local() - t0;
   assertf(dt >= 900 && dt < 5000);
-  assertf(hts_newthread(socwait_delayed_send, &sv[0]) == 0);
+  assertf(hts_newthread_checked(socwait_delayed_send, &sv[0]) == 0);
   t0 = mtime_local();
   assertf(check_readinput_t(sv[1], 10) == 1);
   dt = mtime_local() - t0;
@@ -820,8 +820,8 @@ static int st_sigpipe(httrackp *opt, int argc, char **argv) {
 }
 #endif
 
-/* get_ftp_line must bound a hostile, CRLF-less reply into its 1024-byte
-   buffer, then clip it into the caller's. ASan aborts on an overflow. */
+/* get_ftp_line must bound a hostile reply into its 1024-byte buffer, clip it
+   into the caller's, and report each failure as a status, never as a reply. */
 static int st_ftpline(httrackp *opt, int argc, char **argv) {
   T_SOC sv[2];
   char line[2048];
@@ -829,19 +829,51 @@ static int st_ftpline(httrackp *opt, int argc, char **argv) {
 
   memset(flood, 'x', sizeof(flood));
   assertf(st_socketpair(sv) == 0);
-  // the 4102-byte reply fits the loopback send buffer, so no reader is needed
-  assertf(send(sv[1], "220 ", 4, 0) == 4); // valid 3-digit code
+  // the 4136-byte replies fit the loopback send buffer, so no reader is needed
+  assertf(send(sv[1], "220-", 4, 0) == 4); // a continuation line is discarded
   assertf(send(sv[1], flood, (int) sizeof(flood), 0) == (int) sizeof(flood));
-  assertf(send(sv[1], "\r\n", 2, 0) == 2); // end the line so we return
-  assertf(send(sv[1], "220 short reply\r\n221 bye\r\n", 26, 0) == 26);
+  assertf(send(sv[1], "\r\n220 short reply\r\n221 goodbye\r\n", 32, 0) == 32);
+  assertf(send(sv[1], "250 cut", 7, 0) == 7);
   deletesoc(sv[1]);
-  line[0] = '\0';
-  assertf(get_ftp_line(NULL, sv[0], HTS_BUF(line), 5, NULL));
-  assertf(strlen(line) == 1023 && line[1022] == 'x');
+  assertf(get_ftp_line(NULL, sv[0], HTS_BUF(line), 5, NULL) == HTS_FTP_LINE_OK);
+  assertf(strcmp(line, "220 short reply") == 0);
   memset(line, '#', sizeof(line)); // a zero canary would hide a stray NUL
-  assertf(get_ftp_line(NULL, sv[0], HTS_BUF_N(line, 8), 5, NULL));
-  assertf(strcmp(line, "220 sho") == 0 && line[8] == '#' && line[63] == '#');
-  assertf(get_ftp_line(NULL, sv[0], hts_buf_none(), 5, NULL));
+  assertf(get_ftp_line(NULL, sv[0], HTS_BUF_N(line, 8), 5, NULL) ==
+          HTS_FTP_LINE_OK);
+  assertf(strcmp(line, "221 goo") == 0 && line[8] == '#' && line[63] == '#');
+  // the peer closed mid-reply: an error, and no text a parser could read
+  memset(line, '#', sizeof(line));
+  assertf(get_ftp_line(NULL, sv[0], HTS_BUF(line), 5, NULL) ==
+          HTS_FTP_LINE_ERROR);
+  assertf(line[0] == '\0' && line[1] == '#');
+  assertf(get_ftp_line(NULL, sv[0], hts_buf_none(), 5, NULL) ==
+          HTS_FTP_LINE_ERROR);
+  deletesoc(sv[0]);
+
+  // an over-long final line, a long path echoed in a 150, is clipped and read
+  assertf(st_socketpair(sv) == 0);
+  assertf(send(sv[1], "150 ", 4, 0) == 4);
+  assertf(send(sv[1], flood, (int) sizeof(flood), 0) == (int) sizeof(flood));
+  assertf(send(sv[1], "\r\n\0\0\0\r\n", 7, 0) == 7);
+  memset(line, '#', sizeof(line));
+  assertf(get_ftp_line(NULL, sv[0], HTS_BUF(line), 5, NULL) == HTS_FTP_LINE_OK);
+  assertf(strlen(line) == 1023 && line[1022] == 'x' && line[1024] == '#');
+  // a line of NUL bytes holds no reply code
+  memset(line, '#', sizeof(line));
+  assertf(get_ftp_line(NULL, sv[0], HTS_BUF(line), 5, NULL) ==
+          HTS_FTP_LINE_ERROR);
+  assertf(line[0] == '\0' && line[1] == '#');
+  deletesoc(sv[1]);
+  deletesoc(sv[0]);
+
+  // a silent peer times out; sv[1] stays open, so this is not a close
+  assertf(st_socketpair(sv) == 0);
+  assertf(send(sv[1], "220 par", 7, 0) == 7);
+  memset(line, '#', sizeof(line));
+  assertf(get_ftp_line(NULL, sv[0], HTS_BUF(line), 1, NULL) ==
+          HTS_FTP_LINE_TIMEOUT);
+  assertf(line[0] == '\0' && line[1] == '#');
+  deletesoc(sv[1]);
   deletesoc(sv[0]);
   printf("ftp-line self-test OK (bounded %d-byte reply)\n",
          (int) sizeof(flood));
@@ -1319,7 +1351,7 @@ static int st_catchurl(httrackp *opt, int argc, char **argv) {
   /* the largest block data[] holds: it comes back filled to the last byte */
   arg.tail = fits;
   url[0] = method[0] = data[0] = '\0';
-  assertf(hts_newthread(st_catchurl_client, &arg) == 0);
+  assertf(hts_newthread_checked(st_catchurl_client, &arg) == 0);
   assertf(catch_url_capture(srv, HTS_BUF(url), HTS_BUF(method),
                             hts_buf_at(data, CATCH_URL_DATA_SIZE)) ==
           CATCH_URL_OK);
@@ -1332,7 +1364,7 @@ static int st_catchurl(httrackp *opt, int argc, char **argv) {
   /* one byte more: refused on the block, and no prefix handed back */
   arg.tail = fits + 1;
   url[0] = method[0] = data[0] = '\0';
-  assertf(hts_newthread(st_catchurl_client, &arg) == 0);
+  assertf(hts_newthread_checked(st_catchurl_client, &arg) == 0);
   assertf(catch_url_capture(srv, HTS_BUF(url), HTS_BUF(method),
                             hts_buf_at(data, CATCH_URL_DATA_SIZE)) ==
           CATCH_URL_ERR_BLOCK);
@@ -1404,7 +1436,7 @@ static int st_catchurl_overlong(httrackp *opt, int argc, char **argv) {
 
   /* one over-long line, far under any block bound: refused, nothing kept */
   url[0] = method[0] = data[0] = '\0';
-  assertf(hts_newthread(st_catchurl_over_client, &arg) == 0);
+  assertf(hts_newthread_checked(st_catchurl_over_client, &arg) == 0);
   assertf(catch_url_capture(srv, HTS_BUF(url), HTS_BUF(method),
                             hts_buf_at(data, CATCH_URL_DATA_SIZE)) ==
           CATCH_URL_ERR_HEADER);
@@ -1413,7 +1445,7 @@ static int st_catchurl_overlong(httrackp *opt, int argc, char **argv) {
 
   /* nothing but over-long lines: the capture ends on the first one */
   url[0] = method[0] = data[0] = '\0';
-  assertf(hts_newthread(st_catchurl_flood_client, &arg) == 0);
+  assertf(hts_newthread_checked(st_catchurl_flood_client, &arg) == 0);
   assertf(catch_url_capture(srv, HTS_BUF(url), HTS_BUF(method),
                             hts_buf_at(data, CATCH_URL_DATA_SIZE)) ==
           CATCH_URL_ERR_HEADER);
@@ -1477,7 +1509,7 @@ static void st_catchurl_check_bind(T_SOC srv, int port, const char *adr,
   arg.pads = 0;
   arg.tail = 7;
   url[0] = method[0] = data[0] = '\0';
-  assertf(hts_newthread(st_catchurl_client, &arg) == 0);
+  assertf(hts_newthread_checked(st_catchurl_client, &arg) == 0);
   if (legacy)
     assertf(st_catchurl_legacy(srv, url, method, data));
   else
@@ -1840,7 +1872,7 @@ static catch_url_status st_catchurl_sized_run(const char *req, hts_buf url,
   catch_url_status status;
 
   arg.req = req;
-  assertf(hts_newthread(st_catchurl_sized_client, &arg) == 0);
+  assertf(hts_newthread_checked(st_catchurl_sized_client, &arg) == 0);
   status = catch_url_capture(srv, url, method, data);
   htsthread_wait();
   deletesoc(srv);
@@ -2001,7 +2033,7 @@ static int st_catchurl_sized(httrackp *opt, int argc, char **argv) {
     hts_boolean ok;
 
     arg.req = get;
-    assertf(hts_newthread(st_catchurl_sized_client, &arg) == 0);
+    assertf(hts_newthread_checked(st_catchurl_sized_client, &arg) == 0);
     ok = catch_url_sized(srv, url, cases[i].url, HTS_SIZED(method),
                          HTS_SIZED(data));
     htsthread_wait();

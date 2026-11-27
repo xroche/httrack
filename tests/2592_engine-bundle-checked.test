@@ -1,0 +1,14 @@
+#!/bin/bash
+#
+# Each _checked login-bundle form and its deprecated twin give the same result,
+# on a refusal and on an accepted dry run, and fill the result the same way.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+selftest_queue_lines "refused: 0/0 0/0 0/0 nothing was pasted
+accepted: 1/1 1/1 1/1 shop.example
+names: -1/-1 1/1" bundlechecked
+
+selftest_run_queued

@@ -208,7 +208,7 @@ static void exit_wait_thread(void *arg) {
 static hts_boolean exit_wait_threads(const httrackp *opt) {
   TStamp left, deadline;
 
-  if (opt->maxtime <= 0 || hts_newthread(exit_wait_thread, NULL) != 0) {
+  if (opt->maxtime <= 0 || hts_newthread_checked(exit_wait_thread, NULL) != 0) {
     htsthread_wait();
     return HTS_TRUE;
   }
@@ -433,11 +433,11 @@ static int __cdecl htsshow_loop(t_hts_callbackarg * carg, httrackp * opt, lien_b
       t_StatsBuffer StatsBuffer[NStatsBuffer];
 
       /* Keep the frame within the terminal, or it scrolls the stats away. */
-      const int nstats =
-          min(NStatsBuffer, max(0, term_rows - NStatsHeaderRows));
+      const int nstats = hts_min_int(
+          NStatsBuffer, hts_max_int(0, term_rows - NStatsHeaderRows));
       /* URL budget: half the width, i.e. the historical 40 at 80 columns. */
-      const int maxurl =
-          min((int) sizeof(StatsBuffer[0].name) - 1, max(16, term_cols / 2));
+      const int maxurl = hts_min_int((int) sizeof(StatsBuffer[0].name) - 1,
+                                     hts_max_int(16, term_cols / 2));
 
       (void) stats_collect_rows(opt, back, back_max, back_index, StatsBuffer,
                                 nstats, maxurl);
