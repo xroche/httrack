@@ -258,7 +258,7 @@ int hts_mirror_check_moved(htsmoduleStruct *str,
                     hts_fetch_through(opt, &heap_top()->fetch, heap(ptr)->adr);
                     heap_top()->premier = heap(ptr)->premier;
                     heap_top()->precedent = heap(ptr)->precedent;
-                  } else { // oups erreur, plus de mémoire!!
+                  } else { // link table full (-#L) or out of memory
                     return 0;
                   }
                 } else {

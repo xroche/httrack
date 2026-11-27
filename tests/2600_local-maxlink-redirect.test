@@ -32,7 +32,7 @@ for n in a b c; do
 done
 ok "with room, each redirected image holds its target"
 
-# --- 6 slots: the page and three images, then two of the three redirects ----
+# --- 6 slots: the page, three images and one redirect target ---------------
 crawl cap 6
 grep -q "/ctxcap/c\.gif[[:space:]]" "${tmpdir}/cap/hts-cache/new.txt" ||
     fail "the capped crawl never fetched c.gif, so nothing here is about it"

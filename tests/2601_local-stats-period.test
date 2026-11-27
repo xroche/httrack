@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# -#Z writes hts-stats.txt once a minute, however many links the crawl waits on.
+# -#Z keeps its statistics timer across links, so it writes no line per link.
 
 set -euo pipefail
 
@@ -28,4 +28,4 @@ test "$elapsed" -ge 61 ||
 test "$lines" -ge 1 || fail "no statistics line in ${elapsed}s: ${stats}"
 test "$lines" -le $((elapsed / 60)) ||
     fail "${lines} statistics lines in ${elapsed}s: ${stats}"
-ok "${lines} statistics line(s) in ${elapsed}s"
+ok "hts-stats.txt got ${lines} line(s) in ${elapsed}s, not one per link"
