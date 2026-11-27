@@ -2219,6 +2219,7 @@ hts_boolean url_savename_refname_remove(httrackp *opt, const char *adr,
                                         const char *fil) {
   char *filename = url_savename_refname_fullpath(opt, adr, fil);
 
+  // an absent ref counts as removed
   if (UNLINK(filename) != 0 && errno != ENOENT)
     return HTS_FALSE;
   if (opt->refs_written != NULL)

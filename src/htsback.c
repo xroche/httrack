@@ -1051,6 +1051,7 @@ hts_boolean back_finalize_backup(httrackp *opt, lien_back *const back,
       back_tmpdir_drop(back->tmpfile);
       /* The restore replaced the partial, so its byte ranges now describe a
          file that is gone (#1595). */
+      // best-effort here and below: each caller cleans up either way
       (void) !url_savename_refname_remove(opt, back->url_adr, back->url_fil);
     }
   }

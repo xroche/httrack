@@ -4604,6 +4604,7 @@ static int refname_remove_selftest(httrackp *opt, const char *dir) {
   selftest_tag = "refname-remove";
   selftest_setup_dir(opt, dir);
   (void) MKDIR(reconcile_st_path(opt, "hts-cache"));
+  url_savename_refnames_start(opt);
   (void) MKDIR(reconcile_st_path(opt, CACHE_REFNAME));
   ref_st_refpath(opt, HTS_BUF(path));
   st_put_file(path, body);
@@ -4612,22 +4613,26 @@ static int refname_remove_selftest(httrackp *opt, const char *dir) {
     fprintf(stderr, "%s: a removed ref was not reported gone\n", selftest_tag);
     fail++;
   }
-  if (!url_savename_refname_remove(opt, REF_ST_ADR, REF_ST_FIL)) {
+  url_savename_refname_written(opt, path);
+  if (!url_savename_refname_remove(opt, REF_ST_ADR, REF_ST_FIL) ||
+      url_savename_refname_may_exist(opt, path)) {
     fprintf(stderr, "%s: an absent ref was reported kept\n", selftest_tag);
     fail++;
   }
 #ifndef _WIN32
-  /* the caller skips this test as root, who can unlink here anyway */
   st_put_file(path, body);
-  if (chmod(reconcile_st_path(opt, CACHE_REFNAME), 0555) != 0 ||
-      url_savename_refname_remove(opt, REF_ST_ADR, REF_ST_FIL) ||
-      !fexist(path)) {
+  /* the .test skips root, who can unlink here anyway */
+  if (geteuid() != 0 &&
+      (chmod(reconcile_st_path(opt, CACHE_REFNAME), 0555) != 0 ||
+       url_savename_refname_remove(opt, REF_ST_ADR, REF_ST_FIL) ||
+       !fexist(path))) {
     fprintf(stderr, "%s: a ref that stayed was reported gone\n", selftest_tag);
     fail++;
   }
   (void) chmod(reconcile_st_path(opt, CACHE_REFNAME), 0755);
 #endif
   (void) UNLINK(path);
+  url_savename_refnames_free(opt);
   return fail;
 }
 

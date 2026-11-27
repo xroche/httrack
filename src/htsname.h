@@ -136,8 +136,7 @@ HTS_CHECK_RESULT hts_boolean url_savename_refname(const char *adr,
                                                   hts_buf filename);
 char *url_savename_refname_fullpath(httrackp * opt, const char *adr,
                                     const char *fil);
-/* Remove the temp-ref for (adr,fil). HTS_TRUE when no ref remains, whether
-   this call removed it or it was never there. */
+/* Remove the temp ref for (adr, fil): HTS_TRUE when no ref remains. */
 HTS_CHECK_RESULT hts_boolean url_savename_refname_remove(httrackp *opt,
                                                          const char *adr,
                                                          const char *fil);
