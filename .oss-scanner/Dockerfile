@@ -5,12 +5,14 @@
 FROM docker.io/library/debian:trixie
 
 ENV DEBIAN_FRONTEND=noninteractive \
-    CC=clang \
+    CC=clang-19 \
     ASAN_OPTIONS=detect_leaks=1:abort_on_error=1:symbolize=1 \
-    UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1
+    UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 \
+    ASAN_SYMBOLIZER_PATH=/usr/lib/llvm-19/bin/llvm-symbolizer
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      ca-certificates build-essential clang llvm git \
+      ca-certificates build-essential git \
+      clang-19 llvm-19 libclang-rt-19-dev libfuzzer-19-dev \
       autoconf automake libtool autoconf-archive pkg-config \
       zlib1g-dev libssl-dev libbrotli-dev libzstd-dev \
       python3 openssl gdb strace procps \
