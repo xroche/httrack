@@ -48,8 +48,8 @@ RUN mkdir -p build/fuzz && cd build/fuzz \
 # Smoke tests only: a red test must not fail the image, so the scanner still gets it.
 RUN cd build/asan \
     && (timeout 40m make check -j16 >check.log 2>&1 \
-        || echo "WARNING: make check failed or timed out, see /src/build/asan/check.log") \
-    && tail -n 15 check.log
+        || echo "WARNING: make check failed or timed out, see /src/build/asan/check.log and tests/*.log") \
+    && (grep -E '^(FAIL|ERROR):|^# ' check.log || true)
 RUN (timeout 15m bash fuzz/run-fuzzers.sh build/fuzz/fuzz check >build/fuzz/replay.log 2>&1 \
         || echo "WARNING: corpus replay failed, see /src/build/fuzz/replay.log") \
     && tail -n 5 build/fuzz/replay.log
