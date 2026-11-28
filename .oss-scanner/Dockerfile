@@ -50,7 +50,7 @@ RUN cd build/asan \
     && (timeout 40m make check -j16 >check.log 2>&1 \
         || echo "WARNING: make check failed or timed out, see /src/build/asan/check.log and tests/*.log") \
     && (grep -E '^(FAIL|ERROR):|^# ' check.log || true) \
-    && for t in $(sed -n 's/^\(FAIL\|ERROR\): //p' check.log); do tail -n 30 "tests/${t%.test}.log"; done
+    && for t in $(sed -n 's/^\(FAIL\|ERROR\): //p' check.log); do tail -n 30 "tests/${t%.test}.log" || true; done
 RUN (timeout 15m bash fuzz/run-fuzzers.sh build/fuzz/fuzz check >build/fuzz/replay.log 2>&1 \
         || echo "WARNING: corpus replay failed, see /src/build/fuzz/replay.log") \
     && tail -n 5 build/fuzz/replay.log
