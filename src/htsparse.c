@@ -3833,9 +3833,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
           const char *p_flush = NULL;
 
           // a quoted value ends only at its own quote, as in a browser
-          if (ps->tag.intag && !ps->script.inscript && !ps->page.in_media &&
-              (*ps->html == '"' || *ps->html == '\'') && !in_quoted_value(ps) &&
-              quote_opens_value(ps))
+          if ((*ps->html == '"' || *ps->html == '\'') && ps->tag.intag &&
+              !ps->script.inscript && !ps->page.in_media &&
+              !in_quoted_value(ps) && quote_opens_value(ps))
             ps->tag.value_end = attr_value_end(ps, ps->html + 1, *ps->html, r);
 
           // ------------------------------------------------------------
