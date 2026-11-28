@@ -1630,7 +1630,8 @@ typedef struct parse_state {
   parse_sink sink; /* output HTML */
 } parse_state;
 
-/* Emit the --footer, and the charset meta at the first emission. */
+/* Emit the --footer, plus the charset meta when emited_footer is 1, so the
+   caller counts the emission first. PTR is the page's heap index. */
 static void parse_emit_footer(parse_state *const ps, const httrackp *const opt,
                               const htsblk *const r, const int ptr) {
   const char *eol = "\n";
@@ -1659,10 +1660,8 @@ static void parse_emit_footer(parse_state *const ps, const httrackp *const opt,
           : hts_starts_with_ci(urladr(), "ftp://")   ? "ftp://"
                                                      : "http://";
 
-      // {addr}/{path} are the escaped host and remote path; {url}
-      // prepends the scheme to them (credentials already stripped
-      // by jump_identification_const, and the scheme is a safe
-      // literal, so no re-escaping is needed).
+      // credentials are already stripped and the scheme is a literal, so no
+      // re-escaping
       html_inline_safe(url_host, HTS_BUF(safe_adr));
       html_inline_safe(urlfil(), HTS_BUF(safe_fil));
       snprintf(safe_url, sizeof(safe_url), "%s%s%s", url_scheme, safe_adr,
@@ -1715,7 +1714,8 @@ static void parse_emit_footer(parse_state *const ps, const httrackp *const opt,
   }
 }
 
-/* Start the tag this '<' opens, or the comment a '<!--' opens. */
+/* Start the tag this '<' opens, or the comment a '<!--' opens, and emit the
+   footer at the first <head>, <body> or <meta>, and at </html>. */
 static void parse_tag_open(parse_state *const ps, const httrackp *const opt,
                            const htsblk *const r, const int ptr,
                            char *const codebase) {
@@ -1751,7 +1751,7 @@ static void parse_tag_open(parse_state *const ps, const httrackp *const opt,
     int p = 0;
     switch (ps->page.emited_footer) {
     case 0:
-      // declare the HTTP charset early, at the first <head>, <body> or <meta>
+      // emit footer and charset early, at the first <head>, <body> or <meta>
       // FIXME: this emits before <head> rather than inside it
       if (hts_starts_with_ci(ps->html, "<head>") ||
           tag_opens_with_space(ps->html, "<head") ||
