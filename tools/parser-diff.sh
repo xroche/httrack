@@ -321,10 +321,10 @@ normalize() {
     : >"$dst/LOG"
     if [ -f "$dst/files/hts-log.txt" ]; then
         # "N links scanned, N files written" sits on the duration line, so the
-        # timing goes and the counts stay.
+        # timing goes and the counts stay. A slow crawl adds "1 minutes".
         sed -e '1,2d' \
             -e 's/^[0-9][0-9]:[0-9][0-9]:[0-9][0-9]	//' \
-            -e 's|^HTTrack Website Copier/[^ ]* mirror complete in [0-9]* seconds*|mirror complete|' \
+            -e 's|^HTTrack Website Copier/[^ ]* mirror complete in [0-9a-z, ]* seconds*|mirror complete|' \
             -e 's| at [0-9]* bytes/sec\]| at RATE]|' \
             "$dst/files/hts-log.txt" >"$dst/LOG" ||
             die "cannot normalize $dst/files/hts-log.txt"
