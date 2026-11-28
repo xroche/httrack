@@ -1,11 +1,10 @@
 # Image for Anthropic's OSS Scanner (see threat_model.md next to this file).
 # Two builds of /src, both with ASan and UBSan:
-#   /src/build/asan  httrack, webhttrack, proxytrack, libhttrack; runs make check
-#   /src/build/fuzz  the libFuzzer harnesses in fuzz/
+#   /src/build/asan  httrack, webhttrack, proxytrack, libhttrack (gcc); runs make check
+#   /src/build/fuzz  the libFuzzer harnesses in fuzz/ (clang)
 FROM docker.io/library/debian:trixie
 
 ENV DEBIAN_FRONTEND=noninteractive \
-    CC=clang-19 \
     ASAN_OPTIONS=detect_leaks=1:abort_on_error=1:symbolize=1 \
     UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 \
     ASAN_SYMBOLIZER_PATH=/usr/lib/llvm-19/bin/llvm-symbolizer
@@ -30,8 +29,9 @@ RUN if [ ! -f src/coucal/coucal.c ]; then \
 
 RUN ./bootstrap
 
+# gcc, because clang leaves its sanitizer runtime out of libhttrack.so.
 RUN mkdir -p build/asan && cd build/asan \
-    && /src/configure \
+    && /src/configure CC=gcc \
       CFLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all -g -O1 -fno-omit-frame-pointer" \
       LDFLAGS="-fsanitize=address,undefined" \
     && make -j"$(nproc)" \
@@ -39,7 +39,7 @@ RUN mkdir -p build/asan && cd build/asan \
 
 # unsigned-integer-overflow is how a bounds check that adds before it compares fails.
 RUN mkdir -p build/fuzz && cd build/fuzz \
-    && /src/configure --enable-fuzzers --disable-shared \
+    && /src/configure CC=clang-19 --enable-fuzzers --disable-shared \
       CFLAGS="-fsanitize=address,undefined,unsigned-integer-overflow -fsanitize-ignorelist=/src/fuzz/ubsan-ignorelist.txt -fno-sanitize-recover=all -g -O1 -fno-omit-frame-pointer" \
       LDFLAGS="-fsanitize=address,undefined,unsigned-integer-overflow" \
     && make -j"$(nproc)" \
