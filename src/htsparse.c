@@ -871,10 +871,12 @@ static void escape_url_parens(hts_buf s) {
 }
 
 /* Copy a URL piece with " ' < > percent-encoded, so it cannot end the
-   attribute or script string it is written into; with html, & becomes &amp;.
+   attribute or script string it is written into; with html, & becomes &amp;,
+   and with script, \ is encoded too, as it escapes in a script string.
    Returns the length written, or dest.size on overflow. */
 static size_t escape_url_quotes_any(const char *const s, hts_buf dest,
-                                    const hts_boolean html) {
+                                    const hts_boolean html,
+                                    const hts_boolean script) {
   static const char hex[] = "0123456789abcdef";
   size_t i, j = 0;
 
@@ -886,7 +888,8 @@ static size_t escape_url_quotes_any(const char *const s, hts_buf dest,
     size_t n = 1;
 
     out[0] = (char) c;
-    if (c == '"' || c == '\'' || c == '<' || c == '>') {
+    if (c == '"' || c == '\'' || c == '<' || c == '>' ||
+        (script && c == '\\')) {
       out[0] = '%';
       out[1] = hex[c / 16];
       out[2] = hex[c % 16];
@@ -906,14 +909,21 @@ static size_t escape_url_quotes_any(const char *const s, hts_buf dest,
   return j;
 }
 
-static size_t escape_url_quotes(const char *const s, char *const dest,
-                                const size_t size) {
-  return escape_url_quotes_any(s, hts_buf_at(dest, size), HTS_FALSE);
+static size_t escape_url_quotes_script(const char *const s, char *const dest,
+                                       const size_t size) {
+  return escape_url_quotes_any(s, hts_buf_at(dest, size), HTS_FALSE, HTS_TRUE);
 }
 
 static size_t escape_url_quotes_html(const char *const s, char *const dest,
                                      const size_t size) {
-  return escape_url_quotes_any(s, hts_buf_at(dest, size), HTS_TRUE);
+  return escape_url_quotes_any(s, hts_buf_at(dest, size), HTS_TRUE, HTS_FALSE);
+}
+
+/* A handler or a write string: markup inside a script string. */
+static size_t escape_url_quotes_html_script(const char *const s,
+                                            char *const dest,
+                                            const size_t size) {
+  return escape_url_quotes_any(s, hts_buf_at(dest, size), HTS_TRUE, HTS_TRUE);
 }
 
 /* The rewritten page htsparse() builds. */
@@ -999,7 +1009,10 @@ static void sink_add_htmlescaped_full(parse_sink *const sink,
 static void sink_add_url_htmlescaped(parse_sink *const sink,
                                      const char *const s) {
   if (sink_raw_text(sink)) {
-    sink_add_escaped(sink, s, escape_url_quotes, 3);
+    sink_add_escaped(sink, s, escape_url_quotes_script, 3);
+  } else if (*sink->inscript) {
+    sink_add_escaped(sink, s, escape_url_quotes_html_script,
+                     HTS_HTMLESCAPE_MAXEXP);
   } else {
     sink_add_escaped(sink, s, escape_url_quotes_html, HTS_HTMLESCAPE_MAXEXP);
   }

@@ -1,0 +1,9 @@
+<!DOCTYPE html>
+<html><head><title>j-backslash</title></head>
+<body>
+<script>var s = "//ext.invalid/j-bs1.php?x=&#92;";</script>
+<script>document.write("<img src=//ext.invalid/j-bs2.php?x=&#92;"); var ok = 1;</script>
+<a onclick="document.write('<img src=//ext.invalid/j-bs3.php?x=&#92; alt=a')">handler</a>
+<a href="//ext.invalid/j-bs4.php?x=&#92;">attribute</a>
+<script>var t = "j-bs-plain.html";</script>
+</body></html>
