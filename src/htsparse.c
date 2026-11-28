@@ -1630,6 +1630,103 @@ typedef struct parse_state {
   parse_sink sink; /* output HTML */
 } parse_state;
 
+/* Step past the scanned byte, then skip plain text to the next '<'. */
+static void parse_advance(parse_state *const ps, const htsblk *const r,
+                          const int ptr) {
+  const char *html = ps->html;
+
+  html++; // automate will be checked next loop
+  // lastsaved <= html <= r->adr + r->size at the flush: never the NUL
+  if (html > r->adr + r->size) {
+    html = r->adr + r->size;
+    if (ps->lastsaved > html) // a skipped base href ends past the NUL
+      ps->lastsaved = html;
+  }
+
+  if (ptr > 0) {
+    if ((!ps->tag.intag)              /* Not in tag */
+        && (!ps->script.inscript)     /* Not in (java)script */
+        && (!ps->page.in_media)       /* Not in media */
+        && (!ps->script.incomment)    /* Not in comment (<!--) */
+        && (!ps->script.inscript_tag) /* Not in tag with script inside */
+    ) {
+      /* Not at the end */
+      if (html - r->adr < r->size) {
+        /* Not on a starting tag yet */
+        if (*html != '<') {
+          /* not strchr: the page may hold NUL bytes */
+          const char *adr_next = html;
+
+          while (*adr_next != '<' && (adr_next - r->adr) < r->size) {
+            adr_next++;
+          }
+          /* no tag left: jump close to the end */
+          if (*adr_next != '<') {
+            if (html - r->adr < r->size - 4 && r->size > 4) {
+              html = r->adr + r->size - 2;
+            }
+          } else {
+            html = adr_next;
+          }
+        }
+      }
+    }
+  }
+  ps->html = html;
+}
+
+/* Copy what was scanned to the sink, and end the parse once the sink is out
+   of memory, failing the page rather than the crawl. */
+static void parse_flush(parse_state *const ps, const htsblk *const r) {
+  HT_add_adr;
+  ps->lastsaved = ps->html; // one past the last byte written
+  if (ps->sink.oom) {
+    ps->html = r->adr + r->size;
+  }
+}
+
+/* Time limit, progress and user polling, once per loop pass. Returns
+   HTS_FALSE when the user asked to exit. */
+static hts_boolean parse_poll(parse_state *const ps, httrackp *const opt,
+                              struct_back *const sback, cache_back *const cache,
+                              htsmoduleStructExtended *const stre,
+                              const htsblk *const r, const int ptr,
+                              const int numero_passe) {
+  if (ps->page.back_add_stats != opt->state.back_add_stats) {
+    ps->page.back_add_stats = opt->state.back_add_stats;
+
+    // Check max time
+    if (!back_checkmirror(opt)) {
+      ps->html = r->adr + r->size;
+    }
+  }
+  // progress, for the shell
+  if (r->size)
+    opt->state._hts_in_html_done =
+        (int) ((100 * (LLint) (ps->html - r->adr)) / (LLint) r->size);
+  if (opt->state._hts_in_html_poll) {
+    opt->state._hts_in_html_poll = 0;
+    // wait, then fill the backing cache
+    back_wait(sback, opt, cache, HTS_STAT.stat_timestart);
+    back_fillmax(sback, opt, cache, ptr, numero_passe);
+
+    if (!hts_loop_tick(sback, opt, 0, ptr)) {
+      hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
+      hts_store_release_int(stre->exit_xh_, 1); // exit requested
+      return HTS_FALSE;
+    } else if (opt->state._hts_cancel == 1) {
+      ps->page.nofollow = 1; // gentler than exiting
+      opt->state._hts_cancel = 0;
+    }
+  }
+  // refresh the backing system each 2 seconds
+  if (engine_stats_tick(&ps->page.stats_calls)) {
+    back_wait(sback, opt, cache, HTS_STAT.stat_timestart);
+    back_fillmax(sback, opt, cache, ptr, numero_passe);
+  }
+  return HTS_TRUE;
+}
+
 int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
   char catbuff[CATBUFF_SIZE];
 
@@ -3820,92 +3917,11 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
         } // si '<' ou '>'
 
-        // plus loin
-        ps->html++; // automate will be checked next loop
-        // lastsaved <= html <= r->adr + r->size at the flush: never the NUL
-        if (ps->html > r->adr + r->size) {
-          ps->html = r->adr + r->size;
-          if (ps->lastsaved > ps->html) // a skipped base href ends past the NUL
-            ps->lastsaved = ps->html;
-        }
-
-        /* Otimization: if we are scanning in HTML data (not in tag or script), 
-           then jump to the next starting tag */
-        if (ptr > 0) {
-          if ((!ps->tag.intag)              /* Not in tag */
-              && (!ps->script.inscript)     /* Not in (java)script */
-              && (!ps->page.in_media)       /* Not in media */
-              && (!ps->script.incomment)    /* Not in comment (<!--) */
-              && (!ps->script.inscript_tag) /* Not in tag with script inside */
-          ) {
-            /* Not at the end */
-            if (ps->html - r->adr < r->size) {
-              /* Not on a starting tag yet */
-              if (*ps->html != '<') {
-                /* strchr does not well behave with null chrs.. */
-                /* char* adr_next = strchr(adr,'<'); */
-                const char *adr_next = ps->html;
-
-                while(*adr_next != '<' && (adr_next - r->adr) < r->size) {
-                  adr_next++;
-                }
-                /* Jump to near end (index hack) */
-                if (*adr_next != '<') {
-                  if (ps->html - r->adr < r->size - 4 && r->size > 4) {
-                    ps->html = r->adr + r->size - 2;
-                  }
-                } else {
-                  ps->html = adr_next;
-                }
-              }
-            }
-          }
-        }
-        // ----------
-        // flush what was scanned
-        HT_add_adr;
-        ps->lastsaved = ps->html; // one past the last byte written
-        // ----------
-
-        /* The rewritten page outgrew what we can allocate, so end the parse
-           here and fail the page rather than the crawl. */
-        if (ps->sink.oom) {
-          ps->html = r->adr + r->size;
-        }
-
-        // Checks
-        if (ps->page.back_add_stats != opt->state.back_add_stats) {
-          ps->page.back_add_stats = opt->state.back_add_stats;
-
-          // Check max time
-          if (!back_checkmirror(opt)) {
-            ps->html = r->adr + r->size;
-          }
-        }
-        // pour les stats du shell si parsing trop long
-        if (r->size)
-          opt->state._hts_in_html_done =
-              (int) ((100 * (LLint) (ps->html - r->adr)) / (LLint) r->size);
-        if (opt->state._hts_in_html_poll) {
-          opt->state._hts_in_html_poll = 0;
-          // temps à attendre, et remplir autant que l'on peut le cache (backing)
-          back_wait(sback, opt, cache, HTS_STAT.stat_timestart);
-          back_fillmax(sback, opt, cache, ptr, numero_passe);
-
-          if (!hts_loop_tick(sback, opt, 0, ptr)) {
-            hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
-            hts_store_release_int(stre->exit_xh_, 1); // exit requested
-            TypedArrayFree(ps->sink.buf);
-            return -1;
-          } else if (opt->state._hts_cancel == 1) {
-            ps->page.nofollow = 1; // moins violent
-            opt->state._hts_cancel = 0;
-          }
-        }
-        // refresh the backing system each 2 seconds
-        if (engine_stats_tick(&ps->page.stats_calls)) {
-          back_wait(sback, opt, cache, HTS_STAT.stat_timestart);
-          back_fillmax(sback, opt, cache, ptr, numero_passe);
+        parse_advance(ps, r, ptr);
+        parse_flush(ps, r);
+        if (!parse_poll(ps, opt, sback, cache, stre, r, ptr, numero_passe)) {
+          TypedArrayFree(ps->sink.buf);
+          return -1; // user exit
         }
       }
 
