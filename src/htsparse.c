@@ -1796,9 +1796,6 @@ static void parse_tag_open(parse_state *const ps, const httrackp *const opt,
       if (p)
         ps->page.emited_footer++;
       break;
-    default:
-      p = 0;
-      break;
     }
 
     if (p != 0)
@@ -1835,24 +1832,20 @@ static void parse_tag_close(parse_state *const ps, const httrackp *const opt) {
     if ((ps->tag.intag_start_valid) &&
         (check_tag(ps->tag.intag_start, "script") ||
          check_tag(ps->tag.intag_start, "style"))) {
-      const char *a = ps->tag.intag_start; // <
-
-      if (*a == '<') { // really a tag?
-        if (check_tag(ps->tag.intag_start, "script")) {
-          ps->script.inscript_name = "script";
-          ps->script.incss = 0;
-        } else {
-          ps->script.inscript_name = "style";
-          ps->script.incss = 1;
-        }
-        ps->script.inscript = 1;
-        ps->script.inscript_state_pos = INSCRIPT_START;
-        ps->tag.intag = 1; // as after a <script> tag
-        // the body is code, so the tag start is spent
-        ps->tag.intag_start_valid = 0;
-        if (opt->parsedebug) {
-          HT_ADD("<@@ inscript @@>");
-        }
+      if (check_tag(ps->tag.intag_start, "script")) {
+        ps->script.inscript_name = "script";
+        ps->script.incss = 0;
+      } else {
+        ps->script.inscript_name = "style";
+        ps->script.incss = 1;
+      }
+      ps->script.inscript = 1;
+      ps->script.inscript_state_pos = INSCRIPT_START;
+      ps->tag.intag = 1; // as after a <script> tag
+      // the body is code, so the tag start is spent
+      ps->tag.intag_start_valid = 0;
+      if (opt->parsedebug) {
+        HT_ADD("<@@ inscript @@>");
       }
     }
   } else {
@@ -2079,7 +2072,6 @@ static PARSE_INLINE void parse_dirty_scan(parse_state *const ps,
                   // accept it, as an ordinary link
                   if (url_ok) {
                     lk->valid_p = 1;
-                    lk->p = 0;
                     lk->module_base =
                         ps->script.inscript &&
                         hts_js_quote_is_import_arg(ps->html, r->adr);
@@ -2120,7 +2112,6 @@ static void detect_media(parse_state *const ps, parse_link *const lk,
       while (bol > start && (bol[-1] == ' ' || bol[-1] == '\t'))
         bol--;
       if (bol == start || bol[-1] == '\n' || bol[-1] == '\r') {
-        lk->p = 0;
         lk->valid_p = 1;
       }
     }
@@ -2146,7 +2137,6 @@ static void detect_media(parse_state *const ps, parse_link *const lk,
         strncat(tmp, a + dot + 1, n - dot - 1);
         if (is_knowntype(opt, tmp) || ishtml_ext(hts_span_of(tmp)) != -1) {
           ps->html++;
-          lk->p = 0;
           lk->valid_p = 1;
           lk->unquoted_script = 1;
         }
@@ -2306,7 +2296,6 @@ static PARSE_INLINE void detect_tag_attr(parse_state *const ps,
       if (lk->p == 0) {
         if ((*ps->html == 'o') && (*(ps->html + 1) == 'n') &&
             isUpperLetter(*(ps->html + 2))) {
-          lk->p = 0;
           while ((lk->p < 64) && hts_isalpha((unsigned char) ps->html[lk->p]))
             lk->p++;
           if (lk->p < 64) {
@@ -2431,12 +2420,7 @@ static PARSE_INLINE void detect_script(parse_state *const ps,
        (hts_starts_with_ci(ps->html, "/style") &&
         hts_starts_with_ci(ps->script.inscript_name, "style"))) &&
       ps->script.inscript_locked == 0) {
-    const char *a = ps->html;
-
-    while (is_realspace(*a))
-      a--;
-    a--;
-    if (*a == '<') { // really a tag?
+    if (ps->html[-1] == '<') { // really a tag?
       ps->script.inscript = 0;
       ps->script.inscript_state_pos = INSCRIPT_START;
       if (opt->parsedebug) {
@@ -3133,14 +3117,9 @@ capture_link(parse_state *const ps, const parse_link *const lk,
     // Empty link detected
     if (eadr - ps->html <= 1) { // link empty
       ok = -1;                  // No
-      if (*ps->html != '#') {   // Not empty+unique #
-        // 1=link empty with delim (end_adr-start_adr)
-        if (eadr - ps->html == 1) {
-          // "#" would land before an unflushed base's name
-          if (quote && !link_role_is_base(lk->p_type)) {
-            HT_ADD("#"); // We add this for a <href="">
-          }
-        }
+      // "#" would land before an unflushed base's name
+      if (*ps->html != '#' && quote && !link_role_is_base(lk->p_type)) {
+        HT_ADD("#"); // We add this for a <href="">
       }
     }
     // This is a dirty and horrible hack to avoid parsing an Adobe GoLive bogus
@@ -3349,8 +3328,7 @@ capture_link(parse_state *const ps, const parse_link *const lk,
             hts_log_print(opt, LOG_DEBUG, "wizard link test at %s%s..",
                           adr_nologin(opt, afs.af.adr), afs.af.fil);
             forbidden_url = hts_acceptlink(
-                opt, ptr, afs.af.adr, afs.af.fil,
-                ps->tag.intag_name ? ps->tag.intag_name : NULL,
+                opt, ptr, afs.af.adr, afs.af.fil, ps->tag.intag_name,
                 ps->tag.intag_name ? tag_attr_start : NULL, ps->script.css_file,
                 &set_prio_to, &just_test_it);
             hts_log_print(opt, LOG_DEBUG, "result for wizard link test: %d",
@@ -3408,23 +3386,17 @@ capture_link(parse_state *const ps, const parse_link *const lk,
               // Tester si un lien doit être accepté ou refusé (wizard)
               // forbidden_url=1 : lien refusé
               // forbidden_url=0 : lien accepté
-              if ((ptr > 0) &&
-                  !link_role_is_base(lk->p_type)) { // check the filters
-                if (!lk->p_nocatch) {
-                  if (afs.af.adr[0] != '\0') {
-                    hts_log_print(opt, LOG_DEBUG,
-                                  "wizard moved link retest at %s%s..",
-                                  adr_nologin(opt, afs.af.adr), afs.af.fil);
-                    forbidden_url = hts_acceptlink(
-                        opt, ptr, afs.af.adr, afs.af.fil,
-                        ps->tag.intag_name ? ps->tag.intag_name : NULL,
-                        ps->tag.intag_name ? tag_attr_start : NULL,
-                        ps->script.css_file, &set_prio_to, &just_test_it);
-                    hts_log_print(opt, LOG_DEBUG,
-                                  "result for wizard moved link retest: %d",
-                                  forbidden_url);
-                  }
-                }
+              if (ptr > 0 && afs.af.adr[0] != '\0') { // check the filters
+                hts_log_print(opt, LOG_DEBUG,
+                              "wizard moved link retest at %s%s..",
+                              adr_nologin(opt, afs.af.adr), afs.af.fil);
+                forbidden_url = hts_acceptlink(
+                    opt, ptr, afs.af.adr, afs.af.fil, ps->tag.intag_name,
+                    ps->tag.intag_name ? tag_attr_start : NULL,
+                    ps->script.css_file, &set_prio_to, &just_test_it);
+                hts_log_print(opt, LOG_DEBUG,
+                              "result for wizard moved link retest: %d",
+                              forbidden_url);
               }
               meme_adresse = 0; // on a changé
             }
@@ -3811,20 +3783,15 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
             if (ps->page.in_media) {
               detect_media(ps, &lk, opt, r);
             } else if (ptr > 0) { /* not the primary page 0 */
-              // offset of the file name: name = html + p
-              lk.p = 0;
-
               if (ps->script.inscript) {
                 detect_js_write(ps, opt);
               }
-              if (!lk.p) {
-                // in a tag outside a script, or in HTML a script writes
-                if ((ps->tag.intag && (!ps->script.inscript)) ||
-                    ps->script.inscriptgen) {
-                  detect_tag_attr(ps, &lk, opt, str, r);
-                } else if (ps->script.inscript) {
-                  detect_script(ps, &lk, opt, r);
-                }
+              // in a tag outside a script, or in HTML a script writes
+              if ((ps->tag.intag && (!ps->script.inscript)) ||
+                  ps->script.inscriptgen) {
+                detect_tag_attr(ps, &lk, opt, str, r);
+              } else if (ps->script.inscript) {
+                detect_script(ps, &lk, opt, r);
               }
 
             } else {            // ptr == 0
