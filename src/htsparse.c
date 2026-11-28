@@ -1630,6 +1630,162 @@ typedef struct parse_state {
   parse_sink sink; /* output HTML */
 } parse_state;
 
+/* Emit the --footer, plus the charset meta when emited_footer is 1, so the
+   caller counts the emission first. PTR is the page's heap index. */
+static void parse_emit_footer(parse_state *const ps, const httrackp *const opt,
+                              const htsblk *const r, const int ptr) {
+  const char *eol = "\n";
+
+  if (strchr(r->adr, '\r'))
+    eol = "\r\n";
+  if (StringNotEmpty(opt->footer) ||
+      opt->urlmode != HTS_URLMODE_KEEP_ORIGINAL) {
+    if (StringNotEmpty(opt->footer)) {
+      char BIGSTK tempo[1024 + HTS_URLMAXSIZE * 2];
+      char gmttime[256];
+      char BIGSTK safe_adr[HTS_URLMAXSIZE * 3 + 4];
+      char BIGSTK safe_fil[HTS_URLMAXSIZE * 3 + 4];
+      char BIGSTK safe_url[HTS_URLMAXSIZE * 6 + 16];
+      char safe_lastmod[sizeof(r->lastmodified) * 3 + 4];
+      char safe_ctype[sizeof(r->contenttype) * 3 + 4];
+      char safe_charset[sizeof(r->charset) * 3 + 4];
+      char status_str[16];
+      char size_str[32];
+      // {url} scheme: jump_identification_const strips it for
+      // http/https/ftp, so re-add it (http for a bare host).
+      const char *const url_host = jump_identification_const(urladr());
+      const char *const url_scheme =
+          strstr(url_host, "://") != NULL            ? ""
+          : hts_starts_with_ci(urladr(), "https://") ? "https://"
+          : hts_starts_with_ci(urladr(), "ftp://")   ? "ftp://"
+                                                     : "http://";
+
+      // credentials are already stripped and the scheme is a literal, so no
+      // re-escaping
+      html_inline_safe(url_host, HTS_BUF(safe_adr));
+      html_inline_safe(urlfil(), HTS_BUF(safe_fil));
+      snprintf(safe_url, sizeof(safe_url), "%s%s%s", url_scheme, safe_adr,
+               safe_fil);
+      snprintf(status_str, sizeof(status_str), "%d", r->statuscode);
+      snprintf(size_str, sizeof(size_str), LLintP, (LLint) r->size);
+      time_gmt_rfc822(HTS_BUF(gmttime));
+
+      {
+        // Network strings go through html_inline_safe(), because a
+        // "-->" would close the footer's HTML comment (#165).
+        const char *values[HTS_FOOTER_FIELD_COUNT] = {NULL};
+
+        values[HTS_FOOTER_ADDR] = safe_adr;
+        values[HTS_FOOTER_PATH] = safe_fil;
+        values[HTS_FOOTER_URL] = safe_url;
+        values[HTS_FOOTER_DATE] = gmttime;
+        values[HTS_FOOTER_LASTMODIFIED] =
+            html_inline_safe(r->lastmodified, HTS_BUF(safe_lastmod));
+        values[HTS_FOOTER_VERSION] = HTTRACK_VERSIONID;
+        values[HTS_FOOTER_MIME] =
+            html_inline_safe(r->contenttype, HTS_BUF(safe_ctype));
+        values[HTS_FOOTER_CHARSET] =
+            html_inline_safe(r->charset, HTS_BUF(safe_charset));
+        values[HTS_FOOTER_STATUS] = status_str;
+        values[HTS_FOOTER_SIZE] = size_str;
+
+        tempo[0] = '\0';
+        strcatbuff(tempo, eol);
+        // Overflow (<0) leaves tempo unterminated, and the closing
+        // eol is reserved below because strcatbuff aborts rather
+        // than clips: either one would kill the crawl.
+        if (hts_footer_format(
+                hts_buf_skip(hts_buf_at(tempo, sizeof(tempo) - strlen(eol)),
+                             strlen(tempo)),
+                StringBuff(opt->footer), values) >= 0) {
+          strcatbuff(tempo, eol);
+          HT_ADD(tempo);
+        }
+      }
+    }
+    // the charset meta goes with the first emission only
+    if (ps->page.emited_footer == 1 && strnotempty(r->charset)) {
+      HT_ADD("<!-- Added by HTTrack --><meta http-equiv=\"content-type\" "
+             "content=\"text/html;charset=");
+      HT_ADD(r->charset);
+      HT_ADD("\" /><!-- /Added by HTTrack -->");
+      HT_ADD(eol);
+    }
+  }
+}
+
+/* Start the tag this '<' opens, or the comment a '<!--' opens, and emit the
+   footer at the first <head>, <body> or <meta>, and at </html>. */
+static void parse_tag_open(parse_state *const ps, const httrackp *const opt,
+                           const htsblk *const r, const int ptr,
+                           char *const codebase) {
+  ps->tag.intag = 1;
+  ps->tag.intag_ctype = 0;
+  ps->tag.intag_start = ps->html;
+  for (ps->tag.intag_name = ps->html + 1; is_realspace(*ps->tag.intag_name);
+       ps->tag.intag_name++)
+    ;
+  ps->tag.intag_start_valid = 1;
+  codebase[0] = '\0'; // a codebase belongs to one tag
+
+  // meta http-equiv: remember which header it overrides
+  if (check_tag(ps->tag.intag_start, "meta")) {
+    int pos;
+
+    // <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    if ((pos = rech_tageq_all(ps->html, "http-equiv"))) {
+      const char *token = NULL;
+      int len = rech_endtoken(ps->html + pos, &token);
+
+      if (len > 0) {
+        if (hts_starts_with_ci(token, "content-type")) {
+          ps->tag.intag_ctype = 1;
+        } else if (hts_starts_with_ci(token, "refresh")) {
+          ps->tag.intag_ctype = 2;
+        }
+      }
+    }
+  }
+
+  if (opt->getmode & HTS_GETMODE_HTML) {
+    int p = 0;
+    switch (ps->page.emited_footer) {
+    case 0:
+      // emit footer and charset early, at the first <head>, <body> or <meta>
+      // FIXME: this emits before <head> rather than inside it
+      if (hts_starts_with_ci(ps->html, "<head>") ||
+          tag_opens_with_space(ps->html, "<head") ||
+          hts_starts_with_ci(ps->html, "<body>") ||
+          tag_opens_with_space(ps->html, "<body") ||
+          tag_opens_with_space(ps->html, "<meta")) {
+        p = 1;
+        ps->page.emited_footer++;
+      }
+      break;
+    case 1:
+      // the footer again before </html>
+      p = hts_starts_with_ci(ps->html, "</html");
+      if (p)
+        ps->page.emited_footer++;
+      break;
+    default:
+      p = 0;
+      break;
+    }
+
+    if (p != 0)
+      parse_emit_footer(ps, opt, r, ptr);
+  }
+  // <!-- opens a comment, not a tag
+  if (*(ps->html + 1) == '!')
+    if (*(ps->html + 2) == '-')
+      if (*(ps->html + 3) == '-') {
+        ps->tag.intag = 0;
+        ps->script.incomment = 1;
+        ps->tag.intag_start_valid = 0;
+      }
+}
+
 /* End the tag, event handler or comment this '>' closes, entering a script
    or style body. */
 static void parse_tag_close(parse_state *const ps, const httrackp *const opt) {
@@ -1999,155 +2155,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
             && (!ps->script.incomment) /* Not in comment (<!--) */
             && (!ps->page.in_media)    /* Not in media */
         ) {
-          ps->tag.intag = 1;
-          ps->tag.intag_ctype = 0;
-          ps->tag.intag_start = ps->html;
-          for (ps->tag.intag_name = ps->html + 1;
-               is_realspace(*ps->tag.intag_name); ps->tag.intag_name++)
-            ;
-          ps->tag.intag_start_valid = 1;
-          codebase[0] = '\0';   // effacer éventuel codebase
-
-          /* Meta ? */
-          if (check_tag(ps->tag.intag_start, "meta")) {
-            int pos;
-
-            // <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-            if ((pos = rech_tageq_all(ps->html, "http-equiv"))) {
-              const char *token = NULL;
-              int len = rech_endtoken(ps->html + pos, &token);
-
-              if (len > 0) {
-                if (hts_starts_with_ci(token, "content-type")) {
-                  ps->tag.intag_ctype = 1;
-                } else if (hts_starts_with_ci(token, "refresh")) {
-                  ps->tag.intag_ctype = 2;
-                }
-              }
-            }
-          }
-
-          if (opt->getmode & HTS_GETMODE_HTML) { // sauver html
-            p = 0;
-            switch (ps->page.emited_footer) {
-            case 0:
-              // We are looking for the first head so that we can declare the HTTP-headers charset early
-              // Emit as soon as we see the first <head>, <meta>, or <body> tag.
-              // FIXME: we currently emit the tag BEFORE the <head> tag, actually, which is not clean
-              if (hts_starts_with_ci(ps->html, "<head>") ||
-                  tag_opens_with_space(ps->html, "<head") ||
-                  hts_starts_with_ci(ps->html, "<body>") ||
-                  tag_opens_with_space(ps->html, "<body") ||
-                  tag_opens_with_space(ps->html, "<meta")) {
-                p = 1;
-                ps->page.emited_footer++;
-              }
-              break;
-            case 1:
-              // And the closing comment info tag
-              p = hts_starts_with_ci(ps->html, "</html");
-              if (p)
-                ps->page.emited_footer++;
-              break;
-            default:
-              p = 0;
-              break;
-            }
-
-            if (p != 0) {
-              const char *eol = "\n";
-
-              if (strchr(r->adr, '\r'))
-                eol = "\r\n";
-              if (StringNotEmpty(opt->footer) ||
-                  opt->urlmode != HTS_URLMODE_KEEP_ORIGINAL) {
-                if (StringNotEmpty(opt->footer)) {
-                  char BIGSTK tempo[1024 + HTS_URLMAXSIZE * 2];
-                  char gmttime[256];
-                  char BIGSTK safe_adr[HTS_URLMAXSIZE * 3 + 4];
-                  char BIGSTK safe_fil[HTS_URLMAXSIZE * 3 + 4];
-                  char BIGSTK safe_url[HTS_URLMAXSIZE * 6 + 16];
-                  char safe_lastmod[sizeof(r->lastmodified) * 3 + 4];
-                  char safe_ctype[sizeof(r->contenttype) * 3 + 4];
-                  char safe_charset[sizeof(r->charset) * 3 + 4];
-                  char status_str[16];
-                  char size_str[32];
-                  // {url} scheme: jump_identification_const strips it for
-                  // http/https/ftp, so re-add it (http for a bare host).
-                  const char *const url_host =
-                      jump_identification_const(urladr());
-                  const char *const url_scheme =
-                      strstr(url_host, "://") != NULL            ? ""
-                      : hts_starts_with_ci(urladr(), "https://") ? "https://"
-                      : hts_starts_with_ci(urladr(), "ftp://")   ? "ftp://"
-                                                                 : "http://";
-
-                  // {addr}/{path} are the escaped host and remote path; {url}
-                  // prepends the scheme to them (credentials already stripped
-                  // by jump_identification_const, and the scheme is a safe
-                  // literal, so no re-escaping is needed).
-                  html_inline_safe(url_host, HTS_BUF(safe_adr));
-                  html_inline_safe(urlfil(), HTS_BUF(safe_fil));
-                  snprintf(safe_url, sizeof(safe_url), "%s%s%s", url_scheme,
-                           safe_adr, safe_fil);
-                  snprintf(status_str, sizeof(status_str), "%d", r->statuscode);
-                  snprintf(size_str, sizeof(size_str), LLintP, (LLint) r->size);
-                  time_gmt_rfc822(HTS_BUF(gmttime));
-
-                  {
-                    // Network strings go through html_inline_safe(), because a
-                    // "-->" would close the footer's HTML comment (#165).
-                    const char *values[HTS_FOOTER_FIELD_COUNT] = {NULL};
-
-                    values[HTS_FOOTER_ADDR] = safe_adr;
-                    values[HTS_FOOTER_PATH] = safe_fil;
-                    values[HTS_FOOTER_URL] = safe_url;
-                    values[HTS_FOOTER_DATE] = gmttime;
-                    values[HTS_FOOTER_LASTMODIFIED] = html_inline_safe(
-                        r->lastmodified, HTS_BUF(safe_lastmod));
-                    values[HTS_FOOTER_VERSION] = HTTRACK_VERSIONID;
-                    values[HTS_FOOTER_MIME] =
-                        html_inline_safe(r->contenttype, HTS_BUF(safe_ctype));
-                    values[HTS_FOOTER_CHARSET] =
-                        html_inline_safe(r->charset, HTS_BUF(safe_charset));
-                    values[HTS_FOOTER_STATUS] = status_str;
-                    values[HTS_FOOTER_SIZE] = size_str;
-
-                    tempo[0] = '\0';
-                    strcatbuff(tempo, eol);
-                    // Overflow (<0) leaves tempo unterminated, and the closing
-                    // eol is reserved below because strcatbuff aborts rather
-                    // than clips: either one would kill the crawl.
-                    if (hts_footer_format(
-                            hts_buf_skip(
-                                hts_buf_at(tempo, sizeof(tempo) - strlen(eol)),
-                                strlen(tempo)),
-                            StringBuff(opt->footer), values) >= 0) {
-                      strcatbuff(tempo, eol);
-                      HT_ADD(tempo);
-                    }
-                  }
-                }
-                // Emit charset ?
-                if (ps->page.emited_footer == 1 && strnotempty(r->charset)) {
-                  HT_ADD
-                    ("<!-- Added by HTTrack --><meta http-equiv=\"content-type\" content=\"text/html;charset=");
-                  HT_ADD(r->charset);
-                  HT_ADD("\" /><!-- /Added by HTTrack -->");
-                  HT_ADD(eol);
-                }
-              }
-            }
-          }
-          // éliminer les <!-- (commentaires) : intag dévalidé
-          if (*(ps->html + 1) == '!')
-            if (*(ps->html + 2) == '-')
-              if (*(ps->html + 3) == '-') {
-                ps->tag.intag = 0;
-                ps->script.incomment = 1;
-                ps->tag.intag_start_valid = 0;
-              }
-
+          parse_tag_open(ps, opt, r, ptr, codebase);
         } else if ((*ps->html == '>') /* ending tag */
                    &&
                    ((!ps->script.inscript && !ps->page.in_media) ||
