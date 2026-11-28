@@ -1630,6 +1630,77 @@ typedef struct parse_state {
   parse_sink sink; /* output HTML */
 } parse_state;
 
+/* End the tag, event handler or comment this '>' closes, entering a script
+   or style body. */
+static void parse_tag_close(parse_state *const ps, const httrackp *const opt) {
+  if (ps->script.inscript_tag) {
+    ps->script.inscript_tag = ps->script.inscript = 0;
+    // reset the automaton on exit or its state leaks into plain HTML
+    ps->script.inscript_state_pos = INSCRIPT_START;
+    ps->tag.intag = 0;
+    ps->script.incomment = 0;
+    ps->tag.intag_start_valid = 0;
+    ps->tag.intag_name = NULL;
+    if (opt->parsedebug) {
+      HT_ADD("<@@ /inscript @@>");
+    }
+  } else if (!ps->script.incomment) {
+    ps->tag.intag = 0;
+
+    // enter the script or style body only now, once its src= is parsed
+    if ((ps->tag.intag_start_valid) &&
+        (check_tag(ps->tag.intag_start, "script") ||
+         check_tag(ps->tag.intag_start, "style"))) {
+      const char *a = ps->tag.intag_start; // <
+
+      if (*a == '<') { // really a tag?
+        if (check_tag(ps->tag.intag_start, "script")) {
+          ps->script.inscript_name = "script";
+          ps->script.incss = 0;
+        } else {
+          ps->script.inscript_name = "style";
+          ps->script.incss = 1;
+        }
+        ps->script.inscript = 1;
+        ps->script.inscript_state_pos = INSCRIPT_START;
+        ps->tag.intag = 1; // as after a <script> tag
+        // the body is code, so the tag start is spent
+        ps->tag.intag_start_valid = 0;
+        if (opt->parsedebug) {
+          HT_ADD("<@@ inscript @@>");
+        }
+      }
+    }
+  } else {
+    // a proper "-->" ending
+    if ((*(ps->html - 1) == '-') && (*(ps->html - 2) == '-')) {
+      ps->tag.intag = 0;
+      ps->script.incomment = 0;
+      ps->tag.intag_start_valid = 0;
+      ps->tag.intag_name = NULL;
+    }
+#if GT_ENDS_COMMENT
+    /* wrong comment ending */
+    else {
+      // browsers accept <!-- foo > when no "-->" follows in the page
+      if (!ps->script.comment_unclosed &&
+          (ps->script.comment_close == NULL ||
+           ps->script.comment_close < ps->html)) {
+        ps->script.comment_close = strstr(ps->html, "-->");
+        if (ps->script.comment_close == NULL)
+          ps->script.comment_unclosed = HTS_TRUE;
+      }
+      if (ps->script.comment_unclosed) {
+        ps->tag.intag = 0;
+        ps->script.incomment = 0;
+        ps->tag.intag_start_valid = 0;
+        ps->tag.intag_name = NULL;
+      }
+    }
+#endif
+  }
+}
+
 /* Step past the scanned byte, then skip plain text to the next '<'. */
 static void parse_advance(parse_state *const ps, const htsblk *const r,
                           const int ptr) {
@@ -2082,78 +2153,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                    ((!ps->script.inscript && !ps->page.in_media) ||
                     (ps->script.inscript_tag)) /* and in tag (or in script) */
         ) {
-          if (ps->script.inscript_tag) {
-            ps->script.inscript_tag = ps->script.inscript = 0;
-            // reset the automaton on exit or its state leaks into plain HTML
-            ps->script.inscript_state_pos = INSCRIPT_START;
-            ps->tag.intag = 0;
-            ps->script.incomment = 0;
-            ps->tag.intag_start_valid = 0;
-            ps->tag.intag_name = NULL;
-            if (opt->parsedebug) {
-              HT_ADD("<@@ /inscript @@>");
-            }
-          } else if (!ps->script.incomment) {
-            ps->tag.intag = 0; // inquote=0;
-
-            // entrée dans du javascript?
-            // on parse ICI car il se peut qu'on ait eu a parser les src=..
-            // dedans
-            if ((ps->tag.intag_start_valid) &&
-                (check_tag(ps->tag.intag_start, "script") ||
-                 check_tag(ps->tag.intag_start, "style"))) {
-              const char *a = ps->tag.intag_start; // <
-
-              // ** while(is_realspace(*(--a)));
-              if (*a == '<') {  // sûr que c'est un tag?
-                if (check_tag(ps->tag.intag_start, "script")) {
-                  ps->script.inscript_name = "script";
-                  ps->script.incss = 0;
-                } else {
-                  ps->script.inscript_name = "style";
-                  ps->script.incss = 1;
-                }
-                ps->script.inscript = 1;
-                ps->script.inscript_state_pos = INSCRIPT_START;
-                ps->tag.intag = 1; // as after a <script> tag
-                // yes: this is code, not a real tag
-                ps->tag.intag_start_valid = 0;
-                if (opt->parsedebug) {
-                  HT_ADD("<@@ inscript @@>");
-                }
-              }
-            }
-          } else { /* end of comment? */
-            // vérifier fermeture correcte
-            if ((*(ps->html - 1) == '-') && (*(ps->html - 2) == '-')) {
-              ps->tag.intag = 0;
-              ps->script.incomment = 0;
-              ps->tag.intag_start_valid = 0;
-              ps->tag.intag_name = NULL;
-            }
-#if GT_ENDS_COMMENT
-            /* wrong comment ending */
-            else {
-              /* check if correct ending does not exists
-                 <!-- foo > example <!-- bar > is sometimes accepted by browsers
-                 when no --> is used somewhere else.. darn those browsers are dirty
-               */
-              if (!ps->script.comment_unclosed &&
-                  (ps->script.comment_close == NULL ||
-                   ps->script.comment_close < ps->html)) {
-                ps->script.comment_close = strstr(ps->html, "-->");
-                if (ps->script.comment_close == NULL)
-                  ps->script.comment_unclosed = HTS_TRUE;
-              }
-              if (ps->script.comment_unclosed) {
-                ps->tag.intag = 0;
-                ps->script.incomment = 0;
-                ps->tag.intag_start_valid = 0;
-                ps->tag.intag_name = NULL;
-              }
-            }
-#endif
-          }
+          parse_tag_close(ps, opt);
         } else if (ps->tag.intag || ps->script.inscript ||
                    ps->page.in_media) { // in a tag, script or media body
           hts_link_role p_type = HTS_LINK_PLAIN;
