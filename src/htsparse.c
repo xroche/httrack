@@ -1043,8 +1043,12 @@ const char *hts_parse_escape_selftest(const hts_boolean parens,
 char *hts_parse_sink_selftest(const hts_boolean enabled, const int inscript,
                               const int inscript_tag, const char *const s) {
   const int inscriptgen = 0;
-  parse_sink sink = {EMPTY_TYPED_ARRAY, HTS_FALSE,     enabled,
-                     &inscript,         &inscript_tag, &inscriptgen};
+  parse_sink sink = {.buf = EMPTY_TYPED_ARRAY,
+                     .oom = HTS_FALSE,
+                     .enabled = enabled,
+                     .inscript = &inscript,
+                     .inscript_tag = &inscript_tag,
+                     .inscriptgen = &inscriptgen};
   char *copy;
 
   sink_add(&sink, s);
