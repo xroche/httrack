@@ -923,9 +923,11 @@ typedef struct parse_sink {
   hts_boolean oom;
   /* Every write is dropped when the page is not saved as HTML. */
   hts_boolean enabled;
-  /* The parser's script state: script text is raw, but a handler is markup. */
+  /* The parser's script state: script text is raw, but a handler and the
+     HTML a write string holds are markup. */
   const int *inscript;
   const int *inscript_tag;
+  const int *inscriptgen;
 } parse_sink;
 
 typedef size_t (*sink_escaper)(const char *const s, char *const dest,
@@ -972,7 +974,7 @@ static void sink_add_escaped(parse_sink *const sink, const char *const s,
 
 /* Is the parser inside script or style text, where no entity is decoded? */
 static hts_boolean sink_raw_text(const parse_sink *const sink) {
-  return *sink->inscript && !*sink->inscript_tag;
+  return *sink->inscript && !*sink->inscript_tag && !*sink->inscriptgen;
 }
 
 /* Append 's', with & html-escaped outside raw script text. */
@@ -1040,8 +1042,9 @@ const char *hts_parse_escape_selftest(const hts_boolean parens,
 
 char *hts_parse_sink_selftest(const hts_boolean enabled, const int inscript,
                               const int inscript_tag, const char *const s) {
-  parse_sink sink = {EMPTY_TYPED_ARRAY, HTS_FALSE, enabled, &inscript,
-                     &inscript_tag};
+  const int inscriptgen = 0;
+  parse_sink sink = {EMPTY_TYPED_ARRAY, HTS_FALSE,     enabled,
+                     &inscript,         &inscript_tag, &inscriptgen};
   char *copy;
 
   sink_add(&sink, s);
@@ -3630,6 +3633,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
       ps->sink.enabled = (opt->getmode & HTS_GETMODE_HTML) && ptr > 0;
       ps->sink.inscript = &ps->script.inscript;
       ps->sink.inscript_tag = &ps->script.inscript_tag;
+      ps->sink.inscriptgen = &ps->script.inscriptgen;
       ps->lastsaved = ps->html;
 
       /* Initialize script automate for comments, quotes.. */

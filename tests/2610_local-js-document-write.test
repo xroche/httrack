@@ -117,6 +117,17 @@ are plain script strings, which only -%P follows for 65 to 67 -->
 <a onclick="document.write('<img src=')" href=/w77.html>k</a>
 <script>document.write("<img alt='q' src=/w78.gif title=\"t\"><img src='/w79.gif' alt=y>");</script>
 <script>document.write("<a href=/w80.html>");var z="<img src=/w81.gif>";</script>
+<!-- 83 to 88 point off-site, so they are rewritten, not fetched. A written URL
+is escaped as in a tag: the t lines are the same links outside any script. -->
+<iframe src="//ext.invalid/t83.php?a=1&amp;send=false"></iframe>
+<a href='//ext.invalid/t85.php?x=1&copy=1'>c</a>
+<a href="//ext.invalid/t88.php?x=&quot;1">c</a>
+<script>
+document.write("<iframe src=\"//ext.invalid/w83.php?a=1&amp;send=false\">");
+document.write('<iframe src="//ext.invalid/w84.php?a=1&amp;b=2">');
+document.write("<a href='//ext.invalid/w85.php?x=1&copy=1'>c</a>");
+document.write('<a href="//ext.invalid/w88.php?x=&quot;1">c</a>');
+</script>
 <p>end</p>
 </body>
 </html>
@@ -192,7 +203,8 @@ check() {
     # The expected page, as -%F '' drops the footer: the source with each
     # fetched /wNN link made relative.
     for name in index.html w22.js w23.js w48.js w49.js w51.js w55.js; do
-        cp "$root/$name" "$tmp/expect"
+        sed -e 's|//ext.invalid/|http://ext.invalid/|' -e 's|&copy=1|\&amp;copy=1|' \
+            -e 's|&quot;1|%221|' "$root/$name" >"$tmp/expect"
         for f in "$site"/w*; do
             f=${f##*/}
             sed "s|/$f|$f|g" "$tmp/expect" >"$tmp/expect.new"
