@@ -45,29 +45,54 @@ cat >"$tmp/page" <<'EOF'
 <img alt="<script>" src=@k34.gif>
 <a href=@k35.html title=it's>v</a><style>b { background: url(@k36.gif) }</style><a title='w'>w</a>
 <a title=a>b href=/n30.html>s</a>
+<a onclick="a='x">t</a><style>b{background:url(@k37.gif)}</style><b>rock' n roll</b>
+<a title='x="y'>t</a><style>b{background:url(@k38.gif)}</style><b>a" b</b>
+<a title="x href=@k39.html><img src=@k40.gif>" href=@k41.html>
+<a onclick=x()>j</a><style>b{background:url(@k42.gif)}</style>
 <p>end</p>
 </body></html>
 EOF
-sed 's|@|/|g' "$tmp/page" >"$root/index.html"
-sed 's|@||g' "$tmp/page" >"$tmp/expect"
+# 39 and 40 are text to a browser, but master loads them too.
+
+# A quote left open on a sloppy page still ends at '>', as on master.
+cat >"$tmp/sloppy" <<'EOF'
+<html><body>
+<td style="width:10px><a href=@k51.html>a</a></td><td><a href=@k52.html>b</a></td><img src="@k53.gif">
+<a href="@k54.html" style="color:red>A</a> <img src="@k55.gif">
+<a href="#" onclick="return false;>Menu</a><ul><li><a href=@k56.html>a</a><li><a href=@k57.html>b</a></ul>
+<a onclick="go(1)>x</a><a href=@k58.html>b</a>
+<div class="a><style>@import url(@k59.css);</style>
+<title x="1>t</title><meta http-equiv=refresh content="0;url=@k60.html">
+<div class="a>text href=/n61.html more</div>
+<div class="a><!-- <a href=/n62.html> -->
+<td style="w><a href=@k63.html>a</a> "q </td>
+<td style="w><a href=@k64.html>a</a><img alt=" x" src=@k65.gif>
+</body></html>
+EOF
+
+for f in page sloppy; do
+    sed 's|@\([kn][0-9]\)|/\1|g' "$tmp/$f" >"$tmp/$f.src"
+    sed 's|@\([kn][0-9]\)|\1|g' "$tmp/$f" >"$tmp/$f.expect"
+done
+cp "$tmp/page.src" "$root/index.html"
+cp "$tmp/sloppy.src" "$root/k50.html"
 
 # Pages cut inside a handler or a value: no closing quote, nothing past the end.
 printf '<a href=/k17.html>t</a><a onclick="x>y' >"$root/k17.html"
 printf '<a href=/k18.html>t</a><a onclick=x' >"$root/k18.html"
 printf '<a href=/k31.html>t</a><a title="x>y href=/n32.html>' >"$root/k31.html"
-cat >>"$root/index.html" <<'EOF'
-<a href=/k17.html>t</a><a href=/k18.html>t</a><a href=/k31.html>t</a>
-EOF
-printf '<a href=k17.html>t</a><a href=k18.html>t</a><a href=k31.html>t</a>\n' >>"$tmp/expect"
+printf '<a href=/k44.html>t</a><a onclick=  ' >"$root/k44.html"
+links='<a href=@k17.html>t</a><a href=@k18.html>t</a><a href=@k31.html>t</a><a href=@k44.html>t</a><a href=@k50.html>t</a>'
+printf '%s\n' "${links//@//}" >>"$root/index.html"
+printf '%s\n' "${links//@/}" >>"$tmp/page.expect"
 
-want="k01.html k02.html k03.gif k04.gif k06.html k07.html k08.html k09.html
-k10.html k11.gif k12.html k13.gif k14.html k15.gif k16.gif k17.html k18.html
-k19.gif k20.gif k21.html k22.gif k23.html k24.gif k25.html k26.html k27.html
-k28.html k29.gif k31.html k33.html k34.gif k35.html k36.gif"
-for f in $want n05.gif n30.html n32.html; do
+want="k17.html k18.html k31.html k44.html k50.html $(grep -oh '@k[0-9]*\.[a-z]*' "$tmp/page" "$tmp/sloppy" | tr -d @ | tr '\n' ' ')"
+nots="n32.html $(grep -oh '/n[0-9]*\.[a-z]*' "$tmp/page" "$tmp/sloppy" | tr -d / | tr '\n' ' ')"
+for f in $want $nots; do
     case $f in
     *.gif) printf 'GIF89a' >"$root/$f" ;;
-    k17.html | k18.html | k31.html) ;;
+    *.css) printf 'b{}\n' >"$root/$f" ;;
+    k17.html | k18.html | k31.html | k44.html | k50.html) ;;
     *) printf '<html>t</html>\n' >"$root/$f" ;;
     esac
 done
@@ -87,14 +112,16 @@ check() {
     for f in $want; do
         test -f "$site/$f" || bad="$bad $f"
     done
-    for f in n05.gif n30.html n32.html; do
+    for f in $nots; do
         test ! -e "$site/$f" || bad="$bad $f(captured)"
     done
     test -z "$bad" || fail "$mode: wrong:$bad"
-    cmp -s "$tmp/expect" "$site/index.html" || {
-        diff "$tmp/expect" "$site/index.html" | cut -c1-200 >&2 || true
-        fail "$mode: index.html changed beyond its rewritten links"
-    }
+    for f in index.html:page k50.html:sloppy; do
+        cmp -s "$tmp/${f#*:}.expect" "$site/${f%:*}" || {
+            diff "$tmp/${f#*:}.expect" "$site/${f%:*}" | cut -c1-200 >&2 || true
+            fail "$mode: ${f%:*} changed beyond its rewritten links"
+        }
+    done
 }
 
 check P0 -%P0

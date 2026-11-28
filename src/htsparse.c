@@ -1617,7 +1617,7 @@ typedef struct parse_state {
     const char *intag_startattr; /* start of the current attribute */
     int intag_start_valid;       /* intag_start points at a real tag */
     int intag_ctype; /* meta http-equiv: 1 content-type, 2 refresh */
-    const char *value_end; /* closing quote of the value the cursor is in */
+    const char *quoted_value_end; /* Where does the quoted value close? */
   } tag;
 
   struct {                        /* script, style and comment state */
@@ -1631,8 +1631,7 @@ typedef struct parse_state {
     const char *inscript_name;   /* the tag that opened the script */
     int inscript_tag;        /* inside an event handler such as onLoad="..." */
     char inscript_tag_lastc; /* the quote that ends that handler */
-    const char *inscript_tag_end; /* the byte ending its value, or NULL */
-    const char *quote_absent[2];  /* no " (0) or ' (1) at or past this */
+    const char *handler_value_end; /* Where does that value end, if known? */
     int inscriptgen;         /* inside generated HTML, as in obj.write("...") */
     const char *scriptgen_end; /* the closing quote of that string */
     hts_boolean css_file;    /* the whole document is a stylesheet */
@@ -1760,38 +1759,51 @@ static void parse_emit_footer(parse_state *const ps, const httrackp *const opt,
   }
 }
 
-/* Return the byte that ends an attribute value as a browser reads it: the
-   first QUOTE at or past S, or for an unquoted value ('\0') the first space
-   or '>'. NULL when the quote never comes, then '>' ends the tag as before. */
-static const char *attr_value_end(parse_state *const ps, const char *const s,
-                                  const char quote, const htsblk *const r) {
+/* Does the QUOTE at E close the value opened just before S? It must be
+   followed by a space, '>' or the end, and not be the opening quote of
+   a later attribute, which an unclosed quote on a sloppy page would reach. */
+static hts_boolean quote_closes_value(const char *const s, const char *const e,
+                                      const char *const end) {
+  const char *p = e;
+
+  if (e + 1 < end && !is_realspace(e[1]) && e[1] != '>')
+    return HTS_FALSE;
+  while (p > s && is_realspace(p[-1]))
+    p--;
+  return p == s || p[-1] != '=';
+}
+
+/* Return the closing QUOTE of a value starting at S, or NULL when none looks
+   like one, so '>' ends the tag as it always did. An unquoted value ('\0')
+   ends at the first space or '>', or at the end of the page. */
+static const char *attr_value_end(const char *const s, const char quote,
+                                  const htsblk *const r) {
   const char *const end = r->adr + r->size;
   const char *e;
 
-  if (s >= end)
-    return end;
   if (quote == '\0') {
     for (e = s; e < end && !is_realspace(*e) && *e != '>'; e++)
       ;
     return e;
   }
-  {
-    const int q = quote == '"' ? 0 : 1;
+  e = memchr(s, quote, (size_t) (end - s));
+  return e != NULL && quote_closes_value(s, e, end) ? e : NULL;
+}
 
-    // the cache keeps a page of unclosed quotes linear
-    if (ps->script.quote_absent[q] != NULL && s >= ps->script.quote_absent[q])
-      return NULL;
-    e = memchr(s, quote, (size_t) (end - s));
-    if (e == NULL)
-      ps->script.quote_absent[q] = s;
-    return e;
-  }
+/* Return where a handler value starting at S ends: QUOTE is the one that
+   opened it, '\0' for none, or another byte (a newline) when nothing ends it
+   but the legacy rule. */
+static const char *handler_end_at(const char *const s, const char quote,
+                                  const htsblk *const r) {
+  return quote == '"' || quote == '\'' || quote == '\0'
+             ? attr_value_end(s, quote, r)
+             : NULL;
 }
 
 /* Is the cursor inside a quoted attribute value, where '<' and '>' are text? */
 static hts_boolean in_quoted_value(const parse_state *const ps) {
-  return ps->tag.intag && ps->tag.value_end != NULL &&
-         ps->html < ps->tag.value_end;
+  return ps->tag.intag && ps->tag.quoted_value_end != NULL &&
+         ps->html < ps->tag.quoted_value_end;
 }
 
 /* Does the quote at the cursor open a value, being the first byte after '='? */
@@ -1803,10 +1815,16 @@ static hts_boolean quote_opens_value(const parse_state *const ps) {
   return p > ps->tag.intag_start && *p == '=';
 }
 
+/* Is the cursor inside an event handler whose known end is still ahead? */
+static hts_boolean handler_holds_gt(const parse_state *const ps) {
+  return ps->script.inscript_tag && ps->script.handler_value_end != NULL &&
+         ps->html < ps->script.handler_value_end;
+}
+
 /* Is the cursor at or past the end of the event handler it is in? */
 static hts_boolean handler_ends_here(const parse_state *const ps) {
-  if (ps->script.inscript_tag_end != NULL)
-    return ps->html >= ps->script.inscript_tag_end;
+  if (ps->script.handler_value_end != NULL)
+    return !handler_holds_gt(ps);
   return ps->script.inscript_tag_lastc != '\0' &&
          *ps->html == ps->script.inscript_tag_lastc;
 }
@@ -1818,6 +1836,7 @@ static void parse_tag_open(parse_state *const ps, const httrackp *const opt,
                            char *const codebase) {
   ps->tag.intag = 1;
   ps->tag.intag_ctype = 0;
+  ps->tag.quoted_value_end = NULL;
   ps->tag.intag_start = ps->html;
   for (ps->tag.intag_name = ps->html + 1; is_realspace(*ps->tag.intag_name);
        ps->tag.intag_name++)
@@ -1887,7 +1906,6 @@ static void parse_tag_open(parse_state *const ps, const httrackp *const opt,
 static void parse_tag_close(parse_state *const ps, const httrackp *const opt) {
   if (ps->script.inscript_tag) {
     ps->script.inscript_tag = ps->script.inscript = 0;
-    ps->script.inscript_tag_end = NULL;
     // reset the automaton on exit or its state leaks into plain HTML
     ps->script.inscript_state_pos = INSCRIPT_START;
     ps->script.inscriptgen = 0;
@@ -1900,6 +1918,7 @@ static void parse_tag_close(parse_state *const ps, const httrackp *const opt) {
     }
   } else if (!ps->script.incomment) {
     ps->tag.intag = 0;
+    ps->tag.quoted_value_end = NULL;
 
     // enter the script or style body only now, once its src= is parsed
     if ((ps->tag.intag_start_valid) &&
@@ -2387,9 +2406,10 @@ static PARSE_INLINE void detect_tag_attr(parse_state *const ps,
         ps->script.inscript_tag_lastc = *v;
         while (v < r->adr + r->size && is_realspace(*v))
           v++;
-        ps->script.inscript_tag_end = *v == '"' || *v == '\''
-                                          ? attr_value_end(ps, v + 1, *v, r)
-                                          : attr_value_end(ps, v, '\0', r);
+        if (v < r->adr + r->size && (*v == '"' || *v == '\''))
+          ps->script.handler_value_end = handler_end_at(v + 1, *v, r);
+        else
+          ps->script.handler_value_end = handler_end_at(v, '\0', r);
         ps->html += lk->p /*+ 1*/; /* skip */
         /* now inside JavaScript code */
         ps->script.inscript_name = "";
@@ -3162,7 +3182,10 @@ capture_link(parse_state *const ps, const parse_link *const lk,
           switch (*eadr) {
           case '>':
             if (!quote) {
-              if (!ps->script.inscript && !ps->page.in_media) {
+              // a '>' inside another quoted value leaves the tag open
+              if (!ps->script.inscript && !ps->page.in_media &&
+                  (ps->tag.quoted_value_end == NULL ||
+                   eadr >= ps->tag.quoted_value_end)) {
                 ps->tag.intag = 0; // no longer in a tag
                 ps->tag.intag_start_valid = 0;
                 ps->tag.intag_name = NULL;
@@ -3817,10 +3840,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                    ((!ps->script.inscript && !ps->page.in_media) ||
                     (ps->script.inscript_tag)) /* and in tag (or in script) */
                    /* a quoted value or handler holds '>' */
-                   && !in_quoted_value(ps) &&
-                   (!ps->script.inscript_tag ||
-                    ps->script.inscript_tag_end == NULL ||
-                    ps->html >= ps->script.inscript_tag_end)) {
+                   && !in_quoted_value(ps) && !handler_holds_gt(ps)) {
           parse_tag_close(ps, opt);
         } else if (ps->tag.intag || ps->script.inscript ||
                    ps->page.in_media) { // in a tag, script or media body
@@ -3834,21 +3854,22 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
           // a quoted value ends only at its own quote, as in a browser
           if ((*ps->html == '"' || *ps->html == '\'') && ps->tag.intag &&
-              !ps->script.inscript && !ps->page.in_media &&
-              !in_quoted_value(ps) && quote_opens_value(ps))
-            ps->tag.value_end = attr_value_end(ps, ps->html + 1, *ps->html, r);
+              !ps->script.inscript && !in_quoted_value(ps) &&
+              quote_opens_value(ps))
+            ps->tag.quoted_value_end =
+                attr_value_end(ps->html + 1, *ps->html, r);
 
           // ------------------------------------------------------------
-          // parsing évolé
+          // link and script detection
           // ------------------------------------------------------------
           if (((hts_isalpha((unsigned char) *ps->html)) || (*ps->html == '/') ||
                (ps->script.inscript) || (ps->page.in_media) ||
                (ps->script.inscriptgen))) { // else nothing to test
 
-            /* caractère de terminaison pour "miniparsing" javascript=.. ? 
-               (ex: <a href="javascript:()" action="foo"> ) */
+            /* leave a handler or javascript: URL at its end, as in
+               <a href="javascript:()" action="foo"> */
             if (ps->script.inscript_tag && handler_ends_here(ps)) {
-              ps->script.inscript_tag_end = NULL;
+              ps->script.handler_value_end = NULL;
               ps->script.inscript_tag = ps->script.inscript = 0;
               ps->script.inscriptgen = 0;
               ps->script.inscript_state_pos = INSCRIPT_START;
@@ -4003,10 +4024,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                 ps->script.inscript_state_pos = INSCRIPT_START;
                 /* the quote that ends it */
                 ps->script.inscript_tag_lastc = quote;
-                ps->script.inscript_tag_end =
-                    quote == '"' || quote == '\'' || quote == '\0'
-                        ? attr_value_end(ps, ps->html, quote, r)
-                        : NULL;
+                ps->script.handler_value_end =
+                    handler_end_at(ps->html, quote, r);
                 if (opt->parsedebug) {
                   HT_ADD("<@@ inscript @@>");
                 }
