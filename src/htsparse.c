@@ -2471,9 +2471,10 @@ static PARSE_INLINE void detect_script(parse_state *const ps,
   }
 }
 
-/* Write the captured link into the output as opt->urlmode asks. Returns
-   EADR, moved past the attribute for a <base>. LIEN is the link as written,
-   NUL-terminated in HTS_URLMAXSIZE * 2 bytes. */
+/* Write the captured link into the output as opt->urlmode asks. Writes
+   ps->sink and ps->lastsaved, and updates *ADD_CLASS_DOTS_TO_PATCH_IO.
+   Returns EADR, moved past the attribute for a <base>. PTR, PARENT_RELATIVE
+   and MODULE_BASE are read by the relativesavename() macro. */
 static const char *capture_rewrite(
     parse_state *const ps, const parse_link *const lk, httrackp *const opt,
     const htsblk *const r, const int ptr, const int parent_relative,
@@ -2867,8 +2868,9 @@ static const char *capture_rewrite(
 }
 
 /* Add the captured link to the crawl's link table, robots.txt first when
-   the host needs one. Returns HTS_FALSE when the link limit is reached or
-   memory ran out, and the parse must then end. */
+   the host needs one. Blanks afs->af.adr when the link is too long, and
+   stops the crawl when the table is full. Returns HTS_FALSE when recording
+   fails, and the parse must then end. */
 static hts_boolean
 capture_record(httrackp *const opt, htsmoduleStructExtended *const stre,
                hash_struct *const hash, const int numero_passe, const int ptr,
@@ -3895,7 +3897,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     }
                     /* FIN log */
 
-                    // capture_rewrite() bounds the query it copies by this size
+                    // sf_span_fits in capture_rewrite() needs this size
                     HTS_STATIC_ASSERT(sizeof(lien) == HTS_URLMAXSIZE * 2,
                                       lien_size);
                     eadr = capture_rewrite(
