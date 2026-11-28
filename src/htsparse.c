@@ -3014,16 +3014,18 @@ capture_record(httrackp *const opt, htsmoduleStructExtended *const stre,
 
 /* What capture_link() asks its caller to do next. */
 typedef enum {
-  CAPTURE_LINK_DONE, // the capture is over
-  CAPTURE_LINK_NEXT, // set ok to 1 and goto srcset_next
-  CAPTURE_LINK_FAIL  // free the output and return -1
+  CAPTURE_LINK_DONE, // link handled or skipped
+  CAPTURE_LINK_NEXT, // another srcset candidate follows
+  CAPTURE_LINK_FAIL  // capture_record() failed, so abort the parse
 } capture_link_status;
 
 /* Cut, resolve, rewrite and record the link at ps->html, given the scan
    state OK. Moves ps->html through SAUT, writes ps->sink, ps->lastsaved
    and ps->page, and updates *LINK_FETCH, *ADD_CLASS_DOTS_TO_PATCH and
-   *P_FLUSH. OPT, PTR, PARENT_RELATIVE and MODULE_BASE keep their names
-   because the heap() and relativeurladr() macros read them. */
+   *P_FLUSH. Leaves the tag when the cut reaches its '>', and sets
+   *stre->error_ when a callback refuses the link. OPT, PTR, PARENT_RELATIVE and
+   MODULE_BASE keep their names because the heap() and relativeurladr() macros
+   read them. */
 static capture_link_status
 capture_link(parse_state *const ps, const parse_link *const lk,
              httrackp *const opt, htsmoduleStruct *const str,
