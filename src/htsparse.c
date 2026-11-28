@@ -257,6 +257,13 @@ static hts_boolean tag_opens_with_space(const char *s, const char *tag) {
   return hts_skip_prefix_ci(&s, tag) && hts_isspace((unsigned char) *s);
 }
 
+/* Does s open with tag (A-Z folded), followed by '>', '/', a space or the
+   end? */
+static hts_boolean tag_opens_whole(const char *s, const char *tag) {
+  return hts_skip_prefix_ci(&s, tag) && (*s == '>' || *s == '/' || *s == '\0' ||
+                                         hts_isspace((unsigned char) *s));
+}
+
 /* Is the attribute name [name, nend) one whose value is never a link, a
    hts_nodetect word or an xmlns declaration? Returns the word, or NULL. */
 static const char *hts_dirty_attr_refused(const char *name, const char *nend) {
@@ -1638,6 +1645,7 @@ typedef struct parse_state {
     hts_fetch_tag fetch_tag;        /* the tag a fetched link came from */
     int detect_title;               /* this page entered the index */
     int emited_footer;              /* footer comment tags emitted */
+    hts_boolean bare_html_end;      /* </html> seen before any footer */
     int parseall_lastc;             /* last byte seen by the parseall scan */
     hts_boolean sf_may_mark;        /* --single-file: mark this one? */
     time_t user_interact_timestamp; /* last user-interaction poll */
@@ -1833,11 +1841,13 @@ static void parse_tag_open(parse_state *const ps, const httrackp *const opt,
           tag_opens_with_space(ps->html, "<meta")) {
         p = 1;
         ps->page.emited_footer++;
+      } else if (tag_opens_whole(ps->html, "</html")) {
+        ps->page.bare_html_end = HTS_TRUE;
       }
       break;
     case 1:
       // the footer again before </html>
-      p = hts_starts_with_ci(ps->html, "</html");
+      p = tag_opens_whole(ps->html, "</html");
       if (p)
         ps->page.emited_footer++;
       break;
@@ -4008,6 +4018,14 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
           TypedArrayFree(ps->sink.buf);
           return -1; // user exit
         }
+      }
+
+      // </html> but no <head>, <body> or <meta>: one footer at the very end
+      if (ps->page.emited_footer == 0 && ps->page.bare_html_end &&
+          !ps->tag.intag && (opt->getmode & HTS_GETMODE_HTML) &&
+          is_html_mime_type(r->contenttype)) {
+        ps->page.emited_footer = 2; // no charset meta this late
+        parse_emit_footer(ps, opt, r, ptr);
       }
 
       opt->state._hts_in_html_parsing = 0;      // flag
