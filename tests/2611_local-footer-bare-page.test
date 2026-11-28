@@ -44,6 +44,12 @@ page frameset '<html><frameset><frame name="a"></frameset></html>\n'
 page feed.atom '<feed><content type="html"><html>x</html></content></feed>\n'
 page feed.rss '<rss></html></rss>\n'
 page pic.svg '<svg><foreignObject><html>x</html></foreignObject></svg>\n'
+page page.xhtml '<html>x</html>\n'
+page notype.untyped '<html>x</html>\n'
+page htmlx '<html>a<htmlx>y</htmlx>b\n'
+page include '<html><html-include></html-include>\n'
+page custom '<html><head></head><body><html-foo></html-foo>x</body></html>\n'
+page opentag '<html>x</html><a href="foo'
 for p in "${pages[@]}"; do
     printf '<a href="%s">%s</a>\n' "$p" "$p"
 done >"$root/footer/index.html"
@@ -71,7 +77,11 @@ same() { # same FILE: the mirrored FILE is the served one
 charset='<!-- Added by HTTrack --><meta http-equiv="content-type" content="text/html;charset=utf-8" /><!-- /Added by HTTrack -->\n'
 
 crawl tmpl -%F '<!-- F {path} -->'
-f() { printf '\\n<!-- F /footer/%s.html -->\\n' "$1"; }
+f() { # f FILE: the footer of FILE (.html unless named)
+    local file=$1
+    test "${file%.*}" != "$file" || file=$file.html
+    printf '\\n<!-- F /footer/%s -->\\n' "$file"
+}
 expect bare "<html>hello</html>\n$(f bare)"
 expect notags 'just text\n'
 expect frag '<p>para</p>\n'
@@ -90,6 +100,15 @@ expect frameset "<html><frameset><frame name=\"a\"></frameset></html>\n$(f frame
 same feed.atom
 same feed.rss
 same pic.svg
+expect page.xhtml "<html>x</html>\n$(f page.xhtml)"
+# no Content-Type: is_html_mime_type takes it for HTML, saved with .html
+expect notype.untyped.html "<html>x</html>\n$(f notype.untyped)"
+# </htmlx> and </html-foo> are other elements
+expect htmlx '<html>a<htmlx>y</htmlx>b\n'
+expect include '<html><html-include></html-include>\n'
+expect custom "<html>$(f custom)$charset<head></head><body><html-foo></html-foo>x</body>$(f custom)</html>\n"
+# ends inside a tag: the link is rewritten, and no footer is added
+expect opentag '<html>x</html><a href="foo.html'
 
 # No footer: a bare page is left alone, a normal one keeps its charset meta.
 crawl none -%F ''

@@ -1932,12 +1932,14 @@ class Handler(SimpleHTTPRequestHandler):
         "bom": ("text/html", b"", CHARSET_CJK.encode(), CHARSET_CJK),
     }
 
-    # A file of <root>/footer/, as UTF-8 HTML unless its suffix names a feed or
-    # SVG: the footer pairs a declared charset with a meta.
+    # A file of <root>/footer/, as UTF-8 HTML unless its suffix names another
+    # type or none: the footer pairs a declared charset with a meta.
     FOOTER_TYPES = {
         ".atom": "application/atom+xml",
         ".rss": "application/rss+xml",
         ".svg": "image/svg+xml",
+        ".xhtml": "application/xhtml+xml",
+        ".untyped": None,
     }
 
     def route_footer(self):
@@ -1949,7 +1951,7 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_error(404)
             return
         ctype = self.FOOTER_TYPES.get(os.path.splitext(name)[1], "text/html")
-        self.send_raw(body, ctype + "; charset=utf-8")
+        self.send_raw(body, ctype and ctype + "; charset=utf-8")
 
     def route_charset(self):
         path = unquote(urlsplit(self.path).path)
