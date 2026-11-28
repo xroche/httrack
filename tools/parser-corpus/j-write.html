@@ -1,9 +1,13 @@
 <!DOCTYPE html>
 <html><head><title>js write</title></head>
 <body>
-<!-- links inside document.write(): an img src and an a href. The leading ')' works around the .write( scan bug -->
+<!-- links inside document.write(): img src and a href, quoted, escaped and unquoted -->
 <script type="text/javascript">
-document.write(')<img alt="" src=j-wgen.gif>');
-document.write(')<a href="j-wgen2.gif">x</a>');
+document.write('<img alt="" src=j-wgen.gif>');
+document.write('<a href="j-wgen2.gif">x</a>');
+document.write("<img alt='a' src=\"j-wgen3.gif\">");
+document.writeln('<a href=\'j-wgen4.html\'>y</a>');
+document.write("<b>\\"); var after = "j-wafter.gif";
+// document.write("<img src='j-wcomment.gif'>");
 </script>
 </body></html>

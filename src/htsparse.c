@@ -1617,7 +1617,6 @@ typedef struct parse_state {
     int inscript_tag;        /* inside an event handler such as onLoad="..." */
     char inscript_tag_lastc; /* the quote that ends that handler */
     int inscriptgen;         /* inside generated HTML, as in obj.write("...") */
-    char scriptgen_q;        /* the quote of that generated string */
     hts_boolean css_file;    /* the whole document is a stylesheet */
   } script;
 
@@ -1821,6 +1820,7 @@ static void parse_tag_close(parse_state *const ps, const httrackp *const opt) {
     ps->script.inscript_tag = ps->script.inscript = 0;
     // reset the automaton on exit or its state leaks into plain HTML
     ps->script.inscript_state_pos = INSCRIPT_START;
+    ps->script.inscriptgen = 0;
     ps->tag.intag = 0;
     ps->script.incomment = 0;
     ps->tag.intag_start_valid = 0;
@@ -2155,82 +2155,83 @@ static void detect_media(parse_state *const ps, parse_link *const lk,
   }
 }
 
+/* Is the automaton inside a quoted script string? */
+static hts_boolean inscript_in_string(const INSCRIPT pos) {
+  return pos == INSCRIPT_INQUOTE || pos == INSCRIPT_INQUOTE2 ||
+         pos == INSCRIPT_ANTISLASH_IN_QUOTE ||
+         pos == INSCRIPT_ANTISLASH_IN_QUOTE2;
+}
+
 /* In a script: track a obj.write("...") string, whose content is parsed
    as HTML (inscriptgen) from its opening quote on. Sets or clears
    inscriptgen and may jump ps->html to the string; never touches lk. */
 static PARSE_INLINE void detect_js_write(parse_state *const ps,
-                                         httrackp *const opt) {
-  // already in a write("...") string
+                                         httrackp *const opt,
+                                         const htsblk *const r) {
+  const char *const end = r->adr + r->size;
+
   if (ps->script.inscriptgen) {
-    // its closing quote
-    if (*ps->html == ps->script.scriptgen_q) {
-      if (*(ps->html - 1) != '\\') { // unescaped
-        ps->script.inscriptgen = 0;  // the generated string ends
-      }
+    // the automaton has just read the string's closing quote
+    if (!inscript_in_string(ps->script.inscript_state_pos)) {
+      ps->script.inscriptgen = 0;
     }
-  } else {
-    const char *a = NULL;
-    char check_this_fking_line = 0; // a write( call was found
-    char must_be_terminated = 0;    // the byte that must close the call
-    const char *after = ps->html;
+  } else if (ps->script.inscript_state_pos == INSCRIPT_START) {
+    const char *a = ps->html;
 
-    // ...object.write[ln]("generated html")...
-    if (hts_skip_prefix_ci(&after, ".writeln") ||
-        hts_skip_prefix_ci(&after, ".write")) {
-      a = after;
-      while (is_realspace(*a))
-        a++;
-      if (*a == '(') {
-        check_this_fking_line = 2;
-        must_be_terminated = ')';
-        a++;
-      }
-    }
-    // a write("generated code") call: parse that code
-    if (check_this_fking_line) {
-      while (is_realspace(*a))
-        a++;
-      if ((*a == '\'') || (*a == '"')) { // a quoted string starts
-        const char *b;
+    // ...object.write[ln]("generated html"), outside strings and comments
+    if (!hts_skip_prefix_ci(&a, ".writeln") &&
+        !hts_skip_prefix_ci(&a, ".write"))
+      return;
+    while (is_realspace(*a))
+      a++;
+    if (*a != '(')
+      return;
+    a++;
+    while (is_realspace(*a))
+      a++;
+    if (*a != '\'' && *a != '"')
+      return;
 
-        ps->script.scriptgen_q = *a; // quote
-        b = a + 1;
-        // accept ("code") only, never ("code"+var)
-        do {
-          if (*a == ps->script.scriptgen_q &&
-              *(a - 1) != '\\') // unescaped quote
-            break;
-          else if (*a == 10 &&
-                   *(a - 1) != '\\' /* LF and no continue (\) character */
-                   && (*(a - 1) != '\r' ||
-                       *(a - 2) != '\\')) /* and not CRLF and no .. */
-            break;
-          else
-            a++;
-        } while ((a - b) < HTS_URLMAXSIZE / 2);
-        if (*a == ps->script.scriptgen_q) { // end of the quote
+    const char q = *a;
+    const char *const b = a + 1; // the string's first byte
+
+    /* Find the closing quote. A raw line break leaves the string
+       unterminated, and a </script> ends an inline script before it. */
+    for (a = b; a < end && *a != q && *a != '\n' && *a != '\r'; a++) {
+      if (*a == '<' && !ps->script.inscript_locked &&
+          hts_starts_with_ci(a, "</script"))
+        return;
+      if (*a == '\\') {
+        if (end - a < 2)
+          return;
+        a++;                                            // the escaped byte
+        if (*a == '\r' && end - a >= 2 && a[1] == '\n') // a CRLF continuation
           a++;
-          while (is_realspace(*a))
-            a++;
-          if (*a == must_be_terminated) { // the closing parenthesis
-
-            // HTML generated inside javascript inside HTML: parse
-            // it with the standard rules, from the quote on.
-            ps->script.inscriptgen = 1;
-            ps->html = b;
-
-            if ((opt->debug > 1) && (opt->log != NULL)) {
-              char str[64];
-
-              hts_log_print(
-                  opt, LOG_DEBUG, "active code (%s) detected in javascript: %s",
-                  "parse",
-                  text_excerpt(opt, HTS_BUF(str),
-                               hts_span_at(b, (size_t) (a - b + 1)), 32));
-            }
-          }
-        }
       }
+    }
+    if (a >= end || *a != q)
+      return;
+    a++;
+    while (is_realspace(*a))
+      a++;
+    // accept ("code") only, never ("code"+var)
+    if (*a != ')')
+      return;
+
+    // HTML generated inside javascript inside HTML: parse it with the
+    // standard rules, the automaton inside the string it skipped into.
+    ps->script.inscriptgen = 1;
+    ps->script.inscript_state_pos =
+        q == '"' ? INSCRIPT_INQUOTE2 : INSCRIPT_INQUOTE;
+    ps->html = b;
+
+    if ((opt->debug > 1) && (opt->log != NULL)) {
+      char str[64];
+
+      hts_log_print(opt, LOG_DEBUG,
+                    "active code (%s) detected in javascript: %s", "parse",
+                    text_excerpt(opt, HTS_BUF(str),
+                                 hts_span_at(b, (size_t) (a - b)), 32));
     }
   }
 }
@@ -2438,6 +2439,7 @@ static PARSE_INLINE void detect_script(parse_state *const ps,
     a--;
     if (*a == '<') { // really a tag?
       ps->script.inscript = 0;
+      ps->script.inscriptgen = 0;
       ps->script.inscript_state_pos = INSCRIPT_START;
       if (opt->parsedebug) {
         HT_ADD("<@@ /inscript @@>");
@@ -3788,6 +3790,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                 if (*ps->html == ps->script.inscript_tag_lastc) {
                   /* sortir */
                   ps->script.inscript_tag = ps->script.inscript = 0;
+                  ps->script.inscriptgen = 0;
                   ps->script.inscript_state_pos = INSCRIPT_START;
                   ps->script.incomment = 0;
                   if (opt->parsedebug) {
@@ -3815,7 +3818,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
               lk.p = 0;
 
               if (ps->script.inscript) {
-                detect_js_write(ps, opt);
+                detect_js_write(ps, opt, r);
               }
               if (!lk.p) {
                 // in a tag outside a script, or in HTML a script writes

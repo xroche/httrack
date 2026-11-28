@@ -1,0 +1,176 @@
+#!/bin/bash
+#
+# The HTML a script writes with document.write("...") is parsed for links, and
+# the parser leaves that mode where the string ends. Each pattern links its own
+# /wNN file; a captured link is fetched and rewritten to wNN, and every other
+# byte of the page must survive unchanged.
+
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_jswrite.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmp"
+root=$tmp/root
+mkdir -p "$root"
+
+long=$(printf '%02000d' 0)
+huge=$(printf '%0200000d' 0)
+
+# Each comment says what a browser loads. "either" marks what httrack cannot
+# decide (concatenation, another object's write, template literals): there the
+# test only asks for a consistent rewrite and no bogus fetch.
+cat >"$root/index.html" <<EOF
+<!DOCTYPE html>
+<html>
+<head><title>write</title>
+<script type="text/javascript" src="/w22.js"></script>
+<script type="text/javascript" src="/w23.js"></script>
+<script type="text/javascript" src="/w48.js"></script>
+<script type="text/javascript" src="/w49.js"></script>
+<script type="text/javascript" src="/w51.js"></script>
+</head><body>
+<script type="text/javascript">
+var x = "y", a = 1, b = 2, stream = { write: function (s) { return s; } };
+// 01 to 11: loaded
+document.write("<img src='/w01.gif'>");
+document.write('<img src="/w02.gif">');
+document.write("<img src=\"/w03.gif\">");
+document.write('<img src=\'/w04.gif\'>');
+document.write("<img src=/w05.gif>");
+document.writeln("<img src='/w06.gif'>");
+document.write  (  "<img src='/w07.gif'>"  );
+document.write
+("<img src='/w08.gif'>");
+document.write("<img src='/w09.gif'>");document.write("<img src='/w10.gif'>");
+window.document.write("<a href='/w11.html'>x</a>");
+// 12 loaded, either; 13 nothing to load
+document.write("<img src='" + "/w12.gif" + "'>");
+document.write('<a href="'+x+'">y</a>');
+// 14 loaded, either
+document.write(\`<img src='/w14.gif'>\`);
+// 15 loaded
+document.write("<script src='/w15.js'><\/script>");
+document.write("hello");
+// 17 and 18 not loaded
+// document.write("<img src='/w17.gif'>");
+var s = "a.write(\"<img src='/w18.gif'>\")";
+// 19 not loaded, either
+stream.write("<img src='/w19.gif'>");
+// 20 and 52 loaded
+document.write("<img src='/w20.gif' alt='$long'>");
+document.write("<img src='/w52.gif' alt='$huge'>");
+// 24 loaded; 99 is a string, which httrack follows only with -%P
+document.write("<img src='/w24.gif'>"); var u = "/w99.gif"; if (a < b && b > 0) { u = 'q' + "<b>"; }
+// 25 loaded, then an escaped backslash ends the string; 26 as 99; 42 not loaded
+document.write("<img src='/w25.gif'>\\\\"); var v = "/w26.gif";
+document.write("<b>\\\\"); src = '/w42.gif';
+// 53 and 54 loaded, after a quote that is not the string's end
+document.write("<img alt='a' src='/w53.gif'>");
+document.write('<b class="c">"</b><img src=/w54.gif>');
+// 27 and 28 loaded, either
+document.write("<img src='/w27.gif'>" + "<img src='/w28.gif'>");
+// 29, 31 and 33 loaded
+document.write("<a href='/w29.html'>z</a>");
+document.write("<img src=\"/w31.gif\" alt=\"a\">");
+document.write("<a href='/w33.html' title=\"it's\">x</a>");
+</script>
+<script type="text/javascript"><!--
+// 34 loaded
+document.write("<img src='/w34.gif'>");
+//--></script>
+<!-- 30 loaded -->
+<a href="#" onclick="document.write('<img src=/w30.gif>')">h</a>
+<script type="text/javascript">
+// 21 not loaded: a syntax error
+document.write("<img src='/w21.gif'>
+</script>
+<!-- 37 and 43 not loaded, because the end tag ends the script; 38 and 44 loaded -->
+<script type="text/javascript">
+document.write("<img src='/w37.gif'></script><a href="/w38.html">after</a>
+<script type="text/javascript">
+document.write("<img src='/w43.gif'></script>");<a href="/w44.html">after</a>
+<p>end</p>
+</body>
+</html>
+EOF
+
+# 23, 35 and 36 loaded: a .js file may hold </script> in a string
+cat >"$root/w23.js" <<'EOF'
+document.write("<img src='/w23.gif'>");
+document.write('<script src="/w35.js"></script><img src="/w36.gif">');
+EOF
+# Truncated at the end of the file, so none loads: 22 and 51 lack the closing
+# quote, 48 ends on a backslash, 49 on the open parenthesis.
+printf '%s' "document.write(\"<img src='/w22.gif'>" >"$root/w22.js"
+printf '%s' "document.write(\"<img src='/w48.gif'>\\" >"$root/w48.js"
+printf '%s' "document.write(" >"$root/w49.js"
+printf '%s' "document.write(\"<img src='/w51.gif' alt='$huge" >"$root/w51.js"
+
+all="01 02 03 04 05 06 07 08 09 10 11 12 14 15 17 18 19 20 21 24 25 26 27 28 29
+30 31 33 34 36 37 38 42 43 44 52 53 54 99"
+for n in $all 22 23 35 48 49 51; do
+    printf 'GIF89a' >"$root/w$n.gif"
+    printf '<html>t</html>\n' >"$root/w$n.html"
+    test -e "$root/w$n.js" || printf '//\n' >"$root/w$n.js"
+done
+
+# The targets the bug lost, then the ones httrack follows with or without -%P.
+writes="w01.gif w02.gif w03.gif w04.gif w05.gif w06.gif w07.gif w08.gif w09.gif
+w10.gif w11.html w15.js w20.gif w23.gif w24.gif w25.gif w29.html w30.gif
+w31.gif w33.html w34.gif w35.js w36.gif w52.gif w53.gif w54.gif"
+# shellcheck disable=SC2034 # read by name in check
+want_P0="$writes w38.html w44.html"
+# shellcheck disable=SC2034
+never_P0="w17.gif w18.gif w21.gif w22.gif w37.gif w42.gif w43.gif w48.gif
+w51.gif w26.gif w99.gif"
+# shellcheck disable=SC2034
+want_default="$writes w38.html w44.html w26.gif w99.gif"
+# shellcheck disable=SC2034
+never_default="w17.gif"
+
+local_server_start --root "$root" --log "$tmp/server.log"
+
+# check MODE [httrack args]: crawl, then assert per pattern and byte for byte
+check() {
+    local mode=$1 out site name f want never
+    shift
+    out=$tmp/out-$mode
+    local_crawl --log "$tmp/$mode.log" "$BASEURL/index.html" -O "$out" \
+        -r3 -c4 --robots=0 --quiet -%F '' "$@" || true
+    site=$out/127.0.0.1_$SRV_PORT
+    test -f "$site/index.html" || fail_dump "$mode: no index.html" "$tmp/$mode.log"
+    want=want_$mode never=never_$mode
+    for f in ${!want}; do
+        test -f "$site/$f" || fail "$mode: $f not captured"
+    done
+    for f in ${!never}; do
+        test ! -e "$site/$f" || fail "$mode: $f captured"
+    done
+    # nothing fetched that the fixture lacks, and nothing refused
+    for f in "$site"/*; do
+        test -f "$root/${f##*/}" || fail "$mode: bogus file ${f##*/}"
+    done
+    ! grep -q 'Error:' "$out/hts-log.txt" ||
+        fail_dump "$mode: errors" "$out/hts-log.txt"
+
+    # The expected page, as -%F '' drops the footer: the source with each
+    # fetched /wNN link made relative.
+    for name in index.html w22.js w23.js w48.js w49.js w51.js; do
+        cp "$root/$name" "$tmp/expect"
+        for f in "$site"/w*; do
+            f=${f##*/}
+            sed "s|/$f|$f|g" "$tmp/expect" >"$tmp/expect.new"
+            mv "$tmp/expect.new" "$tmp/expect"
+        done
+        cmp -s "$tmp/expect" "$site/$name" || {
+            diff "$tmp/expect" "$site/$name" | cut -c1-200 >&2 || true
+            fail "$mode: $name changed beyond its rewritten links"
+        }
+    done
+}
+
+# -%P0 turns off the broad scan that also catches some quoted values.
+check P0 -%P0
+check default
