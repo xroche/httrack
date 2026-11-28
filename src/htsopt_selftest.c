@@ -35,6 +35,9 @@ Please visit our Website: http://www.httrack.com
 #include "htsmirror.h"
 #include <limits.h>
 #include <stdint.h>
+#ifdef __linux__
+#include <sys/prctl.h>
+#endif
 
 /* What the build's optional features came out as, so a test gates on the binary
    rather than on the platform it guessed from. */
@@ -1441,6 +1444,12 @@ static int st_lockrule_undeletable(httrackp *opt, const char *base,
     fprintf(stderr, "%s: cannot get euid %d back\n", tag, (int) self);
     err = 1;
   }
+#ifdef __linux__
+  /* The euid switch clears the dumpable flag, which LeakSanitizer needs. */
+  if (self == 0) {
+    (void) prctl(PR_SET_DUMPABLE, 1, 0, 0, 0);
+  }
+#endif
   (void) fchmod(rofd, 0700);
   close(rofd);
   return err;

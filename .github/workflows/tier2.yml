@@ -400,6 +400,27 @@ jobs:
           grep -q '^self-check: the widen mutant .* reported$' "$log"
           grep -q '^self-check: the narrow mutant .* reported$' "$log"
 
+  # Builds the image Anthropic's OSS Scanner uses, so a build change cannot break it unseen.
+  oss-scanner-image:
+    name: OSS Scanner image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      # Check out no submodules, because the scanner's checkout may have none.
+      - uses: actions/checkout@v7
+
+      - name: Build the image
+        run: docker build --progress=plain -t oss-scanner-httrack -f .oss-scanner/Dockerfile .
+
+      # The scanner runs with no network, so the suite must pass there.
+      - name: Run the suite offline
+        run: |
+          docker run --rm --network none oss-scanner-httrack sh -c \
+            'make -C build/asan check -j16 || { cat build/asan/tests/test-suite.log; exit 1; }'
+
+      - name: Replay the fuzz corpora offline
+        run: docker run --rm --network none oss-scanner-httrack bash fuzz/run-fuzzers.sh build/fuzz/fuzz check
+
   # Other people's packaging recipes, each building our dist tarball. A red here
   # is often theirs to fix rather than ours.
   alpine:
@@ -444,6 +465,7 @@ jobs:
       - no-getrandom
       - no-spawn
       - parser-diff-self-check
+      - oss-scanner-image
       - alpine
       - arch
       - fedora
