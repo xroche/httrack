@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# The -%F footer goes once before the first </html> of a page with no <head>,
-# <body> or <meta>, without the late charset meta, and never before a doctype.
+# An HTML page with </html> but no <head>, <body> or <meta> gets the -%F footer
+# once, at its very end and without the charset meta. Other pages are as before.
 
 set -e
 # shellcheck source=tests/crawllib.sh
@@ -18,11 +18,14 @@ mkdir -p "$root/footer"
 local_server_start --root "$root"
 require_httrack
 
-# NAME BODY: a page, and a link to it from the crawl's index
+# NAME BODY: a page, and a link to it from the crawl's index (.html unless
+# NAME has a suffix)
 pages=()
 page() {
-    printf '%b' "$2" >"$root/footer/$1.html"
-    pages+=("$1")
+    local file=$1
+    test "${file%.*}" != "$file" || file=$file.html
+    printf '%b' "$2" >"$root/footer/$file"
+    pages+=("$file")
 }
 page bare '<html>hello</html>\n'
 page notags 'just text\n'
@@ -34,8 +37,15 @@ page xhtml '<?xml version="1.0"?>\n<!DOCTYPE html>\n<html xmlns="http://www.w3.o
 page doctype '<!DOCTYPE html>\n<html>x</html>\n'
 page twice '<html>a</html>\n<html>b</html>\n'
 page crlf '<html>a\r\n</html>\r\n'
+page stray '</html>\n<!DOCTYPE html>\n<html><head></head><body>x</body></html>\n'
+page late '<html>a</html>\n<html><head><title>t</title></head><body>x</body></html>\n'
+page textarea '<html><textarea></html></textarea>x</html>\n'
+page frameset '<html><frameset><frame name="a"></frameset></html>\n'
+page feed.atom '<feed><content type="html"><html>x</html></content></feed>\n'
+page feed.rss '<rss></html></rss>\n'
+page pic.svg '<svg><foreignObject><html>x</html></foreignObject></svg>\n'
 for p in "${pages[@]}"; do
-    printf '<a href="%s.html">%s</a>\n' "$p" "$p"
+    printf '<a href="%s">%s</a>\n' "$p" "$p"
 done >"$root/footer/index.html"
 
 crawl() { # crawl LABEL [httrack args...], leaving the mirrored pages in $mir
@@ -47,26 +57,39 @@ crawl() { # crawl LABEL [httrack args...], leaving the mirrored pages in $mir
         fail "$label crawl failed"
 }
 
-expect() { # expect NAME BODY: the mirrored page holds exactly BODY
+expect() { # expect FILE BODY: the mirrored FILE (.html unless named) is BODY
+    local file=$1
+    test "${file%.*}" != "$file" || file=$file.html
     printf '%b' "$2" >"$tmpdir/want"
-    cmp -s "$tmpdir/want" "$mir/$1.html" ||
-        fail "$1: got $(od -An -c "$mir/$1.html"), want $(od -An -c "$tmpdir/want")"
+    cmp -s "$tmpdir/want" "$mir/$file" ||
+        fail "$1: got $(od -An -c "$mir/$file"), want $(od -An -c "$tmpdir/want")"
+}
+same() { # same FILE: the mirrored FILE is the served one
+    cmp -s "$root/footer/$1" "$mir/$1" || fail "$1 was changed: $(od -An -c "$mir/$1")"
 }
 
 charset='<!-- Added by HTTrack --><meta http-equiv="content-type" content="text/html;charset=utf-8" /><!-- /Added by HTTrack -->\n'
 
 crawl tmpl -%F '<!-- F {path} -->'
 f() { printf '\\n<!-- F /footer/%s.html -->\\n' "$1"; }
-expect bare "<html>hello$(f bare)</html>\n"
+expect bare "<html>hello</html>\n$(f bare)"
 expect notags 'just text\n'
 expect frag '<p>para</p>\n'
 expect normal "<!DOCTYPE html>\n<html>$(f normal)$charset<head><title>t</title></head><body>x</body>$(f normal)</html>\n"
 expect upper "<HTML>$(f upper)$charset<HEAD><TITLE>t</TITLE></HEAD><BODY>x</BODY>$(f upper)</HTML>\n"
-expect hidden "<html><!-- <head> --><script>var s=\"<head></html>\";</script>x$(f hidden)</html>\n"
+expect hidden "<html><!-- <head> --><script>var s=\"<head></html>\";</script>x</html>\n$(f hidden)"
 expect xhtml "<?xml version=\"1.0\"?>\n<!DOCTYPE html>\n<html xmlns=\"http://www.w3.org/1999/xhtml\">$(f xhtml)$charset<head><title>t</title></head><body>x</body>$(f xhtml)</html>\n"
-expect doctype "<!DOCTYPE html>\n<html>x$(f doctype)</html>\n"
-expect twice "<html>a$(f twice)</html>\n<html>b</html>\n"
-expect crlf '<html>a\r\n\r\n<!-- F /footer/crlf.html -->\r\n</html>\r\n'
+expect doctype "<!DOCTYPE html>\n<html>x</html>\n$(f doctype)"
+expect twice "<html>a</html>\n<html>b</html>\n$(f twice)"
+expect crlf '<html>a\r\n</html>\r\n\r\n<!-- F /footer/crlf.html -->\r\n'
+# A <head> after a stray </html> still takes the footer and the charset meta.
+expect stray "</html>\n<!DOCTYPE html>\n<html>$(f stray)$charset<head></head><body>x</body>$(f stray)</html>\n"
+expect late "<html>a</html>\n<html>$(f late)$charset<head><title>t</title></head><body>x</body>$(f late)</html>\n"
+expect textarea "<html><textarea></html></textarea>x</html>\n$(f textarea)"
+expect frameset "<html><frameset><frame name=\"a\"></frameset></html>\n$(f frameset)"
+same feed.atom
+same feed.rss
+same pic.svg
 
 # No footer: a bare page is left alone, a normal one keeps its charset meta.
 crawl none -%F ''

@@ -1629,6 +1629,7 @@ typedef struct parse_state {
     hts_fetch_tag fetch_tag;        /* the tag a fetched link came from */
     int detect_title;               /* this page entered the index */
     int emited_footer;              /* footer comment tags emitted */
+    hts_boolean bare_html_end;      /* </html> seen before any footer */
     int parseall_lastc;             /* last byte seen by the parseall scan */
     hts_boolean sf_may_mark;        /* --single-file: mark this one? */
     time_t user_interact_timestamp; /* last user-interaction poll */
@@ -1743,7 +1744,7 @@ static void parse_emit_footer(parse_state *const ps, const httrackp *const opt,
 }
 
 /* Start the tag this '<' opens, or the comment a '<!--' opens, and emit the
-   footer at the first <head>, <body> or <meta>, and at the first </html>. */
+   footer at the first <head>, <body> or <meta>, and at </html>. */
 static void parse_tag_open(parse_state *const ps, const httrackp *const opt,
                            const htsblk *const r, const int ptr,
                            char *const codebase) {
@@ -1789,9 +1790,7 @@ static void parse_tag_open(parse_state *const ps, const httrackp *const opt,
         p = 1;
         ps->page.emited_footer++;
       } else if (hts_starts_with_ci(ps->html, "</html")) {
-        // no <head>, <body> or <meta>: footer once, without a late charset
-        p = 1;
-        ps->page.emited_footer = 2;
+        ps->page.bare_html_end = HTS_TRUE;
       }
       break;
     case 1:
@@ -3947,6 +3946,14 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
           TypedArrayFree(ps->sink.buf);
           return -1; // user exit
         }
+      }
+
+      // </html> but no <head>, <body> or <meta>: one footer at the very end
+      if (ps->page.emited_footer == 0 && ps->page.bare_html_end &&
+          (opt->getmode & HTS_GETMODE_HTML) &&
+          is_html_mime_type(r->contenttype)) {
+        ps->page.emited_footer = 2; // no charset meta this late
+        parse_emit_footer(ps, opt, r, ptr);
       }
 
       opt->state._hts_in_html_parsing = 0;      // flag
