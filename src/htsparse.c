@@ -877,9 +877,7 @@ static void escape_url_parens(hts_buf s) {
   hts_buf_cpy(s, buff);
 }
 
-/* Copy a URL piece with " ' < > percent-encoded, so it cannot end the
-   attribute or script string it is written into; with html, & becomes &amp;,
-   and with script, \ is encoded too, as it escapes in a script string.
+/* Copy 's' with " ' < > encoded, \ too if script, and & as &amp; if html.
    Returns the length written, or dest.size on overflow. */
 static size_t escape_url_quotes_any(const char *const s, hts_buf dest,
                                     const hts_boolean html,
@@ -916,20 +914,20 @@ static size_t escape_url_quotes_any(const char *const s, hts_buf dest,
   return j;
 }
 
-static size_t escape_url_quotes_script(const char *const s, char *const dest,
-                                       const size_t size) {
+static size_t escape_url_for_script_text(const char *const s, char *const dest,
+                                         const size_t size) {
   return escape_url_quotes_any(s, hts_buf_at(dest, size), HTS_FALSE, HTS_TRUE);
 }
 
-static size_t escape_url_quotes_html(const char *const s, char *const dest,
-                                     const size_t size) {
+static size_t escape_url_for_attr(const char *const s, char *const dest,
+                                  const size_t size) {
   return escape_url_quotes_any(s, hts_buf_at(dest, size), HTS_TRUE, HTS_FALSE);
 }
 
-/* A handler or a write string: markup inside a script string. */
-static size_t escape_url_quotes_html_script(const char *const s,
-                                            char *const dest,
-                                            const size_t size) {
+/* A handler or a write string holds markup inside a script string. */
+static size_t escape_url_for_markup_in_script(const char *const s,
+                                              char *const dest,
+                                              const size_t size) {
   return escape_url_quotes_any(s, hts_buf_at(dest, size), HTS_TRUE, HTS_TRUE);
 }
 
@@ -1011,17 +1009,18 @@ static void sink_add_htmlescaped_full(parse_sink *const sink,
                    HTS_HTMLESCAPE_FULL_MAXEXP);
 }
 
-/* Append the URL host or path 's' with " ' < > percent-encoded, then
-   html-escaped like sink_add_htmlescaped(). */
+/* Append the URL piece 's' with " ' < > percent-encoded, and \ too in a script
+   string, then html-escaped like sink_add_htmlescaped(). */
 static void sink_add_url_htmlescaped(parse_sink *const sink,
                                      const char *const s) {
   if (sink_raw_text(sink)) {
-    sink_add_escaped(sink, s, escape_url_quotes_script, 3);
+    sink_add_escaped(sink, s, escape_url_for_script_text, 3);
   } else if (*sink->inscript) {
-    sink_add_escaped(sink, s, escape_url_quotes_html_script,
+    /* handler or write string */
+    sink_add_escaped(sink, s, escape_url_for_markup_in_script,
                      HTS_HTMLESCAPE_MAXEXP);
   } else {
-    sink_add_escaped(sink, s, escape_url_quotes_html, HTS_HTMLESCAPE_MAXEXP);
+    sink_add_escaped(sink, s, escape_url_for_attr, HTS_HTMLESCAPE_MAXEXP);
   }
 }
 
@@ -1061,8 +1060,8 @@ const char *hts_parse_escape_selftest(const hts_boolean parens,
 }
 
 char *hts_parse_sink_selftest(const hts_boolean enabled, const int inscript,
-                              const int inscript_tag, const char *const s) {
-  const int inscriptgen = 0;
+                              const int inscript_tag, const int inscriptgen,
+                              const char *const s) {
   parse_sink sink = {.buf = EMPTY_TYPED_ARRAY,
                      .oom = HTS_FALSE,
                      .enabled = enabled,
@@ -2847,7 +2846,7 @@ static const char *capture_rewrite(
           char *a = strchr(lien, '?');
 
           if (a) {
-            HT_ADD_HTMLESCAPED(a);
+            HT_ADD_URL_HTMLESCAPED(a);
           }
         }
 

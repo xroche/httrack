@@ -1292,22 +1292,24 @@ static int st_sink(httrackp *opt, int argc, char **argv) {
 
   static const struct {
     hts_boolean enabled;
-    int inscript, inscript_tag;
+    int inscript, inscript_tag, inscriptgen;
     const char *want;
   } cases[] = {
-      {HTS_TRUE, 0, 0,
+      {HTS_TRUE, 0, 0, 0,
        "a&\"<\\\xe9|a&amp;\"<\\\xe9|a&amp;\"<\\&#xe9;|a&amp;%22%3c\\\xe9"},
-      /* Script text is raw, except the always-escaped full writer; a URL
-         there cannot hold a raw backslash. */
-      {HTS_TRUE, 1, 0,
+      /* Script text is raw, but a URL there gets its backslash encoded. */
+      {HTS_TRUE, 1, 0, 0,
        "a&\"<\\\xe9|a&\"<\\\xe9|a&amp;\"<\\&#xe9;|a&%22%3c%5c\xe9"},
-      /* An event handler is markup, inside a script string. */
-      {HTS_TRUE, 1, 1,
+      /* An event handler is markup inside a script string. */
+      {HTS_TRUE, 1, 1, 0,
+       "a&\"<\\\xe9|a&amp;\"<\\\xe9|a&amp;\"<\\&#xe9;|a&amp;%22%3c%5c\xe9"},
+      /* So is a document.write string. */
+      {HTS_TRUE, 1, 0, 1,
        "a&\"<\\\xe9|a&amp;\"<\\\xe9|a&amp;\"<\\&#xe9;|a&amp;%22%3c%5c\xe9"},
       /* A page not saved as HTML (-p2) buffers nothing. */
-      {HTS_FALSE, 0, 0, ""},
-      {HTS_FALSE, 1, 0, ""},
-      {HTS_FALSE, 1, 1, ""},
+      {HTS_FALSE, 0, 0, 0, ""},
+      {HTS_FALSE, 1, 0, 0, ""},
+      {HTS_FALSE, 1, 1, 0, ""},
   };
 
   size_t i;
@@ -1315,7 +1317,8 @@ static int st_sink(httrackp *opt, int argc, char **argv) {
 
   for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
     char *got = hts_parse_sink_selftest(cases[i].enabled, cases[i].inscript,
-                                        cases[i].inscript_tag, in);
+                                        cases[i].inscript_tag,
+                                        cases[i].inscriptgen, in);
 
     if (strcmp(got, cases[i].want) != 0) {
       fprintf(stderr, "sink case %d: got \"%s\", wanted \"%s\"\n", (int) i, got,
