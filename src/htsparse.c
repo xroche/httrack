@@ -3379,13 +3379,7 @@ capture_link(parse_state *const ps, const parse_link *const lk,
                              sback, cache, hash, ptr, numero_passe, NULL);
             if (strcmp(jump_identification_const(last_adr),
                        jump_identification_const(afs.af.adr)) !=
-                0) { // a changé
-
-              // 2e test si moved
-
-              // Tester si un lien doit être accepté ou refusé (wizard)
-              // forbidden_url=1 : lien refusé
-              // forbidden_url=0 : lien accepté
+                0) { // the address moved, so retest it against the filters
               if (ptr > 0 && afs.af.adr[0] != '\0') { // check the filters
                 hts_log_print(opt, LOG_DEBUG,
                               "wizard moved link retest at %s%s..",
@@ -3795,7 +3789,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
               }
 
             } else {            // ptr == 0
-              lk.p = 0;         // No stupid tag anymore, raw link
               lk.valid_p = 1;   // Valid even if p==0
               while ((ps->html[lk.p] == '\r') || (ps->html[lk.p] == '\n'))
                 lk.p++;
