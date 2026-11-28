@@ -2162,9 +2162,10 @@ static hts_boolean inscript_in_string(const INSCRIPT pos) {
          pos == INSCRIPT_ANTISLASH_IN_QUOTE2;
 }
 
-/* In a script: track a obj.write("...") string, whose content is parsed
-   as HTML (inscriptgen) from its opening quote on. Sets or clears
-   inscriptgen and may jump ps->html to the string; never touches lk. */
+/* In a script: track an obj.write("...") string, whose content is parsed
+   as HTML (inscriptgen). On entry, jumps ps->html to the opening quote and
+   sets the automaton inside the string; the mode ends when the automaton
+   leaves it. Never touches lk. */
 static PARSE_INLINE void detect_js_write(parse_state *const ps,
                                          httrackp *const opt,
                                          const htsblk *const r) {
@@ -2223,7 +2224,7 @@ static PARSE_INLINE void detect_js_write(parse_state *const ps,
     ps->script.inscriptgen = 1;
     ps->script.inscript_state_pos =
         q == '"' ? INSCRIPT_INQUOTE2 : INSCRIPT_INQUOTE;
-    ps->html = b;
+    ps->html = b - 1; // the automaton reads b next
 
     if ((opt->debug > 1) && (opt->log != NULL)) {
       char str[64];

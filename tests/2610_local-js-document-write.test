@@ -30,6 +30,7 @@ cat >"$root/index.html" <<EOF
 <script type="text/javascript" src="/w48.js"></script>
 <script type="text/javascript" src="/w49.js"></script>
 <script type="text/javascript" src="/w51.js"></script>
+<script type="text/javascript" src="/w55.js"></script>
 </head><body>
 <script type="text/javascript">
 var x = "y", a = 1, b = 2, stream = { write: function (s) { return s; } };
@@ -56,7 +57,7 @@ document.write("hello");
 // 17 and 18 not loaded
 // document.write("<img src='/w17.gif'>");
 var s = "a.write(\"<img src='/w18.gif'>\")";
-// 19 not loaded, either
+// 19 not loaded, but httrack cannot tell it from document, so either
 stream.write("<img src='/w19.gif'>");
 // 20 and 52 loaded
 document.write("<img src='/w20.gif' alt='$long'>");
@@ -91,6 +92,17 @@ document.write("<img src='/w21.gif'>
 document.write("<img src='/w37.gif'></script><a href="/w38.html">after</a>
 <script type="text/javascript">
 document.write("<img src='/w43.gif'></script>");<a href="/w44.html">after</a>
+<!-- An empty string, or one opening on an escape, must end the mode: 60 to 67
+are plain script strings, which only -%P follows for 65 to 67 -->
+<script>document.write("");var h='<img src=/w60.gif>'; var k="x";</script>
+<script>document.write('');var q="<img src=/w61.gif>"</script>
+<script>document.write('\\\\');var q="<img src=/w62.gif>"</script>
+<script>stream.write("<img src=/w63.gif>");stream.write('');var q="<img src=/w64.gif>"</script>
+<script>document.write("");src = '/w65.gif';</script>
+<script>document.write('');src = '/w66.gif';</script>
+<script>document.write("\"<b>\"");src='/w67.gif';</script>
+<!-- 68 and 69 loaded: the href after the handler is a link of the tag -->
+<a onclick="document.write('<img src=/w68.gif>')" href=/w69.html>k</a>
 <p>end</p>
 </body>
 </html>
@@ -107,10 +119,14 @@ printf '%s' "document.write(\"<img src='/w22.gif'>" >"$root/w22.js"
 printf '%s' "document.write(\"<img src='/w48.gif'>\\" >"$root/w48.js"
 printf '%s' "document.write(" >"$root/w49.js"
 printf '%s' "document.write(\"<img src='/w51.gif' alt='$huge" >"$root/w51.js"
+# 55 to 57 loaded: a backslash before CRLF or LF continues the string
+printf 'document.write("<img src=\x27/w55.gif\x27>\\\r\n<img src=\x27/w56.gif\x27>");\r\n' >"$root/w55.js"
+printf 'document.write("<img src=\x27/w57.gif\x27>\\\n<b>");\n' >>"$root/w55.js"
 
 all="01 02 03 04 05 06 07 08 09 10 11 12 14 15 17 18 19 20 21 24 25 26 27 28 29
-30 31 33 34 36 37 38 42 43 44 52 53 54 99"
-for n in $all 22 23 35 48 49 51; do
+30 31 33 34 36 37 38 42 43 44 52 53 54 56 57 60 61 62 63 64 65 66 67 68
+69 99"
+for n in $all 22 23 35 48 49 51 55; do
     printf 'GIF89a' >"$root/w$n.gif"
     printf '<html>t</html>\n' >"$root/w$n.html"
     test -e "$root/w$n.js" || printf '//\n' >"$root/w$n.js"
@@ -119,16 +135,18 @@ done
 # The targets the bug lost, then the ones httrack follows with or without -%P.
 writes="w01.gif w02.gif w03.gif w04.gif w05.gif w06.gif w07.gif w08.gif w09.gif
 w10.gif w11.html w15.js w20.gif w23.gif w24.gif w25.gif w29.html w30.gif
-w31.gif w33.html w34.gif w35.js w36.gif w52.gif w53.gif w54.gif"
+w31.gif w33.html w34.gif w35.js w36.gif w52.gif w53.gif w54.gif w55.gif
+w56.gif w57.gif w68.gif w69.html"
 # shellcheck disable=SC2034 # read by name in check
 want_P0="$writes w38.html w44.html"
 # shellcheck disable=SC2034
 never_P0="w17.gif w18.gif w21.gif w22.gif w37.gif w42.gif w43.gif w48.gif
-w51.gif w26.gif w99.gif"
+w51.gif w26.gif w99.gif w60.gif w61.gif w62.gif w64.gif w65.gif w66.gif
+w67.gif"
 # shellcheck disable=SC2034
-want_default="$writes w38.html w44.html w26.gif w99.gif"
+want_default="$writes w38.html w44.html w26.gif w99.gif w65.gif w66.gif w67.gif"
 # shellcheck disable=SC2034
-never_default="w17.gif"
+never_default="w17.gif w60.gif w61.gif w62.gif w64.gif"
 
 local_server_start --root "$root" --log "$tmp/server.log"
 
@@ -157,7 +175,7 @@ check() {
 
     # The expected page, as -%F '' drops the footer: the source with each
     # fetched /wNN link made relative.
-    for name in index.html w22.js w23.js w48.js w49.js w51.js; do
+    for name in index.html w22.js w23.js w48.js w49.js w51.js w55.js; do
         cp "$root/$name" "$tmp/expect"
         for f in "$site"/w*; do
             f=${f##*/}
