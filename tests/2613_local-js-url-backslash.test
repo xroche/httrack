@@ -1,0 +1,76 @@
+#!/bin/bash
+#
+# A rewritten URL written into a script string must not end the string or
+# start an escape in it, so a backslash there is percent-encoded like a quote.
+# The b links point off-site and are not fetched. The l links are saved, and
+# their query must be encoded the same way.
+
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_jsbackslash.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmp"
+root=$tmp/root
+mkdir -p "$root"
+echo target >"$root/l.html"
+
+cat >"$root/index.html" <<'EOF'
+<html><body>
+<script>var s="//ext.invalid/b1.php?x=&#92;";</script>
+<script>document.write("<img src=//ext.invalid/b2.php?x=&#92;");var ok=1;</script>
+<a onclick="document.write('<img src=//ext.invalid/b5.php?x=&#92; alt=a')">a</a>
+<a href="//ext.invalid/b6.php?x=&#92;">m</a>
+<script>var u="//ext.invalid/b7.php?x=1";</script>
+<script>var a='l.html?m=&#39;;alert(1)//';</script>
+<script>var b="l.html?m=&#92;";</script>
+<script>document.write('<img src=l.html?w=&#92;&#39;>');</script>
+<a onclick="document.write('<img src=l.html?h=&#92;&quot; alt=a')">a</a>
+<a href="l.html?a=&quot;x&#39;y&#92;z&lt;">m</a>
+</body></html>
+EOF
+
+# A backslash in a script string is encoded, but not in an attribute (b6 and
+# the last l link). Each l link is saved under a hashed name, folded back to
+# l.html before the compare.
+cat >"$tmp/expect-default" <<'EOF'
+<html><body>
+<script>var s="http://ext.invalid/b1.php?x=%5c";</script>
+<script>document.write("<img src=http://ext.invalid/b2.php?x=%5c");var ok=1;</script>
+<a onclick="document.write('<img src=http://ext.invalid/b5.php?x=%5c alt=a')">a</a>
+<a href="http://ext.invalid/b6.php?x=\">m</a>
+<script>var u="http://ext.invalid/b7.php?x=1";</script>
+<script>var a='l.html?m=%27;alert(1)//';</script>
+<script>var b="l.html?m=%5c";</script>
+<script>document.write('<img src=l.html?w=%5c%27>');</script>
+<a onclick="document.write('<img src=l.html?h=%5c%22 alt=a')">a</a>
+<a href="l.html?a=%22x%27y\z%3c">m</a>
+</body></html>
+EOF
+
+# -%P0 leaves the plain script strings as they are.
+awk 'NR==FNR { if (/<script>var /) src[FNR] = $0; next }
+     FNR in src { print src[FNR]; next } { print }' \
+    "$root/index.html" "$tmp/expect-default" >"$tmp/expect-P0"
+
+local_server_start --root "$root" --log "$tmp/server.log"
+
+# check MODE [httrack args]: crawl, then compare the page byte for byte
+check() {
+    local mode=$1 out site
+    shift
+    out=$tmp/out-$mode
+    local_crawl --log "$tmp/$mode.log" "$BASEURL/index.html" -O "$out" \
+        -r2 --robots=0 --quiet -%F '' "$@" || true
+    site=$out/127.0.0.1_$SRV_PORT
+    test -f "$site/index.html" || fail_dump "$mode: no index.html" "$tmp/$mode.log"
+    sed -E 's/l[0-9a-f]{4}\.html/l.html/g' "$site/index.html" >"$out.html"
+    cmp -s "$tmp/expect-$mode" "$out.html" || {
+        diff "$tmp/expect-$mode" "$out.html" | cut -c1-200 >&2 || true
+        fail "$mode: index.html differs"
+    }
+}
+
+check P0 -%P0
+check default
