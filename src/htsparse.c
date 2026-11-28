@@ -1582,7 +1582,7 @@ static hts_boolean meta_robots_nofollow(htsmoduleStruct *str,
   return HTS_FALSE;
 }
 
-/* gcc keeps a per-byte helper out of htsparse()'s huge body otherwise */
+/* gcc keeps a per-byte helper out of line otherwise (+0.4% instructions) */
 #if defined(__GNUC__)
 #define PARSE_INLINE inline __attribute__((always_inline))
 #elif defined(_MSC_VER)
@@ -1639,10 +1639,10 @@ typedef struct parse_state {
   parse_sink sink; /* output HTML */
 } parse_state;
 
-/* What htsparse() knows about the link at the cursor, reset as it scans. */
+/* What htsparse() knows about the link at the cursor, reset for each byte. */
 typedef struct parse_link {
-  int p;                     /* offset from html to a link value, or 0 */
-  int valid_p;               /* take the link even when p is 0 */
+  int p;       /* offset from html to a link value, 0 none, -1 stop looking */
+  int valid_p; /* take the link even when p is 0 */
   int module_base;           /* module specifier: resolve against the script */
   int ending_p;              /* the quote that ends the value, or 0 */
   hts_boolean escape_parens; /* is this a CSS url()? */
@@ -1982,8 +1982,10 @@ static hts_boolean parse_poll(parse_state *const ps, httrackp *const opt,
   return HTS_TRUE;
 }
 
-/* Dirty parsing, the last resort: take a quoted string that looks like a
-   link. POS_PREV is the automaton state before this byte. */
+/* Dirty parsing (-%P), the last resort: take any quoted string that looks
+   like a link, even outside an attribute. On success sets lk->valid_p and
+   lk->module_base, and always updates parseall_lastc. POS_PREV is the script
+   automaton state before this byte. */
 static PARSE_INLINE void parse_dirty_scan(parse_state *const ps,
                                           parse_link *const lk,
                                           httrackp *const opt,
@@ -2270,7 +2272,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
       base[0] = '\0'; // clear base href
       while (ps->html - r->adr < r->size) {
-        parse_link lk; // the B3 fields are set when a tag body is entered
+        parse_link lk; // p_type..add_class are set when a tag body is entered
         lk.p = 0;
         lk.valid_p = 0;
         lk.module_base = 0;
@@ -2406,8 +2408,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                 }
               }
             } else if (ptr > 0) { /* pas première page 0 (primary) */
-              lk.p =
-                  0; // saut pour le nom de fichier: adresse nom fichier=adr+p
+              // offset of the file name: name = html + p
+              lk.p = 0;
 
               // ------------------------------
               // détection d'écriture JavaScript.
@@ -2548,8 +2550,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         }
                         break;
                       case HTS_ATTR_LEAVE:
-                        lk.p_nocatch =
-                            1; /* rewrite the link, never capture it */
+                        /* rewrite the link, never capture it */
+                        lk.p_nocatch = 1;
                         break;
                       default:
                         break;
@@ -2661,7 +2663,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                             check_tag(ps->tag.intag_start, "applet")) {
                           lk.p_type = HTS_LINK_CODEBASE;
                         } else
-                          lk.p = -1; // ne plus chercher
+                          lk.p = -1; // stop looking
                       }
                     }
 
@@ -2751,8 +2753,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
             ps->tag.intag_startattr = ps->html + 1;
           }
 
-          // last resort: any quoted string that looks like a link, never in a
-          // comment
           if (opt->parseall && (opt->parsejava & HTSPARSE_NO_AGGRESSIVE) == 0 &&
               (ptr > 0) && (!ps->page.in_media)) {
             if (!is_realspace(*ps->html))
