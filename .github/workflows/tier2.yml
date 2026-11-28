@@ -400,6 +400,18 @@ jobs:
           grep -q '^self-check: the widen mutant .* reported$' "$log"
           grep -q '^self-check: the narrow mutant .* reported$' "$log"
 
+  # The image Anthropic's OSS Scanner builds, so a build change cannot break it unseen.
+  # No submodules, because the scanner's checkout may have none.
+  oss-scanner-image:
+    name: OSS Scanner image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build the image
+        run: docker build --progress=plain -f .oss-scanner/Dockerfile .
+
   # Other people's packaging recipes, each building our dist tarball. A red here
   # is often theirs to fix rather than ours.
   alpine:
@@ -444,6 +456,7 @@ jobs:
       - no-getrandom
       - no-spawn
       - parser-diff-self-check
+      - oss-scanner-image
       - alpine
       - arch
       - fedora
