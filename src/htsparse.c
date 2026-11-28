@@ -1623,6 +1623,8 @@ typedef struct parse_state {
     const char *inscript_name;   /* the tag that opened the script */
     int inscript_tag;        /* inside an event handler such as onLoad="..." */
     char inscript_tag_lastc; /* the quote that ends that handler */
+    const char *inscript_tag_end; /* the byte ending its value, or NULL */
+    const char *quote_absent[2];  /* no " (0) or ' (1) at or past this */
     int inscriptgen;         /* inside generated HTML, as in obj.write("...") */
     const char *scriptgen_end; /* the closing quote of that string */
     hts_boolean css_file;    /* the whole document is a stylesheet */
@@ -1749,6 +1751,42 @@ static void parse_emit_footer(parse_state *const ps, const httrackp *const opt,
   }
 }
 
+/* Return the byte that ends an attribute value as a browser reads it: the
+   first QUOTE at or past S, or for an unquoted value ('\0') the first space
+   or '>'. NULL when the quote never comes, then '>' ends the tag as before. */
+static const char *attr_value_end(parse_state *const ps, const char *const s,
+                                  const char quote, const htsblk *const r) {
+  const char *const end = r->adr + r->size;
+  const char *e;
+
+  if (s >= end)
+    return end;
+  if (quote == '\0') {
+    for (e = s; e < end && !is_realspace(*e) && *e != '>'; e++)
+      ;
+    return e;
+  }
+  {
+    const int q = quote == '"' ? 0 : 1;
+
+    // the cache keeps a page of unclosed quotes linear
+    if (ps->script.quote_absent[q] != NULL && s >= ps->script.quote_absent[q])
+      return NULL;
+    e = memchr(s, quote, (size_t) (end - s));
+    if (e == NULL)
+      ps->script.quote_absent[q] = s;
+    return e;
+  }
+}
+
+/* Is the cursor at or past the end of the event handler it is in? */
+static hts_boolean handler_ends_here(const parse_state *const ps) {
+  if (ps->script.inscript_tag_end != NULL)
+    return ps->html >= ps->script.inscript_tag_end;
+  return ps->script.inscript_tag_lastc != '\0' &&
+         *ps->html == ps->script.inscript_tag_lastc;
+}
+
 /* Start the tag this '<' opens, or the comment a '<!--' opens, and emit the
    footer at the first <head>, <body> or <meta>, and at </html>. */
 static void parse_tag_open(parse_state *const ps, const httrackp *const opt,
@@ -1823,6 +1861,7 @@ static void parse_tag_open(parse_state *const ps, const httrackp *const opt,
 static void parse_tag_close(parse_state *const ps, const httrackp *const opt) {
   if (ps->script.inscript_tag) {
     ps->script.inscript_tag = ps->script.inscript = 0;
+    ps->script.inscript_tag_end = NULL;
     // reset the automaton on exit or its state leaks into plain HTML
     ps->script.inscript_state_pos = INSCRIPT_START;
     ps->script.inscriptgen = 0;
@@ -2316,8 +2355,15 @@ static PARSE_INLINE void detect_tag_attr(parse_state *const ps,
       }
       /* an event handler was found */
       if (lk->p) {
+        const char *v = ps->html + lk->p;
+
         /* the quote that ends it */
-        ps->script.inscript_tag_lastc = *(ps->html + lk->p);
+        ps->script.inscript_tag_lastc = *v;
+        while (v < r->adr + r->size && is_realspace(*v))
+          v++;
+        ps->script.inscript_tag_end = *v == '"' || *v == '\''
+                                          ? attr_value_end(ps, v + 1, *v, r)
+                                          : attr_value_end(ps, v, '\0', r);
         ps->html += lk->p /*+ 1*/; /* skip */
         /* now inside JavaScript code */
         ps->script.inscript_name = "";
@@ -3743,7 +3789,10 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                    &&
                    ((!ps->script.inscript && !ps->page.in_media) ||
                     (ps->script.inscript_tag)) /* and in tag (or in script) */
-        ) {
+                   /* a quoted handler holds '>' */
+                   && (!ps->script.inscript_tag ||
+                       ps->script.inscript_tag_end == NULL ||
+                       ps->html >= ps->script.inscript_tag_end)) {
           parse_tag_close(ps, opt);
         } else if (ps->tag.intag || ps->script.inscript ||
                    ps->page.in_media) { // in a tag, script or media body
@@ -3764,18 +3813,14 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
             /* caractère de terminaison pour "miniparsing" javascript=.. ? 
                (ex: <a href="javascript:()" action="foo"> ) */
-            if (ps->script.inscript_tag) {
-              if (ps->script.inscript_tag_lastc) {
-                if (*ps->html == ps->script.inscript_tag_lastc) {
-                  /* sortir */
-                  ps->script.inscript_tag = ps->script.inscript = 0;
-                  ps->script.inscriptgen = 0;
-                  ps->script.inscript_state_pos = INSCRIPT_START;
-                  ps->script.incomment = 0;
-                  if (opt->parsedebug) {
-                    HT_ADD("<@@ /inscript @@>");
-                  }
-                }
+            if (ps->script.inscript_tag && handler_ends_here(ps)) {
+              ps->script.inscript_tag_end = NULL;
+              ps->script.inscript_tag = ps->script.inscript = 0;
+              ps->script.inscriptgen = 0;
+              ps->script.inscript_state_pos = INSCRIPT_START;
+              ps->script.incomment = 0;
+              if (opt->parsedebug) {
+                HT_ADD("<@@ /inscript @@>");
               }
             }
 
@@ -3924,6 +3969,10 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                 ps->script.inscript_state_pos = INSCRIPT_START;
                 /* the quote that ends it */
                 ps->script.inscript_tag_lastc = quote;
+                ps->script.inscript_tag_end =
+                    quote == '"' || quote == '\'' || quote == '\0'
+                        ? attr_value_end(ps, ps->html, quote, r)
+                        : NULL;
                 if (opt->parsedebug) {
                   HT_ADD("<@@ inscript @@>");
                 }
