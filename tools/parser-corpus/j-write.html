@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html><head><title>js write</title></head>
 <body>
-<!-- only a string starting with ')' reaches the generated-HTML scan -->
+<!-- links inside document.write(): an img src and an a href. The leading ')' works around the .write( scan bug -->
 <script type="text/javascript">
 document.write(')<img alt="" src=j-wgen.gif>');
 document.write(')<a href="j-wgen2.gif">x</a>');
