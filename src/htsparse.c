@@ -1617,6 +1617,7 @@ typedef struct parse_state {
     const char *intag_startattr; /* start of the current attribute */
     int intag_start_valid;       /* intag_start points at a real tag */
     int intag_ctype; /* meta http-equiv: 1 content-type, 2 refresh */
+    const char *value_end; /* closing quote of the value the cursor is in */
   } tag;
 
   struct {                        /* script, style and comment state */
@@ -1785,6 +1786,21 @@ static const char *attr_value_end(parse_state *const ps, const char *const s,
       ps->script.quote_absent[q] = s;
     return e;
   }
+}
+
+/* Is the cursor inside a quoted attribute value, where '<' and '>' are text? */
+static hts_boolean in_quoted_value(const parse_state *const ps) {
+  return ps->tag.intag && ps->tag.value_end != NULL &&
+         ps->html < ps->tag.value_end;
+}
+
+/* Does the quote at the cursor open a value, being the first byte after '='? */
+static hts_boolean quote_opens_value(const parse_state *const ps) {
+  const char *p = ps->html - 1;
+
+  while (p > ps->tag.intag_start && is_realspace(*p))
+    p--;
+  return p > ps->tag.intag_start && *p == '=';
 }
 
 /* Is the cursor at or past the end of the event handler it is in? */
@@ -3790,6 +3806,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
         /* Parse */
         if ((*ps->html == '<')         /* No starting tag */
+            && !in_quoted_value(ps)    /* Not in title="<b>" */
             && (!ps->script.inscript)  /* Not in (java)script */
             && (!ps->script.incomment) /* Not in comment (<!--) */
             && (!ps->page.in_media)    /* Not in media */
@@ -3799,10 +3816,11 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                    &&
                    ((!ps->script.inscript && !ps->page.in_media) ||
                     (ps->script.inscript_tag)) /* and in tag (or in script) */
-                   /* a quoted handler holds '>' */
-                   && (!ps->script.inscript_tag ||
-                       ps->script.inscript_tag_end == NULL ||
-                       ps->html >= ps->script.inscript_tag_end)) {
+                   /* a quoted value or handler holds '>' */
+                   && !in_quoted_value(ps) &&
+                   (!ps->script.inscript_tag ||
+                    ps->script.inscript_tag_end == NULL ||
+                    ps->html >= ps->script.inscript_tag_end)) {
           parse_tag_close(ps, opt);
         } else if (ps->tag.intag || ps->script.inscript ||
                    ps->page.in_media) { // in a tag, script or media body
@@ -3813,6 +3831,12 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
           lk.add_class = 0;
           int add_class_dots_to_patch = 0;      // number of '.' in code="x.y.z<realname>"
           const char *p_flush = NULL;
+
+          // a quoted value ends only at its own quote, as in a browser
+          if (ps->tag.intag && !ps->script.inscript && !ps->page.in_media &&
+              (*ps->html == '"' || *ps->html == '\'') && !in_quoted_value(ps) &&
+              quote_opens_value(ps))
+            ps->tag.value_end = attr_value_end(ps, ps->html + 1, *ps->html, r);
 
           // ------------------------------------------------------------
           // parsing évolé
