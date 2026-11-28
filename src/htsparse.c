@@ -1582,6 +1582,15 @@ static hts_boolean meta_robots_nofollow(htsmoduleStruct *str,
   return HTS_FALSE;
 }
 
+/* gcc keeps a per-byte helper out of line otherwise (+0.4% instructions) */
+#if defined(__GNUC__)
+#define PARSE_INLINE inline __attribute__((always_inline))
+#elif defined(_MSC_VER)
+#define PARSE_INLINE __forceinline
+#else
+#define PARSE_INLINE inline
+#endif
+
 /* htsparse()'s state that lives across iterations of its byte loop. */
 typedef struct parse_state {
   const char *html;      /* parse cursor */
@@ -1629,6 +1638,25 @@ typedef struct parse_state {
 
   parse_sink sink; /* output HTML */
 } parse_state;
+
+/* What htsparse() knows about the link at the cursor, reset for each byte. */
+typedef struct parse_link {
+  int p;       /* offset from html to a link value, 0 none, -1 stop looking */
+  int valid_p; /* take the link even when p is 0 */
+  int module_base;           /* module specifier: resolve against the script */
+  int ending_p;              /* the quote that ends the value, or 0 */
+  hts_boolean escape_parens; /* is this a CSS url()? */
+  char entity_end;           /* quote of an entity-quoted url() */
+  int archivetag_p;          /* archive=: comma-separated archives */
+  int srcset_p;              /* srcset="url1 480w, url2 2x": list of URLs */
+  int dataattr_p;            /* data-src / data-srcset: may hold a template */
+  int unquoted_script;       /* an unquoted script link: quotes do not end it */
+  hts_link_role p_type;      /* what the link is for */
+  hts_boolean p_xmlbase;     /* the base came from xml:base= */
+  int p_nocatch;             /* write the link but do not fetch it */
+  int p_searchMETAURL;       /* look for ..URL=<url> */
+  int add_class;             /* add .class if missing */
+} parse_link;
 
 /* Emit the --footer, plus the charset meta when emited_footer is 1, so the
    caller counts the emission first. PTR is the page's heap index. */
@@ -1954,6 +1982,125 @@ static hts_boolean parse_poll(parse_state *const ps, httrackp *const opt,
   return HTS_TRUE;
 }
 
+/* Dirty parsing (-%P), the last resort: take any quoted string that looks
+   like a link, even outside an attribute. On success sets lk->valid_p and
+   lk->module_base, and always updates parseall_lastc. POS_PREV is the script
+   automaton state before this byte. */
+static PARSE_INLINE void parse_dirty_scan(parse_state *const ps,
+                                          parse_link *const lk,
+                                          httrackp *const opt,
+                                          const htsblk *const r,
+                                          const INSCRIPT pos_prev) {
+  hts_boolean noparse = HTS_FALSE;
+
+  /* a script byte counts only inside a string */
+  if (ps->script.inscript &&
+      (ps->script.inscript_state_pos != INSCRIPT_INQUOTE &&
+       ps->script.inscript_state_pos != INSCRIPT_INQUOTE2)) {
+    noparse = HTS_TRUE;
+  }
+
+  /* never in a plain <!-- --> */
+  if ((!ps->tag.intag) && (ps->script.incomment) && (!ps->script.inscript))
+    noparse = HTS_TRUE;
+
+  if (!noparse) {
+    if (!lk->p) {                                         // no link found yet
+      if (ps->html != r->adr) {                           // past the first byte
+        if ((*ps->html == '\"') || (*ps->html == '\'')) { // "xx.gif" 'xx.gif'
+          // for example a="img.gif.. (handles comments)
+          if (strchr("=(,", ps->page.parseall_lastc)) {
+            const char *a = ps->html;
+            char stop = *ps->html; // " or '
+            int count = 0;
+
+            a++;
+            while ((*a) && (*a != '\'') && (*a != '\"') &&
+                   (count < HTS_URLMAXSIZE)) {
+              count++;
+              a++;
+            }
+
+            // a non-empty string closed by its own quote
+            if ((*a == stop) && (count < HTS_URLMAXSIZE) && (count > 0)) {
+              char c;
+
+              a++;
+              while (is_taborspace(*a))
+                a++;
+              c = *a;
+              // in-tag, an attribute value ends at its quote: no
+              // delimiter required after it (mid-tag attrs, #201)
+              if (strchr("),;>/+\r\n", c) ||
+                  (ps->tag.intag && !ps->script.inscript &&
+                   ps->tag.intag_start_valid &&
+                   hts_dirty_attr_detectable(ps->html, ps->tag.intag_start))) {
+                // '/' covers a value followed by a JS comment
+                hts_boolean url_ok = hts_dirty_link_is_url(
+                    opt, hts_span_at(ps->html + 1, (size_t) count), c,
+                    ps->script.inscript);
+
+                if (url_ok) {
+
+                  if (ps->tag.intag && ps->tag.intag_start_valid &&
+                      ps->tag.intag_start) {
+                    const char *nend;
+                    const char *const name = hts_dirty_attr_name(
+                        ps->html, ps->tag.intag_start, &nend);
+                    const char *refused = NULL;
+
+                    // a quote nested in a value has no name, so
+                    // also ask the attribute holding it
+                    if (!ps->script.inscript && !ps->script.incomment) {
+                      if (name != NULL)
+                        refused = hts_dirty_attr_refused(name, nend);
+                      if (refused == NULL && ps->tag.intag_startattr != NULL)
+                        refused = hts_dirty_attr_refused(
+                            ps->tag.intag_startattr,
+                            ps->tag.intag_startattr +
+                                strcspn(ps->tag.intag_startattr,
+                                        "=" HTS_SPACES));
+                    }
+                    if (refused != NULL) {
+                      url_ok = HTS_FALSE;
+                      hts_log_print(opt, LOG_DEBUG,
+                                    "dirty parsing: %s attribute "
+                                    "avoided",
+                                    refused);
+                    } else if (name != NULL &&
+                               hts_attr_is_js_binding(name, nend)) {
+                      url_ok = HTS_FALSE;
+                      hts_log_print(opt, LOG_DEBUG,
+                                    "dirty parsing: binding "
+                                    "attribute avoided");
+                    }
+                  }
+
+                  // accept it, as an ordinary link
+                  if (url_ok) {
+                    lk->valid_p = 1;
+                    lk->p = 0;
+                    lk->module_base =
+                        ps->script.inscript &&
+                        hts_js_quote_is_import_arg(ps->html, r->adr);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    } // p == 0
+
+  } // not in comment
+
+  if (ps->script.inscript_state_pos == INSCRIPT_START &&
+      pos_prev == INSCRIPT_START) {
+    // last byte seen by the parseall scan
+    ps->page.parseall_lastc = *ps->html;
+  }
+}
+
 int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
   char catbuff[CATBUFF_SIZE];
 
@@ -2125,16 +2272,17 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
       base[0] = '\0'; // clear base href
       while (ps->html - r->adr < r->size) {
-        int p = 0;
-        int valid_p = 0;        // force to take p even if == 0
-        int module_base = 0;    // module specifier: resolve against the script
-        int ending_p = '\0';    // ending quote?
-        hts_boolean escape_parens = HTS_FALSE; // is this a CSS url()?
-        char entity_end = '\0'; // quote of an entity-quoted url()
-        int archivetag_p = 0;   // avoid multiple-archives with commas
-        int srcset_p = 0;       // srcset="url1 480w, url2 2x": list of URLs
-        int dataattr_p = 0;     // data-src / data-srcset: may hold a template
-        int unquoted_script = 0;
+        parse_link lk; // p_type..add_class are set when a tag body is entered
+        lk.p = 0;
+        lk.valid_p = 0;
+        lk.module_base = 0;
+        lk.ending_p = '\0';
+        lk.escape_parens = HTS_FALSE;
+        lk.entity_end = '\0';
+        lk.archivetag_p = 0;
+        lk.srcset_p = 0;
+        lk.dataattr_p = 0;
+        lk.unquoted_script = 0;
         INSCRIPT inscript_state_pos_prev = ps->script.inscript_state_pos;
 
         *stre->error_ = 0;
@@ -2164,11 +2312,11 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
           parse_tag_close(ps, opt);
         } else if (ps->tag.intag || ps->script.inscript ||
                    ps->page.in_media) { // in a tag, script or media body
-          hts_link_role p_type = HTS_LINK_PLAIN;
-          hts_boolean p_xmlbase = HTS_FALSE; // the base came from xml:base=
-          int p_nocatch = 0;
-          int p_searchMETAURL = 0;      // chercher ..URL=<url>
-          int add_class = 0;    // ajouter .class
+          lk.p_type = HTS_LINK_PLAIN;
+          lk.p_xmlbase = HTS_FALSE;
+          lk.p_nocatch = 0;
+          lk.p_searchMETAURL = 0;
+          lk.add_class = 0;
           int add_class_dots_to_patch = 0;      // number of '.' in code="x.y.z<realname>"
           const char *p_flush = NULL;
 
@@ -2224,8 +2372,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   while (bol > start && (bol[-1] == ' ' || bol[-1] == '\t'))
                     bol--;
                   if (bol == start || bol[-1] == '\n' || bol[-1] == '\r') {
-                    p = 0;
-                    valid_p = 1;
+                    lk.p = 0;
+                    lk.valid_p = 1;
                   }
                 }
               } else if (strcmp(ps->page.in_media, "AAM") == 0) { // AAM
@@ -2252,15 +2400,16 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     if (is_knowntype(opt, tmp) ||
                         ishtml_ext(hts_span_of(tmp)) != -1) {
                       ps->html++;
-                      p = 0;
-                      valid_p = 1;
-                      unquoted_script = 1;
+                      lk.p = 0;
+                      lk.valid_p = 1;
+                      lk.unquoted_script = 1;
                     }
                   }
                 }
               }
             } else if (ptr > 0) { /* pas première page 0 (primary) */
-              p = 0;            // saut pour le nom de fichier: adresse nom fichier=adr+p
+              // offset of the file name: name = html + p
+              lk.p = 0;
 
               // ------------------------------
               // détection d'écriture JavaScript.
@@ -2346,32 +2495,33 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
               // ------------------------------
 
               // analyse proprement dite, A HREF=.. etc..
-              if (!p) {
+              if (!lk.p) {
                 // si dans un tag, et pas dans un script - sauf si on analyse un obj.write("..
                 if ((ps->tag.intag && (!ps->script.inscript)) ||
                     ps->script.inscriptgen) {
                   if ((*(ps->html - 1) == '<') ||
                       (is_space(*(ps->html - 1)))) { // <tag < tag etc
                     // <A HREF=.. pour les liens HTML
-                    p = rech_tageq(ps->html, "href");
-                    if (p) {    // href.. tester si c'est une bas href!
+                    lk.p = rech_tageq(ps->html, "href");
+                    if (lk.p) { // href.. tester si c'est une bas href!
                       if ((ps->tag.intag_start_valid) &&
                           check_tag(ps->tag.intag_start, "base")) {
                         // ** note: base href et codebase ne font pas bon ménage..
-                        p_type = HTS_LINK_BASE;
+                        lk.p_type = HTS_LINK_BASE;
                       }
                     }
                     // XML Base, document-wide: later elements inherit it
-                    if (p == 0 && (p = rech_tageq(ps->html, "xml:base")) != 0) {
-                      p_type = HTS_LINK_BASE;
-                      p_xmlbase = HTS_TRUE;
+                    if (lk.p == 0 &&
+                        (lk.p = rech_tageq(ps->html, "xml:base")) != 0) {
+                      lk.p_type = HTS_LINK_BASE;
+                      lk.p_xmlbase = HTS_TRUE;
                     }
 
                     /* The other attributes that may hold a link */
                     const hts_attr *const at =
-                        p == 0
-                            ? hts_attr_match(ps->html, !ps->script.inscript, &p)
-                            : NULL;
+                        lk.p == 0 ? hts_attr_match(ps->html,
+                                                   !ps->script.inscript, &lk.p)
+                                  : NULL;
                     const hts_boolean is_script_attr =
                         at != NULL && (at->kind == HTS_ATTR_EVENT ||
                                        at->kind == HTS_ATTR_STYLE);
@@ -2379,28 +2529,29 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     if (at != NULL) {
                       switch (at->kind) {
                       case HTS_ATTR_LINK:
-                        dataattr_p = strncmp(at->name, "data-", 5) == 0;
+                        lk.dataattr_p = strncmp(at->name, "data-", 5) == 0;
                         /* A temporary hack to avoid archive=foo.jar,bar.jar */
                         if (strcmp(at->name, "archive") == 0) {
-                          archivetag_p = 1;
+                          lk.archivetag_p = 1;
                         }
                         /* srcset: a comma-list of candidate URLs, each split
                            out and rewritten below (#235, #236) */
                         else if (strcmp(at->name, "srcset") == 0 ||
                                  strcmp(at->name, "data-srcset") == 0) {
-                          srcset_p = 1;
+                          lk.srcset_p = 1;
                         }
                         break;
                       case HTS_ATTR_REFRESH:
                         // <meta http-equiv="Refresh" content="3;URL=a.html">
                         if (ps->tag.intag_ctype == 2) {
-                          p_searchMETAURL = 1;
+                          lk.p_searchMETAURL = 1;
                         } else {
-                          p = 0; /* cancel */
+                          lk.p = 0; /* cancel */
                         }
                         break;
                       case HTS_ATTR_LEAVE:
-                        p_nocatch = 1; /* rewrite the link, never capture it */
+                        /* rewrite the link, never capture it */
+                        lk.p_nocatch = 1;
                         break;
                       default:
                         break;
@@ -2408,31 +2559,31 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     }
 
                     /* Events, but not inside document.write */
-                    if ((p == 0 || is_script_attr) && !ps->script.inscript) {
+                    if ((lk.p == 0 || is_script_attr) && !ps->script.inscript) {
                       /* not in the table: any other onXxx= */
-                      if (p == 0) {
+                      if (lk.p == 0) {
                         if ((*ps->html == 'o') && (*(ps->html + 1) == 'n') &&
                             isUpperLetter(*(ps->html + 2))) {
-                          p = 0;
-                          while ((p < 64) &&
-                                 hts_isalpha((unsigned char) ps->html[p]))
-                            p++;
-                          if (p < 64) {
-                            while (is_space(ps->html[p]))
-                              p++;
-                            if (ps->html[p] == '=')
-                              p++;
+                          lk.p = 0;
+                          while ((lk.p < 64) &&
+                                 hts_isalpha((unsigned char) ps->html[lk.p]))
+                            lk.p++;
+                          if (lk.p < 64) {
+                            while (is_space(ps->html[lk.p]))
+                              lk.p++;
+                            if (ps->html[lk.p] == '=')
+                              lk.p++;
                             else
-                              p = 0;
+                              lk.p = 0;
                           } else
-                            p = 0;
+                            lk.p = 0;
                         }
                       }
                       /* OK, événement repéré */
-                      if (p) {
+                      if (lk.p) {
                         /* the quote that ends it */
-                        ps->script.inscript_tag_lastc = *(ps->html + p);
-                        ps->html += p /*+ 1*/; /* skip */
+                        ps->script.inscript_tag_lastc = *(ps->html + lk.p);
+                        ps->html += lk.p /*+ 1*/; /* skip */
                         /*
                            On est désormais dans du code javascript
                          */
@@ -2445,18 +2596,18 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                           HT_ADD("<@@ inscript @@>");
                         }
                       }
-                      p = 0;    /* quoi qu'il arrive, ne rien démarrer ici */
+                      lk.p = 0; /* quoi qu'il arrive, ne rien démarrer ici */
                     }
                     // <APPLET CODE=.. pour les applet java.. [CODEBASE (chemin..) à faire]
-                    if (p == 0) {
-                      p = rech_tageq(ps->html, "code");
-                      if (p) {
+                    if (lk.p == 0) {
+                      lk.p = rech_tageq(ps->html, "code");
+                      if (lk.p) {
                         // inside an <applet>
                         if ((ps->tag.intag_start_valid) &&
                             check_tag(ps->tag.intag_start, "applet")) {
                           // the codebase is written before it
-                          p_type = HTS_LINK_APPLET_CODE;
-                          add_class = 1; // add .class if missing
+                          lk.p_type = HTS_LINK_APPLET_CODE;
+                          lk.add_class = 1; // add .class if missing
 
                           // A codebase= after code= is swapped before it.
                           {
@@ -2492,9 +2643,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                   memcpy(modify, tempo, strlen(tempo));
                                   /* the tag changed */
                                   ps->page.fetch_tag.name = NULL;
-                                  p = 0; // the link moved, so drop it
-                                  p_type = HTS_LINK_PLAIN;
-                                  add_class = 0;
+                                  lk.p = 0; // the link moved, so drop it
+                                  lk.p_type = HTS_LINK_PLAIN;
+                                  lk.add_class = 0;
                                 }
                               }
                             }
@@ -2503,20 +2654,21 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       }
                     }
                     // liens à patcher mais pas à charger (ex: codebase)
-                    if (p == 0) {       // note: si non chargé (ex: ignorer .class) patché tout de même
-                      p = rech_tageq(ps->html, "codebase");
-                      if (p) {
+                    if (lk.p == 0) { // note: si non chargé (ex: ignorer .class)
+                                     // patché tout de même
+                      lk.p = rech_tageq(ps->html, "codebase");
+                      if (lk.p) {
                         // inside an <applet>
                         if ((ps->tag.intag_start_valid) &&
                             check_tag(ps->tag.intag_start, "applet")) {
-                          p_type = HTS_LINK_CODEBASE;
+                          lk.p_type = HTS_LINK_CODEBASE;
                         } else
-                          p = -1;       // ne plus chercher
+                          lk.p = -1; // stop looking
                       }
                     }
 
                     // Meta tags pour robots
-                    if (p == 0) {
+                    if (lk.p == 0) {
                       if (opt->robots) {
                         if ((ps->tag.intag_start_valid) &&
                             check_tag(ps->tag.intag_start, "meta")) {
@@ -2576,24 +2728,24 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                                      (size_t) jslink.length),
                                          32));
                       }
-                      p = jslink.offset; // p non nul: TRAITER CHAINE COMME
-                                         // FICHIER
-                      module_base = jslink.is_module;
-                      escape_parens = jslink.escape_parens;
-                      entity_end = jslink.entity_quote;
+                      lk.p = jslink.offset; // p non nul: TRAITER CHAINE COMME
+                                            // FICHIER
+                      lk.module_base = jslink.is_module;
+                      lk.escape_parens = jslink.escape_parens;
+                      lk.entity_end = jslink.entity_quote;
                       if (jslink.unquoted_end != '\0')
-                        ending_p = jslink.unquoted_end;
+                        lk.ending_p = jslink.unquoted_end;
                     }
                   }
                 }
               }
 
             } else {            // ptr == 0
-              p = 0;            // No stupid tag anymore, raw link
-              valid_p = 1;      // Valid even if p==0
-              while ((ps->html[p] == '\r') || (ps->html[p] == '\n'))
-                p++;
-              ending_p = '\r';
+              lk.p = 0;         // No stupid tag anymore, raw link
+              lk.valid_p = 1;   // Valid even if p==0
+              while ((ps->html[lk.p] == '\r') || (ps->html[lk.p] == '\n'))
+                lk.p++;
+              lk.ending_p = '\r';
             }
 
           } else if (hts_isspace((unsigned char) *ps->html)) {
@@ -2601,143 +2753,19 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
             ps->tag.intag_startattr = ps->html + 1;
           }
 
-          // ------------------------------------------------------------
-          // dernier recours - parsing "sale" : détection systématique des .gif, etc.
-          // risque: générer de faux fichiers parazites
-          // fix: ne parse plus dans les commentaires
-          // ------------------------------------------------------------
           if (opt->parseall && (opt->parsejava & HTSPARSE_NO_AGGRESSIVE) == 0 &&
-              (ptr > 0) && (!ps->page.in_media)) { // option parsing "brut"
-            if (!is_realspace(*ps->html)) {
-              int noparse = 0;
-
-              /* ensure automate state  0 (not in comments, quotes..) */
-              if (ps->script.inscript &&
-                  (ps->script.inscript_state_pos != INSCRIPT_INQUOTE &&
-                   ps->script.inscript_state_pos != INSCRIPT_INQUOTE2)) {
-                noparse = 1;
-              }
-
-              /* vérifier que l'on est pas dans un <!-- --> pur */
-              if ((!ps->tag.intag) && (ps->script.incomment) &&
-                  (!ps->script.inscript))
-                noparse = 1;    /* commentaire */
-
-              // recherche d'URLs
-              if (!noparse) {
-                if (!p) {       // non déja trouvé
-                  if (ps->html != r->adr) { // past the first byte
-                    // scanner les chaines
-                    if ((*ps->html == '\"') ||
-                        (*ps->html == '\'')) { // "xx.gif" 'xx.gif'
-                      // for example a="img.gif.. (handles comments)
-                      if (strchr("=(,", ps->page.parseall_lastc)) {
-                        const char *a = ps->html;
-                        char stop = *ps->html; // " or '
-                        int count = 0;
-
-                        // sauter caractères
-                        a++;
-                        // copier
-                        while((*a) && (*a != '\'') && (*a != '\"')
-                              && (count < HTS_URLMAXSIZE)) {
-                          count++;
-                          a++;
-                        }
-
-                        // ok chaine terminée par " ou '
-                        if ((*a == stop) && (count < HTS_URLMAXSIZE)
-                            && (count > 0)) {
-                          char c;
-
-                          a++;
-                          while(is_taborspace(*a))
-                            a++;
-                          c = *a;
-                          // in-tag, an attribute value ends at its quote: no
-                          // delimiter required after it (mid-tag attrs, #201)
-                          if (strchr("),;>/+\r\n", c) ||
-                              (ps->tag.intag && !ps->script.inscript &&
-                               ps->tag.intag_start_valid &&
-                               hts_dirty_attr_detectable(
-                                   ps->html, ps->tag.intag_start))) {
-                            // '/' covers a value followed by a JS comment
-                            int url_ok = hts_dirty_link_is_url(
-                                opt, hts_span_at(ps->html + 1, (size_t) count),
-                                c, ps->script.inscript);
-
-                            if (url_ok) {
-
-                              if (ps->tag.intag && ps->tag.intag_start_valid &&
-                                  ps->tag.intag_start) {
-                                const char *nend;
-                                const char *const name = hts_dirty_attr_name(
-                                    ps->html, ps->tag.intag_start, &nend);
-                                const char *refused = NULL;
-
-                                // a quote nested in a value has no name, so
-                                // also ask the attribute holding it
-                                if (!ps->script.inscript &&
-                                    !ps->script.incomment) {
-                                  if (name != NULL)
-                                    refused =
-                                        hts_dirty_attr_refused(name, nend);
-                                  if (refused == NULL &&
-                                      ps->tag.intag_startattr != NULL)
-                                    refused = hts_dirty_attr_refused(
-                                        ps->tag.intag_startattr,
-                                        ps->tag.intag_startattr +
-                                            strcspn(ps->tag.intag_startattr,
-                                                    "=" HTS_SPACES));
-                                }
-                                if (refused != NULL) {
-                                  url_ok = 0;
-                                  hts_log_print(opt, LOG_DEBUG,
-                                                "dirty parsing: %s attribute "
-                                                "avoided",
-                                                refused);
-                                } else if (name != NULL &&
-                                           hts_attr_is_js_binding(name, nend)) {
-                                  url_ok = 0;
-                                  hts_log_print(opt, LOG_DEBUG,
-                                                "dirty parsing: binding "
-                                                "attribute avoided");
-                                }
-                              }
-
-                              // accept it, as an ordinary link
-                              if (url_ok) {
-                                valid_p = 1;
-                                p = 0;
-                                module_base = ps->script.inscript &&
-                                              hts_js_quote_is_import_arg(
-                                                  ps->html, r->adr);
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                } // p == 0
-
-              } // not in comment
-
-              // plus dans un commentaire
-              if (ps->script.inscript_state_pos == INSCRIPT_START &&
-                  inscript_state_pos_prev == INSCRIPT_START) {
-                // last byte seen by the parseall scan
-                ps->page.parseall_lastc = *ps->html;
-              }
-
-            } // if realspace
-          } // if parseall
+              (ptr > 0) && (!ps->page.in_media)) {
+            if (!is_realspace(*ps->html))
+              parse_dirty_scan(ps, &lk, opt, r, inscript_state_pos_prev);
+          }
 
           // ------------------------------------------------------------
           // p!=0 : on a repéré un éventuel lien
           // ------------------------------------------------------------
           //
-          if ((p > 0) || (valid_p)) { // on a repéré un lien
+          if ((lk.p > 0) || (lk.valid_p)) { // on a repéré un lien
+            // the relativeurladr() family reads this name
+            const int module_base = lk.module_base;
             const char *eadr = NULL;  /* fin de l'URL */
 
             int ok = 1;
@@ -2755,22 +2783,23 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
             /* Past the cap nothing fetches links, so write them external. */
             if (hts_maxlinks_no_room(opt)) {
-              p_nocatch = 1;
+              lk.p_nocatch = 1;
               maxlinks_give_up(opt, stre->exit_xh_);
             }
             // si nofollow ou un stop a été déclenché, réécrire tous les liens en externe
             /* an update keeps following, so the cache keeps its data */
             if ((ps->page.nofollow) ||
                 (hts_load_acquire_int(&opt->state.stop) && !opt->is_update))
-              p_nocatch = 1;
+              lk.p_nocatch = 1;
 
             // écrire codebase avant, flusher avant code
-            if (p_type == HTS_LINK_APPLET_CODE || p_type == HTS_LINK_CODEBASE) {
+            if (lk.p_type == HTS_LINK_APPLET_CODE ||
+                lk.p_type == HTS_LINK_CODEBASE) {
               HT_add_adr;       // refresh
               ps->lastsaved = ps->html; // one past the last byte written
             }
             // sauter espaces
-            hts_automate_increment(&saut, p);
+            hts_automate_increment(&saut, lk.p);
             while ((is_space(*ps->html) ||
                     (ps->script.inscriptgen && ps->html[0] == '\\' &&
                      is_space(ps->html[1]))) &&
@@ -2792,7 +2821,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                 (ps->page.in_media && strcmp(ps->page.in_media, "LNK") == 0))
               quote = '\n';
             /* s'arrêter que ce soit un ' ou un " : pour document.write('<img src="foo'+a); par exemple! */
-            else if (ps->script.inscript && !unquoted_script)
+            else if (ps->script.inscript && !lk.unquoted_script)
               noquote = 1;
 
             // sauter éventuel \" ou \' javascript
@@ -2805,7 +2834,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
               }
             }
             // sauter content="1;URL=http://..
-            if (p_searchMETAURL) {
+            if (lk.p_searchMETAURL) {
               int l = 0;
 
               while ((ps->html + l + 4 < r->adr + r->size) &&
@@ -2843,7 +2872,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
  srcset_next:
             /* srcset: skip leading whitespace/commas before each candidate;
                the skipped bytes flush verbatim below */
-            if (srcset_p) {
+            if (lk.srcset_p) {
               while (ps->html < r->adr + r->size &&
                      (is_realspace(*ps->html) || *ps->html == ','))
                 hts_automate_increment(&saut, 1);
@@ -2851,12 +2880,13 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
             eadr = ps->html;
 
             // ne pas flusher après code si on doit écrire le codebase avant!
-            if (p_type != HTS_LINK_APPLET_CODE && !link_role_is_base(p_type)) {
+            if (lk.p_type != HTS_LINK_APPLET_CODE &&
+                !link_role_is_base(lk.p_type)) {
               HT_add_adr;       // refresh
               ps->lastsaved = ps->html; // one past the last byte written
               // après on écrira soit les données initiales,
               // soir une URL/lien modifié!
-            } else if (p_type == HTS_LINK_APPLET_CODE)
+            } else if (lk.p_type == HTS_LINK_APPLET_CODE)
               p_flush = ps->html; // flush up to here afterwards
 
             if (ok != -1) {     // continuer
@@ -2874,16 +2904,20 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       strcmp(ps->page.in_media, "LNK") == 0)
                     ok = 0;                   // a playlist line may end in CR
                   else if (is_space(*eadr)) { // guillemets,CR, etc
-                    if ((*eadr == quote && (!quoteinscript || *(eadr - 1) == '\\'))     // end quote
-                        || (noquote && (*eadr == '\"' || *eadr == '\''))        // end at any quote
-                        || (!noquote && quote == '\0' && is_realspace(*eadr))   // unquoted href
-                        || srcset_p     // whitespace ends a srcset candidate URL
-                      )         // si pas d'attente de quote spéciale ou si quote atteinte
+                    if ((*eadr == quote &&
+                         (!quoteinscript || *(eadr - 1) == '\\')) // end quote
+                        || (noquote && (*eadr == '\"' ||
+                                        *eadr == '\'')) // end at any quote
+                        || (!noquote && quote == '\0' &&
+                            is_realspace(*eadr)) // unquoted href
+                        || lk.srcset_p // whitespace ends a srcset candidate URL
+                        ) // si pas d'attente de quote spéciale ou si quote
+                          // atteinte
                       ok = 0;
-                  } else if (ending_p && (*eadr == ending_p))
+                  } else if (lk.ending_p && (*eadr == lk.ending_p))
                     ok = 0;
-                  else if (entity_end != '\0' && *eadr == '&' &&
-                           html_entity_quote(eadr, NULL) == entity_end)
+                  else if (lk.entity_end != '\0' && *eadr == '&' &&
+                           html_entity_quote(eadr, NULL) == lk.entity_end)
                     ok = 0;
                   else {
                     switch (*eadr) {
@@ -2911,7 +2945,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     case '?':  /*quote_adr=adr; */
                       break;    // noter position query
                     case ',':
-                      if (srcset_p) {
+                      if (lk.srcset_p) {
                         /* split only on a trailing comma; one inside the URL
                            (data: URI, CDN path) is kept, per the WHATWG algo */
                         const char *const n = eadr + 1;
@@ -2933,7 +2967,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   // 1=link empty with delim (end_adr-start_adr)
                   if (eadr - ps->html == 1) {
                     // "#" would land before an unflushed base's name
-                    if (quote && !link_role_is_base(p_type)) {
+                    if (quote && !link_role_is_base(lk.p_type)) {
                       HT_ADD("#"); // We add this for a <href="">
                     }
                   }
@@ -2947,7 +2981,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
               const hts_span value =
                   hts_span_at(ps->html, (size_t) (eadr - ps->html - 1));
 
-              if (ok == 0 && dataattr_p && data_attr_is_not_url(value)) {
+              if (ok == 0 && lk.dataattr_p && data_attr_is_not_url(value)) {
                 char *shown = malloct(value.len + 8);
 
                 if (shown != NULL)
@@ -3031,7 +3065,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                 }
 
                 // commas are forbidden
-                if (archivetag_p) {
+                if (lk.archivetag_p) {
                   if (strchr(lien, ',')) {
                     *stre->error_ = 1;
                     hts_log_print(opt, LOG_DEBUG,
@@ -3068,7 +3102,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                 // yes, this is dirty
                 // but I'm so lazzy..
                 // and besides the java "code" convention is really a pain in html code
-                if (p_type == HTS_LINK_APPLET_CODE) {
+                if (lk.p_type == HTS_LINK_APPLET_CODE) {
                   char *a = strrchr(lien, '.');
 
                   add_class_dots_to_patch = 0;
@@ -3088,7 +3122,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                 hts_strip_default_port(HTS_BUF(lien));
                 // vérifier que l'on ne doit pas ajouter de .class
                 if (!*stre->error_) {
-                  if (add_class) {
+                  if (lk.add_class) {
                     const char *const a = hts_path_ext_dot(lien, "/");
 
                     if (a == NULL || !hts_streq_ci(a, ".class"))
@@ -3096,8 +3130,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   }
                 }
                 if (!*stre->error_) {
-                  resolve_link_base(str, stre, HTS_BUF(lien), p_type,
-                                    p_xmlbase);
+                  resolve_link_base(str, stre, HTS_BUF(lien), lk.p_type,
+                                    lk.p_xmlbase);
                 }
                 // transformer lien quelconque (http, relatif, etc) en une adresse
                 // et un chemin+fichier (adr,fil)
@@ -3141,7 +3175,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
                 // Le lien doit juste être réécrit, mais ne doit pas générer un lien
                 // exemple: <FORM ACTION="url_cgi">
-                if (p_nocatch) {
+                if (lk.p_nocatch) {
                   forbidden_url = 1;    // interdire récupération du lien
                   hts_log_print(opt, LOG_DEBUG, "link forced external at %s%s",
                                 adr_nologin(opt, afs.af.adr), afs.af.fil);
@@ -3149,8 +3183,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                 // Tester si un lien doit être accepté ou refusé (wizard)
                 // forbidden_url=1 : lien refusé
                 // forbidden_url=0 : lien accepté
-                if (!link_role_is_base(p_type)) { // check the filters
-                  if (!p_nocatch) {
+                if (!link_role_is_base(lk.p_type)) { // check the filters
+                  if (!lk.p_nocatch) {
                     if (afs.af.adr[0] != '\0') {
                       hts_log_print(opt, LOG_DEBUG,
                                     "wizard link test at %s%s..",
@@ -3199,7 +3233,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   // dans ce cas on aura une référence directe au lieu des traditionnels
                   // moved en cascade (impossible à reproduire à priori en local, lorsque des fichiers
                   // gif sont impliqués par exemple)
-                  if (!link_role_is_base(p_type)) {
+                  if (!link_role_is_base(lk.p_type)) {
                     if (forbidden_url != 1) {
                       char BIGSTK last_adr[HTS_URLMAXSIZE * 2];
 
@@ -3218,9 +3252,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         // Tester si un lien doit être accepté ou refusé (wizard)
                         // forbidden_url=1 : lien refusé
                         // forbidden_url=0 : lien accepté
-                        if ((ptr > 0) &&
-                            !link_role_is_base(p_type)) { // check the filters
-                          if (!p_nocatch) {
+                        if ((ptr > 0) && !link_role_is_base(
+                                             lk.p_type)) { // check the filters
+                          if (!lk.p_nocatch) {
                             if (afs.af.adr[0] != '\0') {
                               hts_log_print(
                                   opt, LOG_DEBUG,
@@ -3255,9 +3289,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   {
                     const parse_fetch_flags flags = {
                         .redirect_stub = HTTP_IS_REDIRECT(r->statuscode),
-                        .meta_refresh = p_searchMETAURL,
+                        .meta_refresh = lk.p_searchMETAURL,
                         .opaque = ps->page.in_media != NULL ||
-                                  p_type != HTS_LINK_PLAIN,
+                                  lk.p_type != HTS_LINK_PLAIN,
                         .inscript = ps->script.inscript,
                         .incss = ps->script.incss,
                         .tagless_body = sf_tagless_body};
@@ -3270,7 +3304,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   if (former.adr[0] != '\0')
                     link_fetch.dest = HTS_FETCH_DEST_UNKNOWN;
                   // resolve unresolved type
-                  if (r_sv != -1 && !link_role_is_base(p_type) &&
+                  if (r_sv != -1 && !link_role_is_base(lk.p_type) &&
                       forbidden_url == 0 && IS_DELAYED_EXT(afs.save)) {
                     time_t t;
 
@@ -3292,7 +3326,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     /* log */
                     if ((opt->debug > 1) && (opt->log != NULL)) {
                       if (forbidden_url != 1) { // le lien va être chargé
-                        if (link_role_is_base(p_type)) { // not a link to fetch
+                        if (link_role_is_base(
+                                lk.p_type)) { // not a link to fetch
                           hts_log_print(opt, LOG_DEBUG, "Code/Codebase: %s%s",
                                         adr_nologin(opt, afs.af.adr),
                                         afs.af.fil);
@@ -3319,13 +3354,13 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     /* FIN log */
 
                     // écrire lien
-                    if (link_role_is_base(p_type)) { // skip it
+                    if (link_role_is_base(lk.p_type)) { // skip it
                       /* An emptied base href leaves <base >, which means "no
                          base" and stops a framework that requires one (Angular
                          throws). An empty href keeps the document itself as the
                          base, so every reference resolves as it did. */
-                      if (p_type == HTS_LINK_BASE)
-                        HT_ADD(p_xmlbase ? "xml:base=\"\"" : "href=\"\"");
+                      if (lk.p_type == HTS_LINK_BASE)
+                        HT_ADD(lk.p_xmlbase ? "xml:base=\"\"" : "href=\"\"");
                       // resume at the attribute's end, not at a '#' inside it
                       {
                         const char *const end = r->adr + r->size;
@@ -3367,7 +3402,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                     // externe!
                       /* Not only output: also writes external.html or .gif. */
                       if (ps->sink.enabled) {
-                        if (p_type != HTS_LINK_APPLET_CODE) { // not a class
+                        if (lk.p_type != HTS_LINK_APPLET_CODE) { // not a class
                           if (!opt->external) {
                             sink_add_absolute_url(&ps->sink, afs.af.adr,
                                                   afs.af.fil, opt->passprivacy,
@@ -3596,7 +3631,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                           inplace_escape_uri_utf(HTS_SIZED(tempo));
 
                           // CSS url(): keep parens escaped
-                          if (escape_parens)
+                          if (lk.escape_parens)
                             escape_url_parens(HTS_BUF(tempo));
                         }
                         hts_log_print(
@@ -3606,7 +3641,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                             relativesavename(), tempo);
 
                         // lien applet (code) - il faut placer un codebase avant
-                        if (p_type == HTS_LINK_APPLET_CODE) {
+                        if (lk.p_type == HTS_LINK_APPLET_CODE) {
 
                           if (p_flush) {
                             char BIGSTK tempo_pat[HTS_URLMAXSIZE * 2];
@@ -3666,8 +3701,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                              we cannot name must not reach the classifier. */
                           const char sf_class =
                               (opt->single_file && ps->page.sf_may_mark &&
-                               !ps->page.in_media && p_type == HTS_LINK_PLAIN &&
-                               !p_searchMETAURL &&
+                               !ps->page.in_media &&
+                               lk.p_type == HTS_LINK_PLAIN &&
+                               !lk.p_searchMETAURL &&
                                (sf_tag != NULL || sf_tagless_body))
                                   ? singlefile_ref_class(sf_tag, tag_attr_start,
                                                          r->adr)
@@ -3723,7 +3759,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                     afs.save);
                     }
 
-                    if ((afs.af.adr[0] != '\0') && !link_role_is_base(p_type) &&
+                    if ((afs.af.adr[0] != '\0') &&
+                        !link_role_is_base(lk.p_type) &&
                         (forbidden_url !=
                          1)) { // if the file does not exist, add it to the list
                       /* A front end's hts_addurl() can fill the cap after the
@@ -3894,7 +3931,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
             /* srcset candidate loop: skip the descriptor and comma, then
                re-enter the capture for the next URL. Backward goto, not a loop:
                the per-candidate body is this whole block. */
-            if (srcset_p && ok == 0) {
+            if (lk.srcset_p && ok == 0) {
               const char *const endp = r->adr + r->size;
               const char *q = ps->html;
               /* whitespace ends an unquoted value, so its descriptor too */
