@@ -21,7 +21,7 @@ The main attacker is a remote server. HTTrack fetches pages from servers its use
 
 The attacker does not choose the command line. They control only what their server sends, and which links their pages contain.
 
-A second attacker is a web page open in the user's browser while WebHTTrack or ProxyTrack runs. That page can send requests to a server on the loopback address, and it can use DNS rebinding.
+A second attacker is a web page open in the user's browser while WebHTTrack runs. That page can send requests to a server on the loopback address, and it can use DNS rebinding.
 
 ## What we want protected
 
@@ -30,7 +30,7 @@ These are the guarantees, from most to least important:
 1. **No code execution from server data.** This covers memory corruption in any parser above. It also covers the external command option `-V`, because the saved file name comes from the server. On POSIX, `src/htsusercmd.c` passes the name to `sh -c` as `$1`. It refuses a `$0` in a context the shell would re-read. On Windows it quotes the name for `cmd.exe`. The shell must never run any part of that name.
 2. **No write outside the mirror folder.** `url_savename()` in `src/htsname.c` builds each local file name from server data. A name with `..`, an absolute path, or a reserved Windows device name must stay inside the mirror folder. ProxyTrack must not serve a file outside the cache it was given. In WARC and MHT output (`src/htswarc.c`, `src/htsmhtml.c`), server data must stay inside its own record.
 3. **No leak of the user's secrets to another host.** HTTP authentication and cookies must go only to the hosts and paths they belong to (`src/htsbauth.c`). `Referer` must not go from an https page to an http page.
-4. **The WebHTTrack server serves only its own user.** It binds to 127.0.0.1 by default. `host_is_self` in `src/htsserver.c` checks the `Host` header on every request. It accepts `localhost`, any address literal, the `--bind` name and this host's own names. And `origin_is_self` rejects a foreign `Origin` on a POST. An absent `Host` or `Origin` passes. A request with a body must carry the session id (`sid`). An authenticated request can start a crawl with any options, `-V` included. So a bypass of these checks from a web page gives command execution. The GUI pages in `html/server/` show server data, such as the URL and file name of each transfer. A template escapes a value only through `${html:...}`, `${attr:...}` or `${js:...}`. A server string shown unescaped is stored cross-site scripting on the GUI. That script can read the `sid`, so it also gives command execution.
+4. **The WebHTTrack server serves only its own user.** It binds to 127.0.0.1 by default. `host_is_self` in `src/htsserver.c` checks the `Host` header on every request. It accepts `localhost`, any address literal, the `--bind` name and this host's own names. And `origin_is_self` rejects a foreign `Origin` on a POST. An absent `Host` or `Origin` passes. A request with a body must carry the session id (`sid`). An authenticated request can start a crawl with any options, `-V` included. So a bypass of these checks from a web page gives command execution. The GUI pages in `html/server/` show server data, such as the URL and file name of each transfer. The `${html:...}`, `${attr:...}` and `${js:...}` prefixes escape a value. A bare `${key}` is raw unless the page set `${do:output-mode:html}` earlier. A server string shown unescaped is stored cross-site scripting on the GUI. That script can read the `sid`, so it also gives command execution.
 5. **The crawl does not crash.** A crash from server data stops the user's mirror. `AGENTS.md` says when to clip and when to abort. Data from the wire, a header or a cache file must be clipped with `strclipbuff`. So a reachable abort on server data is a bug.
 
 ## What we trust
@@ -42,15 +42,15 @@ These inputs come from the user, not from the attacker. A bug that needs the att
 - Plugins loaded with `-%W`, and the command given to `-V`. The command is trusted. Only the file name substituted into it is not.
 - Symbolic links that already exist in the mirror folder.
 - A WebHTTrack server bound to a non-loopback address with `--bind`.
-- Who can connect to ProxyTrack. It has no access control by design, so serving a mirror to a client is not a finding.
+- Who can connect to ProxyTrack. It has no access control and no `Host` check by design. Serving a mirror to any client, a DNS-rebinding web page included, is not a finding.
 
-The cache (`hts-cache/`) and `cookies.txt` are an exception. HTTrack writes server data into them, and any program that reads them back reads server data. That covers the next run (`--update`, `--continue`) and ProxyTrack. A bug triggered by content that a server could have put there is in scope.
+The cache files in `hts-cache/` (`new.*`, `old.*` and `ref/`) and `cookies.txt` are an exception. HTTrack writes server data into them, and any program that reads them back reads server data. That covers the next run (`--update`, `--continue`) and ProxyTrack. A bug triggered by content that a server could have put there is in scope.
 
 ## How we rate severity
 
 - **Critical** means code execution, or a write outside the mirror folder, from a remote server with default options. A bypass of the WebHTTrack checks, from a web page or from server data shown in the GUI, is also critical.
 - **High** means an out-of-bounds write, a use-after-free or a double free that a remote server can reach, even with no exploit shown. Shell injection through the `-V` file name is also high. So is a write outside the mirror folder that needs a non-default option, and credentials or cookies sent to another host.
-- **Medium** means an out-of-bounds read that a remote server can reach. Small input that costs huge memory or CPU, past the limits that options such as `-M`, `-E` and `-m` set, is also medium. So is a ProxyTrack read outside its cache, and a web page that reads a mirror from a loopback ProxyTrack through DNS rebinding.
+- **Medium** means an out-of-bounds read that a remote server can reach. Small input that costs huge memory or CPU, past the limits that options such as `-M`, `-E` and `-m` set, is also medium. So is a ProxyTrack read outside its cache.
 - **Low** means a crash or abort from server data with no memory corruption, such as a NULL dereference or a safe-helper abort. A crash in a ProxyTrack request parser is also low.
 - **Not a vulnerability**: a bug that needs trusted input from the list above is not one. A server that sends endless or slow content is not one either, because the user sets the crawl limits. A mirrored page that runs its own site's script when opened from disk is not one, because HTTrack copies what the site serves.
 
