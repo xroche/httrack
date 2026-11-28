@@ -1643,7 +1643,6 @@ static void parse_advance(parse_state *const ps, const htsblk *const r,
       ps->lastsaved = html;
   }
 
-  // in plain text, jump to the next tag
   if (ptr > 0) {
     if ((!ps->tag.intag)              /* Not in tag */
         && (!ps->script.inscript)     /* Not in (java)script */
@@ -1655,14 +1654,13 @@ static void parse_advance(parse_state *const ps, const htsblk *const r,
       if (html - r->adr < r->size) {
         /* Not on a starting tag yet */
         if (*html != '<') {
-          /* strchr does not well behave with null chrs.. */
-          /* char* adr_next = strchr(adr,'<'); */
+          /* not strchr: the page may hold NUL bytes */
           const char *adr_next = html;
 
           while (*adr_next != '<' && (adr_next - r->adr) < r->size) {
             adr_next++;
           }
-          /* Jump to near end (index hack) */
+          /* no tag left: jump close to the end */
           if (*adr_next != '<') {
             if (html - r->adr < r->size - 4 && r->size > 4) {
               html = r->adr + r->size - 2;
@@ -1677,25 +1675,23 @@ static void parse_advance(parse_state *const ps, const htsblk *const r,
   ps->html = html;
 }
 
-/* Copy what was scanned to the sink. */
+/* Copy what was scanned to the sink, and end the parse once the sink is out
+   of memory, failing the page rather than the crawl. */
 static void parse_flush(parse_state *const ps, const htsblk *const r) {
   HT_add_adr;
   ps->lastsaved = ps->html; // one past the last byte written
-  /* The rewritten page outgrew what we can allocate, so end the parse
-     here and fail the page rather than the crawl. */
   if (ps->sink.oom) {
     ps->html = r->adr + r->size;
   }
 }
 
 /* Time limit, progress and user polling, once per loop pass. Returns
-   HTS_FALSE when the user asked to exit, after freeing the sink. */
-static hts_boolean parse_checks(parse_state *const ps, httrackp *const opt,
-                                struct_back *const sback,
-                                cache_back *const cache,
-                                htsmoduleStructExtended *const stre,
-                                const htsblk *const r, const int ptr,
-                                const int numero_passe) {
+   HTS_FALSE when the user asked to exit. */
+static hts_boolean parse_poll(parse_state *const ps, httrackp *const opt,
+                              struct_back *const sback, cache_back *const cache,
+                              htsmoduleStructExtended *const stre,
+                              const htsblk *const r, const int ptr,
+                              const int numero_passe) {
   if (ps->page.back_add_stats != opt->state.back_add_stats) {
     ps->page.back_add_stats = opt->state.back_add_stats;
 
@@ -1717,7 +1713,6 @@ static hts_boolean parse_checks(parse_state *const ps, httrackp *const opt,
     if (!hts_loop_tick(sback, opt, 0, ptr)) {
       hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
       hts_store_release_int(stre->exit_xh_, 1); // exit requested
-      TypedArrayFree(ps->sink.buf);
       return HTS_FALSE;
     } else if (opt->state._hts_cancel == 1) {
       ps->page.nofollow = 1; // gentler than exiting
@@ -3924,8 +3919,10 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
         parse_advance(ps, r, ptr);
         parse_flush(ps, r);
-        if (!parse_checks(ps, opt, sback, cache, stre, r, ptr, numero_passe))
-          return -1;
+        if (!parse_poll(ps, opt, sback, cache, stre, r, ptr, numero_passe)) {
+          TypedArrayFree(ps->sink.buf);
+          return -1; // user exit
+        }
       }
 
       opt->state._hts_in_html_parsing = 0;      // flag
