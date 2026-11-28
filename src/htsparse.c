@@ -1743,7 +1743,7 @@ static void parse_emit_footer(parse_state *const ps, const httrackp *const opt,
 }
 
 /* Start the tag this '<' opens, or the comment a '<!--' opens, and emit the
-   footer at the first <head>, <body> or <meta>, and at </html>. */
+   footer at the first <head>, <body> or <meta>, and at the first </html>. */
 static void parse_tag_open(parse_state *const ps, const httrackp *const opt,
                            const htsblk *const r, const int ptr,
                            char *const codebase) {
@@ -1788,6 +1788,10 @@ static void parse_tag_open(parse_state *const ps, const httrackp *const opt,
           tag_opens_with_space(ps->html, "<meta")) {
         p = 1;
         ps->page.emited_footer++;
+      } else if (hts_starts_with_ci(ps->html, "</html")) {
+        // no <head>, <body> or <meta>: footer once, without a late charset
+        p = 1;
+        ps->page.emited_footer = 2;
       }
       break;
     case 1:

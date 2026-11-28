@@ -1,0 +1,79 @@
+#!/bin/bash
+#
+# The -%F footer goes once before the first </html> of a page with no <head>,
+# <body> or <meta>, without the late charset meta, and never before a doctype.
+
+set -e
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_2611.XXXXXX") || exit 1
+cleanup() {
+    rm -rf "$tmpdir"
+}
+trap 'set +e; cleanup' EXIT
+
+root="$tmpdir/docroot"
+mkdir -p "$root/footer"
+local_server_start --root "$root"
+require_httrack
+
+# NAME BODY: a page, and a link to it from the crawl's index
+pages=()
+page() {
+    printf '%b' "$2" >"$root/footer/$1.html"
+    pages+=("$1")
+}
+page bare '<html>hello</html>\n'
+page notags 'just text\n'
+page frag '<p>para</p>\n'
+page normal '<!DOCTYPE html>\n<html><head><title>t</title></head><body>x</body></html>\n'
+page upper '<HTML><HEAD><TITLE>t</TITLE></HEAD><BODY>x</BODY></HTML>\n'
+page hidden '<html><!-- <head> --><script>var s="<head></html>";</script>x</html>\n'
+page xhtml '<?xml version="1.0"?>\n<!DOCTYPE html>\n<html xmlns="http://www.w3.org/1999/xhtml"><head><title>t</title></head><body>x</body></html>\n'
+page doctype '<!DOCTYPE html>\n<html>x</html>\n'
+page twice '<html>a</html>\n<html>b</html>\n'
+page crlf '<html>a\r\n</html>\r\n'
+for p in "${pages[@]}"; do
+    printf '<a href="%s.html">%s</a>\n' "$p" "$p"
+done >"$root/footer/index.html"
+
+crawl() { # crawl LABEL [httrack args...], leaving the mirrored pages in $mir
+    mir="$tmpdir/$1/127.0.0.1_$SRV_PORT/footer"
+    local label=$1
+    shift
+    local_crawl --log "$tmpdir/log-$label" -O "$tmpdir/$label" --quiet \
+        --robots=0 --timeout=30 --retries=0 "$@" "$BASEURL/footer/index.html" ||
+        fail "$label crawl failed"
+}
+
+expect() { # expect NAME BODY: the mirrored page holds exactly BODY
+    printf '%b' "$2" >"$tmpdir/want"
+    cmp -s "$tmpdir/want" "$mir/$1.html" ||
+        fail "$1: got $(od -An -c "$mir/$1.html"), want $(od -An -c "$tmpdir/want")"
+}
+
+charset='<!-- Added by HTTrack --><meta http-equiv="content-type" content="text/html;charset=utf-8" /><!-- /Added by HTTrack -->\n'
+
+crawl tmpl -%F '<!-- F {path} -->'
+f() { printf '\\n<!-- F /footer/%s.html -->\\n' "$1"; }
+expect bare "<html>hello$(f bare)</html>\n"
+expect notags 'just text\n'
+expect frag '<p>para</p>\n'
+expect normal "<!DOCTYPE html>\n<html>$(f normal)$charset<head><title>t</title></head><body>x</body>$(f normal)</html>\n"
+expect upper "<HTML>$(f upper)$charset<HEAD><TITLE>t</TITLE></HEAD><BODY>x</BODY>$(f upper)</HTML>\n"
+expect hidden "<html><!-- <head> --><script>var s=\"<head></html>\";</script>x$(f hidden)</html>\n"
+expect xhtml "<?xml version=\"1.0\"?>\n<!DOCTYPE html>\n<html xmlns=\"http://www.w3.org/1999/xhtml\">$(f xhtml)$charset<head><title>t</title></head><body>x</body>$(f xhtml)</html>\n"
+expect doctype "<!DOCTYPE html>\n<html>x$(f doctype)</html>\n"
+expect twice "<html>a$(f twice)</html>\n<html>b</html>\n"
+expect crlf '<html>a\r\n\r\n<!-- F /footer/crlf.html -->\r\n</html>\r\n'
+
+# No footer: a bare page is left alone, a normal one keeps its charset meta.
+crawl none -%F ''
+expect bare '<html>hello</html>\n'
+expect normal "<!DOCTYPE html>\n<html>$charset<head><title>t</title></head><body>x</body></html>\n"
+
+# The default footer, once.
+crawl default
+n=$(count_matching_lines 'Mirrored from' "$mir/bare.html")
+test "$n" -eq 1 || fail "default footer on a bare page: $n copies, want 1"

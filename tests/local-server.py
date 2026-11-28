@@ -1932,6 +1932,18 @@ class Handler(SimpleHTTPRequestHandler):
         "bom": ("text/html", b"", CHARSET_CJK.encode(), CHARSET_CJK),
     }
 
+    # A file of <root>/footer/ served as UTF-8 HTML: the footer pairs a
+    # declared charset with a meta.
+    def route_footer(self):
+        name = os.path.basename(urlsplit(self.path).path)
+        try:
+            with open(os.path.join(self.directory, "footer", name), "rb") as f:
+                body = f.read()
+        except OSError:
+            self.send_error(404)
+            return
+        self.send_raw(body, "text/html; charset=utf-8")
+
     def route_charset(self):
         path = unquote(urlsplit(self.path).path)
         parts = path.split("/")
@@ -5203,6 +5215,9 @@ class Handler(SimpleHTTPRequestHandler):
             return True
         if path.startswith("/statperiod/"):
             self.route_statperiod()
+            return True
+        if path.startswith("/footer/"):
+            self.route_footer()
             return True
         if path.startswith("/charset/"):
             self.route_charset()
