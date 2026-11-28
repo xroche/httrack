@@ -1630,7 +1630,8 @@ typedef struct parse_state {
   parse_sink sink; /* output HTML */
 } parse_state;
 
-/* Handle a '>' that ends a tag, an event handler or a comment. */
+/* End the tag, event handler or comment this '>' closes, entering a script
+   or style body. */
 static void parse_tag_close(parse_state *const ps, const httrackp *const opt) {
   if (ps->script.inscript_tag) {
     ps->script.inscript_tag = ps->script.inscript = 0;
@@ -1663,14 +1664,14 @@ static void parse_tag_close(parse_state *const ps, const httrackp *const opt) {
         ps->script.inscript = 1;
         ps->script.inscript_state_pos = INSCRIPT_START;
         ps->tag.intag = 1; // as after a <script> tag
-        // yes: this is code, not a real tag
+        // the body is code, so the tag start is spent
         ps->tag.intag_start_valid = 0;
         if (opt->parsedebug) {
           HT_ADD("<@@ inscript @@>");
         }
       }
     }
-  } else { /* end of comment? */
+  } else {
     // a proper "-->" ending
     if ((*(ps->html - 1) == '-') && (*(ps->html - 2) == '-')) {
       ps->tag.intag = 0;
