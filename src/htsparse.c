@@ -3012,6 +3012,549 @@ capture_record(httrackp *const opt, htsmoduleStructExtended *const stre,
   return HTS_TRUE;
 }
 
+/* What capture_link() asks its caller to do next. */
+typedef enum {
+  CAPTURE_LINK_DONE, // link handled or skipped
+  CAPTURE_LINK_NEXT, // another srcset candidate follows
+  CAPTURE_LINK_FAIL  // capture_record() failed, so abort the parse
+} capture_link_status;
+
+/* Cut, resolve, rewrite and record the link at ps->html, given the scan
+   state OK. Moves ps->html through SAUT, writes ps->sink, ps->lastsaved
+   and ps->page, and updates *LINK_FETCH, *ADD_CLASS_DOTS_TO_PATCH and
+   *P_FLUSH. Leaves the tag when the cut reaches its '>', and sets
+   *stre->error_ when a callback refuses the link. OPT, PTR, PARENT_RELATIVE and
+   MODULE_BASE keep their names because the heap() and relativeurladr() macros
+   read them. */
+static capture_link_status
+capture_link(parse_state *const ps, const parse_link *const lk,
+             httrackp *const opt, htsmoduleStruct *const str,
+             htsmoduleStructExtended *const stre, htsblk *const r,
+             struct_back *const sback, cache_back *const cache,
+             hash_struct *const hash, const int numero_passe, const int ptr,
+             const int parent_relative, const int module_base,
+             const char *const codebase, const hts_buf catbuff,
+             const script_automate *const saut, int ok, const char quote,
+             const int quoteinscript, const int noquote,
+             const char *const tag_attr_start, const char *const sf_tag,
+             const int sf_tagless_body, hts_fetch_meta *const link_fetch,
+             int *const add_class_dots_to_patch, const char **const p_flush) {
+  const char *eadr = NULL; /* end of the URL */
+  hts_boolean not_url = HTS_FALSE;
+
+  /* srcset: skip leading whitespace/commas before each candidate;
+     the skipped bytes flush verbatim below */
+  if (lk->srcset_p) {
+    while (ps->html < r->adr + r->size &&
+           (is_realspace(*ps->html) || *ps->html == ','))
+      hts_automate_increment(saut, 1);
+  }
+  eadr = ps->html;
+
+  // ne pas flusher après code si on doit écrire le codebase avant!
+  if (lk->p_type != HTS_LINK_APPLET_CODE && !link_role_is_base(lk->p_type)) {
+    HT_add_adr;               // refresh
+    ps->lastsaved = ps->html; // one past the last byte written
+    // après on écrira soit les données initiales,
+    // soir une URL/lien modifié!
+  } else if (lk->p_type == HTS_LINK_APPLET_CODE)
+    *p_flush = ps->html; // flush up to here afterwards
+
+  if (ok != -1) { // continuer
+    // découper le lien
+    do {
+      if (*eadr == '\0') // end of the parsed buffer
+        ok = 0;
+      // too long: HTS_URLMAXSIZE more is kept for the path
+      if (eadr - ps->html > HTS_URLMAXSIZE)
+        ok = -1; // ne pas traiter ce lien
+
+      if (ok > 0) {
+        if (quote == '\n' && *eadr == '\r' && ps->page.in_media != NULL &&
+            strcmp(ps->page.in_media, "LNK") == 0)
+          ok = 0;                   // a playlist line may end in CR
+        else if (is_space(*eadr)) { // guillemets,CR, etc
+          if ((*eadr == quote &&
+               (!quoteinscript || *(eadr - 1) == '\\')) // end quote
+              ||
+              (noquote && (*eadr == '\"' || *eadr == '\'')) // end at any quote
+              || (!noquote && quote == '\0' &&
+                  is_realspace(*eadr)) // unquoted href
+              || lk->srcset_p          // whitespace ends a srcset candidate URL
+              ) // si pas d'attente de quote spéciale ou si quote
+                // atteinte
+            ok = 0;
+        } else if (lk->ending_p && (*eadr == lk->ending_p))
+          ok = 0;
+        else if (lk->entity_end != '\0' && *eadr == '&' &&
+                 html_entity_quote(eadr, NULL) == lk->entity_end)
+          ok = 0;
+        else {
+          switch (*eadr) {
+          case '>':
+            if (!quote) {
+              if (!ps->script.inscript && !ps->page.in_media) {
+                ps->tag.intag = 0; // no longer in a tag
+                ps->tag.intag_start_valid = 0;
+                ps->tag.intag_name = NULL;
+              }
+              ok = 0;
+            }
+            break;
+            /*case '<': */
+          case '#':
+            /* a playlist link can start the buffer (#EXTM3U) */
+            if (eadr == r->adr || *(eadr - 1) != '&') // &#40;
+              ok = 0;
+            break;
+            // case '?': non!
+          case '\\':
+            if (ps->script.inscript)
+              ok = 0;
+            break;  // \" ou \' point d'arrêt
+          case '?': /*quote_adr=adr; */
+            break;  // noter position query
+          case ',':
+            if (lk->srcset_p) {
+              /* split only on a trailing comma; one inside the URL
+                 (data: URI, CDN path) is kept, per the WHATWG algo */
+              const char *const n = eadr + 1;
+
+              if (n >= r->adr + r->size || is_space(*n) || *n == ',')
+                ok = 0;
+            }
+            break;
+          }
+        }
+      }
+      eadr++;
+    } while (ok == 1);
+
+    // Empty link detected
+    if (eadr - ps->html <= 1) { // link empty
+      ok = -1;                  // No
+      if (*ps->html != '#') {   // Not empty+unique #
+        // 1=link empty with delim (end_adr-start_adr)
+        if (eadr - ps->html == 1) {
+          // "#" would land before an unflushed base's name
+          if (quote && !link_role_is_base(lk->p_type)) {
+            HT_ADD("#"); // We add this for a <href="">
+          }
+        }
+      }
+    }
+    // This is a dirty and horrible hack to avoid parsing an Adobe GoLive bogus
+    // tag
+    if (hts_starts_with_ci(ps->html, "(Empty Reference!)")) {
+      ok = -1; // No
+    }
+    // a lazy-load placeholder or template is no URL: leave it as is
+    const hts_span value =
+        hts_span_at(ps->html, (size_t) (eadr - ps->html - 1));
+
+    if (ok == 0 && lk->dataattr_p && data_attr_is_not_url(value)) {
+      char *shown = malloct(value.len + 8);
+
+      if (shown != NULL)
+        hts_log_print(opt, LOG_DEBUG, "data attribute is no URL: %s",
+                      text_excerpt(opt, hts_buf_at(shown, value.len + 8), value,
+                                   value.len + 7));
+      freet(shown);
+      not_url = HTS_TRUE;
+    }
+  }
+
+  if (ok == 0 && !not_url) { // test a link
+    char BIGSTK lien[HTS_URLMAXSIZE * 2];
+    int meme_adresse = 0; // 0 par défaut pour primary
+
+    // construire lien (découpage)
+    if (eadr - ps->html - 1 < HTS_URLMAXSIZE) { // not too long?
+      strncpy(lien, ps->html, eadr - ps->html - 1);
+      lien[eadr - ps->html - 1] = '\0';
+      while (hts_striplastchar(lien, ' ')) {
+      }
+
+    } else
+      lien[0] = '\0'; // erreur
+
+    // ------------------------------------------------------
+    // Lien repéré et extrait
+    if (strnotempty(lien) > 0) { // construction du lien
+      lien_adrfilsave afs;
+      int forbidden_url = -1; // lien non interdit (mais non autorisé..)
+      int just_test_it = 0;   // mode de test des liens
+      int set_prio_to = 0;    // pour capture de page isolée
+      int import_done = 0; // lien importé (ne pas scanner ensuite *à priori*)
+
+      //
+      afs.af.adr[0] = '\0';
+      afs.af.fil[0] = '\0';
+      afs.save[0] = '\0';
+      //
+      // 0: autorisé
+      // 1: interdit (patcher tout de même adresse)
+
+      hts_log_print(opt, LOG_DEBUG, "link detected in html (tag): %s",
+                    url_nologin(opt, lien));
+
+      // external check
+      if (!RUN_CALLBACK1(opt, linkdetected, lien) ||
+          !RUN_CALLBACK2(opt, linkdetected2, lien, ps->tag.intag_start)) {
+        *stre->error_ = 1;
+        hts_log_print(opt, LOG_ERROR, "Link %s refused by external wrapper",
+                      url_nologin(opt, lien));
+      }
+      // purger espaces de début et fin, CR,LF résiduels
+      // (IMG SRC="foo.<\n><\t>gif<\t>")
+      {
+        char *a = lien;
+        size_t llen;
+
+        // strip both ends of every C0 control or space, as a browser
+        // does; encoding one there would 404 a link that fetched fine
+        llen = (*a != '\0') ? strlen(a) : 0;
+        while (llen > 0 && (unsigned char) lien[llen - 1] <= ' ') {
+          a[--llen] = '\0';
+        }
+        // '\0' is <= ' ' too, and an all-control link ends up empty
+        while (*a != '\0' && (unsigned char) *a <= ' ')
+          a++;
+        // strip cr, lf, tab inside URL, as a browser does; every
+        // other control byte percent-encodes below
+        llen = 0;
+        while (*a) {
+          if (!is_retorsep(*a)) {
+            lien[llen++] = *a;
+          }
+          a++;
+        }
+        lien[llen] = '\0';
+      }
+
+      // commas are forbidden
+      if (lk->archivetag_p) {
+        if (strchr(lien, ',')) {
+          *stre->error_ = 1;
+          hts_log_print(opt, LOG_DEBUG, "link rejected (multiple-archive) %s",
+                        url_nologin(opt, lien));
+        }
+      }
+
+      decode_link_escapes(str, stre, HTS_BUF(lien), catbuff);
+
+      // convertir les éventuels \ en des / pour éviter des problèmes de
+      // reconnaissance!
+      {
+        char *a;
+
+        for (a = jump_identification(lien); *a != '\0' && *a != '?'; a++) {
+          if (*a == '\\') {
+            *a = '/';
+          }
+        }
+      }
+
+      // supprimer le(s) ./
+      while ((lien[0] == '.') && (lien[1] == '/')) {
+        char BIGSTK tempo[HTS_URLMAXSIZE * 2];
+
+        strcpybuff(tempo, lien + /* ./ */ 2);
+        strcpybuff(lien, tempo);
+      }
+      if (strnotempty(lien) == 0) // sauf si plus de nom de fichier
+        strcpybuff(lien, "./");
+
+      // APPLET CODE="mixer.MixerApplet.class" --> APPLET
+      // CODE="mixer/MixerApplet.class" yes, this is dirty but I'm so lazzy..
+      // and besides the java "code" convention is really a pain in html code
+      if (lk->p_type == HTS_LINK_APPLET_CODE) {
+        char *a = strrchr(lien, '.');
+
+        *add_class_dots_to_patch = 0;
+        if (a) {
+          char *b;
+
+          do {
+            b = strchr(lien, '.');
+            if ((b != a) && (b)) {
+              (*add_class_dots_to_patch)++;
+              *b = '/';
+            }
+          } while ((b != a) && (b));
+        }
+      }
+      // drop a default :80 port from the authority
+      hts_strip_default_port(HTS_BUF(lien));
+      // vérifier que l'on ne doit pas ajouter de .class
+      if (!*stre->error_) {
+        if (lk->add_class) {
+          const char *const a = hts_path_ext_dot(lien, "/");
+
+          if (a == NULL || !hts_streq_ci(a, ".class"))
+            strcatbuff(lien, ".class");
+        }
+      }
+      if (!*stre->error_) {
+        resolve_link_base(str, stre, HTS_BUF(lien), lk->p_type, lk->p_xmlbase);
+      }
+      // transformer lien quelconque (http, relatif, etc) en une adresse
+      // et un chemin+fichier (adr,fil)
+      if (!*stre->error_) {
+        int reponse;
+
+        hts_log_print(opt, LOG_DEBUG, "build relative link %s with %s%s",
+                      url_nologin(opt, lien),
+                      adr_nologin(opt, relativeurladr()), relativeurlfil());
+        if ((reponse = ident_url_relatif(lien, relativeurladr(),
+                                         relativeurlfil(), &afs.af)) < 0) {
+          afs.af.adr[0] = '\0'; // erreur
+          if (reponse == -2) {
+            hts_log_print(opt, LOG_WARNING,
+                          "Link %s not caught (protocol not "
+                          "supported by this build)",
+                          url_nologin(opt, lien));
+          } else {
+            hts_log_print(opt, LOG_DEBUG,
+                          "ident_url_relatif failed for %s with %s%s",
+                          url_nologin(opt, lien),
+                          adr_nologin(opt, relativeurladr()), relativeurlfil());
+          }
+        } else {
+          hts_log_print(
+              opt, LOG_DEBUG, "built relative link %s with %s%s -> %s%s",
+              url_nologin(opt, lien), adr_nologin(opt, relativeurladr()),
+              relativeurlfil(), adr_nologin(opt, afs.af.adr), afs.af.fil);
+        }
+      } else {
+        hts_log_print(opt, LOG_DEBUG,
+                      "link %s not build, error detected before",
+                      url_nologin(opt, lien));
+        afs.af.adr[0] = '\0';
+      }
+
+      // Le lien doit juste être réécrit, mais ne doit pas générer un lien
+      // exemple: <FORM ACTION="url_cgi">
+      if (lk->p_nocatch) {
+        forbidden_url = 1; // interdire récupération du lien
+        hts_log_print(opt, LOG_DEBUG, "link forced external at %s%s",
+                      adr_nologin(opt, afs.af.adr), afs.af.fil);
+      }
+      // Tester si un lien doit être accepté ou refusé (wizard)
+      // forbidden_url=1 : lien refusé
+      // forbidden_url=0 : lien accepté
+      if (!link_role_is_base(lk->p_type)) { // check the filters
+        if (!lk->p_nocatch) {
+          if (afs.af.adr[0] != '\0') {
+            hts_log_print(opt, LOG_DEBUG, "wizard link test at %s%s..",
+                          adr_nologin(opt, afs.af.adr), afs.af.fil);
+            forbidden_url = hts_acceptlink(
+                opt, ptr, afs.af.adr, afs.af.fil,
+                ps->tag.intag_name ? ps->tag.intag_name : NULL,
+                ps->tag.intag_name ? tag_attr_start : NULL, ps->script.css_file,
+                &set_prio_to, &just_test_it);
+            hts_log_print(opt, LOG_DEBUG, "result for wizard link test: %d",
+                          forbidden_url);
+          }
+        }
+      }
+      // calculer meme_adresse
+      {
+        const char *const host = jump_identification_const(afs.af.adr);
+
+        // two empty hosts are not the same address
+        meme_adresse = *host != '\0' &&
+                       hts_streq_ci(host, jump_identification_const(urladr()));
+      }
+
+      // Début partie sauvegarde
+
+      // ici on forme le nom du fichier à sauver, et on patche l'URL
+      if (afs.af.adr[0] != '\0') {
+        // savename(): simplifier les ../ et autres joyeusetés
+        int r_sv = 0;
+
+        // En cas de moved, adresse première
+        lien_adrfil former;
+
+        //
+        afs.save[0] = '\0';
+        former.adr[0] = '\0';
+        former.fil[0] = '\0';
+        //
+
+        // nom du chemin à sauver si on doit le calculer
+        // note: url_savename peut décider de tester le lien si il le trouve
+        // suspect, et modifier alors adr et fil
+        // dans ce cas on aura une référence directe au lieu des traditionnels
+        // moved en cascade (impossible à reproduire à priori en local, lorsque
+        // des fichiers gif sont impliqués par exemple)
+        if (!link_role_is_base(lk->p_type)) {
+          if (forbidden_url != 1) {
+            char BIGSTK last_adr[HTS_URLMAXSIZE * 2];
+
+            /* Calc */
+            last_adr[0] = '\0';
+            strcpybuff(last_adr, afs.af.adr); // ancienne adresse
+            r_sv =
+                url_savename(&afs, &former, heap(ptr)->adr, heap(ptr)->fil, opt,
+                             sback, cache, hash, ptr, numero_passe, NULL);
+            if (strcmp(jump_identification_const(last_adr),
+                       jump_identification_const(afs.af.adr)) !=
+                0) { // a changé
+
+              // 2e test si moved
+
+              // Tester si un lien doit être accepté ou refusé (wizard)
+              // forbidden_url=1 : lien refusé
+              // forbidden_url=0 : lien accepté
+              if ((ptr > 0) &&
+                  !link_role_is_base(lk->p_type)) { // check the filters
+                if (!lk->p_nocatch) {
+                  if (afs.af.adr[0] != '\0') {
+                    hts_log_print(opt, LOG_DEBUG,
+                                  "wizard moved link retest at %s%s..",
+                                  adr_nologin(opt, afs.af.adr), afs.af.fil);
+                    forbidden_url = hts_acceptlink(
+                        opt, ptr, afs.af.adr, afs.af.fil,
+                        ps->tag.intag_name ? ps->tag.intag_name : NULL,
+                        ps->tag.intag_name ? tag_attr_start : NULL,
+                        ps->script.css_file, &set_prio_to, &just_test_it);
+                    hts_log_print(opt, LOG_DEBUG,
+                                  "result for wizard moved link retest: %d",
+                                  forbidden_url);
+                  }
+                }
+              }
+              meme_adresse = 0; // on a changé
+            }
+          } else {
+            strcpybuff(afs.save, ""); // dummy
+          }
+        }
+        /* A <base target> sends every link with no target to a
+           frame we cannot tell. */
+        if (ps->page.link_frame < 0)
+          ps->page.link_frame =
+              hts_fetch_has_base_target(r->adr)
+                  ? HTS_FETCH_DEST_UNKNOWN
+                  : hts_fetch_same_frame(heap(ptr)->fetch.dest);
+        {
+          const parse_fetch_flags flags = {
+              .redirect_stub = HTTP_IS_REDIRECT(r->statuscode),
+              .meta_refresh = lk->p_searchMETAURL,
+              .opaque =
+                  ps->page.in_media != NULL || lk->p_type != HTS_LINK_PLAIN,
+              .inscript = ps->script.inscript,
+              .incss = ps->script.incss,
+              .tagless_body = sf_tagless_body};
+
+          parse_fetch_meta(opt, ptr, link_fetch, &flags, ps->page.link_frame,
+                           &ps->page.fetch_tag, sf_tag, tag_attr_start,
+                           afs.af.fil);
+        }
+        /* Naming followed redirects whose hops it does not keep. */
+        if (former.adr[0] != '\0')
+          link_fetch->dest = HTS_FETCH_DEST_UNKNOWN;
+        // resolve unresolved type
+        if (r_sv != -1 && !link_role_is_base(lk->p_type) &&
+            forbidden_url == 0 && IS_DELAYED_EXT(afs.save)) {
+          time_t t;
+
+          // pas d'erreur, on continue
+          r_sv = hts_wait_delayed(str, &afs, heap(ptr)->adr, heap(ptr)->fil,
+                                  &former, &forbidden_url, link_fetch);
+
+          /* User interaction, because hts_wait_delayed can be slow.. (3.43) */
+          t = time(NULL);
+          if (ps->page.user_interact_timestamp == 0 ||
+              t - ps->page.user_interact_timestamp > 0) {
+            ps->page.user_interact_timestamp = t;
+            hts_mirror_process_user_interaction(str, stre);
+          }
+        }
+        // record!
+        if (r_sv != -1) { // pas d'erreur, on continue
+          /* log */
+          if ((opt->debug > 1) && (opt->log != NULL)) {
+            if (forbidden_url != 1) {              // le lien va être chargé
+              if (link_role_is_base(lk->p_type)) { // not a link to fetch
+                hts_log_print(opt, LOG_DEBUG, "Code/Codebase: %s%s",
+                              adr_nologin(opt, afs.af.adr), afs.af.fil);
+              } else if ((opt->getmode & HTS_GETMODE_HTML_FIRST) == 0) {
+                hts_log_print(opt, LOG_DEBUG, "Record: %s%s -> %s",
+                              adr_nologin(opt, afs.af.adr), afs.af.fil,
+                              afs.save);
+              } else {
+                if (!ishtml(opt, afs.af.fil))
+                  hts_log_print(opt, LOG_DEBUG, "Record after: %s%s -> %s",
+                                adr_nologin(opt, afs.af.adr), afs.af.fil,
+                                afs.save);
+                else
+                  hts_log_print(opt, LOG_DEBUG, "Record: %s%s -> %s",
+                                adr_nologin(opt, afs.af.adr), afs.af.fil,
+                                afs.save);
+              }
+            } else
+              hts_log_print(opt, LOG_DEBUG, "External: %s%s",
+                            adr_nologin(opt, afs.af.adr), afs.af.fil);
+          }
+          /* FIN log */
+
+          // sf_span_fits in capture_rewrite() needs this size
+          HTS_STATIC_ASSERT(sizeof(lien) == HTS_URLMAXSIZE * 2, lien_size);
+          eadr = capture_rewrite(
+              ps, lk, opt, r, ptr, parent_relative, module_base, &afs,
+              forbidden_url, lien, eadr, add_class_dots_to_patch, quote,
+              noquote, *p_flush, sf_tag, sf_tagless_body, tag_attr_start);
+
+          if (!capture_record(opt, stre, hash, numero_passe, ptr, codebase, lk,
+                              &afs, &former, link_fetch, forbidden_url,
+                              just_test_it, set_prio_to, import_done,
+                              meme_adresse)) {
+            return CAPTURE_LINK_FAIL;
+          }
+
+        } // if adr[0]!='\0'
+
+      } // if adr[0]!='\0'
+
+    } // if strlen(lien)>0
+
+  } // if ok==0
+
+  assertf(eadr - ps->html >= 0); // Should not go back
+  if (eadr > ps->html) {
+    hts_automate_increment(saut, (int) (eadr - 1 - ps->html));
+  }
+
+  /* srcset candidate loop: skip the descriptor and comma, then
+     have the caller re-enter the capture for the next URL. */
+  if (lk->srcset_p && ok == 0) {
+    const char *const endp = r->adr + r->size;
+    const char *q = ps->html;
+    /* whitespace ends an unquoted value, so its descriptor too */
+    const hts_boolean unquoted = !noquote && quote == '\0';
+
+    while (q < endp && *q != '\0' && *q != ',' && *q != quote && *q != '<' &&
+           *q != '>' && (unsigned char) *q >= 32 &&
+           !(unquoted && is_realspace(*q)))
+      q++; // skip the descriptor
+    if (q < endp && *q == ',') {
+      q++;
+      while (q < endp && (is_realspace(*q) || *q == ','))
+        q++; // skip whitespace and empty candidates
+      if (q < endp && *q != '\0' && *q != ',' && *q != quote && *q != '<' &&
+          *q != '>' && (unsigned char) *q >= 32) {
+        hts_automate_increment(
+            saut, (int) (q - ps->html)); // keep the automate in sync
+        return CAPTURE_LINK_NEXT;
+      }
+    }
+  }
+  return CAPTURE_LINK_DONE;
+}
+
 int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
   char catbuff[CATBUFF_SIZE];
 
@@ -3310,10 +3853,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
           if ((lk.p > 0) || (lk.valid_p)) { // on a repéré un lien
             // the relativeurladr() family reads this name
             const int module_base = lk.module_base;
-            const char *eadr = NULL;  /* fin de l'URL */
 
             int ok = 1;
-            hts_boolean not_url = HTS_FALSE;
             char quote = '\0';
             int quoteinscript = 0;
             int noquote = 0;
@@ -3413,547 +3954,21 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
               }
             }
 
- srcset_next:
-            /* srcset: skip leading whitespace/commas before each candidate;
-               the skipped bytes flush verbatim below */
-            if (lk.srcset_p) {
-              while (ps->html < r->adr + r->size &&
-                     (is_realspace(*ps->html) || *ps->html == ','))
-                hts_automate_increment(&saut, 1);
-            }
-            eadr = ps->html;
-
-            // ne pas flusher après code si on doit écrire le codebase avant!
-            if (lk.p_type != HTS_LINK_APPLET_CODE &&
-                !link_role_is_base(lk.p_type)) {
-              HT_add_adr;       // refresh
-              ps->lastsaved = ps->html; // one past the last byte written
-              // après on écrira soit les données initiales,
-              // soir une URL/lien modifié!
-            } else if (lk.p_type == HTS_LINK_APPLET_CODE)
-              p_flush = ps->html; // flush up to here afterwards
-
-            if (ok != -1) {     // continuer
-              // découper le lien
-              do {
-                if (*eadr == '\0') // end of the parsed buffer
-                  ok = 0;
-                // too long: HTS_URLMAXSIZE more is kept for the path
-                if (eadr - ps->html > HTS_URLMAXSIZE)
-                  ok = -1;      // ne pas traiter ce lien
-
-                if (ok > 0) {
-                  if (quote == '\n' && *eadr == '\r' &&
-                      ps->page.in_media != NULL &&
-                      strcmp(ps->page.in_media, "LNK") == 0)
-                    ok = 0;                   // a playlist line may end in CR
-                  else if (is_space(*eadr)) { // guillemets,CR, etc
-                    if ((*eadr == quote &&
-                         (!quoteinscript || *(eadr - 1) == '\\')) // end quote
-                        || (noquote && (*eadr == '\"' ||
-                                        *eadr == '\'')) // end at any quote
-                        || (!noquote && quote == '\0' &&
-                            is_realspace(*eadr)) // unquoted href
-                        || lk.srcset_p // whitespace ends a srcset candidate URL
-                        ) // si pas d'attente de quote spéciale ou si quote
-                          // atteinte
-                      ok = 0;
-                  } else if (lk.ending_p && (*eadr == lk.ending_p))
-                    ok = 0;
-                  else if (lk.entity_end != '\0' && *eadr == '&' &&
-                           html_entity_quote(eadr, NULL) == lk.entity_end)
-                    ok = 0;
-                  else {
-                    switch (*eadr) {
-                    case '>':
-                      if (!quote) {
-                        if (!ps->script.inscript && !ps->page.in_media) {
-                          ps->tag.intag = 0; // no longer in a tag
-                          ps->tag.intag_start_valid = 0;
-                          ps->tag.intag_name = NULL;
-                        }
-                        ok = 0;
-                      }
-                      break;
-                      /*case '<': */
-                    case '#':
-                      /* a playlist link can start the buffer (#EXTM3U) */
-                      if (eadr == r->adr || *(eadr - 1) != '&') // &#40;
-                        ok = 0;
-                      break;
-                      // case '?': non!
-                    case '\\':
-                      if (ps->script.inscript)
-                        ok = 0;
-                      break;    // \" ou \' point d'arrêt
-                    case '?':  /*quote_adr=adr; */
-                      break;    // noter position query
-                    case ',':
-                      if (lk.srcset_p) {
-                        /* split only on a trailing comma; one inside the URL
-                           (data: URI, CDN path) is kept, per the WHATWG algo */
-                        const char *const n = eadr + 1;
-
-                        if (n >= r->adr + r->size || is_space(*n) || *n == ',')
-                          ok = 0;
-                      }
-                      break;
-                    }
-                  }
-                }
-                eadr++;
-              } while(ok == 1);
-
-              // Empty link detected
-              if (eadr - ps->html <= 1) { // link empty
-                ok = -1;        // No
-                if (*ps->html != '#') { // Not empty+unique #
-                  // 1=link empty with delim (end_adr-start_adr)
-                  if (eadr - ps->html == 1) {
-                    // "#" would land before an unflushed base's name
-                    if (quote && !link_role_is_base(lk.p_type)) {
-                      HT_ADD("#"); // We add this for a <href="">
-                    }
-                  }
-                }
-              }
-              // This is a dirty and horrible hack to avoid parsing an Adobe GoLive bogus tag
-              if (hts_starts_with_ci(ps->html, "(Empty Reference!)")) {
-                ok = -1;        // No
-              }
-              // a lazy-load placeholder or template is no URL: leave it as is
-              const hts_span value =
-                  hts_span_at(ps->html, (size_t) (eadr - ps->html - 1));
-
-              if (ok == 0 && lk.dataattr_p && data_attr_is_not_url(value)) {
-                char *shown = malloct(value.len + 8);
-
-                if (shown != NULL)
-                  hts_log_print(opt, LOG_DEBUG, "data attribute is no URL: %s",
-                                text_excerpt(opt,
-                                             hts_buf_at(shown, value.len + 8),
-                                             value, value.len + 7));
-                freet(shown);
-                not_url = HTS_TRUE;
-              }
-            }
-
-            if (ok == 0 && !not_url) { // test a link
-              char BIGSTK lien[HTS_URLMAXSIZE * 2];
-              int meme_adresse = 0;     // 0 par défaut pour primary
-
-              // construire lien (découpage)
-              if (eadr - ps->html - 1 < HTS_URLMAXSIZE) { // not too long?
-                strncpy(lien, ps->html, eadr - ps->html - 1);
-                lien[eadr - ps->html - 1] = '\0';
-                while (hts_striplastchar(lien, ' ')) {
-                }
-
-              } else
-                lien[0] = '\0'; // erreur
-
-              // ------------------------------------------------------
-              // Lien repéré et extrait
-              if (strnotempty(lien) > 0) {      // construction du lien
-                lien_adrfilsave afs;
-                int forbidden_url = -1; // lien non interdit (mais non autorisé..)
-                int just_test_it = 0;   // mode de test des liens
-                int set_prio_to = 0;    // pour capture de page isolée
-                int import_done = 0;    // lien importé (ne pas scanner ensuite *à priori*)
-
-                //
-                afs.af.adr[0] = '\0';
-                afs.af.fil[0] = '\0';
-                afs.save[0] = '\0';
-                //
-                // 0: autorisé
-                // 1: interdit (patcher tout de même adresse)
-
-                hts_log_print(opt, LOG_DEBUG, "link detected in html (tag): %s",
-                              url_nologin(opt, lien));
-
-                // external check
-                if (!RUN_CALLBACK1(opt, linkdetected, lien) ||
-                    !RUN_CALLBACK2(opt, linkdetected2, lien,
-                                   ps->tag.intag_start)) {
-                  *stre->error_ = 1;
-                  hts_log_print(opt, LOG_ERROR,
-                                "Link %s refused by external wrapper",
-                                url_nologin(opt, lien));
-                }
-                // purger espaces de début et fin, CR,LF résiduels
-                // (IMG SRC="foo.<\n><\t>gif<\t>")
-                {
-                  char *a = lien;
-                  size_t llen;
-
-                  // strip both ends of every C0 control or space, as a browser
-                  // does; encoding one there would 404 a link that fetched fine
-                  llen = (*a != '\0') ? strlen(a) : 0;
-                  while (llen > 0 && (unsigned char) lien[llen - 1] <= ' ') {
-                    a[--llen] = '\0';
-                  }
-                  // '\0' is <= ' ' too, and an all-control link ends up empty
-                  while (*a != '\0' && (unsigned char) *a <= ' ')
-                    a++;
-                  // strip cr, lf, tab inside URL, as a browser does; every
-                  // other control byte percent-encodes below
-                  llen = 0;
-                  while(*a) {
-                    if (!is_retorsep(*a)) {
-                      lien[llen++] = *a;
-                    }
-                    a++;
-                  }
-                  lien[llen] = '\0';
-                }
-
-                // commas are forbidden
-                if (lk.archivetag_p) {
-                  if (strchr(lien, ',')) {
-                    *stre->error_ = 1;
-                    hts_log_print(opt, LOG_DEBUG,
-                                  "link rejected (multiple-archive) %s",
-                                  url_nologin(opt, lien));
-                  }
-                }
-
-                decode_link_escapes(str, stre, HTS_BUF(lien), HTS_BUF(catbuff));
-
-                // convertir les éventuels \ en des / pour éviter des problèmes de reconnaissance!
-                {
-                  char *a;
-
-                  for(a = jump_identification(lien); *a != '\0' && *a != '?';
-                      a++) {
-                    if (*a == '\\') {
-                      *a = '/';
-                    }
-                  }
-                }
-
-                // supprimer le(s) ./
-                while((lien[0] == '.') && (lien[1] == '/')) {
-                  char BIGSTK tempo[HTS_URLMAXSIZE * 2];
-
-                  strcpybuff(tempo, lien + /* ./ */ 2);
-                  strcpybuff(lien, tempo);
-                }
-                if (strnotempty(lien) == 0)     // sauf si plus de nom de fichier
-                  strcpybuff(lien, "./");
-
-                // APPLET CODE="mixer.MixerApplet.class" --> APPLET CODE="mixer/MixerApplet.class"
-                // yes, this is dirty
-                // but I'm so lazzy..
-                // and besides the java "code" convention is really a pain in html code
-                if (lk.p_type == HTS_LINK_APPLET_CODE) {
-                  char *a = strrchr(lien, '.');
-
-                  add_class_dots_to_patch = 0;
-                  if (a) {
-                    char *b;
-
-                    do {
-                      b = strchr(lien, '.');
-                      if ((b != a) && (b)) {
-                        add_class_dots_to_patch++;
-                        *b = '/';
-                      }
-                    } while((b != a) && (b));
-                  }
-                }
-                // drop a default :80 port from the authority
-                hts_strip_default_port(HTS_BUF(lien));
-                // vérifier que l'on ne doit pas ajouter de .class
-                if (!*stre->error_) {
-                  if (lk.add_class) {
-                    const char *const a = hts_path_ext_dot(lien, "/");
-
-                    if (a == NULL || !hts_streq_ci(a, ".class"))
-                      strcatbuff(lien, ".class");
-                  }
-                }
-                if (!*stre->error_) {
-                  resolve_link_base(str, stre, HTS_BUF(lien), lk.p_type,
-                                    lk.p_xmlbase);
-                }
-                // transformer lien quelconque (http, relatif, etc) en une adresse
-                // et un chemin+fichier (adr,fil)
-                if (!*stre->error_) {
-                  int reponse;
-
-                  hts_log_print(
-                      opt, LOG_DEBUG, "build relative link %s with %s%s",
-                      url_nologin(opt, lien),
-                      adr_nologin(opt, relativeurladr()), relativeurlfil());
-                  if ((reponse =
-                       ident_url_relatif(lien, relativeurladr(), relativeurlfil(),
-                                         &afs.af)) < 0) {
-                    afs.af.adr[0] = '\0';      // erreur
-                    if (reponse == -2) {
-                      hts_log_print(opt, LOG_WARNING,
-                                    "Link %s not caught (protocol not "
-                                    "supported by this build)",
-                                    url_nologin(opt, lien));
-                    } else {
-                      hts_log_print(opt, LOG_DEBUG,
-                                    "ident_url_relatif failed for %s with %s%s",
-                                    url_nologin(opt, lien),
-                                    adr_nologin(opt, relativeurladr()),
-                                    relativeurlfil());
-                    }
-                  } else {
-                    hts_log_print(opt, LOG_DEBUG,
-                                  "built relative link %s with %s%s -> %s%s",
-                                  url_nologin(opt, lien),
-                                  adr_nologin(opt, relativeurladr()),
-                                  relativeurlfil(),
-                                  adr_nologin(opt, afs.af.adr), afs.af.fil);
-                  }
-                } else {
-                  hts_log_print(opt, LOG_DEBUG,
-                                "link %s not build, error detected before",
-                                url_nologin(opt, lien));
-                  afs.af.adr[0] = '\0';
-                }
-
-                // Le lien doit juste être réécrit, mais ne doit pas générer un lien
-                // exemple: <FORM ACTION="url_cgi">
-                if (lk.p_nocatch) {
-                  forbidden_url = 1;    // interdire récupération du lien
-                  hts_log_print(opt, LOG_DEBUG, "link forced external at %s%s",
-                                adr_nologin(opt, afs.af.adr), afs.af.fil);
-                }
-                // Tester si un lien doit être accepté ou refusé (wizard)
-                // forbidden_url=1 : lien refusé
-                // forbidden_url=0 : lien accepté
-                if (!link_role_is_base(lk.p_type)) { // check the filters
-                  if (!lk.p_nocatch) {
-                    if (afs.af.adr[0] != '\0') {
-                      hts_log_print(opt, LOG_DEBUG,
-                                    "wizard link test at %s%s..",
-                                    adr_nologin(opt, afs.af.adr), afs.af.fil);
-                      forbidden_url = hts_acceptlink(
-                          opt, ptr, afs.af.adr, afs.af.fil,
-                          ps->tag.intag_name ? ps->tag.intag_name : NULL,
-                          ps->tag.intag_name ? tag_attr_start : NULL,
-                          ps->script.css_file, &set_prio_to, &just_test_it);
-                      hts_log_print(opt, LOG_DEBUG,
-                                    "result for wizard link test: %d",
-                                    forbidden_url);
-                    }
-                  }
-                }
-                // calculer meme_adresse
-                {
-                  const char *const host =
-                      jump_identification_const(afs.af.adr);
-
-                  // two empty hosts are not the same address
-                  meme_adresse =
-                      *host != '\0' &&
-                      hts_streq_ci(host, jump_identification_const(urladr()));
-                }
-
-                // Début partie sauvegarde
-
-                // ici on forme le nom du fichier à sauver, et on patche l'URL
-                if (afs.af.adr[0] != '\0') {
-                  // savename(): simplifier les ../ et autres joyeusetés
-                  int r_sv = 0;
-
-                  // En cas de moved, adresse première
-                  lien_adrfil former;
-
-                  //
-                  afs.save[0] = '\0';
-                  former.adr[0] = '\0';
-                  former.fil[0] = '\0';
-                  //
-
-                  // nom du chemin à sauver si on doit le calculer
-                  // note: url_savename peut décider de tester le lien si il le trouve
-                  // suspect, et modifier alors adr et fil
-                  // dans ce cas on aura une référence directe au lieu des traditionnels
-                  // moved en cascade (impossible à reproduire à priori en local, lorsque des fichiers
-                  // gif sont impliqués par exemple)
-                  if (!link_role_is_base(lk.p_type)) {
-                    if (forbidden_url != 1) {
-                      char BIGSTK last_adr[HTS_URLMAXSIZE * 2];
-
-                      /* Calc */
-                      last_adr[0] = '\0';
-                      strcpybuff(last_adr, afs.af.adr); // ancienne adresse
-                      r_sv =
-                        url_savename(&afs, &former, heap(ptr)->adr, heap(ptr)->fil, opt,
-                                     sback, cache, hash, ptr,
-                                     numero_passe, NULL);
-                      if (strcmp(jump_identification_const(last_adr),
-                        jump_identification_const(afs.af.adr)) != 0) {       // a changé
-
-                        // 2e test si moved
-
-                        // Tester si un lien doit être accepté ou refusé (wizard)
-                        // forbidden_url=1 : lien refusé
-                        // forbidden_url=0 : lien accepté
-                        if ((ptr > 0) && !link_role_is_base(
-                                             lk.p_type)) { // check the filters
-                          if (!lk.p_nocatch) {
-                            if (afs.af.adr[0] != '\0') {
-                              hts_log_print(
-                                  opt, LOG_DEBUG,
-                                  "wizard moved link retest at %s%s..",
-                                  adr_nologin(opt, afs.af.adr), afs.af.fil);
-                              forbidden_url = hts_acceptlink(
-                                  opt, ptr, afs.af.adr, afs.af.fil,
-                                  ps->tag.intag_name ? ps->tag.intag_name
-                                                     : NULL,
-                                  ps->tag.intag_name ? tag_attr_start : NULL,
-                                  ps->script.css_file, &set_prio_to,
-                                  &just_test_it);
-                              hts_log_print(opt, LOG_DEBUG,
-                                            "result for wizard moved link retest: %d",
-                                            forbidden_url);
-                            }
-                          }
-                        }
-                        meme_adresse = 0;       // on a changé
-                      }
-                    } else {
-                      strcpybuff(afs.save, "");     // dummy
-                    }
-                  }
-                  /* A <base target> sends every link with no target to a
-                     frame we cannot tell. */
-                  if (ps->page.link_frame < 0)
-                    ps->page.link_frame =
-                        hts_fetch_has_base_target(r->adr)
-                            ? HTS_FETCH_DEST_UNKNOWN
-                            : hts_fetch_same_frame(heap(ptr)->fetch.dest);
-                  {
-                    const parse_fetch_flags flags = {
-                        .redirect_stub = HTTP_IS_REDIRECT(r->statuscode),
-                        .meta_refresh = lk.p_searchMETAURL,
-                        .opaque = ps->page.in_media != NULL ||
-                                  lk.p_type != HTS_LINK_PLAIN,
-                        .inscript = ps->script.inscript,
-                        .incss = ps->script.incss,
-                        .tagless_body = sf_tagless_body};
-
-                    parse_fetch_meta(opt, ptr, &link_fetch, &flags,
-                                     ps->page.link_frame, &ps->page.fetch_tag,
-                                     sf_tag, tag_attr_start, afs.af.fil);
-                  }
-                  /* Naming followed redirects whose hops it does not keep. */
-                  if (former.adr[0] != '\0')
-                    link_fetch.dest = HTS_FETCH_DEST_UNKNOWN;
-                  // resolve unresolved type
-                  if (r_sv != -1 && !link_role_is_base(lk.p_type) &&
-                      forbidden_url == 0 && IS_DELAYED_EXT(afs.save)) {
-                    time_t t;
-
-                    // pas d'erreur, on continue
-                    r_sv = hts_wait_delayed(str, &afs, heap(ptr)->adr,
-                                            heap(ptr)->fil, &former,
-                                            &forbidden_url, &link_fetch);
-
-                    /* User interaction, because hts_wait_delayed can be slow.. (3.43) */
-                    t = time(NULL);
-                    if (ps->page.user_interact_timestamp == 0 ||
-                        t - ps->page.user_interact_timestamp > 0) {
-                      ps->page.user_interact_timestamp = t;
-                      hts_mirror_process_user_interaction(str, stre);
-                    }
-                  }
-                  // record!
-                  if (r_sv != -1) {     // pas d'erreur, on continue
-                    /* log */
-                    if ((opt->debug > 1) && (opt->log != NULL)) {
-                      if (forbidden_url != 1) { // le lien va être chargé
-                        if (link_role_is_base(
-                                lk.p_type)) { // not a link to fetch
-                          hts_log_print(opt, LOG_DEBUG, "Code/Codebase: %s%s",
-                                        adr_nologin(opt, afs.af.adr),
-                                        afs.af.fil);
-                        } else if ((opt->getmode & HTS_GETMODE_HTML_FIRST) ==
-                                   0) {
-                          hts_log_print(opt, LOG_DEBUG, "Record: %s%s -> %s",
-                                        adr_nologin(opt, afs.af.adr),
-                                        afs.af.fil, afs.save);
-                        } else {
-                          if (!ishtml(opt, afs.af.fil))
-                            hts_log_print(opt, LOG_DEBUG,
-                                          "Record after: %s%s -> %s",
-                                          adr_nologin(opt, afs.af.adr),
-                                          afs.af.fil, afs.save);
-                          else
-                            hts_log_print(opt, LOG_DEBUG, "Record: %s%s -> %s",
-                                          adr_nologin(opt, afs.af.adr),
-                                          afs.af.fil, afs.save);
-                        }
-                      } else
-                        hts_log_print(opt, LOG_DEBUG, "External: %s%s",
-                                      adr_nologin(opt, afs.af.adr), afs.af.fil);
-                    }
-                    /* FIN log */
-
-                    // sf_span_fits in capture_rewrite() needs this size
-                    HTS_STATIC_ASSERT(sizeof(lien) == HTS_URLMAXSIZE * 2,
-                                      lien_size);
-                    eadr = capture_rewrite(
-                        ps, &lk, opt, r, ptr, parent_relative, module_base,
-                        &afs, forbidden_url, lien, eadr,
-                        &add_class_dots_to_patch, quote, noquote, p_flush,
-                        sf_tag, sf_tagless_body, tag_attr_start);
-
-                    if (!capture_record(opt, stre, hash, numero_passe, ptr,
-                                        codebase, &lk, &afs, &former,
-                                        &link_fetch, forbidden_url,
-                                        just_test_it, set_prio_to, import_done,
-                                        meme_adresse)) {
-                      TypedArrayFree(ps->sink.buf);
-                      return -1;
-                    }
-
-                  }             // if adr[0]!='\0' 
-
-                }               // if adr[0]!='\0'
-
-              }                 // if strlen(lien)>0
-
-            } // if ok==0
-
-            assertf(eadr - ps->html >= 0); // Should not go back
-            if (eadr > ps->html) {
-              hts_automate_increment(&saut, (int) (eadr - 1 - ps->html));
-            }
-
-            /* srcset candidate loop: skip the descriptor and comma, then
-               re-enter the capture for the next URL. Backward goto, not a loop:
-               the per-candidate body is this whole block. */
-            if (lk.srcset_p && ok == 0) {
-              const char *const endp = r->adr + r->size;
-              const char *q = ps->html;
-              /* whitespace ends an unquoted value, so its descriptor too */
-              const hts_boolean unquoted = !noquote && quote == '\0';
-
-              while (q < endp && *q != '\0' && *q != ',' && *q != quote &&
-                     *q != '<' && *q != '>' && (unsigned char) *q >= 32 &&
-                     !(unquoted && is_realspace(*q)))
-                q++;            // skip the descriptor
-              if (q < endp && *q == ',') {
-                q++;
-                while(q < endp && (is_realspace(*q) || *q == ','))
-                  q++;          // skip whitespace and empty candidates
-                if (q < endp && *q != '\0' && *q != ',' && *q != quote
-                    && *q != '<' && *q != '>' && (unsigned char) *q >= 32) {
-                  hts_automate_increment(
-                      &saut, (int) (q - ps->html)); // keep the automate in sync
-                  ok = 1;
-                  not_url = HTS_FALSE;
-                  goto srcset_next;
-                }
-              }
+          srcset_next:
+            switch (capture_link(
+                ps, &lk, opt, str, stre, r, sback, cache, hash, numero_passe,
+                ptr, parent_relative, module_base, codebase, HTS_BUF(catbuff),
+                &saut, ok, quote, quoteinscript, noquote, tag_attr_start,
+                sf_tag, sf_tagless_body, &link_fetch, &add_class_dots_to_patch,
+                &p_flush)) {
+            case CAPTURE_LINK_NEXT:
+              ok = 1;
+              goto srcset_next;
+            case CAPTURE_LINK_FAIL:
+              TypedArrayFree(ps->sink.buf);
+              return -1;
+            case CAPTURE_LINK_DONE:
+              break;
             }
 
             /* We skipped bytes and skip the " : reset state */
