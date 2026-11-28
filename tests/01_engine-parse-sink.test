@@ -11,9 +11,9 @@ out=$(httrack -#test=sink) || {
 }
 
 case "$out" in
-"sink self-test OK (6 cases)"*) ;;
+"sink self-test OK (7 cases)"*) ;;
 *)
-    echo "expected 'sink self-test OK (6 cases)', got: $out" >&2
+    echo "expected 'sink self-test OK (7 cases)', got: $out" >&2
     exit 1
     ;;
 esac
