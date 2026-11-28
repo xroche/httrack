@@ -1,0 +1,128 @@
+#!/bin/bash
+#
+# A browser ends a quoted attribute value, event handler or javascript: URL
+# only at its closing quote, and an unquoted one at a space or '>', so a '>'
+# inside leaves the tag open and the attributes after it are links. Each kNN
+# is loaded, each nNN not.
+
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_jshandler.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmp"
+root=$tmp/root
+mkdir -p "$root"
+
+# The source, with a '@' where the rewrite drops the leading '/' of a loaded
+# link. 05 is a script string after the write, which only -%P0 leaves alone.
+cat >"$tmp/page" <<'EOF'
+<html><body>
+<a onclick="document.write('<b>x</b>')" href=@k01.html>a</a>
+<a onclick="if(a>b)x()" href=@k02.html>b</a>
+<img onmouseover='x=">"' src=@k03.gif>
+<a onclick="document.write('<img src=\'@k04.gif\'>');x='<img src=/n05.gif>'" href=@k06.html>c</a>
+<a onclick=x() href=@k07.html>d</a>
+<a onclick=foo() href=@k08.html>e</a>
+<a onclick= "if(a>b)x()" href=@k09.html>f</a>
+<a onclick="a='>'" href=@k10.html>g</a><img onclick='document.write("<i>")' src=@k11.gif>
+<a onclick="x()" href=@k12.html>h</a>
+<a onclick="document.write('<img src=@k13.gif>')" href=@k14.html>i</a>
+<a onclick=x()>j</a><img src=@k15.gif>
+<a href="javascript:x()" title="t"><img src=@k16.gif></a>
+<img lowsrc="javascript:if(a>b)x()" src=@k19.gif>
+<img lowsrc=javascript:x() src=@k20.gif>
+<a title="a>b" href=@k21.html>m</a>
+<img alt='a>b' src=@k22.gif>
+<a data-x="a>b" href=@k23.html>n</a>
+<input type=image value="a>b" src=@k24.gif>
+<a title="<b>x</b>" href=@k25.html>o</a>
+<foo a="x>y" href=@k26.html>p</foo>
+<a title = 'a"b>c' href=@k27.html>q</a>
+<a href=@k28.html title=it's>r</a><img title="" src=@k29.gif>
+<a title="<!--" href=@k33.html>u</a>
+<img alt="<script>" src=@k34.gif>
+<a href=@k35.html title=it's>v</a><style>b { background: url(@k36.gif) }</style><a title='w'>w</a>
+<a title=a>b href=/n30.html>s</a>
+<a onclick="a='x">t</a><style>b{background:url(@k37.gif)}</style><b>rock' n roll</b>
+<a title='x="y'>t</a><style>b{background:url(@k38.gif)}</style><b>a" b</b>
+<a title="x href=@k39.html><img src=@k40.gif>" href=@k41.html>
+<a onclick=x()>j</a><style>b{background:url(@k42.gif)}</style>
+<p>end</p>
+</body></html>
+EOF
+# 39 and 40 are text to a browser, but master loads them too.
+
+# A quote left open on a sloppy page still ends at '>', as on master.
+cat >"$tmp/sloppy" <<'EOF'
+<html><body>
+<td style="width:10px><a href=@k51.html>a</a></td><td><a href=@k52.html>b</a></td><img src="@k53.gif">
+<a href="@k54.html" style="color:red>A</a> <img src="@k55.gif">
+<a href="#" onclick="return false;>Menu</a><ul><li><a href=@k56.html>a</a><li><a href=@k57.html>b</a></ul>
+<a onclick="go(1)>x</a><a href=@k58.html>b</a>
+<div class="a><style>@import url(@k59.css);</style>
+<title x="1>t</title><meta http-equiv=refresh content="0;url=@k60.html">
+<div class="a>text href=/n61.html more</div>
+<div class="a><!-- <a href=/n62.html> -->
+<td style="w><a href=@k63.html>a</a> "q </td>
+<td style="w><a href=@k64.html>a</a><img alt=" x" src=@k65.gif>
+</body></html>
+EOF
+
+for f in page sloppy; do
+    sed 's|@\([kn][0-9]\)|/\1|g' "$tmp/$f" >"$tmp/$f.src"
+    sed 's|@\([kn][0-9]\)|\1|g' "$tmp/$f" >"$tmp/$f.expect"
+done
+cp "$tmp/page.src" "$root/index.html"
+cp "$tmp/sloppy.src" "$root/k50.html"
+
+# Pages cut inside a handler or a value: no closing quote, nothing past the end.
+printf '<a href=/k17.html>t</a><a onclick="x>y' >"$root/k17.html"
+printf '<a href=/k18.html>t</a><a onclick=x' >"$root/k18.html"
+printf '<a href=/k31.html>t</a><a title="x>y href=/n32.html>' >"$root/k31.html"
+printf '<a href=/k44.html>t</a><a onclick=  ' >"$root/k44.html"
+links='<a href=@k17.html>t</a><a href=@k18.html>t</a><a href=@k31.html>t</a><a href=@k44.html>t</a><a href=@k50.html>t</a>'
+printf '%s\n' "${links//@//}" >>"$root/index.html"
+printf '%s\n' "${links//@/}" >>"$tmp/page.expect"
+
+want="k17.html k18.html k31.html k44.html k50.html $(grep -oh '@k[0-9]*\.[a-z]*' "$tmp/page" "$tmp/sloppy" | tr -d @ | tr '\n' ' ')"
+nots="n32.html $(grep -oh '/n[0-9]*\.[a-z]*' "$tmp/page" "$tmp/sloppy" | tr -d / | tr '\n' ' ')"
+for f in $want $nots; do
+    case $f in
+    *.gif) printf 'GIF89a' >"$root/$f" ;;
+    *.css) printf 'b{}\n' >"$root/$f" ;;
+    k17.html | k18.html | k31.html | k44.html | k50.html) ;;
+    *) printf '<html>t</html>\n' >"$root/$f" ;;
+    esac
+done
+
+local_server_start --root "$root" --log "$tmp/server.log"
+
+# check MODE [httrack args]: crawl, then assert each link and the page bytes
+check() {
+    local mode=$1 out site f bad=
+    shift
+    out=$tmp/out-$mode
+    local_crawl --log "$tmp/$mode.log" "$BASEURL/index.html" -O "$out" \
+        -r3 -c4 --robots=0 --quiet -%F '' "$@" || true
+    site=$out/127.0.0.1_$SRV_PORT
+    test -f "$site/index.html" || fail_dump "$mode: no index.html" "$tmp/$mode.log"
+    # name every wrong link, so a failure lists each pattern it breaks
+    for f in $want; do
+        test -f "$site/$f" || bad="$bad $f"
+    done
+    for f in $nots; do
+        test ! -e "$site/$f" || bad="$bad $f(captured)"
+    done
+    test -z "$bad" || fail "$mode: wrong:$bad"
+    for f in index.html:page k50.html:sloppy; do
+        cmp -s "$tmp/${f#*:}.expect" "$site/${f%:*}" || {
+            diff "$tmp/${f#*:}.expect" "$site/${f%:*}" | cut -c1-200 >&2 || true
+            fail "$mode: ${f%:*} changed beyond its rewritten links"
+        }
+    done
+}
+
+check P0 -%P0
+check default
