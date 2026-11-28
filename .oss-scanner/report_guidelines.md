@@ -1,4 +1,4 @@
-# How we would like reports written
+# Report guidelines
 
 ## Layout and length
 
@@ -8,10 +8,10 @@
 
 ## What every report states
 
-- The commit you scanned.
-- The attacker's position, in the terms of `threat_model.md`. For example, the attacker is a malicious web server, or a web page open in the user's browser while WebHTTrack runs.
-- A reproducer that we can run on this tree. The best reproducer is a small file tree to serve, the `httrack` command line that fetches it, and the sanitizer output. A `-#test=NAME` self-test call or a fuzz harness input is also good.
-- What the attacker gains, such as a write outside the mirror directory, code execution, or only a crash. Say if you did not show more than a crash.
+- Name the commit you scanned.
+- State the attacker's position, in the terms of `threat_model.md`. For example, the attacker is a malicious web server, or a web page open in the user's browser while WebHTTrack runs.
+- Give a reproducer that we can run on this tree. The best reproducer is a small file tree to serve, the `httrack` command line that fetches it, and the sanitizer output. A `-#test=NAME` self-test call or a fuzz harness input is also good.
+- Say what the attacker gains, such as a write outside the mirror folder, code execution, or only a crash. Say so if you did not show more than a crash.
 
 ## Style
 

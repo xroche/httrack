@@ -1,11 +1,11 @@
 # Image for Anthropic's OSS Scanner (see threat_model.md next to this file).
-# Two builds of /src, both with ASan and UBSan:
+# Builds /src twice, both with ASan and UBSan:
 #   /src/build/asan  httrack, webhttrack, proxytrack, libhttrack (gcc); runs make check
 #   /src/build/fuzz  the libFuzzer harnesses in fuzz/ (clang)
 FROM docker.io/library/debian:trixie
 
 ENV DEBIAN_FRONTEND=noninteractive \
-    ASAN_OPTIONS=detect_leaks=1:abort_on_error=1:symbolize=1 \
+    ASAN_OPTIONS=detect_leaks=1:abort_on_error=1 \
     UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 \
     ASAN_SYMBOLIZER_PATH=/usr/lib/llvm-19/bin/llvm-symbolizer
 
@@ -14,8 +14,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       clang-19 llvm-19 libclang-rt-19-dev libfuzzer-19-dev \
       autoconf automake libtool autoconf-archive pkg-config \
       zlib1g-dev libssl-dev libbrotli-dev libzstd-dev \
-      python3 openssl gdb strace procps \
-    && rm -rf /var/lib/apt/lists/*
+      python3 gdb strace procps \
+    && rm -rf /var/lib/apt/lists/* \
+    && test -x "$ASAN_SYMBOLIZER_PATH"
 
 COPY . /src
 WORKDIR /src
@@ -23,13 +24,14 @@ WORKDIR /src
 # The build context may come without the coucal submodule.
 RUN if [ ! -f src/coucal/coucal.c ]; then \
       git submodule update --init src/coucal \
-      || { rm -rf src/coucal && git clone https://github.com/xroche/coucal.git src/coucal; }; \
+      || { echo "WARNING: no submodule pin, so coucal comes from its master" \
+           && rm -rf src/coucal && git clone https://github.com/xroche/coucal.git src/coucal; }; \
     fi \
     && test -f src/coucal/coucal.c
 
 RUN ./bootstrap
 
-# gcc, because clang leaves its sanitizer runtime out of libhttrack.so.
+# Use gcc, because clang leaves its sanitizer runtime out of libhttrack.so.
 RUN mkdir -p build/asan && cd build/asan \
     && /src/configure CC=gcc \
       CFLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all -g -O1 -fno-omit-frame-pointer" \
@@ -45,12 +47,11 @@ RUN mkdir -p build/fuzz && cd build/fuzz \
     && make -j"$(nproc)" \
     && ls fuzz/fuzz-*
 
-# Smoke tests only: a red test must not fail the image, so the scanner still gets it.
+# A red test must not fail the image, so the scanner still gets one.
 RUN cd build/asan \
     && (timeout 40m make check -j16 >check.log 2>&1 \
-        || echo "WARNING: make check failed or timed out, see /src/build/asan/check.log and tests/*.log") \
-    && (grep -E '^(FAIL|ERROR):|^# ' check.log || true) \
-    && for t in $(sed -n 's/^\(FAIL\|ERROR\): //p' check.log); do grep -m5 -B2 -A4 -E "Sanitizer|CHECK failed|HINT" "tests/${t%.test}.log" || true; done
+        || echo "WARNING: make check failed or timed out, see /src/build/asan/check.log") \
+    && (grep -E '^(FAIL|ERROR):|^# ' check.log || true)
 RUN (timeout 15m bash fuzz/run-fuzzers.sh build/fuzz/fuzz check >build/fuzz/replay.log 2>&1 \
         || echo "WARNING: corpus replay failed, see /src/build/fuzz/replay.log") \
     && tail -n 5 build/fuzz/replay.log

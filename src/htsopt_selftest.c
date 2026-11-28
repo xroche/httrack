@@ -1445,7 +1445,7 @@ static int st_lockrule_undeletable(httrackp *opt, const char *base,
     err = 1;
   }
 #ifdef __linux__
-  /* The euid change cleared the dumpable flag, which LeakSanitizer needs. */
+  /* The euid switch clears the dumpable flag, which LeakSanitizer needs. */
   if (self == 0) {
     (void) prctl(PR_SET_DUMPABLE, 1, 0, 0, 0);
   }
