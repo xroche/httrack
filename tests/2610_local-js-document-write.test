@@ -103,6 +103,20 @@ are plain script strings, which only -%P follows for 65 to 67 -->
 <script>document.write("\"<b>\"");src='/w67.gif';</script>
 <!-- 68 and 69 loaded: the href after the handler is a link of the tag -->
 <a onclick="document.write('<img src=/w68.gif>')" href=/w69.html>k</a>
+<!-- A written value ends with its string: 70 and 81 are script strings, and
+71 and 76 too, which only -%P follows, and 82 is left to later code. An unquoted value ends at a space, so
+72 to 75 and 77 to 80 are loaded with nothing else in their name. -->
+<script>document.write("<a href=");var q="<img src=/w70.gif>";</script>
+<script>document.write("<img src=");var q="/w71.gif";</script>
+<script>document.write("<img src=/w72.gif width=1 height=1>");</script>
+<script>document.write("<a href=/w73.html target=_blank>x</a>");</script>
+<script>document.write("<img src=/w74.gif alt=x>");</script>
+<script>document.write("<img src=/w75.gif onclick='a()'>");</script>
+<script>document.write('<img src="/w82.gif');document.write('">');</script>
+<script>var u="/w76.gif";document.write('<img src="');document.write(u);document.write('">');</script>
+<a onclick="document.write('<img src=')" href=/w77.html>k</a>
+<script>document.write("<img alt='q' src=/w78.gif title=\"t\"><img src='/w79.gif' alt=y>");</script>
+<script>document.write("<a href=/w80.html>");var z="<img src=/w81.gif>";</script>
 <p>end</p>
 </body>
 </html>
@@ -125,7 +139,7 @@ printf 'document.write("<img src=\x27/w57.gif\x27>\\\n<b>");\n' >>"$root/w55.js"
 
 all="01 02 03 04 05 06 07 08 09 10 11 12 14 15 17 18 19 20 21 24 25 26 27 28 29
 30 31 33 34 36 37 38 42 43 44 52 53 54 56 57 60 61 62 63 64 65 66 67 68
-69 99"
+69 70 71 72 73 74 75 76 77 78 79 80 81 82 99"
 for n in $all 22 23 35 48 49 51 55; do
     printf 'GIF89a' >"$root/w$n.gif"
     printf '<html>t</html>\n' >"$root/w$n.html"
@@ -136,17 +150,19 @@ done
 writes="w01.gif w02.gif w03.gif w04.gif w05.gif w06.gif w07.gif w08.gif w09.gif
 w10.gif w11.html w15.js w20.gif w23.gif w24.gif w25.gif w29.html w30.gif
 w31.gif w33.html w34.gif w35.js w36.gif w52.gif w53.gif w54.gif w55.gif
-w56.gif w57.gif w68.gif w69.html"
+w56.gif w57.gif w68.gif w69.html w72.gif w73.html w74.gif w75.gif
+w77.html w78.gif w79.gif w80.html"
 # shellcheck disable=SC2034 # read by name in check
 want_P0="$writes w38.html w44.html"
 # shellcheck disable=SC2034
 never_P0="w17.gif w18.gif w21.gif w22.gif w37.gif w42.gif w43.gif w48.gif
 w51.gif w26.gif w99.gif w60.gif w61.gif w62.gif w64.gif w65.gif w66.gif
-w67.gif"
+w67.gif w70.gif w71.gif w76.gif w81.gif w82.gif"
 # shellcheck disable=SC2034
-want_default="$writes w38.html w44.html w26.gif w99.gif w65.gif w66.gif w67.gif"
+want_default="$writes w38.html w44.html w26.gif w99.gif w65.gif w66.gif w67.gif
+w71.gif w76.gif"
 # shellcheck disable=SC2034
-never_default="w17.gif w60.gif w61.gif w62.gif w64.gif"
+never_default="w17.gif w60.gif w61.gif w62.gif w64.gif w70.gif w81.gif w82.gif"
 
 local_server_start --root "$root" --log "$tmp/server.log"
 

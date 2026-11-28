@@ -1617,6 +1617,7 @@ typedef struct parse_state {
     int inscript_tag;        /* inside an event handler such as onLoad="..." */
     char inscript_tag_lastc; /* the quote that ends that handler */
     int inscriptgen;         /* inside generated HTML, as in obj.write("...") */
+    const char *scriptgen_end; /* the closing quote of that string */
     hts_boolean css_file;    /* the whole document is a stylesheet */
   } script;
 
@@ -2155,25 +2156,18 @@ static void detect_media(parse_state *const ps, parse_link *const lk,
   }
 }
 
-/* Is the automaton inside a quoted script string? */
-static hts_boolean inscript_in_string(const INSCRIPT pos) {
-  return pos == INSCRIPT_INQUOTE || pos == INSCRIPT_INQUOTE2 ||
-         pos == INSCRIPT_ANTISLASH_IN_QUOTE ||
-         pos == INSCRIPT_ANTISLASH_IN_QUOTE2;
-}
-
 /* In a script: track an obj.write("...") string, whose content is parsed
-   as HTML (inscriptgen). On entry, jumps ps->html to the opening quote and
-   sets the automaton inside the string; the mode ends when the automaton
-   leaves it. Never touches lk. */
+   as HTML (inscriptgen). On entry, jumps ps->html to the opening quote,
+   sets the automaton inside the string and records its closing quote; the
+   mode ends when the cursor reaches that quote. Never touches lk. */
 static PARSE_INLINE void detect_js_write(parse_state *const ps,
                                          httrackp *const opt,
                                          const htsblk *const r) {
   const char *const end = r->adr + r->size;
 
   if (ps->script.inscriptgen) {
-    // the automaton has just read the string's closing quote
-    if (!inscript_in_string(ps->script.inscript_state_pos)) {
+    // the cursor has reached the string's closing quote
+    if (ps->html >= ps->script.scriptgen_end) {
       ps->script.inscriptgen = 0;
     }
   } else if (ps->script.inscript_state_pos == INSCRIPT_START) {
@@ -2212,6 +2206,7 @@ static PARSE_INLINE void detect_js_write(parse_state *const ps,
     }
     if (a >= end || *a != q)
       return;
+    const char *const close = a;
     a++;
     while (is_realspace(*a))
       a++;
@@ -2222,6 +2217,7 @@ static PARSE_INLINE void detect_js_write(parse_state *const ps,
     // HTML generated inside javascript inside HTML: parse it with the
     // standard rules, the automaton inside the string it skipped into.
     ps->script.inscriptgen = 1;
+    ps->script.scriptgen_end = close;
     ps->script.inscript_state_pos =
         q == '"' ? INSCRIPT_INQUOTE2 : INSCRIPT_INQUOTE;
     ps->html = b - 1; // the automaton reads b next
@@ -3044,6 +3040,7 @@ capture_link(parse_state *const ps, const parse_link *const lk,
              int *const add_class_dots_to_patch, const char **const p_flush) {
   const char *eadr = NULL; /* end of the URL */
   hts_boolean not_url = HTS_FALSE;
+  hts_boolean gen_cut = HTS_FALSE; /* stopped at a write string's end */
 
   /* srcset: skip leading whitespace/commas before each candidate;
      the skipped bytes flush verbatim below */
@@ -3072,7 +3069,13 @@ capture_link(parse_state *const ps, const parse_link *const lk,
       if (eadr - ps->html > HTS_URLMAXSIZE)
         ok = -1; // ne pas traiter ce lien
 
-      if (ok > 0) {
+      /* A written value ends with its string. A quote the string never
+         closes is a value built by later code: leave it as is. */
+      if (ok > 0 && ps->script.inscriptgen &&
+          eadr >= ps->script.scriptgen_end) {
+        ok = quote != '\0' ? -1 : 0;
+        gen_cut = HTS_TRUE;
+      } else if (ok > 0) {
         if (quote == '\n' && *eadr == '\r' && ps->page.in_media != NULL &&
             strcmp(ps->page.in_media, "LNK") == 0)
           ok = 0;                   // a playlist line may end in CR
@@ -3081,7 +3084,7 @@ capture_link(parse_state *const ps, const parse_link *const lk,
                (!quoteinscript || *(eadr - 1) == '\\')) // end quote
               ||
               (noquote && (*eadr == '\"' || *eadr == '\'')) // end at any quote
-              || (!noquote && quote == '\0' &&
+              || ((!noquote || ps->script.inscriptgen) && quote == '\0' &&
                   is_realspace(*eadr)) // unquoted href
               || lk->srcset_p          // whitespace ends a srcset candidate URL
               ) // si pas d'attente de quote spéciale ou si quote
@@ -3140,7 +3143,7 @@ capture_link(parse_state *const ps, const parse_link *const lk,
         // 1=link empty with delim (end_adr-start_adr)
         if (eadr - ps->html == 1) {
           // "#" would land before an unflushed base's name
-          if (quote && !link_role_is_base(lk->p_type)) {
+          if (quote && !gen_cut && !link_role_is_base(lk->p_type)) {
             HT_ADD("#"); // We add this for a <href="">
           }
         }
